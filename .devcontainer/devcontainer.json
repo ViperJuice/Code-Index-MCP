@@ -1,8 +1,25 @@
 {
-  "name": "MCP Server Dev",
-  "image": "mcr.microsoft.com/devcontainers/python:0-3.12",
-  "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
-  },
-  "postCreateCommand": "pip install -e ."
-}
+	"name": "MCP Dev Container with UV",
+	"build": {
+	  "dockerfile": "Dockerfile"
+	},
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"terminal.integrated.shell.linux": "/bin/bash"
+			},
+			"extensions": [
+				"ms-python.python",
+				"ms-azuretools.vscode-docker"
+			]
+		}
+	},
+	"postCreateCommand": "./.devcontainer/post_create.sh",
+	"remoteUser": "vscode",
+	"features": {
+	  "ghcr.io/devcontainers/features/node:1": {
+		"version": "18"
+	  }
+	}
+  }
+  

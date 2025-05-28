@@ -54,9 +54,22 @@ class TreeSitterWrapper:
         return f"({node.type} {' '.join(parts)})"
 
     # ------------------------------------------------------------------
+    def parse(self, content: bytes):
+        """Parse ``content`` and return the root :class:`~tree_sitter.Node`."""
+
+        tree = self._parser.parse(content)
+        return tree.root_node
+
+    # ------------------------------------------------------------------
     def parse_file(self, path: Path) -> str:
         """Parse the given file and return the AST root as an S-expression."""
 
         content = path.read_bytes()
-        tree = self._parser.parse(content)
-        return self._sexp(tree.root_node)
+        root = self.parse(content)
+        return self._sexp(root)
+
+    # Convenience -------------------------------------------------------
+    def parse_path(self, path: Path):
+        """Parse ``path`` and return the root node."""
+
+        return self.parse(path.read_bytes())
