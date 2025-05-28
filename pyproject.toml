@@ -1,0 +1,13 @@
+[project]
+name = "mcp_server"
+version = "0.0.0"
+description = "Local-first MCP server"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
+  "watchdog>=4.0",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
