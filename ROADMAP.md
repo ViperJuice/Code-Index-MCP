@@ -3,40 +3,48 @@
 ## Overview
 This roadmap outlines the development phases for completing the Code-Index-MCP local-first code indexing system. The phases align with the comprehensive architecture defined in the architecture files, including performance requirements, security model, and data model specifications.
 
-## Current Status Summary
-- ✅ Core architecture established (3 levels + operational specs)
-- ✅ Plugin system foundation in place
-- ⚠️ Multiple merge conflicts need resolution
-- ❌ Several critical components need implementation
-- ❌ Minimal test coverage
-- ❌ Operational components not implemented
+## Current Status Summary (~20% Complete)
+- ✅ Core architecture established (dual architecture pattern: target + actual)
+- ✅ Basic FastAPI gateway with 2 endpoints working
+- ✅ Python plugin fully functional with Tree-sitter + Jedi
+- ✅ Basic dispatcher routing (no caching/optimization)
+- ⚠️ File watcher exists but doesn't trigger indexing (TODO in code)
+- ❌ 5 language plugins are empty stubs (C, C++, JS, Dart, HTML/CSS)
+- ❌ No persistence layer (SQLite/FTS5 planned)
+- ❌ No operational components (cache, metrics, security)
+- ❌ No tests beyond manual test scripts
 
 ## Architecture Alignment
-This roadmap follows the target architecture:
+This roadmap follows the dual architecture pattern discovered during documentation cleanup:
+- **Target Architecture**: Full enterprise system (level1-3 + level4 PlantUML)
+- **Actual Architecture**: ~20% implemented (*_actual.dsl and *_actual.puml files)
 - **Level 1**: System context with performance SLAs
-- **Level 2**: 14 containers including operational components
-- **Level 3**: Detailed component architecture
-- **Supporting Docs**: Performance, Security, Data Model
+- **Level 2**: 14 containers (only 3-4 actually implemented)
+- **Level 3**: Detailed components (most are stubs or missing)
+- **Supporting Docs**: Performance, Security, Data Model (specs only, not implemented)
 
 ---
 
-## Phase 1: Foundation Stabilization 🚧 IN PROGRESS
+## Phase 1: Foundation Stabilization 🚧 ACTIVE
 
-### 1.1 Resolve Merge Conflicts ⚠️ URGENT
-**Status:** Blocked
-- [ ] Resolve `treesitter_wrapper.py` merge conflict
-- [ ] Resolve `python_plugin/plugin.py` merge conflict
-- [ ] Choose implementation approach (recommend "theirs" for enhanced features)
+### 1.1 Complete File Watcher Integration ⚠️ HIGHEST PRIORITY
+**Status:** Partially Implemented
+- [x] Watchdog integration exists
+- [x] File change detection works
+- [ ] Connect to indexing trigger (TODO at watcher.py:14)
+- [ ] Add debouncing for rapid changes
+- [ ] Handle file deletions/moves
 
-### 1.2 Core Infrastructure ⚠️ PARTIAL
-**Status:** In Progress
-- [x] Gateway API endpoints (`/symbol`, `/search`)
-- [x] Dispatcher routing logic
-- [x] Plugin base interface
+### 1.2 Core Infrastructure Enhancement ⚠️ PARTIAL
+**Status:** Basic Implementation Exists
+- [x] Gateway API endpoints (`/symbol`, `/search`) - Note: dispatcher requires manual init
+- [x] Dispatcher routing logic (basic, no caching)
+- [x] Plugin base interface (IPlugin abstract base)
+- [ ] Add dispatcher auto-initialization on startup
 - [ ] Error handling and logging framework
-- [ ] Configuration management system (per architecture: config container)
-- [ ] Authentication/Authorization (per security model)
-- [ ] Request validation (per security model)
+- [ ] Configuration management system
+- [ ] Add `/status` and `/plugins` endpoints
+- [ ] Request validation beyond Pydantic
 
 ### 1.3 Testing Framework ❌ NOT STARTED
 **Status:** Not Started
@@ -49,33 +57,32 @@ This roadmap follows the target architecture:
 
 ## Phase 2: Core Components Completion
 
-### 2.1 Plugin System Enhancement ❌ NOT STARTED
-**Status:** Not Started (Required by level3 architecture)
-- [ ] Implement `plugin_registry.py` for dynamic plugin registration
-- [ ] Implement `plugin_manager.py` for lifecycle management
-- [ ] Implement `plugin_loader.py` for dynamic loading
-- [ ] Add plugin discovery mechanism
-- [ ] Create plugin configuration system
-- [ ] Add plugin isolation (per security model)
+### 2.1 Complete Stub Language Plugins ❌ CRITICAL
+**Status:** Only Python plugin works
+- [x] Python plugin with Tree-sitter + Jedi
+- [ ] C plugin - implement Tree-sitter parsing
+- [ ] C++ plugin - implement Tree-sitter parsing
+- [ ] JavaScript plugin - implement Tree-sitter parsing
+- [ ] Dart plugin - implement Tree-sitter parsing  
+- [ ] HTML/CSS plugin - implement Tree-sitter parsing
+- [ ] Create plugin development guide using Python as reference
 
-### 2.2 Language Plugin Completion ⚠️ PARTIAL
-**Status:** Partially Complete
-- [x] Python plugin (needs conflict resolution)
-- [ ] Verify C plugin implementation
-- [ ] Verify C++ plugin implementation
-- [ ] Verify JavaScript plugin implementation
-- [ ] Verify Dart plugin implementation
-- [ ] Verify HTML/CSS plugin implementation
-- [ ] Add comprehensive tests for each plugin
+### 2.2 Plugin System Enhancement ❌ NOT STARTED
+**Status:** Basic system only
+- [x] Direct plugin import and registration
+- [ ] Dynamic plugin loading
+- [ ] Plugin configuration system
+- [ ] Plugin isolation (planned: gRPC, current: direct imports)
+- [ ] Plugin lifecycle management
+- [ ] Plugin discovery mechanism
 
-### 2.3 File System Watcher ❌ NOT STARTED
-**Status:** Skeleton Only (Required by level2 architecture)
-- [ ] Implement file change detection logic
-- [ ] Add incremental indexing support
-- [ ] Handle file deletions and moves
-- [ ] Add debouncing for rapid changes
-- [ ] Integrate with indexing pipeline
-- [ ] Connect to task queue for async processing
+### 2.3 Persistence Layer Implementation ❌ CRITICAL
+**Status:** No persistence (memory-only)
+- [ ] Implement SQLite with FTS5 (schema in data_model.md)
+- [ ] Convert FuzzyIndexer to use persistent storage
+- [ ] Add database migrations
+- [ ] Implement index versioning
+- [ ] Add backup/restore functionality
 
 ---
 
@@ -204,40 +211,154 @@ This roadmap follows the target architecture:
 
 ---
 
-## Next Steps (Sprint 1 - Next 2 Weeks)
+## Next Steps - Phase 1 Completion Plan
 
-### Week 1 Priority Tasks
-1. **Resolve merge conflicts** (Day 1-2)
-   - [ ] Fix treesitter_wrapper.py conflict
-   - [ ] Fix python_plugin/plugin.py conflict
-   - [ ] Test resolution thoroughly
+### IMMEDIATE PRIORITIES (Parallel Execution Recommended)
 
-2. **Core Infrastructure** (Day 3-5)
-   - [ ] Implement error handling framework
-   - [ ] Add basic logging system
-   - [ ] Create configuration loader
+#### Task Group 1: File Watcher Completion
+**Files to modify:**
+- `mcp_server/watcher.py`: 
+  - Complete TODO at line 14
+  - Add method `trigger_reindex(self, file_path)` 
+  - Connect to dispatcher for incremental indexing
+- `mcp_server/dispatcher.py`:
+  - Add method `index_file(self, file_path)` for single file indexing
+  - Add caching to avoid re-indexing unchanged files
 
-### Week 2 Priority Tasks
-3. **Testing Framework** (Day 1-2)
-   - [ ] Set up pytest infrastructure
-   - [ ] Add tests for existing components
-   - [ ] Set up GitHub Actions CI
+**Implementation steps:**
+```python
+# In watcher.py on_any_event():
+if event.src_path.endswith(('.py', '.js', '.c', '.cpp', '.dart', '.html', '.css')):
+    self.trigger_reindex(event.src_path)
 
-4. **File Watcher** (Day 3-4)
-   - [ ] Basic file monitoring implementation
-   - [ ] Integration with existing indexer
+def trigger_reindex(self, file_path):
+    # Get dispatcher instance (needs to be passed in __init__)
+    self.dispatcher.index_file(file_path)
+```
 
-5. **Documentation** (Day 5)
-   - [ ] Update setup instructions
-   - [ ] Document resolved conflicts
-   - [ ] Create developer guide
+#### Task Group 2: Dispatcher Auto-Initialization  
+**Files to modify:**
+- `mcp_server/gateway.py`:
+  - Add startup event handler
+  - Initialize dispatcher with all plugins
+  - Remove need for manual initialization
 
-### Sprint Review Checklist
-- [ ] All merge conflicts resolved
-- [ ] Tests passing on CI
-- [ ] File watcher basically functional
-- [ ] Documentation updated
-- [ ] Ready for Sprint 2 planning
+**Implementation:**
+```python
+@app.on_event("startup")
+async def startup_event():
+    from mcp_server.dispatcher import Dispatcher
+    from mcp_server.plugins.python_plugin.plugin import PythonPlugin
+    # Import other plugins when implemented
+    
+    app.state.dispatcher = Dispatcher()
+    app.state.dispatcher.registerPlugin(PythonPlugin())
+    # Register other plugins
+```
+
+#### Task Group 3: Basic Persistence
+**New files to create:**
+- `mcp_server/storage/__init__.py`
+- `mcp_server/storage/sqlite_store.py`
+- `mcp_server/storage/migrations/001_initial_schema.sql`
+
+**Files to modify:**
+- `mcp_server/utils/fuzzy_indexer.py`:
+  - Add SQLite backend option
+  - Implement `persist()` and `load()` methods
+  - Use FTS5 for search
+
+**Implementation outline:**
+```python
+# sqlite_store.py
+class SQLiteStore:
+    def __init__(self, db_path="code_index.db"):
+        self.conn = sqlite3.connect(db_path)
+        self._init_schema()
+    
+    def _init_schema(self):
+        # Create tables from data_model.md
+        # files, symbols, references tables
+        # FTS5 virtual table for search
+```
+
+#### Task Group 4: Missing Endpoints
+**Files to modify:**
+- `mcp_server/gateway.py`:
+  - Add `/status` endpoint
+  - Add `/plugins` endpoint
+  - Add `/reindex` endpoint for manual triggers
+
+**Implementation:**
+```python
+@app.get("/status")
+def get_status():
+    return {
+        "status": "operational",
+        "plugins": len(dispatcher.plugins) if dispatcher else 0,
+        "indexed_files": dispatcher.get_stats() if dispatcher else {}
+    }
+
+@app.get("/plugins")
+def get_plugins():
+    if not dispatcher:
+        return {"error": "Dispatcher not initialized"}
+    return [
+        {"name": p.__class__.__name__, "language": p.lang}
+        for p in dispatcher.plugins
+    ]
+```
+
+#### Task Group 5: Error Handling & Logging
+**New files:**
+- `mcp_server/core/__init__.py`
+- `mcp_server/core/logging.py`
+- `mcp_server/core/errors.py`
+
+**Implementation:**
+```python
+# logging.py
+import logging
+import sys
+
+def setup_logging():
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler('mcp_server.log'),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+```
+
+### TESTING REQUIREMENTS
+**New test files needed:**
+- `tests/test_watcher.py` - Test file monitoring
+- `tests/test_gateway.py` - Test API endpoints
+- `tests/test_sqlite_store.py` - Test persistence
+- `tests/test_dispatcher.py` - Test routing logic
+
+### SUCCESS CRITERIA
+- [ ] File changes trigger automatic re-indexing
+- [ ] Server starts with dispatcher pre-initialized
+- [ ] Fuzzy index persists across restarts
+- [ ] All endpoints return proper responses
+- [ ] Errors are logged to file and console
+- [ ] Basic test suite passes
+
+### PARALLEL EXECUTION STRATEGY
+Use multiple agents/developers to work on task groups simultaneously:
+- Agent 1: File Watcher (Task Group 1)
+- Agent 2: Gateway improvements (Task Groups 2 & 4)
+- Agent 3: Persistence layer (Task Group 3)
+- Agent 4: Core infrastructure (Task Group 5)
+- Agent 5: Testing framework and tests
+
+### ESTIMATED TIMELINE
+- All task groups can be completed in parallel
+- Estimated completion: 2-3 days with parallel execution
+- Sequential execution would take 1-2 weeks
 
 ## Success Metrics
 
@@ -259,24 +380,29 @@ This roadmap follows the target architecture:
 - [ ] Monitoring dashboard operational
 - [ ] Security audit passed
 
-## Risk Factors
+## Risk Factors (Updated)
 
-1. **Technical Debt**: Merge conflicts indicate divergent development
-2. **Test Coverage**: Minimal testing increases bug risk
-3. **Performance**: No benchmarks or optimization
-4. **Scalability**: Storage design not finalized
+1. **Implementation Gap**: Only ~20% implemented vs architecture design
+2. **No Persistence**: All indexing lost on restart (memory-only)
+3. **Manual Initialization**: Dispatcher must be manually initialized
+4. **Stub Plugins**: 5 of 6 language plugins are empty implementations
+5. **File Watcher Incomplete**: Exists but doesn't trigger indexing
+6. **No Tests**: Only manual test scripts, no automated testing
+7. **No Error Handling**: Errors silently ignored in many places
+8. **Documentation Mismatch**: Some docs described features that don't exist (now cleaned up)
 
-## Timeline Estimate
+## Timeline Estimate (Revised based on actual state)
 
-- Phase 1: 1-2 weeks (urgent) - Foundation
-- Phase 2: 3-4 weeks - Core Components
-- Phase 3: 2-3 weeks - Persistence
-- Phase 4: 3-4 weeks - Operational Components
-- Phase 5: 4-5 weeks - Advanced Features
-- Phase 6: 3-4 weeks - Production Readiness
-- Phase 7: Ongoing - Ecosystem
+- Phase 1: 1 week - Complete foundation (file watcher, persistence, auto-init)
+- Phase 2: 4-6 weeks - Implement all language plugins + enhance system
+- Phase 3: 2-3 weeks - Full persistence layer with migrations
+- Phase 4: 4-5 weeks - Operational components (cache, metrics, security)
+- Phase 5: 3-4 weeks - Advanced features (semantic search, cloud sync)
+- Phase 6: 3-4 weeks - Production readiness (testing, docs, optimization)
+- Phase 7: Ongoing - Ecosystem and extensions
 
-**Total estimated time to production-ready: 16-22 weeks**
+**Total estimated time to production-ready: 17-23 weeks**
+**Time to usable MVP (Phase 1-2): 5-7 weeks**
 
 ## Development Process
 
@@ -296,8 +422,10 @@ This roadmap follows the target architecture:
 
 ---
 
-*Last Updated: Sprint 0 - Pre-Development*
-*Next Review: End of Sprint 1*
+*Last Updated: 2025-01-29 - Post Documentation Cleanup*
+*Current Phase: Phase 1 - Foundation Stabilization*
+*Implementation Status: ~20% Complete*
+*Next Review: After Phase 1 Completion*
 *Status Key: ✅ Complete | ⚠️ Partial/In Progress | ❌ Not Started | 🚧 Active Development*
 
 ## Appendix: Architecture Files

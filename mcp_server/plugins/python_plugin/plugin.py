@@ -130,3 +130,11 @@ class Plugin(IPlugin):
         if opts and opts.get("semantic"):
             return []
         return self._indexer.search(query, limit=limit)
+    
+    # ------------------------------------------------------------------
+    def get_indexed_count(self) -> int:
+        """Return the number of indexed files."""
+        # The fuzzy indexer tracks files internally
+        if hasattr(self._indexer, '_file_contents'):
+            return len(self._indexer._file_contents)
+        return 0

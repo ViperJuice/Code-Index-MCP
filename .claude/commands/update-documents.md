@@ -137,6 +137,7 @@ content_corrections: [existing docs needing architecture alignment]
 - **Align** planned features with architecture specifications
 - **Focus** next steps on current incomplete phases only
 - **Cross-reference** with any implementation gap analysis
+- **Update Next-steps section** the roadmap should always end with a next steps section the comprehensively plans the next steps to accomplish in order to complet the last lowest number unfinished phase. It should include a comprehensive plan, including files, classes, methods, .. that need to be modified, added or deleted to complete the phase. It should emphasise using Parallel agentic tools to accomplish this as quickly as possible.
 
 ### UPDATE_MASTER_AGENT_CONFIG
 **Find** and update primary agent configuration:
