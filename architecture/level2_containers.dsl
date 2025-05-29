@@ -1,4 +1,10 @@
 workspace "MCP Server – Level 2" {
+  description "Container diagram showing the internal architecture of the MCP Server"
+  
+  properties {
+    "structurizr.dslEditor" "false"
+  }
+
   model {
     mcp = softwareSystem "MCP Server" {
       # Core containers
@@ -120,20 +126,20 @@ workspace "MCP Server – Level 2" {
       autolayout lr
       description "Container diagram showing MCP Server internal architecture"
     }
-    
-    styles {
-      element "Database" {
-        shape Cylinder
-      }
-      element "Cache" {
-        shape Component
-      }
-      element "Queue" {
-        shape Pipe
-      }
-      element "Web API" {
-        shape WebBrowser
-      }
+  }
+  
+  styles {
+    element "Database" {
+      shape Cylinder
+    }
+    element "Cache" {
+      shape Component
+    }
+    element "Queue" {
+      shape Pipe
+    }
+    element "Web API" {
+      shape WebBrowser
     }
   }
 }

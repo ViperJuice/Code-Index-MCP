@@ -1,0 +1,197 @@
+# Database Rules for Code-Index-MCP
+
+## Overview
+This file defines database design patterns, query optimization strategies, and data management rules for the Code-Index-MCP project.
+
+## Storage Architecture
+
+### Local-First Design
+- **Primary Storage**: SQLite with FTS5 for full-text search
+- **Index Format**: Structured JSON with normalized tables
+- **File-Based**: Each project has its own database file
+- **Portability**: Database files can be copied/moved
+
+### Schema Design
+```sql
+-- Core tables structure
+CREATE TABLE files (
+    id INTEGER PRIMARY KEY,
+    path TEXT UNIQUE NOT NULL,
+    content TEXT,
+    language TEXT,
+    last_modified INTEGER,
+    hash TEXT
+);
+
+CREATE TABLE symbols (
+    id INTEGER PRIMARY KEY,
+    file_id INTEGER REFERENCES files(id),
+    name TEXT NOT NULL,
+    type TEXT, -- function, class, variable, etc.
+    line_start INTEGER,
+    line_end INTEGER,
+    column_start INTEGER,
+    column_end INTEGER,
+    parent_id INTEGER REFERENCES symbols(id)
+);
+
+CREATE TABLE imports (
+    id INTEGER PRIMARY KEY,
+    file_id INTEGER REFERENCES files(id),
+    module_name TEXT,
+    alias TEXT,
+    line_number INTEGER
+);
+
+-- Full-text search tables
+CREATE VIRTUAL TABLE files_fts USING fts5(
+    path, content, tokenize='porter unicode61'
+);
+
+CREATE VIRTUAL TABLE symbols_fts USING fts5(
+    name, type, tokenize='porter unicode61'
+);
+```
+
+## Query Optimization
+
+### Indexing Strategy
+```sql
+-- Performance indexes
+CREATE INDEX idx_symbols_file ON symbols(file_id);
+CREATE INDEX idx_symbols_name ON symbols(name);
+CREATE INDEX idx_symbols_type ON symbols(type);
+CREATE INDEX idx_imports_file ON imports(file_id);
+CREATE INDEX idx_files_language ON files(language);
+```
+
+### Query Patterns
+```python
+# Efficient symbol lookup
+def find_symbol(name: str, file_path: str = None):
+    query = """
+    SELECT s.*, f.path 
+    FROM symbols s
+    JOIN files f ON s.file_id = f.id
+    WHERE s.name = ?
+    """
+    params = [name]
+    
+    if file_path:
+        query += " AND f.path = ?"
+        params.append(file_path)
+    
+    return db.execute(query, params)
+
+# Full-text search with ranking
+def search_code(query: str):
+    return db.execute("""
+    SELECT path, snippet(files_fts, 1, '<b>', '</b>', '...', 32) as snippet,
+           rank
+    FROM files_fts
+    WHERE files_fts MATCH ?
+    ORDER BY rank
+    LIMIT 50
+    """, [query])
+```
+
+## Data Management
+
+### Transaction Handling
+```python
+# Batch insertions with transactions
+def batch_insert_symbols(symbols: List[Dict]):
+    with db.transaction():
+        for symbol in symbols:
+            db.execute(
+                "INSERT INTO symbols (file_id, name, type, line_start) VALUES (?, ?, ?, ?)",
+                [symbol['file_id'], symbol['name'], symbol['type'], symbol['line_start']]
+            )
+```
+
+### Migration System
+```python
+# Version-based migrations
+migrations = {
+    1: "CREATE TABLE schema_version (version INTEGER)",
+    2: "ALTER TABLE files ADD COLUMN encoding TEXT DEFAULT 'utf-8'",
+    3: "CREATE INDEX idx_files_hash ON files(hash)"
+}
+
+def run_migrations():
+    current_version = get_schema_version()
+    for version, sql in migrations.items():
+        if version > current_version:
+            db.execute(sql)
+            update_schema_version(version)
+```
+
+## Performance Guidelines
+
+### Memory Management
+- Use WAL mode for better concurrency
+- Configure page cache size appropriately
+- Implement connection pooling
+- Close connections promptly
+
+### Optimization Techniques
+1. **Prepared Statements**: Reuse compiled queries
+2. **Batch Operations**: Group similar operations
+3. **Lazy Loading**: Load data on demand
+4. **Partitioning**: Split large tables by project/language
+
+## Backup and Recovery
+
+### Backup Strategy
+```bash
+# Automated backup script
+#!/bin/bash
+sqlite3 project.db ".backup backup_$(date +%Y%m%d_%H%M%S).db"
+
+# Incremental backup using WAL
+sqlite3 project.db "PRAGMA wal_checkpoint(TRUNCATE)"
+```
+
+### Data Integrity
+- Regular VACUUM operations
+- Integrity checks on startup
+- Automatic corruption recovery
+- Transaction rollback on errors
+
+## Cloud Sync Considerations
+
+### Sync Protocol
+- Track change timestamps
+- Implement conflict resolution
+- Use merkle trees for efficient diff
+- Support partial syncs
+
+### Data Format
+```json
+{
+    "sync_version": "1.0",
+    "project_id": "uuid",
+    "timestamp": 1234567890,
+    "changes": [
+        {
+            "operation": "insert",
+            "table": "symbols",
+            "data": {...}
+        }
+    ]
+}
+```
+
+## Security Rules
+
+### Access Control
+- Read-only mode for untrusted projects
+- Sanitize all inputs
+- Parameterized queries only
+- No dynamic SQL generation
+
+### Sensitive Data
+- Exclude files matching .gitignore
+- Redact detected secrets
+- Encrypt database at rest (optional)
+- Audit log for all modifications

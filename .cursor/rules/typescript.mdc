@@ -1,0 +1,376 @@
+# TypeScript Rules for Code-Index-MCP
+
+## Overview
+This file defines TypeScript/JavaScript coding standards and patterns for any web UI or Node.js components that may be added to the Code-Index-MCP project.
+
+## Type Safety
+
+### Strict Type Checking
+```typescript
+// tsconfig.json
+{
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true
+  }
+}
+```
+
+### Type Definitions
+```typescript
+// Define interfaces for API responses
+interface SymbolDefinition {
+  name: string;
+  type: 'function' | 'class' | 'variable' | 'method';
+  filePath: string;
+  line: number;
+  column: number;
+  docstring?: string;
+}
+
+interface SearchResult {
+  matches: Array<{
+    file: string;
+    line: number;
+    content: string;
+    score: number;
+  }>;
+  totalCount: number;
+}
+
+// Use discriminated unions for different response types
+type APIResponse<T> = 
+  | { status: 'success'; data: T }
+  | { status: 'error'; error: string }
+  | { status: 'loading' };
+```
+
+## API Client Design
+
+### Type-Safe API Client
+```typescript
+class MCPClient {
+  private baseUrl: string;
+  private apiKey: string;
+
+  constructor(baseUrl: string, apiKey: string) {
+    this.baseUrl = baseUrl;
+    this.apiKey = apiKey;
+  }
+
+  private async request<T>(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<T> {
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': this.apiKey,
+        ...options.headers,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getSymbolDefinition(
+    symbolName: string,
+    filePath?: string
+  ): Promise<SymbolDefinition> {
+    return this.request<SymbolDefinition>('/symbol', {
+      method: 'POST',
+      body: JSON.stringify({ symbol_name: symbolName, file_path: filePath }),
+    });
+  }
+
+  async searchCode(
+    query: string,
+    fileExtensions?: string[]
+  ): Promise<SearchResult> {
+    return this.request<SearchResult>('/search', {
+      method: 'POST',
+      body: JSON.stringify({ query, file_extensions: fileExtensions }),
+    });
+  }
+}
+```
+
+## Error Handling
+
+### Custom Error Classes
+```typescript
+class MCPError extends Error {
+  constructor(
+    message: string,
+    public code: string,
+    public statusCode?: number
+  ) {
+    super(message);
+    this.name = 'MCPError';
+  }
+}
+
+class NetworkError extends MCPError {
+  constructor(message: string) {
+    super(message, 'NETWORK_ERROR');
+  }
+}
+
+class AuthenticationError extends MCPError {
+  constructor(message: string) {
+    super(message, 'AUTH_ERROR', 401);
+  }
+}
+```
+
+### Error Handling Patterns
+```typescript
+// Result type for safer error handling
+type Result<T, E = Error> = 
+  | { ok: true; value: T }
+  | { ok: false; error: E };
+
+async function safeApiCall<T>(
+  fn: () => Promise<T>
+): Promise<Result<T>> {
+  try {
+    const value = await fn();
+    return { ok: true, value };
+  } catch (error) {
+    return { 
+      ok: false, 
+      error: error instanceof Error ? error : new Error(String(error))
+    };
+  }
+}
+
+// Usage
+const result = await safeApiCall(() => 
+  client.getSymbolDefinition('myFunction')
+);
+
+if (result.ok) {
+  console.log('Symbol found:', result.value);
+} else {
+  console.error('Error:', result.error.message);
+}
+```
+
+## State Management
+
+### React State Pattern (if UI is added)
+```typescript
+import { create } from 'zustand';
+
+interface CodeIndexState {
+  symbols: Map<string, SymbolDefinition>;
+  searchResults: SearchResult | null;
+  isLoading: boolean;
+  error: string | null;
+  
+  // Actions
+  searchCode: (query: string) => Promise<void>;
+  getSymbol: (name: string) => Promise<void>;
+  clearError: () => void;
+}
+
+const useCodeIndexStore = create<CodeIndexState>((set, get) => ({
+  symbols: new Map(),
+  searchResults: null,
+  isLoading: false,
+  error: null,
+
+  searchCode: async (query: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const results = await client.searchCode(query);
+      set({ searchResults: results, isLoading: false });
+    } catch (error) {
+      set({ 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        isLoading: false 
+      });
+    }
+  },
+
+  getSymbol: async (name: string) => {
+    const { symbols } = get();
+    if (symbols.has(name)) return;
+
+    set({ isLoading: true, error: null });
+    try {
+      const symbol = await client.getSymbolDefinition(name);
+      set((state) => ({
+        symbols: new Map(state.symbols).set(name, symbol),
+        isLoading: false
+      }));
+    } catch (error) {
+      set({ 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        isLoading: false 
+      });
+    }
+  },
+
+  clearError: () => set({ error: null })
+}));
+```
+
+## Testing Patterns
+
+### Unit Testing
+```typescript
+import { describe, it, expect, vi } from 'vitest';
+
+describe('MCPClient', () => {
+  it('should fetch symbol definition', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        name: 'testFunction',
+        type: 'function',
+        filePath: '/test.py',
+        line: 10,
+        column: 0
+      })
+    });
+
+    global.fetch = mockFetch;
+
+    const client = new MCPClient('http://localhost:8000', 'test-key');
+    const result = await client.getSymbolDefinition('testFunction');
+
+    expect(result.name).toBe('testFunction');
+    expect(mockFetch).toHaveBeenCalledWith(
+      'http://localhost:8000/symbol',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'X-API-Key': 'test-key'
+        })
+      })
+    );
+  });
+});
+```
+
+### Integration Testing
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('search functionality', async ({ page }) => {
+  await page.goto('/');
+  
+  // Search for a function
+  await page.fill('[data-testid="search-input"]', 'parseFile');
+  await page.click('[data-testid="search-button"]');
+  
+  // Wait for results
+  await page.waitForSelector('[data-testid="search-results"]');
+  
+  // Verify results
+  const results = await page.$$('[data-testid="search-result-item"]');
+  expect(results.length).toBeGreaterThan(0);
+});
+```
+
+## Performance Optimization
+
+### Debouncing and Throttling
+```typescript
+function debounce<T extends (...args: any[]) => any>(
+  fn: T,
+  delay: number
+): (...args: Parameters<T>) => void {
+  let timeoutId: NodeJS.Timeout;
+  
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn(...args), delay);
+  };
+}
+
+// Use in search input
+const debouncedSearch = debounce((query: string) => {
+  store.searchCode(query);
+}, 300);
+```
+
+### Caching Strategy
+```typescript
+class CachedMCPClient extends MCPClient {
+  private cache = new Map<string, { data: any; timestamp: number }>();
+  private cacheTimeout = 5 * 60 * 1000; // 5 minutes
+
+  private getCacheKey(method: string, params: any): string {
+    return `${method}:${JSON.stringify(params)}`;
+  }
+
+  async getSymbolDefinition(
+    symbolName: string,
+    filePath?: string
+  ): Promise<SymbolDefinition> {
+    const cacheKey = this.getCacheKey('getSymbolDefinition', { symbolName, filePath });
+    const cached = this.cache.get(cacheKey);
+
+    if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+      return cached.data;
+    }
+
+    const data = await super.getSymbolDefinition(symbolName, filePath);
+    this.cache.set(cacheKey, { data, timestamp: Date.now() });
+    
+    return data;
+  }
+}
+```
+
+## Code Style
+
+### Naming Conventions
+- Use camelCase for variables and functions
+- Use PascalCase for types and classes
+- Use UPPER_SNAKE_CASE for constants
+- Prefix interfaces with 'I' only when necessary to avoid conflicts
+
+### File Organization
+```
+src/
+├── types/          # Type definitions
+├── api/            # API client and related code
+├── components/     # React components (if UI)
+├── hooks/          # Custom hooks
+├── utils/          # Utility functions
+├── stores/         # State management
+└── tests/          # Test files
+```
+
+### Import Order
+```typescript
+// 1. Node modules
+import { readFile } from 'fs/promises';
+
+// 2. External packages
+import React from 'react';
+import { z } from 'zod';
+
+// 3. Internal modules
+import { MCPClient } from '@/api/client';
+
+// 4. Relative imports
+import { formatCode } from './utils';
+
+// 5. Type imports
+import type { SymbolDefinition } from '@/types';
+```

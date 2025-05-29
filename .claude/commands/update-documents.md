@@ -1,6 +1,6 @@
 # update-documents
 
-Updates and synchronizes all documentation files including AGENTS.md, CLAUDE.md, cursor rules, and other markdown files to ensure consistency and reflect the current state of the codebase.
+Updates and synchronizes all documentation files including AGENTS.md, CLAUDE.md, /.curor/rules directory files, and other markdown files to ensure consistency and reflect the current state of the codebase.
 
 ## What it does
 
@@ -86,3 +86,4 @@ Run this command when:
 - Ensure environment variable lists are complete
 - Update deployment guides with new requirements
 - Keep command documentation in sync with actual implementations
+- Do as much IN PARALLEL as possile using the Task tool

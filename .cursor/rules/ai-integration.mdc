@@ -1,0 +1,102 @@
+# AI Integration Rules for Code-Index-MCP
+
+## Overview
+This file defines rules and guidelines for AI integration within the Code-Index-MCP project, including embedding services, language models, and semantic search capabilities.
+
+## Embedding Services
+
+### Voyage AI Integration
+- **Purpose**: Generate code embeddings for semantic search
+- **Configuration**: API key required in environment variables
+- **Fallback**: Local embedding generation if API unavailable
+- **Caching**: Embeddings should be cached locally to reduce API calls
+
+### Implementation Guidelines
+```python
+# Use the semantic_indexer utility
+from mcp_server.utils.semantic_indexer import SemanticIndexer
+
+# Initialize with API key
+indexer = SemanticIndexer(api_key=os.getenv("VOYAGE_AI_API_KEY"))
+
+# Generate embeddings with caching
+embeddings = indexer.get_embeddings(code_snippet, use_cache=True)
+```
+
+## Language Model Integration
+
+### MCP Protocol
+- **Purpose**: Provide code intelligence to Claude and other LLMs
+- **Tools**: Symbol lookup, code search, definition finding
+- **Response Format**: Structured JSON with location references
+
+### Best Practices
+1. **Batch Processing**: Group embedding requests to minimize API calls
+2. **Error Handling**: Gracefully fall back to fuzzy search on API failures
+3. **Rate Limiting**: Respect API rate limits with exponential backoff
+4. **Security**: Never log or expose API keys
+
+## Semantic Search
+
+### Hybrid Approach
+- Combine lexical search (fuzzy matching) with semantic search
+- Weight results based on confidence scores
+- Provide context-aware code suggestions
+
+### Query Processing
+```python
+# Example hybrid search implementation
+def hybrid_search(query: str, weights: Dict[str, float] = None):
+    weights = weights or {"lexical": 0.4, "semantic": 0.6}
+    
+    # Lexical search using fuzzy indexer
+    lexical_results = fuzzy_indexer.search(query)
+    
+    # Semantic search using embeddings
+    semantic_results = semantic_indexer.search(query)
+    
+    # Combine and rank results
+    return combine_results(lexical_results, semantic_results, weights)
+```
+
+## Future AI Integrations
+
+### Planned Features
+1. **Code Completion**: Context-aware suggestions
+2. **Code Review**: Automated quality checks
+3. **Documentation Generation**: AI-powered docs
+4. **Refactoring Suggestions**: Intelligent code improvements
+
+### Integration Points
+- Plugin system for AI providers
+- Standardized API for different models
+- Configurable model selection
+- Local model support (future)
+
+## Security Considerations
+
+### API Key Management
+- Store keys in environment variables
+- Use secure key rotation
+- Implement key encryption at rest
+- Monitor API usage for anomalies
+
+### Data Privacy
+- Option to disable cloud features
+- Local-only mode for sensitive code
+- Data retention policies
+- Audit logging for API calls
+
+## Performance Guidelines
+
+### Optimization Strategies
+1. **Caching**: Cache embeddings and results
+2. **Batching**: Process multiple files together
+3. **Async Processing**: Non-blocking API calls
+4. **Resource Limits**: Cap memory and CPU usage
+
+### Monitoring
+- Track API response times
+- Monitor embedding quality
+- Log cache hit rates
+- Alert on degraded performance

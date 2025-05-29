@@ -1,4 +1,16 @@
 workspace "MCP Server – Level 1" {
+  description "System context diagram showing the MCP Server's interactions with external systems and users"
+  
+  properties {
+    "structurizr.dslEditor" "false"
+    "performance.symbolLookup" "<100ms"
+    "performance.semanticSearch" "<500ms"
+    "performance.indexing" "10K files/minute"
+    "scalability.maxFiles" "1M+ files"
+    "availability.target" "99.9%"
+    "security.model" "Zero-trust, local-first"
+  }
+
   model {
     user = person "Developer" {
       description "Software developer using Claude for code assistance"
@@ -50,16 +62,6 @@ workspace "MCP Server – Level 1" {
       include *
       autolayout lr
       description "System context showing MCP Server interactions"
-    }
-    
-    # Define performance requirements
-    properties {
-      "performance.symbolLookup" "<100ms"
-      "performance.semanticSearch" "<500ms"
-      "performance.indexing" "10K files/minute"
-      "scalability.maxFiles" "1M+ files"
-      "availability.target" "99.9%"
-      "security.model" "Zero-trust, local-first"
     }
   }
 }

@@ -1,4 +1,10 @@
 workspace "MCP Server – Level 3" {
+  description "Component diagram showing the detailed internal components of the MCP Server"
+  
+  properties {
+    "structurizr.dslEditor" "false"
+  }
+
   model {
     mcp = softwareSystem "MCP Server" {
       api = container "API Gateway" {
@@ -200,20 +206,19 @@ workspace "MCP Server – Level 3" {
       description "API Gateway component architecture"
     }
     
-    component all "AllComponents" {
-      include *
+    component indexer "IndexerComponents" {
+      include index_engine parser optimizer fuzzy_indexer semantic_indexer
       autolayout lr
-      description "Complete component architecture"
+      description "Indexer component architecture"
     }
-    
-    styles {
-      element "Plugin" {
-        shape Component
-        background #99ccff
-      }
-      element "Controller" {
-        shape WebBrowser
-      }
+  }
+  
+  styles {
+    element "Controller" {
+      shape Component
+    }
+    element "Plugin" {
+      shape Component
     }
   }
 }
