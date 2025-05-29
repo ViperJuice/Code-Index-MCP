@@ -1,0 +1,280 @@
+@startuml dispatcher
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define INTERNAL <<Internal>>
+!define ASYNC <<async>>
+
+package "mcp_server.dispatcher" <<Component>> {
+    
+    ' ========================================
+    ' Component Interfaces (Public)
+    ' ========================================
+    
+    interface IDispatcher COMPONENT_INTERFACE #LightGreen {
+        +ASYNC dispatch_symbol_request(request: SymbolRequest): SymbolResponse
+        +ASYNC dispatch_search_request(request: SearchRequest): SearchResponse
+        +ASYNC dispatch_index_request(request: IndexRequest): IndexResponse
+        +ASYNC dispatch_context_request(request: ContextRequest): ContextResponse
+        +register_plugin(language: str, plugin: IPlugin): void
+        +get_supported_languages(): List<str>
+    }
+    
+    interface IRequestRouter COMPONENT_INTERFACE #LightGreen {
+        +route_to_plugin(request: Request): IPlugin
+        +route_to_multiple(request: Request): List<IPlugin>
+        +get_plugin_for_file(file_path: str): Optional<IPlugin>
+        +get_all_plugins(): Dict<str, IPlugin>
+    }
+    
+    interface IPluginRouter COMPONENT_INTERFACE #LightGreen {
+        +find_plugin_by_extension(extension: str): Optional<IPlugin>
+        +find_plugin_by_language(language: str): Optional<IPlugin>
+        +find_plugin_by_mimetype(mimetype: str): Optional<IPlugin>
+        +register_mapping(extension: str, language: str): void
+    }
+    
+    interface IFileTypeMatcher COMPONENT_INTERFACE #LightGreen {
+        +get_language(file_path: str): Optional<str>
+        +get_mimetype(file_path: str): str
+        +is_supported(file_path: str): bool
+        +get_file_patterns(language: str): List<str>
+    }
+    
+    interface IResultAggregator COMPONENT_INTERFACE #LightGreen {
+        +ASYNC aggregate_symbol_results(results: List<SymbolResult>): SymbolResponse
+        +ASYNC aggregate_search_results(results: List<SearchResult>): SearchResponse
+        +merge_contexts(contexts: List<CodeContext>): CodeContext
+        +combine_graphs(graphs: List<Graph>): Graph
+    }
+    
+    interface IResultMerger COMPONENT_INTERFACE #LightGreen {
+        +merge_symbols(symbols: List<Symbol>): List<Symbol>
+        +merge_references(references: List<Reference>): List<Reference>
+        +deduplicate_results(results: List<Any]): List<Any>
+        +rank_results(results: List<SearchResult>): List<SearchResult>
+    }
+    
+    ' ========================================
+    ' Main Implementation Classes
+    ' ========================================
+    
+    class DispatcherCore implements IDispatcher, IRequestRouter {
+        -plugin_router: IPluginRouter
+        -result_aggregator: IResultAggregator
+        -cache: ICache
+        -metrics: IMetrics
+        -logger: ILogger
+        -executor: ThreadPoolExecutor
+        
+        +ASYNC dispatch_symbol_request(request: SymbolRequest): SymbolResponse
+        +ASYNC dispatch_search_request(request: SearchRequest): SearchResponse
+        +ASYNC dispatch_index_request(request: IndexRequest): IndexResponse
+        +ASYNC dispatch_context_request(request: ContextRequest): ContextResponse
+        +register_plugin(language: str, plugin: IPlugin): void
+        +get_supported_languages(): List<str>
+        +route_to_plugin(request: Request): IPlugin
+        +route_to_multiple(request: Request): List<IPlugin>
+        +get_plugin_for_file(file_path: str): Optional<IPlugin>
+        +get_all_plugins(): Dict<str, IPlugin>
+        -ASYNC _dispatch_to_plugin(plugin: IPlugin, request: Request): Result<Any>
+        -ASYNC _dispatch_parallel(plugins: List<IPlugin>, request: Request): List<Result>
+        -_should_cache(request: Request): bool
+        -_get_cache_key(request: Request): str
+    }
+    
+    class PluginRouter implements IPluginRouter, IFileTypeMatcher {
+        -extension_map: Dict<str, str>
+        -language_map: Dict<str, IPlugin>
+        -mimetype_map: Dict<str, str>
+        -pattern_map: Dict<str, List<str>>
+        -plugin_registry: IPluginRegistry
+        
+        +find_plugin_by_extension(extension: str): Optional<IPlugin>
+        +find_plugin_by_language(language: str): Optional<IPlugin>
+        +find_plugin_by_mimetype(mimetype: str): Optional<IPlugin>
+        +register_mapping(extension: str, language: str): void
+        +get_language(file_path: str): Optional<str>
+        +get_mimetype(file_path: str): str
+        +is_supported(file_path: str): bool
+        +get_file_patterns(language: str): List<str>
+        -_extract_extension(file_path: str): str
+        -_guess_language(file_path: str, content: Optional<str>): Optional<str>
+        -_load_mappings(): void
+    }
+    
+    class ResultAggregator implements IResultAggregator, IResultMerger {
+        -ranking_strategy: IRankingStrategy
+        -dedup_strategy: IDeduplicationStrategy
+        -merge_config: MergeConfig
+        
+        +ASYNC aggregate_symbol_results(results: List<SymbolResult>): SymbolResponse
+        +ASYNC aggregate_search_results(results: List<SearchResult>): SearchResponse
+        +merge_contexts(contexts: List<CodeContext>): CodeContext
+        +combine_graphs(graphs: List<Graph]): Graph
+        +merge_symbols(symbols: List<Symbol]): List<Symbol>
+        +merge_references(references: List<Reference]): List<Reference]
+        +deduplicate_results(results: List<Any]): List<Any]
+        +rank_results(results: List<SearchResult]): List<SearchResult]
+        -_merge_symbol_definitions(definitions: List<Definition]): Definition
+        -_combine_documentation(docs: List<str]): str
+        -_merge_metadata(metadata_list: List<Dict]): Dict
+    }
+    
+    ' ========================================
+    ' Internal Classes and Interfaces
+    ' ========================================
+    
+    interface IPluginCoordinator INTERNAL {
+        +ASYNC coordinate_multi_plugin_request(request: Request, plugins: List<IPlugin>): List<Result>
+        +ASYNC coordinate_fallback(request: Request, primary: IPlugin, fallbacks: List<IPlugin]): Result
+        +get_plugin_priorities(): Dict<str, int>
+    }
+    
+    interface IRankingStrategy INTERNAL {
+        +rank(results: List<SearchResult]): List<SearchResult]
+        +score(result: SearchResult): float
+        +compare(a: SearchResult, b: SearchResult): int
+    }
+    
+    interface IDeduplicationStrategy INTERNAL {
+        +deduplicate(items: List<Any]): List<Any]
+        +get_key(item: Any): str
+        +merge_duplicates(items: List<Any]): Any
+    }
+    
+    class PluginCoordinator INTERNAL implements IPluginCoordinator {
+        -timeout_ms: int
+        -retry_policy: IRetryPolicy
+        -circuit_breaker: ICircuitBreaker
+        
+        +ASYNC coordinate_multi_plugin_request(request: Request, plugins: List<IPlugin]): List<Result]
+        +ASYNC coordinate_fallback(request: Request, primary: IPlugin, fallbacks: List<IPlugin]): Result
+        +get_plugin_priorities(): Dict<str, int]
+        -ASYNC _execute_with_timeout(plugin: IPlugin, request: Request): Result
+        -ASYNC _handle_plugin_error(plugin: IPlugin, error: Exception): Result
+        -_should_retry(error: Exception): bool
+    }
+    
+    class RequestContext INTERNAL {
+        +request_id: str
+        +start_time: datetime
+        +user_context: ISecurityContext
+        +trace_id: str
+        +metadata: Dict
+        
+        +elapsed_time(): float
+        +add_metadata(key: str, value: Any): void
+        +get_timeout_remaining(): float
+    }
+    
+    class DispatchMetrics INTERNAL {
+        -metrics: IMetrics
+        
+        +record_dispatch_time(plugin: str, duration: float): void
+        +record_plugin_error(plugin: str, error_type: str): void
+        +record_cache_hit(request_type: str): void
+        +record_result_count(request_type: str, count: int): void
+    }
+    
+    class RelevanceRanker INTERNAL implements IRankingStrategy {
+        -weights: Dict<str, float>
+        
+        +rank(results: List<SearchResult]): List<SearchResult]
+        +score(result: SearchResult): float
+        +compare(a: SearchResult, b: SearchResult): int
+        -_calculate_relevance(result: SearchResult): float
+        -_calculate_proximity(result: SearchResult): float
+    }
+    
+    class LocationDeduplicator INTERNAL implements IDeduplicationStrategy {
+        +deduplicate(items: List<Any]): List<Any]
+        +get_key(item: Any): str
+        +merge_duplicates(items: List<Any]): Any
+        -_location_key(location: Location): str
+    }
+    
+    ' ========================================
+    ' Supporting Types
+    ' ========================================
+    
+    class DispatchRequest {
+        +request_type: str
+        +payload: Dict
+        +context: RequestContext
+        +timeout_ms: Optional<int>
+    }
+    
+    class DispatchResult {
+        +success: bool
+        +plugin_name: str
+        +result: Optional<Any>
+        +error: Optional<Error>
+        +duration_ms: float
+    }
+    
+    class PluginMapping {
+        +extension: str
+        +language: str
+        +plugin_name: str
+        +priority: int
+    }
+    
+    class MergeConfig {
+        +prefer_definitions: bool = True
+        +merge_documentation: bool = True
+        +deduplicate: bool = True
+        +max_results: int = 100
+    }
+    
+    class CircuitBreakerState {
+        +state: str  # CLOSED, OPEN, HALF_OPEN
+        +failure_count: int
+        +last_failure_time: Optional<datetime>
+        +success_count: int
+    }
+    
+    ' ========================================
+    ' Relationships
+    ' ========================================
+    
+    DispatcherCore --> IPluginRouter : finds plugins
+    DispatcherCore --> IResultAggregator : aggregates results
+    DispatcherCore --> PluginCoordinator : coordinates execution
+    DispatcherCore --> DispatchMetrics : records metrics
+    
+    PluginRouter --> IPluginRegistry : queries registry
+    
+    ResultAggregator --> IRankingStrategy : ranks with
+    ResultAggregator --> IDeduplicationStrategy : deduplicates with
+    
+    PluginCoordinator --> ICircuitBreaker : protects calls
+    PluginCoordinator --> IRetryPolicy : retries failures
+    
+    ' External dependencies
+    DispatcherCore ..> ICache : caches results
+    DispatcherCore ..> ILogger : logs
+    DispatcherCore ..> IMetrics : reports
+    DispatcherCore ..> IPlugin : dispatches to
+}
+
+' Exceptions
+class DispatchError <<exception>> {
+    +request_type: str
+    +plugin_name: Optional<str>
+    +cause: Exception
+}
+
+class NoPluginFoundError <<exception>> {
+    +file_path: str
+    +language: Optional<str>
+}
+
+class AggregationError <<exception>> {
+    +partial_results: List<Any>
+    +failed_plugins: List<str>
+}
+
+IDispatcher ..> DispatchError : throws
+IPluginRouter ..> NoPluginFoundError : throws
+IResultAggregator ..> AggregationError : throws
+
+@enduml

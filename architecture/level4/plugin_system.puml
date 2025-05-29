@@ -1,0 +1,355 @@
+@startuml plugin_system
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define INTERNAL <<Internal>>
+!define ASYNC <<async>>
+!define ABSTRACT <<abstract>>
+
+package "mcp_server.plugin_system" <<Component>> {
+    
+    ' ========================================
+    ' Component Interfaces (Public)
+    ' ========================================
+    
+    interface IPlugin COMPONENT_INTERFACE #LightGreen {
+        +ASYNC index(file_path: str): IndexResult
+        +ASYNC get_definition(symbol: str, context: Dict): Definition
+        +ASYNC get_references(symbol: str, context: Dict): List<Reference>
+        +ASYNC search(query: str, options: SearchOptions): List<SearchResult>
+        +ASYNC extract_graph_data(file_path: str): GraphData
+        +get_supported_extensions(): List<str>
+        +get_language_name(): str
+        +get_capabilities(): PluginCapabilities
+    }
+    
+    interface ILanguageAnalyzer COMPONENT_INTERFACE #LightGreen {
+        +ASYNC analyze_file(file_path: str): FileAnalysis
+        +ASYNC extract_symbols(content: str): List<Symbol>
+        +ASYNC parse_imports(content: str): List<Import>
+        +ASYNC get_ast(content: str): AST
+        +validate_syntax(content: str): ValidationResult
+    }
+    
+    interface IPluginRegistry COMPONENT_INTERFACE #LightGreen {
+        +register_plugin(name: str, plugin: IPlugin): void
+        +unregister_plugin(name: str): void
+        +get_plugin(name: str): Optional<IPlugin>
+        +get_all_plugins(): Dict<str, IPlugin>
+        +get_plugins_by_capability(capability: str): List<IPlugin]
+        +is_registered(name: str): bool
+    }
+    
+    interface IPluginDiscovery COMPONENT_INTERFACE #LightGreen {
+        +discover_plugins(path: str): List<PluginInfo]
+        +ASYNC scan_directory(directory: str): List<PluginInfo]
+        +validate_plugin(plugin_path: str): ValidationResult
+        +get_plugin_metadata(plugin_path: str): PluginMetadata
+    }
+    
+    interface IPluginManager COMPONENT_INTERFACE #LightGreen {
+        +ASYNC load_plugin(plugin_info: PluginInfo): IPlugin
+        +ASYNC unload_plugin(name: str): void
+        +ASYNC reload_plugin(name: str): void
+        +get_plugin_status(name: str): PluginStatus
+        +get_all_statuses(): Dict<str, PluginStatus]
+        +ASYNC enable_plugin(name: str): void
+        +ASYNC disable_plugin(name: str): void
+    }
+    
+    interface ILifecycleManager COMPONENT_INTERFACE #LightGreen {
+        +ASYNC initialize_plugin(plugin: IPlugin): void
+        +ASYNC start_plugin(plugin: IPlugin): void
+        +ASYNC stop_plugin(plugin: IPlugin): void
+        +ASYNC destroy_plugin(plugin: IPlugin): void
+        +get_lifecycle_state(plugin: IPlugin): LifecycleState
+    }
+    
+    interface IPluginLoader COMPONENT_INTERFACE #LightGreen {
+        +load_module(module_path: str): Module
+        +create_instance(module: Module, config: Dict): IPlugin
+        +validate_interface(instance: Any): bool
+        +get_plugin_class(module: Module): Type[IPlugin]
+    }
+    
+    interface IModuleImporter COMPONENT_INTERFACE #LightGreen {
+        +import_module(path: str): Module
+        +reload_module(module: Module): Module
+        +unload_module(module: Module): void
+        +is_valid_module(path: str): bool
+    }
+    
+    ' ========================================
+    ' Base Classes
+    ' ========================================
+    
+    abstract class PluginBase ABSTRACT implements IPlugin, ILanguageAnalyzer {
+        #config: Dict
+        #logger: ILogger
+        #metrics: IMetrics
+        #cache: ICache
+        #language_name: str
+        #supported_extensions: List<str>
+        
+        +{abstract} ASYNC index(file_path: str): IndexResult
+        +{abstract} ASYNC get_definition(symbol: str, context: Dict): Definition
+        +{abstract} ASYNC get_references(symbol: str, context: Dict): List<Reference]
+        +{abstract} ASYNC search(query: str, options: SearchOptions): List<SearchResult]
+        +{abstract} ASYNC extract_graph_data(file_path: str): GraphData
+        +{abstract} ASYNC analyze_file(file_path: str): FileAnalysis
+        +{abstract} ASYNC extract_symbols(content: str): List<Symbol]
+        +{abstract} ASYNC parse_imports(content: str): List<Import]
+        +{abstract} ASYNC get_ast(content: str): AST
+        +{abstract} validate_syntax(content: str): ValidationResult
+        
+        +get_supported_extensions(): List<str]
+        +get_language_name(): str
+        +get_capabilities(): PluginCapabilities
+        #read_file(file_path: str): str
+        #get_file_hash(file_path: str): str
+        #is_cached(file_path: str, hash: str): bool
+        #get_from_cache(key: str): Optional<Any]
+        #save_to_cache(key: str, value: Any): void
+    }
+    
+    ' ========================================
+    ' Main Implementation Classes
+    ' ========================================
+    
+    class PluginRegistry implements IPluginRegistry, IPluginDiscovery {
+        -plugins: Dict<str, IPlugin]
+        -plugin_info: Dict<str, PluginInfo]
+        -capabilities_index: Dict<str, List<str]]
+        -lock: RWLock
+        
+        +register_plugin(name: str, plugin: IPlugin): void
+        +unregister_plugin(name: str): void
+        +get_plugin(name: str): Optional<IPlugin]
+        +get_all_plugins(): Dict<str, IPlugin]
+        +get_plugins_by_capability(capability: str): List<IPlugin]
+        +is_registered(name: str): bool
+        +discover_plugins(path: str): List<PluginInfo]
+        +ASYNC scan_directory(directory: str): List<PluginInfo]
+        +validate_plugin(plugin_path: str): ValidationResult
+        +get_plugin_metadata(plugin_path: str): PluginMetadata
+        -_index_capabilities(name: str, plugin: IPlugin): void
+        -_validate_plugin_structure(path: str): bool
+    }
+    
+    class PluginManager implements IPluginManager, ILifecycleManager {
+        -registry: IPluginRegistry
+        -loader: IPluginLoader
+        -plugin_states: Dict<str, PluginState]
+        -config: IConfig
+        -event_bus: IEventBus
+        
+        +ASYNC load_plugin(plugin_info: PluginInfo): IPlugin
+        +ASYNC unload_plugin(name: str): void
+        +ASYNC reload_plugin(name: str): void
+        +get_plugin_status(name: str): PluginStatus
+        +get_all_statuses(): Dict<str, PluginStatus]
+        +ASYNC enable_plugin(name: str): void
+        +ASYNC disable_plugin(name: str): void
+        +ASYNC initialize_plugin(plugin: IPlugin): void
+        +ASYNC start_plugin(plugin: IPlugin): void
+        +ASYNC stop_plugin(plugin: IPlugin): void
+        +ASYNC destroy_plugin(plugin: IPlugin): void
+        +get_lifecycle_state(plugin: IPlugin): LifecycleState
+        -ASYNC _execute_lifecycle_hook(plugin: IPlugin, hook: str): void
+        -_emit_plugin_event(event_type: str, plugin_name: str): void
+    }
+    
+    class PluginLoader implements IPluginLoader, IModuleImporter {
+        -module_cache: Dict<str, Module]
+        -class_cache: Dict<str, Type[IPlugin]]
+        -import_lock: Lock
+        
+        +load_module(module_path: str): Module
+        +create_instance(module: Module, config: Dict): IPlugin
+        +validate_interface(instance: Any): bool
+        +get_plugin_class(module: Module): Type[IPlugin]
+        +import_module(path: str): Module
+        +reload_module(module: Module): Module
+        +unload_module(module: Module): void
+        +is_valid_module(path: str): bool
+        -_find_plugin_class(module: Module): Optional<Type[IPlugin]]
+        -_validate_class(cls: Type): bool
+        -_clear_module_cache(module_name: str): void
+    }
+    
+    ' ========================================
+    ' Internal Classes and Interfaces
+    ' ========================================
+    
+    interface IPluginValidator INTERNAL {
+        +validate_plugin_class(cls: Type): ValidationResult
+        +validate_plugin_instance(instance: IPlugin): ValidationResult
+        +check_required_methods(cls: Type): List<str]
+        +check_capabilities(plugin: IPlugin): bool
+    }
+    
+    interface IPluginSandbox INTERNAL {
+        +create_sandbox(plugin: IPlugin): Sandbox
+        +execute_in_sandbox(sandbox: Sandbox, func: Callable, *args): Any
+        +set_resource_limits(sandbox: Sandbox, limits: ResourceLimits): void
+        +destroy_sandbox(sandbox: Sandbox): void
+    }
+    
+    class PluginValidator INTERNAL implements IPluginValidator {
+        -required_methods: List<str]
+        -required_attributes: List<str]
+        
+        +validate_plugin_class(cls: Type): ValidationResult
+        +validate_plugin_instance(instance: IPlugin): ValidationResult
+        +check_required_methods(cls: Type): List<str]
+        +check_capabilities(plugin: IPlugin): bool
+        -_check_method_signatures(cls: Type): List<str]
+        -_validate_return_types(cls: Type): bool
+    }
+    
+    class PluginSandbox INTERNAL implements IPluginSandbox {
+        -sandboxes: Dict<str, Sandbox]
+        -resource_monitor: IResourceMonitor
+        
+        +create_sandbox(plugin: IPlugin): Sandbox
+        +execute_in_sandbox(sandbox: Sandbox, func: Callable, *args): Any
+        +set_resource_limits(sandbox: Sandbox, limits: ResourceLimits): void
+        +destroy_sandbox(sandbox: Sandbox): void
+        -_monitor_resources(sandbox: Sandbox): void
+        -_enforce_limits(sandbox: Sandbox): void
+    }
+    
+    class PluginCache INTERNAL {
+        -cache: ICache
+        -ttl_seconds: int
+        
+        +get(plugin_name: str, key: str): Optional<Any]
+        +set(plugin_name: str, key: str, value: Any): void
+        +invalidate(plugin_name: str): void
+        +get_size(plugin_name: str): int
+        -_make_cache_key(plugin_name: str, key: str): str
+    }
+    
+    class PluginEventHandler INTERNAL {
+        -event_bus: IEventBus
+        -handlers: Dict<str, List<Callable]]
+        
+        +on_plugin_loaded(handler: Callable): void
+        +on_plugin_unloaded(handler: Callable): void
+        +on_plugin_error(handler: Callable): void
+        +emit_event(event: PluginEvent): void
+    }
+    
+    ' ========================================
+    ' Supporting Types
+    ' ========================================
+    
+    class PluginInfo {
+        +name: str
+        +version: str
+        +path: str
+        +module_name: str
+        +class_name: str
+        +metadata: PluginMetadata
+    }
+    
+    class PluginMetadata {
+        +author: str
+        +description: str
+        +language: str
+        +capabilities: List<str]
+        +dependencies: List<str]
+        +config_schema: Dict
+    }
+    
+    class PluginCapabilities {
+        +supports_indexing: bool
+        +supports_definitions: bool
+        +supports_references: bool
+        +supports_search: bool
+        +supports_graph_extraction: bool
+        +supports_incremental_update: bool
+        +custom_capabilities: Dict<str, bool]
+    }
+    
+    class PluginState {
+        +plugin: IPlugin
+        +status: PluginStatus
+        +lifecycle_state: LifecycleState
+        +loaded_at: datetime
+        +last_error: Optional<Exception]
+        +statistics: PluginStatistics
+    }
+    
+    class PluginStatistics {
+        +requests_handled: int
+        +errors_count: int
+        +total_processing_time: float
+        +cache_hits: int
+        +cache_misses: int
+    }
+    
+    class ResourceLimits {
+        +max_memory_mb: int
+        +max_cpu_percent: float
+        +max_execution_time_seconds: int
+        +max_file_handles: int
+    }
+    
+    class Sandbox {
+        +id: str
+        +plugin_name: str
+        +process: Optional<Process]
+        +resource_limits: ResourceLimits
+        +created_at: datetime
+    }
+    
+    ' ========================================
+    ' Relationships
+    ' ========================================
+    
+    PluginManager --> IPluginRegistry : registers with
+    PluginManager --> IPluginLoader : loads with
+    PluginManager --> PluginValidator : validates with
+    PluginManager --> PluginEventHandler : emits events
+    
+    PluginLoader --> IModuleImporter : imports modules
+    PluginLoader --> PluginValidator : validates loaded
+    
+    PluginBase --> PluginCache : caches results
+    PluginBase --> ILogger : logs
+    PluginBase --> IMetrics : reports metrics
+    
+    ' External dependencies
+    PluginRegistry ..> IEventBus : publishes events
+    PluginManager ..> IConfig : reads config
+}
+
+' Exceptions
+class PluginLoadError <<exception>> {
+    +plugin_path: str
+    +reason: str
+}
+
+class PluginValidationError <<exception>> {
+    +plugin_name: str
+    +missing_methods: List<str]
+    +invalid_signatures: List<str]
+}
+
+class PluginExecutionError <<exception>> {
+    +plugin_name: str
+    +method: str
+    +original_error: Exception
+}
+
+class PluginLifecycleError <<exception>> {
+    +plugin_name: str
+    +lifecycle_phase: str
+    +reason: str
+}
+
+IPluginLoader ..> PluginLoadError : throws
+IPluginValidator ..> PluginValidationError : throws
+IPlugin ..> PluginExecutionError : throws
+ILifecycleManager ..> PluginLifecycleError : throws
+
+@enduml

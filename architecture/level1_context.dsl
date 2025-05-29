@@ -21,7 +21,7 @@ workspace "MCP Server – Level 1" {
     }
     
     mcp = softwareSystem "MCP Server" {
-      description "Local-first code indexing system with deep language understanding"
+      description "Local-first code indexing system with deep language understanding and graph-based context analysis"
       tags "Core System"
     }
     

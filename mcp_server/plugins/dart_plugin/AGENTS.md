@@ -1,80 +1,67 @@
 # Dart Plugin Agent Configuration
 
-This file defines the capabilities and constraints for AI agents working with the Dart plugin.
+## Implementation Status
+❌ **STUB IMPLEMENTATION** - This plugin is NOT implemented
 
-## Agent Capabilities
+## Overview
+This is a stub plugin that exists only as a placeholder. All methods contain only `...` (ellipsis) and do not provide any functionality.
 
-### Dart Analysis
-- Parse Dart code
-- Handle mixins
-- Resolve extensions
-- Track types
-- Analyze async code
-- Process null safety
+## Current State
 
-### Code Understanding
-- Understand Dart idioms
-- Handle mixin chains
-- Process extensions
-- Track dependencies
-- Analyze scopes
+```python
+class Plugin(IPlugin):
+    lang = "dart"
+    
+    def supports(self, path):
+        ...  # NOT IMPLEMENTED
+    
+    def indexFile(self, path, content):
+        ...  # NOT IMPLEMENTED
+    
+    def getDefinition(self, symbol):
+        ...  # NOT IMPLEMENTED
+    
+    def findReferences(self, symbol):
+        ...  # NOT IMPLEMENTED
+    
+    def search(self, query, opts):
+        ...  # NOT IMPLEMENTED
+```
 
-### Testing & Validation
-- Test parsing
-- Validate mixin resolution
-- Check type inference
-- Verify extensions
-- Test edge cases
+## What Would Need Implementation
 
-### Performance
-- Optimize parsing
-- Cache results
-- Handle large codebases
-- Manage memory
+If this plugin were to be implemented, it would need:
+- Tree-sitter Dart grammar integration
+- Null safety understanding
+- Mixin and extension method support
+- Future/Stream async handling
+- Widget tree analysis (for Flutter)
+- Import/export resolution
+- Strong typing support
 
-## Agent Constraints
+## Current Limitations
+- **No functionality**: All methods are stubs
+- **Cannot parse Dart files**: No Tree-sitter integration
+- **Cannot index symbols**: No parsing logic
+- **Cannot find definitions or references**: No symbol tracking
+- **Cannot search**: No indexing capability
 
-1. **Dart Support**
-   - Support Dart 2.x
-   - Handle null safety
-   - Maintain compatibility
-   - Process new features
+## Next Steps for Implementation
+1. Integrate Tree-sitter Dart grammar
+2. Implement basic parsing in `indexFile()`
+3. Add symbol extraction for:
+   - Classes and constructors
+   - Functions and methods
+   - Variables and fields
+   - Enums and mixins
+4. Handle Dart-specific features:
+   - Null safety operators (??, ?., !)
+   - Extension methods
+   - Mixins and with clauses
+   - Async/await and Future/Stream
+   - Generics and type parameters
+5. Add Flutter-specific understanding (widgets, state management)
+6. Implement package dependency resolution
 
-2. **Analysis Accuracy**
-   - Correct mixin resolution
-   - Accurate type inference
-   - Valid extension handling
-   - Proper null safety
-
-3. **Performance**
-   - Efficient parsing
-   - Optimize memory usage
-   - Handle large codebases
-   - Cache effectively
-
-4. **Edge Cases**
-   - Handle multiple mixins
-   - Process extension conflicts
-   - Support code generation
-   - Handle async flow
-
-## Common Operations
-
-```dart
-// Parse Dart file
-AST parseFile(String path) {
-  return treeSitterParse(path);
-}
-
-// Analyze mixins
-void analyzeMixins(AST ast) {
-  processMixinDeclarations(ast);
-  resolveMixinChains();
-}
-
-// Track extensions
-void trackExtensions(AST ast) {
-  buildExtensionMap(ast);
-  resolveConflicts();
-}
-``` 
+## Testing
+No tests exist for this stub implementation.

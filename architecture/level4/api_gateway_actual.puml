@@ -1,0 +1,107 @@
+@startuml api_gateway_actual
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define INTERNAL <<Internal>>
+!define ASYNC <<async>>
+!define NOT_IMPLEMENTED <<Not Implemented>>
+
+' This diagram reflects the ACTUAL implementation in gateway.py
+
+package "mcp_server" <<Component>> {
+    
+    ' ========================================
+    ' Actual Gateway Implementation
+    ' ========================================
+    
+    class "gateway.py" <<FastAPI Module>> {
+        ' Simple FastAPI app with two endpoints
+        -app: FastAPI
+        -dispatcher: Dispatcher
+        
+        +ASYNC get_symbol(request: SymbolRequest): SymbolResponse
+        +ASYNC search_code(request: SearchRequest): SearchResults
+    }
+    
+    ' ========================================
+    ' Request/Response Models (Pydantic)
+    ' ========================================
+    
+    class SymbolRequest <<Pydantic Model>> {
+        +file: str
+        +line: int
+        +column: int
+        +base_directory: str
+        ' Basic validation via Pydantic
+    }
+    
+    class SymbolResponse <<Pydantic Model>> {
+        +symbol: str
+        +definition: str
+        +references: List[str]
+        +docstring: Optional[str]
+    }
+    
+    class SearchRequest <<Pydantic Model>> {
+        +query: str
+        +file_extensions: Optional[List[str]]
+        +base_directory: str
+        +limit: int = 20
+        ' Basic validation via Pydantic
+    }
+    
+    class SearchResults <<Pydantic Model>> {
+        +results: List[SearchResult]
+        +total_matches: int
+    }
+    
+    ' ========================================
+    ' NOT IMPLEMENTED Components
+    ' ========================================
+    
+    class "Auth Middleware" NOT_IMPLEMENTED {
+        ' No authentication implemented
+        ' No JWT tokens
+        ' No authorization
+    }
+    
+    class "Request Validator" NOT_IMPLEMENTED {
+        ' Only basic Pydantic validation
+        ' No path sanitization
+        ' No security checks
+    }
+    
+    class "Health Check" NOT_IMPLEMENTED {
+        ' No health check endpoints
+        ' No readiness/liveness probes
+    }
+    
+    class "Rate Limiter" NOT_IMPLEMENTED {
+        ' No rate limiting
+    }
+    
+    class "CORS Handler" NOT_IMPLEMENTED {
+        ' Basic FastAPI CORS only
+    }
+    
+    class "Metrics" NOT_IMPLEMENTED {
+        ' No metrics collection
+        ' No Prometheus integration
+    }
+    
+    ' ========================================
+    ' Relationships
+    ' ========================================
+    
+    "gateway.py" --> Dispatcher : directly calls
+    "gateway.py" --> SymbolRequest : validates with Pydantic
+    "gateway.py" --> SearchRequest : validates with Pydantic
+    
+    note right of "gateway.py"
+        Minimal implementation:
+        - No interfaces
+        - No dependency injection
+        - Direct coupling to Dispatcher
+        - Basic error handling only
+    end note
+}
+
+@enduml

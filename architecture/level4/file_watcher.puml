@@ -1,0 +1,286 @@
+@startuml file_watcher
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define INTERNAL <<Internal>>
+!define ASYNC <<async>>
+
+package "mcp_server.watcher" <<Component>> {
+    
+    ' ========================================
+    ' Component Interfaces (Public)
+    ' ========================================
+    
+    interface IFileWatcher COMPONENT_INTERFACE #LightGreen {
+        +start_watching(path: str, recursive: bool): void
+        +stop_watching(path: str): void
+        +stop_all(): void
+        +add_pattern(pattern: str): void
+        +ignore_pattern(pattern: str): void
+        +get_watched_paths(): List<str>
+        +is_watching(path: str): bool
+    }
+    
+    interface IChangeNotifier COMPONENT_INTERFACE #LightGreen {
+        +on_file_created(handler: FileEventHandler): void
+        +on_file_modified(handler: FileEventHandler): void
+        +on_file_deleted(handler: FileEventHandler): void
+        +on_file_moved(handler: FileMoveHandler): void
+        +on_directory_created(handler: FileEventHandler): void
+        +on_directory_deleted(handler: FileEventHandler): void
+        +remove_handler(handler_id: str): void
+    }
+    
+    ' ========================================
+    ' Main Implementation Class
+    ' ========================================
+    
+    class WatcherEngine implements IFileWatcher, IChangeNotifier {
+        -observers: Dict<str, Observer>
+        -event_handlers: Dict<str, List<EventHandler>>
+        -event_queue: IEventQueue
+        -debouncer: IDebouncer
+        -filter: IPathFilter
+        -logger: ILogger
+        -metrics: IMetrics
+        
+        +start_watching(path: str, recursive: bool): void
+        +stop_watching(path: str): void
+        +stop_all(): void
+        +add_pattern(pattern: str): void
+        +ignore_pattern(pattern: str): void
+        +get_watched_paths(): List<str>
+        +is_watching(path: str): bool
+        +on_file_created(handler: FileEventHandler): void
+        +on_file_modified(handler: FileEventHandler): void
+        +on_file_deleted(handler: FileEventHandler): void
+        +on_file_moved(handler: FileMoveHandler): void
+        +on_directory_created(handler: FileEventHandler): void
+        +on_directory_deleted(handler: FileEventHandler): void
+        +remove_handler(handler_id: str): void
+        -_create_observer(path: str, recursive: bool): Observer
+        -_process_event(event: FileSystemEvent): void
+        -_should_process_path(path: str): bool
+    }
+    
+    ' ========================================
+    ' Internal Components
+    ' ========================================
+    
+    interface IEventQueue INTERNAL {
+        +ASYNC enqueue(event: FileSystemEvent): void
+        +ASYNC dequeue(): Optional<FileSystemEvent>
+        +ASYNC process_batch(size: int): List<FileSystemEvent>
+        +size(): int
+        +clear(): void
+    }
+    
+    interface IDebouncer INTERNAL {
+        +debounce(event: FileSystemEvent): Optional<FileSystemEvent>
+        +should_coalesce(event1: FileSystemEvent, event2: FileSystemEvent): bool
+        +get_pending_events(): List<FileSystemEvent]
+        +flush(): List<FileSystemEvent]
+    }
+    
+    interface IPathFilter INTERNAL {
+        +should_watch(path: str): bool
+        +add_include_pattern(pattern: str): void
+        +add_exclude_pattern(pattern: str): void
+        +matches_any_pattern(path: str, patterns: List<str]): bool
+    }
+    
+    interface IBatchProcessor INTERNAL {
+        +ASYNC process_events(events: List<FileSystemEvent]): BatchResult
+        +group_events(events: List<FileSystemEvent]): Dict<str, List<FileSystemEvent]]
+        +prioritize_events(events: List<FileSystemEvent]): List<FileSystemEvent]
+    }
+    
+    class EventQueue INTERNAL implements IEventQueue {
+        -queue: PriorityQueue<FileSystemEvent>
+        -lock: asyncio.Lock
+        -max_size: int
+        
+        +ASYNC enqueue(event: FileSystemEvent): void
+        +ASYNC dequeue(): Optional<FileSystemEvent]
+        +ASYNC process_batch(size: int): List<FileSystemEvent]
+        +size(): int
+        +clear(): void
+        -_get_priority(event: FileSystemEvent): int
+    }
+    
+    class Debouncer INTERNAL implements IDebouncer {
+        -pending_events: Dict<str, DebouncedEvent]
+        -debounce_interval_ms: int
+        -coalesce_strategy: ICoalesceStrategy
+        
+        +debounce(event: FileSystemEvent): Optional<FileSystemEvent]
+        +should_coalesce(event1: FileSystemEvent, event2: FileSystemEvent): bool
+        +get_pending_events(): List<FileSystemEvent]
+        +flush(): List<FileSystemEvent]
+        -_is_debounce_expired(event: DebouncedEvent): bool
+    }
+    
+    class PathFilter INTERNAL implements IPathFilter {
+        -include_patterns: List<Pattern]
+        -exclude_patterns: List<Pattern]
+        -gitignore_parser: IGitignoreParser
+        
+        +should_watch(path: str): bool
+        +add_include_pattern(pattern: str): void
+        +add_exclude_pattern(pattern: str): void
+        +matches_any_pattern(path: str, patterns: List<str]): bool
+        -_compile_pattern(pattern: str): Pattern
+        -_is_system_file(path: str): bool
+    }
+    
+    class BatchProcessor INTERNAL implements IBatchProcessor {
+        -index_engine: IIndexEngine
+        -priority_rules: List<PriorityRule]
+        
+        +ASYNC process_events(events: List<FileSystemEvent]): BatchResult
+        +group_events(events: List<FileSystemEvent]): Dict<str, List<FileSystemEvent]]
+        +prioritize_events(events: List<FileSystemEvent]): List<FileSystemEvent]
+        -ASYNC _process_group(group: str, events: List<FileSystemEvent]): GroupResult
+        -_merge_move_events(events: List<FileSystemEvent]): List[FileSystemEvent]
+    }
+    
+    class WatchdogAdapter INTERNAL {
+        -observer: watchdog.Observer
+        -handler: FileSystemEventHandler
+        
+        +start(): void
+        +stop(): void
+        +schedule(path: str, recursive: bool): void
+        +unschedule(watch: Any): void
+        -_convert_event(watchdog_event: Any): FileSystemEvent
+    }
+    
+    ' ========================================
+    ' Event Handlers
+    ' ========================================
+    
+    class FileSystemEventHandler INTERNAL {
+        -event_queue: IEventQueue
+        -filter: IPathFilter
+        
+        +on_created(event: watchdog.FileCreatedEvent): void
+        +on_modified(event: watchdog.FileModifiedEvent): void
+        +on_deleted(event: watchdog.FileDeletedEvent): void
+        +on_moved(event: watchdog.FileMovedEvent): void
+        -_create_event(watchdog_event: Any, event_type: str): FileSystemEvent
+    }
+    
+    class EventDispatcher INTERNAL {
+        -handlers: Dict<str, List<Callable]]
+        -executor: ThreadPoolExecutor
+        
+        +ASYNC dispatch(event: FileSystemEvent): void
+        +register_handler(event_type: str, handler: Callable): str
+        +unregister_handler(handler_id: str): void
+        -ASYNC _call_handler(handler: Callable, event: FileSystemEvent): void
+    }
+    
+    ' ========================================
+    ' Supporting Types
+    ' ========================================
+    
+    class FileSystemEvent {
+        +event_type: FileEventType
+        +path: str
+        +is_directory: bool
+        +timestamp: datetime
+        +size: Optional<int]
+        +hash: Optional<str]
+    }
+    
+    enum FileEventType {
+        CREATED
+        MODIFIED
+        DELETED
+        MOVED
+        RENAMED
+    }
+    
+    class FileMoveEvent extends FileSystemEvent {
+        +src_path: str
+        +dest_path: str
+    }
+    
+    class DebouncedEvent {
+        +original_event: FileSystemEvent
+        +coalesced_events: List<FileSystemEvent]
+        +first_seen: datetime
+        +last_seen: datetime
+    }
+    
+    class BatchResult {
+        +processed: int
+        +failed: int
+        +skipped: int
+        +duration_ms: float
+        +errors: List<Error]
+    }
+    
+    class WatchConfig {
+        +path: str
+        +recursive: bool
+        +patterns: List<str]
+        +ignore_patterns: List<str]
+        +debounce_ms: int
+        +batch_size: int
+    }
+    
+    type FileEventHandler = Callable[[FileSystemEvent], None]
+    type FileMoveHandler = Callable[[FileMoveEvent], None]
+    
+    ' ========================================
+    ' Strategies
+    ' ========================================
+    
+    interface ICoalesceStrategy INTERNAL {
+        +coalesce(events: List<FileSystemEvent]): FileSystemEvent
+        +can_coalesce(event1: FileSystemEvent, event2: FileSystemEvent): bool
+    }
+    
+    class ModificationCoalescer INTERNAL implements ICoalesceStrategy {
+        +coalesce(events: List<FileSystemEvent]): FileSystemEvent
+        +can_coalesce(event1: FileSystemEvent, event2: FileSystemEvent): bool
+        -_merge_metadata(events: List<FileSystemEvent]): Dict
+    }
+    
+    ' ========================================
+    ' Relationships
+    ' ========================================
+    
+    WatcherEngine --> IEventQueue : queues events
+    WatcherEngine --> IDebouncer : debounces events
+    WatcherEngine --> IPathFilter : filters paths
+    WatcherEngine --> EventDispatcher : dispatches events
+    WatcherEngine --> WatchdogAdapter : uses for watching
+    
+    EventQueue --> FileSystemEvent : stores
+    Debouncer --> ICoalesceStrategy : uses
+    BatchProcessor --> IIndexEngine : triggers indexing
+    
+    FileSystemEventHandler --> IEventQueue : enqueues to
+    FileSystemEventHandler --> IPathFilter : checks with
+    
+    ' External dependencies
+    WatcherEngine ..> ILogger : logs
+    WatcherEngine ..> IMetrics : reports
+    BatchProcessor ..> IIndexEngine : indexes with
+}
+
+' Exceptions
+class WatcherError <<exception>> {
+    +path: str
+    +reason: str
+}
+
+class EventProcessingError <<exception>> {
+    +event: FileSystemEvent
+    +cause: Exception
+}
+
+IFileWatcher ..> WatcherError : throws
+IBatchProcessor ..> EventProcessingError : throws
+
+@enduml

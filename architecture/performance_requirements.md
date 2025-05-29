@@ -1,7 +1,7 @@
 # Performance Requirements
 
 ## Overview
-This document defines the performance requirements and targets for the MCP Server system.
+This document defines the performance requirements and targets for the MCP Server system, including both SQLite-based indexing and Memgraph-based graph analysis.
 
 ## Response Time Requirements
 
@@ -10,6 +10,9 @@ This document defines the performance requirements and targets for the MCP Serve
 - **Semantic Search**: < 500ms (p95)
 - **Code Search**: < 200ms (p95)
 - **Index Status**: < 50ms (p95)
+- **Context Analysis**: < 300ms (p95)
+- **Dependency Graph**: < 500ms (p95)
+- **Impact Analysis**: < 400ms (p95)
 
 ### Background Operations
 - **File Indexing**: 10,000 files/minute
@@ -101,6 +104,9 @@ This document defines the performance requirements and targets for the MCP Serve
 - Index Update: 20ms/file
 - Embedding: 500ms/file
 - Search: 100ms base + 10ms/plugin
+- Graph Update: 30ms/file
+- Graph Traversal: 50ms per hop
+- Pattern Matching: 200ms for complex queries
 
 ## Implementation Guidelines
 

@@ -1,0 +1,137 @@
+@startuml indexer_actual
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define NOT_IMPLEMENTED <<Not Implemented>>
+
+' This diagram reflects the ACTUAL implementation
+
+package "mcp_server.utils" <<Component>> {
+    
+    ' ========================================
+    ' Actual Fuzzy Indexer Implementation
+    ' ========================================
+    
+    class FuzzyIndexer {
+        -index: dict[str, list[tuple[int, str]]]
+        
+        +__init__()
+        +add_file(path: str, content: str): void
+        +search(query: str, limit: int = 20): list[dict]
+        
+        ' Simple substring matching
+        ' In-memory storage only
+        ' No persistence
+    }
+    
+    ' ========================================
+    ' Actual Semantic Indexer Implementation
+    ' ========================================
+    
+    class SemanticIndexer {
+        -collection: str
+        -qdrant: QdrantClient
+        -wrapper: TreeSitterWrapper
+        -voyage: voyageai.Client
+        
+        +__init__(collection: str = "code-index", qdrant_path: str = ":memory:")
+        +index_file(path: Path): dict[str, Any]
+        +query(text: str, limit: int = 5): Iterable[dict[str, Any]]
+        -_ensure_collection(): void
+        -_symbol_id(file: str, name: str, line: int): int
+    }
+    
+    class SymbolEntry <<dataclass>> {
+        +symbol: str
+        +kind: str
+        +signature: str
+        +line: int
+        +span: tuple[int, int]
+    }
+    
+    ' ========================================
+    ' External Dependencies
+    ' ========================================
+    
+    class "voyageai" <<External Library>> {
+        ' Voyage AI embeddings
+        +embed(texts, model="voyage-code-3")
+    }
+    
+    class "qdrant_client" <<External Library>> {
+        ' Vector database
+        +QdrantClient(location)
+        +upsert(collection_name, points)
+        +search(collection_name, query_vector, limit)
+    }
+    
+    ' ========================================
+    ' NOT IMPLEMENTED Components
+    ' ========================================
+    
+    class "Index Engine" NOT_IMPLEMENTED {
+        ' No coordinating engine
+        ' No IIndexEngine interface
+        ' No IIndexCoordinator interface
+        ' Direct indexer usage only
+    }
+    
+    class "Parser Coordinator" NOT_IMPLEMENTED {
+        ' No parsing coordination
+        ' No IParserCoordinator interface
+        ' No IParseOrchestrator interface
+        ' Each indexer parses independently
+    }
+    
+    class "Query Optimizer" NOT_IMPLEMENTED {
+        ' No query optimization
+        ' No IQueryOptimizer interface
+        ' No ISearchPlanner interface
+        ' Direct query execution
+    }
+    
+    class "Index Storage" NOT_IMPLEMENTED {
+        ' FuzzyIndexer: In-memory only
+        ' SemanticIndexer: Default Qdrant
+        ' No SQLite FTS5 integration
+        ' No persistent fuzzy index
+    }
+    
+    class "Incremental Updates" NOT_IMPLEMENTED {
+        ' Full re-indexing only
+        ' No change detection
+        ' No partial updates
+    }
+    
+    ' ========================================
+    ' Implementation Notes
+    ' ========================================
+    
+    note right of FuzzyIndexer
+        Simple implementation:
+        - Case-insensitive substring search
+        - Line-by-line indexing
+        - No tokenization
+        - No ranking/scoring
+        - Memory-only storage
+    end note
+    
+    note right of SemanticIndexer
+        Advanced features:
+        - Voyage Code 3 embeddings
+        - Qdrant vector storage
+        - Tree-sitter parsing
+        - Symbol extraction
+        - Cosine similarity search
+        - In-memory mode by default
+    end note
+    
+    ' ========================================
+    ' Relationships
+    ' ========================================
+    
+    SemanticIndexer --> TreeSitterWrapper : parses with
+    SemanticIndexer --> voyageai : generates embeddings
+    SemanticIndexer --> qdrant_client : stores vectors
+    SemanticIndexer ..> SymbolEntry : creates
+}
+
+@enduml

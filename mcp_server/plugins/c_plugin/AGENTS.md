@@ -1,80 +1,57 @@
 # C Plugin Agent Configuration
 
-This file defines the capabilities and constraints for AI agents working with the C plugin.
+## Implementation Status
+❌ **STUB IMPLEMENTATION** - This plugin is NOT implemented
 
-## Agent Capabilities
+## Overview
+This is a stub plugin that exists only as a placeholder. All methods contain only `...` (ellipsis) and do not provide any functionality.
 
-### C Analysis
-- Parse C source code
-- Handle preprocessor
-- Resolve includes
-- Track symbols
-- Analyze types
-- Process macros
+## Current State
 
-### Code Understanding
-- Understand C idioms
-- Handle preprocessor directives
-- Process header files
-- Track dependencies
-- Analyze scopes
+```python
+class Plugin(IPlugin):
+    lang = "c"
+    
+    def supports(self, path):
+        ...  # NOT IMPLEMENTED
+    
+    def indexFile(self, path, content):
+        ...  # NOT IMPLEMENTED
+    
+    def getDefinition(self, symbol):
+        ...  # NOT IMPLEMENTED
+    
+    def findReferences(self, symbol):
+        ...  # NOT IMPLEMENTED
+    
+    def search(self, query, opts):
+        ...  # NOT IMPLEMENTED
+```
 
-### Testing & Validation
-- Test parsing
-- Validate symbol resolution
-- Check type analysis
-- Verify header resolution
-- Test edge cases
+## What Would Need Implementation
 
-### Performance
-- Optimize parsing
-- Cache results
-- Handle large codebases
-- Manage memory
+If this plugin were to be implemented, it would need:
+- Tree-sitter C grammar integration
+- C preprocessor handling
+- Header file resolution
+- Symbol table management
+- Macro expansion support
+- Include path resolution
 
-## Agent Constraints
+## Current Limitations
+- **No functionality**: All methods are stubs
+- **Cannot parse C files**: No Tree-sitter integration
+- **Cannot index symbols**: No parsing logic
+- **Cannot find definitions or references**: No symbol tracking
+- **Cannot search**: No indexing capability
 
-1. **C Standard Support**
-   - Support C89/C99/C11
-   - Handle standard differences
-   - Maintain compatibility
-   - Process extensions
+## Next Steps for Implementation
+1. Integrate Tree-sitter C grammar
+2. Implement basic parsing in `indexFile()`
+3. Add symbol extraction logic
+4. Handle C-specific features (structs, enums, typedefs)
+5. Implement preprocessor directives handling
+6. Add header file tracking
 
-2. **Analysis Accuracy**
-   - Correct symbol resolution
-   - Accurate type analysis
-   - Valid preprocessor handling
-   - Proper scope tracking
-
-3. **Performance**
-   - Efficient parsing
-   - Optimize memory usage
-   - Handle large codebases
-   - Cache effectively
-
-4. **Edge Cases**
-   - Handle circular includes
-   - Process conditional compilation
-   - Support macro redefinition
-   - Handle scope conflicts
-
-## Common Operations
-
-```c
-// Parse C file
-AST* parse_file(const char* path) {
-    return tree_sitter_parse(path);
-}
-
-// Analyze includes
-void analyze_includes(AST* tree) {
-    process_preprocessor_directives(tree);
-    resolve_includes();
-}
-
-// Track symbols
-void track_symbols(AST* tree) {
-    build_symbol_table(tree);
-    resolve_references();
-}
-``` 
+## Testing
+No tests exist for this stub implementation.

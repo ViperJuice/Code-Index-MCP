@@ -1,80 +1,63 @@
 # C++ Plugin Agent Configuration
 
-This file defines the capabilities and constraints for AI agents working with the C++ plugin.
+## Implementation Status
+❌ **STUB IMPLEMENTATION** - This plugin is NOT implemented
 
-## Agent Capabilities
+## Overview
+This is a stub plugin that exists only as a placeholder. All methods contain only `...` (ellipsis) and do not provide any functionality.
 
-### C++ Analysis
-- Parse C++ source code
-- Handle templates
-- Resolve namespaces
-- Track classes
-- Analyze overloads
-- Process modern features
+## Current State
 
-### Code Understanding
-- Understand C++ idioms
-- Handle template metaprogramming
-- Process class hierarchies
-- Track dependencies
-- Analyze scopes
+```python
+class Plugin(IPlugin):
+    lang = "cpp"
+    
+    def supports(self, path):
+        ...  # NOT IMPLEMENTED
+    
+    def indexFile(self, path, content):
+        ...  # NOT IMPLEMENTED
+    
+    def getDefinition(self, symbol):
+        ...  # NOT IMPLEMENTED
+    
+    def findReferences(self, symbol):
+        ...  # NOT IMPLEMENTED
+    
+    def search(self, query, opts):
+        ...  # NOT IMPLEMENTED
+```
 
-### Testing & Validation
-- Test parsing
-- Validate template resolution
-- Check class hierarchy
-- Verify namespace resolution
-- Test edge cases
+## What Would Need Implementation
 
-### Performance
-- Optimize parsing
-- Cache results
-- Handle large codebases
-- Manage memory
+If this plugin were to be implemented, it would need:
+- Tree-sitter C++ grammar integration
+- Template parsing and instantiation tracking
+- Namespace resolution
+- Class hierarchy analysis
+- Overload resolution
+- STL and standard library awareness
+- Modern C++ feature support (C++11/14/17/20)
 
-## Agent Constraints
+## Current Limitations
+- **No functionality**: All methods are stubs
+- **Cannot parse C++ files**: No Tree-sitter integration
+- **Cannot index symbols**: No parsing logic
+- **Cannot find definitions or references**: No symbol tracking
+- **Cannot search**: No indexing capability
 
-1. **C++ Standard Support**
-   - Support C++11/14/17/20
-   - Handle standard differences
-   - Maintain compatibility
-   - Process extensions
+## Next Steps for Implementation
+1. Integrate Tree-sitter C++ grammar
+2. Implement basic parsing in `indexFile()`
+3. Add symbol extraction for classes, functions, templates
+4. Handle C++ specific features:
+   - Templates and template specializations
+   - Namespaces and using declarations
+   - Multiple inheritance
+   - Operator overloading
+   - Lambda expressions
+5. Implement name mangling/demangling
+6. Add STL container and algorithm recognition
 
-2. **Analysis Accuracy**
-   - Correct template resolution
-   - Accurate class hierarchy
-   - Valid namespace handling
-   - Proper overload resolution
-
-3. **Performance**
-   - Efficient parsing
-   - Optimize memory usage
-   - Handle large codebases
-   - Cache effectively
-
-4. **Edge Cases**
-   - Handle template metaprogramming
-   - Process multiple inheritance
-   - Support SFINAE
-   - Handle CRTP
-
-## Common Operations
-
-```cpp
-// Parse C++ file
-AST* parse_file(const char* path) {
-    return tree_sitter_parse(path);
-}
-
-// Analyze templates
-void analyze_templates(AST* tree) {
-    process_template_declarations(tree);
-    resolve_specializations();
-}
-
-// Track classes
-void track_classes(AST* tree) {
-    build_class_hierarchy(tree);
-    resolve_inheritance();
-}
-``` 
+## Testing
+No tests exist for this stub implementation.

@@ -1,0 +1,77 @@
+@startuml dispatcher_actual
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define INTERNAL <<Internal>>
+!define NOT_IMPLEMENTED <<Not Implemented>>
+
+' This diagram reflects the ACTUAL implementation in dispatcher.py
+
+package "mcp_server" <<Component>> {
+    
+    ' ========================================
+    ' Actual Dispatcher Implementation
+    ' ========================================
+    
+    class Dispatcher {
+        -_plugins: list[IPlugin]
+        -_by_lang: dict[str, IPlugin]
+        
+        +__init__(plugins: list[IPlugin])
+        +lookup(symbol: str): SymbolDef | None
+        +search(query: str, semantic: bool = False, limit: int = 20): Iterable[SearchResult]
+        -_match_plugin(path: Path): IPlugin
+    }
+    
+    ' ========================================
+    ' NOT IMPLEMENTED Components
+    ' ========================================
+    
+    class "Dispatcher Core" NOT_IMPLEMENTED {
+        ' No formal IDispatcher interface
+        ' No IRequestRouter interface
+    }
+    
+    class "Plugin Router" NOT_IMPLEMENTED {
+        ' Basic plugin matching by file extension only
+        ' No IPluginRouter interface
+        ' No IFileTypeMatcher interface
+    }
+    
+    class "Result Aggregator" NOT_IMPLEMENTED {
+        ' Simple iteration over plugins
+        ' No IResultAggregator interface
+        ' No IResultMerger interface
+        ' No parallel processing
+    }
+    
+    class "Request Queue" NOT_IMPLEMENTED {
+        ' No request queueing
+        ' No async processing
+        ' No priority handling
+    }
+    
+    class "Load Balancer" NOT_IMPLEMENTED {
+        ' No load balancing
+        ' No plugin health checks
+        ' No failover
+    }
+    
+    ' ========================================
+    ' Relationships
+    ' ========================================
+    
+    Dispatcher --> IPlugin : iterates over
+    Dispatcher ..> SymbolDef : returns
+    Dispatcher ..> SearchResult : yields
+    
+    note right of Dispatcher
+        Minimal implementation:
+        - Simple list of plugins
+        - Direct method calls
+        - No parallel processing
+        - No caching
+        - No error aggregation
+        - Sequential plugin execution
+    end note
+}
+
+@enduml

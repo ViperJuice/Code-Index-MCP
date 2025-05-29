@@ -1,0 +1,114 @@
+@startuml python_plugin_actual
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define NOT_IMPLEMENTED <<Not Implemented>>
+
+' This diagram reflects the ACTUAL implementation in python_plugin/plugin.py
+
+package "mcp_server.plugins.python_plugin" <<Component>> {
+    
+    ' ========================================
+    ' Actual Python Plugin Implementation
+    ' ========================================
+    
+    class Plugin implements IPlugin {
+        +lang: str = "python"
+        -_ts: TreeSitterWrapper
+        -_indexer: FuzzyIndexer
+        
+        +__init__()
+        +supports(path: str | Path): bool
+        +indexFile(path: str | Path, content: str): IndexShard
+        +getDefinition(symbol: str): SymbolDef | None
+        +findReferences(symbol: str): Iterable[Reference]
+        +search(query: str, opts: SearchOpts | None): Iterable[SearchResult]
+        -_preindex(): void
+    }
+    
+    ' ========================================
+    ' External Dependencies (Actually Used)
+    ' ========================================
+    
+    class "jedi" <<External Library>> {
+        ' Used for Python code intelligence
+        +Script(code: str, path: str)
+        +get_names()
+        +goto()
+        +get_references()
+    }
+    
+    class TreeSitterWrapper {
+        ' Basic tree-sitter wrapper
+        -_parser: Parser
+        +parse(content: bytes): Tree
+    }
+    
+    class FuzzyIndexer {
+        ' Simple substring search
+        +add_file(path: str, content: str)
+        +search(query: str): list
+    }
+    
+    ' ========================================
+    ' NOT IMPLEMENTED Features
+    ' ========================================
+    
+    class "Semantic Analysis" NOT_IMPLEMENTED {
+        ' No type inference beyond Jedi
+        ' No dataflow analysis
+        ' No call graph analysis
+    }
+    
+    class "Import Resolution" NOT_IMPLEMENTED {
+        ' Basic Jedi import following only
+        ' No custom import resolver
+        ' No virtual environment handling
+    }
+    
+    class "Incremental Indexing" NOT_IMPLEMENTED {
+        ' Full re-indexing only
+        ' No incremental updates
+        ' No change tracking
+    }
+    
+    class "Cache Management" NOT_IMPLEMENTED {
+        ' No caching of parse results
+        ' No persistent cache
+        ' Re-parses on every request
+    }
+    
+    class "Advanced Features" NOT_IMPLEMENTED {
+        ' No decorator analysis
+        ' No metaclass handling
+        ' No async/await tracking
+        ' No type hint analysis
+    }
+    
+    ' ========================================
+    ' Actual Implementation Details
+    ' ========================================
+    
+    note right of Plugin
+        Current implementation:
+        - Pre-indexes all .py files on init
+        - Uses tree-sitter for basic parsing
+        - Uses Jedi for definition/reference lookup
+        - Simple fuzzy search with substrings
+        - No caching or optimization
+        - No error handling for parse failures
+    end note
+    
+    ' ========================================
+    ' Relationships
+    ' ========================================
+    
+    Plugin --> TreeSitterWrapper : parses with
+    Plugin --> FuzzyIndexer : indexes with
+    Plugin --> jedi : analyzes with
+    
+    Plugin ..> IndexShard : returns
+    Plugin ..> SymbolDef : returns
+    Plugin ..> Reference : yields
+    Plugin ..> SearchResult : yields
+}
+
+@enduml

@@ -1,80 +1,67 @@
 # HTML/CSS Plugin Agent Configuration
 
-This file defines the capabilities and constraints for AI agents working with the HTML/CSS plugin.
+## Implementation Status
+❌ **STUB IMPLEMENTATION** - This plugin is NOT implemented
 
-## Agent Capabilities
+## Overview
+This is a stub plugin that exists only as a placeholder. All methods contain only `...` (ellipsis) and do not provide any functionality.
 
-### HTML/CSS Analysis
-- Parse HTML5 code
-- Handle CSS3 rules
-- Resolve selectors
-- Track styles
-- Analyze media queries
-- Process custom properties
+## Current State
 
-### Code Understanding
-- Understand HTML structure
-- Handle CSS specificity
-- Process style inheritance
-- Track dependencies
-- Analyze layouts
+```python
+class Plugin(IPlugin):
+    lang = "html_css"
+    
+    def supports(self, path):
+        ...  # NOT IMPLEMENTED
+    
+    def indexFile(self, path, content):
+        ...  # NOT IMPLEMENTED
+    
+    def getDefinition(self, symbol):
+        ...  # NOT IMPLEMENTED
+    
+    def findReferences(self, symbol):
+        ...  # NOT IMPLEMENTED
+    
+    def search(self, query, opts):
+        ...  # NOT IMPLEMENTED
+```
 
-### Testing & Validation
-- Test parsing
-- Validate selectors
-- Check style resolution
-- Verify media queries
-- Test edge cases
+## What Would Need Implementation
 
-### Performance
-- Optimize parsing
-- Cache results
-- Handle large codebases
-- Manage memory
+If this plugin were to be implemented, it would need:
+- Tree-sitter HTML and CSS grammar integration
+- HTML DOM structure parsing
+- CSS selector parsing and matching
+- Style inheritance tracking
+- Media query analysis
+- CSS preprocessor support (SASS, LESS)
+- HTML template language support
 
-## Agent Constraints
+## Current Limitations
+- **No functionality**: All methods are stubs
+- **Cannot parse HTML/CSS files**: No Tree-sitter integration
+- **Cannot index elements or styles**: No parsing logic
+- **Cannot find definitions or references**: No symbol tracking
+- **Cannot search**: No indexing capability
 
-1. **HTML/CSS Support**
-   - Support HTML5
-   - Handle CSS3
-   - Maintain compatibility
-   - Process new features
+## Next Steps for Implementation
+1. Integrate Tree-sitter HTML and CSS grammars
+2. Implement basic parsing in `indexFile()`
+3. Add extraction for:
+   - HTML elements, IDs, and classes
+   - CSS selectors and rules
+   - Style properties and values
+   - Data attributes
+4. Handle HTML/CSS-specific features:
+   - CSS cascade and specificity
+   - Pseudo-classes and pseudo-elements
+   - CSS custom properties (variables)
+   - Flexbox and Grid layouts
+   - Media queries and responsive design
+5. Add preprocessor support (SASS/SCSS, LESS, Stylus)
+6. Consider framework integration (Bootstrap, Tailwind)
 
-2. **Analysis Accuracy**
-   - Correct selector resolution
-   - Accurate style inheritance
-   - Valid media query handling
-   - Proper specificity
-
-3. **Performance**
-   - Efficient parsing
-   - Optimize memory usage
-   - Handle large codebases
-   - Cache effectively
-
-4. **Edge Cases**
-   - Handle dynamic classes
-   - Process custom properties
-   - Support media queries
-   - Handle Shadow DOM
-
-## Common Operations
-
-```javascript
-// Parse HTML file
-function parseHTML(path) {
-  return treeSitterParse(path);
-}
-
-// Analyze styles
-function analyzeStyles(ast) {
-  processCSSRules(ast);
-  resolveSelectors();
-}
-
-// Track elements
-function trackElements(ast) {
-  buildElementTree(ast);
-  resolveRelationships();
-}
-``` 
+## Testing
+No tests exist for this stub implementation.

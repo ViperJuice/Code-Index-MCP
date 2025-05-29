@@ -1,0 +1,204 @@
+@startuml shared_interfaces
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define INTERNAL <<Internal>>
+!define ASYNC <<async>>
+!define SHARED <<Shared>>
+
+package "mcp_server.shared" <<Shared>> {
+    
+    ' ========================================
+    ' Cross-Cutting Interfaces
+    ' ========================================
+    
+    interface ILogger SHARED {
+        +log(level: LogLevel, message: str, context: Dict): void
+        +debug(message: str, context: Dict): void
+        +info(message: str, context: Dict): void
+        +warning(message: str, context: Dict): void
+        +error(message: str, exception: Exception, context: Dict): void
+    }
+    
+    interface IMetrics SHARED {
+        +increment(metric: str, value: int, tags: Dict): void
+        +gauge(metric: str, value: float, tags: Dict): void
+        +histogram(metric: str, value: float, tags: Dict): void
+        +timer(metric: str): ContextManager
+    }
+    
+    interface IConfig SHARED {
+        +get(key: str, default: Any): Any
+        +get_int(key: str, default: int): int
+        +get_bool(key: str, default: bool): bool
+        +get_str(key: str, default: str): str
+        +get_dict(key: str, default: Dict): Dict
+        +reload(): void
+    }
+    
+    interface ICache SHARED {
+        +get(key: str): Optional<Any>
+        +set(key: str, value: Any, ttl: Optional<int>): void
+        +delete(key: str): void
+        +exists(key: str): bool
+        +clear(): void
+    }
+    
+    interface IEventBus SHARED {
+        +publish(event: Event): void
+        +subscribe(event_type: str, handler: Callable): void
+        +unsubscribe(event_type: str, handler: Callable): void
+    }
+    
+    ' ========================================
+    ' Common Data Types
+    ' ========================================
+    
+    enum LogLevel {
+        DEBUG
+        INFO
+        WARNING
+        ERROR
+        CRITICAL
+    }
+    
+    enum IndexStatus {
+        PENDING
+        IN_PROGRESS
+        COMPLETED
+        FAILED
+        CANCELLED
+    }
+    
+    enum PluginStatus {
+        UNLOADED
+        LOADING
+        READY
+        ERROR
+        DISABLED
+    }
+    
+    class Event SHARED {
+        +event_type: str
+        +timestamp: datetime
+        +source: str
+        +data: Dict
+    }
+    
+    class Result<T> SHARED {
+        +success: bool
+        +value: Optional<T>
+        +error: Optional<Error>
+        +metadata: Dict
+    }
+    
+    class Error SHARED {
+        +code: str
+        +message: str
+        +details: Dict
+        +timestamp: datetime
+    }
+    
+    ' ========================================
+    ' Security Interfaces
+    ' ========================================
+    
+    interface ISecurityContext SHARED {
+        +user_id: Optional<str>
+        +roles: List<str>
+        +permissions: List<str>
+        +is_authenticated: bool
+        +is_authorized(permission: str): bool
+    }
+    
+    interface IValidator SHARED {
+        +validate(data: Any, schema: Schema): Result<Any>
+        +sanitize(data: Any): Any
+    }
+    
+    ' ========================================
+    ' Async Support
+    ' ========================================
+    
+    interface IAsyncSupport SHARED {
+        +ASYNC run_async(func: Callable, *args, **kwargs): Awaitable<Any>
+        +ASYNC gather(*awaitables: Awaitable): List<Any>
+        +create_task(coro: Coroutine): Task
+        +get_event_loop(): EventLoop
+    }
+    
+    ' ========================================
+    ' Repository Pattern
+    ' ========================================
+    
+    interface IRepository<T> SHARED {
+        +find(id: str): Optional<T>
+        +find_all(filter: Dict): List<T>
+        +save(entity: T): T
+        +delete(id: str): bool
+        +exists(id: str): bool
+    }
+    
+    interface IAsyncRepository<T> SHARED {
+        +ASYNC find(id: str): Optional<T>
+        +ASYNC find_all(filter: Dict): List<T>
+        +ASYNC save(entity: T): T
+        +ASYNC delete(id: str): bool
+        +ASYNC exists(id: str): bool
+    }
+    
+    ' ========================================
+    ' Factory Pattern
+    ' ========================================
+    
+    interface IFactory<T> SHARED {
+        +create(*args, **kwargs): T
+        +create_from_config(config: Dict): T
+    }
+    
+    ' ========================================
+    ' Observer Pattern
+    ' ========================================
+    
+    interface IObserver SHARED {
+        +update(event: Event): void
+    }
+    
+    interface IObservable SHARED {
+        +attach(observer: IObserver): void
+        +detach(observer: IObserver): void
+        +notify(event: Event): void
+    }
+    
+    ' ========================================
+    ' Common Exceptions
+    ' ========================================
+    
+    class ValidationError <<exception>> {
+        +field: str
+        +value: Any
+        +constraint: str
+    }
+    
+    class NotFoundError <<exception>> {
+        +resource_type: str
+        +resource_id: str
+    }
+    
+    class PermissionError <<exception>> {
+        +required_permission: str
+        +user_id: str
+    }
+    
+    class ConfigurationError <<exception>> {
+        +config_key: str
+        +expected_type: str
+        +actual_value: Any
+    }
+    
+    class PluginError <<exception>> {
+        +plugin_name: str
+        +operation: str
+        +cause: Exception
+    }
+}
+
+@enduml

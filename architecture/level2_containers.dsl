@@ -41,6 +41,13 @@ workspace "MCP Server – Level 2" {
         technology "Voyage AI, Qdrant"
       }
       
+      # Graph storage
+      graph_store = container "Graph Store" {
+        description "Graph database for code relationships and context analysis"
+        technology "Memgraph, Cypher"
+        tags "Database"
+      }
+      
       # Plugin architecture
       plugin_system = container "Plugin System" {
         description "Manages language-specific plugins"
@@ -94,6 +101,7 @@ workspace "MCP Server – Level 2" {
     dispatcher -> plugin_system "delegates to plugins"
     dispatcher -> cache "checks cache"
     dispatcher -> store "queries indices"
+    dispatcher -> graph_store "queries relationships"
     dispatcher -> embed "semantic search"
     dispatcher -> queue "queues tasks"
     
@@ -101,6 +109,7 @@ workspace "MCP Server – Level 2" {
     plugin_system -> indexer "triggers indexing"
     
     indexer -> store "persists indices"
+    indexer -> graph_store "stores relationships"
     indexer -> embed "generates embeddings"
     indexer -> cache "updates cache"
     

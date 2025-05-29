@@ -1,0 +1,120 @@
+@startuml plugin_system_actual
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define ABSTRACT <<abstract>>
+!define NOT_IMPLEMENTED <<Not Implemented>>
+
+' This diagram reflects the ACTUAL implementation
+
+package "mcp_server" <<Component>> {
+    
+    ' ========================================
+    ' Actual Plugin Interface
+    ' ========================================
+    
+    abstract class IPlugin <<ABC>> {
+        +lang: str
+        
+        +{abstract} supports(path: str | Path): bool
+        +{abstract} indexFile(path: str | Path, content: str): IndexShard
+        +{abstract} getDefinition(symbol: str): SymbolDef | None
+        +{abstract} findReferences(symbol: str): Iterable[Reference]
+        +{abstract} search(query: str, opts: SearchOpts | None): Iterable[SearchResult]
+    }
+    
+    ' ========================================
+    ' Data Types (TypedDict and dataclass)
+    ' ========================================
+    
+    class IndexShard <<TypedDict>> {
+        +file: str
+        +symbols: list[dict]
+        +language: str
+    }
+    
+    class SymbolDef <<TypedDict>> {
+        +symbol: str
+        +kind: str
+        +language: str
+        +signature: str
+        +doc: str | None
+        +defined_in: str
+        +line: int
+        +span: tuple[int, int]
+    }
+    
+    class SearchResult <<TypedDict>> {
+        +file: str
+        +line: int
+        +snippet: str
+    }
+    
+    class SearchOpts <<TypedDict>> {
+        +semantic: bool
+        +limit: int
+    }
+    
+    class Reference <<dataclass>> {
+        +file: str
+        +line: int
+        <<frozen>>
+    }
+    
+    ' ========================================
+    ' NOT IMPLEMENTED Components
+    ' ========================================
+    
+    class "Plugin Registry" NOT_IMPLEMENTED {
+        ' No dynamic plugin discovery
+        ' No IPluginRegistry interface
+        ' No IPluginDiscovery interface
+        ' Plugins are hardcoded
+    }
+    
+    class "Plugin Manager" NOT_IMPLEMENTED {
+        ' No lifecycle management
+        ' No IPluginManager interface
+        ' No ILifecycleManager interface
+        ' No plugin enable/disable
+    }
+    
+    class "Plugin Loader" NOT_IMPLEMENTED {
+        ' No dynamic loading
+        ' No IPluginLoader interface
+        ' No IModuleImporter interface
+        ' Direct imports only
+    }
+    
+    class "Plugin Configuration" NOT_IMPLEMENTED {
+        ' No per-plugin configuration
+        ' No plugin settings
+        ' No plugin state management
+    }
+    
+    class "Plugin Sandbox" NOT_IMPLEMENTED {
+        ' No plugin isolation
+        ' No resource limits
+        ' No security boundaries
+    }
+    
+    ' ========================================
+    ' Relationships
+    ' ========================================
+    
+    IPlugin ..> IndexShard : returns
+    IPlugin ..> SymbolDef : returns
+    IPlugin ..> SearchResult : yields
+    IPlugin ..> Reference : yields
+    IPlugin --> SearchOpts : uses
+    
+    note bottom of IPlugin
+        Minimal plugin system:
+        - Simple abstract base class
+        - No plugin discovery
+        - No lifecycle management
+        - No configuration
+        - No isolation/sandboxing
+        - Direct implementation only
+    end note
+}
+
+@enduml

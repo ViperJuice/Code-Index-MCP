@@ -1,78 +1,71 @@
 # Python Plugin Agent Configuration
 
-This file defines the capabilities and constraints for AI agents working with the Python plugin.
+## Implementation Status
+✅ **FULLY IMPLEMENTED** - This is the ONLY working plugin in the system
 
-## Agent Capabilities
+## Overview
+The Python plugin is the only fully implemented language plugin. It uses Tree-sitter for parsing (NOT the Python AST module) and Jedi for advanced Python intelligence features.
 
-### Python Analysis
-- Parse Python AST
-- Resolve imports
-- Infer types
-- Analyze docstrings
-- Process decorators
-- Track class hierarchies
+## Actual Implementation
 
-### Code Understanding
-- Understand Python idioms
-- Handle Python 3.x features
-- Process type hints
-- Analyze async code
-- Track dependencies
+### What It Does
+- **Parsing**: Uses Tree-sitter to parse Python files
+- **Indexing**: Extracts top-level functions and classes only
+- **Symbol Lookup**: Uses Jedi to find symbol definitions
+- **Reference Finding**: Uses Jedi to find all references to symbols
+- **Search**: Fuzzy text search across all Python files
+- **Pre-indexing**: Automatically indexes all .py files on startup
 
-### Testing & Validation
-- Test AST parsing
-- Validate import resolution
-- Check type inference
-- Verify docstring parsing
-- Test edge cases
+### What It Does NOT Do
+- Does NOT use Python's AST module
+- Does NOT index variables or nested definitions
+- Does NOT resolve imports
+- Does NOT extract detailed type information
+- Does NOT support semantic/embedding-based search
+- Does NOT cache parsed results
+- Does NOT handle decorators, metaclasses, or advanced Python features
 
-### Performance
-- Optimize AST traversal
-- Cache parsed results
-- Handle large files
-- Manage memory usage
-
-## Agent Constraints
-
-1. **Python Version Support**
-   - Support Python 3.x
-   - Handle version differences
-   - Maintain compatibility
-   - Process new syntax
-
-2. **Analysis Accuracy**
-   - Correct type inference
-   - Accurate import resolution
-   - Valid AST parsing
-   - Proper docstring handling
-
-3. **Performance**
-   - Efficient AST traversal
-   - Optimize memory usage
-   - Handle large codebases
-   - Cache effectively
-
-4. **Edge Cases**
-   - Handle circular imports
-   - Process dynamic imports
-   - Support metaclasses
-   - Handle decorator chains
-
-## Common Operations
+## Code Structure
 
 ```python
-# Parse Python file
-def parse_file(path: str) -> ast.Module:
-    with open(path) as f:
-        return ast.parse(f.read())
+class Plugin(IPlugin):
+    lang = "python"
+    
+    def __init__(self):
+        self._ts = TreeSitterWrapper()  # Tree-sitter parser
+        self._indexer = FuzzyIndexer()  # Text search
+        self._preindex()  # Index all .py files
+    
+    def indexFile(self, path, content):
+        # Parses with Tree-sitter
+        # Extracts only function_definition and class_definition nodes
+        # Returns simple signatures like "def foo(...):"
+    
+    def getDefinition(self, symbol):
+        # Uses Jedi to find symbol definitions
+        # Searches all .py files in the project
+    
+    def findReferences(self, symbol):
+        # Uses Jedi to find references
+        # Returns list of file+line locations
+    
+    def search(self, query, opts):
+        # Uses FuzzyIndexer for text search
+        # Returns empty list for semantic search
+```
 
-# Analyze imports
-def analyze_imports(tree: ast.Module) -> List[str]:
-    return [n.module for n in ast.walk(tree) 
-            if isinstance(n, ast.Import) or isinstance(n, ast.ImportFrom)]
+## Limitations
 
-# Infer types
-def infer_types(tree: ast.Module) -> Dict[str, str]:
-    return {node.target.id: get_type(node.value) 
-            for node in ast.walk(tree) 
-            if isinstance(node, ast.Assign)} 
+1. **Limited Symbol Types**: Only indexes functions and classes at the top level
+2. **Simple Signatures**: Extracts basic signatures without parameters
+3. **No Caching**: Re-parses files on every operation
+4. **No Import Analysis**: Cannot resolve imports or dependencies
+5. **Basic Error Handling**: Silently skips files with errors
+
+## Dependencies
+- `jedi`: For Python code intelligence
+- `TreeSitterWrapper`: Internal utility for Tree-sitter parsing
+- `FuzzyIndexer`: Internal utility for text search
+
+## Testing
+Test with `test_python_plugin.py` to verify basic functionality.

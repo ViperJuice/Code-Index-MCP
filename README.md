@@ -230,6 +230,42 @@ All API responses follow a consistent JSON structure:
 }
 ```
 
+## 🚢 Deployment
+
+### Quick Docker Deployment
+
+```bash
+# Using Docker Compose
+docker-compose up -d
+
+# Or build and run manually
+docker build -t code-index-mcp .
+docker run -p 8000:8000 -v ./codebase:/codebase code-index-mcp
+```
+
+### Production Deployment
+
+For production environments, we recommend:
+
+1. **Use environment variables** for all configuration
+2. **Enable Redis** for caching and performance
+3. **Use PostgreSQL** instead of SQLite for persistence
+4. **Deploy behind a reverse proxy** (nginx/Caddy)
+5. **Enable monitoring** with Prometheus/Grafana
+
+See our [Deployment Guide](docs/DEPLOYMENT-GUIDE.md) for detailed instructions including:
+- Kubernetes deployment configurations
+- Auto-scaling setup
+- Database optimization
+- Security best practices
+- Monitoring and observability
+
+### System Requirements
+
+- **Minimum**: 2GB RAM, 2 CPU cores, 10GB storage
+- **Recommended**: 8GB RAM, 4 CPU cores, 50GB SSD storage
+- **Large codebases**: 16GB+ RAM, 8+ CPU cores, 100GB+ SSD storage
+
 ## 🤝 Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
@@ -256,17 +292,21 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 | Operation | Performance Target | Current |
 |-----------|-------------------|----------|
-| Symbol Lookup | <100ms (p95) | ~50ms |
-| Code Search | <500ms (p95) | ~200ms |
-| File Indexing | 10K files/min | 8K files/min |
-| Memory Usage | <2GB for 100K files | 1.5GB |
+| Symbol Lookup | <100ms (p95) | Not measured |
+| Code Search | <500ms (p95) | Not implemented |
+| File Indexing | 10K files/min | Not implemented |
+| Memory Usage | <2GB for 100K files | Not measured |
 
-### Optimization Tips
+**Note**: These are design targets. Performance has not been measured as most features are not yet implemented.
 
-1. **Enable caching**: Set `ENABLE_CACHE=true` in `.env`
-2. **Adjust batch size**: `INDEX_BATCH_SIZE=100` for large codebases
-3. **Use SSD storage**: Significantly improves indexing speed
-4. **Limit file size**: Skip very large files with `MAX_FILE_SIZE`
+### Optimization Tips (Future)
+
+These optimizations will be relevant once the system is fully implemented:
+
+1. **Enable caching**: Set `ENABLE_CACHE=true` in `.env` (not implemented)
+2. **Adjust batch size**: `INDEX_BATCH_SIZE=100` for large codebases (not implemented)
+3. **Use SSD storage**: Will improve indexing speed
+4. **Limit file size**: Skip very large files with `MAX_FILE_SIZE` (not implemented)
 
 ## 🔒 Security
 

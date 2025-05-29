@@ -1,0 +1,336 @@
+@startuml python_plugin
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define INTERNAL <<Internal>>
+!define ASYNC <<async>>
+
+package "mcp_server.plugins.python" <<Component>> {
+    
+    ' ========================================
+    ' Component Interfaces (Public)
+    ' ========================================
+    
+    interface IPythonPlugin COMPONENT_INTERFACE #LightGreen {
+        +ASYNC index(file_path: str): IndexResult
+        +ASYNC get_definition(symbol: str, context: Dict): Definition
+        +ASYNC get_references(symbol: str, context: Dict): List<Reference>
+        +ASYNC search(query: str, options: SearchOptions): List<SearchResult>
+        +ASYNC extract_graph_data(file_path: str): GraphData
+        +get_python_version(): str
+    }
+    
+    interface IPythonAnalyzer COMPONENT_INTERFACE #LightGreen {
+        +ASYNC analyze_module(file_path: str): ModuleAnalysis
+        +ASYNC analyze_class(class_node: ast.ClassDef): ClassAnalysis
+        +ASYNC analyze_function(func_node: ast.FunctionDef): FunctionAnalysis
+        +ASYNC infer_types(node: ast.AST): TypeInfo
+        +ASYNC resolve_imports(module: ast.Module): List<ResolvedImport]
+    }
+    
+    ' ========================================
+    ' Main Implementation Class
+    ' ========================================
+    
+    class PythonPlugin extends PluginBase implements IPythonPlugin, IPythonAnalyzer {
+        -ast_parser: IASTParser
+        -jedi_analyzer: IJediAnalyzer
+        -type_inferrer: ITypeInferrer
+        -import_resolver: IImportResolver
+        -docstring_parser: IDocstringParser
+        -graph_extractor: IPythonGraphExtractor
+        
+        +ASYNC index(file_path: str): IndexResult
+        +ASYNC get_definition(symbol: str, context: Dict): Definition
+        +ASYNC get_references(symbol: str, context: Dict): List<Reference]
+        +ASYNC search(query: str, options: SearchOptions): List<SearchResult]
+        +ASYNC extract_graph_data(file_path: str): GraphData
+        +get_python_version(): str
+        +ASYNC analyze_module(file_path: str): ModuleAnalysis
+        +ASYNC analyze_class(class_node: ast.ClassDef): ClassAnalysis
+        +ASYNC analyze_function(func_node: ast.FunctionDef): FunctionAnalysis
+        +ASYNC infer_types(node: ast.AST): TypeInfo
+        +ASYNC resolve_imports(module: ast.Module): List<ResolvedImport]
+        -ASYNC _extract_symbols(tree: ast.Module): List<Symbol]
+        -ASYNC _extract_references(tree: ast.Module): List<Reference]
+        -_get_node_location(node: ast.AST): Location
+    }
+    
+    ' ========================================
+    ' Internal Components
+    ' ========================================
+    
+    interface IASTParser INTERNAL {
+        +parse_file(file_path: str): ast.Module
+        +parse_string(source: str, filename: str): ast.Module
+        +get_ast_dump(node: ast.AST): str
+        +validate_syntax(source: str): ValidationResult
+    }
+    
+    interface IJediAnalyzer INTERNAL {
+        +ASYNC get_definition(source: str, line: int, column: int): Optional<JediDefinition]
+        +ASYNC get_references(source: str, line: int, column: int): List<JediReference]
+        +ASYNC get_completions(source: str, line: int, column: int): List<Completion]
+        +ASYNC infer_type(source: str, line: int, column: int): Optional<str]
+    }
+    
+    interface ITypeInferrer INTERNAL {
+        +infer_expression_type(expr: ast.expr): TypeInfo
+        +infer_variable_type(name: str, scope: Scope): TypeInfo
+        +infer_function_return_type(func: ast.FunctionDef): TypeInfo
+        +get_type_from_annotation(annotation: ast.expr): TypeInfo
+    }
+    
+    interface IImportResolver INTERNAL {
+        +resolve_import(import_node: ast.Import): List<ResolvedImport]
+        +resolve_import_from(import_from: ast.ImportFrom): List<ResolvedImport]
+        +find_module_path(module_name: str): Optional<str]
+        +get_import_symbols(module_path: str): List<str]
+    }
+    
+    interface IDocstringParser INTERNAL {
+        +parse_docstring(docstring: str): ParsedDocstring
+        +extract_parameters(docstring: ParsedDocstring): List<Parameter]
+        +extract_returns(docstring: ParsedDocstring): Optional<ReturnType]
+        +extract_raises(docstring: ParsedDocstring): List<Exception]
+        +get_docstring_format(docstring: str): DocstringFormat
+    }
+    
+    interface IPythonGraphExtractor INTERNAL {
+        +extract_class_hierarchy(module: ast.Module): List<InheritanceRelation]
+        +extract_function_calls(module: ast.Module): List<CallRelation]
+        +extract_imports_graph(module: ast.Module): List<ImportRelation]
+        +extract_variable_usage(module: ast.Module): List<UsageRelation]
+    }
+    
+    ' ========================================
+    ' Implementation Classes
+    ' ========================================
+    
+    class ASTParser INTERNAL implements IASTParser {
+        -python_version: tuple
+        -error_handler: IErrorHandler
+        
+        +parse_file(file_path: str): ast.Module
+        +parse_string(source: str, filename: str): ast.Module
+        +get_ast_dump(node: ast.AST): str
+        +validate_syntax(source: str): ValidationResult
+        -_handle_syntax_error(e: SyntaxError): ParseError
+        -_preprocess_source(source: str): str
+    }
+    
+    class JediAnalyzer INTERNAL implements IJediAnalyzer {
+        -project: jedi.Project
+        -cache: Dict<str, jedi.Script]
+        
+        +ASYNC get_definition(source: str, line: int, column: int): Optional<JediDefinition]
+        +ASYNC get_references(source: str, line: int, column: int): List<JediReference]
+        +ASYNC get_completions(source: str, line: int, column: int): List<Completion]
+        +ASYNC infer_type(source: str, line: int, column: int): Optional<str]
+        -_create_script(source: str, path: Optional<str]): jedi.Script
+        -_convert_definition(jedi_def: jedi.api.classes.Definition): JediDefinition
+    }
+    
+    class TypeInferrer INTERNAL implements ITypeInferrer {
+        -type_store: TypeStore
+        -builtin_types: Dict<str, TypeInfo]
+        
+        +infer_expression_type(expr: ast.expr): TypeInfo
+        +infer_variable_type(name: str, scope: Scope): TypeInfo
+        +infer_function_return_type(func: ast.FunctionDef): TypeInfo
+        +get_type_from_annotation(annotation: ast.expr): TypeInfo
+        -_infer_call_type(call: ast.Call): TypeInfo
+        -_infer_binary_op_type(op: ast.BinOp): TypeInfo
+        -_resolve_type_string(type_str: str): TypeInfo
+    }
+    
+    class ImportResolver INTERNAL implements IImportResolver {
+        -module_finder: ModuleFinder
+        -import_cache: Dict<str, ResolvedImport]
+        
+        +resolve_import(import_node: ast.Import): List<ResolvedImport]
+        +resolve_import_from(import_from: ast.ImportFrom): List<ResolvedImport]
+        +find_module_path(module_name: str): Optional<str]
+        +get_import_symbols(module_path: str): List<str]
+        -_resolve_relative_import(module: str, level: int): str
+        -_check_circular_import(module: str): bool
+    }
+    
+    class DocstringParser INTERNAL implements IDocstringParser {
+        -parsers: Dict<DocstringFormat, IFormatParser]
+        
+        +parse_docstring(docstring: str): ParsedDocstring
+        +extract_parameters(docstring: ParsedDocstring): List<Parameter]
+        +extract_returns(docstring: ParsedDocstring): Optional<ReturnType]
+        +extract_raises(docstring: ParsedDocstring): List<Exception]
+        +get_docstring_format(docstring: str): DocstringFormat
+        -_detect_format(docstring: str): DocstringFormat
+    }
+    
+    class PythonGraphExtractor INTERNAL implements IPythonGraphExtractor {
+        -symbol_table: SymbolTable
+        -scope_manager: ScopeManager
+        
+        +extract_class_hierarchy(module: ast.Module): List<InheritanceRelation]
+        +extract_function_calls(module: ast.Module): List<CallRelation]
+        +extract_imports_graph(module: ast.Module): List<ImportRelation]
+        +extract_variable_usage(module: ast.Module): List<UsageRelation]
+        -_build_symbol_table(module: ast.Module): SymbolTable
+        -_resolve_call_target(call: ast.Call, scope: Scope): Optional<Symbol]
+    }
+    
+    ' ========================================
+    ' AST Visitors
+    ' ========================================
+    
+    class SymbolExtractor INTERNAL extends ast.NodeVisitor {
+        -symbols: List<Symbol]
+        -current_scope: Scope
+        
+        +visit_ClassDef(node: ast.ClassDef): void
+        +visit_FunctionDef(node: ast.FunctionDef): void
+        +visit_AsyncFunctionDef(node: ast.AsyncFunctionDef): void
+        +visit_Assign(node: ast.Assign): void
+        +visit_AnnAssign(node: ast.AnnAssign): void
+        -_create_symbol(name: str, node: ast.AST, kind: str): Symbol
+        -_enter_scope(name: str): void
+        -_exit_scope(): void
+    }
+    
+    class ReferenceExtractor INTERNAL extends ast.NodeVisitor {
+        -references: List<Reference]
+        -current_context: Context
+        
+        +visit_Name(node: ast.Name): void
+        +visit_Attribute(node: ast.Attribute): void
+        +visit_Call(node: ast.Call): void
+        +visit_Import(node: ast.Import): void
+        +visit_ImportFrom(node: ast.ImportFrom): void
+        -_create_reference(name: str, node: ast.AST, kind: str): Reference
+    }
+    
+    class CallGraphVisitor INTERNAL extends ast.NodeVisitor {
+        -calls: List<CallRelation]
+        -current_function: Optional<str]
+        
+        +visit_FunctionDef(node: ast.FunctionDef): void
+        +visit_Call(node: ast.Call): void
+        -_extract_call_name(node: ast.Call): Optional<str]
+        -_create_call_relation(caller: str, callee: str, node: ast.Call): CallRelation
+    }
+    
+    ' ========================================
+    ' Supporting Types
+    ' ========================================
+    
+    class ModuleAnalysis {
+        +module_name: str
+        +file_path: str
+        +classes: List<ClassAnalysis]
+        +functions: List<FunctionAnalysis]
+        +variables: List<VariableAnalysis]
+        +imports: List<ResolvedImport]
+        +docstring: Optional<ParsedDocstring]
+    }
+    
+    class ClassAnalysis {
+        +name: str
+        +bases: List<str]
+        +methods: List<FunctionAnalysis]
+        +attributes: List<VariableAnalysis]
+        +decorators: List<str]
+        +docstring: Optional<ParsedDocstring]
+        +is_abstract: bool
+    }
+    
+    class FunctionAnalysis {
+        +name: str
+        +parameters: List<Parameter]
+        +return_type: Optional<TypeInfo]
+        +decorators: List<str]
+        +is_async: bool
+        +is_generator: bool
+        +complexity: int
+        +docstring: Optional<ParsedDocstring]
+    }
+    
+    class TypeInfo {
+        +type_name: str
+        +is_optional: bool
+        +is_union: bool
+        +type_args: List<TypeInfo]
+        +module: Optional<str]
+    }
+    
+    class ResolvedImport {
+        +module_name: str
+        +alias: Optional<str]
+        +imported_names: List<str]
+        +resolved_path: Optional<str]
+        +is_relative: bool
+        +level: int
+    }
+    
+    class ParsedDocstring {
+        +summary: str
+        +description: Optional<str]
+        +parameters: List<DocstringParam]
+        +returns: Optional<DocstringReturn]
+        +raises: List<DocstringRaise]
+        +examples: List<str]
+        +format: DocstringFormat
+    }
+    
+    enum DocstringFormat {
+        GOOGLE
+        NUMPY
+        SPHINX
+        EPYTEXT
+        PLAIN
+    }
+    
+    ' ========================================
+    ' Relationships
+    ' ========================================
+    
+    PythonPlugin --> IASTParser : parses with
+    PythonPlugin --> IJediAnalyzer : analyzes with
+    PythonPlugin --> ITypeInferrer : infers types
+    PythonPlugin --> IImportResolver : resolves imports
+    PythonPlugin --> IDocstringParser : parses docs
+    PythonPlugin --> IPythonGraphExtractor : extracts graph
+    
+    ASTParser --> IErrorHandler : handles errors
+    JediAnalyzer --> jedi.Project : uses
+    TypeInferrer --> TypeStore : stores types
+    ImportResolver --> ModuleFinder : finds modules
+    
+    PythonGraphExtractor --> SymbolTable : builds
+    PythonGraphExtractor --> ScopeManager : manages scopes
+    
+    SymbolExtractor --> Scope : tracks scope
+    ReferenceExtractor --> Context : tracks context
+    CallGraphVisitor --> CallRelation : creates
+}
+
+' Python-specific exceptions
+class PythonSyntaxError <<exception>> {
+    +line: int
+    +column: int
+    +text: str
+    +filename: str
+}
+
+class ImportError <<exception>> {
+    +module_name: str
+    +import_path: str
+}
+
+class TypeInferenceError <<exception>> {
+    +expression: str
+    +reason: str
+}
+
+IASTParser ..> PythonSyntaxError : throws
+IImportResolver ..> ImportError : throws
+ITypeInferrer ..> TypeInferenceError : throws
+
+@enduml

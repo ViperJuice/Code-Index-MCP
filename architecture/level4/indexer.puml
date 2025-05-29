@@ -1,0 +1,382 @@
+@startuml indexer
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define INTERNAL <<Internal>>
+!define ASYNC <<async>>
+
+package "mcp_server.indexer" <<Component>> {
+    
+    ' ========================================
+    ' Component Interfaces (Public)
+    ' ========================================
+    
+    interface IIndexEngine COMPONENT_INTERFACE #LightGreen {
+        +ASYNC index_file(file_path: str, force: bool): IndexResult
+        +ASYNC index_directory(directory: str, recursive: bool, patterns: List<str>): BatchIndexResult
+        +ASYNC update_index(file_path: str): UpdateResult
+        +ASYNC remove_from_index(file_path: str): void
+        +get_index_status(path: str): IndexStatus
+        +ASYNC rebuild_index(): void
+    }
+    
+    interface IIndexCoordinator COMPONENT_INTERFACE #LightGreen {
+        +ASYNC coordinate_indexing(paths: List<str], options: IndexOptions): CoordinationResult
+        +ASYNC schedule_reindex(path: str, priority: int): void
+        +get_pending_tasks(): List<IndexTask]
+        +cancel_task(task_id: str): bool
+        +get_progress(): IndexProgress
+    }
+    
+    interface IParserCoordinator COMPONENT_INTERFACE #LightGreen {
+        +ASYNC parse_file(file_path: str): ParseResult
+        +ASYNC parse_content(content: str, language: str): ParseResult
+        +get_parser_for_language(language: str): IParser
+        +register_parser(language: str, parser: IParser): void
+    }
+    
+    interface IParseOrchestrator COMPONENT_INTERFACE #LightGreen {
+        +ASYNC orchestrate_parsing(files: List<str]): List<ParseResult]
+        +ASYNC parse_with_fallback(file_path: str): ParseResult
+        +get_parse_statistics(): ParseStatistics
+        +clear_parse_cache(): void
+    }
+    
+    interface IQueryOptimizer COMPONENT_INTERFACE #LightGreen {
+        +optimize_query(query: Query): OptimizedQuery
+        +estimate_cost(query: Query): QueryCost
+        +suggest_indexes(query_patterns: List<Query]): List<IndexSuggestion]
+        +analyze_query_performance(query: Query, results: QueryResults): PerformanceReport
+    }
+    
+    interface ISearchPlanner COMPONENT_INTERFACE #LightGreen {
+        +plan_search(query: SearchQuery): SearchPlan
+        +ASYNC execute_plan(plan: SearchPlan): SearchResults
+        +optimize_plan(plan: SearchPlan): SearchPlan
+        +get_search_statistics(): SearchStatistics
+    }
+    
+    interface IFuzzyIndexer COMPONENT_INTERFACE #LightGreen {
+        +ASYNC index_for_fuzzy(text: str, metadata: Dict): void
+        +ASYNC search_fuzzy(query: str, threshold: float): List<FuzzyMatch]
+        +update_fuzzy_index(id: str, text: str): void
+        +remove_from_fuzzy_index(id: str): void
+    }
+    
+    interface ITrigramSearcher COMPONENT_INTERFACE #LightGreen {
+        +generate_trigrams(text: str): Set<str]
+        +ASYNC search_trigrams(trigrams: Set<str], limit: int): List<TrigramMatch]
+        +calculate_similarity(text1: str, text2: str): float
+        +get_trigram_statistics(): TrigramStats
+    }
+    
+    interface ISemanticIndexer COMPONENT_INTERFACE #LightGreen {
+        +ASYNC generate_embeddings(text: str): Embedding
+        +ASYNC index_semantic(text: str, metadata: Dict): void
+        +ASYNC search_semantic(query: str, k: int): List<SemanticMatch]
+        +ASYNC find_similar(embedding: Embedding, k: int): List<SemanticMatch]
+    }
+    
+    interface IEmbeddingGenerator COMPONENT_INTERFACE #LightGreen {
+        +ASYNC generate(text: str): Embedding
+        +ASYNC batch_generate(texts: List<str]): List<Embedding]
+        +get_embedding_dimension(): int
+        +get_model_info(): ModelInfo
+    }
+    
+    ' ========================================
+    ' Main Implementation Classes
+    ' ========================================
+    
+    class IndexEngine implements IIndexEngine, IIndexCoordinator {
+        -parser_coordinator: IParserCoordinator
+        -storage: IIndexStorage
+        -graph_builder: IGraphBuilder
+        -fuzzy_indexer: IFuzzyIndexer
+        -semantic_indexer: ISemanticIndexer
+        -task_queue: ITaskQueue
+        -cache: ICache
+        -logger: ILogger
+        -metrics: IMetrics
+        
+        +ASYNC index_file(file_path: str, force: bool): IndexResult
+        +ASYNC index_directory(directory: str, recursive: bool, patterns: List<str]): BatchIndexResult
+        +ASYNC update_index(file_path: str): UpdateResult
+        +ASYNC remove_from_index(file_path: str): void
+        +get_index_status(path: str): IndexStatus
+        +ASYNC rebuild_index(): void
+        +ASYNC coordinate_indexing(paths: List<str], options: IndexOptions): CoordinationResult
+        +ASYNC schedule_reindex(path: str, priority: int): void
+        +get_pending_tasks(): List<IndexTask]
+        +cancel_task(task_id: str): bool
+        +get_progress(): IndexProgress
+        -ASYNC _process_file(file_path: str, options: IndexOptions): IndexResult
+        -ASYNC _extract_and_store(parse_result: ParseResult, file_path: str): void
+        -_should_index(file_path: str, force: bool): bool
+        -_get_file_hash(file_path: str): str
+    }
+    
+    class ParserCoordinator implements IParserCoordinator, IParseOrchestrator {
+        -parsers: Dict<str, IParser]
+        -plugin_manager: IPluginManager
+        -cache: IParseCache
+        -metrics: ParseMetrics
+        
+        +ASYNC parse_file(file_path: str): ParseResult
+        +ASYNC parse_content(content: str, language: str): ParseResult
+        +get_parser_for_language(language: str): IParser
+        +register_parser(language: str, parser: IParser): void
+        +ASYNC orchestrate_parsing(files: List<str]): List<ParseResult]
+        +ASYNC parse_with_fallback(file_path: str): ParseResult
+        +get_parse_statistics(): ParseStatistics
+        +clear_parse_cache(): void
+        -ASYNC _parse_with_timeout(parser: IParser, content: str): ParseResult
+        -_detect_language(file_path: str, content: str): str
+        -_normalize_parse_result(result: Any, language: str): ParseResult
+    }
+    
+    class QueryOptimizer implements IQueryOptimizer, ISearchPlanner {
+        -index_stats: IIndexStatistics
+        -query_cache: IQueryCache
+        -cost_model: ICostModel
+        
+        +optimize_query(query: Query): OptimizedQuery
+        +estimate_cost(query: Query): QueryCost
+        +suggest_indexes(query_patterns: List<Query]): List<IndexSuggestion]
+        +analyze_query_performance(query: Query, results: QueryResults): PerformanceReport
+        +plan_search(query: SearchQuery): SearchPlan
+        +ASYNC execute_plan(plan: SearchPlan): SearchResults
+        +optimize_plan(plan: SearchPlan): SearchPlan
+        +get_search_statistics(): SearchStatistics
+        -_rewrite_query(query: Query): Query
+        -_choose_index(query: Query): IndexChoice
+        -_estimate_selectivity(predicate: Predicate): float
+    }
+    
+    class FuzzyIndexer implements IFuzzyIndexer, ITrigramSearcher {
+        -trigram_index: ITrigramIndex
+        -storage: IFuzzyStorage
+        -similarity_threshold: float
+        
+        +ASYNC index_for_fuzzy(text: str, metadata: Dict): void
+        +ASYNC search_fuzzy(query: str, threshold: float): List<FuzzyMatch]
+        +update_fuzzy_index(id: str, text: str): void
+        +remove_from_fuzzy_index(id: str): void
+        +generate_trigrams(text: str): Set<str]
+        +ASYNC search_trigrams(trigrams: Set<str], limit: int): List<TrigramMatch]
+        +calculate_similarity(text1: str, text2: str): float
+        +get_trigram_statistics(): TrigramStats
+        -_normalize_text(text: str): str
+        -_calculate_jaccard_similarity(set1: Set<str], set2: Set<str]): float
+    }
+    
+    class SemanticIndexer implements ISemanticIndexer, IEmbeddingGenerator {
+        -embedding_model: IEmbeddingModel
+        -vector_store: IVectorStore
+        -dimension: int
+        -batch_size: int
+        
+        +ASYNC generate_embeddings(text: str): Embedding
+        +ASYNC index_semantic(text: str, metadata: Dict): void
+        +ASYNC search_semantic(query: str, k: int): List<SemanticMatch]
+        +ASYNC find_similar(embedding: Embedding, k: int): List<SemanticMatch]
+        +ASYNC generate(text: str): Embedding
+        +ASYNC batch_generate(texts: List<str]): List<Embedding]
+        +get_embedding_dimension(): int
+        +get_model_info(): ModelInfo
+        -ASYNC _chunk_text(text: str): List<str]
+        -_normalize_embedding(embedding: List<float]): Embedding
+    }
+    
+    ' ========================================
+    ' Internal Classes and Interfaces
+    ' ========================================
+    
+    interface IIndexStorage INTERNAL {
+        +store_file_index(file_path: str, index_data: IndexData): void
+        +get_file_index(file_path: str): Optional<IndexData]
+        +update_file_index(file_path: str, updates: Dict): void
+        +delete_file_index(file_path: str): void
+        +search_indexes(criteria: SearchCriteria): List<IndexData]
+    }
+    
+    interface IParseCache INTERNAL {
+        +get(file_path: str, hash: str): Optional<ParseResult]
+        +put(file_path: str, hash: str, result: ParseResult): void
+        +invalidate(file_path: str): void
+        +get_stats(): CacheStats
+    }
+    
+    interface ICostModel INTERNAL {
+        +estimate_index_scan_cost(index: str, selectivity: float): float
+        +estimate_join_cost(left_size: int, right_size: int): float
+        +estimate_sort_cost(size: int): float
+        +estimate_filter_cost(size: int, selectivity: float): float
+    }
+    
+    class IndexStorage INTERNAL implements IIndexStorage {
+        -db: ISQLiteConnection
+        -serializer: ISerializer
+        
+        +store_file_index(file_path: str, index_data: IndexData): void
+        +get_file_index(file_path: str): Optional<IndexData]
+        +update_file_index(file_path: str, updates: Dict): void
+        +delete_file_index(file_path: str): void
+        +search_indexes(criteria: SearchCriteria): List<IndexData]
+        -_serialize_index_data(data: IndexData): bytes
+        -_deserialize_index_data(data: bytes): IndexData
+    }
+    
+    class BatchIndexer INTERNAL {
+        -engine: IIndexEngine
+        -batch_size: int
+        -parallelism: int
+        
+        +ASYNC index_batch(files: List<str], options: IndexOptions): BatchResult
+        +ASYNC parallel_index(files: List<str], workers: int): BatchResult
+        -ASYNC _process_batch(batch: List<str]): List<IndexResult]
+        -_partition_files(files: List<str], partitions: int): List<List<str]]
+    }
+    
+    class IndexStatistics INTERNAL implements IIndexStatistics {
+        -stats_cache: Dict<str, Stats]
+        -update_interval: int
+        
+        +get_table_stats(table: str): TableStats
+        +get_index_stats(index: str): IndexStats
+        +get_cardinality(column: str): int
+        +update_statistics(): void
+    }
+    
+    class ProgressTracker INTERNAL {
+        -total_files: int
+        -processed_files: int
+        -failed_files: int
+        -start_time: datetime
+        
+        +update_progress(processed: int, failed: int): void
+        +get_progress(): IndexProgress
+        +estimate_time_remaining(): Optional<timedelta]
+        +get_throughput(): float
+    }
+    
+    ' ========================================
+    ' Supporting Types
+    ' ========================================
+    
+    class IndexResult {
+        +file_path: str
+        +success: bool
+        +symbols_count: int
+        +references_count: int
+        +duration_ms: float
+        +error: Optional<str]
+    }
+    
+    class BatchIndexResult {
+        +total_files: int
+        +successful: int
+        +failed: int
+        +results: List<IndexResult]
+        +total_duration_ms: float
+    }
+    
+    class ParseResult {
+        +ast: AST
+        +symbols: List<Symbol]
+        +imports: List<Import]
+        +references: List<Reference]
+        +language: str
+        +parse_time_ms: float
+    }
+    
+    class IndexOptions {
+        +force_reindex: bool
+        +include_patterns: List<str]
+        +exclude_patterns: List<str]
+        +max_file_size: int
+        +follow_symlinks: bool
+        +extract_graph: bool
+        +generate_embeddings: bool
+    }
+    
+    class SearchPlan {
+        +query: SearchQuery
+        +index_choice: str
+        +filter_order: List<Filter]
+        +use_cache: bool
+        +estimated_cost: float
+    }
+    
+    class FuzzyMatch {
+        +text: str
+        +score: float
+        +metadata: Dict
+        +location: Location
+    }
+    
+    class SemanticMatch {
+        +text: str
+        +score: float
+        +embedding: Embedding
+        +metadata: Dict
+        +location: Location
+    }
+    
+    class IndexProgress {
+        +total: int
+        +completed: int
+        +failed: int
+        +current_file: Optional<str]
+        +elapsed_time: timedelta
+        +estimated_remaining: Optional<timedelta]
+    }
+    
+    ' ========================================
+    ' Relationships
+    ' ========================================
+    
+    IndexEngine --> IParserCoordinator : coordinates parsing
+    IndexEngine --> IIndexStorage : stores indexes
+    IndexEngine --> IFuzzyIndexer : fuzzy indexing
+    IndexEngine --> ISemanticIndexer : semantic indexing
+    IndexEngine --> IGraphBuilder : builds graph
+    
+    ParserCoordinator --> IPluginManager : gets parsers
+    ParserCoordinator --> IParseCache : caches results
+    
+    QueryOptimizer --> IIndexStatistics : uses stats
+    QueryOptimizer --> ICostModel : estimates costs
+    
+    FuzzyIndexer --> ITrigramIndex : stores trigrams
+    SemanticIndexer --> IVectorStore : stores embeddings
+    
+    ' External dependencies
+    IndexEngine ..> ITaskQueue : queues tasks
+    IndexEngine ..> ICache : caches
+    IndexEngine ..> ILogger : logs
+    IndexEngine ..> IMetrics : reports
+}
+
+' Exceptions
+class IndexError <<exception>> {
+    +file_path: str
+    +operation: str
+    +cause: Exception
+}
+
+class ParseError <<exception>> {
+    +file_path: str
+    +line: int
+    +column: int
+    +message: str
+}
+
+class QueryError <<exception>> {
+    +query: str
+    +reason: str
+}
+
+IIndexEngine ..> IndexError : throws
+IParserCoordinator ..> ParseError : throws
+IQueryOptimizer ..> QueryError : throws
+
+@enduml

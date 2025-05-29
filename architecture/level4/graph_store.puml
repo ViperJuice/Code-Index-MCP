@@ -1,0 +1,338 @@
+@startuml graph_store
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define INTERNAL <<Internal>>
+!define ASYNC <<async>>
+
+package "mcp_server.graph_store" <<Component>> {
+    
+    ' ========================================
+    ' Component Interfaces (Public)
+    ' ========================================
+    
+    interface IGraphBuilder COMPONENT_INTERFACE #LightGreen {
+        +ASYNC build_file_node(file_data: FileData): Node
+        +ASYNC build_symbol_nodes(symbols: List<Symbol]): List<Node]
+        +ASYNC build_relationships(relations: List<RelationData]): List<Relationship]
+        +ASYNC update_graph(file_path: str, parse_result: ParseResult): GraphUpdateResult
+        +ASYNC remove_file_from_graph(file_path: str): void
+    }
+    
+    interface INodeFactory COMPONENT_INTERFACE #LightGreen {
+        +create_file_node(path: str, metadata: Dict): FileNode
+        +create_module_node(name: str, path: str): ModuleNode
+        +create_class_node(name: str, file: str, line: int): ClassNode
+        +create_function_node(name: str, file: str, signature: str): FunctionNode
+        +create_variable_node(name: str, type: str, scope: str): VariableNode
+    }
+    
+    interface IGraphAnalyzer COMPONENT_INTERFACE #LightGreen {
+        +ASYNC analyze_dependencies(module: str): DependencyAnalysis
+        +ASYNC find_circular_dependencies(): List<CircularDependency]
+        +ASYNC calculate_complexity(function: str): ComplexityMetrics
+        +ASYNC find_code_smells(): List<CodeSmell]
+        +ASYNC get_impact_analysis(symbol: str): ImpactAnalysis
+    }
+    
+    interface IRelationshipAnalyzer COMPONENT_INTERFACE #LightGreen {
+        +ASYNC analyze_call_chain(start: str, end: str): List<CallPath]
+        +ASYNC find_unused_code(): List<UnusedSymbol]
+        +ASYNC analyze_coupling(module: str): CouplingMetrics
+        +ASYNC find_inheritance_issues(): List<InheritanceIssue]
+        +ASYNC analyze_cohesion(class_name: str): CohesionMetrics
+    }
+    
+    interface IContextAnalyzer COMPONENT_INTERFACE #LightGreen {
+        +ASYNC get_symbol_context(symbol: str, depth: int): SymbolContext
+        +ASYNC get_file_context(file_path: str): FileContext
+        +ASYNC get_usage_context(symbol: str): UsageContext
+        +ASYNC get_modification_context(symbol: str): ModificationContext
+    }
+    
+    interface IContextExtractor COMPONENT_INTERFACE #LightGreen {
+        +ASYNC extract_call_context(function: str): CallContext
+        +ASYNC extract_data_flow(variable: str): DataFlow
+        +ASYNC extract_control_flow(function: str): ControlFlow
+        +ASYNC extract_type_context(symbol: str): TypeContext
+    }
+    
+    ' ========================================
+    ' Main Implementation Classes
+    ' ========================================
+    
+    class GraphBuilder implements IGraphBuilder, INodeFactory {
+        -memgraph_client: IMemgraphClient
+        -node_cache: Dict<str, Node]
+        -relationship_cache: Set<str]
+        -batch_size: int
+        -logger: ILogger
+        
+        +ASYNC build_file_node(file_data: FileData): Node
+        +ASYNC build_symbol_nodes(symbols: List<Symbol]): List<Node]
+        +ASYNC build_relationships(relations: List<RelationData]): List<Relationship]
+        +ASYNC update_graph(file_path: str, parse_result: ParseResult): GraphUpdateResult
+        +ASYNC remove_file_from_graph(file_path: str): void
+        +create_file_node(path: str, metadata: Dict): FileNode
+        +create_module_node(name: str, path: str): ModuleNode
+        +create_class_node(name: str, file: str, line: int): ClassNode
+        +create_function_node(name: str, file: str, signature: str): FunctionNode
+        +create_variable_node(name: str, type: str, scope: str): VariableNode
+        -ASYNC _batch_create_nodes(nodes: List<Node]): void
+        -ASYNC _batch_create_relationships(relationships: List[Relationship]): void
+        -_generate_node_id(node_type: str, properties: Dict): str
+    }
+    
+    class GraphAnalyzer implements IGraphAnalyzer, IRelationshipAnalyzer {
+        -memgraph_client: IMemgraphClient
+        -algorithm_runner: IAlgorithmRunner
+        -metrics_calculator: IMetricsCalculator
+        -cache: ICache
+        
+        +ASYNC analyze_dependencies(module: str): DependencyAnalysis
+        +ASYNC find_circular_dependencies(): List<CircularDependency]
+        +ASYNC calculate_complexity(function: str): ComplexityMetrics
+        +ASYNC find_code_smells(): List<CodeSmell]
+        +ASYNC get_impact_analysis(symbol: str): ImpactAnalysis
+        +ASYNC analyze_call_chain(start: str, end: str): List<CallPath]
+        +ASYNC find_unused_code(): List<UnusedSymbol]
+        +ASYNC analyze_coupling(module: str): CouplingMetrics
+        +ASYNC find_inheritance_issues(): List<InheritanceIssue]
+        +ASYNC analyze_cohesion(class_name: str): CohesionMetrics
+        -ASYNC _run_cypher_query(query: str, params: Dict): List<Dict]
+        -ASYNC _run_graph_algorithm(algorithm: str, config: Dict): AlgorithmResult
+    }
+    
+    class ContextAnalyzer implements IContextAnalyzer, IContextExtractor {
+        -memgraph_client: IMemgraphClient
+        -traversal_engine: ITraversalEngine
+        -context_builder: IContextBuilder
+        
+        +ASYNC get_symbol_context(symbol: str, depth: int): SymbolContext
+        +ASYNC get_file_context(file_path: str): FileContext
+        +ASYNC get_usage_context(symbol: str): UsageContext
+        +ASYNC get_modification_context(symbol: str): ModificationContext
+        +ASYNC extract_call_context(function: str): CallContext
+        +ASYNC extract_data_flow(variable: str): DataFlow
+        +ASYNC extract_control_flow(function: str): ControlFlow
+        +ASYNC extract_type_context(symbol: str): TypeContext
+        -ASYNC _traverse_relationships(start_node: str, rel_types: List<str], depth: int): GraphSubset
+        -_build_context_from_subgraph(subgraph: GraphSubset): Context
+    }
+    
+    ' ========================================
+    ' Internal Components
+    ' ========================================
+    
+    interface IMemgraphClient INTERNAL {
+        +ASYNC execute(query: str, params: Dict): List<Dict]
+        +ASYNC execute_write(query: str, params: Dict): int
+        +ASYNC begin_transaction(): Transaction
+        +get_connection_status(): ConnectionStatus
+        +close(): void
+    }
+    
+    interface IAlgorithmRunner INTERNAL {
+        +ASYNC run_pagerank(config: PageRankConfig): PageRankResult
+        +ASYNC run_community_detection(config: CommunityConfig): CommunityResult
+        +ASYNC run_shortest_path(start: str, end: str): PathResult
+        +ASYNC run_centrality(config: CentralityConfig): CentralityResult
+    }
+    
+    interface ITraversalEngine INTERNAL {
+        +ASYNC traverse_bfs(start: str, max_depth: int): List<Node]
+        +ASYNC traverse_dfs(start: str, max_depth: int): List<Node]
+        +ASYNC traverse_pattern(pattern: TraversalPattern): TraversalResult
+        +ASYNC find_paths(start: str, end: str, constraints: PathConstraints): List<Path]
+    }
+    
+    interface IMetricsCalculator INTERNAL {
+        +calculate_cyclomatic_complexity(call_graph: Graph): int
+        +calculate_coupling_metrics(module_graph: Graph): CouplingMetrics
+        +calculate_cohesion_metrics(class_graph: Graph): CohesionMetrics
+        +calculate_maintainability_index(metrics: Dict): float
+    }
+    
+    class MemgraphClient INTERNAL implements IMemgraphClient {
+        -connection_pool: ConnectionPool
+        -query_timeout: int
+        -retry_policy: IRetryPolicy
+        
+        +ASYNC execute(query: str, params: Dict): List<Dict]
+        +ASYNC execute_write(query: str, params: Dict): int
+        +ASYNC begin_transaction(): Transaction
+        +get_connection_status(): ConnectionStatus
+        +close(): void
+        -ASYNC _get_connection(): Connection
+        -_format_query_params(params: Dict): Dict
+    }
+    
+    class QueryBuilder INTERNAL {
+        -query_parts: List<str]
+        -parameters: Dict
+        
+        +match(pattern: str): QueryBuilder
+        +where(condition: str): QueryBuilder
+        +with_clause(clause: str): QueryBuilder
+        +return_clause(clause: str): QueryBuilder
+        +create(pattern: str): QueryBuilder
+        +merge(pattern: str): QueryBuilder
+        +delete(pattern: str): QueryBuilder
+        +set_property(property: str, value: Any): QueryBuilder
+        +build(): Tuple<str, Dict]
+    }
+    
+    class PatternMatcher INTERNAL {
+        -patterns: Dict<str, GraphPattern]
+        
+        +register_pattern(name: str, pattern: GraphPattern): void
+        +ASYNC find_pattern(pattern_name: str): List<PatternMatch]
+        +ASYNC find_anti_pattern(anti_pattern_name: str): List<AntiPatternMatch]
+        -_compile_pattern(pattern: GraphPattern): CypherQuery
+    }
+    
+    class GraphCache INTERNAL {
+        -node_cache: LRUCache<str, Node]
+        -relationship_cache: LRUCache<str, Relationship]
+        -query_cache: TTLCache<str, Any]
+        
+        +get_node(node_id: str): Optional<Node]
+        +cache_node(node_id: str, node: Node): void
+        +get_query_result(query_hash: str): Optional<Any]
+        +cache_query_result(query_hash: str, result: Any): void
+        +invalidate_file(file_path: str): void
+    }
+    
+    ' ========================================
+    ' Graph Node Types
+    ' ========================================
+    
+    class FileNode {
+        +path: str
+        +language: str
+        +size: int
+        +hash: str
+        +last_modified: datetime
+    }
+    
+    class ModuleNode {
+        +name: str
+        +path: str
+        +package: str
+        +is_package: bool
+    }
+    
+    class ClassNode {
+        +name: str
+        +file: str
+        +line: int
+        +is_abstract: bool
+        +docstring: Optional<str]
+    }
+    
+    class FunctionNode {
+        +name: str
+        +file: str
+        +line: int
+        +signature: str
+        +is_async: bool
+        +complexity: int
+    }
+    
+    class VariableNode {
+        +name: str
+        +file: str
+        +line: int
+        +type: Optional<str]
+        +scope: str
+    }
+    
+    ' ========================================
+    ' Analysis Results
+    ' ========================================
+    
+    class DependencyAnalysis {
+        +module: str
+        +direct_dependencies: List<str]
+        +transitive_dependencies: List<str]
+        +dependency_depth: int
+        +circular_dependencies: List<CircularDependency]
+    }
+    
+    class ImpactAnalysis {
+        +symbol: str
+        +direct_impact: List<ImpactedSymbol]
+        +transitive_impact: List<ImpactedSymbol]
+        +affected_files: List<str]
+        +risk_score: float
+    }
+    
+    class ComplexityMetrics {
+        +cyclomatic_complexity: int
+        +cognitive_complexity: int
+        +nesting_depth: int
+        +parameter_count: int
+        +line_count: int
+    }
+    
+    class SymbolContext {
+        +symbol: Symbol
+        +definition: Location
+        +references: List<Reference]
+        +callers: List<Function]
+        +callees: List<Function]
+        +dependencies: List<Symbol]
+        +related_symbols: List<Symbol]
+    }
+    
+    class GraphUpdateResult {
+        +nodes_created: int
+        +nodes_updated: int
+        +nodes_deleted: int
+        +relationships_created: int
+        +relationships_deleted: int
+        +duration_ms: float
+    }
+    
+    ' ========================================
+    ' Relationships
+    ' ========================================
+    
+    GraphBuilder --> IMemgraphClient : writes to
+    GraphBuilder --> QueryBuilder : builds queries
+    GraphBuilder --> GraphCache : caches nodes
+    
+    GraphAnalyzer --> IMemgraphClient : queries
+    GraphAnalyzer --> IAlgorithmRunner : runs algorithms
+    GraphAnalyzer --> IMetricsCalculator : calculates metrics
+    
+    ContextAnalyzer --> IMemgraphClient : queries
+    ContextAnalyzer --> ITraversalEngine : traverses graph
+    ContextAnalyzer --> IContextBuilder : builds context
+    
+    ' External dependencies
+    GraphBuilder ..> ILogger : logs
+    GraphAnalyzer ..> ICache : caches results
+}
+
+' Graph-specific exceptions
+class GraphConnectionError <<exception>> {
+    +host: str
+    +port: int
+    +reason: str
+}
+
+class GraphQueryError <<exception>> {
+    +query: str
+    +error_code: str
+    +message: str
+}
+
+class GraphIntegrityError <<exception>> {
+    +node_id: str
+    +constraint: str
+}
+
+IMemgraphClient ..> GraphConnectionError : throws
+IMemgraphClient ..> GraphQueryError : throws
+IGraphBuilder ..> GraphIntegrityError : throws
+
+@enduml

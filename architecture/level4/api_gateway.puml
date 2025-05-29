@@ -1,0 +1,315 @@
+@startuml api_gateway
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define INTERNAL <<Internal>>
+!define ASYNC <<async>>
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+package "mcp_server.gateway" <<Component>> {
+    
+    ' ========================================
+    ' Component Interfaces (Public)
+    ' ========================================
+    
+    interface IRequestHandler COMPONENT_INTERFACE #LightGreen {
+        +ASYNC handle_symbol_request(request: SymbolRequest): SymbolResponse
+        +ASYNC handle_search_request(request: SearchRequest): SearchResponse
+        +ASYNC handle_index_request(request: IndexRequest): IndexResponse
+        +ASYNC handle_context_request(request: ContextRequest): ContextResponse
+    }
+    
+    interface IHealthCheck COMPONENT_INTERFACE #LightGreen {
+        +ASYNC check_health(): HealthStatus
+        +ASYNC check_readiness(): ReadinessStatus
+        +ASYNC check_liveness(): bool
+    }
+    
+    interface IAuthenticator COMPONENT_INTERFACE #LightGreen {
+        +ASYNC authenticate(request: Request): AuthResult
+        +ASYNC validate_token(token: str): TokenInfo
+        +generate_token(user_id: str, roles: List<str>): str
+    }
+    
+    interface IAuthorizer COMPONENT_INTERFACE #LightGreen {
+        +authorize(context: ISecurityContext, resource: str, action: str): bool
+        +get_permissions(context: ISecurityContext): List<str>
+        +check_role(context: ISecurityContext, role: str): bool
+    }
+    
+    interface IRequestValidator COMPONENT_INTERFACE #LightGreen {
+        +validate_symbol_request(data: Dict): Result<SymbolRequest>
+        +validate_search_request(data: Dict): Result<SearchRequest>
+        +validate_index_request(data: Dict): Result<IndexRequest>
+        +validate_context_request(data: Dict): Result<ContextRequest>
+    }
+    
+    interface ISanitizer COMPONENT_INTERFACE #LightGreen {
+        +sanitize_path(path: str): str
+        +sanitize_query(query: str): str
+        +sanitize_symbol_name(name: str): str
+        +remove_secrets(content: str): str
+    }
+    
+    ' ========================================
+    ' Main Implementation Classes
+    ' ========================================
+    
+    class GatewayController implements IRequestHandler, IHealthCheck {
+        -app: FastAPI
+        -dispatcher: IDispatcher
+        -validator: IRequestValidator
+        -auth: IAuthenticator
+        -metrics: IMetrics
+        -logger: ILogger
+        
+        +ASYNC handle_symbol_request(request: SymbolRequest): SymbolResponse
+        +ASYNC handle_search_request(request: SearchRequest): SearchResponse
+        +ASYNC handle_index_request(request: IndexRequest): IndexResponse
+        +ASYNC handle_context_request(request: ContextRequest): ContextResponse
+        +ASYNC check_health(): HealthStatus
+        +ASYNC check_readiness(): ReadinessStatus
+        +ASYNC check_liveness(): bool
+        -ASYNC _handle_request(request: Request, handler: Callable): Response
+        -_log_request(request: Request): void
+        -_log_response(response: Response, duration: float): void
+    }
+    
+    class AuthMiddleware implements IAuthenticator, IAuthorizer {
+        -jwt_secret: str
+        -token_expiry: int
+        -role_permissions: Dict<str, List<str>>
+        -cache: ICache
+        
+        +ASYNC authenticate(request: Request): AuthResult
+        +ASYNC validate_token(token: str): TokenInfo
+        +generate_token(user_id: str, roles: List<str>): str
+        +authorize(context: ISecurityContext, resource: str, action: str): bool
+        +get_permissions(context: ISecurityContext): List<str>
+        +check_role(context: ISecurityContext, role: str): bool
+        -_decode_jwt(token: str): Dict
+        -_verify_signature(token: str): bool
+        -_check_expiry(token_info: TokenInfo): bool
+    }
+    
+    class RequestValidator implements IRequestValidator, ISanitizer {
+        -schemas: Dict<str, Schema>
+        -path_validator: IPathValidator
+        -query_validator: IQueryValidator
+        
+        +validate_symbol_request(data: Dict): Result<SymbolRequest>
+        +validate_search_request(data: Dict): Result<SearchRequest>
+        +validate_index_request(data: Dict): Result<IndexRequest>
+        +validate_context_request(data: Dict): Result<ContextRequest>
+        +sanitize_path(path: str): str
+        +sanitize_query(query: str): str
+        +sanitize_symbol_name(name: str): str
+        +remove_secrets(content: str): str
+        -_validate_against_schema(data: Dict, schema: Schema): Result<Any>
+        -_check_injection_attacks(value: str): bool
+    }
+    
+    ' ========================================
+    ' Internal Classes and Interfaces
+    ' ========================================
+    
+    interface IPathValidator INTERNAL {
+        +validate_path(path: str): bool
+        +is_safe_path(path: str): bool
+        +normalize_path(path: str): str
+    }
+    
+    interface IQueryValidator INTERNAL {
+        +validate_query(query: str): bool
+        +validate_regex(pattern: str): bool
+        +check_complexity(query: str): bool
+    }
+    
+    interface IResponseFormatter INTERNAL {
+        +format_success(data: Any): Response
+        +format_error(error: Error): Response
+        +format_validation_error(errors: List<ValidationError>): Response
+    }
+    
+    class PathValidator INTERNAL implements IPathValidator {
+        -allowed_roots: List<str>
+        -forbidden_patterns: List<str>
+        
+        +validate_path(path: str): bool
+        +is_safe_path(path: str): bool
+        +normalize_path(path: str): str
+        -_check_traversal(path: str): bool
+        -_check_forbidden(path: str): bool
+    }
+    
+    class QueryValidator INTERNAL implements IQueryValidator {
+        -max_query_length: int
+        -forbidden_patterns: List<str>
+        
+        +validate_query(query: str): bool
+        +validate_regex(pattern: str): bool
+        +check_complexity(query: str): bool
+        -_estimate_complexity(query: str): int
+    }
+    
+    class ResponseFormatter INTERNAL implements IResponseFormatter {
+        -include_stack_trace: bool
+        
+        +format_success(data: Any): Response
+        +format_error(error: Error): Response
+        +format_validation_error(errors: List<ValidationError>): Response
+        -_build_response(status: str, data: Any, errors: List<Error>): Response
+    }
+    
+    class RateLimiter INTERNAL {
+        -cache: ICache
+        -limits: Dict<str, RateLimit>
+        
+        +ASYNC check_rate_limit(key: str, endpoint: str): bool
+        +ASYNC increment_counter(key: str, endpoint: str): void
+        +get_remaining_quota(key: str, endpoint: str): int
+    }
+    
+    class CORSHandler INTERNAL {
+        -allowed_origins: List<str>
+        -allowed_methods: List<str>
+        -allowed_headers: List<str>
+        
+        +add_cors_headers(response: Response, origin: str): Response
+        +is_allowed_origin(origin: str): bool
+        +handle_preflight(request: Request): Response
+    }
+    
+    ' ========================================
+    ' Request/Response Models
+    ' ========================================
+    
+    class SymbolRequest {
+        +symbol_name: str
+        +file_path: Optional<str>
+        +context: Optional<Dict>
+    }
+    
+    class SymbolResponse {
+        +symbol: Symbol
+        +definition: Location
+        +references: List<Reference>
+        +documentation: Optional<str>
+    }
+    
+    class SearchRequest {
+        +query: str
+        +file_extensions: Optional<List<str>>
+        +path_filter: Optional<str>
+        +limit: int = 50
+        +offset: int = 0
+    }
+    
+    class SearchResponse {
+        +results: List<SearchResult>
+        +total_count: int
+        +facets: Dict<str, List<Facet>>
+    }
+    
+    class IndexRequest {
+        +path: str
+        +recursive: bool = True
+        +force: bool = False
+        +file_patterns: Optional<List<str>>
+    }
+    
+    class IndexResponse {
+        +status: IndexStatus
+        +files_processed: int
+        +errors: List<IndexError>
+        +duration_ms: float
+    }
+    
+    class ContextRequest {
+        +symbol_name: str
+        +depth: int = 2
+        +include_references: bool = True
+        +include_dependencies: bool = True
+    }
+    
+    class ContextResponse {
+        +symbol: Symbol
+        +context: CodeContext
+        +call_graph: Optional<Graph>
+        +dependencies: List<Dependency>
+    }
+    
+    ' ========================================
+    ' Supporting Types
+    ' ========================================
+    
+    class AuthResult {
+        +success: bool
+        +user_id: Optional<str>
+        +roles: List<str>
+        +permissions: List<str>
+        +context: ISecurityContext
+    }
+    
+    class TokenInfo {
+        +user_id: str
+        +roles: List<str>
+        +issued_at: datetime
+        +expires_at: datetime
+        +jti: str
+    }
+    
+    class HealthStatus {
+        +status: str
+        +version: str
+        +uptime_seconds: float
+        +checks: Dict<str, ComponentHealth>
+    }
+    
+    class RateLimit {
+        +requests_per_minute: int
+        +burst_size: int
+        +penalty_duration_seconds: int
+    }
+    
+    ' ========================================
+    ' Relationships
+    ' ========================================
+    
+    GatewayController --> IRequestValidator : validates with
+    GatewayController --> IAuthenticator : authenticates with
+    GatewayController --> IDispatcher : delegates to
+    GatewayController --> ResponseFormatter : formats responses
+    GatewayController --> RateLimiter : checks limits
+    
+    AuthMiddleware --> ICache : caches tokens
+    
+    RequestValidator --> IPathValidator : validates paths
+    RequestValidator --> IQueryValidator : validates queries
+    
+    ' External dependencies
+    GatewayController ..> ILogger : logs
+    GatewayController ..> IMetrics : reports metrics
+    AuthMiddleware ..> ISecurityContext : creates
+}
+
+' Exception handling
+class AuthenticationError <<exception>> {
+    +reason: str
+    +token: Optional<str>
+}
+
+class AuthorizationError <<exception>> {
+    +user_id: str
+    +resource: str
+    +action: str
+}
+
+class RateLimitError <<exception>> {
+    +limit: int
+    +reset_time: datetime
+}
+
+IAuthenticator ..> AuthenticationError : throws
+IAuthorizer ..> AuthorizationError : throws
+RateLimiter ..> RateLimitError : throws
+
+@enduml

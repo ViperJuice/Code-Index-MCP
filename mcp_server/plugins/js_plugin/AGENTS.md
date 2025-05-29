@@ -1,80 +1,68 @@
 # JavaScript Plugin Agent Configuration
 
-This file defines the capabilities and constraints for AI agents working with the JavaScript plugin.
+## Implementation Status
+❌ **STUB IMPLEMENTATION** - This plugin is NOT implemented
 
-## Agent Capabilities
+## Overview
+This is a stub plugin that exists only as a placeholder. All methods contain only `...` (ellipsis) and do not provide any functionality.
 
-### JS Analysis
-- Parse JavaScript code
-- Handle ES modules
-- Resolve imports
-- Track prototypes
-- Analyze types
-- Process async code
+## Current State
 
-### Code Understanding
-- Understand JS idioms
-- Handle ES6+ features
-- Process modules
-- Track dependencies
-- Analyze scopes
+```python
+class Plugin(IPlugin):
+    lang = "js"
+    
+    def supports(self, path):
+        ...  # NOT IMPLEMENTED
+    
+    def indexFile(self, path, content):
+        ...  # NOT IMPLEMENTED
+    
+    def getDefinition(self, symbol):
+        ...  # NOT IMPLEMENTED
+    
+    def findReferences(self, symbol):
+        ...  # NOT IMPLEMENTED
+    
+    def search(self, query, opts):
+        ...  # NOT IMPLEMENTED
+```
 
-### Testing & Validation
-- Test parsing
-- Validate module resolution
-- Check type inference
-- Verify prototype chains
-- Test edge cases
+## What Would Need Implementation
 
-### Performance
-- Optimize parsing
-- Cache results
-- Handle large codebases
-- Manage memory
+If this plugin were to be implemented, it would need:
+- Tree-sitter JavaScript grammar integration
+- ES6+ syntax support
+- Module resolution (CommonJS, ES modules)
+- Scope and closure analysis
+- Prototype chain tracking
+- Async/await handling
+- JSX support (for React)
+- TypeScript support consideration
 
-## Agent Constraints
+## Current Limitations
+- **No functionality**: All methods are stubs
+- **Cannot parse JavaScript files**: No Tree-sitter integration
+- **Cannot index symbols**: No parsing logic
+- **Cannot find definitions or references**: No symbol tracking
+- **Cannot search**: No indexing capability
 
-1. **JavaScript Support**
-   - Support ES6+
-   - Handle module systems
-   - Maintain compatibility
-   - Process new features
+## Next Steps for Implementation
+1. Integrate Tree-sitter JavaScript grammar
+2. Implement basic parsing in `indexFile()`
+3. Add symbol extraction for:
+   - Functions (regular, arrow, async)
+   - Classes and constructors
+   - Variables (var, let, const)
+   - Object properties and methods
+4. Handle JavaScript-specific features:
+   - Hoisting
+   - Closures and scope
+   - Prototype inheritance
+   - Module imports/exports
+   - Destructuring assignments
+5. Add framework-specific understanding (React, Vue, etc.)
+6. Consider TypeScript integration
 
-2. **Analysis Accuracy**
-   - Correct module resolution
-   - Accurate type inference
-   - Valid prototype tracking
-   - Proper scope handling
-
-3. **Performance**
-   - Efficient parsing
-   - Optimize memory usage
-   - Handle large codebases
-   - Cache effectively
-
-4. **Edge Cases**
-   - Handle dynamic imports
-   - Process prototype chains
-   - Support async flow
-   - Handle decorators
-
-## Common Operations
-
-```javascript
-// Parse JS file
-function parseFile(path) {
-  return treeSitterParse(path);
-}
-
-// Analyze modules
-function analyzeModules(ast) {
-  processImports(ast);
-  resolveDependencies();
-}
-
-// Track prototypes
-function trackPrototypes(ast) {
-  buildPrototypeChain(ast);
-  resolveInheritance();
-}
-``` 
+## Testing
+No tests exist for this stub implementation.

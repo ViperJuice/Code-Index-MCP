@@ -1,0 +1,281 @@
+@startuml shared_utilities
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define INTERNAL <<Internal>>
+!define ASYNC <<async>>
+
+package "mcp_server.utils" <<Component>> {
+    
+    ' ========================================
+    ' TreeSitter Wrapper
+    ' ========================================
+    
+    interface ITreeSitterWrapper COMPONENT_INTERFACE #LightGreen {
+        +load_language(language: str): Language
+        +parse(content: str, language: str): Tree
+        +parse_file(file_path: str, language: str): Tree
+        +query(tree: Tree, query_string: str): List<QueryMatch]
+        +get_node_text(node: Node): str
+        +walk_tree(tree: Tree, visitor: NodeVisitor): void
+    }
+    
+    interface IParserAdapter COMPONENT_INTERFACE #LightGreen {
+        +adapt_to_ast(tree: Tree, language: str): AST
+        +extract_symbols(tree: Tree): List<Symbol]
+        +extract_imports(tree: Tree): List<Import]
+        +get_language_config(language: str): LanguageConfig
+    }
+    
+    class TreeSitterWrapper implements ITreeSitterWrapper, IParserAdapter {
+        -parsers: Dict<str, Parser]
+        -languages: Dict<str, Language]
+        -language_configs: Dict<str, LanguageConfig]
+        -cache: IParseCache
+        
+        +load_language(language: str): Language
+        +parse(content: str, language: str): Tree
+        +parse_file(file_path: str, language: str): Tree
+        +query(tree: Tree, query_string: str): List<QueryMatch]
+        +get_node_text(node: Node): str
+        +walk_tree(tree: Tree, visitor: NodeVisitor): void
+        +adapt_to_ast(tree: Tree, language: str): AST
+        +extract_symbols(tree: Tree): List<Symbol]
+        +extract_imports(tree: Tree): List<Import]
+        +get_language_config(language: str): LanguageConfig
+        -_create_parser(language: str): Parser
+        -_load_language_library(language: str): Language
+        -_convert_node_to_symbol(node: Node, language: str): Optional<Symbol]
+    }
+    
+    ' ========================================
+    ' Common Parser Components
+    ' ========================================
+    
+    interface INodeVisitor INTERNAL {
+        +visit(node: Node): void
+        +should_visit_children(node: Node): bool
+    }
+    
+    class SymbolExtractorVisitor INTERNAL implements INodeVisitor {
+        -symbols: List<Symbol]
+        -language_config: LanguageConfig
+        -scope_stack: List<str]
+        
+        +visit(node: Node): void
+        +should_visit_children(node: Node): bool
+        +get_symbols(): List<Symbol]
+        -_is_symbol_node(node: Node): bool
+        -_create_symbol_from_node(node: Node): Symbol
+    }
+    
+    class LanguageConfig {
+        +name: str
+        +file_extensions: List<str]
+        +symbol_types: Dict<str, str]
+        +import_patterns: List<str]
+        +comment_patterns: List<str]
+        +string_delimiters: List<str]
+    }
+    
+    ' ========================================
+    ' Common Data Structures
+    ' ========================================
+    
+    class AST {
+        +root: ASTNode
+        +language: str
+        +source_file: Optional<str]
+        
+        +walk(visitor: ASTVisitor): void
+        +find_nodes(node_type: str): List<ASTNode]
+        +get_node_at_position(line: int, column: int): Optional<ASTNode]
+    }
+    
+    class ASTNode {
+        +type: str
+        +children: List<ASTNode]
+        +parent: Optional<ASTNode]
+        +start_position: Position
+        +end_position: Position
+        +text: str
+        
+        +get_child_by_field(field: str): Optional<ASTNode]
+        +descendants_of_type(type: str): List<ASTNode]
+    }
+    
+    class Symbol {
+        +name: str
+        +kind: SymbolKind
+        +location: Location
+        +signature: Optional<str]
+        +docstring: Optional<str]
+        +modifiers: List<str]
+        +parent: Optional<str]
+    }
+    
+    enum SymbolKind {
+        CLASS
+        FUNCTION
+        METHOD
+        VARIABLE
+        CONSTANT
+        INTERFACE
+        ENUM
+        MODULE
+        NAMESPACE
+        PROPERTY
+        PARAMETER
+    }
+    
+    class Location {
+        +file: str
+        +start_line: int
+        +start_column: int
+        +end_line: int
+        +end_column: int
+        
+        +contains(line: int, column: int): bool
+        +to_range(): Range
+    }
+    
+    class Import {
+        +module: str
+        +alias: Optional<str]
+        +symbols: List<str]
+        +location: Location
+        +is_relative: bool
+        +level: int
+    }
+    
+    ' ========================================
+    ' Shared Query Language
+    ' ========================================
+    
+    class QueryBuilder {
+        -language: str
+        -query_parts: List<str]
+        
+        +match_type(node_type: str): QueryBuilder
+        +with_field(field: str, value: str): QueryBuilder
+        +capture_as(name: str): QueryBuilder
+        +build(): str
+    }
+    
+    class QueryMatch {
+        +pattern_index: int
+        +captures: Dict<str, Node]
+        
+        +get_capture(name: str): Optional<Node]
+        +get_all_captures(): List<Tuple<str, Node]]
+    }
+    
+    ' ========================================
+    ' Error Handling
+    ' ========================================
+    
+    class ParseError <<exception>> {
+        +message: str
+        +location: Location
+        +language: str
+    }
+    
+    class LanguageNotSupportedError <<exception>> {
+        +language: str
+        +supported_languages: List<str]
+    }
+    
+    class QueryError <<exception>> {
+        +query: str
+        +error_message: str
+    }
+    
+    ' ========================================
+    ' Caching
+    ' ========================================
+    
+    interface IParseCache INTERNAL {
+        +get(key: str): Optional<Tree]
+        +put(key: str, tree: Tree): void
+        +invalidate(key: str): void
+        +clear(): void
+    }
+    
+    class LRUParseCache INTERNAL implements IParseCache {
+        -cache: OrderedDict<str, CacheEntry]
+        -max_size: int
+        -total_size: int
+        
+        +get(key: str): Optional<Tree]
+        +put(key: str, tree: Tree): void
+        +invalidate(key: str): void
+        +clear(): void
+        -_evict_oldest(): void
+        -_calculate_size(tree: Tree): int
+    }
+    
+    class CacheEntry {
+        +tree: Tree
+        +size: int
+        +last_accessed: datetime
+        +access_count: int
+    }
+    
+    ' ========================================
+    ' Language Support
+    ' ========================================
+    
+    class LanguageRegistry {
+        -languages: Dict<str, LanguageInfo]
+        -extension_map: Dict<str, str]
+        
+        +register_language(info: LanguageInfo): void
+        +get_language_by_extension(ext: str): Optional<str]
+        +get_language_info(language: str): Optional<LanguageInfo]
+        +get_supported_languages(): List<str]
+    }
+    
+    class LanguageInfo {
+        +name: str
+        +tree_sitter_name: str
+        +file_extensions: List<str]
+        +mime_types: List<str]
+        +library_path: str
+        +query_path: Optional<str]
+    }
+    
+    ' ========================================
+    ' Utilities
+    ' ========================================
+    
+    class PositionMapper {
+        -line_starts: List<int]
+        
+        +offset_to_position(offset: int): Position
+        +position_to_offset(position: Position): int
+        +get_line_content(line: int): str
+    }
+    
+    class NodeUtils {
+        +{static} find_parent_of_type(node: Node, type: str): Optional<Node]
+        +{static} get_siblings(node: Node): List<Node]
+        +{static} is_ancestor_of(ancestor: Node, descendant: Node): bool
+        +{static} get_node_path(node: Node): List<Node]
+    }
+    
+    ' ========================================
+    ' Relationships
+    ' ========================================
+    
+    TreeSitterWrapper --> IParseCache : caches with
+    TreeSitterWrapper --> LanguageRegistry : gets languages
+    TreeSitterWrapper --> Parser : creates
+    
+    SymbolExtractorVisitor --> LanguageConfig : uses
+    QueryBuilder --> QueryMatch : produces
+    
+    ' Exceptions
+    ITreeSitterWrapper ..> ParseError : throws
+    ITreeSitterWrapper ..> LanguageNotSupportedError : throws
+    ITreeSitterWrapper ..> QueryError : throws
+}
+
+@enduml

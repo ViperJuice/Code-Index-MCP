@@ -1,7 +1,7 @@
 # Data Model
 
 ## Overview
-This document defines the data structures and storage schema for the MCP Server's Local Index Store.
+This document defines the data structures and storage schema for the MCP Server's dual storage system: Local Index Store (SQLite) and Graph Store (Memgraph).
 
 ## Core Entities
 
@@ -308,3 +308,238 @@ FROM similar
 JOIN symbols s ON similar.symbol_id = s.id
 JOIN files f ON s.file_id = f.id;
 ```
+
+## Graph Database Schema (Memgraph)
+
+### Node Types
+
+#### File Node
+```cypher
+CREATE (f:File {
+    path: '/src/main.py',
+    language: 'python',
+    hash: 'abc123...',
+    size: 1024,
+    last_modified: timestamp()
+})
+```
+
+#### Module Node
+```cypher
+CREATE (m:Module {
+    name: 'app.core',
+    path: '/src/app/core.py',
+    package: 'app'
+})
+```
+
+#### Symbol Nodes
+```cypher
+// Class
+CREATE (c:Class:Symbol {
+    name: 'UserService',
+    file: '/src/services/user.py',
+    line: 15,
+    docstring: 'Handles user operations'
+})
+
+// Function
+CREATE (f:Function:Symbol {
+    name: 'process_data',
+    file: '/src/utils.py',
+    line: 42,
+    signature: 'def process_data(data: List[Dict]) -> Dict',
+    async: true
+})
+
+// Variable
+CREATE (v:Variable:Symbol {
+    name: 'CONFIG',
+    file: '/src/config.py',
+    line: 10,
+    type: 'dict',
+    scope: 'global'
+})
+```
+
+### Relationship Types
+
+#### Structural Relationships
+```cypher
+// File contains symbols
+(file:File)-[:CONTAINS]->(symbol:Symbol)
+
+// Module exports symbols
+(module:Module)-[:EXPORTS]->(symbol:Symbol)
+
+// Class inheritance
+(child:Class)-[:INHERITS]->(parent:Class)
+
+// Class implements interface
+(class:Class)-[:IMPLEMENTS]->(interface:Interface)
+
+// Nested definitions
+(class:Class)-[:DEFINES]->(method:Function)
+```
+
+#### Dependency Relationships
+```cypher
+// Module imports
+(module:Module)-[:IMPORTS {line: 1, alias: 'np'}]->(imported:Module)
+
+// Function calls
+(caller:Function)-[:CALLS {line: 45, column: 12}]->(callee:Function)
+
+// Symbol references
+(function:Function)-[:REFERENCES {line: 52}]->(symbol:Symbol)
+
+// Variable usage
+(function:Function)-[:USES]->(variable:Variable)
+
+// Type dependencies
+(class:Class)-[:DEPENDS_ON]->(type:Class)
+```
+
+#### Analysis Relationships
+```cypher
+// Possible calls (from static analysis)
+(function:Function)-[:MAY_CALL {confidence: 0.85}]->(target:Function)
+
+// Overrides
+(method:Function)-[:OVERRIDES]->(parent_method:Function)
+
+// Test coverage
+(test:Function)-[:TESTS]->(function:Function)
+```
+
+### Graph Indexes
+```cypher
+// Create indexes for performance
+CREATE INDEX ON :File(path);
+CREATE INDEX ON :Module(name);
+CREATE INDEX ON :Symbol(name);
+CREATE INDEX ON :Function(name);
+CREATE INDEX ON :Class(name);
+
+// Unique constraints
+CREATE CONSTRAINT ON (f:File) ASSERT f.path IS UNIQUE;
+CREATE CONSTRAINT ON (m:Module) ASSERT m.name IS UNIQUE;
+```
+
+### Graph Queries
+
+#### Find Symbol Context
+```cypher
+MATCH (s:Symbol {name: $symbol_name})
+OPTIONAL MATCH (s)<-[:CONTAINS]-(file:File)
+OPTIONAL MATCH (s)-[:CALLS]->(calls:Function)
+OPTIONAL MATCH (s)<-[:CALLS]-(called_by:Function)
+OPTIONAL MATCH (s)-[:USES]->(uses:Variable)
+RETURN s, file, collect(DISTINCT calls) as calls, 
+       collect(DISTINCT called_by) as called_by,
+       collect(DISTINCT uses) as uses
+```
+
+#### Dependency Analysis
+```cypher
+// Find all dependencies of a module
+MATCH path = (m:Module {name: $module_name})-[:IMPORTS*]->(dep:Module)
+RETURN dep.name, length(path) as distance
+ORDER BY distance
+
+// Find circular dependencies
+MATCH (m1:Module)-[:IMPORTS*]->(m2:Module)-[:IMPORTS*]->(m1)
+WHERE m1.name < m2.name
+RETURN DISTINCT m1.name, m2.name
+```
+
+#### Impact Analysis
+```cypher
+// What will be affected if we change a function?
+MATCH (f:Function {name: $function_name})
+OPTIONAL MATCH (f)<-[:CALLS*1..3]-(affected:Function)
+OPTIONAL MATCH (f)<-[:REFERENCES*1..2]-(refs:Symbol)
+RETURN f, 
+       collect(DISTINCT affected) as affected_functions,
+       collect(DISTINCT refs) as affected_symbols
+```
+
+#### Call Graph
+```cypher
+// Get call graph with depth limit
+MATCH path = (start:Function {name: $start_function})-[:CALLS*..5]->(:Function)
+RETURN path
+```
+
+### Graph Algorithms
+
+#### PageRank for Important Functions
+```cypher
+CALL algo.pagerank({
+    nodeProjection: 'Function',
+    relationshipProjection: {
+        CALLS: {
+            type: 'CALLS',
+            orientation: 'REVERSE'
+        }
+    }
+}) YIELD nodeId, score
+RETURN gds.util.asNode(nodeId).name AS function, score
+ORDER BY score DESC
+LIMIT 10
+```
+
+#### Community Detection for Modules
+```cypher
+CALL algo.louvain({
+    nodeProjection: 'Module',
+    relationshipProjection: 'IMPORTS'
+}) YIELD nodeId, communityId
+RETURN communityId, collect(gds.util.asNode(nodeId).name) as modules
+ORDER BY size(modules) DESC
+```
+
+### Data Synchronization
+
+#### SQLite to Memgraph Sync
+```python
+# Sync strategy
+def sync_to_graph(file_data, symbols, relationships):
+    # Create file node
+    graph.execute("""
+        MERGE (f:File {path: $path})
+        SET f.language = $language,
+            f.hash = $hash,
+            f.last_modified = $last_modified
+    """, file_data)
+    
+    # Create symbol nodes
+    for symbol in symbols:
+        graph.execute("""
+            MERGE (s:Symbol:{type} {name: $name, file: $file})
+            SET s.line = $line,
+                s.docstring = $docstring
+        """.format(type=symbol['type']), symbol)
+    
+    # Create relationships
+    for rel in relationships:
+        graph.execute("""
+            MATCH (a:Symbol {name: $from_name, file: $from_file})
+            MATCH (b:Symbol {name: $to_name, file: $to_file})
+            MERGE (a)-[r:{type}]->(b)
+            SET r.line = $line
+        """.format(type=rel['type']), rel)
+```
+
+### Performance Considerations
+
+#### Memory Usage
+- Estimated 1KB per node (file/symbol)
+- Estimated 100 bytes per relationship
+- For 100K files with 10 symbols each: ~1GB RAM
+
+#### Query Optimization
+- Use node labels in all queries
+- Limit traversal depth
+- Use indexes for lookups
+- Profile queries with EXPLAIN
