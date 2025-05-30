@@ -134,10 +134,15 @@ content_corrections: [existing docs needing architecture alignment]
 **Find** and update roadmap documentation:
 - **Search** for ROADMAP.md, roadmap.md, or similar files
 - **Update** implementation status based on codebase analysis
-- **Align** planned features with architecture specifications
-- **Focus** next steps on current incomplete phases only
-- **Cross-reference** with any implementation gap analysis
-- **Update Next-steps section** the roadmap should always end with a next steps section the comprehensively plans the next steps to accomplish in order to complet the last lowest number unfinished phase. It should include a comprehensive plan, including files, classes, methods, .. that need to be modified, added or deleted to complete the phase. It should emphasise using Parallel agentic tools to accomplish this as quickly as possible.
+- **Verify** completed components match actual implementation
+- **Align** risk factors with current codebase state
+- **Remove** human-centric terminology (timelines, sprints, teams)
+- **Update Next Steps section** to focus on priority implementation tasks:
+  - **Identify** critical path items that block other work
+  - **Group** parallel execution opportunities (non-conflicting tasks)
+  - **Specify** exact files, classes, and methods to modify
+  - **Prioritize** tasks that unblock the most additional work
+  - **Focus** only on completing the lowest numbered incomplete phase
 
 ### UPDATE_MASTER_AGENT_CONFIG
 **Find** and update primary agent configuration:
