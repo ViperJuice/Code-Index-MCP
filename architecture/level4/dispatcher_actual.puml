@@ -2,76 +2,113 @@
 !define COMPONENT_INTERFACE <<Component Interface>>
 !define INTERNAL <<Internal>>
 !define NOT_IMPLEMENTED <<Not Implemented>>
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-' This diagram reflects the ACTUAL implementation in dispatcher.py
+title Dispatcher - Code Level (Actual Implementation)
 
-package "mcp_server" <<Component>> {
+package "mcp_server.dispatcher" <<Component>> {
     
     ' ========================================
-    ' Actual Dispatcher Implementation
+    ' ACTUAL Implementation
     ' ========================================
     
-    class Dispatcher {
-        -_plugins: list[IPlugin]
-        -_by_lang: dict[str, IPlugin]
-        
-        +__init__(plugins: list[IPlugin])
-        +lookup(symbol: str): SymbolDef | None
-        +search(query: str, semantic: bool = False, limit: int = 20): Iterable[SearchResult]
-        -_match_plugin(path: Path): IPlugin
+    class Dispatcher #LightGreen {
+        -_plugins: List[IPlugin]
+        -_by_lang: Dict[str, IPlugin]
+        -_file_cache: Dict[Path, str]
+        --
+        +__init__(plugins: List[IPlugin])
+        +@property plugins(): Dict[str, IPlugin]
+        +lookup(symbol: str) -> SymbolDef | None
+        +search(query: str, semantic: bool = False, limit: int = 20) -> Iterable[SearchResult]
+        +index_file(path: Path) -> None
+        +get_statistics() -> Dict[str, Any]
+        -_get_file_hash(path: Path) -> str
+        -_match_plugin(path: Path) -> IPlugin | None
     }
     
     ' ========================================
-    ' NOT IMPLEMENTED Components
+    ' What's Actually Implemented
     ' ========================================
     
-    class "Dispatcher Core" NOT_IMPLEMENTED {
-        ' No formal IDispatcher interface
-        ' No IRequestRouter interface
+    note right of Dispatcher #LightGreen
+        IMPLEMENTED:
+        - Basic plugin management
+        - File extension based routing
+        - Simple caching (file hashes)
+        - Sequential plugin search
+        - Index file functionality
+        - Basic statistics
+    end note
+    
+    ' ========================================
+    ' What's Missing
+    ' ========================================
+    
+    note bottom of Dispatcher #FF6B6B
+        NOT IMPLEMENTED:
+        - No IDispatcher interface
+        - No IRequestRouter interface
+        - No Plugin Router component
+        - No Result Aggregator component
+        - No parallel processing
+        - No error aggregation
+        - No request queueing
+        - No priority handling
+        - No load balancing
+        - No circuit breakers
+        - No retry logic
+    end note
+    
+    ' ========================================
+    ' Dependencies and Types
+    ' ========================================
+    
+    class IPlugin <<interface>> {
+        +lang: str
+        +supports(path: str | Path) -> bool
+        +indexFile(path: str | Path, content: str) -> IndexShard
+        +getDefinition(symbol: str) -> SymbolDef | None
+        +findReferences(symbol: str) -> Iterable[Reference]
+        +search(query: str, opts: SearchOpts | None) -> Iterable[SearchResult]
     }
     
-    class "Plugin Router" NOT_IMPLEMENTED {
-        ' Basic plugin matching by file extension only
-        ' No IPluginRouter interface
-        ' No IFileTypeMatcher interface
+    class SymbolDef <<TypedDict>> {
+        +name: str
+        +kind: str
+        +file: str
+        +line: int
+        +character: int
+        +docstring: str | None
+        +parent: str | None
     }
     
-    class "Result Aggregator" NOT_IMPLEMENTED {
-        ' Simple iteration over plugins
-        ' No IResultAggregator interface
-        ' No IResultMerger interface
-        ' No parallel processing
-    }
-    
-    class "Request Queue" NOT_IMPLEMENTED {
-        ' No request queueing
-        ' No async processing
-        ' No priority handling
-    }
-    
-    class "Load Balancer" NOT_IMPLEMENTED {
-        ' No load balancing
-        ' No plugin health checks
-        ' No failover
+    class SearchResult <<TypedDict>> {
+        +file: str
+        +line: int
+        +snippet: str
+        +score: float | None
     }
     
     ' ========================================
-    ' Relationships
+    ' Actual Relationships
     ' ========================================
     
-    Dispatcher --> IPlugin : iterates over
+    Dispatcher --> IPlugin : manages list of
     Dispatcher ..> SymbolDef : returns
     Dispatcher ..> SearchResult : yields
-    
-    note right of Dispatcher
-        Minimal implementation:
-        - Simple list of plugins
-        - Direct method calls
-        - No parallel processing
-        - No caching
-        - No error aggregation
-        - Sequential plugin execution
-    end note
+    Dispatcher --> "_file_cache" : maintains
 }
+
+' ========================================
+' Implementation Status Legend
+' ========================================
+
+legend right
+    |<#90EE90>| Implemented |
+    |<#FFD700>| Partially Implemented |
+    |<#FFA500>| Stub Only |
+    |<#FF6B6B>| Not Implemented |
+endlegend
 
 @enduml

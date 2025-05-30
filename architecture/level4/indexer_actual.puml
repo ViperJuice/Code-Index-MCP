@@ -1,50 +1,70 @@
 @startuml indexer_actual
 !define COMPONENT_INTERFACE <<Component Interface>>
 !define NOT_IMPLEMENTED <<Not Implemented>>
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-' This diagram reflects the ACTUAL implementation
+title Indexer - Code Level (Actual Implementation)
 
 package "mcp_server.utils" <<Component>> {
     
     ' ========================================
-    ' Actual Fuzzy Indexer Implementation
+    ' ACTUAL Implementation - Fuzzy Indexer
     ' ========================================
     
-    class FuzzyIndexer {
-        -index: dict[str, list[tuple[int, str]]]
-        
-        +__init__()
-        +add_file(path: str, content: str): void
-        +search(query: str, limit: int = 20): list[dict]
-        
-        ' Simple substring matching
-        ' In-memory storage only
-        ' No persistence
+    class FuzzyIndexer #LightGreen {
+        +index: Dict[str, List[Tuple[int, str]]]
+        +sqlite_store: Optional[SQLiteStore]
+        -_index_type: str = "fuzzy_file_index"
+        -_symbol_metadata: Dict[str, Any]
+        --
+        +__init__(sqlite_store: Optional[SQLiteStore] = None)
+        +add_file(path: str, content: str) -> None
+        +search(query: str, limit: int = 20) -> List[Dict]
+        +persist() -> bool
+        +load() -> bool
+        +clear() -> None
+        +add_symbol(symbol_name: str, file_path: str, line_number: int, metadata: Dict) -> None
+        +search_symbols(query: str, limit: int = 20) -> List[Dict]
+        +get_stats() -> Dict[str, int]
     }
     
     ' ========================================
-    ' Actual Semantic Indexer Implementation
+    ' ACTUAL Implementation - Semantic Indexer
     ' ========================================
     
-    class SemanticIndexer {
+    class SemanticIndexer #LightGreen {
         -collection: str
         -qdrant: QdrantClient
         -wrapper: TreeSitterWrapper
         -voyage: voyageai.Client
-        
+        --
         +__init__(collection: str = "code-index", qdrant_path: str = ":memory:")
-        +index_file(path: Path): dict[str, Any]
-        +query(text: str, limit: int = 5): Iterable[dict[str, Any]]
-        -_ensure_collection(): void
-        -_symbol_id(file: str, name: str, line: int): int
+        +index_file(path: Path) -> Dict[str, Any]
+        +query(text: str, limit: int = 5) -> Iterable[Dict[str, Any]]
+        -_ensure_collection() -> None
+        -_symbol_id(file: str, name: str, line: int) -> int
     }
     
-    class SymbolEntry <<dataclass>> {
+    class SymbolEntry <<dataclass>> #LightGreen {
         +symbol: str
         +kind: str
         +signature: str
         +line: int
-        +span: tuple[int, int]
+        +span: Tuple[int, int]
+    }
+    
+    ' ========================================
+    ' Storage Integration
+    ' ========================================
+    
+    package "mcp_server.storage" {
+        class SQLiteStore #LightGreen {
+            +persist_fuzzy_index(index_data: Dict) -> None
+            +load_fuzzy_index() -> Dict
+            +search_symbols_fuzzy(query: str, limit: int) -> List[Dict]
+            +search_symbols_fts(query: str, limit: int) -> List[Dict]
+            +search_code_fts(query: str, limit: int) -> List[Dict]
+        }
     }
     
     ' ========================================
@@ -52,86 +72,75 @@ package "mcp_server.utils" <<Component>> {
     ' ========================================
     
     class "voyageai" <<External Library>> {
-        ' Voyage AI embeddings
-        +embed(texts, model="voyage-code-3")
+        +embed(texts: List[str], model: str = "voyage-code-3") -> List[List[float]]
     }
     
     class "qdrant_client" <<External Library>> {
-        ' Vector database
-        +QdrantClient(location)
-        +upsert(collection_name, points)
-        +search(collection_name, query_vector, limit)
+        +QdrantClient(location: str)
+        +recreate_collection(collection_name: str, vectors_config: VectorParams)
+        +upsert(collection_name: str, points: List[PointStruct])
+        +search(collection_name: str, query_vector: List[float], limit: int) -> List[ScoredPoint]
     }
     
     ' ========================================
-    ' NOT IMPLEMENTED Components
+    ' What's Actually Implemented
     ' ========================================
     
-    class "Index Engine" NOT_IMPLEMENTED {
-        ' No coordinating engine
-        ' No IIndexEngine interface
-        ' No IIndexCoordinator interface
-        ' Direct indexer usage only
-    }
-    
-    class "Parser Coordinator" NOT_IMPLEMENTED {
-        ' No parsing coordination
-        ' No IParserCoordinator interface
-        ' No IParseOrchestrator interface
-        ' Each indexer parses independently
-    }
-    
-    class "Query Optimizer" NOT_IMPLEMENTED {
-        ' No query optimization
-        ' No IQueryOptimizer interface
-        ' No ISearchPlanner interface
-        ' Direct query execution
-    }
-    
-    class "Index Storage" NOT_IMPLEMENTED {
-        ' FuzzyIndexer: In-memory only
-        ' SemanticIndexer: Default Qdrant
-        ' No SQLite FTS5 integration
-        ' No persistent fuzzy index
-    }
-    
-    class "Incremental Updates" NOT_IMPLEMENTED {
-        ' Full re-indexing only
-        ' No change detection
-        ' No partial updates
-    }
-    
-    ' ========================================
-    ' Implementation Notes
-    ' ========================================
-    
-    note right of FuzzyIndexer
-        Simple implementation:
-        - Case-insensitive substring search
-        - Line-by-line indexing
-        - No tokenization
-        - No ranking/scoring
-        - Memory-only storage
+    note right of FuzzyIndexer #LightGreen
+        IMPLEMENTED:
+        - In-memory indexing
+        - SQLite persistence
+        - Symbol indexing
+        - Fuzzy string matching
+        - Statistics tracking
+        - Persistence/loading
     end note
     
-    note right of SemanticIndexer
-        Advanced features:
-        - Voyage Code 3 embeddings
-        - Qdrant vector storage
-        - Tree-sitter parsing
+    note right of SemanticIndexer #LightGreen
+        IMPLEMENTED:
+        - Voyage AI embeddings
+        - Qdrant vector search
         - Symbol extraction
-        - Cosine similarity search
-        - In-memory mode by default
+        - Tree-sitter parsing
+        - Cosine similarity
+    end note
+    
+    ' ========================================
+    ' What's Missing
+    ' ========================================
+    
+    note bottom of FuzzyIndexer #FF6B6B
+        NOT IMPLEMENTED:
+        - No Index Engine coordinator
+        - No Parser Coordinator
+        - No Query Optimizer
+        - No incremental updates
+        - No change detection
+        - No distributed indexing
+        - No background indexing
+        - No index compression
     end note
     
     ' ========================================
     ' Relationships
     ' ========================================
     
+    FuzzyIndexer --> SQLiteStore : persists to
     SemanticIndexer --> TreeSitterWrapper : parses with
     SemanticIndexer --> voyageai : generates embeddings
     SemanticIndexer --> qdrant_client : stores vectors
     SemanticIndexer ..> SymbolEntry : creates
 }
+
+' ========================================
+' Implementation Status Legend
+' ========================================
+
+legend right
+    |<#90EE90>| Implemented |
+    |<#FFD700>| Partially Implemented |
+    |<#FFA500>| Stub Only |
+    |<#FF6B6B>| Not Implemented |
+endlegend
 
 @enduml

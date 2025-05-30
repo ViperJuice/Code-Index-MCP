@@ -1,0 +1,174 @@
+@startuml c_plugin_actual
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define NOT_IMPLEMENTED <<Not Implemented>>
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title C Plugin - Code Level (Actual Implementation)
+
+package "mcp_server.plugins.c_plugin" <<Component>> {
+    
+    ' ========================================
+    ' ACTUAL Implementation
+    ' ========================================
+    
+    class Plugin implements IPlugin #LightGreen {
+        +lang: str = "c"
+        -_ts: TreeSitterWrapper
+        -_indexer: FuzzyIndexer
+        -_sqlite_store: Optional[SQLiteStore]
+        -_repository_id: Optional[int]
+        -_indexed_files: int = 0
+        --
+        +__init__(sqlite_store: Optional[SQLiteStore] = None)
+        +supports(path: str | Path) -> bool
+        +indexFile(path: str | Path, content: str) -> IndexShard
+        +getDefinition(symbol: str) -> SymbolDef | None
+        +findReferences(symbol: str) -> List[Reference]
+        +search(query: str, opts: SearchOpts | None) -> List[SearchResult]
+        +get_indexed_count() -> int
+        -_preindex() -> None
+        -_extract_symbols(tree: Tree, source: str, file_path: str) -> List[Dict]
+        -_get_symbol_context(node: Node, source: str) -> Tuple[str, str]
+        -_get_function_params(node: Node, source: str) -> str
+        -_get_function_return_type(node: Node, source: str) -> str
+        -_get_declarator_name(declarator: Node, source: str) -> Optional[str]
+        -_extract_struct_members(node: Node, source: str) -> List[str]
+        -_extract_enum_values(node: Node, source: str) -> List[str]
+        -_get_parent_context(node: Node, source: str) -> Optional[str]
+    }
+    
+    ' ========================================
+    ' Supported File Types
+    ' ========================================
+    
+    note right of Plugin #LightGreen
+        IMPLEMENTED:
+        - C source files (.c)
+        - C header files (.h)
+        - Tree-sitter parsing
+        - Symbol extraction
+        - Include tracking
+        - SQLite persistence
+        - Function signatures
+        - Struct definitions
+        - Enum definitions
+        - Typedef declarations
+        - Macro definitions
+        - Global variables
+    end note
+    
+    ' ========================================
+    ' Symbol Types Extracted
+    ' ========================================
+    
+    class SymbolTypes <<enumeration>> #LightGreen {
+        function_definition
+        declaration (functions)
+        struct_specifier
+        enum_specifier
+        type_definition
+        preproc_def (macros)
+        preproc_function_def
+        field_declaration
+        enumerator
+    }
+    
+    ' ========================================
+    ' C-Specific Features
+    ' ========================================
+    
+    class CFeatures <<features>> #LightGreen {
+        +Function pointers
+        +Forward declarations
+        +Static functions
+        +Inline functions
+        +Extern declarations
+        +Const qualifiers
+        +Volatile qualifiers
+        +Pointer types
+        +Array types
+        +Union types
+    }
+    
+    ' ========================================
+    ' External Dependencies
+    ' ========================================
+    
+    class TreeSitterWrapper #LightGreen {
+        -parser: Parser
+        -language: Language
+        --
+        +parse(content: str) -> Tree
+        +extract_symbols(tree: Tree, source: str) -> List[Symbol]
+    }
+    
+    class FuzzyIndexer #LightGreen {
+        +add_file(path: str, content: str) -> None
+        +add_symbol(symbol_name: str, file_path: str, line_number: int, metadata: Dict) -> None
+        +search(query: str, limit: int = 20) -> List[Dict]
+        +search_symbols(query: str, limit: int = 20) -> List[Dict]
+    }
+    
+    ' ========================================
+    ' What's Actually Implemented
+    ' ========================================
+    
+    note left of SymbolTypes
+        Full support for:
+        - K&R and ANSI C
+        - C99/C11 features
+        - Complex declarations
+        - Nested structures
+        - Anonymous unions
+        - Bit fields
+        - Function prototypes
+        - Variadic functions
+    end note
+    
+    ' ========================================
+    ' What's Missing
+    ' ========================================
+    
+    note bottom of Plugin #FF6B6B
+        NOT IMPLEMENTED:
+        - No preprocessor expansion
+        - No include path resolution
+        - No macro expansion
+        - No cross-file linking
+        - No call graph analysis
+        - No dependency tracking
+        - No conditional compilation handling
+        - No inline assembly parsing
+        - No attribute parsing
+        - No pragma handling
+        - No linkage analysis
+    end note
+    
+    ' ========================================
+    ' Relationships
+    ' ========================================
+    
+    Plugin --> TreeSitterWrapper : parses with
+    Plugin --> FuzzyIndexer : indexes with
+    Plugin --> SQLiteStore : persists to
+    Plugin ..> SymbolTypes : extracts
+    Plugin ..> CFeatures : supports
+    
+    Plugin ..> IndexShard : returns
+    Plugin ..> SymbolDef : returns
+    Plugin ..> Reference : yields
+    Plugin ..> SearchResult : yields
+}
+
+' ========================================
+' Implementation Status Legend
+' ========================================
+
+legend right
+    |<#90EE90>| Implemented |
+    |<#FFD700>| Partially Implemented |
+    |<#FFA500>| Stub Only |
+    |<#FF6B6B>| Not Implemented |
+endlegend
+
+@enduml

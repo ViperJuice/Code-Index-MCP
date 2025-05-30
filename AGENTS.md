@@ -4,23 +4,29 @@ This file defines the capabilities and constraints for AI agents working with th
 
 ## Current State
 
-**⚠️ PROTOTYPE STATUS**: This is an early-stage prototype with significant implementation gaps. Most functionality is stubbed or partially implemented.
+**PROJECT STATUS**: ~65% Complete - Core functionality implemented with comprehensive testing framework
 
 ### What's Actually Implemented
-- ✅ Basic FastAPI gateway with `/symbol` and `/search` endpoints
-- ✅ Plugin base class structure
-- ✅ Python plugin with partial Jedi integration (basic functionality only)
-- ✅ TreeSitter wrapper utility class
-- ✅ Architecture documentation (C4 model)
+- ✅ FastAPI gateway with all endpoints: `/symbol`, `/search`, `/status`, `/plugins`, `/reindex`
+- ✅ Dispatcher with caching and auto-initialization
+- ✅ Python plugin fully functional with Tree-sitter + Jedi
+- ✅ JavaScript/TypeScript plugin fully functional with Tree-sitter
+- ✅ C plugin fully functional with Tree-sitter
+- ✅ SQLite persistence layer with FTS5 search
+- ✅ File watcher integrated with automatic re-indexing
+- ✅ Error handling and logging framework
+- ✅ Comprehensive testing framework (pytest with fixtures)
+- ✅ CI/CD pipeline with GitHub Actions
+- ✅ Docker support and build system
 
 ### What's NOT Implemented (Stubs/Placeholders)
-- ❌ Dispatcher (stub returning "not found")
-- ❌ File watcher (empty implementation)
-- ❌ Local storage/indexing (no persistence)
-- ❌ All language plugins except Python (empty stubs)
-- ❌ Fuzzy and semantic indexers (placeholders)
-- ❌ Cloud sync (stub only)
-- ❌ Actual code indexing functionality
+- ❌ C++, HTML/CSS, and Dart plugins (stubs with guides)
+- ❌ Advanced metrics collection (Prometheus)
+- ❌ Security layer (JWT authentication)
+- ❌ Task queue system (Celery + Redis)
+- ❌ Semantic search features
+- ❌ Cloud sync capabilities
+- ❌ Dynamic plugin loading (hardcoded in gateway)
 
 ## Agent Capabilities
 
@@ -70,26 +76,160 @@ This file defines the capabilities and constraints for AI agents working with th
    - Plan for efficient memory usage
    - Design efficient file watching
 
-## Common Commands
+## ESSENTIAL_COMMANDS
 
 ```bash
-# Start the server (runs but most features don't work)
-uvicorn mcp_server.gateway:app --reload
+# Build & Install
+make install                    # Install dependencies
+pip install -e .               # Install in development mode
 
-# View architecture diagrams
+# Testing
+make test                       # Run unit tests
+make test-all                   # Run all tests with coverage
+make coverage                   # Generate coverage report
+make benchmark                  # Run performance benchmarks
+
+# Code Quality
+make lint                       # Run linters (black, isort, flake8, mypy, pylint)
+make format                     # Format code (black, isort)
+make security                   # Run security checks (safety, bandit)
+
+# Development
+uvicorn mcp_server.gateway:app --reload --host 0.0.0.0 --port 8000
+make clean                      # Clean up temporary files
+
+# Docker
+make docker                     # Build Docker image
+
+# Architecture
 docker run --rm -p 8080:8080 -v "$(pwd)/architecture":/usr/local/structurizr structurizr/lite
-
-# Run available tests
-python test_python_plugin.py  # Tests basic Python plugin functionality
-python test_tree_sitter.py    # Tests TreeSitter wrapper
-
-# Note: No pytest tests exist yet
 ```
 
 ## Development Priorities
 
-1. **Implement the Dispatcher** - Currently returns "not found" for everything
-2. **Complete Python Plugin** - Add actual indexing beyond basic Jedi calls
-3. **Add Local Storage** - Implement SQLite with FTS5 for persistence
-4. **Implement File Watcher** - Make it actually monitor file changes
-5. **Create Working Tests** - Add pytest suite for all components 
+1. **Performance Benchmarks** - Required to validate against requirements
+2. **Dynamic Plugin Loading** - Currently hardcoded in gateway
+3. **C++ Plugin** - Implementation guide exists in AGENTS.md
+4. **HTML/CSS Plugin** - Implementation guide exists in AGENTS.md
+5. **Dart Plugin** - Implementation guide exists in AGENTS.md
+
+## Architecture Context
+
+The codebase follows C4 architecture model with comprehensive diagrams:
+- **Structurizr DSL files**: Define system context, containers, and components
+- **PlantUML files**: Detailed component designs in architecture/level4/
+- **Architecture vs Implementation**: ~20% of planned architecture is implemented
+- **Pragmatic approach**: Core functionality works but lacks many architectural components
+
+Key architectural gaps:
+- No authentication/security layer
+- Missing plugin registry (hardcoded imports)
+- No graph store (Memgraph) 
+- No cache layer (Redis)
+- Missing metrics/monitoring components
+
+## CODE_STYLE_PREFERENCES
+
+```python
+# Discovered from pyproject.toml and Makefile
+# Formatting: black + isort
+# Linting: flake8 + mypy + pylint
+# Type hints: Required for all functions
+# Docstrings: Required for public APIs
+
+# Function naming (discovered patterns)
+def get_current_user(request: Request) -> TokenData:
+def cache_symbol_lookup(query_cache: QueryResultCache):
+def require_permission(permission: Permission):
+
+# Class naming (discovered patterns)  
+class FileWatcher:
+class AuthenticationError(Exception):
+class SecurityError(Exception):
+
+# File naming patterns
+# test_*.py for tests
+# *_manager.py for managers
+# *_middleware.py for middleware
+```
+
+## ARCHITECTURAL_PATTERNS
+
+```python
+# Plugin Pattern: All language plugins inherit from PluginBase
+class LanguagePlugin(PluginBase):
+    def index(self, file_path: str) -> Dict
+    def getDefinition(self, symbol: str, context: Dict) -> Dict
+    def getReferences(self, symbol: str, context: Dict) -> List[Dict]
+
+# FastAPI Gateway: Standardized tool interface
+@app.get("/symbol")
+@app.get("/search") 
+@app.get("/status")
+
+# Tree-sitter Integration: Use TreeSitterWrapper for parsing
+from mcp_server.utils.treesitter_wrapper import TreeSitterWrapper
+
+# Error Handling: All functions return structured responses
+{"status": "success|error", "data": {...}, "timestamp": "..."}
+
+# Testing: pytest with fixtures, >80% coverage required
+def test_plugin_functionality(plugin_fixture):
+```
+
+## NAMING_CONVENTIONS
+
+```bash
+# Functions: snake_case
+get_current_user, cache_symbol_lookup, require_permission
+
+# Classes: PascalCase
+FileWatcher, AuthenticationError, PluginBase
+
+# Files: snake_case.py
+gateway.py, plugin_manager.py, security_middleware.py
+
+# Tests: test_*.py
+test_python_plugin.py, test_dispatcher.py, test_gateway.py
+
+# Directories: snake_case
+mcp_server/, plugin_system/, tree_sitter_wrapper/
+```
+
+## DEVELOPMENT_ENVIRONMENT
+
+```bash
+# Python Version: 3.8+ (from pyproject.toml)
+# Virtual Environment: Required
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Dependencies
+pip install -r requirements.txt
+pip install -e .
+
+# Pre-commit: Configured for linting and formatting
+make lint     # Verify before committing
+make format   # Auto-format code
+
+# IDE Setup: VS Code recommended (if .vscode/ exists)
+# Extensions: Python, Pylance, Black Formatter
+```
+
+## TEAM_SHARED_PRACTICES
+
+```bash
+# Testing: Always run tests before committing
+make test-all
+
+# Documentation: Update AGENTS.md when adding new patterns
+# Plugin Development: Follow established PluginBase interface  
+# Error Messages: Include context and suggested fixes
+# Performance: Target <100ms symbol lookup, <500ms search
+
+# Code Review: Focus on
+# - Type hints for all functions
+# - Comprehensive error handling  
+# - Test coverage >80%
+# - Documentation updates
+``` 

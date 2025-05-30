@@ -257,11 +257,16 @@ class SQLiteStore:
                    ON CONFLICT(path) DO UPDATE SET 
                    name=excluded.name, 
                    metadata=excluded.metadata,
-                   updated_at=CURRENT_TIMESTAMP
-                   RETURNING id""",
+                   updated_at=CURRENT_TIMESTAMP""",
                 (path, name, json.dumps(metadata or {}))
             )
-            return cursor.fetchone()[0]
+            if cursor.lastrowid:
+                return cursor.lastrowid
+            else:
+                # If lastrowid is None, it means we updated an existing row
+                # Get the id of the existing repository
+                cursor = conn.execute("SELECT id FROM repositories WHERE path = ?", (path,))
+                return cursor.fetchone()[0]
     
     def get_repository(self, path: str) -> Optional[Dict]:
         """Get repository by path."""
@@ -290,12 +295,20 @@ class SQLiteStore:
                    hash=excluded.hash,
                    last_modified=CURRENT_TIMESTAMP,
                    indexed_at=CURRENT_TIMESTAMP,
-                   metadata=excluded.metadata
-                   RETURNING id""",
+                   metadata=excluded.metadata""",
                 (repository_id, path, relative_path, language, size, hash, 
                  json.dumps(metadata or {}))
             )
-            return cursor.fetchone()[0]
+            if cursor.lastrowid:
+                return cursor.lastrowid
+            else:
+                # If lastrowid is None, it means we updated an existing row
+                # Get the id of the existing file
+                cursor = conn.execute(
+                    "SELECT id FROM files WHERE repository_id = ? AND path = ?", 
+                    (repository_id, path)
+                )
+                return cursor.fetchone()[0]
     
     def get_file(self, file_path: str, repository_id: Optional[int] = None) -> Optional[Dict]:
         """Get file by path."""
@@ -326,12 +339,11 @@ class SQLiteStore:
                 """INSERT INTO symbols 
                    (file_id, name, kind, line_start, line_end, column_start, 
                     column_end, signature, documentation, metadata)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                   RETURNING id""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (file_id, name, kind, line_start, line_end, column_start,
                  column_end, signature, documentation, json.dumps(metadata or {}))
             )
-            symbol_id = cursor.fetchone()[0]
+            symbol_id = cursor.lastrowid
             
             # Generate and store trigrams for fuzzy search
             self._store_trigrams(conn, symbol_id, name)
@@ -386,12 +398,11 @@ class SQLiteStore:
                 """INSERT INTO symbol_references 
                    (symbol_id, file_id, line_number, column_number, 
                     reference_kind, metadata)
-                   VALUES (?, ?, ?, ?, ?, ?)
-                   RETURNING id""",
+                   VALUES (?, ?, ?, ?, ?, ?)""",
                 (symbol_id, file_id, line_number, column_number,
                  reference_kind, json.dumps(metadata or {}))
             )
-            return cursor.fetchone()[0]
+            return cursor.lastrowid
     
     def get_references(self, symbol_id: int) -> List[Dict]:
         """Get all references to a symbol."""

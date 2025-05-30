@@ -3,6 +3,8 @@ workspace "MCP Server – Level 1" {
   
   properties {
     "structurizr.dslEditor" "false"
+    "implementation.status" "prototype"
+    "implementation.coverage" "65%"
     "performance.symbolLookup" "<100ms"
     "performance.semanticSearch" "<500ms"
     "performance.indexing" "10K files/minute"
@@ -22,11 +24,20 @@ workspace "MCP Server – Level 1" {
     
     mcp = softwareSystem "MCP Server" {
       description "Local-first code indexing system with deep language understanding and graph-based context analysis"
-      tags "Core System"
+      tags "Core System" "PartiallyImplemented"
+      properties {
+        "implementation.status" "partial"
+        "implementation.notes" "Basic indexing and search working. Missing graph analysis, cloud sync, monitoring."
+      }
     }
     
     plugins = softwareSystem "Language Plugins" {
       description "Language-specific analyzers (Python, JS, C++, etc.)"
+      tags "PartiallyImplemented"
+      properties {
+        "implementation.status" "partial"
+        "implementation.notes" "Python plugin fully implemented. Others are stubs."
+      }
     }
     
     repo = container "Local Code Repo" {
@@ -35,14 +46,28 @@ workspace "MCP Server – Level 1" {
     
     cloud = container "Cloud" {
       description "Optional cloud services for sync and embeddings"
+      tags "NotImplemented"
+      properties {
+        "implementation.status" "not_implemented"
+        "implementation.notes" "Cloud sync is stub only. Embeddings work locally via Voyage AI."
+      }
     }
     
     monitoring = softwareSystem "Monitoring" {
       description "Observability and metrics collection"
+      tags "NotImplemented"
+      properties {
+        "implementation.status" "not_implemented"
+      }
     }
     
     ide = softwareSystem "IDE/Editor" {
       description "Development environment integration"
+      tags "NotImplemented"
+      properties {
+        "implementation.status" "not_implemented"
+        "implementation.notes" "No IDE integration yet."
+      }
     }
 
     # Relationships
@@ -62,6 +87,19 @@ workspace "MCP Server – Level 1" {
       include *
       autolayout lr
       description "System context showing MCP Server interactions"
+    }
+  }
+  
+  styles {
+    element "Core System" {
+      background #1168bd
+      color #ffffff
+    }
+    element "PartiallyImplemented" {
+      background #FFD700
+    }
+    element "NotImplemented" {
+      background #FF6B6B
     }
   }
 }

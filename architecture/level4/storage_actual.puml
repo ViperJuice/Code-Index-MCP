@@ -1,0 +1,152 @@
+@startuml storage_actual
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define NOT_IMPLEMENTED <<Not Implemented>>
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Storage - Code Level (Actual Implementation)
+
+package "mcp_server.storage" <<Component>> {
+    
+    ' ========================================
+    ' ACTUAL Implementation
+    ' ========================================
+    
+    class SQLiteStore #LightGreen {
+        -db_path: str
+        -_conn: Optional[sqlite3.Connection]
+        --
+        +__init__(db_path: str = "code_index.db")
+        +close() -> None
+        ' Repository Management
+        +create_repository(path: str, name: str, metadata: Dict) -> int
+        +get_repository(path: str) -> Optional[Dict]
+        ' File Management
+        +store_file(repository_id: int, path: str, language: str, content: str, hash: str, metadata: Dict) -> int
+        +get_file(file_path: str, repository_id: Optional[int]) -> Optional[Dict]
+        +update_file_content(file_id: int, content: str, hash: str) -> None
+        ' Symbol Management
+        +store_symbol(file_id: int, name: str, kind: str, line: int, column: int, end_line: int, end_column: int, signature: str, docstring: str, parent_symbol: str, metadata: Dict) -> int
+        +get_symbol(name: str, kind: Optional[str]) -> List[Dict]
+        +get_symbols_in_file(file_id: int) -> List[Dict]
+        ' Reference Management
+        +store_reference(symbol_id: int, file_id: int, line: int, column: int, reference_kind: str) -> int
+        +get_references(symbol_id: int) -> List[Dict]
+        ' Search Functions
+        +search_symbols_fuzzy(query: str, limit: int = 20) -> List[Dict]
+        +search_symbols_fts(query: str, limit: int = 20) -> List[Dict]
+        +search_code_fts(query: str, limit: int = 20) -> List[Dict]
+        ' Index Management
+        +persist_fuzzy_index(index_data: Dict) -> None
+        +load_fuzzy_index() -> Dict
+        +store_semantic_embedding(file_id: int, embedding_model: str, embedding_vector: bytes, metadata: Dict) -> int
+        ' Cache Management
+        +clear_cache() -> None
+        +get_statistics() -> Dict[str, int]
+        -_execute_schema() -> None
+        -_create_indexes() -> None
+        -_setup_fts5() -> None
+    }
+    
+    ' ========================================
+    ' Database Schema (Actual)
+    ' ========================================
+    
+    note right of SQLiteStore #LightGreen
+        IMPLEMENTED Tables:
+        - repositories
+        - files  
+        - symbols
+        - references
+        - symbol_search (FTS5)
+        - code_search (FTS5)
+        - symbol_trigrams
+        - fuzzy_indexes
+        - embeddings
+        - query_cache
+        
+        Indexes:
+        - idx_files_repo_path
+        - idx_symbols_name
+        - idx_symbols_file
+        - idx_references_symbol
+        - idx_embeddings_file
+        - idx_fuzzy_type
+        - idx_cache_query_time
+        
+        Triggers:
+        - symbol_trigram_insert
+        - symbol_trigram_update
+        - symbol_trigram_delete
+    end note
+    
+    ' ========================================
+    ' What's Actually Implemented
+    ' ========================================
+    
+    note left of SQLiteStore #LightGreen
+        IMPLEMENTED:
+        - Full SQLite persistence
+        - FTS5 full-text search
+        - Trigram indexing
+        - Fuzzy search support
+        - Embedding storage
+        - Query caching
+        - Transaction support
+        - Schema migrations
+        - Statistics tracking
+    end note
+    
+    ' ========================================
+    ' What's Missing
+    ' ========================================
+    
+    note bottom of SQLiteStore #FF6B6B
+        NOT IMPLEMENTED:
+        - No connection pooling
+        - No async operations
+        - No distributed storage
+        - No data partitioning
+        - No backup/restore
+        - No data compression
+        - No query optimization
+        - No index optimization
+        - No WAL mode config
+        - No prepared statements cache
+    end note
+    
+    ' ========================================
+    ' External Dependencies
+    ' ========================================
+    
+    class "sqlite3" <<Standard Library>> {
+        +connect(database: str) -> Connection
+        +Row: Type
+        +PARSE_DECLTYPES: int
+        +PARSE_COLNAMES: int
+    }
+    
+    class "json" <<Standard Library>> {
+        +dumps(obj: Any) -> str
+        +loads(s: str) -> Any
+    }
+    
+    ' ========================================
+    ' Relationships
+    ' ========================================
+    
+    SQLiteStore --> sqlite3 : uses
+    SQLiteStore --> json : serializes with
+}
+
+' ========================================
+' Implementation Status Legend
+' ========================================
+
+legend right
+    |<#90EE90>| Implemented |
+    |<#FFD700>| Partially Implemented |
+    |<#FFA500>| Stub Only |
+    |<#FF6B6B>| Not Implemented |
+endlegend
+
+@enduml

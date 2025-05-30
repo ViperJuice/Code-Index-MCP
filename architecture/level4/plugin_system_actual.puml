@@ -2,99 +2,118 @@
 !define COMPONENT_INTERFACE <<Component Interface>>
 !define ABSTRACT <<abstract>>
 !define NOT_IMPLEMENTED <<Not Implemented>>
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-' This diagram reflects the ACTUAL implementation
+title Plugin System - Code Level (Actual Implementation)
 
-package "mcp_server" <<Component>> {
+package "mcp_server.plugin_base" <<Component>> {
     
     ' ========================================
-    ' Actual Plugin Interface
+    ' ACTUAL Implementation
     ' ========================================
     
-    abstract class IPlugin <<ABC>> {
+    abstract class IPlugin <<ABC>> #LightGreen {
         +lang: str
-        
-        +{abstract} supports(path: str | Path): bool
-        +{abstract} indexFile(path: str | Path, content: str): IndexShard
-        +{abstract} getDefinition(symbol: str): SymbolDef | None
-        +{abstract} findReferences(symbol: str): Iterable[Reference]
-        +{abstract} search(query: str, opts: SearchOpts | None): Iterable[SearchResult]
+        --
+        +{abstract} supports(path: str | Path) -> bool
+        +{abstract} indexFile(path: str | Path, content: str) -> IndexShard
+        +{abstract} getDefinition(symbol: str) -> SymbolDef | None
+        +{abstract} findReferences(symbol: str) -> Iterable[Reference]
+        +{abstract} search(query: str, opts: SearchOpts | None) -> Iterable[SearchResult]
     }
     
     ' ========================================
     ' Data Types (TypedDict and dataclass)
     ' ========================================
     
-    class IndexShard <<TypedDict>> {
+    class IndexShard <<TypedDict>> #LightGreen {
         +file: str
-        +symbols: list[dict]
+        +symbols: List[Dict]
         +language: str
     }
     
-    class SymbolDef <<TypedDict>> {
-        +symbol: str
+    class SymbolDef <<TypedDict>> #LightGreen {
+        +name: str
         +kind: str
-        +language: str
-        +signature: str
-        +doc: str | None
-        +defined_in: str
+        +file: str
         +line: int
-        +span: tuple[int, int]
+        +character: int
+        +docstring: str | None
+        +parent: str | None
     }
     
-    class SearchResult <<TypedDict>> {
+    class SearchResult <<TypedDict>> #LightGreen {
         +file: str
         +line: int
         +snippet: str
+        +score: float | None
     }
     
-    class SearchOpts <<TypedDict>> {
+    class SearchOpts <<TypedDict>> #LightGreen {
         +semantic: bool
         +limit: int
     }
     
-    class Reference <<dataclass>> {
+    class Reference <<dataclass>> #LightGreen {
         +file: str
         +line: int
         <<frozen>>
     }
     
     ' ========================================
-    ' NOT IMPLEMENTED Components
+    ' TreeSitter Wrapper (Utility)
     ' ========================================
     
-    class "Plugin Registry" NOT_IMPLEMENTED {
-        ' No dynamic plugin discovery
-        ' No IPluginRegistry interface
-        ' No IPluginDiscovery interface
-        ' Plugins are hardcoded
+    package "mcp_server.utils" {
+        class TreeSitterWrapper #LightGreen {
+            -parser: Parser
+            -language: Language
+            --
+            +__init__(language: str)
+            +parse(content: str) -> Tree
+            +extract_symbols(tree: Tree, source: str) -> List[Symbol]
+            +get_node_text(node: Node, source: str) -> str
+            +walk_tree(node: Node, callback: Callable) -> None
+        }
     }
     
-    class "Plugin Manager" NOT_IMPLEMENTED {
-        ' No lifecycle management
-        ' No IPluginManager interface
-        ' No ILifecycleManager interface
-        ' No plugin enable/disable
-    }
+    ' ========================================
+    ' What's Actually Implemented
+    ' ========================================
     
-    class "Plugin Loader" NOT_IMPLEMENTED {
-        ' No dynamic loading
-        ' No IPluginLoader interface
-        ' No IModuleImporter interface
-        ' Direct imports only
-    }
+    note right of IPlugin #LightGreen
+        IMPLEMENTED:
+        - Abstract base class (ABC)
+        - Core plugin interface
+        - Type definitions
+        - Basic data structures
+    end note
     
-    class "Plugin Configuration" NOT_IMPLEMENTED {
-        ' No per-plugin configuration
-        ' No plugin settings
-        ' No plugin state management
-    }
+    note right of TreeSitterWrapper #LightGreen
+        IMPLEMENTED:
+        - Python parser support
+        - Symbol extraction
+        - Tree traversal
+        - Text extraction
+    end note
     
-    class "Plugin Sandbox" NOT_IMPLEMENTED {
-        ' No plugin isolation
-        ' No resource limits
-        ' No security boundaries
-    }
+    ' ========================================
+    ' What's Missing
+    ' ========================================
+    
+    note bottom of IPlugin #FF6B6B
+        NOT IMPLEMENTED:
+        - No Plugin Registry component
+        - No Plugin Manager component
+        - No Plugin Loader component
+        - No dynamic plugin discovery
+        - No lifecycle management
+        - No per-plugin configuration
+        - No plugin isolation/sandboxing
+        - No plugin versioning
+        - No dependency management
+        - Hardcoded plugin list in gateway
+    end note
     
     ' ========================================
     ' Relationships
@@ -106,15 +125,18 @@ package "mcp_server" <<Component>> {
     IPlugin ..> Reference : yields
     IPlugin --> SearchOpts : uses
     
-    note bottom of IPlugin
-        Minimal plugin system:
-        - Simple abstract base class
-        - No plugin discovery
-        - No lifecycle management
-        - No configuration
-        - No isolation/sandboxing
-        - Direct implementation only
-    end note
+    TreeSitterWrapper <.. IPlugin : used by implementations
 }
+
+' ========================================
+' Implementation Status Legend
+' ========================================
+
+legend right
+    |<#90EE90>| Implemented |
+    |<#FFD700>| Partially Implemented |
+    |<#FFA500>| Stub Only |
+    |<#FF6B6B>| Not Implemented |
+endlegend
 
 @enduml

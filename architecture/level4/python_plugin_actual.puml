@@ -1,27 +1,33 @@
 @startuml python_plugin_actual
 !define COMPONENT_INTERFACE <<Component Interface>>
 !define NOT_IMPLEMENTED <<Not Implemented>>
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-' This diagram reflects the ACTUAL implementation in python_plugin/plugin.py
+title Python Plugin - Code Level (Actual Implementation)
 
 package "mcp_server.plugins.python_plugin" <<Component>> {
     
     ' ========================================
-    ' Actual Python Plugin Implementation
+    ' ACTUAL Implementation
     ' ========================================
     
-    class Plugin implements IPlugin {
+    class Plugin implements IPlugin #LightGreen {
         +lang: str = "python"
         -_ts: TreeSitterWrapper
         -_indexer: FuzzyIndexer
-        
-        +__init__()
-        +supports(path: str | Path): bool
-        +indexFile(path: str | Path, content: str): IndexShard
-        +getDefinition(symbol: str): SymbolDef | None
-        +findReferences(symbol: str): Iterable[Reference]
-        +search(query: str, opts: SearchOpts | None): Iterable[SearchResult]
-        -_preindex(): void
+        -_sqlite_store: Optional[SQLiteStore]
+        -_repository_id: Optional[int]
+        --
+        +__init__(sqlite_store: Optional[SQLiteStore] = None)
+        +supports(path: str | Path) -> bool
+        +indexFile(path: str | Path, content: str) -> IndexShard
+        +getDefinition(symbol: str) -> SymbolDef | None
+        +findReferences(symbol: str) -> Iterable[Reference]
+        +search(query: str, opts: SearchOpts | None) -> List[SearchResult]
+        +get_indexed_count() -> int
+        -_preindex() -> None
+        -_extract_symbols(tree: Tree, source: str, file_path: str) -> List[Dict]
+        -_get_symbol_context(node: Node, source: str) -> Tuple[str, str]
     }
     
     ' ========================================
@@ -29,72 +35,76 @@ package "mcp_server.plugins.python_plugin" <<Component>> {
     ' ========================================
     
     class "jedi" <<External Library>> {
-        ' Used for Python code intelligence
-        +Script(code: str, path: str)
-        +get_names()
-        +goto()
-        +get_references()
+        +Script(code: str, path: Optional[Path] = None)
+        +complete(line: int, column: int) -> List[Completion]
+        +goto(line: int, column: int, follow_imports: bool = True) -> List[Name]
+        +get_references(line: int, column: int) -> List[Name]
+        +get_names(all_scopes: bool = True) -> List[Name]
     }
     
-    class TreeSitterWrapper {
-        ' Basic tree-sitter wrapper
-        -_parser: Parser
-        +parse(content: bytes): Tree
+    class TreeSitterWrapper #LightGreen {
+        -parser: Parser
+        -language: Language
+        --
+        +parse(content: str) -> Tree
+        +extract_symbols(tree: Tree, source: str) -> List[Symbol]
+        +get_node_text(node: Node, source: str) -> str
     }
     
-    class FuzzyIndexer {
-        ' Simple substring search
-        +add_file(path: str, content: str)
-        +search(query: str): list
-    }
-    
-    ' ========================================
-    ' NOT IMPLEMENTED Features
-    ' ========================================
-    
-    class "Semantic Analysis" NOT_IMPLEMENTED {
-        ' No type inference beyond Jedi
-        ' No dataflow analysis
-        ' No call graph analysis
-    }
-    
-    class "Import Resolution" NOT_IMPLEMENTED {
-        ' Basic Jedi import following only
-        ' No custom import resolver
-        ' No virtual environment handling
-    }
-    
-    class "Incremental Indexing" NOT_IMPLEMENTED {
-        ' Full re-indexing only
-        ' No incremental updates
-        ' No change tracking
-    }
-    
-    class "Cache Management" NOT_IMPLEMENTED {
-        ' No caching of parse results
-        ' No persistent cache
-        ' Re-parses on every request
-    }
-    
-    class "Advanced Features" NOT_IMPLEMENTED {
-        ' No decorator analysis
-        ' No metaclass handling
-        ' No async/await tracking
-        ' No type hint analysis
+    class FuzzyIndexer #LightGreen {
+        +add_file(path: str, content: str) -> None
+        +add_symbol(symbol_name: str, file_path: str, line_number: int, metadata: Dict) -> None
+        +search(query: str, limit: int = 20) -> List[Dict]
+        +search_symbols(query: str, limit: int = 20) -> List[Dict]
     }
     
     ' ========================================
-    ' Actual Implementation Details
+    ' What's Actually Implemented
     ' ========================================
     
-    note right of Plugin
-        Current implementation:
-        - Pre-indexes all .py files on init
-        - Uses tree-sitter for basic parsing
-        - Uses Jedi for definition/reference lookup
-        - Simple fuzzy search with substrings
-        - No caching or optimization
-        - No error handling for parse failures
+    note right of Plugin #LightGreen
+        IMPLEMENTED:
+        - Pre-indexing on startup
+        - Tree-sitter parsing
+        - Jedi integration
+        - Symbol extraction
+        - Definition lookup
+        - Reference finding
+        - Fuzzy search
+        - SQLite persistence
+    end note
+    
+    ' ========================================
+    ' What's Missing
+    ' ========================================
+    
+    note bottom of Plugin #FF6B6B
+        NOT IMPLEMENTED:
+        - No type inference beyond Jedi
+        - No dataflow analysis
+        - No call graph analysis  
+        - No custom import resolver
+        - No virtual env handling
+        - No incremental indexing
+        - No parse result caching
+        - No decorator analysis
+        - No metaclass handling
+        - No async/await tracking
+        - Limited type hint analysis
+        - No error recovery
+    end note
+    
+    ' ========================================
+    ' Data Flow
+    ' ========================================
+    
+    note left of jedi
+        Jedi provides:
+        - Code completion
+        - Go to definition
+        - Find references
+        - Module imports
+        - Docstring extraction
     end note
     
     ' ========================================
@@ -104,11 +114,23 @@ package "mcp_server.plugins.python_plugin" <<Component>> {
     Plugin --> TreeSitterWrapper : parses with
     Plugin --> FuzzyIndexer : indexes with
     Plugin --> jedi : analyzes with
+    Plugin --> SQLiteStore : persists to
     
     Plugin ..> IndexShard : returns
     Plugin ..> SymbolDef : returns
     Plugin ..> Reference : yields
     Plugin ..> SearchResult : yields
 }
+
+' ========================================
+' Implementation Status Legend
+' ========================================
+
+legend right
+    |<#90EE90>| Implemented |
+    |<#FFD700>| Partially Implemented |
+    |<#FFA500>| Stub Only |
+    |<#FF6B6B>| Not Implemented |
+endlegend
 
 @enduml

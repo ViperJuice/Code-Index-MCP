@@ -86,33 +86,138 @@ This directory contains language-specific plugins for the code indexing system. 
    - No search ranking or relevance scoring
    - No semantic search (despite parameter)
 
-## Common Operations
+## ESSENTIAL_COMMANDS
+
+```bash
+# Development Server
+uvicorn mcp_server.gateway:app --reload --host 0.0.0.0 --port 8000
+
+# Testing Implementation
+pytest tests/test_gateway.py -v
+pytest tests/test_dispatcher.py -v  
+pytest tests/test_python_plugin.py -v
+
+# Plugin Testing
+python -m mcp_server.plugins.python_plugin.plugin  # Test plugin directly
+
+# API Testing
+curl http://localhost:8000/status
+curl "http://localhost:8000/symbol?symbol_name=parse&file_path=mcp_server/gateway.py"
+curl "http://localhost:8000/search?query=def%20parse&limit=10"
+
+# Debugging
+tail -f mcp_server.log  # If logging is configured
+```
+
+## CODE_STYLE_PREFERENCES
 
 ```python
-# Start server (basic mode only)
-uvicorn mcp_server.gateway:app --reload
+# Implementation Patterns (discovered from existing code)
+# FastAPI endpoints with structured responses
+@app.get("/symbol")
+async def get_symbol(symbol_name: str, file_path: Optional[str] = None):
+    return {"status": "success", "data": result, "timestamp": datetime.now()}
 
-# Add new plugin (must implement all methods)
-class MyPlugin(PluginBase):
-    def index(self, path: str) -> Dict:
-        # Must implement
-        pass
-    
-    def getDefinition(self, symbol: str) -> SymbolDef | None:
-        # Must implement
-        pass
-    
-    def getReferences(self, symbol: str) -> list[Reference]:
-        # Must implement
-        pass
-    
-    def search(self, query: str, options: dict) -> list[SearchResult]:
-        # Must implement
-        pass
+# Plugin Base Pattern
+class LanguagePlugin(PluginBase):
+    def index(self, file_path: str) -> Dict
+    def getDefinition(self, symbol: str, context: Dict) -> Dict
+    def getReferences(self, symbol: str, context: Dict) -> List[Dict]
+    def search(self, query: str, options: Dict) -> List[Dict]
 
-# File watcher exists but doesn't do anything useful yet
-watcher = FileWatcher(root_path, dispatcher)
-watcher.start()  # Watches files but doesn't trigger indexing
+# Error Handling Pattern
+try:
+    result = await dispatcher.dispatch_request(...)
+except Exception as e:
+    return {"status": "error", "error": str(e), "timestamp": datetime.now()}
+
+# Type Hints Required
+from typing import Dict, List, Optional, Union
+```
+
+## ARCHITECTURAL_PATTERNS
+
+```python
+# MCP Server Architecture Components
+gateway.py          # FastAPI endpoints, request routing
+dispatcher.py       # Plugin routing and lifecycle
+plugin_base.py      # Abstract base for all plugins
+plugin_system/      # Plugin discovery and management
+storage/           # SQLite persistence layer
+utils/             # TreeSitter wrapper, indexing utilities
+
+# Plugin Discovery Pattern
+# Plugins auto-registered in dispatcher initialization
+# File extensions mapped to language plugins
+
+# Caching Pattern (when implemented)
+# Content-based caching in dispatcher
+# Query result caching for performance
+```
+
+## NAMING_CONVENTIONS
+
+```python
+# Files: snake_case.py
+gateway.py, dispatcher.py, plugin_base.py
+sqlite_store.py, file_watcher.py
+
+# Classes: PascalCase
+class FileWatcher, class PluginBase, class AuthManager
+
+# Functions: snake_case
+def get_definition(), def cache_symbol_lookup()
+
+# Plugin Structure
+mcp_server/plugins/{language}_plugin/
+├── __init__.py
+├── plugin.py          # Main plugin implementation
+└── AGENTS.md          # Plugin-specific guidance
+```
+
+## DEVELOPMENT_ENVIRONMENT
+
+```bash
+# Python Setup
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+pip install -e .
+
+# FastAPI Development
+# Auto-reload enabled by default in uvicorn command
+# API docs available at: http://localhost:8000/docs
+
+# Testing Environment
+pytest --version
+# Use fixtures from tests/conftest.py
+# Test isolation with temporary directories
+
+# Plugin Development
+# Follow python_plugin as reference implementation
+# Tree-sitter grammars auto-installed via tree-sitter-languages
+```
+
+## TEAM_SHARED_PRACTICES
+
+```python
+# Implementation Status: Always update AGENTS.md with actual status
+# Plugin Development: Use python_plugin as template
+# API Development: Follow FastAPI response patterns
+# Error Handling: Structured error responses required
+# Testing: Integration tests for all plugins
+
+# Plugin Interface Compliance:
+# - All methods must be implemented (no pass/...)
+# - Use Tree-sitter for parsing when possible
+# - Return structured data formats
+# - Handle errors gracefully
+
+# Performance Considerations:
+# - Cache plugin results in dispatcher
+# - Use async/await for I/O operations
+# - Lazy loading for large codebases
+# - Monitor memory usage during indexing
 ```
 
 ## What Actually Works

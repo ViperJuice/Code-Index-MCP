@@ -1,0 +1,55 @@
+# Plugin System Configuration
+# This file configures the MCP Server plugin system
+
+# Plugin directories to scan
+plugin_dirs:
+  - mcp_server/plugins
+
+# Plugin system settings
+auto_discover: true
+auto_load: true
+validate_interfaces: true
+enable_hot_reload: false
+
+# Disabled plugins (by name)
+disabled_plugins: []
+
+# Plugin-specific configurations
+plugins:
+  "Python Plugin":
+    enabled: true
+    priority: 10
+    settings:
+      max_file_size: 1048576  # 1MB
+      enable_jedi: true
+      cache_definitions: true
+  
+  "JavaScript Plugin":
+    enabled: true
+    priority: 10
+    settings:
+      max_file_size: 1048576
+      parse_jsx: true
+      parse_typescript: true
+  
+  "C Plugin":
+    enabled: true
+    priority: 10
+    settings:
+      max_file_size: 1048576
+      parse_headers: true
+  
+  "C++ Plugin":
+    enabled: false  # Stub implementation
+    priority: 5
+    settings: {}
+  
+  "Dart Plugin":
+    enabled: false  # Stub implementation
+    priority: 5
+    settings: {}
+  
+  "HTML/CSS Plugin":
+    enabled: false  # Stub implementation
+    priority: 5
+    settings: {}

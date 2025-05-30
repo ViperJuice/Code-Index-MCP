@@ -3,105 +3,100 @@
 !define INTERNAL <<Internal>>
 !define ASYNC <<async>>
 !define NOT_IMPLEMENTED <<Not Implemented>>
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-' This diagram reflects the ACTUAL implementation in gateway.py
+title API Gateway - Code Level (Actual Implementation)
 
-package "mcp_server" <<Component>> {
+package "mcp_server.gateway" <<Component>> {
     
     ' ========================================
-    ' Actual Gateway Implementation
+    ' ACTUAL Implementation
     ' ========================================
     
-    class "gateway.py" <<FastAPI Module>> {
-        ' Simple FastAPI app with two endpoints
-        -app: FastAPI
-        -dispatcher: Dispatcher
+    class "FastAPI Application" <<Application>> {
+        +app: FastAPI
+        +dispatcher: Dispatcher (global)
+        +sqlite_store: SQLiteStore (global)
+        +file_watcher: FileWatcher (global)
+        --
+        +ASYNC startup_event(): void
+        +ASYNC shutdown_event(): void
+    }
+    
+    ' HTTP Endpoints (Functions, not classes)
+    note "HTTP Endpoints (Functions)" as N1 #LightYellow {
+        @app.get("/symbol")
+        +ASYNC lookup_symbol(name: str): Dict
         
-        +ASYNC get_symbol(request: SymbolRequest): SymbolResponse
-        +ASYNC search_code(request: SearchRequest): SearchResults
+        @app.get("/search")
+        +ASYNC search_code(query: str, semantic: bool, limit: int): List[Dict]
+        
+        @app.get("/status")
+        +ASYNC get_status(): Dict
+        
+        @app.get("/plugins")
+        +ASYNC get_plugins(): Dict
+        
+        @app.post("/reindex")
+        +ASYNC reindex_files(): Dict
     }
     
     ' ========================================
-    ' Request/Response Models (Pydantic)
+    ' What's Actually Implemented
     ' ========================================
     
-    class SymbolRequest <<Pydantic Model>> {
-        +file: str
-        +line: int
-        +column: int
-        +base_directory: str
-        ' Basic validation via Pydantic
-    }
-    
-    class SymbolResponse <<Pydantic Model>> {
-        +symbol: str
-        +definition: str
-        +references: List[str]
-        +docstring: Optional[str]
-    }
-    
-    class SearchRequest <<Pydantic Model>> {
-        +query: str
-        +file_extensions: Optional[List[str]]
-        +base_directory: str
-        +limit: int = 20
-        ' Basic validation via Pydantic
-    }
-    
-    class SearchResults <<Pydantic Model>> {
-        +results: List[SearchResult]
-        +total_matches: int
-    }
-    
-    ' ========================================
-    ' NOT IMPLEMENTED Components
-    ' ========================================
-    
-    class "Auth Middleware" NOT_IMPLEMENTED {
-        ' No authentication implemented
-        ' No JWT tokens
-        ' No authorization
-    }
-    
-    class "Request Validator" NOT_IMPLEMENTED {
-        ' Only basic Pydantic validation
-        ' No path sanitization
-        ' No security checks
-    }
-    
-    class "Health Check" NOT_IMPLEMENTED {
-        ' No health check endpoints
-        ' No readiness/liveness probes
-    }
-    
-    class "Rate Limiter" NOT_IMPLEMENTED {
-        ' No rate limiting
-    }
-    
-    class "CORS Handler" NOT_IMPLEMENTED {
-        ' Basic FastAPI CORS only
-    }
-    
-    class "Metrics" NOT_IMPLEMENTED {
-        ' No metrics collection
-        ' No Prometheus integration
-    }
-    
-    ' ========================================
-    ' Relationships
-    ' ========================================
-    
-    "gateway.py" --> Dispatcher : directly calls
-    "gateway.py" --> SymbolRequest : validates with Pydantic
-    "gateway.py" --> SearchRequest : validates with Pydantic
-    
-    note right of "gateway.py"
-        Minimal implementation:
-        - No interfaces
-        - No dependency injection
-        - Direct coupling to Dispatcher
-        - Basic error handling only
+    note right of "FastAPI Application" #LightGreen
+        IMPLEMENTED:
+        - Basic FastAPI setup
+        - 5 HTTP endpoints
+        - Global state management
+        - Startup/shutdown events
+        - Basic error responses
     end note
+    
+    ' ========================================
+    ' What's Missing
+    ' ========================================
+    
+    note bottom of N1 #FF6B6B
+        NOT IMPLEMENTED:
+        - No authentication (IAuthenticator)
+        - No authorization (IAuthorizer) 
+        - No request validation (IRequestValidator)
+        - No input sanitization (ISanitizer)
+        - No rate limiting
+        - No CORS handling
+        - No health checks (IHealthCheck)
+        - No structured error handling
+        - No request/response models
+        - No middleware pipeline
+        - No logging middleware
+        - No metrics collection
+    end note
+    
+    ' ========================================
+    ' Actual Dependencies
+    ' ========================================
+    
+    "FastAPI Application" --> "Dispatcher" : uses global instance
+    "FastAPI Application" --> "SQLiteStore" : uses global instance
+    "FastAPI Application" --> "FileWatcher" : controls lifecycle
+    
+    N1 .down.> "FastAPI Application" : defined in
+    N1 --> "Dispatcher" : calls methods
+    N1 --> "SQLiteStore" : queries
+    N1 --> "FileWatcher" : triggers reindex
 }
+
+' ========================================
+' Implementation Status Legend
+' ========================================
+
+legend right
+    |<#90EE90>| Implemented |
+    |<#FFD700>| Partially Implemented |
+    |<#FFA500>| Stub Only |
+    |<#FF6B6B>| Not Implemented |
+endlegend
 
 @enduml

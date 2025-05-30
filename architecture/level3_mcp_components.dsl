@@ -3,6 +3,8 @@ workspace "MCP Server – Level 3" {
   
   properties {
     "structurizr.dslEditor" "false"
+    "implementation.status" "prototype"
+    "implementation.coverage" "65%"
   }
 
   model {
@@ -11,28 +13,35 @@ workspace "MCP Server – Level 3" {
         gateway = component "Gateway Controller" {
           description "FastAPI controllers and endpoints"
           technology "Python, FastAPI"
-          tags "Controller"
+          tags "Controller" "PartiallyImplemented"
           properties {
             "interfaces" "IRequestHandler, IHealthCheck"
             "level4" "architecture/level4/api_gateway.puml"
+            "implementation.status" "partial"
+            "implementation.notes" "Simple FastAPI app with 2 endpoints only"
+            "missing" "Auth, validation, health checks"
           }
         }
         
         auth = component "Auth Middleware" {
           description "Authentication and authorization"
           technology "Python, JWT"
+          tags "NotImplemented"
           properties {
             "interfaces" "IAuthenticator, IAuthorizer"
             "level4" "architecture/level4/api_gateway.puml"
+            "implementation.status" "not_implemented"
           }
         }
         
         validator = component "Request Validator" {
           description "Input validation and sanitization"
           technology "Python, Pydantic"
+          tags "NotImplemented"
           properties {
             "interfaces" "IRequestValidator, ISanitizer"
             "level4" "architecture/level4/api_gateway.puml"
+            "implementation.status" "not_implemented"
           }
         }
       }
@@ -41,27 +50,36 @@ workspace "MCP Server – Level 3" {
         core = component "Dispatcher Core" {
           description "Request routing logic"
           technology "Python"
+          tags "Implemented"
           properties {
             "interfaces" "IDispatcher, IRequestRouter"
             "level4" "architecture/level4/dispatcher.puml"
+            "implementation.status" "implemented"
+            "implementation.notes" "Basic plugin routing by file extension"
+            "actual_interface" "Simple class, no interfaces"
           }
         }
         
         router = component "Plugin Router" {
           description "Routes to appropriate plugin by file type"
           technology "Python"
+          tags "NotImplemented"
           properties {
             "interfaces" "IPluginRouter, IFileTypeMatcher"
             "level4" "architecture/level4/dispatcher.puml"
+            "implementation.status" "not_implemented"
+            "implementation.notes" "Routing logic embedded in dispatcher core"
           }
         }
         
         aggregator = component "Result Aggregator" {
           description "Combines results from multiple plugins"
           technology "Python"
+          tags "NotImplemented"
           properties {
             "interfaces" "IResultAggregator, IResultMerger"
             "level4" "architecture/level4/dispatcher.puml"
+            "implementation.status" "not_implemented"
           }
         }
       }
@@ -70,45 +88,59 @@ workspace "MCP Server – Level 3" {
         base = component "Plugin Base" {
           description "Abstract interface for all plugins"
           technology "Python, ABC"
+          tags "Implemented"
           properties {
             "interfaces" "IPlugin, ILanguageAnalyzer"
             "level4" "architecture/level4/plugin_system.puml"
+            "implementation.status" "implemented"
+            "actual_interface" "IPlugin abstract class"
           }
         }
         
         registry = component "Plugin Registry" {
           description "Dynamic plugin discovery and registration"
           technology "Python"
+          tags "NotImplemented"
           properties {
             "interfaces" "IPluginRegistry, IPluginDiscovery"
             "level4" "architecture/level4/plugin_system.puml"
+            "implementation.status" "not_implemented"
+            "implementation.notes" "Hardcoded plugin list only"
           }
         }
         
         manager = component "Plugin Manager" {
           description "Plugin lifecycle management"
           technology "Python"
+          tags "NotImplemented"
           properties {
             "interfaces" "IPluginManager, ILifecycleManager"
             "level4" "architecture/level4/plugin_system.puml"
+            "implementation.status" "not_implemented"
           }
         }
         
         loader = component "Plugin Loader" {
           description "Dynamic plugin loading"
           technology "Python, importlib"
+          tags "NotImplemented"
           properties {
             "interfaces" "IPluginLoader, IModuleImporter"
             "level4" "architecture/level4/plugin_system.puml"
+            "implementation.status" "not_implemented"
           }
         }
         
         treesitter_wrapper = component "TreeSitter Wrapper" {
           description "Unified tree-sitter interface"
           technology "Python, tree-sitter"
+          tags "Implemented"
           properties {
             "interfaces" "ITreeSitterWrapper, IParserAdapter"
             "level4" "architecture/level4/shared_utilities.puml"
+            "implementation.status" "implemented"
+            "actual_interface" "Simple wrapper class"
+            "limitations" "Python-only currently"
           }
         }
       }
@@ -117,45 +149,59 @@ workspace "MCP Server – Level 3" {
         index_engine = component "Index Engine" {
           description "Core indexing logic"
           technology "Python"
+          tags "NotImplemented"
           properties {
             "interfaces" "IIndexEngine, IIndexCoordinator"
             "level4" "architecture/level4/indexer.puml"
+            "implementation.status" "not_implemented"
           }
         }
         
         parser = component "Parser Coordinator" {
           description "Coordinates parsing across plugins"
           technology "Python"
+          tags "NotImplemented"
           properties {
             "interfaces" "IParserCoordinator, IParseOrchestrator"
             "level4" "architecture/level4/indexer.puml"
+            "implementation.status" "not_implemented"
           }
         }
         
         optimizer = component "Query Optimizer" {
           description "Optimizes search queries"
           technology "Python"
+          tags "NotImplemented"
           properties {
             "interfaces" "IQueryOptimizer, ISearchPlanner"
             "level4" "architecture/level4/indexer.puml"
+            "implementation.status" "not_implemented"
           }
         }
         
         fuzzy_indexer = component "Fuzzy Indexer" {
           description "Fuzzy search implementation"
           technology "Python"
+          tags "Implemented"
           properties {
             "interfaces" "IFuzzyIndexer, ITrigramSearcher"
             "level4" "architecture/level4/indexer.puml"
+            "implementation.status" "implemented"
+            "actual_interface" "Simple class"
+            "limitations" "No persistence, basic search"
           }
         }
         
         semantic_indexer = component "Semantic Indexer" {
           description "Semantic search with embeddings"
           technology "Python, Voyage AI"
+          tags "Implemented"
           properties {
             "interfaces" "ISemanticIndexer, IEmbeddingGenerator"
             "level4" "architecture/level4/indexer.puml"
+            "implementation.status" "implemented"
+            "actual_interface" "Voyage + Qdrant integration"
+            "features" "Vector search, embeddings"
           }
         }
       }
@@ -165,9 +211,11 @@ workspace "MCP Server – Level 3" {
         graph_builder = component "Graph Builder" {
           description "Builds graph from parsed code"
           technology "Python"
+          tags "NotImplemented"
           properties {
             "interfaces" "IGraphBuilder, INodeFactory"
             "level4" "architecture/level4/graph_store.puml"
+            "implementation.status" "not_implemented"
           }
         }
         
@@ -194,9 +242,13 @@ workspace "MCP Server – Level 3" {
         watcher_engine = component "Watcher Engine" {
           description "File system monitoring"
           technology "Python, Watchdog"
+          tags "PartiallyImplemented"
           properties {
             "interfaces" "IFileWatcher, IChangeNotifier"
             "level4" "architecture/level4/file_watcher.puml"
+            "implementation.status" "partial"
+            "actual_interface" "Basic observer pattern"
+            "missing" "Actual indexing trigger"
           }
         }
       }
@@ -205,9 +257,11 @@ workspace "MCP Server – Level 3" {
         cache_manager = component "Cache Manager" {
           description "Cache coordination"
           technology "Python, Redis"
+          tags "NotImplemented"
           properties {
             "interfaces" "ICacheManager, ICacheCoordinator"
             "level4" "architecture/level4/cache.puml"
+            "implementation.status" "not_implemented"
           }
         }
       }
@@ -216,9 +270,11 @@ workspace "MCP Server – Level 3" {
         metrics = component "Metrics Engine" {
           description "Performance metrics collection"
           technology "Python, Prometheus"
+          tags "NotImplemented"
           properties {
             "interfaces" "IMetricsCollector, IMetricsExporter"
             "level4" "architecture/level4/monitoring.puml"
+            "implementation.status" "not_implemented"
           }
         }
       }
@@ -227,9 +283,11 @@ workspace "MCP Server – Level 3" {
         config_loader = component "Config Loader" {
           description "Configuration management"
           technology "Python, YAML"
+          tags "NotImplemented"
           properties {
             "interfaces" "IConfigLoader, IConfigProvider"
             "level4" "architecture/level4/configuration.puml"
+            "implementation.status" "not_implemented"
           }
         }
       }
@@ -239,18 +297,24 @@ workspace "MCP Server – Level 3" {
         storage_engine = component "Storage Engine" {
           description "SQLite persistence layer"
           technology "Python, SQLite, FTS5"
+          tags "Implemented"
           properties {
             "interfaces" "IStorageEngine, IQueryEngine"
             "level4" "architecture/level4/storage.puml"
+            "implementation.status" "implemented"
+            "implementation.notes" "Basic SQLite implementation added"
           }
         }
         
         fts_engine = component "FTS Engine" {
           description "Full-text search engine"
           technology "SQLite FTS5"
+          tags "NotImplemented"
           properties {
             "interfaces" "IFTSEngine, ITextSearcher"
             "level4" "architecture/level4/storage.puml"
+            "implementation.status" "not_implemented"
+            "implementation.notes" "FTS5 not yet integrated"
           }
         }
       }
@@ -260,18 +324,23 @@ workspace "MCP Server – Level 3" {
         sync_engine = component "Sync Engine" {
           description "Cloud synchronization engine"
           technology "Python, gRPC"
+          tags "Stub"
           properties {
             "interfaces" "ISyncEngine, ICloudConnector"
             "level4" "architecture/level4/cloud_sync.puml"
+            "implementation.status" "stub"
+            "actual_interface" "Empty methods only"
           }
         }
         
         conflict_resolver = component "Conflict Resolver" {
           description "Sync conflict resolution"
           technology "Python"
+          tags "NotImplemented"
           properties {
             "interfaces" "IConflictResolver, IMergeStrategy"
             "level4" "architecture/level4/cloud_sync.puml"
+            "implementation.status" "not_implemented"
           }
         }
       }
@@ -280,18 +349,24 @@ workspace "MCP Server – Level 3" {
         embedding_generator = component "Embedding Generator" {
           description "Code embedding generation"
           technology "Python, Voyage AI"
+          tags "PartiallyImplemented"
           properties {
             "interfaces" "IEmbeddingGenerator, IVectorizer"
             "level4" "architecture/level4/embeddings.puml"
+            "implementation.status" "partial"
+            "implementation.notes" "Embeddings in semantic indexer only"
           }
         }
         
         vector_store = component "Vector Store" {
           description "Vector database interface"
           technology "Python, Qdrant"
+          tags "PartiallyImplemented"
           properties {
             "interfaces" "IVectorStore, ISimilaritySearcher"
             "level4" "architecture/level4/embeddings.puml"
+            "implementation.status" "partial"
+            "implementation.notes" "Used by semantic indexer"
           }
         }
       }
@@ -301,18 +376,22 @@ workspace "MCP Server – Level 3" {
         access_controller = component "Access Controller" {
           description "Access control and validation"
           technology "Python"
+          tags "NotImplemented"
           properties {
             "interfaces" "IAccessController, IPermissionChecker"
             "level4" "architecture/level4/security.puml"
+            "implementation.status" "not_implemented"
           }
         }
         
         policy_engine = component "Policy Engine" {
           description "Security policy enforcement"
           technology "Python"
+          tags "NotImplemented"
           properties {
             "interfaces" "IPolicyEngine, IRuleEvaluator"
             "level4" "architecture/level4/security.puml"
+            "implementation.status" "not_implemented"
           }
         }
       }
@@ -321,18 +400,22 @@ workspace "MCP Server – Level 3" {
         queue_manager = component "Queue Manager" {
           description "Async task management"
           technology "Python, Celery"
+          tags "NotImplemented"
           properties {
             "interfaces" "IQueueManager, ITaskScheduler"
             "level4" "architecture/level4/task_queue.puml"
+            "implementation.status" "not_implemented"
           }
         }
         
         worker_pool = component "Worker Pool" {
           description "Task worker management"
           technology "Python, Celery"
+          tags "NotImplemented"
           properties {
             "interfaces" "IWorkerPool, ITaskExecutor"
             "level4" "architecture/level4/task_queue.puml"
+            "implementation.status" "not_implemented"
           }
         }
       }
@@ -341,9 +424,12 @@ workspace "MCP Server – Level 3" {
         registry_store = component "Registry Store" {
           description "Plugin metadata storage"
           technology "Python"
+          tags "NotImplemented"
           properties {
             "interfaces" "IRegistryStore, IPluginMetadata"
             "level4" "architecture/level4/plugin_registry.puml"
+            "implementation.status" "not_implemented"
+            "implementation.notes" "Hardcoded plugin list only"
           }
         }
       }
@@ -353,10 +439,13 @@ workspace "MCP Server – Level 3" {
         python_analyzer = component "Python Analyzer" {
           description "Python code analysis with Jedi"
           technology "Python, Tree-sitter, Jedi"
-          tags "Plugin"
+          tags "Plugin" "Implemented"
           properties {
             "interfaces" "IPythonPlugin, IPythonAnalyzer"
             "level4" "architecture/level4/python_plugin.puml"
+            "implementation.status" "implemented"
+            "actual_interface" "Implements IPlugin"
+            "features" "Pre-indexing, definition lookup"
           }
         }
       }
@@ -365,10 +454,12 @@ workspace "MCP Server – Level 3" {
         cpp_analyzer = component "C++ Analyzer" {
           description "C++ code analysis with template support"
           technology "Python, Tree-sitter, Clang"
-          tags "Plugin"
+          tags "Plugin" "Stub"
           properties {
             "interfaces" "ICppPlugin, ITemplateAnalyzer"
             "level4" "architecture/level4/cpp_plugin.puml"
+            "implementation.status" "stub"
+            "actual_interface" "Empty implementation"
           }
         }
       }
@@ -377,10 +468,13 @@ workspace "MCP Server – Level 3" {
         js_analyzer = component "JavaScript Analyzer" {
           description "JS/TS code analysis"
           technology "Python, Tree-sitter, TypeScript"
-          tags "Plugin"
+          tags "Plugin" "Implemented"
           properties {
             "interfaces" "IJavaScriptPlugin, ITypeScriptAnalyzer"
             "level4" "architecture/level4/js_plugin.puml"
+            "implementation.status" "implemented"
+            "actual_interface" "Full IPlugin implementation with Tree-sitter"
+            "features" "JS/TS/JSX/TSX support, symbol extraction, SQLite persistence"
           }
         }
       }
@@ -389,10 +483,13 @@ workspace "MCP Server – Level 3" {
         c_analyzer = component "C Analyzer" {
           description "C code analysis"
           technology "Python, Tree-sitter"
-          tags "Plugin"
+          tags "Plugin" "Implemented"
           properties {
             "interfaces" "ICPlugin, IPreprocessorHandler"
             "level4" "architecture/level4/c_plugin.puml"
+            "implementation.status" "implemented"
+            "actual_interface" "Full IPlugin implementation with Tree-sitter"
+            "features" "Functions, structs, enums, typedefs, macros, SQLite persistence"
           }
         }
       }
@@ -401,10 +498,12 @@ workspace "MCP Server – Level 3" {
         dart_analyzer = component "Dart Analyzer" {
           description "Dart/Flutter code analysis"
           technology "Python, Tree-sitter"
-          tags "Plugin"
+          tags "Plugin" "Stub"
           properties {
             "interfaces" "IDartPlugin, IFlutterAnalyzer"
             "level4" "architecture/level4/dart_plugin.puml"
+            "implementation.status" "stub"
+            "actual_interface" "Empty implementation"
           }
         }
       }
@@ -413,10 +512,12 @@ workspace "MCP Server – Level 3" {
         html_css_analyzer = component "HTML/CSS Analyzer" {
           description "Web markup and styles analysis"
           technology "Python, Tree-sitter"
-          tags "Plugin"
+          tags "Plugin" "Stub"
           properties {
             "interfaces" "IHtmlCssPlugin, ISelectorAnalyzer"
             "level4" "architecture/level4/html_css_plugin.puml"
+            "implementation.status" "stub"
+            "actual_interface" "Empty implementation"
           }
         }
       }
@@ -527,6 +628,18 @@ workspace "MCP Server – Level 3" {
     }
     element "Plugin" {
       shape Component
+    }
+    element "Implemented" {
+      background #90EE90
+    }
+    element "PartiallyImplemented" {
+      background #FFD700  
+    }
+    element "Stub" {
+      background #FFA500
+    }
+    element "NotImplemented" {
+      background #FF6B6B
     }
   }
 }

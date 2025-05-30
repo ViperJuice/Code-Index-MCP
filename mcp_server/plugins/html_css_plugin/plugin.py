@@ -1,25 +1,778 @@
+from __future__ import annotations
+
 from pathlib import Path
-from ...plugin_base import IPlugin, IndexShard, SymbolDef, Reference, SearchResult, SearchOpts
+from typing import Optional, Dict, List, Set, Tuple, Any
+import ctypes
+import logging
+import re
+
+from tree_sitter import Language, Parser, Node
+import tree_sitter_languages
+
+from ...plugin_base import (
+    IPlugin,
+    IndexShard,
+    SymbolDef,
+    Reference,
+    SearchResult,
+    SearchOpts,
+)
+from ...utils.fuzzy_indexer import FuzzyIndexer
+from ...storage.sqlite_store import SQLiteStore
+
+logger = logging.getLogger(__name__)
+
 
 class Plugin(IPlugin):
+    """HTML/CSS plugin for code intelligence."""
+    
     lang = "html_css"
 
+    def __init__(self, sqlite_store: Optional[SQLiteStore] = None) -> None:
+        """Initialize the HTML/CSS plugin.
+        
+        Args:
+            sqlite_store: Optional SQLite store for persistence
+        """
+        # Initialize parsers for HTML and CSS
+        self._html_parser = Parser()
+        self._css_parser = Parser()
+        
+        # Load language grammars
+        lib_path = Path(tree_sitter_languages.__path__[0]) / "languages.so"
+        self._lib = ctypes.CDLL(str(lib_path))
+        
+        # Configure HTML
+        self._lib.tree_sitter_html.restype = ctypes.c_void_p
+        self._html_language = Language(self._lib.tree_sitter_html())
+        self._html_parser.language = self._html_language
+        
+        # Configure CSS
+        self._lib.tree_sitter_css.restype = ctypes.c_void_p
+        self._css_language = Language(self._lib.tree_sitter_css())
+        self._css_parser.language = self._css_language
+        
+        # Initialize indexer and storage
+        self._indexer = FuzzyIndexer(sqlite_store=sqlite_store)
+        self._sqlite_store = sqlite_store
+        self._repository_id = None
+        
+        # Cross-reference cache for matching CSS selectors to HTML elements
+        self._html_elements: Dict[str, List[Dict[str, Any]]] = {}  # file -> elements
+        self._css_selectors: Dict[str, List[Dict[str, Any]]] = {}  # file -> selectors
+        
+        # Symbol cache for faster lookups
+        self._symbol_cache: Dict[str, List[SymbolDef]] = {}
+        
+        # Current file being indexed
+        self._current_file: Optional[Path] = None
+        
+        # Create or get repository if SQLite is enabled
+        if self._sqlite_store:
+            self._repository_id = self._sqlite_store.create_repository(
+                str(Path.cwd()), 
+                Path.cwd().name,
+                {"language": "html/css"}
+            )
+        
+        # Pre-index existing files
+        self._preindex()
+
+    def _preindex(self) -> None:
+        """Pre-index all supported files in the current directory."""
+        for pattern in ["*.html", "*.htm", "*.css", "*.scss", "*.sass", "*.less"]:
+            for path in Path(".").rglob(pattern):
+                try:
+                    # Skip common build directories
+                    if any(part in path.parts for part in ["node_modules", "dist", "build", ".next", "vendor"]):
+                        continue
+                    
+                    # Skip minified files
+                    if path.stem.endswith(".min"):
+                        continue
+                    
+                    text = path.read_text(encoding="utf-8")
+                    self._indexer.add_file(str(path), text)
+                except Exception as e:
+                    logger.warning(f"Failed to pre-index {path}: {e}")
+                    continue
+
     def supports(self, path: str | Path) -> bool:
-        """Return True if file extension matches plugin."""
-        ...
+        """Check if this plugin supports the given file."""
+        suffixes = {'.html', '.htm', '.css', '.scss', '.sass', '.less'}
+        return Path(path).suffix.lower() in suffixes
+
+    def _is_css_file(self, path: Path) -> bool:
+        """Check if the file is a CSS file."""
+        return path.suffix.lower() in {'.css', '.scss', '.sass', '.less'}
+
+    def _is_html_file(self, path: Path) -> bool:
+        """Check if the file is an HTML file."""
+        return path.suffix.lower() in {'.html', '.htm'}
 
     def indexFile(self, path: str | Path, content: str) -> IndexShard:
-        """Parse the file and return an index shard."""
-        ...
+        """Parse and index an HTML or CSS file."""
+        if isinstance(path, str):
+            path = Path(path)
+        
+        self._current_file = path
+        self._indexer.add_file(str(path), content)
+        
+        # Store file in SQLite if available
+        file_id = None
+        if self._sqlite_store and self._repository_id:
+            import hashlib
+            file_hash = hashlib.sha256(content.encode('utf-8')).hexdigest()
+            language = "html" if self._is_html_file(path) else "css"
+            # Handle relative path calculation safely
+            try:
+                relative_path = str(path.relative_to(Path.cwd()))
+            except ValueError:
+                # If path is not under cwd, just use the path as-is
+                relative_path = str(path)
+            
+            file_id = self._sqlite_store.store_file(
+                self._repository_id,
+                str(path),
+                relative_path,
+                language=language,
+                size=len(content),
+                hash=file_hash
+            )
+        
+        symbols: List[Dict[str, Any]] = []
+        
+        if self._is_html_file(path):
+            symbols = self._index_html_file(path, content, file_id)
+        else:
+            symbols = self._index_css_file(path, content, file_id)
+        
+        # Cache symbols for quick lookup
+        cache_key = str(path)
+        self._symbol_cache[cache_key] = [
+            self._symbol_to_def(s, str(path), content) 
+            for s in symbols
+        ]
+        
+        return {
+            'file': str(path),
+            'symbols': symbols,
+            'language': self.lang
+        }
+
+    def _index_html_file(self, path: Path, content: str, file_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Index an HTML file."""
+        tree = self._html_parser.parse(content.encode('utf-8'))
+        root = tree.root_node
+        
+        symbols: List[Dict[str, Any]] = []
+        elements: List[Dict[str, Any]] = []
+        
+        self._extract_html_symbols(root, content, symbols, elements, file_id)
+        
+        # Store elements for cross-reference
+        self._html_elements[str(path)] = elements
+        
+        return symbols
+
+    def _index_css_file(self, path: Path, content: str, file_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Index a CSS file."""
+        tree = self._css_parser.parse(content.encode('utf-8'))
+        root = tree.root_node
+        
+        symbols: List[Dict[str, Any]] = []
+        selectors: List[Dict[str, Any]] = []
+        
+        self._extract_css_symbols(root, content, symbols, selectors, file_id)
+        
+        # Store selectors for cross-reference
+        self._css_selectors[str(path)] = selectors
+        
+        return symbols
+
+    def _extract_html_symbols(self, node: Node, content: str, symbols: List[Dict], 
+                             elements: List[Dict], file_id: Optional[int] = None) -> None:
+        """Extract symbols from HTML AST."""
+        if node.type == 'element':
+            # Extract tag name from start_tag
+            tag_name = None
+            start_tag = None
+            
+            for child in node.children:
+                if child.type == 'start_tag':
+                    start_tag = child
+                    # Find tag name in start_tag
+                    for tag_child in child.children:
+                        if tag_child.type == 'tag_name':
+                            tag_name = content[tag_child.start_byte:tag_child.end_byte]
+                            break
+                    break
+            
+            if tag_name and start_tag:
+                # Extract attributes
+                attributes = self._extract_html_attributes(node, content)
+                
+                # Look for id attribute
+                if 'id' in attributes:
+                    id_value = attributes['id']
+                    symbol_info = {
+                        'symbol': f"#{id_value}",
+                        'kind': 'id',
+                        'signature': f'<{tag_name} id="{id_value}">',
+                        'line': node.start_point[0] + 1,
+                        'span': (node.start_point[0] + 1, node.end_point[0] + 1),
+                        'tag': tag_name
+                    }
+                    symbols.append(symbol_info)
+                    
+                    # Store in SQLite if available
+                    if self._sqlite_store and file_id:
+                        symbol_id = self._sqlite_store.store_symbol(
+                            file_id,
+                            f"#{id_value}",
+                            'id',
+                            node.start_point[0] + 1,
+                            node.end_point[0] + 1,
+                            signature=symbol_info['signature']
+                        )
+                        self._indexer.add_symbol(
+                            f"#{id_value}", 
+                            str(self._current_file or "unknown"), 
+                            node.start_point[0] + 1,
+                            {"symbol_id": symbol_id, "file_id": file_id}
+                        )
+                
+                # Look for class attributes
+                if 'class' in attributes:
+                    classes = attributes['class'].split()
+                    for class_name in classes:
+                        symbol_info = {
+                            'symbol': f".{class_name}",
+                            'kind': 'class',
+                            'signature': f'<{tag_name} class="{class_name}">',
+                            'line': node.start_point[0] + 1,
+                            'span': (node.start_point[0] + 1, node.end_point[0] + 1),
+                            'tag': tag_name
+                        }
+                        symbols.append(symbol_info)
+                        
+                        # Store in SQLite if available
+                        if self._sqlite_store and file_id:
+                            symbol_id = self._sqlite_store.store_symbol(
+                                file_id,
+                                f".{class_name}",
+                                'class',
+                                node.start_point[0] + 1,
+                                node.end_point[0] + 1,
+                                signature=symbol_info['signature']
+                            )
+                            self._indexer.add_symbol(
+                                f".{class_name}", 
+                                str(self._current_file or "unknown"), 
+                                node.start_point[0] + 1,
+                                {"symbol_id": symbol_id, "file_id": file_id}
+                            )
+                
+                # Look for custom elements (with hyphen)
+                if '-' in tag_name:
+                    symbol_info = {
+                        'symbol': tag_name,
+                        'kind': 'custom-element',
+                        'signature': f'<{tag_name}>',
+                        'line': node.start_point[0] + 1,
+                        'span': (node.start_point[0] + 1, node.end_point[0] + 1)
+                    }
+                    symbols.append(symbol_info)
+                    
+                    # Store in SQLite if available
+                    if self._sqlite_store and file_id:
+                        symbol_id = self._sqlite_store.store_symbol(
+                            file_id,
+                            tag_name,
+                            'custom-element',
+                            node.start_point[0] + 1,
+                            node.end_point[0] + 1,
+                            signature=symbol_info['signature']
+                        )
+                        self._indexer.add_symbol(
+                            tag_name, 
+                            str(self._current_file or "unknown"), 
+                            node.start_point[0] + 1,
+                            {"symbol_id": symbol_id, "file_id": file_id}
+                        )
+                
+                # Look for data attributes
+                for attr_name, attr_value in attributes.items():
+                    if attr_name.startswith('data-'):
+                        symbol_info = {
+                            'symbol': f"[{attr_name}]",
+                            'kind': 'data-attribute',
+                            'signature': f'{attr_name}="{attr_value}"',
+                            'line': node.start_point[0] + 1,
+                            'tag': tag_name
+                        }
+                        symbols.append(symbol_info)
+                
+                # Store element info for cross-reference
+                elements.append({
+                    'tag': tag_name,
+                    'id': attributes.get('id'),
+                    'classes': attributes.get('class', '').split() if 'class' in attributes else [],
+                    'attributes': attributes,
+                    'line': node.start_point[0] + 1
+                })
+        
+        # Continue recursion
+        for child in node.children:
+            self._extract_html_symbols(child, content, symbols, elements, file_id)
+
+    def _extract_html_attributes(self, element_node: Node, content: str) -> Dict[str, str]:
+        """Extract attributes from an HTML element node."""
+        attributes = {}
+        
+        # Look for attribute nodes
+        for child in element_node.children:
+            if child.type == 'start_tag':
+                for attr_child in child.children:
+                    if attr_child.type == 'attribute':
+                        attr_name = None
+                        attr_value = ''
+                        
+                        # Extract attribute name and value
+                        for attr_part in attr_child.children:
+                            if attr_part.type == 'attribute_name':
+                                attr_name = content[attr_part.start_byte:attr_part.end_byte]
+                            elif attr_part.type == 'quoted_attribute_value':
+                                # Get the actual value inside the quotes
+                                for value_child in attr_part.children:
+                                    if value_child.type == 'attribute_value':
+                                        attr_value = content[value_child.start_byte:value_child.end_byte]
+                                        break
+                        
+                        if attr_name is not None:
+                            attributes[attr_name] = attr_value
+        
+        return attributes
+
+    def _extract_css_symbols(self, node: Node, content: str, symbols: List[Dict], 
+                            selectors: List[Dict], file_id: Optional[int] = None,
+                            parent_selector: Optional[str] = None) -> None:
+        """Extract symbols from CSS AST."""
+        if node.type == 'rule_set':
+            # Extract selectors
+            selector_list = []
+            for child in node.children:
+                if child.type == 'selectors':
+                    selector_list = self._extract_css_selectors(child, content)
+                    break
+            
+            # Process each selector
+            for selector in selector_list:
+                # Combine with parent selector if in nested context
+                if parent_selector:
+                    if selector.startswith('&'):
+                        selector = parent_selector + selector[1:]
+                    else:
+                        selector = f"{parent_selector} {selector}"
+                
+                # Determine selector type
+                if selector.startswith('#'):
+                    kind = 'id'
+                elif ':' in selector:
+                    kind = 'pseudo-selector'
+                elif selector.startswith('.'):
+                    kind = 'class'
+                elif selector.startswith('[') and selector.endswith(']'):
+                    kind = 'attribute-selector'
+                else:
+                    kind = 'element-selector'
+                
+                symbol_info = {
+                    'symbol': selector,
+                    'kind': kind,
+                    'signature': f"{selector} {{ }}",
+                    'line': node.start_point[0] + 1,
+                    'span': (node.start_point[0] + 1, node.end_point[0] + 1)
+                }
+                symbols.append(symbol_info)
+                
+                # Store in SQLite if available
+                if self._sqlite_store and file_id:
+                    symbol_id = self._sqlite_store.store_symbol(
+                        file_id,
+                        selector,
+                        kind,
+                        node.start_point[0] + 1,
+                        node.end_point[0] + 1,
+                        signature=symbol_info['signature']
+                    )
+                    self._indexer.add_symbol(
+                        selector, 
+                        str(self._current_file or "unknown"), 
+                        node.start_point[0] + 1,
+                        {"symbol_id": symbol_id, "file_id": file_id}
+                    )
+                
+                # Store selector for cross-reference
+                selectors.append({
+                    'selector': selector,
+                    'kind': kind,
+                    'line': node.start_point[0] + 1
+                })
+            
+            # Process nested rules (for SCSS/Sass)
+            block_node = None
+            for child in node.children:
+                if child.type == 'block':
+                    block_node = child
+                    break
+            
+            if block_node:
+                for child in block_node.children:
+                    if child.type == 'rule_set':
+                        # Nested rule
+                        for selector in selector_list:
+                            self._extract_css_symbols(child, content, symbols, selectors, file_id, selector)
+        
+        elif node.type == 'keyframes_statement':
+            # Extract @keyframes
+            keyframe_name = None
+            for child in node.children:
+                if child.type == 'keyframes_name':
+                    keyframe_name = content[child.start_byte:child.end_byte]
+                    break
+            
+            if keyframe_name:
+                symbol_info = {
+                    'symbol': f"@keyframes {keyframe_name}",
+                    'kind': 'keyframes',
+                    'signature': f"@keyframes {keyframe_name} {{ }}",
+                    'line': node.start_point[0] + 1,
+                    'span': (node.start_point[0] + 1, node.end_point[0] + 1)
+                }
+                symbols.append(symbol_info)
+                
+                if self._sqlite_store and file_id:
+                    symbol_id = self._sqlite_store.store_symbol(
+                        file_id,
+                        f"@keyframes {keyframe_name}",
+                        'keyframes',
+                        node.start_point[0] + 1,
+                        node.end_point[0] + 1,
+                        signature=symbol_info['signature']
+                    )
+                    self._indexer.add_symbol(
+                        f"@keyframes {keyframe_name}", 
+                        str(self._current_file or "unknown"), 
+                        node.start_point[0] + 1,
+                        {"symbol_id": symbol_id, "file_id": file_id}
+                    )
+        
+        elif node.type in ['media_statement', 'supports_statement', 'charset_statement', 'import_statement', 'namespace_statement']:
+            # Extract other @rules
+            rule_type = node.type.replace('_statement', '')
+            rule_text = content[node.start_byte:node.end_byte]
+            
+            # For rules with blocks, extract just the part before the block
+            if '{' in rule_text:
+                rule_text = rule_text.split('{')[0].strip()
+            else:
+                rule_text = rule_text.strip()
+            
+            # Special handling for media queries to match test expectations
+            if rule_type == 'media':
+                kind = 'media-query'
+            else:
+                kind = f'{rule_type}-rule'
+            
+            symbol_info = {
+                'symbol': rule_text,
+                'kind': kind,
+                'signature': rule_text + ' { }',
+                'line': node.start_point[0] + 1,
+                'span': (node.start_point[0] + 1, node.end_point[0] + 1)
+            }
+            symbols.append(symbol_info)
+            
+            # Store in SQLite if available
+            if self._sqlite_store and file_id:
+                symbol_id = self._sqlite_store.store_symbol(
+                    file_id,
+                    rule_text,
+                    kind,
+                    node.start_point[0] + 1,
+                    node.end_point[0] + 1,
+                    signature=symbol_info['signature']
+                )
+                self._indexer.add_symbol(
+                    rule_text, 
+                    str(self._current_file or "unknown"), 
+                    node.start_point[0] + 1,
+                    {"symbol_id": symbol_id, "file_id": file_id}
+                )
+        
+        elif node.type == 'declaration':
+            # Extract CSS variables
+            prop_name = None
+            prop_value_parts = []
+            
+            for child in node.children:
+                if child.type == 'property_name':
+                    prop_name = content[child.start_byte:child.end_byte]
+                elif child.type not in [':', ';', ' ', '\n']:
+                    # Collect all value parts
+                    prop_value_parts.append(content[child.start_byte:child.end_byte])
+            
+            if prop_name and prop_name.startswith('--'):
+                # CSS variable
+                prop_value = ' '.join(prop_value_parts)
+                symbol_info = {
+                    'symbol': prop_name,
+                    'kind': 'css-variable',
+                    'signature': f"{prop_name}: {prop_value}",
+                    'line': node.start_point[0] + 1
+                }
+                symbols.append(symbol_info)
+                
+                if self._sqlite_store and file_id:
+                    symbol_id = self._sqlite_store.store_symbol(
+                        file_id,
+                        prop_name,
+                        'css-variable',
+                        node.start_point[0] + 1,
+                        node.start_point[0] + 1,
+                        signature=symbol_info['signature']
+                    )
+                    self._indexer.add_symbol(
+                        prop_name, 
+                        str(self._current_file or "unknown"), 
+                        node.start_point[0] + 1,
+                        {"symbol_id": symbol_id, "file_id": file_id}
+                    )
+        
+        # For preprocessor features (SCSS/Sass)
+        elif node.type == 'mixin_statement':
+            # SCSS mixin
+            name_node = None
+            for child in node.children:
+                if child.type == 'identifier':
+                    name_node = child
+                    break
+            
+            if name_node:
+                mixin_name = content[name_node.start_byte:name_node.end_byte]
+                symbol_info = {
+                    'symbol': f"@mixin {mixin_name}",
+                    'kind': 'mixin',
+                    'signature': f"@mixin {mixin_name}()",
+                    'line': node.start_point[0] + 1,
+                    'span': (node.start_point[0] + 1, node.end_point[0] + 1)
+                }
+                symbols.append(symbol_info)
+        
+        # Continue recursion for all node types
+        for child in node.children:
+            self._extract_css_symbols(child, content, symbols, selectors, file_id, parent_selector)
+
+    def _extract_css_selectors(self, selectors_node: Node, content: str) -> List[str]:
+        """Extract selectors from a selectors node."""
+        # For simple cases, just extract the text content
+        selector_text = content[selectors_node.start_byte:selectors_node.end_byte]
+        
+        # Split by comma for multiple selectors
+        if ',' in selector_text:
+            selectors = [s.strip() for s in selector_text.split(',')]
+        else:
+            selectors = [selector_text.strip()]
+        
+        # Filter out empty selectors
+        return [s for s in selectors if s]
+
+    def _symbol_to_def(self, symbol: Dict[str, Any], file_path: str, content: str) -> SymbolDef:
+        """Convert internal symbol representation to SymbolDef."""
+        return {
+            'symbol': symbol['symbol'],
+            'kind': symbol['kind'],
+            'language': self.lang,
+            'signature': symbol['signature'],
+            'doc': None,  # HTML/CSS don't typically have inline docs
+            'defined_in': file_path,
+            'line': symbol.get('line', 1),
+            'span': symbol.get('span', (symbol.get('line', 1), symbol.get('line', 1) + 1))
+        }
 
     def getDefinition(self, symbol: str) -> SymbolDef | None:
-        """Return the definition of a symbol, if known."""
-        ...
+        """Get the definition of a symbol."""
+        # First check cache
+        for file_path, symbols in self._symbol_cache.items():
+            for sym_def in symbols:
+                if sym_def['symbol'] == symbol:
+                    return sym_def
+        
+        # Search in all supported files
+        for pattern in ["*.html", "*.htm", "*.css", "*.scss", "*.sass", "*.less"]:
+            for path in Path(".").rglob(pattern):
+                try:
+                    # Skip common build directories
+                    if any(part in path.parts for part in ["node_modules", "dist", "build", ".next", "vendor"]):
+                        continue
+                    
+                    content = path.read_text(encoding="utf-8")
+                    shard = self.indexFile(path, content)
+                    
+                    for sym in shard['symbols']:
+                        if sym['symbol'] == symbol:
+                            return self._symbol_to_def(sym, str(path), content)
+                except Exception:
+                    continue
+        
+        return None
 
     def findReferences(self, symbol: str) -> list[Reference]:
-        """List all references to a symbol."""
-        ...
+        """Find all references to a symbol, including cross-references between HTML and CSS."""
+        refs: List[Reference] = []
+        seen: Set[Tuple[str, int]] = set()
+        
+        # Determine symbol type
+        symbol_type = None
+        if symbol.startswith('#'):
+            symbol_type = 'id'
+            symbol_value = symbol[1:]  # Remove #
+        elif symbol.startswith('.'):
+            symbol_type = 'class'
+            symbol_value = symbol[1:]  # Remove .
+        else:
+            symbol_type = 'other'
+            symbol_value = symbol
+        
+        # Search in HTML files
+        for pattern in ["*.html", "*.htm"]:
+            for path in Path(".").rglob(pattern):
+                try:
+                    if any(part in path.parts for part in ["node_modules", "dist", "build", ".next", "vendor"]):
+                        continue
+                    
+                    content = path.read_text(encoding="utf-8")
+                    lines = content.splitlines()
+                    
+                    for i, line in enumerate(lines):
+                        found = False
+                        
+                        if symbol_type == 'id':
+                            # Look for id="value" or id='value'
+                            if re.search(rf'id\s*=\s*["\']({re.escape(symbol_value)})["\']', line):
+                                found = True
+                        elif symbol_type == 'class':
+                            # Look for class="... value ..." or class='... value ...'
+                            if re.search(rf'class\s*=\s*["\'][^"\']*\b{re.escape(symbol_value)}\b[^"\']*["\']', line):
+                                found = True
+                        else:
+                            # Look for custom elements or data attributes
+                            if re.search(rf'<{re.escape(symbol_value)}[\s>]', line) or \
+                               re.search(rf'{re.escape(symbol_value)}\s*=', line):
+                                found = True
+                        
+                        if found:
+                            line_no = i + 1
+                            key = (str(path), line_no)
+                            if key not in seen:
+                                refs.append(Reference(file=str(path), line=line_no))
+                                seen.add(key)
+                
+                except Exception:
+                    continue
+        
+        # Search in CSS files
+        for pattern in ["*.css", "*.scss", "*.sass", "*.less"]:
+            for path in Path(".").rglob(pattern):
+                try:
+                    if any(part in path.parts for part in ["node_modules", "dist", "build", ".next", "vendor"]):
+                        continue
+                    
+                    content = path.read_text(encoding="utf-8")
+                    lines = content.splitlines()
+                    
+                    for i, line in enumerate(lines):
+                        # Look for the symbol as a selector or reference
+                        # Use a more flexible pattern for CSS selectors
+                        escaped_symbol = re.escape(symbol)
+                        if re.search(escaped_symbol, line):
+                            line_no = i + 1
+                            key = (str(path), line_no)
+                            if key not in seen:
+                                refs.append(Reference(file=str(path), line=line_no))
+                                seen.add(key)
+                
+                except Exception:
+                    continue
+        
+        return refs
 
     def search(self, query: str, opts: SearchOpts | None = None) -> list[SearchResult]:
         """Search for code snippets matching a query."""
-        ...
+        limit = 20
+        if opts and "limit" in opts:
+            limit = opts["limit"]
+        
+        # Semantic search not implemented yet
+        if opts and opts.get("semantic"):
+            return []
+        
+        # Use fuzzy indexer for search
+        results = self._indexer.search(query, limit=limit)
+        
+        # Convert to SearchResult objects if they're not already
+        search_results = []
+        for result in results:
+            if isinstance(result, dict):
+                # Convert dict result to SearchResult-like object
+                search_results.append({
+                    'file': result.get('file', ''),
+                    'line': result.get('line', 1),
+                    'content': result.get('content', ''),
+                    'score': result.get('score', 1.0),
+                    'match': result.get('match', query)
+                })
+            else:
+                search_results.append(result)
+        
+        # If query looks like a CSS selector or HTML element, boost relevant results
+        if query.startswith('#') or query.startswith('.') or query.startswith('['):
+            # Boost exact matches for selectors
+            for result in search_results:
+                if result.get('match', '').strip() == query:
+                    result['score'] = result.get('score', 1.0) * 2.0
+        
+        # Sort by score
+        search_results.sort(key=lambda x: x.get('score', 0), reverse=True)
+        
+        return search_results[:limit]
+
+    def get_indexed_count(self) -> int:
+        """Return the number of indexed files."""
+        # Count unique files in the symbol cache
+        return len(self._symbol_cache)
+
+    def get_cross_references(self, symbol: str) -> Dict[str, List[Reference]]:
+        """Get cross-references between HTML and CSS files for a symbol.
+        
+        This is an additional method to help find where CSS selectors are used in HTML
+        and vice versa.
+        """
+        refs = {
+            'html_usage': [],
+            'css_definitions': []
+        }
+        
+        # If it's a CSS selector, find HTML usage
+        if symbol.startswith('#') or symbol.startswith('.'):
+            refs['html_usage'] = [
+                ref for ref in self.findReferences(symbol)
+                if ref.file.endswith(('.html', '.htm'))
+            ]
+            refs['css_definitions'] = [
+                ref for ref in self.findReferences(symbol)
+                if ref.file.endswith(('.css', '.scss', '.sass', '.less'))
+            ]
+        
+        return refs

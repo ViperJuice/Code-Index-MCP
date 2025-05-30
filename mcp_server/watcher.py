@@ -2,15 +2,27 @@ from pathlib import Path
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import logging
+from typing import Optional
 from .dispatcher import Dispatcher
 
 logger = logging.getLogger(__name__)
 
 class _Handler(FileSystemEventHandler):
-    def __init__(self, dispatcher: Dispatcher):
+    def __init__(self, dispatcher: Dispatcher, query_cache=None):
         self.dispatcher = dispatcher
+        self.query_cache = query_cache
         # Track supported file extensions
         self.code_extensions = {'.py', '.js', '.c', '.cpp', '.dart', '.html', '.css'}
+    
+    async def invalidate_cache_for_file(self, path: Path):
+        """Invalidate cache entries that depend on the changed file."""
+        if self.query_cache:
+            try:
+                count = await self.query_cache.invalidate_file_queries(str(path))
+                if count > 0:
+                    logger.debug(f"Invalidated {count} cache entries for file {path}")
+            except Exception as e:
+                logger.error(f"Error invalidating cache for {path}: {e}")
     
     def trigger_reindex(self, path: Path):
         """Trigger re-indexing of a single file through the dispatcher."""
@@ -18,6 +30,19 @@ class _Handler(FileSystemEventHandler):
             if path.suffix in self.code_extensions:
                 logger.info(f"Triggering re-index for {path}")
                 self.dispatcher.index_file(path)
+                
+                # Invalidate cache entries for this file
+                if self.query_cache:
+                    import asyncio
+                    try:
+                        # Run cache invalidation in background
+                        loop = asyncio.get_event_loop()
+                        if loop.is_running():
+                            asyncio.create_task(self.invalidate_cache_for_file(path))
+                        else:
+                            asyncio.run(self.invalidate_cache_for_file(path))
+                    except Exception as e:
+                        logger.warning(f"Failed to invalidate cache for {path}: {e}")
         except Exception as e:
             logger.error(f"Error re-indexing {path}: {e}")
     
@@ -51,9 +76,9 @@ class _Handler(FileSystemEventHandler):
         pass
 
 class FileWatcher:
-    def __init__(self, root: Path, dispatcher: Dispatcher):
+    def __init__(self, root: Path, dispatcher: Dispatcher, query_cache=None):
         self._observer = Observer()
-        self._observer.schedule(_Handler(dispatcher), str(root), recursive=True)
+        self._observer.schedule(_Handler(dispatcher, query_cache), str(root), recursive=True)
 
     def start(self): self._observer.start()
     def stop(self): self._observer.stop()
