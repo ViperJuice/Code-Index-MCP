@@ -1,216 +1,164 @@
 # Markdown Documentation Index
 # This file is auto-generated for AI agent reference - do not edit manually
-# Last updated: 2025-01-29
+# Last updated: 2025-01-30 (Enhanced with plugin implementation guides)
 
 ## AGENT_INSTRUCTIONS
 - Use this index to locate relevant documentation before making changes
 - Always check MERGE_CANDIDATES before creating new documentation
 - Execute CLEANUP_ACTIONS to maintain documentation hygiene
 - Reference FILE_PURPOSES when deciding where to add new content
+- CLAUDE.md files are stubs that point to AGENTS.md - always read AGENTS.md for actual content
 
 ## FILE_INVENTORY
 
-### ACTIVE_DOCS
-
-#### AI Agent Context Files
+### ACTIVE_DOCS - AI AGENT CONTEXT
 ```
-/CLAUDE.md | purpose:project_context_for_ai | refs:high | status:CURRENT | size:7.3kb | context:AI_AGENT
-/AGENTS.md | purpose:agent_capabilities | refs:high | status:CURRENT | size:3.2kb | context:AI_AGENT
-/architecture/CLAUDE.md | purpose:architecture_ai_context | refs:medium | status:CURRENT | size:2.3kb | context:AI_AGENT
-/architecture/AGENTS.md | purpose:architecture_agent_tasks | refs:low | status:CURRENT | size:1.4kb | context:AI_AGENT
-/mcp_server/AGENTS.md | purpose:mcp_server_agent_config | refs:medium | status:CURRENT | size:4.2kb | context:AI_AGENT
-/mcp_server/plugins/python_plugin/AGENTS.md | purpose:python_plugin_actual_implementation | refs:medium | status:CURRENT | size:2.5kb | context:AI_AGENT
-.claude/commands/update-documents.md | purpose:document_update_command | refs:low | status:CURRENT | size:9.4kb | context:AI_AGENT
-.claude/commands/add-feature.md | purpose:feature_addition_command | refs:low | status:CURRENT | size:7.7kb | context:AI_AGENT
-.claude/commands/update-table-of-contents.md | purpose:toc_generation_command | refs:low | status:CURRENT | size:6.5kb | context:AI_AGENT
-```
-
-#### Human Documentation
-```
-/README.md | purpose:project_overview | refs:high | status:CURRENT | size:10.4kb | context:HUMAN
-/ROADMAP.md | purpose:development_timeline | refs:medium | status:CURRENT | size:9.6kb | context:HUMAN
-/CONTRIBUTING.md | purpose:contribution_guide | refs:medium | status:CURRENT | size:7.1kb | context:HUMAN
-/SECURITY.md | purpose:security_policy | refs:low | status:CURRENT | size:1.9kb | context:HUMAN
-/TROUBLESHOOTING.md | purpose:common_issues | refs:low | status:CURRENT | size:5.6kb | context:HUMAN
-/CHANGELOG.md | purpose:version_history | refs:low | status:CURRENT | size:1.7kb | context:HUMAN
-/DOCUMENTATION_UPDATE_SUMMARY.md | purpose:doc_alignment_report | refs:low | status:CURRENT | size:4.0kb | context:HUMAN
-/markdown-table-of-contents.md | purpose:markdown_index | refs:high | status:CURRENT | size:7.3kb | context:HUMAN
+/CLAUDE.md | purpose:ai_agent_navigation | refs:high | status:CURRENT | size:302b | context:AI_AGENT
+/AGENTS.md | purpose:ai_agent_instructions | refs:high | status:CURRENT | size:3.5kb | context:AI_AGENT
+/MARKDOWN_INDEX.md | purpose:comprehensive_doc_catalog | refs:high | status:CURRENT | size:9.8kb | context:AI_AGENT
+/markdown-table-of-contents.md | purpose:ai_agent_doc_index | refs:high | status:CURRENT | size:6.4kb | context:AI_AGENT
+/architecture/CLAUDE.md | purpose:ai_agent_navigation | refs:high | status:CURRENT | size:302b | context:AI_AGENT
+/architecture/AGENTS.md | purpose:architecture_agent_notes | refs:high | status:CURRENT | size:3.9kb | context:AI_AGENT
+/mcp_server/CLAUDE.md | purpose:ai_agent_navigation | refs:high | status:CURRENT | size:302b | context:AI_AGENT
+/mcp_server/AGENTS.md | purpose:server_agent_notes | refs:high | status:CURRENT | size:2.8kb | context:AI_AGENT
+/.claude/commands/*.md | purpose:ai_command_definitions | refs:medium | status:CURRENT | size:varies | context:AI_AGENT
+/mcp_server/plugins/*/CLAUDE.md | purpose:ai_agent_navigation | refs:medium | status:CURRENT | size:302b each | context:AI_AGENT
+/mcp_server/plugins/*/AGENTS.md | purpose:plugin_implementation_guides | refs:high | status:ENHANCED | size:7-12kb | context:AI_AGENT
 ```
 
-#### Architecture Documentation
+### ACTIVE_DOCS - HUMAN CONTEXT
 ```
-/architecture/README.md | purpose:architecture_overview | refs:medium | status:CURRENT | size:6.0kb | context:HUMAN
-/architecture/data_model.md | purpose:data_structures | refs:medium | status:CURRENT | size:12.2kb | context:HUMAN
-/architecture/performance_requirements.md | purpose:performance_specs | refs:low | status:CURRENT | size:3.4kb | context:HUMAN
-/architecture/security_model.md | purpose:security_design | refs:low | status:CURRENT | size:5.0kb | context:HUMAN
-/architecture/IMPLEMENTATION_GAP_ANALYSIS.md | purpose:implementation_gaps | refs:low | status:CURRENT | size:4.6kb | context:HUMAN
-/architecture/ARCHITECTURE_FIXES.md | purpose:architecture_issues | refs:low | status:CURRENT | size:3.0kb | context:HUMAN
-```
+/README.md | purpose:project_overview | refs:high | status:CURRENT | size:18.7kb | context:HUMAN
+/ROADMAP.md | purpose:development_roadmap | refs:high | status:CURRENT | size:19.2kb | context:HUMAN
+/CHANGELOG.md | purpose:release_history | refs:medium | status:CURRENT | size:3.7kb | context:HUMAN
+/CONTRIBUTING.md | purpose:contribution_guide | refs:medium | status:CURRENT | size:6.4kb | context:HUMAN
+/SECURITY.md | purpose:security_policy | refs:low | status:CURRENT | size:2.5kb | context:HUMAN
+/TROUBLESHOOTING.md | purpose:common_issues | refs:medium | status:CURRENT | size:9.5kb | context:HUMAN
+/PHASE1_COMPLETION_SUMMARY.md | purpose:milestone_report | refs:low | status:CURRENT | size:3.2kb | context:HUMAN
+/DOCUMENTATION_UPDATE_SUMMARY.md | purpose:cleanup_report | refs:low | status:CURRENT | size:11.5kb | context:HUMAN
 
-#### Docs Directory
-```
-/docs/DEPLOYMENT-GUIDE.md | purpose:deployment_instructions | refs:medium | status:CURRENT | size:22.7kb | context:HUMAN
-/docs/api/API-REFERENCE.md | purpose:api_documentation | refs:high | status:CURRENT | size:6.5kb | context:HUMAN
-/docs/configuration/ENVIRONMENT-VARIABLES.md | purpose:env_config | refs:medium | status:CURRENT | size:9.1kb | context:HUMAN
-/docs/development/TESTING-GUIDE.md | purpose:testing_documentation | refs:medium | status:CURRENT | size:33.6kb | context:HUMAN
-```
+/architecture/README.md | purpose:architecture_overview | refs:high | status:CURRENT | size:21.8kb | context:HUMAN
+/architecture/data_model.md | purpose:database_schema | refs:high | status:CURRENT | size:18.9kb | context:HUMAN
+/architecture/performance_requirements.md | purpose:performance_specs | refs:medium | status:CURRENT | size:12.1kb | context:HUMAN
+/architecture/security_model.md | purpose:security_design | refs:medium | status:CURRENT | size:15.3kb | context:HUMAN
+/architecture/IMPLEMENTATION_GAP_ANALYSIS.md | purpose:gap_analysis | refs:medium | status:CURRENT | size:30.2kb | context:HUMAN
+/architecture/ARCHITECTURE_ALIGNMENT_REPORT.md | purpose:alignment_report | refs:low | status:CURRENT | size:1.2kb | context:HUMAN
+/architecture/ARCHITECTURE_FIXES.md | purpose:fix_documentation | refs:low | status:CURRENT | size:10.1kb | context:HUMAN
 
-#### AI Documentation (Reference)
-```
-/ai_docs/README.md | purpose:ai_docs_index | refs:high | status:CURRENT | size:10.9kb | context:HUMAN
-/ai_docs/celery_overview.md | purpose:celery_reference | refs:low | status:CURRENT | size:8.5kb | context:HUMAN
-/ai_docs/fastapi_overview.md | purpose:fastapi_reference | refs:low | status:CURRENT | size:9.4kb | context:HUMAN
-/ai_docs/grpc_overview.md | purpose:grpc_reference | refs:low | status:CURRENT | size:8.8kb | context:HUMAN
-/ai_docs/jedi.md | purpose:jedi_reference | refs:low | status:CURRENT | size:27.8kb | context:HUMAN
-/ai_docs/jwt_authentication_overview.md | purpose:jwt_reference | refs:low | status:CURRENT | size:7.9kb | context:HUMAN
-/ai_docs/memgraph_overview.md | purpose:memgraph_reference | refs:low | status:CURRENT | size:8.5kb | context:HUMAN
-/ai_docs/plantuml_reference.md | purpose:plantuml_reference | refs:low | status:CURRENT | size:11.9kb | context:HUMAN
-/ai_docs/prometheus_overview.md | purpose:prometheus_reference | refs:low | status:CURRENT | size:11.2kb | context:HUMAN
-/ai_docs/pydantic_overview.md | purpose:pydantic_reference | refs:low | status:CURRENT | size:7.6kb | context:HUMAN
-/ai_docs/qdrant.md | purpose:qdrant_reference | refs:low | status:CURRENT | size:50.9kb | context:HUMAN
-/ai_docs/redis.md | purpose:redis_reference | refs:low | status:CURRENT | size:32.2kb | context:HUMAN
-/ai_docs/sqlite_fts5_overview.md | purpose:sqlite_reference | refs:low | status:CURRENT | size:6.4kb | context:HUMAN
-/ai_docs/tree_sitter_overview.md | purpose:tree_sitter_reference | refs:low | status:CURRENT | size:11.5kb | context:HUMAN
-/ai_docs/voyage_ai_overview.md | purpose:voyage_ai_reference | refs:low | status:CURRENT | size:5.1kb | context:HUMAN
-/ai_docs/watchdog.md | purpose:watchdog_reference | refs:low | status:CURRENT | size:21.5kb | context:HUMAN
+/docs/DEPLOYMENT-GUIDE.md | purpose:deployment_instructions | refs:medium | status:CURRENT | size:14.5kb | context:HUMAN
+/docs/api/API-REFERENCE.md | purpose:api_documentation | refs:high | status:CURRENT | size:19.8kb | context:HUMAN
+/docs/configuration/ENVIRONMENT-VARIABLES.md | purpose:config_reference | refs:medium | status:CURRENT | size:5.2kb | context:HUMAN
+/docs/development/TESTING-GUIDE.md | purpose:testing_instructions | refs:medium | status:CURRENT | size:8.7kb | context:HUMAN
+
+/ai_docs/*.md | purpose:technology_references | refs:medium | status:CURRENT | size:210kb total | context:HUMAN
 ```
 
 ### MAINTENANCE_REQUIRED
-
-#### Obsolete/Stale Files
 ```
-/mcp_server/CLAUDE.md | purpose:outdated_mcp_context | refs:low | status:OBSOLETE | size:1.0kb | context:AI_AGENT | action:DELETE
-  REASON: Contains incorrect API endpoints (/index instead of /symbol), conflicts with root CLAUDE.md
-```
-
-#### Plugin Documentation (Stub Implementations)
-```
-/mcp_server/plugins/c_plugin/CLAUDE.md | purpose:unimplemented_plugin_doc | refs:none | status:MISLEADING | size:1.2kb | context:AI_AGENT | action:DELETE
-/mcp_server/plugins/cpp_plugin/CLAUDE.md | purpose:unimplemented_plugin_doc | refs:none | status:MISLEADING | size:1.4kb | context:AI_AGENT | action:DELETE
-/mcp_server/plugins/js_plugin/CLAUDE.md | purpose:unimplemented_plugin_doc | refs:none | status:MISLEADING | size:1.2kb | context:AI_AGENT | action:DELETE
-/mcp_server/plugins/dart_plugin/CLAUDE.md | purpose:unimplemented_plugin_doc | refs:none | status:MISLEADING | size:1.1kb | context:AI_AGENT | action:DELETE
-/mcp_server/plugins/html_css_plugin/CLAUDE.md | purpose:unimplemented_plugin_doc | refs:none | status:MISLEADING | size:1.2kb | context:AI_AGENT | action:DELETE
-  REASON: All describe features that don't exist (only Python plugin is implemented)
-
-/mcp_server/plugins/c_plugin/AGENTS.md | purpose:stub_plugin_agent_doc | refs:none | status:LOW_VALUE | size:1.6kb | context:AI_AGENT | action:CONSIDER_DELETE
-/mcp_server/plugins/cpp_plugin/AGENTS.md | purpose:stub_plugin_agent_doc | refs:none | status:LOW_VALUE | size:2.0kb | context:AI_AGENT | action:CONSIDER_DELETE
-/mcp_server/plugins/js_plugin/AGENTS.md | purpose:stub_plugin_agent_doc | refs:none | status:LOW_VALUE | size:1.7kb | context:AI_AGENT | action:CONSIDER_DELETE
-/mcp_server/plugins/dart_plugin/AGENTS.md | purpose:stub_plugin_agent_doc | refs:none | status:LOW_VALUE | size:1.5kb | context:AI_AGENT | action:CONSIDER_DELETE
-/mcp_server/plugins/html_css_plugin/AGENTS.md | purpose:stub_plugin_agent_doc | refs:none | status:LOW_VALUE | size:1.5kb | context:AI_AGENT | action:CONSIDER_DELETE
-  REASON: All correctly marked as STUB but provide minimal value
-```
-
-#### Low-Value Files
-```
-/mcp_server/plugins/python_plugin/CLAUDE.md | purpose:redundant_plugin_doc | refs:none | status:REDUNDANT | size:1.4kb | context:AI_AGENT | action:DELETE
-  REASON: Duplicates information already in python_plugin/AGENTS.md
-
-/mcp_server/plugins/CLAUDE.md | purpose:plugin_overview | refs:low | status:REDUNDANT | size:1.1kb | context:AI_AGENT | action:MERGE_INTO:/CLAUDE.md
-  REASON: General plugin info better placed in main CLAUDE.md
-
-/mcp_server/plugins/AGENTS.md | purpose:plugin_agent_overview | refs:low | status:LOW_VALUE | size:847b | context:AI_AGENT | action:MERGE_INTO:/mcp_server/AGENTS.md
-  REASON: Very brief, better consolidated with parent directory AGENTS.md
+None - Recent cleanup removed obsolete files as documented in DOCUMENTATION_UPDATE_SUMMARY.md
 ```
 
 ## AGENT_ACTIONS
 
 ### IMMEDIATE_CLEANUP
 ```bash
-# Delete obsolete and misleading files
-rm /workspaces/Code-Index-MCP/mcp_server/CLAUDE.md  # Outdated API endpoints
-
-# Delete misleading plugin documentation for unimplemented plugins
-rm /workspaces/Code-Index-MCP/mcp_server/plugins/c_plugin/CLAUDE.md
-rm /workspaces/Code-Index-MCP/mcp_server/plugins/cpp_plugin/CLAUDE.md
-rm /workspaces/Code-Index-MCP/mcp_server/plugins/js_plugin/CLAUDE.md
-rm /workspaces/Code-Index-MCP/mcp_server/plugins/dart_plugin/CLAUDE.md
-rm /workspaces/Code-Index-MCP/mcp_server/plugins/html_css_plugin/CLAUDE.md
-
-# Delete redundant Python plugin CLAUDE.md
-rm /workspaces/Code-Index-MCP/mcp_server/plugins/python_plugin/CLAUDE.md
+# No immediate cleanup required - recent documentation cleanup already completed
 ```
 
 ### CONSOLIDATION_TASKS
 ```
-MERGE: /mcp_server/plugins/CLAUDE.md → /CLAUDE.md
-  REASON: Plugin overview info better centralized
-  LOCATION: Add to "Language Plugins" section
-  
-MERGE: /mcp_server/plugins/AGENTS.md → /mcp_server/AGENTS.md
-  REASON: Minimal content (847 bytes), better consolidated
-  LOCATION: Add as subsection in parent AGENTS.md
-
-CONSIDER: Delete stub plugin AGENTS.md files
-  FILES: c_plugin, cpp_plugin, js_plugin, dart_plugin, html_css_plugin AGENTS.md
-  REASON: All marked as STUB, provide minimal value
-  ACTION: Delete after confirming no unique information
+# All CLAUDE.md files are intentional stubs - DO NOT CONSOLIDATE
+# Each points to its corresponding AGENTS.md file for actual content
 ```
 
 ### CONTENT_UPDATES_NEEDED
 ```
-/CLAUDE.md | UPDATE | Add correct dispatcher initialization instructions
-/architecture/CLAUDE.md | UPDATE | Sync with main CLAUDE.md for consistency
+/ROADMAP.md | ACTIVE | Update completion percentages after Phase 1 completion (~25% now)
+/mcp_server/plugins/*/AGENTS.md | ENHANCED | Comprehensive implementation guides added for all 5 stub plugins
 ```
 
 ## SEMANTIC_CLUSTERS
 ```
-ai_agent_context: [/CLAUDE.md, /AGENTS.md, /architecture/CLAUDE.md, /architecture/AGENTS.md, /mcp_server/AGENTS.md]
-project_documentation: [/README.md, /ROADMAP.md, /CONTRIBUTING.md, /SECURITY.md, /TROUBLESHOOTING.md]
-architecture_docs: [/architecture/README.md, /architecture/data_model.md, /architecture/performance_requirements.md, /architecture/security_model.md]
-api_documentation: [/docs/api/API-REFERENCE.md, /docs/configuration/ENVIRONMENT-VARIABLES.md]
-deployment_guides: [/docs/DEPLOYMENT-GUIDE.md, /docs/development/TESTING-GUIDE.md]
-technology_reference: [/ai_docs/*.md (15 files)]
-plugin_documentation: [plugin CLAUDE.md and AGENTS.md files]
+ai_agent_context: [All CLAUDE.md files, All AGENTS.md files, .claude/commands/*.md]
+project_management: [README.md, ROADMAP.md, CHANGELOG.md, CONTRIBUTING.md]
+architecture_docs: [architecture/*.md, All dual architecture pattern files]
+implementation_guides: [docs/*.md, DEPLOYMENT-GUIDE.md, TESTING-GUIDE.md]
+technology_references: [ai_docs/*.md - 17 files covering various tools/libraries]
+plugin_documentation: [mcp_server/plugins/*/AGENTS.md, mcp_server/plugins/*/CLAUDE.md]
 ```
 
 ## REFERENCE_MAP
 ```
-# Incoming references
-/CONTRIBUTING.md ← [/README.md]
-/docs/DEPLOYMENT-GUIDE.md ← [/README.md]
-/ROADMAP.md ← [/ai_docs/README.md]
-/architecture/security_model.md ← [/ai_docs/README.md]
-/architecture/performance_requirements.md ← [/ai_docs/README.md]
+# Key Reference Patterns
+All CLAUDE.md → AGENTS.md (consistent navigation pattern)
+README.md → [architecture/README.md, docs/*, CONTRIBUTING.md]
+ROADMAP.md → [architecture/*.md, IMPLEMENTATION_GAP_ANALYSIS.md]
+architecture/*_actual.* ← → architecture/*.* (dual architecture pattern)
 
-# Outgoing references
-/README.md → [/CONTRIBUTING.md, /docs/DEPLOYMENT-GUIDE.md]
-/ai_docs/README.md → [all ai_docs files, /ROADMAP.md, /architecture/security_model.md, /architecture/performance_requirements.md]
-/markdown-table-of-contents.md → [all markdown files]
+# Technology Dependencies
+ai_docs/tree_sitter_overview.md ← Python plugin implementation
+ai_docs/sqlite_fts5_overview.md ← storage/sqlite_store.py
+ai_docs/fastapi_overview.md ← gateway.py implementation
 ```
 
 ## CONTENT_GAPS
 ```
-MISSING: Proper dispatcher initialization guide (referenced in CLAUDE.md but not detailed)
-MISSING: Plugin development tutorial (base class exists but no guide)
-MISSING: Performance benchmarks documentation (performance_requirements.md exists but no actuals)
-MISSING: Migration guide for moving from stubs to implementations
-REDUNDANT: Multiple CLAUDE.md files with conflicting information
-REDUNDANT: Plugin documentation for unimplemented features
+# Missing documentation that should exist based on codebase analysis
+MISSING: Plugin development guide (referenced in ROADMAP but doesn't exist)
+MISSING: Performance benchmarks documentation (specs exist but no actuals)
+MISSING: Migration guide for stub plugins to full implementations
+MISSING: Dispatcher initialization detailed guide
+```
+
+## DOCUMENTATION_PATTERNS
+```
+# CLAUDE.md Stub Pattern (All 302 bytes, identical content)
+- Every major directory has CLAUDE.md → AGENTS.md navigation
+- Consistent message: "Do not modify this file directly"
+- Total: 18 CLAUDE.md files, all pointing to corresponding AGENTS.md
+
+# Dual Architecture Pattern
+- *_actual.dsl/puml files track implementation (~20% complete)
+- Original files show target architecture (100% designed)
+- Clear separation between aspiration and reality
+
+# Plugin Documentation Pattern
+- Each plugin has CLAUDE.md (stub) + AGENTS.md (content)
+- Python plugin: fully documented and implemented
+- Other 5 plugins: documentation stubs awaiting implementation
 ```
 
 ## AGENT_PROMPTS
 ```
+# When working with CLAUDE.md files:
+"CLAUDE.md files are navigation stubs - always read the corresponding AGENTS.md for actual content"
+
 # When creating new documentation:
-"Check SEMANTIC_CLUSTERS in markdown-table-of-contents.md before creating new files. Most content should go in existing files."
+"Before creating new docs, check SEMANTIC_CLUSTERS and existing AGENTS.md files"
 
-# When working with plugins:
-"Only Python plugin is implemented. All other plugins are stubs. Check python_plugin/AGENTS.md for actual implementation details."
+# When implementing stub plugins:
+"Update the corresponding plugin's AGENTS.md file with implementation notes"
 
-# For maintenance tasks:
-"Execute IMMEDIATE_CLEANUP first to remove obsolete files, then handle CONSOLIDATION_TASKS."
-
-# For AI agent context:
-"CLAUDE.md and AGENTS.md files are for AI agents. Keep them updated with actual implementation status."
+# For architecture work:
+"Check both ideal and *_actual files to understand design vs implementation gap"
 ```
 
-## STATISTICS
+## FILE_SIZE_SUMMARY
 ```
-Total markdown files: 55
-AI Agent Context files: 23 (41.8%)
-Human Context files: 32 (58.2%)
-Files needing deletion: 6
-Files needing merge: 2
-Total documentation size: ~450KB
-Largest file: /docs/development/TESTING-GUIDE.md (33.6KB)
-Smallest file: /mcp_server/plugins/AGENTS.md (847 bytes)
+Total Documentation: ~650KB
+- AI Agent Context: ~45KB (18 files)
+- Human Documentation: ~605KB (50 files)
+- Largest file: architecture/IMPLEMENTATION_GAP_ANALYSIS.md (30.2KB)
+- Smallest files: All CLAUDE.md stubs (302 bytes each)
+```
+
+## IMPLEMENTATION_STATUS
+```
+Based on documentation analysis:
+- Core System: ~20% implemented
+- Core System: ~25% implemented (Phase 1 complete)
+- Python Plugin: 100% implemented ✓
+- Other Language Plugins: 0% implemented (comprehensive guides added)
+- Architecture: 100% designed, ~25% implemented
+- Documentation: Recently cleaned, enhanced with plugin guides
 ```
