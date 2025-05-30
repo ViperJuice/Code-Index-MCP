@@ -8,7 +8,7 @@ Execute comprehensive documentation synchronization and maintenance for any code
 2. **Execute** IMMEDIATE_CLEANUP actions from the index
 3. **Process** CONSOLIDATION_TASKS in parallel where possible
 4. **Analyze** architecture files (PlantUML, Structurizr DSL) if present for alignment
-5. **Update** hierarchical agent configuration files (AGENTS.md, CLAUDE.md)
+5. **Update** hierarchical agent configuration files (AGENTS.md, CLAUDE.md stubs referencing AGENTS.md)
 6. **Synchronize** IDE configuration files (.cursor/rules, .vscode settings)
 7. **Generate** update summary and architecture alignment reports
 
@@ -213,7 +213,7 @@ DOCUMENTATION_UPDATE_SUMMARY.md
 
 CODEBASE_ANALYSIS_COMPLETED:
 - Documentation files processed: [count from markdown-table-of-contents.md]
-- Agent configuration files updated: [list of AGENTS.md, CLAUDE.md files found]
+- Agent configuration files updated: [list of AGENTS.md files and CLAUDE.md stubs found]
 - IDE configuration files synchronized: [list of config files updated]
 - Architecture files analyzed: [list of architecture files found and processed]
 

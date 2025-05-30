@@ -20,7 +20,7 @@ mcp_server/
 │       ├── __init__.py
 │       ├── plugin.py           # Implements IPlugin interface
 │       ├── AGENTS.md          # AI agent configuration
-│       └── CLAUDE.md          # Plugin documentation
+│       └── CLAUDE.md          # Points to AGENTS.md for instructions
 ```
 
 #### For Core Feature:
@@ -189,22 +189,10 @@ The plugin automatically handles files with extensions: .ext, .extension
 
 #### CLAUDE.md Template:
 ```markdown
-# $ARGUMENTS[0] Plugin Documentation
+# Claude Agent Instructions
 
-The $ARGUMENTS[0] plugin provides code intelligence for $ARGUMENTS[0] language files.
-
-## Features
-- Syntax-aware parsing using Tree-sitter
-- Symbol definition extraction
-- Reference finding
-- Code search
-
-## Implementation Status
-Currently in development. Basic structure implemented.
-
-## Language Support
-- File extensions: .ext, .extension
-- Syntax elements: [list supported elements]
+This file intentionally mirrors `AGENTS.md`.
+Please read `AGENTS.md` in this directory for full details.
 ```
 
 ### 10. **Implementation Checklist**
@@ -214,7 +202,7 @@ Currently in development. Basic structure implemented.
 - [ ] Register plugin with dispatcher
 - [ ] Create test file
 - [ ] Add AGENTS.md configuration
-- [ ] Add CLAUDE.md documentation
+- [ ] Add CLAUDE.md reference pointing to AGENTS.md
 - [ ] Update architecture diagrams
 - [ ] Update level3_mcp_components.dsl
 - [ ] Test with sample files

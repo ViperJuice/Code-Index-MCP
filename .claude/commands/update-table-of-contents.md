@@ -1,6 +1,6 @@
 # AI Agent Markdown Documentation Index Generator
 
-You are an AI assistant creating a comprehensive markdown file index optimized for AI coding agents. The output will be referenced in CLAUDE.md files to help agents quickly locate, read, consolidate, or remove markdown documentation.
+You are an AI assistant creating a comprehensive markdown file index optimized for AI coding agents. The output will be referenced in CLAUDE.md stubs (which point to AGENTS.md) to help agents quickly locate, read, consolidate, or remove markdown documentation.
 
 ## Agent-Optimized Analysis
 
@@ -8,7 +8,7 @@ You are an AI assistant creating a comprehensive markdown file index optimized f
    - Locate all markdown files (*.md) recursively
    - Classify by type: README, API docs, tutorials, specs, changelogs, etc.
    -- Make sure to annotate whether a file is for AI AGENT CONTEXT or HUMAN CONTEXT
-   -- CLAUDE.md, AGENTS.md, items in .cursor/rules, and .claude/commands directories are all AI AGENT CONTEXT
+   -- CLAUDE.md stubs, AGENTS.md, items in .cursor/rules, and .claude/commands directories are all AI AGENT CONTEXT
    -- README.md is always HUMAN CONTEXT and it should normally be the only HUMAN CONTEXT markdown file in the codebase
    - Extract primary purpose and target audience from content
 
@@ -155,7 +155,7 @@ MISSING: Contribution guidelines (CONTRIBUTING.md referenced but doesn't exist)
 ## Agent Usage Examples
 
 ```markdown
-# In CLAUDE.md, reference this index:
+# In CLAUDE.md stub, reference this index:
 "Before modifying documentation, consult markdown-table-of-contents.md for current file inventory and planned changes"
 
 # For cleanup tasks:
