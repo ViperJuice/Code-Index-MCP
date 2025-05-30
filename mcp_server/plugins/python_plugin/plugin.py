@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import jedi
+from typing import Optional
 
 from ...plugin_base import (
     IPlugin,
@@ -14,14 +15,26 @@ from ...plugin_base import (
 
 from ...utils.treesitter_wrapper import TreeSitterWrapper
 from ...utils.fuzzy_indexer import FuzzyIndexer
+from ...storage.sqlite_store import SQLiteStore
 
 
 class Plugin(IPlugin):
     lang = "python"
 
-    def __init__(self) -> None:
+    def __init__(self, sqlite_store: Optional[SQLiteStore] = None) -> None:
         self._ts = TreeSitterWrapper()
-        self._indexer = FuzzyIndexer()
+        self._indexer = FuzzyIndexer(sqlite_store=sqlite_store)
+        self._sqlite_store = sqlite_store
+        self._repository_id = None
+        
+        # Create or get repository if SQLite is enabled
+        if self._sqlite_store:
+            self._repository_id = self._sqlite_store.create_repository(
+                str(Path.cwd()), 
+                Path.cwd().name,
+                {"language": "python"}
+            )
+        
         self._preindex()
 
     # ------------------------------------------------------------------
@@ -46,6 +59,20 @@ class Plugin(IPlugin):
         tree = self._ts._parser.parse(content.encode("utf-8"))
         root = tree.root_node
 
+        # Store file in SQLite if available
+        file_id = None
+        if self._sqlite_store and self._repository_id:
+            import hashlib
+            file_hash = hashlib.sha256(content.encode('utf-8')).hexdigest()
+            file_id = self._sqlite_store.store_file(
+                self._repository_id,
+                str(path),
+                str(path.relative_to(Path.cwd())),
+                language="python",
+                size=len(content),
+                hash=file_hash
+            )
+
         symbols: list[dict] = []
         for child in root.named_children:
             if child.type not in {"function_definition", "class_definition"}:
@@ -65,6 +92,24 @@ class Plugin(IPlugin):
             else:
                 kind = "class"
                 signature = f"class {name}:"
+
+            # Store symbol in SQLite if available
+            if self._sqlite_store and file_id:
+                symbol_id = self._sqlite_store.store_symbol(
+                    file_id,
+                    name,
+                    kind,
+                    start_line,
+                    end_line,
+                    signature=signature
+                )
+                # Add to fuzzy indexer with metadata
+                self._indexer.add_symbol(
+                    name, 
+                    str(path), 
+                    start_line,
+                    {"symbol_id": symbol_id, "file_id": file_id}
+                )
 
             symbols.append(
                 {
