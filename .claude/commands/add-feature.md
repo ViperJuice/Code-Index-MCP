@@ -191,6 +191,8 @@ The plugin automatically handles files with extensions: .ext, .extension
 ```markdown
 # Claude Agent Instructions
 
+> **AI Agents:** Do not modify this file directly. Add any updates to `AGENTS.md` in this directory.
+
 This file intentionally mirrors `AGENTS.md`.
 Please read `AGENTS.md` in this directory for full details.
 ```
