@@ -7,7 +7,6 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     build-essential \
     git \
-    redis-server \
     curl \
     libcurl4-openssl-dev \
     && rm -rf /var/lib/apt/lists/*

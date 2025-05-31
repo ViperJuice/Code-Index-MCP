@@ -28,10 +28,15 @@ pydantic-settings==2.8.0      # Settings management
 
 # Language Processing & Tree-sitter
 tree-sitter==0.24.0           # Parser generator
+tree-sitter-languages==1.10.2 # All language grammars bundle (includes all below)
 tree-sitter-python==0.23.6    # Python grammar
 tree-sitter-javascript==0.23.7 # JavaScript grammar
+tree-sitter-typescript==0.23.6 # TypeScript grammar (used by JS plugin)
 tree-sitter-c==0.23.5         # C grammar
 tree-sitter-cpp==0.23.6       # C++ grammar
+tree-sitter-html==0.23.5      # HTML grammar (used by HTML/CSS plugin)
+tree-sitter-css==0.23.4       # CSS grammar (used by HTML/CSS plugin)
+# Note: Dart plugin uses regex-based parsing, no tree-sitter-dart needed
 jedi==0.19.2                  # Python analysis
 
 # Monitoring & Metrics
