@@ -31,14 +31,14 @@ class TestPluginInitialization:
         plugin = PythonPlugin()
         
         assert plugin.lang == "python"
-        assert plugin.sqlite_store is None
+        assert plugin._sqlite_store is None
     
     def test_init_with_store(self, sqlite_store):
         """Test initialization with SQLite store."""
         plugin = PythonPlugin(sqlite_store=sqlite_store)
         
         assert plugin.lang == "python"
-        assert plugin.sqlite_store == sqlite_store
+        assert plugin._sqlite_store == sqlite_store
     
     def test_language_property(self):
         """Test the language property."""

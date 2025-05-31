@@ -1,0 +1,8 @@
+# Kubernetes namespace for MCP Server
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mcp-server
+  labels:
+    name: mcp-server
+    environment: production

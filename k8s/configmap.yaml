@@ -1,0 +1,45 @@
+# ConfigMap for MCP Server configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mcp-server-config
+  namespace: mcp-server
+data:
+  MCP_ENVIRONMENT: "production"
+  HOST: "0.0.0.0"
+  PORT: "8000"
+  WORKERS: "4"
+  
+  # Database settings
+  DB_POOL_SIZE: "20"
+  DB_MAX_OVERFLOW: "40"
+  DB_POOL_TIMEOUT: "30"
+  DB_AUTO_MIGRATE: "false"
+  
+  # Cache settings
+  REDIS_POOL_SIZE: "20"
+  CACHE_DEFAULT_TTL: "3600"
+  CACHE_SYMBOL_TTL: "1800"
+  CACHE_SEARCH_TTL: "600"
+  
+  # JWT settings
+  JWT_ACCESS_EXPIRE_MINUTES: "15"
+  JWT_REFRESH_EXPIRE_DAYS: "7"
+  
+  # Rate limiting
+  RATE_LIMIT_REQUESTS: "60"
+  RATE_LIMIT_WINDOW: "3600"
+  
+  # Logging
+  LOG_LEVEL: "INFO"
+  LOG_JSON_FORMAT: "true"
+  
+  # Monitoring
+  PROMETHEUS_ENABLED: "true"
+  PROMETHEUS_PORT: "8001"
+  HEALTH_CHECK_ENABLED: "true"
+  PERFORMANCE_MONITORING_ENABLED: "true"
+  
+  # Features
+  DYNAMIC_PLUGIN_LOADING: "true"
+  SEMANTIC_SEARCH_ENABLED: "false"

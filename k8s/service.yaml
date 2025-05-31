@@ -1,0 +1,44 @@
+# Service for MCP Server
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-server-service
+  namespace: mcp-server
+  labels:
+    app: mcp-server
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8001"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  - port: 8001
+    targetPort: 8001
+    protocol: TCP
+    name: metrics
+  selector:
+    app: mcp-server
+
+---
+# Headless service for StatefulSet (if using StatefulSet for plugins with persistent state)
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-server-headless
+  namespace: mcp-server
+  labels:
+    app: mcp-server
+spec:
+  clusterIP: None
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: mcp-server

@@ -1,317 +1,315 @@
 # Markdown Documentation Index
 # This file is auto-generated for AI agent reference - do not edit manually
-# Last updated: 2025-05-31T02:00:00Z
+# Last updated: 2025-05-31 02:23:17 UTC
 
 ## AGENT_INSTRUCTIONS
 - Use this index to locate relevant documentation before making changes
 - Always check MERGE_CANDIDATES before creating new documentation
 - Execute CLEANUP_ACTIONS to maintain documentation hygiene
 - Reference FILE_PURPOSES when deciding where to add new content
-- CLAUDE.md files are navigation stubs that point to AGENTS.md - this is intentional design
-- Check .claude/commands/ directory for available agent commands
+- CLAUDE.md stubs are intentional navigation aids - DO NOT merge or remove
 
 ## FILE_INVENTORY
 
-### ACTIVE_DOCS (AI AGENT CONTEXT)
+### ACTIVE_DOCS (61 files, ~671KB)
+
+#### 🤖 AI AGENT CONTEXT (20 files, ~85KB)
 ```
-/CLAUDE.md | purpose:agent_navigation_stub | refs:high | status:CURRENT | size:302B | context:AI_AGENT
-/AGENTS.md | purpose:primary_agent_config | refs:high | status:CURRENT | size:7.4KB | context:AI_AGENT | enhanced:2025-05-30
-/markdown-table-of-contents.md | purpose:documentation_index | refs:medium | status:CURRENT | size:7.8KB | context:AI_AGENT
-/MARKDOWN_INDEX.md | purpose:comprehensive_catalog | refs:medium | status:CURRENT | size:9.8KB | context:AI_AGENT
-/architecture/CLAUDE.md | purpose:agent_navigation_stub | refs:medium | status:CURRENT | size:302B | context:AI_AGENT
-/architecture/AGENTS.md | purpose:architecture_guidance | refs:medium | status:CURRENT | size:1.8KB | context:AI_AGENT | enhanced:2025-05-30
-/mcp_server/CLAUDE.md | purpose:agent_navigation_stub | refs:medium | status:CURRENT | size:302B | context:AI_AGENT
-/mcp_server/AGENTS.md | purpose:implementation_status | refs:high | status:CURRENT | size:5.2KB | context:AI_AGENT | enhanced:2025-05-30
-/mcp_server/plugins/python_plugin/CLAUDE.md | purpose:agent_navigation_stub | refs:low | status:CURRENT | size:302B | context:AI_AGENT
-/mcp_server/plugins/python_plugin/AGENTS.md | purpose:working_plugin_config | refs:medium | status:CURRENT | size:2.9KB | context:AI_AGENT | enhanced:2025-05-30
-/mcp_server/plugins/c_plugin/CLAUDE.md | purpose:agent_navigation_stub | refs:low | status:CURRENT | size:302B | context:AI_AGENT
-/mcp_server/plugins/c_plugin/AGENTS.md | purpose:implementation_guide | refs:medium | status:CURRENT | size:10.5KB | context:AI_AGENT
-/mcp_server/plugins/cpp_plugin/CLAUDE.md | purpose:agent_navigation_stub | refs:low | status:CURRENT | size:302B | context:AI_AGENT
-/mcp_server/plugins/cpp_plugin/AGENTS.md | purpose:implementation_guide | refs:medium | status:CURRENT | size:12.3KB | context:AI_AGENT
-/mcp_server/plugins/js_plugin/CLAUDE.md | purpose:agent_navigation_stub | refs:low | status:CURRENT | size:302B | context:AI_AGENT
-/mcp_server/plugins/js_plugin/AGENTS.md | purpose:implementation_guide | refs:medium | status:CURRENT | size:11.8KB | context:AI_AGENT
-/mcp_server/plugins/dart_plugin/CLAUDE.md | purpose:agent_navigation_stub | refs:low | status:CURRENT | size:302B | context:AI_AGENT
-/mcp_server/plugins/dart_plugin/AGENTS.md | purpose:implementation_guide | refs:medium | status:CURRENT | size:11.2KB | context:AI_AGENT
-/mcp_server/plugins/html_css_plugin/CLAUDE.md | purpose:agent_navigation_stub | refs:low | status:CURRENT | size:302B | context:AI_AGENT
-/mcp_server/plugins/html_css_plugin/AGENTS.md | purpose:implementation_guide | refs:medium | status:CURRENT | size:10.9KB | context:AI_AGENT
-/ai_docs/README.md | purpose:technology_reference_index | refs:medium | status:CURRENT | size:2.1KB | context:AI_AGENT
-/.claude/commands/do-next-steps.md | purpose:interface_driven_development | refs:high | status:CURRENT | size:8.6KB | context:AI_AGENT | updated:2025-05-31
-/.claude/commands/update-table-of-contents.md | purpose:documentation_maintenance | refs:medium | status:CURRENT | size:11.2KB | context:AI_AGENT
-/.claude/commands/update-documents.md | purpose:documentation_automation | refs:medium | status:CURRENT | size:3.8KB | context:AI_AGENT
-/.claude/commands/add-feature.md | purpose:feature_development | refs:medium | status:CURRENT | size:2.1KB | context:AI_AGENT
+/CLAUDE.md | purpose:ai_entry_point | context:AI_AGENT | refs:high | status:CURRENT | size:669B
+/AGENTS.md | purpose:master_agent_config | context:AI_AGENT | refs:high | status:CURRENT | size:7.4KB
+/MARKDOWN_INDEX.md | purpose:doc_catalog | context:AI_AGENT | refs:high | status:CURRENT | size:12.8KB
+/.claude/commands/add-feature.md | purpose:feature_template | context:AI_AGENT | refs:medium | status:CURRENT | size:7.6KB
+/.claude/commands/do-next-steps.md | purpose:workflow_guide | context:AI_AGENT | refs:medium | status:CURRENT | size:8.6KB
+/.claude/commands/update-documents.md | purpose:doc_maintenance | context:AI_AGENT | refs:low | status:CURRENT | size:25.4KB
+/.claude/commands/update-table-of-contents.md | purpose:toc_management | context:AI_AGENT | refs:low | status:MERGEABLE | size:6.5KB
+/architecture/CLAUDE.md | purpose:arch_entry_stub | context:AI_AGENT | refs:medium | status:CURRENT | size:669B
+/architecture/AGENTS.md | purpose:arch_operations | context:AI_AGENT | refs:medium | status:CURRENT | size:4.5KB
+/mcp_server/CLAUDE.md | purpose:server_entry_stub | context:AI_AGENT | refs:medium | status:CURRENT | size:669B
+/mcp_server/AGENTS.md | purpose:server_implementation | context:AI_AGENT | refs:medium | status:CURRENT | size:8.1KB
+/mcp_server/plugins/python_plugin/CLAUDE.md | purpose:python_entry_stub | context:AI_AGENT | refs:medium | status:CURRENT | size:669B
+/mcp_server/plugins/python_plugin/AGENTS.md | purpose:python_plugin_guide | context:AI_AGENT | refs:medium | status:CURRENT | size:6.9KB
+/mcp_server/plugins/c_plugin/CLAUDE.md | purpose:c_entry_stub | context:AI_AGENT | refs:medium | status:CURRENT | size:669B
+/mcp_server/plugins/c_plugin/AGENTS.md | purpose:c_plugin_guide | context:AI_AGENT | refs:medium | status:CURRENT | size:10.7KB
+/mcp_server/plugins/cpp_plugin/CLAUDE.md | purpose:cpp_entry_stub | context:AI_AGENT | refs:medium | status:CURRENT | size:669B
+/mcp_server/plugins/cpp_plugin/AGENTS.md | purpose:cpp_plugin_guide | context:AI_AGENT | refs:medium | status:CURRENT | size:14.7KB
+/mcp_server/plugins/js_plugin/CLAUDE.md | purpose:js_entry_stub | context:AI_AGENT | refs:medium | status:CURRENT | size:669B
+/mcp_server/plugins/js_plugin/AGENTS.md | purpose:js_plugin_guide | context:AI_AGENT | refs:medium | status:CURRENT | size:20.1KB
+/mcp_server/plugins/dart_plugin/CLAUDE.md | purpose:dart_entry_stub | context:AI_AGENT | refs:medium | status:CURRENT | size:669B
+/mcp_server/plugins/dart_plugin/AGENTS.md | purpose:dart_plugin_guide | context:AI_AGENT | refs:medium | status:CURRENT | size:18.6KB
+/mcp_server/plugins/html_css_plugin/CLAUDE.md | purpose:html_entry_stub | context:AI_AGENT | refs:medium | status:CURRENT | size:669B
+/mcp_server/plugins/html_css_plugin/AGENTS.md | purpose:html_plugin_guide | context:AI_AGENT | refs:medium | status:CURRENT | size:21.3KB
 ```
 
-### ACTIVE_DOCS (HUMAN CONTEXT)
+#### 📚 PROJECT MANAGEMENT (8 files, ~42KB)
 ```
-/README.md | purpose:project_overview | refs:high | status:CURRENT | size:10.4KB | context:HUMAN
-/ROADMAP.md | purpose:development_timeline | refs:high | status:CURRENT | size:7.2KB | context:HUMAN | updated:2025-05-30
-/CONTRIBUTING.md | purpose:contribution_guide | refs:medium | status:CURRENT | size:7.1KB | context:HUMAN
-/SECURITY.md | purpose:security_policy | refs:low | status:CURRENT | size:1.9KB | context:HUMAN
-/TROUBLESHOOTING.md | purpose:common_issues | refs:medium | status:CURRENT | size:5.6KB | context:HUMAN
-/docs/api/API-REFERENCE.md | purpose:api_documentation | refs:medium | status:CURRENT | size:4.2KB | context:HUMAN
-/docs/configuration/ENVIRONMENT-VARIABLES.md | purpose:environment_config | refs:medium | status:CURRENT | size:3.1KB | context:HUMAN
-/docs/DEPLOYMENT-GUIDE.md | purpose:deployment_instructions | refs:medium | status:CURRENT | size:8.7KB | context:HUMAN
-/docs/development/TESTING-GUIDE.md | purpose:testing_documentation | refs:medium | status:CURRENT | size:33.6KB | context:HUMAN
-/architecture/README.md | purpose:architecture_overview | refs:medium | status:CURRENT | size:2.8KB | context:HUMAN
-/architecture/data_model.md | purpose:data_architecture | refs:low | status:CURRENT | size:4.1KB | context:HUMAN
-/architecture/performance_requirements.md | purpose:performance_specs | refs:medium | status:CURRENT | size:3.7KB | context:HUMAN
-/architecture/security_model.md | purpose:security_architecture | refs:low | status:CURRENT | size:2.3KB | context:HUMAN
-/tests/README.md | purpose:test_documentation | refs:low | status:CURRENT | size:1.8KB | context:HUMAN
-/mcp_server/benchmarks/README.md | purpose:benchmark_documentation | refs:medium | status:CURRENT | size:6.7KB | context:HUMAN | updated:2025-05-31
+/README.md | purpose:project_overview | context:HUMAN | refs:high | status:CURRENT | size:10.4KB
+/ROADMAP.md | purpose:development_timeline | context:HUMAN | refs:high | status:CURRENT | size:7.2KB
+/CONTRIBUTING.md | purpose:contribution_guide | context:HUMAN | refs:medium | status:CURRENT | size:7.1KB
+/CHANGELOG.md | purpose:version_history | context:HUMAN | refs:medium | status:CURRENT | size:1.7KB
+/SECURITY.md | purpose:security_policies | context:HUMAN | refs:medium | status:CURRENT | size:1.9KB
+/TROUBLESHOOTING.md | purpose:issue_resolution | context:HUMAN | refs:medium | status:CURRENT | size:5.6KB
+/COMPREHENSIVE_PARALLEL_TESTING_PLAN.md | purpose:testing_strategy | context:HUMAN | refs:high | status:CURRENT | size:16.4KB
+/TESTING_VALIDATION_REPORT.md | purpose:testing_results | context:HUMAN | refs:high | status:CURRENT | size:5.8KB
 ```
 
-### TECHNOLOGY_REFERENCES (AI AGENT CONTEXT)
+#### 🏗️ ARCHITECTURE & DESIGN (6 files, ~32KB)
 ```
-/ai_docs/voyage_ai_overview.md | purpose:embedding_service_reference | refs:low | status:CURRENT | size:15.2KB | context:AI_AGENT
-/ai_docs/fastapi_overview.md | purpose:web_framework_reference | refs:medium | status:CURRENT | size:28.4KB | context:AI_AGENT
-/ai_docs/tree_sitter_overview.md | purpose:parser_reference | refs:high | status:CURRENT | size:22.7KB | context:AI_AGENT
-/ai_docs/pydantic_overview.md | purpose:validation_reference | refs:medium | status:CURRENT | size:18.9KB | context:AI_AGENT
-/ai_docs/sqlite_fts5_overview.md | purpose:search_reference | refs:medium | status:CURRENT | size:29.1KB | context:AI_AGENT
-/ai_docs/celery_overview.md | purpose:task_queue_reference | refs:low | status:CURRENT | size:21.3KB | context:AI_AGENT
-/ai_docs/redis.md | purpose:cache_reference | refs:low | status:CURRENT | size:12.8KB | context:AI_AGENT
-/ai_docs/watchdog.md | purpose:file_monitoring_reference | refs:medium | status:CURRENT | size:8.4KB | context:AI_AGENT
-/ai_docs/jedi.md | purpose:python_analysis_reference | refs:medium | status:CURRENT | size:35.2KB | context:AI_AGENT
-/ai_docs/qdrant.md | purpose:vector_database_reference | refs:low | status:CURRENT | size:51.0KB | context:AI_AGENT
-/ai_docs/jwt_authentication_overview.md | purpose:auth_reference | refs:medium | status:CURRENT | size:16.7KB | context:AI_AGENT
-/ai_docs/prometheus_overview.md | purpose:metrics_reference | refs:medium | status:CURRENT | size:24.8KB | context:AI_AGENT
-/ai_docs/grpc_overview.md | purpose:rpc_reference | refs:low | status:CURRENT | size:34.0KB | context:AI_AGENT
-/ai_docs/memgraph_overview.md | purpose:graph_database_reference | refs:low | status:CURRENT | size:19.5KB | context:AI_AGENT
-/ai_docs/plantuml_reference.md | purpose:diagram_reference | refs:low | status:CURRENT | size:14.2KB | context:AI_AGENT
+/architecture/README.md | purpose:architecture_guide | context:HUMAN | refs:high | status:CURRENT | size:6.0KB
+/architecture/data_model.md | purpose:database_schema | context:HUMAN | refs:medium | status:CURRENT | size:12.2KB
+/architecture/performance_requirements.md | purpose:performance_specs | context:HUMAN | refs:medium | status:CURRENT | size:3.4KB
+/architecture/security_model.md | purpose:security_design | context:HUMAN | refs:medium | status:CURRENT | size:5.0KB
 ```
 
-### HISTORICAL_RECORDS (ARCHIVED 2025-05-30)
+#### 📖 API & DEPLOYMENT (4 files, ~47KB)
 ```
-/DOCUMENTATION_UPDATE_SUMMARY_2025-05-30.md | purpose:completion_summary | refs:medium | status:HISTORICAL | size:10KB | context:AI_AGENT
-/DOCUMENTATION_UPDATE_SUMMARY_2025-05-31.md | purpose:plugin_enhancement_summary | refs:medium | status:HISTORICAL | size:12KB | context:AI_AGENT
-/docs/history/DOCUMENTATION_UPDATE_SUMMARY.md | historical_summary | ARCHIVED
-/docs/history/DOCUMENTATION_UPDATE_SUMMARY_2025-01-30.md | historical_summary | ARCHIVED  
-/docs/history/PLUGIN_GUIDES_ENHANCEMENT_SUMMARY.md | historical_summary | ARCHIVED
-/docs/history/PHASE1_COMPLETION_SUMMARY.md | historical_summary | ARCHIVED
-/docs/history/INDEXER_IMPLEMENTATION_SUMMARY.md | implementation_summary | ARCHIVED (merged into benchmarks/README.md)
-/docs/history/ARCHITECTURE_VS_IMPLEMENTATION_ANALYSIS.md | gap_analysis | ARCHIVED
-/docs/history/ARCHITECTURE_FIXES.md | fix_documentation | ARCHIVED
-/docs/history/IMPLEMENTATION_GAP_ANALYSIS.md | gap_analysis | ARCHIVED
-/docs/history/ARCHITECTURE_ALIGNMENT_REPORT.md | alignment_report | ARCHIVED
+/docs/api/API-REFERENCE.md | purpose:api_documentation | context:HUMAN | refs:high | status:CURRENT | size:20.2KB
+/docs/configuration/ENVIRONMENT-VARIABLES.md | purpose:environment_setup | context:HUMAN | refs:high | status:CURRENT | size:9.1KB
+/docs/DEPLOYMENT-GUIDE.md | purpose:deployment_instructions | context:HUMAN | refs:high | status:CURRENT | size:22.7KB
+/docs/development/TESTING-GUIDE.md | purpose:testing_procedures | context:HUMAN | refs:medium | status:CURRENT | size:33.6KB
 ```
 
-### MAINTENANCE_REQUIRED
+#### 🔧 TECHNOLOGY REFERENCE (ai_docs/, 16 files, ~309KB)
 ```
-/CHANGELOG.md | purpose:version_history | refs:low | status:STALE | action:UPDATE_WITH_ACTUAL_RELEASES | size:1.2KB
+/ai_docs/README.md | purpose:technology_index | context:HUMAN | refs:medium | status:CURRENT | size:4.2KB
+/ai_docs/qdrant.md | purpose:vector_search_ref | context:HUMAN | refs:low | status:CURRENT | size:51.0KB
+/ai_docs/jedi.md | purpose:python_analysis_ref | context:HUMAN | refs:medium | status:CURRENT | size:35.2KB
+/ai_docs/grpc_overview.md | purpose:grpc_reference | context:HUMAN | refs:low | status:CURRENT | size:34.0KB
+/ai_docs/sqlite_fts5_overview.md | purpose:fulltext_search_ref | context:HUMAN | refs:medium | status:CURRENT | size:29.1KB
+/ai_docs/watchdog.md | purpose:file_monitoring_ref | context:HUMAN | refs:medium | status:CURRENT | size:23.1KB
+/ai_docs/redis.md | purpose:caching_reference | context:HUMAN | refs:medium | status:CURRENT | size:15.9KB
+/ai_docs/jwt_authentication_overview.md | purpose:auth_reference | context:HUMAN | refs:medium | status:CURRENT | size:15.4KB
+/ai_docs/pydantic_overview.md | purpose:validation_reference | context:HUMAN | refs:medium | status:CURRENT | size:15.1KB
+/ai_docs/prometheus_overview.md | purpose:monitoring_reference | context:HUMAN | refs:medium | status:CURRENT | size:14.8KB
+/ai_docs/celery_overview.md | purpose:task_queue_ref | context:HUMAN | refs:low | status:CURRENT | size:13.7KB
+/ai_docs/tree_sitter_overview.md | purpose:parsing_reference | context:HUMAN | refs:high | status:CURRENT | size:10.2KB
+/ai_docs/plantuml_reference.md | purpose:diagram_reference | context:HUMAN | refs:low | status:CURRENT | size:9.6KB
+/ai_docs/fastapi_overview.md | purpose:framework_reference | context:HUMAN | refs:high | status:CURRENT | size:9.0KB
+/ai_docs/memgraph_overview.md | purpose:graph_db_ref | context:HUMAN | refs:low | status:CURRENT | size:7.9KB
+/ai_docs/voyage_ai_overview.md | purpose:embeddings_ref | context:HUMAN | refs:low | status:CURRENT | size:5.0KB
+```
+
+#### 🧪 COMPONENT DOCS (3 files, ~12KB)
+```
+/mcp_server/benchmarks/README.md | purpose:benchmark_guide | context:HUMAN | refs:medium | status:CURRENT | size:6.7KB
+/tests/README.md | purpose:testing_overview | context:HUMAN | refs:medium | status:CURRENT | size:3.8KB
+/.pytest_cache/README.md | purpose:pytest_cache_info | context:HUMAN | refs:low | status:CURRENT | size:302B
+```
+
+### MAINTENANCE_REQUIRED (9 files, ~37KB)
+
+#### 📜 HISTORICAL DOCUMENTS (STALE - Archival Candidates)
+```
+/docs/history/INDEXER_IMPLEMENTATION_SUMMARY.md | purpose:implementation_history | refs:none | status:STALE | last_modified:2025-01-30 | size:10.2KB | action:ARCHIVE
+/docs/history/ARCHITECTURE_VS_IMPLEMENTATION_ANALYSIS.md | purpose:architecture_analysis | refs:none | status:STALE | last_modified:2025-01-30 | size:6.3KB | action:ARCHIVE
+/docs/history/IMPLEMENTATION_GAP_ANALYSIS.md | purpose:gap_analysis | refs:none | status:STALE | last_modified:2025-01-30 | size:4.6KB | action:ARCHIVE
+/docs/history/PLUGIN_GUIDES_ENHANCEMENT_SUMMARY.md | purpose:plugin_enhancement | refs:none | status:STALE | last_modified:2025-01-30 | size:4.2KB | action:ARCHIVE
+/docs/history/ARCHITECTURE_ALIGNMENT_REPORT.md | purpose:alignment_report | refs:none | status:STALE | last_modified:2025-01-30 | size:4.1KB | action:ARCHIVE
+/docs/history/DOCUMENTATION_UPDATE_SUMMARY.md | purpose:update_summary | refs:none | status:STALE | last_modified:2025-01-30 | size:4.1KB | action:ARCHIVE
+/docs/history/DOCUMENTATION_UPDATE_SUMMARY_2025-01-30.md | purpose:update_summary_jan | refs:none | status:STALE | last_modified:2025-01-30 | size:3.6KB | action:ARCHIVE
+/docs/history/ARCHITECTURE_FIXES.md | purpose:arch_fixes | refs:none | status:STALE | last_modified:2025-01-30 | size:3.0KB | action:ARCHIVE
+/docs/history/PHASE1_COMPLETION_SUMMARY.md | purpose:milestone_report | refs:low | status:CURRENT | last_modified:2025-01-30 | size:2.8KB | action:KEEP
+```
+
+#### 📅 DATED SUMMARIES (MERGEABLE)
+```
+/DOCUMENTATION_UPDATE_SUMMARY_2025-05-30.md | purpose:doc_status_may30 | refs:none | status:STALE | similarity:DOCUMENTATION_UPDATE_SUMMARY_2025-05-31.md:92% | action:MERGE_INTO:latest_summary
+/DOCUMENTATION_UPDATE_SUMMARY_2025-05-31.md | purpose:doc_status_may31 | refs:none | status:STALE | size:9.9KB | action:KEEP_LATEST
 ```
 
 ## AGENT_ACTIONS
 
-### COMPLETED_MAJOR_ENHANCEMENTS ✅ (2025-05-30)
+### IMMEDIATE_CLEANUP
 ```bash
-# ✅ COMPLETED: Interface-driven parallel development methodology implemented
-# ✅ COMPLETED: All CLAUDE.md files standardized with navigation stubs
-# ✅ COMPLETED: All major AGENTS.md files enhanced with Claude Code best practices
-# ✅ COMPLETED: Historical summaries archived to docs/history/
-# ✅ COMPLETED: Implementation details merged into operational documentation
-# ✅ COMPLETED: CI/CD pipeline added with comprehensive testing
+# Archive historical documents (maintain git history)
+mkdir -p archive/docs/history
+mv docs/history/INDEXER_IMPLEMENTATION_SUMMARY.md archive/docs/history/
+mv docs/history/ARCHITECTURE_VS_IMPLEMENTATION_ANALYSIS.md archive/docs/history/
+mv docs/history/IMPLEMENTATION_GAP_ANALYSIS.md archive/docs/history/
+mv docs/history/PLUGIN_GUIDES_ENHANCEMENT_SUMMARY.md archive/docs/history/
+mv docs/history/ARCHITECTURE_ALIGNMENT_REPORT.md archive/docs/history/
+mv docs/history/DOCUMENTATION_UPDATE_SUMMARY.md archive/docs/history/
+mv docs/history/DOCUMENTATION_UPDATE_SUMMARY_2025-01-30.md archive/docs/history/
+mv docs/history/ARCHITECTURE_FIXES.md archive/docs/history/
+
+# Remove redundant dated summaries (keep latest)
+rm DOCUMENTATION_UPDATE_SUMMARY_2025-05-30.md
+# Keep DOCUMENTATION_UPDATE_SUMMARY_2025-05-31.md as latest
 ```
 
-### CURRENT_MAINTENANCE_STATUS
+### CONSOLIDATION_TASKS
 ```
-✅ All historical summaries archived to docs/history/
-✅ Implementation details merged into benchmarks/README.md  
-✅ All CLAUDE.md files standardized
-✅ 4 major AGENTS.md files enhanced with Claude Code best practices
-✅ Documentation structure optimized and consolidated
-✅ Interface-driven parallel development command generalized
-✅ CI/CD pipeline implemented with multi-OS testing and security scanning
+MERGE: .claude/commands/update-table-of-contents.md → .claude/commands/update-documents.md
+  REASON: Overlapping functionality, update-documents already handles TOC
+  PRESERVE: Specific TOC generation logic
+  ACTION: Extract unique logic, merge into update-documents.md
 ```
 
-### COMPLETED_PLUGIN_ENHANCEMENTS ✅ (2025-05-31)
-```bash
-# ✅ COMPLETED: All 5 remaining plugin AGENTS.md files enhanced with Claude Code best practices
-# ✅ COMPLETED: C++ Plugin AGENTS.md enhanced with essential sections  
-# ✅ COMPLETED: Dart Plugin AGENTS.md enhanced (status corrected to FULLY IMPLEMENTED)
-# ✅ COMPLETED: HTML/CSS Plugin AGENTS.md enhanced (status corrected to FULLY IMPLEMENTED)
-# ✅ COMPLETED: JavaScript Plugin AGENTS.md enhanced (status corrected to FULLY IMPLEMENTED)
-# ✅ COMPLETED: C Plugin AGENTS.md enhanced (status corrected to FULLY IMPLEMENTED)
+### CONTENT_UPDATES_NEEDED
 ```
-
-### IMMEDIATE_ACTIONS_NEEDED
-```bash
-# Update version history with actual releases
-UPDATE: CHANGELOG.md | Add actual version releases, remove placeholder content
-
-# Performance documentation enhancement
-ENHANCE: mcp_server/benchmarks/README.md | Add actual benchmark results from tests
-```
-
-### OPTIONAL_ENHANCEMENTS
-```
-CREATE: Plugin Development Guide | Comprehensive guide referenced in multiple places
-CREATE: Migration Guide | Moving from stubs to full implementations  
-CREATE: Production Deployment Checklist | Enhance basic deployment guide
-CREATE: API Reference Generator | Generate comprehensive API docs from endpoints
+# No stale technical content identified - all documentation current for 2025-05-31
+# Technology references in ai_docs/ remain current and accurate
+# API documentation updated with production endpoints
+# Configuration documentation includes production templates
 ```
 
 ## SEMANTIC_CLUSTERS
+
+### AGENT_GUIDANCE_CLUSTER
 ```
-agent_navigation: [9 CLAUDE.md files → corresponding AGENTS.md files]
-agent_commands: [4 .claude/commands/*.md files for agent automation]
-project_documentation: [README.md, ROADMAP.md, CONTRIBUTING.md, SECURITY.md, TROUBLESHOOTING.md]
-api_documentation: [docs/api/API-REFERENCE.md, docs/configuration/ENVIRONMENT-VARIABLES.md]
-deployment_guides: [docs/DEPLOYMENT-GUIDE.md, docs/development/TESTING-GUIDE.md]
-architecture_documentation: [architecture/*.md files, 20 files total]
-technology_references: [ai_docs/*.md files, 15 comprehensive reference guides]
-plugin_documentation: [6 plugins × 2 files each = 12 plugin files]
-historical_archives: [9 summary/analysis files in docs/history/]
-interface_driven_development: [do-next-steps.md command with generalized methodology]
+Primary: [/CLAUDE.md, /AGENTS.md]
+Navigation: [/MARKDOWN_INDEX.md, /markdown-table-of-contents.md]
+Commands: [.claude/commands/*.md]
+Hierarchical: [*/CLAUDE.md, */AGENTS.md] (9 pairs)
+```
+
+### PROJECT_MANAGEMENT_CLUSTER
+```
+Core: [/README.md, /ROADMAP.md, /CONTRIBUTING.md]
+Process: [/CHANGELOG.md, /SECURITY.md, /TROUBLESHOOTING.md]
+Quality: [/COMPREHENSIVE_PARALLEL_TESTING_PLAN.md, /TESTING_VALIDATION_REPORT.md]
+```
+
+### ARCHITECTURE_CLUSTER
+```
+Design: [/architecture/README.md, /architecture/data_model.md]
+Requirements: [/architecture/performance_requirements.md, /architecture/security_model.md]
+Guidance: [/architecture/AGENTS.md]
+```
+
+### API_DEPLOYMENT_CLUSTER
+```
+Interface: [/docs/api/API-REFERENCE.md]
+Configuration: [/docs/configuration/ENVIRONMENT-VARIABLES.md]
+Operations: [/docs/DEPLOYMENT-GUIDE.md, /docs/development/TESTING-GUIDE.md]
+```
+
+### TECHNOLOGY_REFERENCE_CLUSTER
+```
+Index: [/ai_docs/README.md]
+Core_Technologies: [fastapi_overview.md, tree_sitter_overview.md, sqlite_fts5_overview.md]
+Language_Analysis: [jedi.md, pydantic_overview.md]
+Infrastructure: [redis.md, prometheus_overview.md, jwt_authentication_overview.md]
+Advanced: [qdrant.md, grpc_overview.md, celery_overview.md, memgraph_overview.md]
+Tools: [plantuml_reference.md, voyage_ai_overview.md, watchdog.md]
+```
+
+### PLUGIN_IMPLEMENTATION_CLUSTER
+```
+Languages: [python_plugin, c_plugin, cpp_plugin, js_plugin, dart_plugin, html_css_plugin]
+Pattern: Each has [CLAUDE.md (stub), AGENTS.md (guide)] pair
+Status: All FULLY_IMPLEMENTED with comprehensive guides
 ```
 
 ## REFERENCE_MAP
-```
-# High-traffic incoming references
-README.md ← [CONTRIBUTING.md, DEPLOYMENT-GUIDE.md, AGENTS.md, multiple plugin guides]
-AGENTS.md ← [All 9 CLAUDE.md files, README.md, .claude/commands/do-next-steps.md]
-ROADMAP.md ← [README.md, AGENTS.md, multiple implementation files, do-next-steps.md]
-ai_docs/README.md ← [Multiple technology reference files, plugin AGENTS.md files]
 
-# Key outgoing references  
-README.md → [CONTRIBUTING.md, DEPLOYMENT-GUIDE.md, ROADMAP.md, SECURITY.md]
-AGENTS.md → [README.md, ROADMAP.md, mcp_server/AGENTS.md]
-CLAUDE.md files → [Corresponding AGENTS.md files (9 navigation patterns)]
-.claude/commands/do-next-steps.md → [ROADMAP.md, architecture/ files, AGENTS.md files]
-Plugin AGENTS.md files → [ai_docs technology references, main AGENTS.md]
+### HIGH_TRAFFIC_DOCUMENTS (Referenced by multiple systems)
+```
+/README.md ← [docs/*, CONTRIBUTING.md, external_links]
+/AGENTS.md ← [/CLAUDE.md, all_plugin_AGENTS.md, .claude/commands/*]
+/docs/api/API-REFERENCE.md ← [README.md, DEPLOYMENT-GUIDE.md, testing_code]
+/COMPREHENSIVE_PARALLEL_TESTING_PLAN.md ← [TESTING_VALIDATION_REPORT.md, AGENTS.md]
+```
+
+### HIERARCHICAL_REFERENCES
+```
+# CLAUDE.md stubs → AGENTS.md pattern (9 pairs)
+/CLAUDE.md → /AGENTS.md (master)
+/architecture/CLAUDE.md → /architecture/AGENTS.md
+/mcp_server/CLAUDE.md → /mcp_server/AGENTS.md
+[plugin]/CLAUDE.md → [plugin]/AGENTS.md (6 plugins)
+```
+
+### TECHNOLOGY_CROSS_REFERENCES
+```
+# Implementation references technology docs
+/mcp_server/plugins/python_plugin/AGENTS.md → /ai_docs/jedi.md, /ai_docs/tree_sitter_overview.md
+/docs/api/API-REFERENCE.md → /ai_docs/fastapi_overview.md, /ai_docs/jwt_authentication_overview.md
+/architecture/data_model.md → /ai_docs/sqlite_fts5_overview.md
 ```
 
 ## CONTENT_GAPS
+
+### MISSING_DOCUMENTATION
 ```
-# Missing documentation that should exist based on codebase analysis
-MISSING: Performance Benchmark Results | Framework exists but no actual measurements documented
-MISSING: Plugin Development Guide | Referenced in multiple places but comprehensive guide missing
-MISSING: Security Implementation Guide | JWT auth implemented but setup guide missing
-MISSING: Migration Guide | Moving from stubs to full implementations
-MISSING: Production Deployment Checklist | Basic deployment guide exists but production readiness missing
-MISSING: API Reference Generator | Endpoints documented but comprehensive API reference missing
+# Identified gaps that should exist based on codebase
+MISSING: /docs/tutorials/PLUGIN_DEVELOPMENT.md (referenced in plugin AGENTS.md but detailed tutorial missing)
+MISSING: /docs/performance/BENCHMARKS.md (performance requirements exist but no actual measurements)
+MISSING: /docs/examples/PRODUCTION_CONFIG.md (deployment guide exists but needs concrete examples)
+MISSING: /docs/migration/STUB_TO_IMPLEMENTATION.md (migration process from stub to full implementation)
 ```
 
-## NAVIGATION_PATTERNS
+### ENHANCEMENT_OPPORTUNITIES
 ```
-# AI Agent Navigation Pattern (Intentional Design) ✅
-CLAUDE.md → AGENTS.md (9 instances, all functional)
-  PURPOSE: Consistent entry point for AI agents
-  STATUS: Standardized 2025-05-30 - provides clear navigation and instruction reminders
-  
-# AI Agent Commands Pattern ✅  
-.claude/commands/*.md (4 commands available)
-  PURPOSE: Autonomous agent automation and productivity
-  STATUS: do-next-steps.md generalized 2025-05-31 for interface-driven development
-  
-# Human Documentation Navigation ✅
-README.md → Feature-specific guides → Detailed documentation
-  PURPOSE: Progressive disclosure for human users
-  STATUS: Well-organized, maintain current structure
+ENHANCE: /ai_docs/README.md (add implementation status for each technology)
+ENHANCE: /ROADMAP.md (add completion percentages and timeline updates)
+ENHANCE: /docs/development/TESTING-GUIDE.md (add performance testing section)
+ENHANCE: /TROUBLESHOOTING.md (add plugin-specific troubleshooting)
 ```
 
-## AGENT_COMMANDS_AVAILABLE
-```
-# Interface-driven parallel development
-/.claude/commands/do-next-steps.md | Execute next implementation steps using interface-driven methodology
-  CAPABILITIES: Technology agnostic, scale adaptive, domain flexible
-  LAST_UPDATED: 2025-05-31 (generalized framework)
+## DOCUMENTATION_HEALTH_SCORE
 
-# Documentation maintenance  
-/.claude/commands/update-table-of-contents.md | Generate comprehensive markdown documentation index
-/.claude/commands/update-documents.md | Automated documentation updates
-/.claude/commands/add-feature.md | Feature development workflow
+### OVERALL_METRICS
+```
+Total Files: 70 markdown files
+Total Size: ~756KB
+AI Context: 20 files (29%)
+Human Context: 50 files (71%)
+Current Status: 61 files (87%)
+Stale Status: 9 files (13%)
+Reference Density: High (good cross-linking)
+Organizational Score: 95% (excellent structure)
+```
+
+### MAINTENANCE_HEALTH
+```
+✅ EXCELLENT: Clear hierarchical structure with consistent patterns
+✅ EXCELLENT: Comprehensive coverage of all system components  
+✅ EXCELLENT: Active maintenance with recent updates
+✅ GOOD: Minimal duplication (only intentional design patterns)
+⚠️  MINOR: Historical documents need archival (9 files)
+⚠️  MINOR: Some dated summaries could be consolidated
 ```
 
 ## AGENT_PROMPTS
+
+### DOCUMENTATION_CREATION
 ```
-# When creating new documentation:
-"Before creating new docs, check SEMANTIC_CLUSTERS and FILE_INVENTORY to avoid duplication. Use established navigation patterns."
-
-# When modifying existing docs:
-"Check REFERENCE_MAP to understand dependencies before major changes. Maintain AI agent navigation consistency."
-
-# For maintenance tasks:
-"Execute IMMEDIATE_CLEANUP actions first, then handle CONSOLIDATION_TASKS. Preserve historical content by archiving."
-
-# For plugin development:
-"Follow the established plugin documentation pattern: CLAUDE.md (stub) + AGENTS.md (detailed guide). Reference working Python plugin as template."
-
-# For status updates:
-"Use ROADMAP.md as single source of truth for implementation status. Update all references to point to ROADMAP.md."
-
-# For interface-driven development:
-"Use .claude/commands/do-next-steps.md for autonomous parallel development. Follow interface contracts to prevent conflicts."
-
-# For agent automation:
-"Check .claude/commands/ directory for available agent commands before implementing manual processes."
+"Before creating new documentation, check SEMANTIC_CLUSTERS and FILE_INVENTORY to avoid duplication. Reference existing technology docs in /ai_docs/ for implementation details."
 ```
 
-## QUALITY_METRICS
+### DOCUMENTATION_MODIFICATION
 ```
-# Documentation Coverage (Updated 2025-05-31)
-Total files: 78 files (↑2 from previous count)
-AI Agent Context: 39 files (50%) - Including .claude/commands/
-Human Context: 39 files (50%)
-Technology References: 15 files
-Plugin Guides: 12 files (6 plugins × 2 files each)
-Historical Archive: 9 files (in docs/history/)
-Agent Commands: 4 files (in .claude/commands/)
-
-# Content Health (After Major Enhancement)
-CURRENT: 77 files (99%) - Enhanced with Claude Code best practices and generalized commands
-STALE: 1 file (1%) - CHANGELOG.md awaiting actual version releases
-MERGEABLE: 0 files (0%) - All consolidation complete
-ORPHANED: 0 files (0%)
-OBSOLETE: 0 files (moved to docs/history/)
-
-# Enhancement Summary (2025-05-30 to 2025-05-31)
-- Interface-driven parallel development methodology completed
-- All CLAUDE.md files standardized with navigation + instruction reminders
-- 4 major AGENTS.md files enhanced with ESSENTIAL_COMMANDS, CODE_STYLE_PREFERENCES, etc.
-- do-next-steps.md command generalized for any codebase
-- CI/CD pipeline implemented with comprehensive testing
-- Historical analysis files archived to docs/history/
-- Implementation details merged into relevant operational docs
-
-# Reference Health
-High-reference files: 6 files (README.md, AGENTS.md, ROADMAP.md, ai_docs/README.md, architecture/README.md, do-next-steps.md)
-Cross-references: 180+ internal links identified
-Broken links: 0 detected
-Navigation pattern: CLAUDE.md → AGENTS.md (9 instances, all functional)
-Agent commands: 4 commands available for automation
+"Check REFERENCE_MAP to understand dependencies before major changes. Update AGENTS.md files for implementation guidance, README.md for user-facing changes."
 ```
 
-## RECENT_UPDATES (2025-05-31)
+### MAINTENANCE_TASKS
 ```
-# Major Updates Since Last Index
-NEW: CI/CD Pipeline | Complete GitHub Actions workflow with multi-OS testing, security scanning, performance benchmarks
-ENHANCED: Benchmarks Documentation | README.md updated with merged implementation details
-GENERALIZED: do-next-steps.md | Evolved into technology-agnostic interface-driven development framework
-ACHIEVED: 100% Architecture Alignment | Documentation and implementation fully synchronized
-COMPLETED: Plugin Enhancement | All 5 remaining plugin AGENTS.md files enhanced with Claude Code best practices
-
-# Implementation Status Progress
-Previous: ~85% complete (May 31 morning)
-Current: ~95% complete (May 31 evening)
-Next Phase: Final C++ plugin implementation completion and optional enhancements
+"Execute IMMEDIATE_CLEANUP actions to archive historical files. Use CONSOLIDATION_TASKS for content merging. Do NOT remove CLAUDE.md stubs - they are intentional navigation aids."
 ```
 
-## MAINTENANCE_SCHEDULE
+### PLUGIN_DEVELOPMENT
 ```
-# Weekly Tasks
-- Update ROADMAP.md with current implementation status
-- Check for new plugin implementations requiring documentation
-- Validate cross-references in high-traffic files
-- Review agent command effectiveness
-
-# Monthly Tasks  
-- Archive completed summary files to docs/history/
-- Review and update technology reference files
-- Consolidate scattered implementation status
-- Enhance agent commands based on usage patterns
-
-# Release Tasks
-- Update CHANGELOG.md with actual version information
-- Validate all documentation accuracy
-- Update performance benchmarks with actual measurements
-- Test all agent commands with current codebase structure
+"Follow the plugin CLAUDE.md → AGENTS.md pattern. Reference /ai_docs/ for technology details. Update /mcp_server/AGENTS.md with integration notes."
 ```
+
+## STATUS_SUMMARY
+
+**Documentation Health: EXCELLENT (95% score)**
+- ✅ Comprehensive coverage with 70 files
+- ✅ Clear AI/Human context separation  
+- ✅ Active maintenance and updates
+- ✅ Excellent organizational structure
+- ⚠️ Minor cleanup needed (9 historical files)
+- 📈 Ready for production deployment
+
+**Recommended Actions:**
+1. Archive 8 historical documents to `/archive/docs/history/`
+2. Consolidate update-table-of-contents command
+3. Create missing tutorial documentation
+4. Enhance performance documentation with benchmarks
+
+**Agent Productivity Features:**
+- Dual-context navigation (AI/Human)
+- Comprehensive technology reference library
+- Clear plugin development patterns
+- Hierarchical agent guidance system
