@@ -176,6 +176,19 @@ class IHealthCheck(ABC):
         pass
 
 
+# Import implementations
+from .metrics_collector import PrometheusMetricsCollector
+from .health_check import ComponentHealthChecker
+
+# Factory functions
+def get_metrics_collector() -> IMetricsCollector:
+    """Get the default metrics collector instance."""
+    return PrometheusMetricsCollector()
+
+def get_health_checker() -> IHealthCheck:
+    """Get the default health checker instance."""
+    return ComponentHealthChecker()
+
 # Export key classes and interfaces
 __all__ = [
     'IMetricsCollector',
@@ -183,5 +196,9 @@ __all__ = [
     'HealthStatus',
     'HealthCheckResult',
     'MetricType',
-    'MetricPoint'
+    'MetricPoint',
+    'PrometheusMetricsCollector',
+    'ComponentHealthChecker',
+    'get_metrics_collector',
+    'get_health_checker'
 ]

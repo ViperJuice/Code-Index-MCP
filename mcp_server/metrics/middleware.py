@@ -4,11 +4,10 @@ import time
 import logging
 from typing import Callable, Optional
 from fastapi import Request, Response
-from fastapi.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
-from .metrics_collector import get_metrics_collector
-from .health_check import get_health_checker
+from ..metrics import get_metrics_collector, get_health_checker
 
 logger = logging.getLogger(__name__)
 
