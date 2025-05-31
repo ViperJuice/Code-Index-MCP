@@ -97,6 +97,72 @@ class Plugin(PluginBase):
 # FuzzyIndexer: Text-based search across files
 ```
 
+## CODE_STYLE_PREFERENCES
+
+```python
+# Python Plugin follows project standards:
+# - Type hints for all function parameters and returns
+# - Docstrings for all public methods
+# - Error handling with structured responses
+# - Tree-sitter node traversal patterns
+
+# Interface Method Implementation
+def getDefinition(self, file_path: str, line: int, column: int) -> Dict[str, Any]:
+    """Get definition for symbol at position."""
+    try:
+        # Use Jedi for accurate definition lookup
+        script = jedi.Script(source=source, line=line, column=column, path=file_path)
+        definitions = script.goto(follow_imports=True)
+        return {"status": "success", "definitions": [d.to_dict() for d in definitions]}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+# Tree-sitter Pattern
+def _extract_symbols(self, tree):
+    """Extract symbols using Tree-sitter traversal."""
+    symbols = []
+    for node in tree.root_node.children:
+        if node.type in ["function_definition", "class_definition"]:
+            symbols.append(self._node_to_symbol(node))
+    return symbols
+```
+
+## ARCHITECTURAL_PATTERNS
+
+```python
+# Plugin Architecture: Inherits from PluginBase
+from mcp_server.plugin_base import PluginBase
+
+class Plugin(PluginBase):
+    lang = "python"  # Language identifier
+    
+    def __init__(self, sqlite_store=None):
+        self._ts = TreeSitterWrapper()  # Tree-sitter integration
+        self._indexer = FuzzyIndexer()  # Search functionality
+        self._preindex()  # Auto-index on startup
+
+# Tree-sitter Integration Pattern
+def _parse_with_treesitter(self, content: str) -> Tree:
+    """Standard Tree-sitter parsing pattern."""
+    return self._ts.parse(content.encode('utf-8'))
+
+# Jedi Integration Pattern  
+def _get_jedi_definitions(self, source: str, line: int, column: int):
+    """Standard Jedi definition lookup pattern."""
+    script = jedi.Script(source=source, line=line, column=column)
+    return script.goto(follow_imports=True)
+
+# Error Handling Pattern
+def safe_operation(self, operation_name: str) -> Dict[str, Any]:
+    """Consistent error handling across plugin methods."""
+    try:
+        result = self._perform_operation()
+        return {"status": "success", "data": result}
+    except Exception as e:
+        logger.error(f"Python plugin {operation_name} failed: {e}")
+        return {"status": "error", "message": str(e)}
+```
+
 ## NAMING_CONVENTIONS
 
 ```python
