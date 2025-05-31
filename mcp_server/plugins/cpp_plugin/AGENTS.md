@@ -1,5 +1,48 @@
 # C++ Plugin Agent Configuration
 
+## ESSENTIAL_COMMANDS
+- **Build**: `make test` (builds and tests the plugin)
+- **Test**: `pytest tests/test_cpp_plugin.py -v` (run C++ plugin tests)
+- **Lint**: `make lint` (check code style)
+- **Install**: `pip install -e .` (install in development mode)
+- **Plugin Test**: `python -m pytest mcp_server/plugins/cpp_plugin/ -v`
+- **Tree-sitter**: `pip install tree-sitter-languages` (C++ grammar support)
+
+## CODE_STYLE_PREFERENCES
+- **Functions**: snake_case (`extract_cpp_classes`, `parse_templates`)
+- **Classes**: PascalCase (`CppSymbolExtractor`, `TemplateParser`)
+- **Files**: snake_case (`cpp_plugin.py`, `test_cpp_parser.py`)
+- **Constants**: UPPER_SNAKE_CASE (`CPP_EXTENSIONS`, `TEMPLATE_MARKERS`)
+- **Variables**: snake_case (`namespace_stack`, `template_depth`)
+
+## ARCHITECTURAL_PATTERNS
+- **Plugin Pattern**: Inherit from `IPlugin` base class with standardized interface
+- **Tree-sitter Integration**: Use `TreeSitterWrapper` for parsing C++ AST
+- **Symbol Storage**: Store symbols via `SQLiteStore` with relationship tracking
+- **Error Handling**: Return `Result[T, Error]` pattern for all operations
+- **Template Handling**: Special parsing for C++ templates and generics
+- **Namespace Tracking**: Maintain namespace context during symbol extraction
+
+## DEVELOPMENT_ENVIRONMENT
+- **Python Version**: 3.8+ (required for Tree-sitter)
+- **Dependencies**: `tree-sitter>=0.20.0`, `tree-sitter-languages>=1.8.0`
+- **Virtual Environment**: Required (`python -m venv venv`)
+- **C++ Test Files**: Place in `tests/fixtures/cpp/` for testing
+- **IDE Setup**: Configure for C++ syntax highlighting in test files
+
+## NAMING_CONVENTIONS
+- **Symbol Types**: Use standardized types (`class`, `function`, `template`, `namespace`)
+- **File Extensions**: Support `.cpp`, `.cc`, `.cxx`, `.c++`, `.hpp`, `.h`, `.hh`, `.h++`
+- **Test Files**: `test_cpp_*.py` pattern for plugin tests
+- **Fixtures**: `cpp_sample_*.cpp` for test source files
+
+## TEAM_SHARED_PRACTICES
+- **Testing**: Always test with complex C++ features (templates, inheritance, namespaces)
+- **Documentation**: Include C++ code examples in docstrings
+- **Symbol Extraction**: Maintain namespace context and template parameter tracking
+- **Error Messages**: Include C++ syntax context and line numbers
+- **Performance**: Target <100ms for symbol extraction, handle large template files
+
 ## Implementation Status
 ❌ **STUB IMPLEMENTATION** - This plugin needs full implementation following the Python plugin pattern
 

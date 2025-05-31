@@ -1,7 +1,54 @@
 # JavaScript Plugin Agent Configuration
 
+## ESSENTIAL_COMMANDS
+- **Build**: `make test` (builds and tests the plugin)
+- **Test**: `pytest tests/test_js_plugin.py -v` (run JavaScript plugin tests)
+- **Lint**: `make lint` (check code style)
+- **Install**: `pip install -e .` (install in development mode)
+- **Plugin Test**: `python -m pytest mcp_server/plugins/js_plugin/ -v`
+- **Tree-sitter**: `pip install tree-sitter-languages` (JavaScript grammar support)
+- **Node Check**: `node --version` (verify Node.js for test validation)
+
+## CODE_STYLE_PREFERENCES
+- **Functions**: snake_case (`extract_js_functions`, `parse_jsx_components`)
+- **Classes**: PascalCase (`JavaScriptParser`, `JSXComponentExtractor`)
+- **Files**: snake_case (`js_plugin.py`, `test_js_parser.py`)
+- **Constants**: UPPER_SNAKE_CASE (`JS_EXTENSIONS`, `RESERVED_KEYWORDS`)
+- **Variables**: snake_case (`scope_stack`, `module_exports`)
+
+## ARCHITECTURAL_PATTERNS
+- **Plugin Pattern**: Inherit from `IPlugin` base class with standardized interface
+- **Tree-sitter Integration**: Use `TreeSitterWrapper` for parsing JavaScript AST
+- **Scope Tracking**: Maintain lexical scope context during symbol extraction
+- **Module Detection**: Auto-detect CommonJS vs ES6 modules
+- **Symbol Storage**: Store symbols via `SQLiteStore` with scope relationships
+- **Error Handling**: Return `Result[T, Error]` pattern for all operations
+- **JSX Support**: Special handling for React components and JSX syntax
+
+## DEVELOPMENT_ENVIRONMENT
+- **Python Version**: 3.8+ (required for Tree-sitter)
+- **Dependencies**: `tree-sitter>=0.20.0`, `tree-sitter-languages>=1.8.0`
+- **Virtual Environment**: Required (`python -m venv venv`)
+- **JS Test Files**: Place in `tests/fixtures/js/` for testing
+- **Node.js**: Optional but recommended for syntax validation
+- **IDE Setup**: Configure for JavaScript/JSX syntax highlighting
+
+## NAMING_CONVENTIONS
+- **Symbol Types**: Use JS-specific types (`function`, `class`, `variable`, `component`, `hook`)
+- **File Extensions**: Support `.js`, `.mjs`, `.jsx`, `.es6`, `.es`
+- **Test Files**: `test_js_*.py` pattern for plugin tests
+- **Fixtures**: `js_sample_*.js`, `jsx_sample_*.jsx` for test files
+- **Components**: Distinguish regular functions from React components
+
+## TEAM_SHARED_PRACTICES
+- **Testing**: Include modern JS features (async/await, destructuring, modules)
+- **Documentation**: Include JavaScript code examples in docstrings
+- **Scope Handling**: Track closure relationships and variable hoisting
+- **Error Messages**: Include JavaScript context (line numbers, scope info)
+- **Performance**: Target <100ms for symbol extraction, handle large React apps
+
 ## Implementation Status
-❌ **STUB IMPLEMENTATION** - This plugin needs full implementation following the Python plugin pattern
+✅ **FULLY IMPLEMENTED** - Complete JavaScript/JSX plugin with modern ES6+ support
 
 ## Overview
 The JavaScript plugin will provide code intelligence for JavaScript/ECMAScript files (.js, .mjs, .jsx) using Tree-sitter for parsing and handling modern JavaScript features including ES6+ syntax, modules, async/await, and JSX.

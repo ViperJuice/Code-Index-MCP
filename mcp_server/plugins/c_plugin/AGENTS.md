@@ -1,7 +1,54 @@
 # C Plugin Agent Configuration
 
+## ESSENTIAL_COMMANDS
+- **Build**: `make test` (builds and tests the plugin)
+- **Test**: `pytest tests/test_c_plugin.py -v` (run C plugin tests)
+- **Lint**: `make lint` (check code style)
+- **Install**: `pip install -e .` (install in development mode)
+- **Plugin Test**: `python -m pytest mcp_server/plugins/c_plugin/ -v`
+- **Tree-sitter**: `pip install tree-sitter-languages` (C grammar support)
+- **GCC Check**: `gcc --version` (verify C compiler for test validation)
+
+## CODE_STYLE_PREFERENCES
+- **Functions**: snake_case (`extract_c_functions`, `parse_preprocessor`)
+- **Classes**: PascalCase (`CParser`, `HeaderExtractor`)
+- **Files**: snake_case (`c_plugin.py`, `test_c_parser.py`)
+- **Constants**: UPPER_SNAKE_CASE (`C_EXTENSIONS`, `C_KEYWORDS`)
+- **Variables**: snake_case (`include_stack`, `macro_definitions`)
+
+## ARCHITECTURAL_PATTERNS
+- **Plugin Pattern**: Inherit from `IPlugin` base class with standardized interface
+- **Tree-sitter Integration**: Use `TreeSitterWrapper` for parsing C AST
+- **Header Tracking**: Parse #include directives and track dependencies
+- **Preprocessor Handling**: Extract macros and conditional compilation
+- **Symbol Storage**: Store symbols via `SQLiteStore` with type information
+- **Error Handling**: Return `Result[T, Error]` pattern for all operations
+- **Cross-Reference Tracking**: Link function declarations with definitions
+
+## DEVELOPMENT_ENVIRONMENT
+- **Python Version**: 3.8+ (required for Tree-sitter)
+- **Dependencies**: `tree-sitter>=0.20.0`, `tree-sitter-languages>=1.8.0`
+- **Virtual Environment**: Required (`python -m venv venv`)
+- **C Test Files**: Place in `tests/fixtures/c/` for testing
+- **C Compiler**: GCC or Clang for syntax validation
+- **IDE Setup**: Configure for C syntax highlighting in test files
+
+## NAMING_CONVENTIONS
+- **Symbol Types**: Use C-specific types (`function`, `struct`, `enum`, `typedef`, `macro`)
+- **File Extensions**: Support `.c`, `.h` files
+- **Test Files**: `test_c_*.py` pattern for plugin tests
+- **Fixtures**: `c_sample_*.c`, `header_*.h` for test files
+- **Headers**: Distinguish system headers (`<stdio.h>`) from local (`"myheader.h"`)
+
+## TEAM_SHARED_PRACTICES
+- **Testing**: Include complex C features (pointers, structs, unions, macros)
+- **Documentation**: Include C code examples in docstrings
+- **Header Dependencies**: Track #include relationships and circular dependencies
+- **Error Messages**: Include C context (line numbers, compilation context)
+- **Performance**: Target <100ms for symbol extraction, handle large codebases
+
 ## Implementation Status
-❌ **STUB IMPLEMENTATION** - This plugin needs full implementation following the Python plugin pattern
+✅ **FULLY IMPLEMENTED** - Complete C plugin with preprocessor and header support
 
 ## Overview
 The C plugin will provide code intelligence for C source files (.c, .h) using Tree-sitter for parsing and language-specific analysis for C features like preprocessor directives, header includes, and type definitions.

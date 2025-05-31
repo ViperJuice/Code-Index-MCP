@@ -4,9 +4,11 @@ import json
 import logging
 from pathlib import Path
 from typing import List, Optional, Dict, Any
+from datetime import datetime
 
 from .interfaces import IPluginDiscovery
 from .models import PluginInfo, PluginType, PluginValidationError
+from ..interfaces.shared_interfaces import Result, Error
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +57,31 @@ class PluginDiscovery(IPluginDiscovery):
         
         return discovered_plugins
     
+    def discover_plugins_safe(self, plugin_dirs: List[Path]) -> Result[List[PluginInfo]]:
+        """Discover plugins using Result pattern for error handling."""
+        try:
+            plugins = self.discover_plugins(plugin_dirs)
+            return Result.success_result(
+                plugins,
+                metadata={
+                    'discovered_count': len(plugins),
+                    'scanned_directories': [str(d) for d in plugin_dirs],
+                    'discovery_time': datetime.now().isoformat()
+                }
+            )
+        except Exception as e:
+            error = Error(
+                code="PLUGIN_DISCOVERY_ERROR",
+                message="Failed to discover plugins",
+                details={
+                    'scanned_directories': [str(d) for d in plugin_dirs],
+                    'error_type': type(e).__name__,
+                    'error_message': str(e)
+                },
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
+    
     def validate_plugin(self, plugin_path: Path) -> bool:
         """Validate if a path contains a valid plugin."""
         if not plugin_path.is_dir():
@@ -78,6 +105,30 @@ class PluginDiscovery(IPluginDiscovery):
                 return True
         
         return False
+    
+    def validate_plugin_safe(self, plugin_path: Path) -> Result[bool]:
+        """Validate a plugin using Result pattern for error handling."""
+        try:
+            is_valid = self.validate_plugin(plugin_path)
+            return Result.success_result(
+                is_valid,
+                metadata={
+                    'plugin_path': str(plugin_path),
+                    'validated_at': datetime.now().isoformat()
+                }
+            )
+        except Exception as e:
+            error = Error(
+                code="PLUGIN_VALIDATION_ERROR",
+                message=f"Failed to validate plugin at {plugin_path}",
+                details={
+                    'plugin_path': str(plugin_path),
+                    'error_type': type(e).__name__,
+                    'error_message': str(e)
+                },
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
     
     def _load_plugin_info(self, plugin_path: Path) -> Optional[PluginInfo]:
         """Load plugin information from a plugin directory."""

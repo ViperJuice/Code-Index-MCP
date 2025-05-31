@@ -5,6 +5,7 @@ from typing import Optional, Dict, List, Set, Tuple, Any
 import ctypes
 import logging
 import re
+from datetime import datetime
 
 from tree_sitter import Language, Parser, Node
 import tree_sitter_languages
@@ -17,13 +18,22 @@ from ...plugin_base import (
     SearchResult,
     SearchOpts,
 )
+from ...interfaces.plugin_interfaces import (
+    ICppPlugin,
+    ILanguageAnalyzer,
+    SymbolDefinition,
+    SymbolReference,
+    IndexedFile,
+    SearchResult as InterfaceSearchResult,
+)
+from ...interfaces.shared_interfaces import Result, Error
 from ...utils.fuzzy_indexer import FuzzyIndexer
 from ...storage.sqlite_store import SQLiteStore
 
 logger = logging.getLogger(__name__)
 
 
-class Plugin(IPlugin):
+class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
     """C++ language plugin for code intelligence."""
     
     lang = "cpp"
@@ -907,3 +917,469 @@ class Plugin(IPlugin):
         """Return the number of indexed files."""
         # Count unique files in the symbol cache
         return len(self._symbol_cache)
+
+    # ========================================
+    # ICppPlugin Interface Implementation
+    # ========================================
+    
+    @property
+    def name(self) -> str:
+        """Get the plugin name"""
+        return "C++ Plugin"
+    
+    @property
+    def supported_extensions(self) -> List[str]:
+        """Get list of file extensions this plugin supports"""
+        return ['.cpp', '.cc', '.cxx', '.c++', '.hpp', '.h', '.hh', '.h++', '.hxx']
+    
+    @property
+    def supported_languages(self) -> List[str]:
+        """Get list of programming languages this plugin supports"""
+        return ['cpp', 'c++']
+    
+    def can_handle(self, file_path: str) -> bool:
+        """Check if this plugin can handle the given file"""
+        return self.supports(file_path)
+    
+    def index(self, file_path: str, content: Optional[str] = None) -> Result[IndexedFile]:
+        """Index a file and extract symbols"""
+        try:
+            if content is None:
+                content = Path(file_path).read_text(encoding='utf-8')
+            
+            # Use existing indexFile method
+            shard = self.indexFile(file_path, content)
+            
+            # Convert to IndexedFile format
+            symbols = []
+            for symbol_data in shard['symbols']:
+                symbol_def = SymbolDefinition(
+                    symbol=symbol_data['symbol'],
+                    file_path=file_path,
+                    line=symbol_data.get('line', 1),
+                    column=0,  # Tree-sitter doesn't provide column easily
+                    symbol_type=symbol_data['kind'],
+                    signature=symbol_data.get('signature'),
+                    docstring=None,  # Will be extracted separately
+                    scope=self._get_scope_from_symbol(symbol_data['symbol'])
+                )
+                symbols.append(symbol_def)
+            
+            indexed_file = IndexedFile(
+                file_path=file_path,
+                last_modified=Path(file_path).stat().st_mtime,
+                size=len(content),
+                symbols=symbols,
+                language=self.lang,
+                encoding='utf-8'
+            )
+            
+            return Result.success_result(indexed_file)
+            
+        except Exception as e:
+            error = Error(
+                code="CPP_INDEX_ERROR",
+                message=f"Failed to index C++ file: {str(e)}",
+                details={'file_path': file_path, 'exception': str(e)},
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
+    
+    def get_definition(self, symbol: str, context: Dict[str, Any]) -> Result[Optional[SymbolDefinition]]:
+        """Get the definition of a symbol"""
+        try:
+            definition = self.getDefinition(symbol)
+            if definition is None:
+                return Result.success_result(None)
+            
+            symbol_def = SymbolDefinition(
+                symbol=definition['symbol'],
+                file_path=definition['defined_in'],
+                line=definition['line'],
+                column=0,
+                symbol_type=definition['kind'],
+                signature=definition['signature'],
+                docstring=definition.get('doc'),
+                scope=self._get_scope_from_symbol(definition['symbol'])
+            )
+            
+            return Result.success_result(symbol_def)
+            
+        except Exception as e:
+            error = Error(
+                code="CPP_DEFINITION_ERROR",
+                message=f"Failed to get definition: {str(e)}",
+                details={'symbol': symbol, 'exception': str(e)},
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
+    
+    def get_references(self, symbol: str, context: Dict[str, Any]) -> Result[List[SymbolReference]]:
+        """Get all references to a symbol"""
+        try:
+            references = self.findReferences(symbol)
+            symbol_refs = [
+                SymbolReference(
+                    symbol=symbol,
+                    file_path=ref.file,
+                    line=ref.line,
+                    column=0,
+                    context=None
+                )
+                for ref in references
+            ]
+            
+            return Result.success_result(symbol_refs)
+            
+        except Exception as e:
+            error = Error(
+                code="CPP_REFERENCES_ERROR",
+                message=f"Failed to find references: {str(e)}",
+                details={'symbol': symbol, 'exception': str(e)},
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
+    
+    def search(self, query: str, options: Dict[str, Any]) -> Result[List[InterfaceSearchResult]]:
+        """Search for code patterns"""
+        try:
+            # Convert options to SearchOpts format
+            opts = SearchOpts()
+            if 'limit' in options:
+                opts['limit'] = options['limit']
+            if 'semantic' in options:
+                opts['semantic'] = options['semantic']
+            
+            # Use the fuzzy indexer search method to avoid infinite recursion
+            results = self._indexer.search(query, limit=options.get('limit', 20))
+            
+            search_results = [
+                InterfaceSearchResult(
+                    file_path=result['file'],
+                    line=result['line'],
+                    column=0,
+                    snippet=result['snippet'],
+                    match_type='fuzzy',
+                    score=1.0,
+                    context=None
+                )
+                for result in results
+            ]
+            
+            return Result.success_result(search_results)
+            
+        except Exception as e:
+            error = Error(
+                code="CPP_SEARCH_ERROR",
+                message=f"Failed to search: {str(e)}",
+                details={'query': query, 'exception': str(e)},
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
+    
+    def validate_syntax(self, content: str) -> Result[bool]:
+        """Validate syntax of code content"""
+        try:
+            # Use Tree-sitter to parse and check for errors
+            tree = self._parser.parse(content.encode('utf-8'))
+            root = tree.root_node
+            
+            # Check for parse errors
+            def has_errors(node: Node) -> bool:
+                if node.has_error:
+                    return True
+                for child in node.children:
+                    if has_errors(child):
+                        return True
+                return False
+            
+            is_valid = not has_errors(root)
+            return Result.success_result(is_valid)
+            
+        except Exception as e:
+            error = Error(
+                code="CPP_SYNTAX_ERROR",
+                message=f"Failed to validate syntax: {str(e)}",
+                details={'exception': str(e)},
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
+    
+    def get_completions(self, file_path: str, line: int, column: int) -> Result[List[str]]:
+        """Get code completions at a position"""
+        # Basic implementation - in a real plugin this would be more sophisticated
+        try:
+            completions = []
+            
+            # Add common C++ keywords
+            cpp_keywords = [
+                'class', 'struct', 'namespace', 'template', 'typename',
+                'public', 'private', 'protected', 'virtual', 'override',
+                'const', 'static', 'inline', 'constexpr', 'auto',
+                'if', 'else', 'for', 'while', 'do', 'switch', 'case',
+                'return', 'break', 'continue', 'try', 'catch', 'throw'
+            ]
+            
+            # Add symbols from the current file context
+            if file_path in self._symbol_cache:
+                for symbol_def in self._symbol_cache[file_path]:
+                    completions.append(symbol_def['symbol'])
+            
+            completions.extend(cpp_keywords)
+            completions = list(set(completions))  # Remove duplicates
+            
+            return Result.success_result(completions)
+            
+        except Exception as e:
+            error = Error(
+                code="CPP_COMPLETION_ERROR",
+                message=f"Failed to get completions: {str(e)}",
+                details={'file_path': file_path, 'line': line, 'column': column, 'exception': str(e)},
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
+    
+    def resolve_includes(self, file_path: str) -> Result[List[str]]:
+        """Resolve #include directives"""
+        try:
+            content = Path(file_path).read_text(encoding='utf-8')
+            tree = self._parser.parse(content.encode('utf-8'))
+            root = tree.root_node
+            
+            includes = []
+            
+            def extract_includes(node: Node) -> None:
+                if node.type == 'preproc_include':
+                    # Extract the include path
+                    for child in node.children:
+                        if child.type in ['string_literal', 'system_lib_string']:
+                            include_path = content[child.start_byte:child.end_byte]
+                            # Remove quotes or angle brackets
+                            include_path = include_path.strip('"<>')
+                            includes.append(include_path)
+                
+                for child in node.children:
+                    extract_includes(child)
+            
+            extract_includes(root)
+            return Result.success_result(includes)
+            
+        except Exception as e:
+            error = Error(
+                code="CPP_INCLUDE_ERROR",
+                message=f"Failed to resolve includes: {str(e)}",
+                details={'file_path': file_path, 'exception': str(e)},
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
+    
+    def parse_templates(self, content: str) -> Result[List[SymbolDefinition]]:
+        """Parse template definitions"""
+        try:
+            tree = self._parser.parse(content.encode('utf-8'))
+            root = tree.root_node
+            
+            templates = []
+            
+            def extract_templates(node: Node) -> None:
+                if node.type == 'template_declaration':
+                    # Extract template parameters and declaration
+                    params_node = node.child_by_field_name('parameters')
+                    decl_node = None
+                    
+                    # Find the actual declaration (class, function, etc.)
+                    for child in node.children:
+                        if child.type in ['class_specifier', 'struct_specifier', 'function_declaration', 'function_definition']:
+                            decl_node = child
+                            break
+                    
+                    if decl_node:
+                        name = self._extract_template_name(decl_node, content)
+                        if name:
+                            template_params = ""
+                            if params_node:
+                                template_params = content[params_node.start_byte:params_node.end_byte]
+                            
+                            symbol_def = SymbolDefinition(
+                                symbol=name,
+                                file_path="",  # Will be set by caller
+                                line=node.start_point[0] + 1,
+                                column=node.start_point[1],
+                                symbol_type='template',
+                                signature=f"template{template_params} {content[decl_node.start_byte:decl_node.end_byte][:100]}...",
+                                docstring=None,
+                                scope=None
+                            )
+                            templates.append(symbol_def)
+                
+                for child in node.children:
+                    extract_templates(child)
+            
+            extract_templates(root)
+            return Result.success_result(templates)
+            
+        except Exception as e:
+            error = Error(
+                code="CPP_TEMPLATE_ERROR",
+                message=f"Failed to parse templates: {str(e)}",
+                details={'exception': str(e)},
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
+    
+    # ========================================
+    # ILanguageAnalyzer Interface Implementation
+    # ========================================
+    
+    def parse_imports(self, content: str) -> Result[List[str]]:
+        """Parse import statements from content (C++ includes)"""
+        # Reuse the resolve_includes logic
+        try:
+            tree = self._parser.parse(content.encode('utf-8'))
+            root = tree.root_node
+            
+            includes = []
+            
+            def extract_includes(node: Node) -> None:
+                if node.type == 'preproc_include':
+                    for child in node.children:
+                        if child.type in ['string_literal', 'system_lib_string']:
+                            include_path = content[child.start_byte:child.end_byte]
+                            include_path = include_path.strip('"<>')
+                            includes.append(include_path)
+                
+                for child in node.children:
+                    extract_includes(child)
+            
+            extract_includes(root)
+            return Result.success_result(includes)
+            
+        except Exception as e:
+            error = Error(
+                code="CPP_IMPORTS_ERROR",
+                message=f"Failed to parse imports: {str(e)}",
+                details={'exception': str(e)},
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
+    
+    def extract_symbols(self, content: str) -> Result[List[SymbolDefinition]]:
+        """Extract all symbols from content"""
+        try:
+            tree = self._parser.parse(content.encode('utf-8'))
+            root = tree.root_node
+            
+            symbols: List[Dict[str, Any]] = []
+            self._namespace_stack = []
+            self._extract_symbols(root, content, symbols)
+            
+            symbol_defs = [
+                SymbolDefinition(
+                    symbol=s['symbol'],
+                    file_path="",  # Will be set by caller
+                    line=s.get('line', 1),
+                    column=0,
+                    symbol_type=s['kind'],
+                    signature=s.get('signature'),
+                    docstring=None,
+                    scope=self._get_scope_from_symbol(s['symbol'])
+                )
+                for s in symbols
+            ]
+            
+            return Result.success_result(symbol_defs)
+            
+        except Exception as e:
+            error = Error(
+                code="CPP_SYMBOLS_ERROR",
+                message=f"Failed to extract symbols: {str(e)}",
+                details={'exception': str(e)},
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
+    
+    def resolve_type(self, symbol: str, context: Dict[str, Any]) -> Result[Optional[str]]:
+        """Resolve the type of a symbol"""
+        try:
+            # Look up the symbol definition
+            definition = self.getDefinition(symbol)
+            if definition:
+                # Try to extract type from signature
+                signature = definition.get('signature', '')
+                if definition['kind'] == 'function' or definition['kind'] == 'method':
+                    # For functions, return type is usually at the beginning
+                    parts = signature.split()
+                    if parts:
+                        return Result.success_result(parts[0])
+                elif definition['kind'] == 'field':
+                    # For fields, type is usually before the name
+                    parts = signature.split()
+                    if len(parts) >= 2:
+                        return Result.success_result(parts[0])
+            
+            return Result.success_result(None)
+            
+        except Exception as e:
+            error = Error(
+                code="CPP_TYPE_ERROR",
+                message=f"Failed to resolve type: {str(e)}",
+                details={'symbol': symbol, 'exception': str(e)},
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
+    
+    def get_call_hierarchy(self, symbol: str, context: Dict[str, Any]) -> Result[Dict[str, List[str]]]:
+        """Get call hierarchy for a symbol"""
+        try:
+            # Basic implementation - find who calls this symbol and what it calls
+            calls_to = []  # Functions this symbol calls
+            called_by = []  # Functions that call this symbol
+            
+            # Find references to get called_by
+            references = self.findReferences(symbol)
+            for ref in references:
+                # This is a simplified approach
+                called_by.append(f"{ref.file}:{ref.line}")
+            
+            # For calls_to, we'd need more sophisticated analysis
+            # This would require parsing the function body and finding function calls
+            
+            hierarchy = {
+                'calls_to': calls_to,
+                'called_by': called_by
+            }
+            
+            return Result.success_result(hierarchy)
+            
+        except Exception as e:
+            error = Error(
+                code="CPP_HIERARCHY_ERROR",
+                message=f"Failed to get call hierarchy: {str(e)}",
+                details={'symbol': symbol, 'exception': str(e)},
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
+    
+    # ========================================
+    # Helper Methods
+    # ========================================
+    
+    def _get_scope_from_symbol(self, symbol: str) -> Optional[str]:
+        """Extract scope/namespace from a qualified symbol name"""
+        if '::' in symbol:
+            parts = symbol.split('::')
+            if len(parts) > 1:
+                return '::'.join(parts[:-1])
+        return None
+    
+    def _extract_template_name(self, node: Node, content: str) -> Optional[str]:
+        """Extract name from a template declaration node"""
+        if node.type in ['class_specifier', 'struct_specifier']:
+            name_node = node.child_by_field_name('name')
+            if name_node:
+                return content[name_node.start_byte:name_node.end_byte]
+        elif node.type in ['function_declaration', 'function_definition']:
+            declarator = node.child_by_field_name('declarator')
+            if declarator:
+                return self._extract_function_name(declarator, content)
+        return None

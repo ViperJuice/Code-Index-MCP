@@ -10,6 +10,7 @@ from typing import Dict, List, Optional, Any, Type, Callable
 from dataclasses import dataclass
 
 from ..plugin_base import IPlugin
+from ..interfaces.shared_interfaces import Result
 
 
 class IPluginDiscovery(ABC):
@@ -38,6 +39,14 @@ class IPluginDiscovery(ABC):
             True if valid plugin, False otherwise
         """
         pass
+    
+    def discover_plugins_safe(self, plugin_dirs: List[Path]) -> Result[List['PluginInfo']]:
+        """Discover plugins using Result pattern for error handling."""
+        pass
+    
+    def validate_plugin_safe(self, plugin_path: Path) -> Result[bool]:
+        """Validate a plugin using Result pattern for error handling."""
+        pass
 
 
 class IPluginLoader(ABC):
@@ -65,6 +74,14 @@ class IPluginLoader(ABC):
         Args:
             plugin_name: Name of the plugin to unload
         """
+        pass
+    
+    def load_plugin_safe(self, plugin_info: 'PluginInfo') -> Result[Type[IPlugin]]:
+        """Load a plugin using Result pattern for error handling."""
+        pass
+    
+    def unload_plugin_safe(self, plugin_name: str) -> Result[None]:
+        """Unload a plugin using Result pattern for error handling."""
         pass
 
 
@@ -130,6 +147,14 @@ class IPluginRegistry(ABC):
         Returns:
             List of plugin information
         """
+        pass
+    
+    def register_plugin_safe(self, plugin_info: 'PluginInfo', plugin_class: Type[IPlugin]) -> Result[None]:
+        """Register a plugin using Result pattern for error handling."""
+        pass
+    
+    def unregister_plugin_safe(self, plugin_name: str) -> Result[None]:
+        """Unregister a plugin using Result pattern for error handling."""
         pass
 
 

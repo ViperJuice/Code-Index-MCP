@@ -150,9 +150,16 @@ async def startup_event():
         config_path = Path("plugins.yaml")
         plugin_manager = PluginManager(sqlite_store=sqlite_store)
         
-        # Load plugins from configuration
+        # Load plugins from configuration using safe method for better error handling
         logger.info("Loading plugins...")
-        plugin_manager.load_plugins(config_path if config_path.exists() else None)
+        load_result = plugin_manager.load_plugins_safe(config_path if config_path.exists() else None)
+        
+        if not load_result.success:
+            logger.error(f"Plugin loading failed: {load_result.error.message}")
+            logger.error(f"Error details: {load_result.error.details}")
+            # Continue with any successfully loaded plugins
+        else:
+            logger.info(f"Plugin loading completed: {load_result.metadata}")
         
         # Get active plugin instances
         active_plugins = plugin_manager.get_active_plugins()
@@ -203,10 +210,14 @@ async def startup_event():
             memory_usage=0    # Will be updated by middleware
         )
         
-        # Log loaded plugins
-        plugin_status = plugin_manager.get_plugin_status()
+        # Log loaded plugins with detailed status
+        plugin_status = plugin_manager.get_detailed_plugin_status()
         for name, status in plugin_status.items():
-            logger.info(f"Plugin '{name}': {status['state']} (v{status['version']}, language: {status['language']})")
+            basic_info = status['basic_info']
+            runtime_info = status['runtime_info']
+            logger.info(f"Plugin '{name}': {runtime_info['state']} (v{basic_info['version']}, language: {basic_info['language']}, enabled: {runtime_info['enabled']})")
+            if runtime_info.get('error'):
+                logger.warning(f"Plugin '{name}' has error: {runtime_info['error']}")
         
         logger.info("MCP Server initialized successfully with dynamic plugin system, SQLite persistence, and file watcher")
     except Exception as e:
@@ -227,8 +238,12 @@ async def shutdown_event():
     
     if plugin_manager:
         try:
-            plugin_manager.shutdown()
-            logger.info("Plugin manager shutdown successfully")
+            shutdown_result = plugin_manager.shutdown_safe()
+            if shutdown_result.success:
+                logger.info("Plugin manager shutdown successfully")
+            else:
+                logger.error(f"Plugin manager shutdown failed: {shutdown_result.error.message}")
+                logger.error(f"Shutdown error details: {shutdown_result.error.details}")
         except Exception as e:
             logger.error(f"Error shutting down plugin manager: {e}", exc_info=True)
     

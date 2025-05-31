@@ -3,6 +3,7 @@
 import pytest
 import tempfile
 import json
+import yaml
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
@@ -16,11 +17,13 @@ from mcp_server.plugin_system import (
     PluginSystemConfig,
     PluginNotFoundError,
     PluginLoadError,
-    PluginInitError
+    PluginInitError,
+    PluginInstance
 )
 from mcp_server.plugin_system.plugin_discovery import PluginDiscovery
 from mcp_server.plugin_system.plugin_loader import PluginLoader
 from mcp_server.plugin_system.plugin_registry import PluginRegistry
+from mcp_server.interfaces.shared_interfaces import Result, Error
 
 
 class MockPlugin(IPlugin):
@@ -32,30 +35,52 @@ class MockPlugin(IPlugin):
         self.started = False
         self.stopped = False
         self.destroyed = False
+        self.health_status = "healthy"
+        self.metrics = {
+            "operations_count": 0,
+            "last_operation_time": None
+        }
     
     def supports(self, path):
         return path.endswith('.mock')
     
     def indexFile(self, path, content):
+        self.metrics["operations_count"] += 1
+        import time
+        self.metrics["last_operation_time"] = time.time()
         return {'file': path, 'symbols': [], 'language': 'mock'}
     
     def getDefinition(self, symbol):
+        self.metrics["operations_count"] += 1
         return None
     
     def findReferences(self, symbol):
+        self.metrics["operations_count"] += 1
         return []
     
     def search(self, query, opts=None):
+        self.metrics["operations_count"] += 1
         return []
     
     def start(self):
         self.started = True
+        self.health_status = "healthy"
     
     def stop(self):
         self.stopped = True
+        self.health_status = "stopped"
     
     def destroy(self):
         self.destroyed = True
+        self.health_status = "destroyed"
+    
+    def get_health_status(self):
+        """Get plugin health status."""
+        return self.health_status
+    
+    def get_metrics(self):
+        """Get plugin performance metrics."""
+        return self.metrics.copy()
 
 
 class TestPluginDiscovery:
@@ -66,6 +91,21 @@ class TestPluginDiscovery:
         discovery = PluginDiscovery()
         plugins = discovery.discover_plugins([tmp_path])
         assert plugins == []
+    
+    def test_discover_plugins_safe(self, tmp_path):
+        """Test safe plugin discovery with Result pattern."""
+        discovery = PluginDiscovery()
+        
+        # Create a valid plugin
+        plugin_dir = tmp_path / "test_plugin"
+        plugin_dir.mkdir()
+        (plugin_dir / "plugin.py").write_text("class Plugin: pass")
+        
+        result = discovery.discover_plugins_safe([tmp_path])
+        assert result.success
+        assert len(result.value) == 1
+        assert "discovered_count" in result.metadata
+        assert result.metadata["discovered_count"] == 1
     
     def test_discover_plugin_with_manifest(self, tmp_path):
         """Test discovering plugin with plugin.json manifest."""
@@ -150,6 +190,24 @@ class Plugin:
         valid_py_dir.mkdir()
         (valid_py_dir / "plugin.py").write_text('')
         assert discovery.validate_plugin(valid_py_dir)
+    
+    def test_validate_plugin_safe(self, tmp_path):
+        """Test safe plugin validation."""
+        discovery = PluginDiscovery()
+        
+        # Valid plugin
+        plugin_dir = tmp_path / "valid_plugin"
+        plugin_dir.mkdir()
+        (plugin_dir / "plugin.py").write_text("class Plugin: pass")
+        
+        result = discovery.validate_plugin_safe(plugin_dir)
+        assert result.success
+        assert result.value == True
+        
+        # Invalid plugin
+        result = discovery.validate_plugin_safe(tmp_path / "nonexistent")
+        assert result.success  # Validation succeeds, but result is False
+        assert result.value == False
 
 
 class TestPluginLoader:
@@ -176,6 +234,28 @@ class TestPluginLoader:
         assert plugin_class is not None
         assert hasattr(plugin_class, 'lang')
     
+    def test_load_plugin_safe_success(self):
+        """Test safe plugin loading with Result pattern."""
+        loader = PluginLoader()
+        
+        plugin_info = PluginInfo(
+            name="Test Plugin",
+            version="1.0.0",
+            description="Test",
+            author="Test",
+            plugin_type=PluginType.LANGUAGE,
+            language="python",
+            file_extensions=[".py"],
+            path=Path("mcp_server/plugins/python_plugin"),
+            module_name="mcp_server.plugins.python_plugin"
+        )
+        
+        result = loader.load_plugin_safe(plugin_info)
+        assert result.success
+        assert result.value is not None
+        assert hasattr(result.value, 'lang')
+        assert "plugin_name" in result.metadata
+    
     def test_load_plugin_not_found(self, tmp_path):
         """Test loading non-existent plugin."""
         loader = PluginLoader()
@@ -194,6 +274,19 @@ class TestPluginLoader:
         
         with pytest.raises(PluginLoadError):
             loader.load_plugin(plugin_info)
+        
+        # Test safe version
+        result = loader.load_plugin_safe(plugin_info)
+        assert not result.success
+        assert result.error.code == "PLUGIN_LOAD_ERROR"
+    
+    def test_unload_plugin_safe(self):
+        """Test safe plugin unloading."""
+        loader = PluginLoader()
+        
+        # Test unloading non-existent plugin (should succeed)
+        result = loader.unload_plugin_safe("NonExistent")
+        assert result.success
     
     def test_validate_plugin_class(self):
         """Test plugin class validation."""
@@ -236,6 +329,27 @@ class TestPluginRegistry:
         assert "Test Plugin" in registry.get_plugins_by_language("test")
         assert "Test Plugin" in registry.get_plugins_by_extension(".test")
     
+    def test_register_plugin_safe(self):
+        """Test safe plugin registration."""
+        registry = PluginRegistry()
+        
+        plugin_info = PluginInfo(
+            name="Test Plugin",
+            version="1.0.0",
+            description="Test",
+            author="Test",
+            plugin_type=PluginType.LANGUAGE,
+            language="test",
+            file_extensions=[".test"],
+            path=Path("test"),
+            module_name="test"
+        )
+        
+        result = registry.register_plugin_safe(plugin_info, MockPlugin)
+        assert result.success
+        assert "plugin_name" in result.metadata
+        assert result.metadata["plugin_name"] == "Test Plugin"
+    
     def test_unregister_plugin(self):
         """Test plugin unregistration."""
         registry = PluginRegistry()
@@ -257,6 +371,43 @@ class TestPluginRegistry:
         
         assert registry.get_plugin("Test Plugin") is None
         assert registry.get_plugins_by_language("test") == []
+    
+    def test_unregister_plugin_safe(self):
+        """Test safe plugin unregistration."""
+        registry = PluginRegistry()
+        
+        # Test unregistering non-existent plugin
+        result = registry.unregister_plugin_safe("NonExistent")
+        assert not result.success
+        assert result.error.code == "PLUGIN_UNREGISTER_ERROR"
+    
+    def test_plugin_status_tracking(self):
+        """Test plugin status information."""
+        registry = PluginRegistry()
+        
+        plugin_info = PluginInfo(
+            name="Test Plugin",
+            version="1.0.0",
+            description="Test Plugin Description",
+            author="Test Author",
+            plugin_type=PluginType.LANGUAGE,
+            language="test",
+            file_extensions=[".test"],
+            path=Path("test"),
+            module_name="test"
+        )
+        
+        registry.register_plugin(plugin_info, MockPlugin)
+        
+        status = registry.get_plugin_status("Test Plugin")
+        assert status is not None
+        assert status["name"] == "Test Plugin"
+        assert status["version"] == "1.0.0"
+        assert status["description"] == "Test Plugin Description"
+        assert status["is_registered"] == True
+        
+        all_statuses = registry.get_all_plugin_statuses()
+        assert "Test Plugin" in all_statuses
     
     def test_get_plugin_for_file(self):
         """Test getting plugin for file."""
@@ -443,6 +594,21 @@ plugin_dirs:
   
 auto_discover: false
 auto_load: false
+max_concurrent_loads: 3
+load_timeout_seconds: 15
+
+defaults:
+  max_file_size: 2097152
+  cache_enabled: true
+
+environments:
+  testing:
+    enable_hot_reload: true
+    validate_interfaces: false
+
+loading:
+  strategy: "alphabetical"
+  parallel_loading: false
 
 plugins:
   "Test Plugin":
@@ -450,6 +616,10 @@ plugins:
     priority: 100
     settings:
       custom_setting: value
+    dependencies: ["Base Plugin"]
+    health_check:
+      enabled: true
+      interval_seconds: 30
 """
         config_file = tmp_path / "test_config.yaml"
         config_file.write_text(config_content)
@@ -459,8 +629,243 @@ plugins:
         
         assert not manager.config.auto_discover
         assert not manager.config.auto_load
+        assert manager.config.max_concurrent_loads == 3
+        assert manager.config.load_timeout_seconds == 15
         assert "Test Plugin" in manager.config.plugin_configs
-        assert manager.config.plugin_configs["Test Plugin"].priority == 100
+        plugin_config = manager.config.plugin_configs["Test Plugin"]
+        assert plugin_config.priority == 100
+        assert plugin_config.dependencies == ["Base Plugin"]
+        assert plugin_config.health_check["interval_seconds"] == 30
+        assert manager.config.loading["strategy"] == "alphabetical"
+        assert manager.config.defaults["max_file_size"] == 2097152
+    
+    def test_environment_config_overrides(self, tmp_path):
+        """Test environment-specific configuration overrides."""
+        config_content = """
+auto_discover: true
+enable_hot_reload: false
+
+environments:
+  testing:
+    auto_discover: false
+    enable_hot_reload: true
+  production:
+    validate_interfaces: false
+"""
+        config_file = tmp_path / "test_config.yaml"
+        config_file.write_text(config_content)
+        
+        with patch.dict('os.environ', {'ENVIRONMENT': 'testing'}):
+            config = PluginSystemConfig(config_file=config_file)
+            config.apply_environment_overrides()
+            assert not config.auto_discover  # Overridden by testing environment
+            assert config.enable_hot_reload  # Overridden by testing environment
+    
+    def test_safe_plugin_operations(self):
+        """Test Result[T] pattern methods."""
+        manager = PluginManager()
+        
+        # Test safe plugin loading
+        with patch.object(manager, 'load_plugins') as mock_load:
+            mock_load.side_effect = Exception("Load failed")
+            result = manager.load_plugins_safe()
+            assert not result.success
+            assert result.error.code == "PLUGIN_LOAD_BATCH_ERROR"
+            assert "Load failed" in result.error.message
+        
+        # Test safe plugin reload
+        result = manager.reload_plugin_safe("NonExistent")
+        assert not result.success
+        assert result.error.code == "PLUGIN_RELOAD_ERROR"
+        
+        # Test safe plugin enable/disable
+        result = manager.enable_plugin_safe("NonExistent")
+        assert not result.success
+        assert result.error.code == "PLUGIN_ENABLE_ERROR"
+        
+        result = manager.disable_plugin_safe("NonExistent")
+        assert not result.success
+        assert result.error.code == "PLUGIN_DISABLE_ERROR"
+        
+        # Test safe shutdown
+        result = manager.shutdown_safe()
+        assert result.success  # Should succeed even with no plugins
+    
+    def test_detailed_plugin_status(self):
+        """Test detailed plugin status reporting."""
+        manager = PluginManager()
+        
+        # Create a mock plugin instance
+        plugin_info = PluginInfo(
+            name="Test Plugin",
+            version="1.0.0",
+            description="Test",
+            author="Test",
+            plugin_type=PluginType.LANGUAGE,
+            language="test",
+            file_extensions=[".test"],
+            path=Path("test"),
+            module_name="test"
+        )
+        
+        plugin_config = PluginConfig(
+            enabled=True,
+            priority=10,
+            settings={"test_setting": "value"},
+            dependencies=["dep1"],
+            health_check={"enabled": True, "interval_seconds": 60}
+        )
+        
+        instance = PluginInstance(
+            info=plugin_info,
+            config=plugin_config,
+            instance=MockPlugin(),
+            state=PluginState.STARTED,
+            load_time=0.5,
+            health_status="healthy"
+        )
+        
+        manager._instances["Test Plugin"] = instance
+        
+        status = manager.get_detailed_plugin_status()
+        assert "Test Plugin" in status
+        plugin_status = status["Test Plugin"]
+        
+        assert plugin_status["basic_info"]["name"] == "Test Plugin"
+        assert plugin_status["runtime_info"]["state"] == "started"
+        assert plugin_status["runtime_info"]["is_healthy"] == True
+        assert plugin_status["runtime_info"]["load_time"] == 0.5
+        assert plugin_status["config"]["dependencies"] == ["dep1"]
+        assert plugin_status["config"]["health_check"]["enabled"] == True
+    
+    def test_plugin_queries_by_attributes(self):
+        """Test querying plugins by various attributes."""
+        manager = PluginManager()
+        
+        # Setup test plugins
+        plugin_info1 = PluginInfo(
+            name="Python Plugin", version="1.0.0", description="Test", author="Test",
+            plugin_type=PluginType.LANGUAGE, language="python", file_extensions=[".py"],
+            path=Path("test"), module_name="test"
+        )
+        plugin_info2 = PluginInfo(
+            name="JS Plugin", version="1.0.0", description="Test", author="Test",
+            plugin_type=PluginType.LANGUAGE, language="javascript", file_extensions=[".js"],
+            path=Path("test"), module_name="test"
+        )
+        
+        manager._registry.register_plugin(plugin_info1, MockPlugin)
+        manager._registry.register_plugin(plugin_info2, MockPlugin)
+        
+        # Create active instances
+        instance1 = PluginInstance(
+            info=plugin_info1, config=PluginConfig(enabled=True),
+            instance=MockPlugin(), state=PluginState.STARTED
+        )
+        instance2 = PluginInstance(
+            info=plugin_info2, config=PluginConfig(enabled=False),
+            instance=None, state=PluginState.LOADED
+        )
+        
+        manager._instances["Python Plugin"] = instance1
+        manager._instances["JS Plugin"] = instance2
+        
+        # Test queries
+        enabled_plugins = manager.get_enabled_plugins()
+        assert "Python Plugin" in enabled_plugins
+        assert "JS Plugin" not in enabled_plugins
+        
+        active_plugins = manager.get_plugins_by_status(PluginState.STARTED)
+        assert "Python Plugin" in active_plugins
+        assert "JS Plugin" not in active_plugins
+        
+        python_plugins = manager.get_plugins_by_language("python")
+        assert "Python Plugin" in python_plugins
+        
+        js_plugins = manager.get_plugins_by_extension(".js")
+        assert "JS Plugin" in js_plugins
+
+
+class TestPluginInstance:
+    """Test plugin instance functionality."""
+    
+    def test_plugin_instance_properties(self):
+        """Test plugin instance property methods."""
+        plugin_info = PluginInfo(
+            name="Test Plugin",
+            version="1.0.0",
+            description="Test",
+            author="Test",
+            plugin_type=PluginType.LANGUAGE,
+            language="test",
+            file_extensions=[".test"],
+            path=Path("test"),
+            module_name="test"
+        )
+        
+        plugin_config = PluginConfig(enabled=True)
+        
+        # Test active instance
+        instance = PluginInstance(
+            info=plugin_info,
+            config=plugin_config,
+            instance=MockPlugin(),
+            state=PluginState.STARTED,
+            health_status="healthy"
+        )
+        
+        assert instance.is_active
+        assert not instance.is_error
+        assert instance.is_healthy
+        
+        # Test error instance
+        error_instance = PluginInstance(
+            info=plugin_info,
+            config=plugin_config,
+            instance=None,
+            state=PluginState.ERROR,
+            error="Test error",
+            health_status="unhealthy"
+        )
+        
+        assert not error_instance.is_active
+        assert error_instance.is_error
+        assert not error_instance.is_healthy
+    
+    def test_plugin_metrics_update(self):
+        """Test plugin metrics updating."""
+        plugin_info = PluginInfo(
+            name="Test Plugin",
+            version="1.0.0",
+            description="Test",
+            author="Test",
+            plugin_type=PluginType.LANGUAGE,
+            language="test",
+            file_extensions=[".test"],
+            path=Path("test"),
+            module_name="test"
+        )
+        
+        instance = PluginInstance(
+            info=plugin_info,
+            config=PluginConfig(),
+            instance=MockPlugin(),
+            state=PluginState.STARTED
+        )
+        
+        # Update metrics
+        test_metrics = {
+            "cpu_usage": 15.5,
+            "memory_usage": 128.0,
+            "request_count": 42
+        }
+        
+        instance.update_metrics(test_metrics)
+        
+        assert instance.metrics["cpu_usage"] == 15.5
+        assert instance.metrics["memory_usage"] == 128.0
+        assert instance.metrics["request_count"] == 42
+        assert "last_updated" in instance.metrics
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ import shutil
 
 from mcp_server.plugins.cpp_plugin.plugin import Plugin
 from mcp_server.storage.sqlite_store import SQLiteStore
+from mcp_server.interfaces.plugin_interfaces import SymbolDefinition
 
 
 @pytest.fixture
@@ -561,3 +562,220 @@ class TestCppPlugin:
         
         # Count should increase
         assert plugin.get_indexed_count() > 0
+
+
+class TestCppPluginNewInterface:
+    """Test cases for the new ICppPlugin interface methods."""
+    
+    def test_plugin_properties(self, plugin):
+        """Test plugin properties from ICppPlugin interface."""
+        assert plugin.name == "C++ Plugin"
+        assert '.cpp' in plugin.supported_extensions
+        assert '.hpp' in plugin.supported_extensions
+        assert 'cpp' in plugin.supported_languages
+        
+    def test_can_handle(self, plugin):
+        """Test can_handle method."""
+        assert plugin.can_handle("test.cpp")
+        assert plugin.can_handle("test.hpp")
+        assert not plugin.can_handle("test.py")
+        
+    def test_index_interface_method(self, plugin, temp_cpp_file):
+        """Test the new index interface method."""
+        with open(temp_cpp_file, 'r') as f:
+            content = f.read()
+        
+        result = plugin.index(temp_cpp_file, content)
+        
+        assert result.success
+        indexed_file = result.value
+        assert indexed_file.file_path == temp_cpp_file
+        assert indexed_file.language == 'cpp'
+        assert len(indexed_file.symbols) > 0
+        
+        # Check symbol definitions
+        symbol_names = [s.symbol for s in indexed_file.symbols]
+        assert any('MyClass' in name for name in symbol_names)
+        
+    def test_get_definition_interface(self, plugin, temp_cpp_file):
+        """Test get_definition from ICppPlugin interface."""
+        with open(temp_cpp_file, 'r') as f:
+            content = f.read()
+        
+        # Index first
+        plugin.indexFile(temp_cpp_file, content)
+        
+        result = plugin.get_definition('MyClass', {})
+        assert result.success
+        
+        if result.value:
+            definition = result.value
+            assert isinstance(definition, SymbolDefinition)
+            assert 'MyClass' in definition.symbol
+            assert definition.symbol_type == 'class'
+    
+    def test_get_references_interface(self, plugin, temp_cpp_file):
+        """Test get_references from ICppPlugin interface."""
+        with open(temp_cpp_file, 'r') as f:
+            content = f.read()
+        
+        # Index first
+        plugin.indexFile(temp_cpp_file, content)
+        
+        result = plugin.get_references('MyClass', {})
+        assert result.success
+        references = result.value
+        assert isinstance(references, list)
+        
+    def test_search_interface(self, plugin, temp_cpp_file):
+        """Test search from ICppPlugin interface."""
+        with open(temp_cpp_file, 'r') as f:
+            content = f.read()
+        
+        # Index first
+        plugin.indexFile(temp_cpp_file, content)
+        
+        result = plugin.search('MyClass', {'limit': 10})
+        assert result.success
+        search_results = result.value
+        assert isinstance(search_results, list)
+        
+    def test_validate_syntax(self, plugin):
+        """Test syntax validation."""
+        valid_code = "class Test { public: int x; };"
+        result = plugin.validate_syntax(valid_code)
+        assert result.success
+        assert result.value is True
+        
+        # Test with invalid syntax
+        invalid_code = "class Test { public int x; }"  # Missing colon
+        result = plugin.validate_syntax(invalid_code)
+        assert result.success
+        # Note: Tree-sitter is quite forgiving, so this might still parse
+        
+    def test_get_completions(self, plugin, temp_cpp_file):
+        """Test code completions."""
+        with open(temp_cpp_file, 'r') as f:
+            content = f.read()
+        
+        # Index first
+        plugin.indexFile(temp_cpp_file, content)
+        
+        result = plugin.get_completions(temp_cpp_file, 50, 10)
+        assert result.success
+        completions = result.value
+        assert isinstance(completions, list)
+        assert len(completions) > 0
+        
+        # Should include C++ keywords
+        assert any('class' in comp for comp in completions)
+        
+    def test_resolve_includes(self, plugin, temp_header_file):
+        """Test include resolution."""
+        result = plugin.resolve_includes(temp_header_file)
+        assert result.success
+        includes = result.value
+        assert isinstance(includes, list)
+        # The header file should have no includes
+        
+    def test_parse_templates(self, plugin):
+        """Test template parsing."""
+        template_code = '''
+        template<typename T, int N>
+        class Array {
+            T data[N];
+        public:
+            T& operator[](int index) { return data[index]; }
+        };
+        
+        template<typename T>
+        T max(T a, T b) {
+            return a > b ? a : b;
+        }
+        '''
+        
+        result = plugin.parse_templates(template_code)
+        assert result.success
+        templates = result.value
+        assert len(templates) >= 2  # Array and max
+        
+        template_names = [t.symbol for t in templates]
+        assert 'Array' in template_names
+        assert 'max' in template_names
+        
+    def test_parse_imports(self, plugin):
+        """Test import parsing (includes)."""
+        code_with_includes = '''
+        #include <iostream>
+        #include <vector>
+        #include "myheader.h"
+        
+        int main() { return 0; }
+        '''
+        
+        result = plugin.parse_imports(code_with_includes)
+        assert result.success
+        imports = result.value
+        assert 'iostream' in imports
+        assert 'vector' in imports
+        assert 'myheader.h' in imports
+        
+    def test_extract_symbols_interface(self, plugin):
+        """Test symbol extraction via interface."""
+        code = '''
+        namespace NS {
+            class MyClass {
+            public:
+                void method();
+                int field;
+            };
+        }
+        '''
+        
+        result = plugin.extract_symbols(code)
+        assert result.success
+        symbols = result.value
+        assert len(symbols) > 0
+        
+        symbol_names = [s.symbol for s in symbols]
+        assert any('NS' in name for name in symbol_names)
+        assert any('MyClass' in name for name in symbol_names)
+        
+    def test_resolve_type(self, plugin, temp_cpp_file):
+        """Test type resolution."""
+        with open(temp_cpp_file, 'r') as f:
+            content = f.read()
+        
+        # Index first
+        plugin.indexFile(temp_cpp_file, content)
+        
+        result = plugin.resolve_type('getValue', {})
+        assert result.success
+        # Type resolution might return None if not found
+        
+    def test_get_call_hierarchy(self, plugin, temp_cpp_file):
+        """Test call hierarchy."""
+        with open(temp_cpp_file, 'r') as f:
+            content = f.read()
+        
+        # Index first
+        plugin.indexFile(temp_cpp_file, content)
+        
+        result = plugin.get_call_hierarchy('main', {})
+        assert result.success
+        hierarchy = result.value
+        assert 'calls_to' in hierarchy
+        assert 'called_by' in hierarchy
+        
+    def test_error_handling(self, plugin):
+        """Test error handling in interface methods."""
+        # Test with non-existent file
+        result = plugin.resolve_includes("/non/existent/file.cpp")
+        assert not result.success
+        assert result.error is not None
+        assert result.error.code == "CPP_INCLUDE_ERROR"
+        
+        # Test with invalid content
+        result = plugin.validate_syntax(None)
+        assert not result.success
+        assert result.error is not None

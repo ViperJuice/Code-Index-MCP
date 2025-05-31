@@ -1,55 +1,193 @@
 # Plugin System Configuration
-# This file configures the MCP Server plugin system
+# This file configures the MCP Server plugin system with comprehensive settings
 
-# Plugin directories to scan
+# Plugin directories to scan for available plugins
 plugin_dirs:
   - mcp_server/plugins
+  # Add custom plugin directories here
+  # - /path/to/custom/plugins
 
-# Plugin system settings
-auto_discover: true
-auto_load: true
-validate_interfaces: true
-enable_hot_reload: false
+# Plugin system global settings
+auto_discover: true          # Automatically discover plugins in plugin_dirs
+auto_load: true             # Automatically load discovered plugins
+validate_interfaces: true   # Validate plugin interfaces before loading
+enable_hot_reload: false    # Enable hot reloading of plugins (experimental)
+max_concurrent_loads: 5     # Maximum number of plugins to load concurrently
+load_timeout_seconds: 30    # Timeout for plugin loading operations
 
-# Disabled plugins (by name)
+# Global plugin defaults
+defaults:
+  max_file_size: 1048576    # Default max file size (1MB)
+  cache_enabled: true       # Enable caching by default
+  timeout_seconds: 10       # Default operation timeout
+  retry_attempts: 3         # Default retry attempts for failed operations
+
+# Disabled plugins (by name) - these will not be loaded even if discovered
 disabled_plugins: []
+
+# Environment-specific overrides
+environments:
+  development:
+    enable_hot_reload: true
+    validate_interfaces: true
+    log_level: DEBUG
+  
+  production:
+    enable_hot_reload: false
+    validate_interfaces: false
+    log_level: INFO
+  
+  testing:
+    auto_load: false
+    validate_interfaces: true
+    log_level: DEBUG
 
 # Plugin-specific configurations
 plugins:
   "Python Plugin":
     enabled: true
-    priority: 10
+    priority: 10           # Higher priority = loaded first
     settings:
-      max_file_size: 1048576  # 1MB
-      enable_jedi: true
-      cache_definitions: true
+      max_file_size: 2097152  # 2MB for Python files
+      enable_jedi: true       # Enable Jedi for intelligent completion
+      cache_definitions: true # Cache symbol definitions
+      parse_docstrings: true  # Parse and index docstrings
+      include_stdlib: false   # Include standard library symbols
+      max_recursion_depth: 10 # Max depth for symbol resolution
+    dependencies: []          # Plugin dependencies
+    health_check:
+      enabled: true
+      interval_seconds: 60
+      timeout_seconds: 5
   
   "JavaScript Plugin":
     enabled: true
     priority: 10
     settings:
       max_file_size: 1048576
-      parse_jsx: true
-      parse_typescript: true
+      parse_jsx: true         # Support JSX syntax
+      parse_typescript: true  # Support TypeScript
+      enable_babel: false     # Use Babel for parsing (if available)
+      include_node_modules: false  # Index node_modules
+      typescript_config: null # Path to tsconfig.json
+    dependencies: []
+    health_check:
+      enabled: true
+      interval_seconds: 60
+      timeout_seconds: 5
   
   "C Plugin":
     enabled: true
     priority: 10
     settings:
       max_file_size: 1048576
-      parse_headers: true
+      parse_headers: true     # Parse .h files
+      include_system_headers: false  # Include system headers
+      gcc_flags: []           # Additional GCC flags for parsing
+      max_include_depth: 5    # Max depth for header includes
+    dependencies: []
+    health_check:
+      enabled: true
+      interval_seconds: 60
+      timeout_seconds: 5
   
   "C++ Plugin":
-    enabled: false  # Stub implementation
-    priority: 5
-    settings: {}
+    enabled: true            # Full implementation now available
+    priority: 10
+    settings:
+      max_file_size: 2097152  # 2MB for C++ files (can be large)
+      parse_headers: true
+      std_version: "c++17"    # C++ standard version
+      include_boost: false    # Include Boost library headers
+      parse_templates: true   # Parse template definitions
+      extract_docs: true      # Extract documentation comments
+      max_include_depth: 10   # Max depth for header includes
+      enable_inheritance_tracking: true  # Track class inheritance
+      parse_preprocessor: true # Parse preprocessor directives
+    dependencies: []
+    health_check:
+      enabled: true
+      interval_seconds: 60
+      timeout_seconds: 5
   
   "Dart Plugin":
-    enabled: false  # Stub implementation
-    priority: 5
-    settings: {}
+    enabled: true            # Full implementation now available
+    priority: 10
+    settings:
+      max_file_size: 2097152  # 2MB for Dart files (Flutter apps can be large)
+      parse_flutter: true     # Parse Flutter widgets and state classes
+      extract_docs: true      # Extract Dart documentation comments
+      dart_sdk_path: null     # Path to Dart SDK (auto-detect if null)
+      pubspec_path: null      # Path to pubspec.yaml (auto-detect if null)
+      parse_mixins: true      # Parse mixin definitions
+      parse_extensions: true  # Parse extension methods
+      parse_enums: true       # Parse enum definitions
+      parse_typedefs: true    # Parse type definitions
+      enable_flutter_analysis: true  # Enable Flutter-specific analysis
+      track_widget_hierarchy: true   # Track widget inheritance
+      parse_async_functions: true    # Parse async/await patterns
+      extract_imports: true         # Extract import/export statements
+      enable_completions: true      # Enable code completions
+      validate_syntax: true        # Enable syntax validation
+      max_class_depth: 15          # Max inheritance depth to track
+    dependencies: []
+    health_check:
+      enabled: true
+      interval_seconds: 60
+      timeout_seconds: 5
   
   "HTML/CSS Plugin":
-    enabled: false  # Stub implementation
-    priority: 5
-    settings: {}
+    enabled: true            # Full implementation now available
+    priority: 10
+    settings:
+      max_file_size: 1048576  # Max file size for HTML/CSS files
+      parse_css: true         # Parse CSS files
+      parse_scss: true        # Parse SCSS files
+      parse_sass: true        # Parse SASS files
+      parse_less: true        # Parse LESS files
+      minify_support: false   # Support minified files (disabled by default)
+      cross_reference: true   # Enable HTML-CSS cross-referencing
+      extract_media_queries: true  # Extract media queries
+      extract_css_variables: true  # Extract CSS custom properties
+      extract_keyframes: true      # Extract @keyframes animations
+      extract_data_attributes: true  # Extract HTML data attributes
+      extract_custom_elements: true  # Extract custom HTML elements
+      enable_completions: true      # Enable code completions
+      validate_syntax: true        # Enable syntax validation
+      max_selector_depth: 10       # Max nesting depth for CSS selectors
+    dependencies: []
+    health_check:
+      enabled: true
+      interval_seconds: 60
+      timeout_seconds: 5
+
+# Plugin loading strategies
+loading:
+  strategy: "priority"      # priority, alphabetical, dependency_order
+  parallel_loading: true    # Load plugins in parallel where possible
+  fail_fast: false         # Stop loading if any plugin fails
+  retry_failed: true       # Retry failed plugin loads
+
+# Monitoring and logging
+monitoring:
+  enable_metrics: true      # Collect plugin performance metrics
+  enable_health_checks: true # Enable plugin health monitoring
+  metric_collection_interval: 30  # Seconds between metric collections
+  
+# Security settings
+security:
+  sandbox_plugins: false    # Run plugins in sandboxed environment (experimental)
+  validate_signatures: false # Validate plugin signatures (if available)
+  allowed_imports: []       # Restricted import whitelist (if sandboxing enabled)
+  
+# Resource limits
+resource_limits:
+  max_memory_mb: 256        # Max memory per plugin
+  max_cpu_percent: 50       # Max CPU usage per plugin
+  max_file_handles: 100     # Max file handles per plugin
+  
+# Backup and recovery
+backup:
+  enabled: false           # Enable plugin state backup
+  interval_hours: 24       # Backup interval
+  retention_days: 7        # How long to keep backups

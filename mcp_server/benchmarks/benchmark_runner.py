@@ -2,7 +2,7 @@
 Benchmark runner with reporting and analysis capabilities.
 
 This module provides:
-- Automated benchmark execution
+- Automated benchmark execution implementing IBenchmarkRunner interface
 - Result persistence and comparison
 - Performance regression detection
 - HTML and JSON report generation
@@ -10,6 +10,7 @@ This module provides:
 
 import json
 import time
+import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from datetime import datetime
@@ -22,12 +23,14 @@ from jinja2 import Template
 
 from .benchmark_suite import BenchmarkSuite, BenchmarkResult, PerformanceMetrics
 from ..plugin_base import IPlugin
+from ..interfaces.indexing_interfaces import IBenchmarkRunner
+from ..interfaces.shared_interfaces import Result, Error
 
 logger = logging.getLogger(__name__)
 
 
-class BenchmarkRunner:
-    """Orchestrates benchmark execution and reporting."""
+class BenchmarkRunner(IBenchmarkRunner):
+    """Orchestrates benchmark execution and reporting, implementing IBenchmarkRunner interface."""
     
     def __init__(self, output_dir: Path = None):
         self.output_dir = output_dir or Path("benchmark_results")
@@ -76,6 +79,305 @@ class BenchmarkRunner:
             result.regression_report = regression_report
         
         return result
+    
+    # Implementation of IBenchmarkRunner interface methods
+    
+    async def run_indexing_benchmark(self, file_paths: List[str]) -> Result[Dict[str, Any]]:
+        """Run indexing performance benchmark."""
+        try:
+            # Create a minimal plugin set for indexing benchmark
+            from ..plugins.python_plugin import PythonPlugin
+            from ..plugins.js_plugin import JSPlugin
+            from ..plugins.c_plugin import CPlugin
+            
+            plugins = [PythonPlugin(), JSPlugin(), CPlugin()]
+            suite = BenchmarkSuite(plugins)
+            
+            # Run indexing benchmark with provided files
+            start_time = time.perf_counter()
+            indexed_count = 0
+            errors = []
+            timing_samples = []
+            
+            for file_path in file_paths:
+                try:
+                    path_obj = Path(file_path)
+                    if not path_obj.exists():
+                        continue
+                        
+                    content = path_obj.read_text()
+                    plugin = suite.dispatcher._match_plugin(path_obj)
+                    
+                    if plugin:
+                        file_start = time.perf_counter()
+                        plugin.index(path_obj, content)
+                        file_duration = (time.perf_counter() - file_start) * 1000
+                        timing_samples.append(file_duration)
+                        indexed_count += 1
+                except Exception as e:
+                    errors.append(f"Error indexing {file_path}: {str(e)}")
+            
+            total_time = time.perf_counter() - start_time
+            files_per_minute = (indexed_count / total_time) * 60 if total_time > 0 else 0
+            
+            metrics = {
+                "indexed_files": indexed_count,
+                "total_time_seconds": total_time,
+                "files_per_minute": files_per_minute,
+                "average_time_per_file_ms": sum(timing_samples) / len(timing_samples) if timing_samples else 0,
+                "p95_time_ms": sorted(timing_samples)[int(len(timing_samples) * 0.95)] if timing_samples else 0,
+                "errors": errors,
+                "meets_target": files_per_minute >= suite.FILES_PER_MINUTE_TARGET
+            }
+            
+            return Result.success_result(metrics)
+            
+        except Exception as e:
+            error = Error(
+                code="indexing_benchmark_failed",
+                message=f"Indexing benchmark failed: {str(e)}",
+                details={"exception_type": type(e).__name__},
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
+    
+    async def run_search_benchmark(self, queries: List[str]) -> Result[Dict[str, Any]]:
+        """Run search performance benchmark."""
+        try:
+            from ..plugins.python_plugin import PythonPlugin
+            from ..plugins.js_plugin import JSPlugin
+            from ..plugins.c_plugin import CPlugin
+            
+            plugins = [PythonPlugin(), JSPlugin(), CPlugin()]
+            suite = BenchmarkSuite(plugins)
+            
+            # Populate some test data first
+            test_symbols = {
+                "test_function": "function test_function() { return 42; }",
+                "calculate_sum": "def calculate_sum(a, b): return a + b",
+                "MyClass": "class MyClass: pass",
+                "process_data": "void process_data(int* data, size_t len) {}"
+            }
+            
+            for symbol, definition in test_symbols.items():
+                plugins[0]._symbols[symbol] = type('SymbolDef', (), {
+                    'name': symbol,
+                    'type': 'function',
+                    'path': '/test.py',
+                    'line': 1,
+                    'character': 0,
+                    'definition': definition
+                })()
+            
+            timing_samples = []
+            result_counts = []
+            errors = []
+            
+            for query in queries:
+                try:
+                    start_time = time.perf_counter()
+                    results = list(suite.dispatcher.search(query, semantic=False))
+                    duration_ms = (time.perf_counter() - start_time) * 1000
+                    
+                    timing_samples.append(duration_ms)
+                    result_counts.append(len(results))
+                except Exception as e:
+                    errors.append(f"Error searching '{query}': {str(e)}")
+            
+            metrics = {
+                "queries_executed": len(timing_samples),
+                "total_queries": len(queries),
+                "average_time_ms": sum(timing_samples) / len(timing_samples) if timing_samples else 0,
+                "p95_time_ms": sorted(timing_samples)[int(len(timing_samples) * 0.95)] if timing_samples else 0,
+                "p99_time_ms": sorted(timing_samples)[int(len(timing_samples) * 0.99)] if timing_samples else 0,
+                "average_results": sum(result_counts) / len(result_counts) if result_counts else 0,
+                "errors": errors,
+                "meets_symbol_target": all(t <= suite.SYMBOL_LOOKUP_TARGET_MS for t in timing_samples[:10]) if timing_samples else False,
+                "meets_search_target": all(t <= suite.SEARCH_TARGET_MS for t in timing_samples) if timing_samples else False
+            }
+            
+            return Result.success_result(metrics)
+            
+        except Exception as e:
+            error = Error(
+                code="search_benchmark_failed",
+                message=f"Search benchmark failed: {str(e)}",
+                details={"exception_type": type(e).__name__},
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
+    
+    async def run_memory_benchmark(self, file_count: int) -> Result[Dict[str, Any]]:
+        """Run memory usage benchmark."""
+        try:
+            from ..plugins.python_plugin import PythonPlugin
+            from ..plugins.js_plugin import JSPlugin
+            from ..plugins.c_plugin import CPlugin
+            
+            plugins = [PythonPlugin(), JSPlugin(), CPlugin()]
+            suite = BenchmarkSuite(plugins)
+            
+            import psutil
+            import gc
+            
+            # Force garbage collection and get initial memory
+            gc.collect()
+            process = psutil.Process()
+            initial_memory_mb = process.memory_info().rss / (1024 * 1024)
+            
+            # Generate test files and index them
+            with tempfile.TemporaryDirectory() as tmpdir:
+                test_path = Path(tmpdir)
+                test_files = suite._generate_test_files(file_count, test_path)
+                
+                memory_samples = []
+                
+                for i, file_path in enumerate(test_files):
+                    try:
+                        content = file_path.read_text()
+                        plugin = suite.dispatcher._match_plugin(file_path)
+                        
+                        if plugin:
+                            plugin.index(file_path, content)
+                        
+                        # Sample memory every 100 files
+                        if i % 100 == 0:
+                            current_memory_mb = process.memory_info().rss / (1024 * 1024)
+                            memory_samples.append(current_memory_mb - initial_memory_mb)
+                    
+                    except Exception as e:
+                        logger.warning(f"Memory benchmark error for {file_path}: {e}")
+                
+                final_memory_mb = process.memory_info().rss / (1024 * 1024)
+                total_memory_used = final_memory_mb - initial_memory_mb
+                
+                # Extrapolate to 100K files
+                memory_per_100k_files = (total_memory_used / file_count) * 100000
+                
+                metrics = {
+                    "files_indexed": file_count,
+                    "initial_memory_mb": initial_memory_mb,
+                    "final_memory_mb": final_memory_mb,
+                    "memory_used_mb": total_memory_used,
+                    "memory_per_file_kb": (total_memory_used * 1024) / file_count if file_count > 0 else 0,
+                    "projected_memory_100k_files_mb": memory_per_100k_files,
+                    "meets_memory_target": memory_per_100k_files <= suite.MEMORY_TARGET_MB_PER_100K,
+                    "memory_samples": memory_samples
+                }
+                
+                return Result.success_result(metrics)
+                
+        except Exception as e:
+            error = Error(
+                code="memory_benchmark_failed",
+                message=f"Memory benchmark failed: {str(e)}",
+                details={"exception_type": type(e).__name__},
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
+    
+    async def generate_benchmark_report(self) -> Result[str]:
+        """Generate benchmark report."""
+        try:
+            if not self.history:
+                return Result.success_result("No benchmark history available.")
+            
+            latest_result = self.history[-1]
+            
+            # Generate comprehensive report
+            report_lines = []
+            report_lines.append("=" * 80)
+            report_lines.append("MCP SERVER PERFORMANCE BENCHMARK REPORT")
+            report_lines.append("=" * 80)
+            report_lines.append(f"Generated: {datetime.now().isoformat()}")
+            report_lines.append(f"Latest Run: {latest_result['timestamp']}")
+            report_lines.append(f"Suite: {latest_result['suite_name']}")
+            report_lines.append("")
+            
+            # Performance Summary
+            report_lines.append("PERFORMANCE SUMMARY")
+            report_lines.append("-" * 40)
+            
+            if 'metrics' in latest_result:
+                for metric_name, metric_data in latest_result['metrics'].items():
+                    p95_ms = metric_data.get('p95', 0)
+                    
+                    # Determine status against targets
+                    status = "UNKNOWN"
+                    if metric_name == "symbol_lookup":
+                        status = "PASS" if p95_ms <= BenchmarkSuite.SYMBOL_LOOKUP_TARGET_MS else "FAIL"
+                    elif "search" in metric_name:
+                        status = "PASS" if p95_ms <= BenchmarkSuite.SEARCH_TARGET_MS else "FAIL"
+                    
+                    report_lines.append(f"{metric_name:<30} P95: {p95_ms:>8.2f}ms [{status}]")
+            
+            # Special metrics
+            if 'metrics' in latest_result and 'indexing' in latest_result['metrics']:
+                indexing_metric = latest_result['metrics']['indexing']
+                if 'files_per_minute' in indexing_metric:
+                    fpm = indexing_metric['files_per_minute']
+                    status = "PASS" if fpm >= BenchmarkSuite.FILES_PER_MINUTE_TARGET else "FAIL"
+                    report_lines.append(f"{'Indexing Throughput':<30} {fpm:>8.0f} files/min [{status}]")
+            
+            # SLO Summary
+            report_lines.append("")
+            report_lines.append("SLO VALIDATION")
+            report_lines.append("-" * 40)
+            
+            if 'validations' in latest_result:
+                passed = sum(1 for v in latest_result['validations'].values() if v)
+                total = len(latest_result['validations'])
+                report_lines.append(f"Overall: {passed}/{total} SLOs passed")
+                
+                for slo_name, passed in latest_result['validations'].items():
+                    status = "PASS" if passed else "FAIL"
+                    report_lines.append(f"  {slo_name:<35} [{status}]")
+            
+            # Trending
+            if len(self.history) > 1:
+                report_lines.append("")
+                report_lines.append("PERFORMANCE TRENDS")
+                report_lines.append("-" * 40)
+                
+                previous_result = self.history[-2]
+                if 'metrics' in latest_result and 'metrics' in previous_result:
+                    for metric_name in latest_result['metrics']:
+                        if metric_name in previous_result['metrics']:
+                            current_p95 = latest_result['metrics'][metric_name].get('p95', 0)
+                            previous_p95 = previous_result['metrics'][metric_name].get('p95', 0)
+                            
+                            if previous_p95 > 0:
+                                change_pct = ((current_p95 - previous_p95) / previous_p95) * 100
+                                trend = "↑" if change_pct > 5 else "↓" if change_pct < -5 else "→"
+                                report_lines.append(f"  {metric_name:<30} {trend} {change_pct:>+6.1f}%")
+            
+            # Errors
+            if 'errors' in latest_result and latest_result['errors']:
+                report_lines.append("")
+                report_lines.append("ERRORS")
+                report_lines.append("-" * 40)
+                for error in latest_result['errors']:
+                    report_lines.append(f"  • {error}")
+            
+            report_lines.append("")
+            report_lines.append("=" * 80)
+            
+            report_text = "\n".join(report_lines)
+            
+            # Save report to file
+            report_file = self.output_dir / "comprehensive_report.txt"
+            report_file.write_text(report_text)
+            
+            return Result.success_result(report_text)
+            
+        except Exception as e:
+            error = Error(
+                code="report_generation_failed",
+                message=f"Report generation failed: {str(e)}",
+                details={"exception_type": type(e).__name__},
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
     
     def _save_result(self, result: BenchmarkResult):
         """Save benchmark result to history."""

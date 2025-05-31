@@ -6,10 +6,12 @@ import logging
 import sys
 from pathlib import Path
 from typing import Type, Dict, Optional, Any
+from datetime import datetime
 
 from ..plugin_base import IPlugin
 from .interfaces import IPluginLoader
 from .models import PluginInfo, PluginLoadError
+from ..interfaces.shared_interfaces import Result, Error
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +50,32 @@ class PluginLoader(IPluginLoader):
             logger.error(f"Failed to load plugin {plugin_info.name}: {e}")
             raise PluginLoadError(f"Failed to load plugin {plugin_info.name}: {str(e)}") from e
     
+    def load_plugin_safe(self, plugin_info: PluginInfo) -> Result[Type[IPlugin]]:
+        """Load a plugin class using Result pattern for error handling."""
+        try:
+            plugin_class = self.load_plugin(plugin_info)
+            return Result.success_result(
+                plugin_class,
+                metadata={
+                    'plugin_name': plugin_info.name,
+                    'plugin_version': plugin_info.version,
+                    'loaded_at': datetime.now().isoformat()
+                }
+            )
+        except Exception as e:
+            error = Error(
+                code="PLUGIN_LOAD_ERROR",
+                message=f"Failed to load plugin {plugin_info.name}",
+                details={
+                    'plugin_name': plugin_info.name,
+                    'plugin_path': str(plugin_info.path),
+                    'error_type': type(e).__name__,
+                    'error_message': str(e)
+                },
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
+    
     def unload_plugin(self, plugin_name: str) -> None:
         """Unload a plugin module."""
         if plugin_name in self._loaded_modules:
@@ -67,6 +95,30 @@ class PluginLoader(IPluginLoader):
                 del sys.modules[name]
             
             logger.info(f"Unloaded plugin: {plugin_name}")
+    
+    def unload_plugin_safe(self, plugin_name: str) -> Result[None]:
+        """Unload a plugin module using Result pattern for error handling."""
+        try:
+            self.unload_plugin(plugin_name)
+            return Result.success_result(
+                None,
+                metadata={
+                    'plugin_name': plugin_name,
+                    'unloaded_at': datetime.now().isoformat()
+                }
+            )
+        except Exception as e:
+            error = Error(
+                code="PLUGIN_UNLOAD_ERROR",
+                message=f"Failed to unload plugin {plugin_name}",
+                details={
+                    'plugin_name': plugin_name,
+                    'error_type': type(e).__name__,
+                    'error_message': str(e)
+                },
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
     
     def _load_module(self, plugin_info: PluginInfo) -> Any:
         """Load a module from plugin info."""

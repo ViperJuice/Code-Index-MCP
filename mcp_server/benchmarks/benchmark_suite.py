@@ -7,6 +7,7 @@ This module defines benchmarks for:
 - Indexing throughput (10K files/minute target)
 - Memory usage for large codebases
 - Cache performance metrics
+- Interface compliance with IIndexPerformanceMonitor and IPerformanceMonitor
 """
 
 import time
@@ -22,10 +23,11 @@ import numpy as np
 import logging
 
 from ..dispatcher import Dispatcher
-from ..gateway import Gateway
 from ..plugin_base import IPlugin, SymbolDef, SearchResult
 from ..storage.sqlite_store import SQLiteStore
-from ..watcher import FileWatcher
+from ..interfaces.indexing_interfaces import IIndexPerformanceMonitor
+from ..interfaces.metrics_interfaces import IPerformanceMonitor
+from ..interfaces.shared_interfaces import Result, Error
 
 logger = logging.getLogger(__name__)
 
@@ -105,8 +107,8 @@ class BenchmarkResult:
         self.end_time = datetime.now()
 
 
-class BenchmarkSuite:
-    """Main benchmark suite for MCP Server performance validation."""
+class BenchmarkSuite(IIndexPerformanceMonitor, IPerformanceMonitor):
+    """Main benchmark suite for MCP Server performance validation implementing monitoring interfaces."""
     
     # Performance SLOs from requirements
     SYMBOL_LOOKUP_TARGET_MS = 100  # p95 < 100ms
@@ -121,8 +123,13 @@ class BenchmarkSuite:
         self.dispatcher = Dispatcher(plugins)
         self.db_path = db_path or Path(tempfile.mktemp(suffix=".db"))
         self.store = SQLiteStore(self.db_path)
-        self.gateway = Gateway(self.dispatcher, self.store)
         self._process = psutil.Process(os.getpid())
+        
+        # Performance monitoring storage
+        self._indexing_times: List[Dict[str, Any]] = []
+        self._search_times: List[Dict[str, Any]] = []
+        self._performance_timers: Dict[str, Dict[str, Any]] = {}
+        self._timer_counter = 0
         
     def _measure_time(self, func, *args, **kwargs) -> Tuple[Any, float]:
         """Measure execution time in milliseconds."""
@@ -426,6 +433,199 @@ void test_method_{idx}(TestStruct{idx}* s) {{
         
         return result
     
+    # Implementation of IIndexPerformanceMonitor interface
+    
+    async def record_indexing_time(self, file_path: str, time_taken: float) -> None:
+        """Record time taken to index a file."""
+        self._indexing_times.append({
+            "file_path": file_path,
+            "time_taken": time_taken,
+            "timestamp": datetime.now()
+        })
+        
+        # Keep only last 10000 records to prevent memory growth
+        if len(self._indexing_times) > 10000:
+            self._indexing_times = self._indexing_times[-10000:]
+    
+    async def record_search_time(self, query: str, time_taken: float, result_count: int) -> None:
+        """Record search performance."""
+        self._search_times.append({
+            "query": query,
+            "time_taken": time_taken,
+            "result_count": result_count,
+            "timestamp": datetime.now()
+        })
+        
+        # Keep only last 10000 records to prevent memory growth
+        if len(self._search_times) > 10000:
+            self._search_times = self._search_times[-10000:]
+    
+    async def get_performance_metrics(self) -> Result[Dict[str, Any]]:
+        """Get performance metrics."""
+        try:
+            indexing_times = [r["time_taken"] for r in self._indexing_times]
+            search_times = [r["time_taken"] for r in self._search_times]
+            
+            metrics = {
+                "indexing": {
+                    "total_operations": len(indexing_times),
+                    "mean_time": np.mean(indexing_times) if indexing_times else 0,
+                    "p95_time": np.percentile(indexing_times, 95) if indexing_times else 0,
+                    "p99_time": np.percentile(indexing_times, 99) if indexing_times else 0,
+                } if indexing_times else {"total_operations": 0},
+                "search": {
+                    "total_operations": len(search_times),
+                    "mean_time": np.mean(search_times) if search_times else 0,
+                    "p95_time": np.percentile(search_times, 95) if search_times else 0,
+                    "p99_time": np.percentile(search_times, 99) if search_times else 0,
+                    "mean_results": np.mean([r["result_count"] for r in self._search_times]) if self._search_times else 0
+                } if search_times else {"total_operations": 0},
+                "system": {
+                    "memory_usage_mb": self._measure_memory(),
+                    "cpu_percent": self._measure_cpu()
+                }
+            }
+            
+            return Result.success_result(metrics)
+            
+        except Exception as e:
+            error = Error(
+                code="metrics_retrieval_failed",
+                message=f"Failed to retrieve performance metrics: {str(e)}",
+                details={"exception_type": type(e).__name__},
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
+    
+    async def get_slow_queries(self, threshold: float) -> Result[List[Dict[str, Any]]]:
+        """Get queries that took longer than threshold."""
+        try:
+            slow_queries = [
+                {
+                    "query": record["query"],
+                    "time_taken": record["time_taken"],
+                    "result_count": record["result_count"],
+                    "timestamp": record["timestamp"].isoformat()
+                }
+                for record in self._search_times
+                if record["time_taken"] > threshold
+            ]
+            
+            # Sort by time taken (slowest first)
+            slow_queries.sort(key=lambda x: x["time_taken"], reverse=True)
+            
+            return Result.success_result(slow_queries)
+            
+        except Exception as e:
+            error = Error(
+                code="slow_queries_retrieval_failed",
+                message=f"Failed to retrieve slow queries: {str(e)}",
+                details={"exception_type": type(e).__name__},
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
+    
+    # Implementation of IPerformanceMonitor interface
+    
+    def start_timer(self, operation: str, labels: Dict[str, str] = None) -> str:
+        """Start a performance timer."""
+        timer_id = f"timer_{self._timer_counter}"
+        self._timer_counter += 1
+        
+        self._performance_timers[timer_id] = {
+            "operation": operation,
+            "labels": labels or {},
+            "start_time": time.perf_counter(),
+            "end_time": None
+        }
+        
+        return timer_id
+    
+    def stop_timer(self, timer_id: str) -> float:
+        """Stop a timer and return duration."""
+        if timer_id not in self._performance_timers:
+            logger.warning(f"Timer {timer_id} not found")
+            return 0.0
+        
+        timer = self._performance_timers[timer_id]
+        end_time = time.perf_counter()
+        timer["end_time"] = end_time
+        
+        duration = end_time - timer["start_time"]
+        
+        # Record the duration
+        self.record_duration(timer["operation"], duration, timer["labels"])
+        
+        return duration
+    
+    def record_duration(self, operation: str, duration: float, labels: Dict[str, str] = None) -> None:
+        """Record operation duration."""
+        # Store in appropriate collection based on operation type
+        if "index" in operation.lower():
+            # Simulate file path for indexing operations
+            file_path = labels.get("file_path", f"simulated_{operation}.py") if labels else f"simulated_{operation}.py"
+            # Convert to async call in real implementation
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.create_task(self.record_indexing_time(file_path, duration * 1000))  # Convert to ms
+                else:
+                    loop.run_until_complete(self.record_indexing_time(file_path, duration * 1000))
+            except RuntimeError:
+                # No event loop, record directly
+                self._indexing_times.append({
+                    "file_path": file_path,
+                    "time_taken": duration * 1000,  # Convert to ms
+                    "timestamp": datetime.now()
+                })
+        
+        elif "search" in operation.lower():
+            query = labels.get("query", "benchmark_query") if labels else "benchmark_query"
+            result_count = int(labels.get("result_count", "0")) if labels else 0
+            # Convert to async call in real implementation
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.create_task(self.record_search_time(query, duration * 1000, result_count))  # Convert to ms
+                else:
+                    loop.run_until_complete(self.record_search_time(query, duration * 1000, result_count))
+            except RuntimeError:
+                # No event loop, record directly
+                self._search_times.append({
+                    "query": query,
+                    "time_taken": duration * 1000,  # Convert to ms
+                    "result_count": result_count,
+                    "timestamp": datetime.now()
+                })
+    
+    def get_performance_stats(self, operation: str) -> Dict[str, Any]:
+        """Get performance statistics."""
+        if "index" in operation.lower():
+            times = [r["time_taken"] for r in self._indexing_times]
+            operation_type = "indexing"
+        elif "search" in operation.lower():
+            times = [r["time_taken"] for r in self._search_times]
+            operation_type = "search"
+        else:
+            return {"error": f"Unknown operation type: {operation}"}
+        
+        if not times:
+            return {"operation": operation, "total_operations": 0}
+        
+        return {
+            "operation": operation,
+            "operation_type": operation_type,
+            "total_operations": len(times),
+            "mean_time_ms": float(np.mean(times)),
+            "median_time_ms": float(np.median(times)),
+            "p95_time_ms": float(np.percentile(times, 95)),
+            "p99_time_ms": float(np.percentile(times, 99)),
+            "min_time_ms": float(np.min(times)),
+            "max_time_ms": float(np.max(times))
+        }
+    
     def validate_performance_requirements(self, result: BenchmarkResult) -> Dict[str, bool]:
         """Validate results against performance requirements."""
         validations = {}
@@ -456,3 +656,106 @@ void test_method_{idx}(TestStruct{idx}* s) {{
                 validations["memory_usage"] = mb_per_100k <= self.MEMORY_TARGET_MB_PER_100K
         
         return validations
+    
+    def get_performance_summary(self) -> Dict[str, Any]:
+        """Get a comprehensive performance summary."""
+        summary = {
+            "timestamp": datetime.now().isoformat(),
+            "slo_compliance": {},
+            "performance_stats": {},
+            "system_resources": {
+                "memory_mb": self._measure_memory(),
+                "cpu_percent": self._measure_cpu()
+            }
+        }
+        
+        # Calculate SLO compliance based on recorded data
+        if self._search_times:
+            search_p95 = np.percentile([r["time_taken"] for r in self._search_times], 95)
+            summary["slo_compliance"]["search_p95_ms"] = {
+                "current": float(search_p95),
+                "target": self.SEARCH_TARGET_MS,
+                "compliant": search_p95 <= self.SEARCH_TARGET_MS
+            }
+        
+        if self._indexing_times:
+            indexing_p95 = np.percentile([r["time_taken"] for r in self._indexing_times], 95)
+            summary["slo_compliance"]["indexing_p95_ms"] = {
+                "current": float(indexing_p95),
+                "target": 100,  # 100ms for indexing individual files
+                "compliant": indexing_p95 <= 100
+            }
+        
+        # Add performance stats
+        summary["performance_stats"]["indexing"] = self.get_performance_stats("indexing")
+        summary["performance_stats"]["search"] = self.get_performance_stats("search")
+        
+        return summary
+
+
+def run_pytest_benchmarks(benchmark, plugins: List[IPlugin]):
+    """Integration with pytest-benchmark for standard testing."""
+    suite = BenchmarkSuite(plugins)
+    
+    # Populate some test data for meaningful benchmarks
+    test_symbols = {
+        "test_function": "def test_function(): pass",
+        "calculate_sum": "def calculate_sum(a, b): return a + b",
+        "MyClass": "class MyClass: pass",
+        "process_data": "void process_data(int* data) {}"
+    }
+    
+    # Add symbols to first plugin for testing
+    if plugins and hasattr(plugins[0], '_symbols'):
+        for name, definition in test_symbols.items():
+            plugins[0]._symbols[name] = type('SymbolDef', (), {
+                'name': name,
+                'type': 'function',
+                'path': '/test.py',
+                'line': 1,
+                'character': 0,
+                'definition': definition
+            })()
+    
+    # Define individual benchmark functions with performance monitoring
+    def bench_symbol_lookup():
+        timer_id = suite.start_timer("symbol_lookup", {"symbol": "test_function"})
+        try:
+            result = suite.dispatcher.lookup("test_function")
+            return result
+        finally:
+            suite.stop_timer(timer_id)
+    
+    def bench_fuzzy_search():
+        timer_id = suite.start_timer("fuzzy_search", {"query": "test"})
+        try:
+            results = list(suite.dispatcher.search("test", semantic=False))
+            return results
+        finally:
+            suite.stop_timer(timer_id)
+    
+    def bench_semantic_search():
+        timer_id = suite.start_timer("semantic_search", {"query": "calculate sum"})
+        try:
+            results = list(suite.dispatcher.search("calculate sum", semantic=True))
+            return results
+        finally:
+            suite.stop_timer(timer_id)
+    
+    # Run with pytest-benchmark
+    benchmark.group = "mcp_server"
+    
+    if hasattr(benchmark, '_item') and benchmark._item:
+        test_name = benchmark._item.name
+    else:
+        test_name = getattr(benchmark, 'name', 'unknown')
+    
+    if "symbol_lookup" in test_name:
+        return benchmark(bench_symbol_lookup)
+    elif "fuzzy_search" in test_name:
+        return benchmark(bench_fuzzy_search)
+    elif "semantic_search" in test_name:
+        return benchmark(bench_semantic_search)
+    else:
+        # Default to symbol lookup
+        return benchmark(bench_symbol_lookup)

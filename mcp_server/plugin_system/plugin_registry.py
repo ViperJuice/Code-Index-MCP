@@ -2,10 +2,12 @@
 
 import logging
 from typing import Dict, List, Optional, Type
+from datetime import datetime
 
 from ..plugin_base import IPlugin
 from .interfaces import IPluginRegistry
 from .models import PluginInfo, PluginNotFoundError
+from ..interfaces.shared_interfaces import Result, Error
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +49,31 @@ class PluginRegistry(IPluginRegistry):
         logger.info(f"Registered plugin: {plugin_name} (language: {plugin_info.language}, "
                    f"extensions: {', '.join(plugin_info.file_extensions)})")
     
+    def register_plugin_safe(self, plugin_info: PluginInfo, plugin_class: Type[IPlugin]) -> Result[None]:
+        """Register a plugin using Result pattern for error handling."""
+        try:
+            self.register_plugin(plugin_info, plugin_class)
+            return Result.success_result(
+                None,
+                metadata={
+                    'plugin_name': plugin_info.name,
+                    'plugin_version': plugin_info.version,
+                    'registered_at': datetime.now().isoformat()
+                }
+            )
+        except Exception as e:
+            error = Error(
+                code="PLUGIN_REGISTER_ERROR",
+                message=f"Failed to register plugin {plugin_info.name}",
+                details={
+                    'plugin_name': plugin_info.name,
+                    'error_type': type(e).__name__,
+                    'error_message': str(e)
+                },
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
+    
     def unregister_plugin(self, plugin_name: str) -> None:
         """Unregister a plugin."""
         if plugin_name not in self._plugins:
@@ -73,6 +100,30 @@ class PluginRegistry(IPluginRegistry):
                     del self._extension_map[ext]
         
         logger.info(f"Unregistered plugin: {plugin_name}")
+    
+    def unregister_plugin_safe(self, plugin_name: str) -> Result[None]:
+        """Unregister a plugin using Result pattern for error handling."""
+        try:
+            self.unregister_plugin(plugin_name)
+            return Result.success_result(
+                None,
+                metadata={
+                    'plugin_name': plugin_name,
+                    'unregistered_at': datetime.now().isoformat()
+                }
+            )
+        except Exception as e:
+            error = Error(
+                code="PLUGIN_UNREGISTER_ERROR",
+                message=f"Failed to unregister plugin {plugin_name}",
+                details={
+                    'plugin_name': plugin_name,
+                    'error_type': type(e).__name__,
+                    'error_message': str(e)
+                },
+                timestamp=datetime.now()
+            )
+            return Result.error_result(error)
     
     def get_plugin(self, plugin_name: str) -> Optional[Type[IPlugin]]:
         """Get a registered plugin class by name."""
@@ -121,3 +172,30 @@ class PluginRegistry(IPluginRegistry):
         self._language_map.clear()
         self._extension_map.clear()
         logger.info("Cleared plugin registry")
+    
+    def get_plugin_status(self, plugin_name: str) -> Optional[Dict[str, any]]:
+        """Get detailed status information for a plugin."""
+        if plugin_name not in self._plugins:
+            return None
+        
+        plugin_info = self._plugin_info[plugin_name]
+        return {
+            'name': plugin_info.name,
+            'version': plugin_info.version,
+            'description': plugin_info.description,
+            'author': plugin_info.author,
+            'language': plugin_info.language,
+            'file_extensions': plugin_info.file_extensions,
+            'plugin_type': plugin_info.plugin_type.value,
+            'is_registered': True,
+            'registration_time': getattr(plugin_info, 'registration_time', None)
+        }
+    
+    def get_all_plugin_statuses(self) -> Dict[str, Dict[str, any]]:
+        """Get status information for all registered plugins."""
+        statuses = {}
+        for plugin_name in self._plugins.keys():
+            status = self.get_plugin_status(plugin_name)
+            if status:
+                statuses[plugin_name] = status
+        return statuses

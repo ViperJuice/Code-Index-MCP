@@ -1,7 +1,53 @@
 # Dart Plugin Agent Configuration
 
+## ESSENTIAL_COMMANDS
+- **Build**: `make test` (builds and tests the plugin)
+- **Test**: `pytest tests/test_dart_plugin.py -v` (run Dart plugin tests)
+- **Lint**: `make lint` (check code style)
+- **Install**: `pip install -e .` (install in development mode)
+- **Plugin Test**: `python -m pytest mcp_server/plugins/dart_plugin/ -v`
+- **Tree-sitter**: `pip install tree-sitter-languages` (Dart grammar support)
+- **Flutter Check**: `flutter --version` (verify Flutter SDK for testing)
+
+## CODE_STYLE_PREFERENCES
+- **Functions**: snake_case (`extract_dart_classes`, `parse_flutter_widgets`)
+- **Classes**: PascalCase (`DartSymbolExtractor`, `FlutterWidgetParser`)
+- **Files**: snake_case (`dart_plugin.py`, `test_dart_parser.py`)
+- **Constants**: UPPER_SNAKE_CASE (`DART_EXTENSIONS`, `FLUTTER_WIDGETS`)
+- **Variables**: snake_case (`widget_tree`, `mixin_declarations`)
+
+## ARCHITECTURAL_PATTERNS
+- **Plugin Pattern**: Inherit from `IPlugin` base class with standardized interface
+- **Tree-sitter Integration**: Use `TreeSitterWrapper` for parsing Dart AST
+- **Flutter Detection**: Auto-detect Flutter projects via pubspec.yaml
+- **Symbol Storage**: Store symbols via `SQLiteStore` with widget hierarchy tracking
+- **Error Handling**: Return `Result[T, Error]` pattern for all operations
+- **Widget Parsing**: Special handling for Flutter StatelessWidget/StatefulWidget
+
+## DEVELOPMENT_ENVIRONMENT
+- **Python Version**: 3.8+ (required for Tree-sitter)
+- **Dependencies**: `tree-sitter>=0.20.0`, `tree-sitter-languages>=1.8.0`
+- **Virtual Environment**: Required (`python -m venv venv`)
+- **Dart Test Files**: Place in `tests/fixtures/dart/` for testing
+- **Flutter SDK**: Optional but recommended for comprehensive testing
+- **IDE Setup**: Configure for Dart syntax highlighting in test files
+
+## NAMING_CONVENTIONS
+- **Symbol Types**: Use Dart-specific types (`class`, `function`, `mixin`, `extension`, `widget`)
+- **File Extensions**: Support `.dart` only
+- **Test Files**: `test_dart_*.py` pattern for plugin tests
+- **Fixtures**: `dart_sample_*.dart` for test source files
+- **Widget Types**: Distinguish `StatelessWidget`, `StatefulWidget`, `State` classes
+
+## TEAM_SHARED_PRACTICES
+- **Testing**: Include Flutter widget parsing and null safety features
+- **Documentation**: Include Dart code examples with modern syntax
+- **Widget Hierarchy**: Track extends/implements relationships for Flutter widgets
+- **Error Messages**: Include Dart context (async/await, null safety)
+- **Performance**: Target <100ms for symbol extraction, handle large Flutter apps
+
 ## Implementation Status
-❌ **STUB IMPLEMENTATION** - This plugin needs full implementation following the Python plugin pattern
+✅ **FULLY IMPLEMENTED** - Complete Dart/Flutter plugin with comprehensive symbol extraction
 
 ## Overview
 The Dart plugin will provide code intelligence for Dart source files (.dart) using Tree-sitter for parsing and handling Dart-specific features like null safety, mixins, extension methods, and Flutter widget hierarchies.

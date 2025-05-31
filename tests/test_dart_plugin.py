@@ -10,6 +10,8 @@ Tests cover:
 - Documentation extraction
 - Error handling
 - Edge cases and complex code structures
+- Interface compliance (both IPlugin and IDartPlugin)
+- Result pattern usage
 - Performance benchmarks
 """
 
@@ -17,11 +19,14 @@ import json
 from pathlib import Path
 from unittest.mock import Mock, patch
 from textwrap import dedent
+from datetime import datetime
 
 import pytest
 
 from mcp_server.plugins.dart_plugin.plugin import Plugin as DartPlugin
 from mcp_server.plugin_base import SymbolDef, SearchResult
+from mcp_server.interfaces.plugin_interfaces import SymbolDefinition, SymbolReference, IndexedFile
+from mcp_server.interfaces.shared_interfaces import Result
 
 
 class TestPluginInitialization:
@@ -46,6 +51,14 @@ class TestPluginInitialization:
         plugin = DartPlugin()
         assert plugin.lang == "dart"
 
+    def test_interface_properties(self):
+        """Test IDartPlugin interface properties."""
+        plugin = DartPlugin()
+        
+        assert plugin.name == "dart_plugin"
+        assert plugin.supported_extensions == [".dart"]
+        assert plugin.supported_languages == ["dart", "flutter"]
+
 
 class TestFileSupport:
     """Test file support detection."""
@@ -64,6 +77,7 @@ class TestFileSupport:
         
         for file_path in dart_files:
             assert plugin.supports(file_path) is True
+            assert plugin.can_handle(str(file_path)) is True
     
     def test_does_not_support_other_files(self):
         """Test that plugin doesn't support non-Dart files."""
@@ -82,6 +96,7 @@ class TestFileSupport:
         
         for file_path in other_files:
             assert plugin.supports(file_path) is False
+            assert plugin.can_handle(str(file_path)) is False
     
     def test_supports_case_sensitivity(self):
         """Test case sensitivity in file extension."""
@@ -91,6 +106,235 @@ class TestFileSupport:
         assert plugin.supports(Path("test.dart")) is True
         assert plugin.supports(Path("test.DART")) is False
         assert plugin.supports(Path("test.Dart")) is False
+
+
+class TestNewInterfaceImplementation:
+    """Test the new IDartPlugin interface implementation."""
+    
+    def test_index_interface(self):
+        """Test the new index method that returns Result[IndexedFile]."""
+        plugin = DartPlugin()
+        code = dedent("""
+        /// A simple class for testing
+        class TestClass {
+          void method() {}
+        }
+        """)
+        
+        # Test successful indexing
+        result = plugin.index("test.dart", code)
+        
+        assert isinstance(result, Result)
+        assert result.success is True
+        assert result.value is not None
+        assert isinstance(result.value, IndexedFile)
+        
+        indexed_file = result.value
+        assert indexed_file.file_path == "test.dart"
+        assert indexed_file.language == "dart"
+        assert len(indexed_file.symbols) > 0
+        
+        # Check symbols
+        class_symbol = next(s for s in indexed_file.symbols if s.symbol == "TestClass")
+        assert class_symbol.symbol_type == "class"
+        assert class_symbol.line > 0
+    
+    def test_get_definition_interface(self):
+        """Test the new get_definition method with Result pattern."""
+        plugin = DartPlugin()
+        code = dedent("""
+        /// A target function to find.
+        void targetFunction() {
+          print('Found me!');
+        }
+        """)
+        
+        # Index first
+        plugin.index("test.dart", code)
+        
+        # Test successful definition lookup
+        result = plugin.get_definition("targetFunction", {})
+        
+        assert isinstance(result, Result)
+        assert result.success is True
+        assert result.value is not None
+        assert isinstance(result.value, SymbolDefinition)
+        
+        definition = result.value
+        assert definition.symbol == "targetFunction"
+        assert definition.symbol_type == "function"
+        assert "targetFunction" in definition.signature
+    
+    def test_get_references_interface(self):
+        """Test the new get_references method with Result pattern."""
+        plugin = DartPlugin()
+        code = dedent("""
+        void targetFunction() {
+          print('Hello');
+        }
+        
+        void caller() {
+          targetFunction();
+        }
+        """)
+        
+        # Index first
+        plugin.index("test.dart", code)
+        
+        # Test successful references lookup
+        result = plugin.get_references("targetFunction", {})
+        
+        assert isinstance(result, Result)
+        assert result.success is True
+        assert isinstance(result.value, list)
+        
+        # Should find references (including the definition)
+        assert len(result.value) >= 1
+        
+        for ref in result.value:
+            assert isinstance(ref, SymbolReference)
+            assert ref.symbol == "targetFunction"
+    
+    def test_search_interface(self):
+        """Test the new search method with Result pattern."""
+        plugin = DartPlugin()
+        code = dedent("""
+        void calculateSum() {}
+        void calculateProduct() {}
+        """)
+        
+        # Index first
+        plugin.index("test.dart", code)
+        
+        # Test successful search
+        result = plugin.search("calculate", {"limit": 10})
+        
+        assert isinstance(result, Result)
+        assert result.success is True
+        assert isinstance(result.value, list)
+    
+    def test_validate_syntax_interface(self):
+        """Test the validate_syntax method."""
+        plugin = DartPlugin()
+        
+        # Valid syntax
+        valid_code = "void main() { print('Hello'); }"
+        result = plugin.validate_syntax(valid_code)
+        
+        assert isinstance(result, Result)
+        assert result.success is True
+        assert result.value is True
+        
+        # Invalid syntax (unbalanced braces)
+        invalid_code = "void main() { print('Hello');"
+        result = plugin.validate_syntax(invalid_code)
+        
+        assert isinstance(result, Result)
+        assert result.success is True
+        assert result.value is False
+    
+    def test_get_completions_interface(self):
+        """Test the get_completions method."""
+        plugin = DartPlugin()
+        
+        result = plugin.get_completions("test.dart", 10, 5)
+        
+        assert isinstance(result, Result)
+        assert result.success is True
+        assert isinstance(result.value, list)
+        
+        # Should include Dart keywords
+        completions = result.value
+        assert "class" in completions
+        assert "void" in completions
+        assert "Widget" in completions
+    
+    def test_parse_flutter_widgets_interface(self):
+        """Test the parse_flutter_widgets method."""
+        plugin = DartPlugin()
+        code = dedent("""
+        import 'package:flutter/material.dart';
+        
+        class MyWidget extends StatelessWidget {
+          Widget build(BuildContext context) {
+            return Text('Hello');
+          }
+        }
+        """)
+        
+        result = plugin.parse_flutter_widgets(code)
+        
+        assert isinstance(result, Result)
+        assert result.success is True
+        assert isinstance(result.value, list)
+        
+        widgets = result.value
+        assert len(widgets) >= 1
+        
+        widget = widgets[0]
+        assert isinstance(widget, SymbolDefinition)
+        assert widget.symbol == "MyWidget"
+        assert widget.symbol_type == "widget"
+    
+    def test_resolve_packages_interface(self):
+        """Test the resolve_packages method."""
+        plugin = DartPlugin()
+        
+        # Create a temporary file with package imports
+        test_file = Path("test_file.dart")
+        code = dedent("""
+        import 'package:flutter/material.dart';
+        import 'package:http/http.dart';
+        """)
+        
+        # Write the file temporarily
+        with patch('pathlib.Path.read_text') as mock_read:
+            mock_read.return_value = code
+            
+            result = plugin.resolve_packages(str(test_file))
+            
+            assert isinstance(result, Result)
+            assert result.success is True
+            assert isinstance(result.value, list)
+            
+            packages = result.value
+            assert "flutter" in packages
+            assert "http" in packages
+    
+    def test_language_analyzer_interface(self):
+        """Test ILanguageAnalyzer interface methods."""
+        plugin = DartPlugin()
+        code = dedent("""
+        import 'package:flutter/material.dart';
+        import 'dart:async';
+        
+        void testFunction() {}
+        class TestClass {}
+        """)
+        
+        # Test parse_imports
+        imports_result = plugin.parse_imports(code)
+        assert isinstance(imports_result, Result)
+        assert imports_result.success is True
+        assert "package:flutter/material.dart" in imports_result.value
+        
+        # Test extract_symbols
+        symbols_result = plugin.extract_symbols(code)
+        assert isinstance(symbols_result, Result)
+        assert symbols_result.success is True
+        assert len(symbols_result.value) >= 2
+        
+        # Test resolve_type
+        type_result = plugin.resolve_type("testFunction", {})
+        assert isinstance(type_result, Result)
+        assert type_result.success is True
+        
+        # Test get_call_hierarchy
+        hierarchy_result = plugin.get_call_hierarchy("testFunction", {})
+        assert isinstance(hierarchy_result, Result)
+        assert hierarchy_result.success is True
+        assert "calls" in hierarchy_result.value
+        assert "called_by" in hierarchy_result.value
 
 
 class TestSymbolExtraction:
@@ -496,6 +740,17 @@ class TestErrorHandling:
         
         assert isinstance(result, dict)
         assert len(result.get("symbols", [])) == 0
+    
+    def test_error_result_patterns(self):
+        """Test error handling with Result patterns."""
+        plugin = DartPlugin()
+        
+        # Test with invalid file path
+        result = plugin.index("/nonexistent/file.dart")
+        assert isinstance(result, Result)
+        assert result.success is False
+        assert result.error is not None
+        assert "Failed to index file" in result.error.message
 
 
 class TestSearchFunctionality:
@@ -821,3 +1076,51 @@ class TestPersistenceIntegration:
         app_class = plugin.getDefinition("MyApp")
         assert app_class is not None
         assert app_class["kind"] == "widget"
+
+
+class TestPerformanceAndScalability:
+    """Test performance characteristics and scalability."""
+    
+    def test_large_file_handling(self):
+        """Test handling of large Dart files."""
+        plugin = DartPlugin()
+        
+        # Generate a large file with many symbols
+        classes = []
+        for i in range(100):
+            classes.append(f"""
+class TestClass{i} {{
+  String property{i} = 'value{i}';
+  
+  void method{i}() {{
+    print('Method {i}');
+  }}
+  
+  int calculate{i}(int x) {{
+    return x * {i};
+  }}
+}}
+""")
+        
+        large_code = "\n".join(classes)
+        
+        # Should handle large file without issues
+        result = plugin.indexFile(Path("large_test.dart"), large_code)
+        
+        symbols = result["symbols"]
+        assert len(symbols) >= 300  # 100 classes + 100 properties + 200 methods
+    
+    def test_get_indexed_count(self):
+        """Test get_indexed_count method."""
+        plugin = DartPlugin()
+        
+        # Initially should be 0 (or pre-indexed count)
+        initial_count = plugin.get_indexed_count()
+        
+        # Index a file
+        code = "class TestClass {}"
+        plugin.indexFile(Path("test1.dart"), code)
+        
+        # Count should increase
+        new_count = plugin.get_indexed_count()
+        assert new_count >= initial_count

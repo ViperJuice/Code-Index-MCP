@@ -5,10 +5,21 @@ from typing import Optional, Dict, List, Set, Tuple, Any
 import ctypes
 import logging
 import re
+import hashlib
+from datetime import datetime
 
 from tree_sitter import Language, Parser, Node
 import tree_sitter_languages
 
+from ...interfaces.plugin_interfaces import (
+    IHtmlCssPlugin,
+    ILanguageAnalyzer,
+    SymbolDefinition,
+    SymbolReference,
+    SearchResult as PluginSearchResult,
+    IndexedFile,
+)
+from ...interfaces.shared_interfaces import Result, Error
 from ...plugin_base import (
     IPlugin,
     IndexShard,
@@ -23,7 +34,7 @@ from ...storage.sqlite_store import SQLiteStore
 logger = logging.getLogger(__name__)
 
 
-class Plugin(IPlugin):
+class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
     """HTML/CSS plugin for code intelligence."""
     
     lang = "html_css"
@@ -77,6 +88,470 @@ class Plugin(IPlugin):
         
         # Pre-index existing files
         self._preindex()
+    
+    # ========================================
+    # IPlugin Interface Implementation
+    # ========================================
+    
+    @property
+    def name(self) -> str:
+        """Get the plugin name."""
+        return "html_css_plugin"
+    
+    @property
+    def supported_extensions(self) -> List[str]:
+        """Get list of file extensions this plugin supports."""
+        return [".html", ".htm", ".css", ".scss", ".sass", ".less"]
+    
+    @property
+    def supported_languages(self) -> List[str]:
+        """Get list of programming languages this plugin supports."""
+        return ["html", "css", "scss", "sass", "less"]
+    
+    def can_handle(self, file_path: str) -> bool:
+        """Check if this plugin can handle the given file."""
+        return self.supports(file_path)
+    
+    def index(self, file_path: str, content: Optional[str] = None) -> Result[IndexedFile]:
+        """Index a file and extract symbols."""
+        try:
+            path = Path(file_path)
+            
+            if content is None:
+                if not path.exists():
+                    return Result.error_result(
+                        Error(
+                            code="file_not_found",
+                            message=f"File not found: {file_path}",
+                            details={"file_path": file_path},
+                            timestamp=datetime.now()
+                        )
+                    )
+                content = path.read_text(encoding="utf-8")
+            
+            # Use the existing indexFile method
+            index_shard = self.indexFile(file_path, content)
+            
+            # Convert to new interface format
+            symbols = []
+            for symbol_dict in index_shard["symbols"]:
+                symbol_def = SymbolDefinition(
+                    symbol=symbol_dict["symbol"],
+                    file_path=file_path,
+                    line=symbol_dict.get("line", 1),
+                    column=0,  # HTML/CSS doesn't typically track columns precisely
+                    symbol_type=symbol_dict["kind"],
+                    signature=symbol_dict.get("signature"),
+                    docstring=None,  # HTML/CSS don't have docstrings
+                    scope=symbol_dict.get("tag")  # Use tag as scope for HTML elements
+                )
+                symbols.append(symbol_def)
+            
+            indexed_file = IndexedFile(
+                file_path=file_path,
+                last_modified=path.stat().st_mtime if path.exists() else 0,
+                size=len(content),
+                symbols=symbols,
+                language="html" if self._is_html_file(path) else "css",
+                encoding="utf-8"
+            )
+            
+            return Result.success_result(indexed_file)
+            
+        except Exception as e:
+            return Result.error_result(
+                Error(
+                    code="indexing_error",
+                    message=f"Failed to index file: {str(e)}",
+                    details={"file_path": file_path, "exception": str(e)},
+                    timestamp=datetime.now()
+                )
+            )
+    
+    def get_definition(self, symbol: str, context: Dict[str, Any]) -> Result[Optional[SymbolDefinition]]:
+        """Get the definition of a symbol."""
+        try:
+            symbol_def = self.getDefinition(symbol)
+            if symbol_def is None:
+                return Result.success_result(None)
+            
+            # Convert from old format to new
+            definition = SymbolDefinition(
+                symbol=symbol_def["symbol"],
+                file_path=symbol_def["defined_in"],
+                line=symbol_def["line"],
+                column=0,
+                symbol_type=symbol_def["kind"],
+                signature=symbol_def.get("signature"),
+                docstring=symbol_def.get("doc"),
+                scope=None
+            )
+            
+            return Result.success_result(definition)
+            
+        except Exception as e:
+            return Result.error_result(
+                Error(
+                    code="definition_error",
+                    message=f"Failed to get definition: {str(e)}",
+                    details={"symbol": symbol, "exception": str(e)},
+                    timestamp=datetime.now()
+                )
+            )
+    
+    def get_references(self, symbol: str, context: Dict[str, Any]) -> Result[List[SymbolReference]]:
+        """Get all references to a symbol."""
+        try:
+            references = self.findReferences(symbol)
+            symbol_refs = []
+            
+            for ref in references:
+                symbol_ref = SymbolReference(
+                    symbol=symbol,
+                    file_path=ref.file,
+                    line=ref.line,
+                    column=0,
+                    context=None
+                )
+                symbol_refs.append(symbol_ref)
+            
+            return Result.success_result(symbol_refs)
+            
+        except Exception as e:
+            return Result.error_result(
+                Error(
+                    code="references_error",
+                    message=f"Failed to get references: {str(e)}",
+                    details={"symbol": symbol, "exception": str(e)},
+                    timestamp=datetime.now()
+                )
+            )
+    
+    def search(self, query: str, options: Dict[str, Any]) -> Result[List[PluginSearchResult]]:
+        """Search for code patterns."""
+        try:
+            # Convert options to old format
+            opts: SearchOpts = {}
+            if "semantic" in options:
+                opts["semantic"] = options["semantic"]
+            if "limit" in options:
+                opts["limit"] = options["limit"]
+            
+            results = self.search_legacy(query, opts)
+            plugin_results = []
+            
+            for result in results:
+                if isinstance(result, dict):
+                    plugin_result = PluginSearchResult(
+                        file_path=result.get("file", ""),
+                        line=result.get("line", 1),
+                        column=0,
+                        snippet=result.get("content", result.get("match", "")),
+                        match_type="fuzzy" if not options.get("semantic") else "semantic",
+                        score=result.get("score", 1.0),
+                        context=None
+                    )
+                    plugin_results.append(plugin_result)
+            
+            return Result.success_result(plugin_results)
+            
+        except Exception as e:
+            return Result.error_result(
+                Error(
+                    code="search_error",
+                    message=f"Failed to search: {str(e)}",
+                    details={"query": query, "exception": str(e)},
+                    timestamp=datetime.now()
+                )
+            )
+    
+    def validate_syntax(self, content: str) -> Result[bool]:
+        """Validate syntax of code content."""
+        try:
+            # For HTML/CSS, we can try parsing with tree-sitter to validate
+            # HTML validation
+            try:
+                tree = self._html_parser.parse(content.encode('utf-8'))
+                if tree.root_node.has_error:
+                    return Result.success_result(False)
+            except:
+                # If HTML parsing fails, try CSS
+                try:
+                    tree = self._css_parser.parse(content.encode('utf-8'))
+                    if tree.root_node.has_error:
+                        return Result.success_result(False)
+                except:
+                    return Result.success_result(False)
+            
+            return Result.success_result(True)
+            
+        except Exception as e:
+            return Result.error_result(
+                Error(
+                    code="validation_error",
+                    message=f"Failed to validate syntax: {str(e)}",
+                    details={"exception": str(e)},
+                    timestamp=datetime.now()
+                )
+            )
+    
+    def get_completions(self, file_path: str, line: int, column: int) -> Result[List[str]]:
+        """Get code completions at a position."""
+        # HTML/CSS completions are complex and context-dependent
+        # For now, return basic completions based on context
+        try:
+            path = Path(file_path)
+            if not path.exists():
+                return Result.success_result([])
+            
+            content = path.read_text(encoding="utf-8")
+            lines = content.splitlines()
+            
+            if line >= len(lines):
+                return Result.success_result([])
+            
+            current_line = lines[line]
+            completions = []
+            
+            if self._is_html_file(path):
+                # Basic HTML completions
+                if '<' in current_line:
+                    completions.extend(['div', 'span', 'p', 'h1', 'h2', 'h3', 'a', 'img', 'ul', 'li'])
+                if 'class="' in current_line or "class='" in current_line:
+                    # Suggest existing classes
+                    for classes in self._html_elements.values():
+                        for element in classes:
+                            completions.extend(element.get('classes', []))
+            
+            elif self._is_css_file(path):
+                # Basic CSS completions
+                if '{' not in current_line or current_line.count('{') > current_line.count('}'):
+                    # In selector context
+                    completions.extend(['.class', '#id', 'element', ':hover', ':active', ':focus'])
+                else:
+                    # In property context
+                    completions.extend([
+                        'color', 'background', 'padding', 'margin', 'border', 'font-size',
+                        'display', 'position', 'width', 'height', 'flex', 'grid'
+                    ])
+            
+            # Remove duplicates and sort
+            completions = sorted(list(set(completions)))
+            
+            return Result.success_result(completions)
+            
+        except Exception as e:
+            return Result.error_result(
+                Error(
+                    code="completions_error",
+                    message=f"Failed to get completions: {str(e)}",
+                    details={"file_path": file_path, "line": line, "column": column, "exception": str(e)},
+                    timestamp=datetime.now()
+                )
+            )
+    
+    # ========================================
+    # ILanguageAnalyzer Interface Implementation
+    # ========================================
+    
+    def parse_imports(self, content: str) -> Result[List[str]]:
+        """Parse import statements from content."""
+        try:
+            imports = []
+            
+            # CSS @import statements
+            import_pattern = r'@import\s+["\']([^"\']+)["\']'
+            matches = re.findall(import_pattern, content)
+            imports.extend(matches)
+            
+            # HTML link tags for CSS
+            link_pattern = r'<link[^>]+href=["\']([^"\']+\.css)["\']'
+            matches = re.findall(link_pattern, content, re.IGNORECASE)
+            imports.extend(matches)
+            
+            # HTML script tags for JS (related files)
+            script_pattern = r'<script[^>]+src=["\']([^"\']+\.js)["\']'
+            matches = re.findall(script_pattern, content, re.IGNORECASE)
+            imports.extend(matches)
+            
+            return Result.success_result(imports)
+            
+        except Exception as e:
+            return Result.error_result(
+                Error(
+                    code="parse_imports_error",
+                    message=f"Failed to parse imports: {str(e)}",
+                    details={"exception": str(e)},
+                    timestamp=datetime.now()
+                )
+            )
+    
+    def extract_symbols(self, content: str) -> Result[List[SymbolDefinition]]:
+        """Extract all symbols from content."""
+        try:
+            # Use a temporary file path for parsing
+            temp_path = "temp.html" if "<" in content else "temp.css"
+            index_result = self.index(temp_path, content)
+            
+            if not index_result.success:
+                return Result.error_result(index_result.error)
+            
+            return Result.success_result(index_result.value.symbols)
+            
+        except Exception as e:
+            return Result.error_result(
+                Error(
+                    code="extract_symbols_error",
+                    message=f"Failed to extract symbols: {str(e)}",
+                    details={"exception": str(e)},
+                    timestamp=datetime.now()
+                )
+            )
+    
+    def resolve_type(self, symbol: str, context: Dict[str, Any]) -> Result[Optional[str]]:
+        """Resolve the type of a symbol."""
+        try:
+            # Determine symbol type based on prefix/pattern
+            if symbol.startswith('#'):
+                return Result.success_result("id")
+            elif symbol.startswith('.'):
+                return Result.success_result("class")
+            elif symbol.startswith('@keyframes'):
+                return Result.success_result("keyframes")
+            elif symbol.startswith('@media'):
+                return Result.success_result("media-query")
+            elif symbol.startswith('--'):
+                return Result.success_result("css-variable")
+            elif '-' in symbol and not symbol.startswith('.') and not symbol.startswith('#'):
+                return Result.success_result("custom-element")
+            elif symbol.startswith('[') and symbol.endswith(']'):
+                return Result.success_result("attribute-selector")
+            else:
+                return Result.success_result("element")
+                
+        except Exception as e:
+            return Result.error_result(
+                Error(
+                    code="resolve_type_error",
+                    message=f"Failed to resolve type: {str(e)}",
+                    details={"symbol": symbol, "exception": str(e)},
+                    timestamp=datetime.now()
+                )
+            )
+    
+    def get_call_hierarchy(self, symbol: str, context: Dict[str, Any]) -> Result[Dict[str, List[str]]]:
+        """Get call hierarchy for a symbol."""
+        try:
+            # For HTML/CSS, call hierarchy means CSS selectors that target HTML elements
+            hierarchy = {
+                "callers": [],  # CSS selectors that use this symbol
+                "callees": []   # HTML elements that this CSS selector targets
+            }
+            
+            if symbol.startswith('.') or symbol.startswith('#'):
+                # CSS selector - find HTML elements it targets
+                refs = self.findReferences(symbol)
+                for ref in refs:
+                    if ref.file.endswith(('.html', '.htm')):
+                        hierarchy["callees"].append(ref.file)
+            else:
+                # HTML element - find CSS selectors that target it
+                # Convert element to potential selectors
+                potential_selectors = [f".{symbol}", f"#{symbol}", symbol]
+                for selector in potential_selectors:
+                    refs = self.findReferences(selector)
+                    for ref in refs:
+                        if ref.file.endswith(('.css', '.scss', '.sass', '.less')):
+                            hierarchy["callers"].append(selector)
+            
+            return Result.success_result(hierarchy)
+            
+        except Exception as e:
+            return Result.error_result(
+                Error(
+                    code="call_hierarchy_error",
+                    message=f"Failed to get call hierarchy: {str(e)}",
+                    details={"symbol": symbol, "exception": str(e)},
+                    timestamp=datetime.now()
+                )
+            )
+    
+    # ========================================
+    # IHtmlCssPlugin Interface Implementation
+    # ========================================
+    
+    def extract_selectors(self, css_content: str) -> Result[List[str]]:
+        """Extract CSS selectors."""
+        try:
+            tree = self._css_parser.parse(css_content.encode('utf-8'))
+            root = tree.root_node
+            
+            selectors = []
+            self._collect_css_selectors(root, css_content, selectors)
+            
+            return Result.success_result(selectors)
+            
+        except Exception as e:
+            return Result.error_result(
+                Error(
+                    code="extract_selectors_error",
+                    message=f"Failed to extract selectors: {str(e)}",
+                    details={"exception": str(e)},
+                    timestamp=datetime.now()
+                )
+            )
+    
+    def find_css_usage(self, html_content: str) -> Result[List[str]]:
+        """Find CSS class/ID usage in HTML."""
+        try:
+            tree = self._html_parser.parse(html_content.encode('utf-8'))
+            root = tree.root_node
+            
+            css_usage = []
+            self._collect_html_css_usage(root, html_content, css_usage)
+            
+            return Result.success_result(css_usage)
+            
+        except Exception as e:
+            return Result.error_result(
+                Error(
+                    code="find_css_usage_error",
+                    message=f"Failed to find CSS usage: {str(e)}",
+                    details={"exception": str(e)},
+                    timestamp=datetime.now()
+                )
+            )
+    
+    def _collect_css_selectors(self, node: Node, content: str, selectors: List[str]) -> None:
+        """Recursively collect CSS selectors from AST."""
+        if node.type == 'rule_set':
+            for child in node.children:
+                if child.type == 'selectors':
+                    selector_list = self._extract_css_selectors(child, content)
+                    selectors.extend(selector_list)
+        
+        for child in node.children:
+            self._collect_css_selectors(child, content, selectors)
+    
+    def _collect_html_css_usage(self, node: Node, content: str, css_usage: List[str]) -> None:
+        """Recursively collect CSS class/ID usage from HTML AST."""
+        if node.type == 'element':
+            attributes = self._extract_html_attributes(node, content)
+            
+            if 'id' in attributes:
+                css_usage.append(f"#{attributes['id']}")
+            
+            if 'class' in attributes:
+                classes = attributes['class'].split()
+                for class_name in classes:
+                    css_usage.append(f".{class_name}")
+        
+        for child in node.children:
+            self._collect_html_css_usage(child, content, css_usage)
+
+    # ========================================
+    # Legacy IPlugin Interface Implementation
+    # ========================================
 
     def _preindex(self) -> None:
         """Pre-index all supported files in the current directory."""
@@ -121,7 +596,6 @@ class Plugin(IPlugin):
         # Store file in SQLite if available
         file_id = None
         if self._sqlite_store and self._repository_id:
-            import hashlib
             file_hash = hashlib.sha256(content.encode('utf-8')).hexdigest()
             language = "html" if self._is_html_file(path) else "css"
             # Handle relative path calculation safely
@@ -708,7 +1182,7 @@ class Plugin(IPlugin):
         
         return refs
 
-    def search(self, query: str, opts: SearchOpts | None = None) -> list[SearchResult]:
+    def search_legacy(self, query: str, opts: SearchOpts | None = None) -> list[SearchResult]:
         """Search for code snippets matching a query."""
         limit = 20
         if opts and "limit" in opts:
