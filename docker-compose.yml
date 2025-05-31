@@ -1,0 +1,165 @@
+version: '3.8'
+
+services:
+  # Main MCP Server
+  mcp-server:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # Database configuration
+      - DATABASE_URL=sqlite:///app/data/code_index.db
+      
+      # Redis cache configuration
+      - REDIS_URL=redis://redis:6379
+      - CACHE_BACKEND=redis
+      - CACHE_DEFAULT_TTL=3600
+      - CACHE_MAX_ENTRIES=10000
+      - CACHE_MAX_MEMORY_MB=500
+      
+      # Query cache settings
+      - QUERY_CACHE_ENABLED=true
+      - QUERY_CACHE_DEFAULT_TTL=300
+      - QUERY_CACHE_SYMBOL_TTL=1800
+      - QUERY_CACHE_SEARCH_TTL=600
+      - QUERY_CACHE_SEMANTIC_TTL=3600
+      
+      # Semantic search configuration (dormant - requires API key)
+      - SEMANTIC_SEARCH_ENABLED=false
+      - QDRANT_URL=http://qdrant:6333
+      - SEMANTIC_COLLECTION_NAME=code-index
+      - SEMANTIC_VECTOR_SIZE=1024
+      - SEMANTIC_SEARCH_LIMIT=10
+      # - VOYAGE_AI_API_KEY=your-voyage-ai-key  # Uncomment and set when enabling
+      
+      # Security configuration
+      - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - REFRESH_TOKEN_EXPIRE_DAYS=7
+      - PASSWORD_MIN_LENGTH=12
+      - MAX_LOGIN_ATTEMPTS=5
+      - LOCKOUT_DURATION_MINUTES=30
+      
+      # Rate limiting
+      - RATE_LIMIT_REQUESTS=100
+      - RATE_LIMIT_WINDOW_MINUTES=1
+      
+      # CORS configuration
+      - CORS_ORIGINS=*
+      
+      # Admin user
+      - DEFAULT_ADMIN_PASSWORD=admin123!
+      - DEFAULT_ADMIN_EMAIL=admin@localhost
+      
+      # Indexing performance
+      - INDEXING_MAX_WORKERS=8
+      - INDEXING_BATCH_SIZE=20
+      - INDEXING_MAX_FILE_SIZE=10485760
+      - INDEXING_GENERATE_EMBEDDINGS=false
+      - INDEXING_EXTRACT_GRAPH=true
+      
+      # Metrics and monitoring
+      - METRICS_ENABLED=true
+      - METRICS_DETAILED=true
+      - HEALTH_CHECK_ENABLED=true
+      - BUSINESS_METRICS_ENABLED=true
+      
+      # Logging
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./data:/app/data
+      - /code:/code:ro  # Mount code to be indexed
+    depends_on:
+      - redis
+      - qdrant
+    restart: unless-stopped
+    networks:
+      - mcp-network
+
+  # Redis cache service
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Qdrant vector database (for semantic search)
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    restart: unless-stopped
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Prometheus monitoring (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - mcp-network
+    profiles:
+      - monitoring
+
+  # Grafana dashboard (optional)
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    restart: unless-stopped
+    networks:
+      - mcp-network
+    profiles:
+      - monitoring
+    depends_on:
+      - prometheus
+
+volumes:
+  redis-data:
+  qdrant-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  mcp-network:
+    driver: bridge

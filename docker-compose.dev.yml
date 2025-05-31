@@ -1,0 +1,89 @@
+version: '3.8'
+
+# Development override for docker-compose.yml
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      # Mount source code for development
+      - .:/app
+      - ./data:/app/data
+      - /code:/code:rw  # Read-write for development
+    environment:
+      # Development-specific environment
+      - LOG_LEVEL=DEBUG
+      - METRICS_DETAILED=true
+      
+      # Enable all dormant features for development
+      - SEMANTIC_SEARCH_ENABLED=true
+      - INDEXING_GENERATE_EMBEDDINGS=true
+      - CACHE_BACKEND=redis
+      
+      # Development cache settings (shorter TTLs for testing)
+      - CACHE_DEFAULT_TTL=300
+      - QUERY_CACHE_DEFAULT_TTL=60
+      - QUERY_CACHE_SYMBOL_TTL=300
+      - QUERY_CACHE_SEARCH_TTL=120
+      - QUERY_CACHE_SEMANTIC_TTL=600
+      
+      # Development indexing settings
+      - INDEXING_MAX_WORKERS=4
+      - INDEXING_BATCH_SIZE=10
+      
+      # Set API key from environment (user must provide)
+      - VOYAGE_AI_API_KEY=${VOYAGE_AI_API_KEY:-}
+    ports:
+      - "8000:8000"
+      - "8001:8001"  # Additional port for debugging
+    command: uvicorn mcp_server.gateway:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+
+  # Add Redis monitoring for development
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    profiles:
+      - debug
+
+  # Enable monitoring stack for development
+  prometheus:
+    profiles: []  # Always include in dev
+  
+  grafana:
+    profiles: []  # Always include in dev
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=dev
+      - GF_USERS_ALLOW_SIGN_UP=true
+      - GF_LOG_LEVEL=debug
+
+  # Test runner service for development
+  test-runner:
+    build: .
+    volumes:
+      - .:/app
+      - ./test_results:/app/test_results
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - QDRANT_URL=http://qdrant:6333
+      - SEMANTIC_SEARCH_ENABLED=true
+      - VOYAGE_AI_API_KEY=${VOYAGE_AI_API_KEY:-}
+      - MCP_TEST_MODE=1
+    command: python -m pytest tests/ -v --tb=short
+    depends_on:
+      - redis
+      - qdrant
+    profiles:
+      - testing

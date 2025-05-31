@@ -45,6 +45,8 @@ env/
 .env
 .env.local
 .env.*.local
+.env.production
+.env.development
 
 # IDEs and editors
 .vscode/
@@ -81,6 +83,12 @@ logs/
 *.tmp
 *.temp
 .cache/
+
+# Docker and data
+data/
+backup/
+test_workspace/
+test_results/
 
 # AI Guidance files - DO NOT IGNORE
 # CLAUDE.md

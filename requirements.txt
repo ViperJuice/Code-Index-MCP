@@ -16,6 +16,10 @@ hypothesis>=6.82.0
 # Cache dependencies (optional)
 redis>=4.5.0
 
+# Semantic search dependencies (dormant features)
+voyageai>=0.2.0
+qdrant-client>=1.7.0
+
 # Security dependencies
 pyjwt>=2.8.0
 passlib[bcrypt]>=1.7.4

@@ -187,6 +187,71 @@ class ParallelTestRunner:
                 parallel_workers=2,
                 estimated_duration_minutes=30,
                 dependencies=["performance_validation"]
+            ),
+            
+            TestPhase(
+                name="real_world_validation",
+                description="Real-World Codebase Testing",
+                test_groups=[
+                    {
+                        "name": "repository_indexing",
+                        "command": "pytest tests/real_world/test_repository_indexing.py -v --benchmark-autosave --tb=short",
+                        "workers": 2
+                    },
+                    {
+                        "name": "symbol_search",
+                        "command": "pytest tests/real_world/test_symbol_search.py -v --tb=short",
+                        "workers": 2
+                    },
+                    {
+                        "name": "performance_scaling",
+                        "command": "pytest tests/real_world/test_performance_scaling.py -v --benchmark-autosave --tb=short",
+                        "workers": 1
+                    },
+                    {
+                        "name": "memory_usage",
+                        "command": "pytest tests/real_world/test_memory_usage.py -v --tb=short",
+                        "workers": 1
+                    },
+                    {
+                        "name": "developer_workflows",
+                        "command": "pytest tests/real_world/test_developer_workflows.py -v --tb=short",
+                        "workers": 2
+                    }
+                ],
+                parallel_workers=3,
+                estimated_duration_minutes=90,
+                dependencies=["resilience_testing"]
+            ),
+            
+            TestPhase(
+                name="dormant_features_validation",
+                description="Dormant Features Activation Testing",
+                test_groups=[
+                    {
+                        "name": "semantic_search",
+                        "command": "pytest tests/real_world/test_semantic_search.py -v --tb=short -m semantic",
+                        "workers": 1
+                    },
+                    {
+                        "name": "redis_caching",
+                        "command": "pytest tests/real_world/test_redis_caching.py -v --tb=short -m cache",
+                        "workers": 1
+                    },
+                    {
+                        "name": "advanced_indexing",
+                        "command": "pytest tests/real_world/test_advanced_indexing.py -v --tb=short -m advanced_indexing",
+                        "workers": 2
+                    },
+                    {
+                        "name": "cross_language",
+                        "command": "pytest tests/real_world/test_cross_language.py -v --tb=short -m cross_language",
+                        "workers": 2
+                    }
+                ],
+                parallel_workers=2,
+                estimated_duration_minutes=60,
+                dependencies=["real_world_validation"]
             )
         ]
     
@@ -443,10 +508,12 @@ async def main():
     parser = argparse.ArgumentParser(description="Run comprehensive parallel tests for Code-Index-MCP")
     parser.add_argument("--phases", nargs="+", help="Specific phases to run", 
                        choices=["interface_compliance", "plugin_functionality", "integration_testing", 
-                               "performance_validation", "resilience_testing"])
+                               "performance_validation", "resilience_testing", "real_world_validation", 
+                               "dormant_features_validation"])
     parser.add_argument("--max-workers", type=int, help="Maximum parallel workers")
     parser.add_argument("--fail-fast", action="store_true", help="Stop on first phase failure")
     parser.add_argument("--setup-only", action="store_true", help="Only setup environment, don't run tests")
+    parser.add_argument("--setup-real-world", action="store_true", help="Setup real-world testing environment and download repositories")
     
     args = parser.parse_args()
     
@@ -456,6 +523,21 @@ async def main():
     if args.setup_only:
         print("✅ Environment setup complete. Run without --setup-only to execute tests.")
         return
+    
+    # Setup real-world testing environment if requested
+    if args.setup_real_world:
+        print("🌍 Setting up real-world testing environment...")
+        try:
+            # Run the repository download script
+            subprocess.run([
+                sys.executable, "scripts/download_test_repos.py", "--tier", "tier1"
+            ], check=True)
+            print("✅ Real-world testing environment setup complete.")
+            print("   Run with --phases real_world_validation to execute real-world tests.")
+            return
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Failed to setup real-world environment: {e}")
+            sys.exit(1)
     
     # Create test runner
     runner = ParallelTestRunner(max_workers=args.max_workers)
