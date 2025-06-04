@@ -78,17 +78,55 @@ yarn-error.log*
 # Logs
 *.log
 logs/
+*.log.*
 
 # Temporary files
 *.tmp
 *.temp
 .cache/
+tmp/
 
 # Docker and data
 data/
 backup/
 test_workspace/
 test_results/
+docker-data/
+
+# MCP specific
+.mcp/
+*.mcp-index
+mcp-indexes/
+# But keep the example config
+!mcp-config.json
+
+# Coverage reports
+htmlcov/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Test repositories (downloaded during testing)
+test_repos/
+
+# Generated documentation
+docs/_build/
+site/
+
+# Security - never commit these
+*.pem
+*.key
+*.cert
+*.crt
+private/
+
+# Local development
+.envrc
+.direnv/
+
+# Performance profiling
+*.prof
+*.lprof
 
 # AI Guidance files - DO NOT IGNORE
 # CLAUDE.md

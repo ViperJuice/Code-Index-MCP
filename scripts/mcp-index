@@ -1,0 +1,280 @@
+#!/usr/bin/env python3
+"""
+Smart MCP indexing script that automatically handles setup and remote indexes.
+
+This script wraps the MCP server indexing functionality to provide:
+- Automatic download of pre-built indexes from git remotes
+- Fallback to local indexing if no remote index available
+- Git hook setup for future automatic updates
+- Zero-configuration experience
+"""
+
+import os
+import sys
+import subprocess
+import tempfile
+import argparse
+import json
+from pathlib import Path
+from typing import Optional, Tuple
+
+# ANSI color codes
+GREEN = '\033[0;32m'
+YELLOW = '\033[1;33m'
+RED = '\033[0;31m'
+BLUE = '\033[0;34m'
+NC = '\033[0m'  # No Color
+
+
+def print_colored(message: str, color: str = NC):
+    """Print colored message."""
+    print(f"{color}{message}{NC}")
+
+
+def run_command(cmd: list, cwd: Optional[Path] = None, capture: bool = True) -> Tuple[int, str, str]:
+    """Run a command and return (returncode, stdout, stderr)."""
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=cwd,
+            capture_output=capture,
+            text=True,
+            timeout=30
+        )
+        return result.returncode, result.stdout, result.stderr
+    except subprocess.TimeoutExpired:
+        return -1, "", "Command timed out"
+    except Exception as e:
+        return -1, "", str(e)
+
+
+def is_git_repo(path: Path) -> bool:
+    """Check if path is a git repository."""
+    return (path / ".git").exists()
+
+
+def get_repo_name(path: Path) -> str:
+    """Get repository name from path or remote."""
+    # Try to get from remote URL
+    ret, stdout, _ = run_command(["git", "remote", "get-url", "origin"], cwd=path)
+    if ret == 0 and stdout:
+        # Extract repo name from URL
+        url = stdout.strip()
+        if url.endswith('.git'):
+            url = url[:-4]
+        return os.path.basename(url)
+    
+    # Fallback to directory name
+    return path.name
+
+
+def check_existing_index(index_dir: Path) -> bool:
+    """Check if valid index already exists."""
+    return (index_dir / "code_index.db").exists()
+
+
+def try_download_remote_index(project_path: Path, index_dir: Path) -> bool:
+    """Try to download pre-built index from remote repository."""
+    print_colored("Checking for pre-built index...", YELLOW)
+    
+    # Check if it's a git repo
+    if not is_git_repo(project_path):
+        print_colored("Not a git repository - will build locally", YELLOW)
+        return False
+    
+    # Try to fetch mcp-index branch
+    ret, _, _ = run_command(
+        ["git", "fetch", "origin", "mcp-index", "--depth=1"],
+        cwd=project_path
+    )
+    
+    if ret != 0:
+        print_colored("No pre-built index found in remote repository", YELLOW)
+        return False
+    
+    # Try to download index
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        
+        # Check out the index file
+        ret, _, _ = run_command(
+            ["git", "checkout", "origin/mcp-index", "--", "mcp-index-latest.tar.gz"],
+            cwd=project_path
+        )
+        
+        if ret == 0 and (project_path / "mcp-index-latest.tar.gz").exists():
+            print_colored("Downloading pre-built index...", GREEN)
+            
+            # Move to temp location
+            index_file = project_path / "mcp-index-latest.tar.gz"
+            temp_index = temp_path / "mcp-index-latest.tar.gz"
+            index_file.rename(temp_index)
+            
+            # Extract to index directory
+            index_dir.mkdir(parents=True, exist_ok=True)
+            ret, _, _ = run_command(
+                ["tar", "-xzf", str(temp_index), "-C", str(index_dir)]
+            )
+            
+            if ret == 0:
+                print_colored(f"✓ Pre-built index downloaded to {index_dir}", GREEN)
+                
+                # Clean up any leftover files
+                (project_path / "mcp-index-latest.tar.gz").unlink(missing_ok=True)
+                
+                return True
+    
+    return False
+
+
+def build_local_index(project_path: Path, index_dir: Path):
+    """Build index locally using MCP server."""
+    print_colored("Building index locally...", YELLOW)
+    
+    # Ensure MCP server is available
+    ret, _, _ = run_command(["python", "-m", "mcp_server", "--help"])
+    if ret != 0:
+        print_colored("Error: MCP server not found. Please install it first.", RED)
+        print_colored("Run: pip install -e /path/to/Code-Index-MCP", YELLOW)
+        sys.exit(1)
+    
+    # Create index directory
+    index_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Build the index
+    print_colored(f"Indexing {project_path}...", BLUE)
+    ret, stdout, stderr = run_command(
+        [
+            "python", "-m", "mcp_server", "index", "build",
+            "--path", str(project_path),
+            "--output", str(index_dir),
+            "--include-embeddings",
+            "--show-progress"
+        ],
+        capture=False  # Show progress to user
+    )
+    
+    if ret == 0:
+        print_colored(f"✓ Index built successfully at {index_dir}", GREEN)
+    else:
+        print_colored(f"Error building index: {stderr}", RED)
+        sys.exit(1)
+
+
+def setup_git_hooks(project_path: Path):
+    """Set up git hooks for automatic index updates."""
+    if not is_git_repo(project_path):
+        return
+    
+    # Check if setup script exists
+    setup_script = project_path / "scripts" / "setup-git-hooks.sh"
+    if setup_script.exists():
+        print_colored("Setting up git hooks for automatic updates...", YELLOW)
+        ret, _, _ = run_command(["bash", str(setup_script)], cwd=project_path)
+        if ret == 0:
+            print_colored("✓ Git hooks configured", GREEN)
+    else:
+        # Basic git config
+        run_command(["git", "config", "core.hooksPath", ".githooks"], cwd=project_path)
+
+
+def verify_index(index_dir: Path):
+    """Verify index integrity."""
+    ret, stdout, _ = run_command(
+        ["python", "-m", "mcp_server", "index", "verify", "--path", str(index_dir)]
+    )
+    
+    if ret == 0:
+        print(stdout)
+    else:
+        print_colored("Warning: Could not verify index", YELLOW)
+
+
+def main():
+    """Main entry point."""
+    parser = argparse.ArgumentParser(
+        description="Smart MCP indexing with automatic setup"
+    )
+    parser.add_argument(
+        "path",
+        nargs="?",
+        default=".",
+        help="Path to the project to index (default: current directory)"
+    )
+    parser.add_argument(
+        "--force-rebuild",
+        action="store_true",
+        help="Force rebuild even if index exists"
+    )
+    parser.add_argument(
+        "--index-dir",
+        help="Custom index directory (default: ~/.mcp/indexes/<project-name>)"
+    )
+    parser.add_argument(
+        "--no-hooks",
+        action="store_true",
+        help="Don't set up git hooks"
+    )
+    
+    args = parser.parse_args()
+    
+    # Resolve project path
+    project_path = Path(args.path).resolve()
+    if not project_path.exists():
+        print_colored(f"Error: Path does not exist: {project_path}", RED)
+        sys.exit(1)
+    
+    # Determine index directory
+    if args.index_dir:
+        index_dir = Path(args.index_dir)
+    else:
+        repo_name = get_repo_name(project_path)
+        index_dir = Path.home() / ".mcp" / "indexes" / repo_name
+    
+    print_colored(f"MCP Smart Indexing for: {project_path}", BLUE)
+    print_colored(f"Index location: {index_dir}", BLUE)
+    
+    # Check if index already exists
+    if check_existing_index(index_dir) and not args.force_rebuild:
+        print_colored("✓ Index already exists!", GREEN)
+        verify_index(index_dir)
+        print_colored(f"\nTo use: export MCP_INDEX_PATH=\"{index_dir}\"", YELLOW)
+        return
+    
+    # Try to download remote index first
+    if not args.force_rebuild:
+        if try_download_remote_index(project_path, index_dir):
+            # Set up hooks for future updates
+            if not args.no_hooks:
+                setup_git_hooks(project_path)
+            
+            verify_index(index_dir)
+            print_colored(f"\nTo use: export MCP_INDEX_PATH=\"{index_dir}\"", YELLOW)
+            return
+    
+    # Build locally
+    build_local_index(project_path, index_dir)
+    
+    # Set up hooks for future updates
+    if not args.no_hooks:
+        setup_git_hooks(project_path)
+    
+    verify_index(index_dir)
+    
+    # Show usage instructions
+    print_colored("\n" + "="*50, BLUE)
+    print_colored("Index ready! To use with MCP server:", GREEN)
+    print_colored(f"export MCP_INDEX_PATH=\"{index_dir}\"", YELLOW)
+    print_colored("python -m mcp_server", YELLOW)
+    
+    if is_git_repo(project_path):
+        print_colored("\nTo share this index with others:", GREEN)
+        print_colored("1. Push to mcp-index branch:", YELLOW)
+        print_colored("   git checkout -b mcp-index", YELLOW)
+        print_colored("   tar -czf mcp-index-latest.tar.gz -C ~/.mcp/indexes/<project> .", YELLOW)
+        print_colored("   git add mcp-index-latest.tar.gz && git commit -m 'Update index'", YELLOW)
+        print_colored("   git push origin mcp-index", YELLOW)
+
+
+if __name__ == "__main__":
+    main()

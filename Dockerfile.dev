@@ -1,0 +1,76 @@
+# Development container for Phase 5 with Enhanced Repository Management
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies for Phase 5 development and repository management
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
+    curl \
+    wget \
+    vim \
+    nano \
+    htop \
+    tree \
+    jq \
+    sqlite3 \
+    libsqlite3-dev \
+    libcurl4-openssl-dev \
+    pkg-config \
+    libssl-dev \
+    cmake \
+    clang \
+    parallel \
+    nodejs \
+    npm \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Tree-sitter CLI
+RUN npm install -g tree-sitter-cli
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+COPY pyproject.toml .
+
+# Install Python dependencies including Phase 5 additions
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir \
+    tree-sitter \
+    tree-sitter-rust \
+    tree-sitter-go \
+    tree-sitter-java \
+    tree-sitter-kotlin \
+    tree-sitter-ruby \
+    tree-sitter-php \
+    celery \
+    redis \
+    kombu \
+    pytest-xdist \
+    pytest-parallel
+
+# Create development directories including repository data
+RUN mkdir -p /app/logs /app/data /app/benchmarks /app/repositories
+
+# Install the package in development mode
+COPY . .
+RUN pip install -e .
+
+# Create volume mounts for development
+VOLUME ["/app", "/code", "/external_repos"]
+
+# Set environment variables for development and repository management
+ENV PYTHONPATH=/app
+ENV LOG_LEVEL=DEBUG
+ENV DEVELOPMENT=true
+ENV DATABASE_URL=sqlite:///app/data/code_index.db
+ENV ENABLE_REPOSITORY_MANAGEMENT=true
+ENV REPOSITORY_AUTO_CLEANUP=true
+ENV DEFAULT_REPOSITORY_TTL_DAYS=30
+
+# Expose ports for services
+EXPOSE 8000 6333 6379 9090 3000
+
+# Development command with shell access
+CMD ["/bin/bash"]

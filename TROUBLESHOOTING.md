@@ -1,254 +1,247 @@
 # Troubleshooting Guide
 
-This guide helps you resolve common issues with Code-Index-MCP.
+## 🤖 AI Agent Instructions
+> **AI Agents:** When encountering issues, check this guide first. For new troubleshooting patterns, update `AGENTS.md` with the solution.
 
-## Table of Contents
-- [Installation Issues](#installation-issues)
-- [Server Startup Problems](#server-startup-problems)
-- [Plugin Errors](#plugin-errors)
-- [Performance Issues](#performance-issues)
-- [API Errors](#api-errors)
-- [File System Issues](#file-system-issues)
+## Common Issues and Solutions
 
-## Installation Issues
+### Installation Issues
 
-### Python Version Mismatch
-**Problem**: `ERROR: This package requires Python 3.8+`
-
-**Solution**:
+#### Problem: Tree-sitter build fails
+```
+ERROR: Failed building wheel for tree-sitter
+```
+**Solution:**
 ```bash
-# Check Python version
-python --version
+# Install build dependencies
+sudo apt-get install build-essential python3-dev  # Ubuntu/Debian
+brew install python3  # macOS
 
-# Use pyenv to install correct version
-pyenv install 3.8.10
-pyenv local 3.8.10
+# Reinstall tree-sitter
+pip install --no-binary tree-sitter tree-sitter
 ```
 
-### Missing Dependencies
-**Problem**: `ModuleNotFoundError: No module named 'fastapi'`
-
-**Solution**:
+#### Problem: Missing language parsers
+```
+FileNotFoundError: Language parser not found
+```
+**Solution:**
 ```bash
-# Ensure you're in virtual environment
-source venv/bin/activate  # Linux/Mac
-# or
-venv\Scripts\activate  # Windows
-
-# Reinstall dependencies
-pip install -r requirements.txt
+# Download and install language parsers
+python scripts/setup-mcp-index.sh
 ```
 
-### Tree-sitter Build Errors
-**Problem**: `error: Microsoft Visual C++ 14.0 is required`
+### API and Connection Issues
 
-**Solution**:
-- Windows: Install Visual Studio Build Tools
-- Linux: `sudo apt-get install build-essential`
-- Mac: `xcode-select --install`
-
-## Server Startup Problems
-
-### Port Already in Use
-**Problem**: `ERROR: [Errno 48] Address already in use`
-
-**Solution**:
+#### Problem: MCP server won't start
+```
+Error: Address already in use
+```
+**Solution:**
 ```bash
-# Find process using port 8000
-lsof -i :8000  # Linux/Mac
-netstat -ano | findstr :8000  # Windows
-
-# Kill the process or use different port
-uvicorn mcp_server.gateway:app --port 8001
+# Check for existing processes
+lsof -i :5173
+# Kill the process or use a different port
+MCP_PORT=5174 python -m mcp_server
 ```
 
-### Import Errors
-**Problem**: `ImportError: cannot import name 'app' from 'mcp_server.gateway'`
+#### Problem: Voyage AI API errors
+```
+Error: Invalid API key or rate limit exceeded
+```
+**Solution:**
+1. Verify API key: `echo $VOYAGE_API_KEY`
+2. Check rate limits in Voyage AI dashboard
+3. Implement exponential backoff (already included)
 
-**Solution**:
+#### Problem: Qdrant connection failed
+```
+ConnectionError: Cannot connect to Qdrant
+```
+**Solution:**
 ```bash
-# Ensure you're in project root
-pwd  # Should show /path/to/Code-Index-MCP
+# Start Qdrant container
+docker run -p 6333:6333 qdrant/qdrant
 
-# Add project to Python path
+# Verify connection
+curl http://localhost:6333/health
+```
+
+### Indexing Issues
+
+#### Problem: Slow indexing performance
+**Symptoms:** Indexing takes hours for large repos
+**Solution:**
+1. Enable distributed processing:
+   ```bash
+   docker-compose -f docker-compose.distributed.yml up -d
+   ```
+2. Increase worker count:
+   ```bash
+   WORKER_COUNT=10 python -m mcp_server
+   ```
+3. Check cache configuration
+
+#### Problem: Out of memory during indexing
+**Solution:**
+```bash
+# Increase memory limits
+export INDEXER_BATCH_SIZE=100  # Default: 1000
+export MAX_MEMORY_MB=4096      # Default: 2048
+```
+
+#### Problem: Symbols not found after indexing
+**Checklist:**
+1. Verify file was indexed: `SELECT * FROM files WHERE path LIKE '%filename%';`
+2. Check language plugin loaded: `python -m mcp_server plugins list`
+3. Verify parser working: `python debug_parser.py <file>`
+
+### Search Issues
+
+#### Problem: No semantic search results
+**Solution:**
+1. Ensure embeddings generated:
+   ```sql
+   SELECT COUNT(*) FROM embeddings;
+   ```
+2. Check Voyage AI key configured
+3. Verify Qdrant has collections:
+   ```bash
+   curl http://localhost:6333/collections
+   ```
+
+#### Problem: Fuzzy search not working
+**Solution:**
+```bash
+# Rebuild FTS index
+python -m mcp_server.cli rebuild-index
+```
+
+### Docker/Production Issues
+
+#### Problem: Container keeps restarting
+**Check logs:**
+```bash
+docker logs mcp-server
+docker-compose logs -f mcp-server
+```
+**Common causes:**
+- Missing environment variables
+- Database connection issues
+- Permission problems
+
+#### Problem: High memory usage in production
+**Solution:**
+1. Enable memory optimization:
+   ```yaml
+   environment:
+     - ENABLE_MEMORY_OPTIMIZATION=true
+     - CACHE_SIZE_MB=1024
+   ```
+2. Use connection pooling
+3. Configure cache eviction
+
+### Development Issues
+
+#### Problem: Tests failing with import errors
+**Solution:**
+```bash
+# Install development dependencies
+pip install -e ".[dev]"
+
+# Set Python path
 export PYTHONPATH="${PYTHONPATH}:$(pwd)"
 ```
 
-## Plugin Errors
+#### Problem: Plugin not loading
+**Checklist:**
+1. Plugin in `plugins.yaml`
+2. `__init__.py` exports plugin class
+3. Plugin implements `IPlugin` interface
+4. No syntax errors: `python -m py_compile mcp_server/plugins/*/plugin.py`
 
-### Plugin Not Found
-**Problem**: `Plugin 'python' not found`
+## Debugging Tools
 
-**Solution**:
-1. Check plugin is registered in dispatcher.py
-2. Verify plugin file exists in correct location
-3. Check for import errors in plugin
-
-### Tree-sitter Language Not Installed
-**Problem**: `Language 'python' not available`
-
-**Solution**:
-```python
-# Install language grammar
-from tree_sitter import Language
-
-Language.build_library(
-    'build/languages.so',
-    ['vendor/tree-sitter-python']
-)
-```
-
-## Performance Issues
-
-### Slow Indexing
-**Problem**: Indexing takes too long for large codebases
-
-**Solutions**:
-1. **Increase batch size**:
-   ```bash
-   export INDEX_BATCH_SIZE=1000
-   ```
-
-2. **Skip large files**:
-   ```bash
-   export MAX_FILE_SIZE=5242880  # 5MB
-   ```
-
-3. **Use faster storage**: Move index to SSD
-
-4. **Limit file types**:
-   ```python
-   # Only index specific extensions
-   ALLOWED_EXTENSIONS = ['.py', '.js', '.cpp']
-   ```
-
-### High Memory Usage
-**Problem**: Server using too much RAM
-
-**Solutions**:
-1. **Limit cache size**:
-   ```bash
-   export CACHE_SIZE_MB=512
-   ```
-
-2. **Enable garbage collection**:
-   ```python
-   import gc
-   gc.collect()  # Force garbage collection
-   ```
-
-3. **Process files in chunks**
-
-## API Errors
-
-### 400 Bad Request
-**Problem**: `{"detail": "Invalid file path"}`
-
-**Solution**: Ensure file paths are absolute and within project directory
-
-### 404 Not Found
-**Problem**: `{"detail": "Symbol not found"}`
-
-**Solution**: 
-- Verify file has been indexed
-- Check symbol name spelling
-- Ensure correct file extension
-
-### 500 Internal Server Error
-**Problem**: Server returns 500 error
-
-**Solution**:
-1. Check server logs for stack trace
-2. Enable debug mode: `export DEBUG=true`
-3. Common causes:
-   - Plugin crashes
-   - Database locked
-   - Out of memory
-
-## File System Issues
-
-### Permission Denied
-**Problem**: `PermissionError: [Errno 13] Permission denied`
-
-**Solution**:
+### Enable Debug Logging
 ```bash
-# Check file permissions
-ls -la problem_file.py
-
-# Fix permissions
-chmod 644 problem_file.py
+export MCP_LOG_LEVEL=DEBUG
+export MCP_DEBUG=true
+python -m mcp_server
 ```
 
-### File Not Found
-**Problem**: `FileNotFoundError: [Errno 2] No such file or directory`
-
-**Solution**:
-- Use absolute paths
-- Check working directory
-- Verify file exists: `ls -la /path/to/file`
-
-### Symlink Issues
-**Problem**: Symbolic links not followed
-
-**Solution**:
-```python
-# Enable symlink following
-FOLLOW_SYMLINKS = True
-```
-
-## Debug Mode
-
-Enable detailed logging:
+### Test Individual Components
 ```bash
-# Set log level
-export LOG_LEVEL=DEBUG
+# Test parser
+python debug_parser.py <file>
 
-# Enable FastAPI debug mode
-export DEBUG=true
+# Test search
+python -m mcp_server.tools.search_code "query"
 
-# Start server with reload
-uvicorn mcp_server.gateway:app --reload --log-level debug
+# Test plugin
+python -m mcp_server.plugins.<plugin_name> test
+```
+
+### Performance Profiling
+```bash
+# Enable profiling
+export ENABLE_PROFILING=true
+python -m mcp_server
+
+# View profile results
+python -m pstats profile_results.prof
 ```
 
 ## Getting Help
 
-If you're still having issues:
+1. Check existing issues: https://github.com/code-index-mcp/issues
+2. Enable debug logging and include logs
+3. Provide minimal reproduction steps
+4. Include system information:
+   ```bash
+   python --version
+   pip freeze | grep -E "(tree-sitter|mcp-server)"
+   uname -a
+   ```
 
-1. **Check existing issues**: [GitHub Issues](https://github.com/yourusername/Code-Index-MCP/issues)
-2. **Ask in discussions**: [GitHub Discussions](https://github.com/yourusername/Code-Index-MCP/discussions)
-3. **Create a bug report** with:
-   - Error message and stack trace
-   - Steps to reproduce
-   - System information (OS, Python version)
-   - Relevant configuration
+## FAQ
 
-## Common Error Messages
+**Q: How do I reset the index?**
+```bash
+rm -rf ~/.mcp/cache/index.db
+python -m mcp_server.cli rebuild-index
+```
 
-| Error | Likely Cause | Solution |
-|-------|--------------|----------|
-| `ConnectionRefusedError` | Server not running | Start server with `uvicorn` |
-| `JSONDecodeError` | Invalid request body | Check API request format |
-| `TimeoutError` | Large file or slow system | Increase timeout settings |
-| `MemoryError` | Out of RAM | Reduce batch size or file limits |
-| `KeyError: 'symbol_name'` | Missing required field | Check API documentation |
+**Q: Can I index multiple repositories?**
+Yes, use repository management mode:
+```bash
+export ENABLE_REPOSITORY_MANAGEMENT=true
+```
+
+**Q: How do I add a new language?**
+See `docs/development/creating-plugins.md`
+
+**Q: Is Windows supported?**
+Partially. Use WSL2 for best experience.
 
 ## Performance Tuning
 
-### Recommended Settings for Large Codebases
-```bash
-# .env file
-INDEX_BATCH_SIZE=1000
-MAX_FILE_SIZE=10485760  # 10MB
-CACHE_SIZE_MB=1024
-WORKER_THREADS=4
-ENABLE_PROFILING=true
+### For Large Codebases (>100k files)
+```yaml
+# docker-compose.production.yml
+environment:
+  - WORKER_COUNT=20
+  - INDEXER_BATCH_SIZE=500
+  - CACHE_SIZE_MB=4096
+  - ENABLE_DISTRIBUTED=true
 ```
 
-### Database Optimization
-```sql
--- Optimize SQLite
-PRAGMA journal_mode = WAL;
-PRAGMA synchronous = NORMAL;
-PRAGMA cache_size = -64000;  -- 64MB
-PRAGMA temp_store = MEMORY;
+### For Limited Resources
+```yaml
+environment:
+  - WORKER_COUNT=2
+  - INDEXER_BATCH_SIZE=50
+  - CACHE_SIZE_MB=512
+  - ENABLE_MEMORY_OPTIMIZATION=true
 ```
+
+For more detailed troubleshooting, see `docs/development/debugging.md`.

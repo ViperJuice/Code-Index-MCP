@@ -1,74 +1,97 @@
 # Security Policy
 
-## Supported Versions
+## 🤖 AI Agent Instructions
+> **AI Agents:** For security-related changes, update `AGENTS.md` with security considerations and guidelines.
 
-We support security updates for the following versions:
+## Supported Versions
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.x.x   | :white_check_mark: |
+| 1.0.x   | :white_check_mark: |
 | < 1.0   | :x:                |
 
 ## Reporting a Vulnerability
 
-We take security seriously. If you discover a security vulnerability, please follow these steps:
+If you discover a security vulnerability in Code-Index-MCP, please follow these steps:
 
-1. **DO NOT** open a public issue
-2. Email security@code-index-mcp.com with details
-3. Include steps to reproduce if possible
-4. We'll respond within 48 hours
+1. **DO NOT** create a public GitHub issue
+2. Send details to: security@code-index-mcp.dev (placeholder - update with actual contact)
+3. Include:
+   - Description of the vulnerability
+   - Steps to reproduce
+   - Potential impact
+   - Suggested fix (if applicable)
 
-## Security Measures
-
-### Code Security
-- Input validation on all API endpoints
-- Path traversal prevention
-- SQL injection prevention via parameterized queries
-- XSS protection in any web interfaces
-
-### Secret Detection
-- Automatic scanning for API keys, tokens, and credentials
-- Redaction of detected secrets in logs and outputs
-- `.gitignore` patterns respected
+## Security Features
 
 ### Authentication & Authorization
-- API key authentication for production use
-- Rate limiting to prevent abuse
-- Request validation and sanitization
-
-### Plugin Security
-- Plugins run in isolated environments
-- Resource limits enforced (CPU, memory)
-- No access to system files outside project directory
-- Dangerous operations blocked (eval, exec, etc.)
+- JWT-based authentication for API endpoints
+- Role-based access control (RBAC)
+- API key management for external services
 
 ### Data Protection
-- Local-first design - no data leaves your machine by default
-- Optional encryption at rest
-- Secure deletion of temporary files
-- No telemetry or usage tracking
+- Encrypted storage for sensitive configuration
+- Secure handling of API keys (Voyage AI, OpenAI, etc.)
+- No storage of source code content, only metadata
+
+### Network Security
+- HTTPS-only communication in production
+- Rate limiting on all endpoints
+- CORS configuration for web clients
+
+### Container Security
+- Non-root user execution
+- Minimal base images
+- Regular dependency updates
+- Security scanning in CI/CD
+
+## Security Best Practices
+
+### For Developers
+1. Never commit secrets or API keys
+2. Use environment variables for sensitive data
+3. Regular dependency updates (`pip-audit`)
+4. Follow secure coding guidelines
+
+### For Deployment
+1. Use strong `SECRET_KEY` values
+2. Enable all security middleware
+3. Configure proper CORS origins
+4. Regular security audits
+
+### For AI Agents
+1. Never expose or log sensitive data
+2. Validate all file paths before access
+3. Sanitize user inputs
+4. Follow principle of least privilege
 
 ## Security Checklist
 
-Before deployment:
-- [ ] Change default API keys
-- [ ] Enable HTTPS in production
-- [ ] Configure firewall rules
-- [ ] Set up monitoring and alerting
-- [ ] Review file permissions
-- [ ] Enable audit logging
-- [ ] Test input validation
-- [ ] Scan for vulnerabilities
+- [ ] All API keys in environment variables
+- [ ] Strong SECRET_KEY configured
+- [ ] HTTPS enabled in production
+- [ ] Rate limiting configured
+- [ ] CORS properly restricted
+- [ ] Authentication required for sensitive endpoints
+- [ ] Regular security updates applied
+- [ ] Logs sanitized of sensitive data
 
-## Dependencies
+## Known Security Considerations
 
-We regularly update dependencies to patch security vulnerabilities. Run:
-```bash
-pip list --outdated
-pip-audit
-```
+1. **File System Access**: The indexer requires read access to codebases
+   - Mitigated by: Path validation, sandboxing options
 
-## Contact
+2. **External API Integration**: Voyage AI and other services
+   - Mitigated by: Secure key storage, request validation
 
-Security Team: security@code-index-mcp.com
-PGP Key: [Available on request]
+3. **Database Access**: SQLite/PostgreSQL connections
+   - Mitigated by: Parameterized queries, connection encryption
+
+## Compliance
+
+This project follows security best practices aligned with:
+- OWASP Top 10
+- CWE/SANS Top 25
+- Security-focused development lifecycle
+
+For additional security resources, see `docs/api/security/` directory.

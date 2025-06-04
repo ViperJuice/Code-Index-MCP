@@ -7,12 +7,13 @@ services:
   mcp-server:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     volumes:
       # Mount source code for development
       - .:/app
       - ./data:/app/data
       - /code:/code:rw  # Read-write for development
+      - ./external_repos:/external_repos:ro  # Mount for external repositories
     environment:
       # Development-specific environment
       - LOG_LEVEL=DEBUG
@@ -22,6 +23,12 @@ services:
       - SEMANTIC_SEARCH_ENABLED=true
       - INDEXING_GENERATE_EMBEDDINGS=true
       - CACHE_BACKEND=redis
+      
+      # Enhanced repository management for development
+      - ENABLE_REPOSITORY_MANAGEMENT=true
+      - REPOSITORY_AUTO_CLEANUP=true
+      - DEFAULT_REPOSITORY_TTL_DAYS=7  # Shorter TTL for development
+      - EXTERNAL_REPOS_PATH=/external_repos
       
       # Development cache settings (shorter TTLs for testing)
       - CACHE_DEFAULT_TTL=300
