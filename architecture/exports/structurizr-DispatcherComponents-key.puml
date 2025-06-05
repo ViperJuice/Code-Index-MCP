@@ -1,0 +1,53 @@
+@startuml
+set separator none
+
+skinparam {
+  shadowing false
+  arrowFontSize 15
+  defaultTextAlignment center
+  wrapWidth 100
+  maxMessageSize 100
+}
+hide stereotype
+
+skinparam rectangle<<_transparent>> {
+  BorderColor transparent
+  BackgroundColor transparent
+  FontColor transparent
+}
+
+skinparam component<<1>> {
+  BackgroundColor #27ae60
+  FontColor #ffffff
+  BorderColor #1b7943
+}
+component "==Component, Reusable, AsIs" <<1>>
+
+skinparam component<<2>> {
+  BackgroundColor #f39c12
+  FontColor #ffffff
+  BorderColor #aa6d0c
+}
+component "==Component, Reusable, Modify" <<2>>
+
+skinparam rectangle<<3>> {
+  BackgroundColor #9b59b6
+  FontColor #ffffff
+  BorderColor #6c3e7f
+  roundCorner 20
+}
+rectangle "==Container, New, Required, Adapter" <<3>>
+
+skinparam rectangle<<4>> {
+  BackgroundColor #27ae60
+  FontColor #ffffff
+  BorderColor #1b7943
+  roundCorner 20
+}
+rectangle "==Container, Reusable, AsIs" <<4>>
+
+rectangle "." <<_transparent>> as 5
+5 .[#666666,thickness=2].> 5 : "<color:#666666>Relationship"
+
+
+@enduml

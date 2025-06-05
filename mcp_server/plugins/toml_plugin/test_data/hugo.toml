@@ -1,0 +1,188 @@
+# Hugo site configuration
+baseURL = "https://example.com/"
+languageCode = "en-us"
+title = "My Hugo Site"
+theme = "ananke"
+paginate = 10
+enableRobotsTXT = true
+enableGitInfo = true
+
+# Hugo modules
+[module]
+  [[module.imports]]
+    path = "github.com/gohugoio/hugo-mod-bootstrap-scss/v5"
+    disable = false
+  
+  [[module.imports]]
+    path = "github.com/gohugoio/hugo-mod-jslibs-dist/popperjs/v2"
+    disable = false
+
+# Site parameters
+[params]
+  author = "Site Author"
+  description = "A Hugo site with TOML configuration"
+  featured_image = "/images/hero.jpg"
+  show_reading_time = true
+  
+  [params.social]
+    twitter = "https://twitter.com/example"
+    github = "https://github.com/example"
+    linkedin = "https://linkedin.com/in/example"
+
+# Menu configuration
+[[menu.main]]
+  name = "Home"
+  url = "/"
+  weight = 1
+
+[[menu.main]]
+  name = "About"
+  url = "/about/"
+  weight = 2
+
+[[menu.main]]
+  name = "Blog"
+  url = "/posts/"
+  weight = 3
+  
+  [[menu.main]]
+    parent = "Blog"
+    name = "Categories"
+    url = "/categories/"
+    weight = 1
+  
+  [[menu.main]]
+    parent = "Blog"
+    name = "Tags"
+    url = "/tags/"
+    weight = 2
+
+# Permalinks
+[permalinks]
+  posts = "/blog/:year/:month/:slug/"
+  pages = "/:slug/"
+
+# Taxonomies
+[taxonomies]
+  category = "categories"
+  tag = "tags"
+  series = "series"
+
+# Language configuration
+[languages]
+  [languages.en]
+    languageName = "English"
+    weight = 1
+    
+    [languages.en.params]
+      linkedin = "https://linkedin.com/in/example"
+  
+  [languages.fr]
+    languageName = "Français"
+    weight = 2
+    title = "Mon site Hugo"
+    
+    [languages.fr.params]
+      linkedin = "https://linkedin.com/in/example-fr"
+      description = "Un site Hugo avec configuration TOML"
+    
+    [[languages.fr.menu.main]]
+      name = "Accueil"
+      url = "/"
+      weight = 1
+
+# Build configuration
+[build]
+  useResourceCacheWhen = "fallback"
+  writeStats = true
+  
+  [[build.cachebusters]]
+    source = "assets/.*\\.(js|ts|jsx|tsx)"
+    target = "(js|scripts|javascript)"
+  
+  [[build.cachebusters]]
+    source = "assets/.*\\.(css|sass|scss)$"
+    target = "(css|styles|scss|sass)"
+
+# Minification
+[minify]
+  disableCSS = false
+  disableHTML = false
+  disableJS = false
+  disableJSON = false
+  disableSVG = false
+  disableXML = false
+  minifyOutput = true
+  
+  [minify.tdewolff]
+    [minify.tdewolff.css]
+      keepCSS2 = true
+      precision = 0
+    
+    [minify.tdewolff.html]
+      keepComments = false
+      keepConditionalComments = true
+      keepDefaultAttrVals = true
+      keepDocumentTags = true
+      keepEndTags = true
+      keepQuotes = false
+      keepWhitespace = false
+
+# Security configuration
+[security]
+  enableInlineShortcodes = false
+  
+  [security.exec]
+    allow = ['^dart-sass-embedded$', '^go$', '^npx$', '^postcss$']
+    osEnv = ['(?i)^(PATH|PATHEXT|APPDATA|TMP|TEMP|TERM)$']
+  
+  [security.funcs]
+    getenv = ['^HUGO_']
+  
+  [security.http]
+    methods = ['(?i)GET|POST']
+    urls = ['.*']
+
+# Services
+[services]
+  [services.googleAnalytics]
+    ID = "UA-123456789-1"
+  
+  [services.disqus]
+    shortname = "example-site"
+  
+  [services.instagram]
+    disableInlineCSS = false
+    accessToken = "your-access-token"
+
+# Output formats
+[outputFormats]
+  [outputFormats.RSS]
+    mediaType = "application/rss+xml"
+    baseName = "feed"
+
+# Media types
+[mediaTypes]
+  [mediaTypes."application/manifest+json"]
+    suffixes = ["webmanifest"]
+  
+  [mediaTypes."text/netlify"]
+    delimiter = ""
+    suffixes = [""]
+
+# Related content
+[related]
+  includeNewer = false
+  indices = [
+    { name = "tags", weight = 100 },
+    { name = "categories", weight = 70 },
+    { name = "date", weight = 50 }
+  ]
+  threshold = 80
+  toLower = false
+
+# Sitemap configuration
+[sitemap]
+  changefreq = "monthly"
+  filename = "sitemap.xml"
+  priority = 0.5

@@ -1,0 +1,273 @@
+{
+  "title": "MDX Sample Document",
+  "author": "MDX Test Suite",
+  "created": "2024-12-18",
+  "components": ["Chart", "CodeBlock", "Alert"],
+  "interactive": true
+}
+
+import { Chart } from '../components/Chart'
+import { CodeBlock } from '../components/CodeBlock'
+import { Alert } from '../components/Alert'
+
+# MDX Sample Document
+
+This document demonstrates MDX capabilities with React components embedded in Markdown.
+
+## Interactive Components
+
+<Alert type="info">
+  This is an info alert component with **Markdown** content inside.
+  
+  - It supports lists
+  - And other Markdown features
+  - While being a React component
+</Alert>
+
+### Data Visualization
+
+Here's an interactive chart component:
+
+<Chart 
+  type="line"
+  data={[
+    { month: 'Jan', sales: 100, profit: 40 },
+    { month: 'Feb', sales: 120, profit: 50 },
+    { month: 'Mar', sales: 90, profit: 30 },
+    { month: 'Apr', sales: 140, profit: 65 }
+  ]}
+  title="Monthly Sales & Profit"
+  height={300}
+/>
+
+## Code Examples with Custom Syntax Highlighting
+
+<CodeBlock 
+  language="python"
+  title="Advanced Python Example"
+  showLineNumbers={true}
+  highlightLines={[2, 5, 8]}
+>
+```python
+import asyncio
+from typing import List, Dict, Any, Optional
+
+async def process_batch(items: List[Dict[str, Any]]) -> List[str]:
+    """Process items in batches for better performance."""
+    batch_size = 10
+    results = []
+    
+    for i in range(0, len(items), batch_size):
+        batch = items[i:i + batch_size]
+        batch_results = await asyncio.gather(*[
+            process_single_item(item) for item in batch
+        ])
+        results.extend(batch_results)
+    
+    return results
+
+async def process_single_item(item: Dict[str, Any]) -> str:
+    # Simulate processing time
+    await asyncio.sleep(0.1)
+    return f"Processed: {item.get('name', 'unknown')}"
+```
+</CodeBlock>
+
+## Traditional Markdown Features
+
+### Tables
+
+| Component | Props | Description |
+|-----------|--------|-------------|
+| `<Alert>` | type, children | Display alerts with different severity levels |
+| `<Chart>` | type, data, title | Interactive data visualization |
+| `<CodeBlock>` | language, title, showLineNumbers | Enhanced code display |
+
+### Task Lists
+
+- [x] Create MDX document structure
+- [x] Add React component imports
+- [x] Implement interactive components
+- [ ] Add more component examples
+  - [x] Alert component
+  - [x] Chart component
+  - [ ] Form components
+  - [ ] Navigation components
+
+## Nested JSX with Markdown
+
+<div className="feature-grid">
+  
+  ### Component 1
+  
+  <Alert type="success">
+    ✅ **Feature Complete**
+    
+    This feature has been fully implemented and tested.
+  </Alert>
+  
+  ### Component 2
+  
+  <Alert type="warning">
+    ⚠️ **In Development**
+    
+    This feature is currently being developed:
+    
+    - Core functionality: 80%
+    - Testing: 40%
+    - Documentation: 20%
+  </Alert>
+  
+  ### Component 3
+  
+  <Alert type="error">
+    ❌ **Needs Attention**
+    
+    This component has known issues:
+    
+    1. Performance bottleneck in large datasets
+    2. Memory leak under certain conditions
+    3. Incomplete error handling
+  </Alert>
+  
+</div>
+
+## Mathematical Expressions in JSX
+
+<div className="math-section">
+  
+  The quadratic formula: $x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$
+  
+  Complex matrix operations:
+  
+  $$
+  \begin{bmatrix}
+  a & b \\
+  c & d
+  \end{bmatrix}
+  \begin{bmatrix}
+  x \\
+  y
+  \end{bmatrix}
+  =
+  \begin{bmatrix}
+  ax + by \\
+  cx + dy
+  \end{bmatrix}
+  $$
+  
+</div>
+
+## Dynamic Content
+
+export const currentYear = new Date().getFullYear()
+export const features = ['TypeScript', 'React', 'MDX', 'Tailwind CSS']
+
+<Alert type="info">
+  Current year: **{currentYear}**
+  
+  Available features: {features.join(', ')}
+</Alert>
+
+## Code with JSX Highlighting
+
+```jsx
+import React, { useState, useEffect } from 'react'
+
+function InteractiveCounter({ initialValue = 0 }) {
+  const [count, setCount] = useState(initialValue)
+  const [isActive, setIsActive] = useState(false)
+  
+  useEffect(() => {
+    let interval = null
+    if (isActive) {
+      interval = setInterval(() => {
+        setCount(count => count + 1)
+      }, 1000)
+    } else if (!isActive && count !== 0) {
+      clearInterval(interval)
+    }
+    return () => clearInterval(interval)
+  }, [isActive, count])
+  
+  return (
+    <div className="counter">
+      <h3>Counter: {count}</h3>
+      <button onClick={() => setIsActive(!isActive)}>
+        {isActive ? 'Pause' : 'Start'}
+      </button>
+      <button onClick={() => setCount(0)}>Reset</button>
+    </div>
+  )
+}
+
+export default InteractiveCounter
+```
+
+## Conditional Rendering
+
+{/* This is a JSX comment */}
+{process.env.NODE_ENV === 'development' && (
+  <Alert type="warning">
+    🚧 **Development Mode**
+    
+    This content is only visible in development environment.
+  </Alert>
+)}
+
+## Component with Complex Props
+
+<Chart
+  type="bar"
+  data={[
+    { category: 'Q1', value: 100, color: '#3b82f6' },
+    { category: 'Q2', value: 150, color: '#10b981' },
+    { category: 'Q3', value: 120, color: '#f59e0b' },
+    { category: 'Q4', value: 180, color: '#ef4444' }
+  ]}
+  options={{
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top',
+      },
+      title: {
+        display: true,
+        text: 'Quarterly Performance'
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        max: 200
+      }
+    }
+  }}
+  width={600}
+  height={400}
+/>
+
+## Frontmatter Variables
+
+export const meta = frontMatter
+
+<div className="document-meta">
+  
+  **Document Information:**
+  
+  - Title: {meta.title}
+  - Author: {meta.author}
+  - Created: {meta.created}
+  - Interactive: {meta.interactive ? 'Yes' : 'No'}
+  - Components: {meta.components.join(', ')}
+  
+</div>
+
+---
+
+<Alert type="success">
+  🎉 **MDX Document Complete**
+  
+  This document demonstrates the power of combining Markdown with React components,
+  enabling rich, interactive documentation and content creation.
+</Alert>

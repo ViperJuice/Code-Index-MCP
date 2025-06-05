@@ -1,0 +1,60 @@
+version: '3.8'
+
+# Simplified Docker Compose for MCP Server
+# This configuration is optimized for MCP usage with Claude Code
+
+services:
+  mcp-server:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: mcp-code-index
+    environment:
+      # MCP Configuration
+      - MCP_DISABLE_RESOURCES=true
+      - PYTHONPATH=/app
+      - LOG_LEVEL=INFO
+      
+      # Database configuration
+      - DATABASE_URL=sqlite:///app/data/code_index.db
+      
+      # Disable optional features for MCP usage
+      - SEMANTIC_SEARCH_ENABLED=false
+      - METRICS_ENABLED=false
+      - CACHE_BACKEND=memory
+      
+      # Performance settings for MCP
+      - INDEXING_MAX_WORKERS=4
+      - INDEXING_BATCH_SIZE=10
+      - INDEXING_MAX_FILE_SIZE=5242880  # 5MB limit
+      
+      # MCP-specific settings
+      - MCP_MODE=1
+      - ENABLE_WATCHER=false
+      - ENABLE_API_GATEWAY=false
+    
+    volumes:
+      # Mount the current project for indexing
+      - .:/code:ro
+      # Persistent data directory
+      - ./data:/app/data
+    
+    # No port exposure needed for MCP stdio mode
+    # ports: []
+    
+    stdin_open: true
+    tty: true
+    
+    # Health check for container readiness
+    healthcheck:
+      test: ["CMD", "python", "-c", "import mcp_server; print('OK')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    restart: "no"  # Don't restart automatically for MCP usage
+
+# No external services needed for basic MCP usage
+# volumes: []
+# networks: []

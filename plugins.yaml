@@ -160,6 +160,39 @@ plugins:
       enabled: true
       interval_seconds: 60
       timeout_seconds: 5
+  
+  "Assembly Plugin":
+    enabled: true            # Generic assembly language support
+    priority: 5              # Lower priority - fallback for assembly files
+    settings:
+      max_file_size: 2097152  # 2MB for assembly files
+      detect_assembler: true  # Auto-detect assembler dialect
+      parse_macros: true      # Parse macro definitions
+      parse_includes: true    # Parse include directives
+      extract_comments: true  # Extract documentation comments
+      track_segments: true    # Track segment/section context
+      track_procedures: true  # Track procedure boundaries
+      case_insensitive: true  # Case-insensitive pattern matching
+      supported_dialects:     # Supported assembler dialects
+        - "TASM"
+        - "FASM"
+        - "NASM"
+        - "MASM"
+        - "GAS"
+        - "Generic"
+      comment_styles:         # Supported comment styles
+        - ";"                 # Traditional assembly
+        - "#"                 # GAS style
+        - "//"                # C-style
+      max_macro_depth: 10     # Max nested macro expansion depth
+      parse_data_defs: true   # Parse data declarations
+      parse_extern_public: true  # Parse external/public symbols
+      enable_cross_refs: true    # Enable cross-reference tracking
+    dependencies: []
+    health_check:
+      enabled: true
+      interval_seconds: 60
+      timeout_seconds: 5
 
 # Plugin loading strategies
 loading:

@@ -1,0 +1,113 @@
+cabal-version:       2.4
+name:                myproject
+version:             0.1.0.0
+synopsis:            A sample Haskell project with comprehensive features
+description:         This project demonstrates various Haskell features including
+                     web frameworks, parsing libraries, and functional patterns.
+homepage:            https://github.com/example/myproject
+bug-reports:         https://github.com/example/myproject/issues
+license:             BSD-3-Clause
+license-file:        LICENSE
+author:              Example Author
+maintainer:          author@example.com
+copyright:           2024 Example Author
+category:            Web, Network
+build-type:          Simple
+extra-source-files:  README.md
+                   , CHANGELOG.md
+
+common common-options
+  default-language:    Haskell2010
+  ghc-options:         -Wall
+                       -Wcompat
+                       -Widentities
+                       -Wincomplete-uni-patterns
+                       -Wincomplete-record-updates
+                       -Wredundant-constraints
+                       -fhide-source-paths
+                       -Wmissing-export-lists
+                       -Wpartial-fields
+  build-depends:       base >= 4.14 && < 5
+
+library
+  import:              common-options
+  exposed-modules:     MyProject
+                     , MyProject.Types
+                     , MyProject.Utils
+                     , MyProject.Web.Server
+                     , MyProject.Web.Handlers
+                     , MyProject.Database
+                     , MyProject.Parser
+  other-modules:       MyProject.Internal
+                     , MyProject.Web.Middleware
+  build-depends:       aeson >= 1.5 && < 2.2
+                     , containers >= 0.6 && < 0.7
+                     , text >= 1.2 && < 2.1
+                     , bytestring >= 0.10 && < 0.12
+                     , time >= 1.9 && < 1.13
+                     , mtl >= 2.2 && < 2.4
+                     , transformers >= 0.5 && < 0.7
+                     , servant >= 0.18 && < 0.21
+                     , servant-server >= 0.18 && < 0.21
+                     , wai >= 3.2 && < 3.3
+                     , warp >= 3.3 && < 3.4
+                     , postgresql-simple >= 0.6 && < 0.7
+                     , parsec >= 3.1 && < 3.2
+                     , optparse-applicative >= 0.16 && < 0.18
+  hs-source-dirs:      src
+  default-extensions:  OverloadedStrings
+                     , RecordWildCards
+                     , DeriveGeneric
+
+executable myproject-server
+  import:              common-options
+  main-is:             Main.hs
+  other-modules:       Config
+                     , CLI
+  build-depends:       myproject
+                     , optparse-applicative >= 0.16 && < 0.18
+                     , yaml >= 0.11 && < 0.12
+  hs-source-dirs:      app
+  ghc-options:         -threaded
+                       -rtsopts
+                       -with-rtsopts=-N
+
+executable myproject-cli
+  import:              common-options
+  main-is:             CLI.hs
+  build-depends:       myproject
+                     , optparse-applicative >= 0.16 && < 0.18
+  hs-source-dirs:      cli
+  ghc-options:         -threaded
+                       -rtsopts
+
+test-suite myproject-test
+  import:              common-options
+  type:                exitcode-stdio-1.0
+  main-is:             Spec.hs
+  other-modules:       MyProject.TypesSpec
+                     , MyProject.UtilsSpec
+                     , MyProject.ParserSpec
+                     , MyProject.Web.HandlersSpec
+  build-depends:       myproject
+                     , hspec >= 2.7 && < 2.11
+                     , QuickCheck >= 2.14 && < 2.15
+                     , quickcheck-instances >= 0.3 && < 0.4
+                     , hedgehog >= 1.0 && < 1.3
+  hs-source-dirs:      test
+  ghc-options:         -threaded
+                       -rtsopts
+                       -with-rtsopts=-N
+  build-tool-depends:  hspec-discover:hspec-discover
+
+benchmark myproject-bench
+  import:              common-options
+  type:                exitcode-stdio-1.0
+  main-is:             Bench.hs
+  build-depends:       myproject
+                     , criterion >= 1.5 && < 1.7
+                     , deepseq >= 1.4 && < 1.5
+  hs-source-dirs:      bench
+  ghc-options:         -threaded
+                       -rtsopts
+                       -with-rtsopts=-N

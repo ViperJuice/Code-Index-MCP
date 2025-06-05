@@ -16,12 +16,10 @@ from typing import Generator, Dict, Any, List
 from unittest.mock import Mock, patch
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 # Import our modules
-from mcp_server.gateway import app
 from mcp_server.dispatcher import Dispatcher
 from mcp_server.storage.sqlite_store import SQLiteStore
 from mcp_server.watcher import FileWatcher
@@ -249,33 +247,6 @@ def file_watcher(temp_code_directory: Path, dispatcher_with_plugins: Dispatcher)
         watcher.stop()
     except:
         pass
-
-
-# API client fixtures
-@pytest.fixture
-def test_client() -> TestClient:
-    """Create a test client for the FastAPI app."""
-    return TestClient(app)
-
-
-@pytest.fixture
-def test_client_with_dispatcher(
-    test_client: TestClient,
-    dispatcher_with_plugins: Dispatcher,
-    sqlite_store: SQLiteStore,
-    monkeypatch
-) -> TestClient:
-    """Create a test client with initialized dispatcher."""
-    # Patch the global variables in gateway module
-    import mcp_server.gateway as gateway
-    monkeypatch.setattr(gateway, "dispatcher", dispatcher_with_plugins)
-    monkeypatch.setattr(gateway, "sqlite_store", sqlite_store)
-    
-    # Also set in app.state
-    test_client.app.state.dispatcher = dispatcher_with_plugins
-    test_client.app.state.sqlite_store = sqlite_store
-    
-    return test_client
 
 
 # Async fixtures

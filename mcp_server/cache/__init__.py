@@ -50,6 +50,25 @@ from .query_cache import (
     cache_project_status
 )
 
+# Advanced cache features
+try:
+    from .advanced import (
+        TieredCache,
+        CacheTier,
+        CacheWarmingManager,
+        WarmingStrategy,
+        PerformanceMonitor,
+        cached as advanced_cached,
+        cache_symbol_lookup as advanced_cache_symbol_lookup,
+        cache_search_results,
+        cache_file_analysis,
+        set_global_cache,
+        get_gpu_accelerator
+    )
+    ADVANCED_CACHE_AVAILABLE = True
+except ImportError:
+    ADVANCED_CACHE_AVAILABLE = False
+
 __all__ = [
     # Backend classes
     "CacheBackend",
@@ -79,5 +98,24 @@ __all__ = [
     "cache_file_symbols",
     "cache_project_status"
 ]
+
+# Add advanced cache exports if available
+if ADVANCED_CACHE_AVAILABLE:
+    __all__.extend([
+        "TieredCache",
+        "CacheTier", 
+        "CacheWarmingManager",
+        "WarmingStrategy",
+        "PerformanceMonitor",
+        "advanced_cached",
+        "advanced_cache_symbol_lookup",
+        "cache_search_results",
+        "cache_file_analysis",
+        "set_global_cache",
+        "get_gpu_accelerator",
+        "ADVANCED_CACHE_AVAILABLE"
+    ])
+
+__all__.append("ADVANCED_CACHE_AVAILABLE")
 
 __version__ = "1.0.0"

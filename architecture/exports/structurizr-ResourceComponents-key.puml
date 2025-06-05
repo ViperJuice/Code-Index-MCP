@@ -1,0 +1,75 @@
+@startuml
+set separator none
+
+skinparam {
+  shadowing false
+  arrowFontSize 15
+  defaultTextAlignment center
+  wrapWidth 100
+  maxMessageSize 100
+}
+hide stereotype
+
+skinparam rectangle<<_transparent>> {
+  BorderColor transparent
+  BackgroundColor transparent
+  FontColor transparent
+}
+
+skinparam component<<1>> {
+  BackgroundColor #9b59b6
+  FontColor #ffffff
+  BorderColor #6c3e7f
+}
+component "==Component, New, Adapter" <<1>>
+
+skinparam component<<2>> {
+  BackgroundColor #e74c3c
+  FontColor #ffffff
+  BorderColor #999999
+}
+component "==Component, New, Advanced" <<2>>
+
+skinparam component<<3>> {
+  BackgroundColor #1168bd
+  FontColor #ffffff
+  BorderColor #0b4884
+}
+component "==Component, New, Core" <<3>>
+
+skinparam rectangle<<4>> {
+  BackgroundColor #1168bd
+  FontColor #ffffff
+  BorderColor #0b4884
+  roundCorner 20
+}
+rectangle "==Container, New, Required, Core" <<4>>
+
+skinparam database<<5>> {
+  BackgroundColor #438dd5
+  FontColor #ffffff
+  BorderColor #2e6295
+}
+database "==Container, Reusable, AsIs, Database" <<5>>
+
+skinparam rectangle<<6>> {
+  BackgroundColor #f39c12
+  FontColor #ffffff
+  BorderColor #aa6d0c
+  roundCorner 20
+}
+rectangle "==Container, Reusable, Modify" <<6>>
+
+skinparam rectangle<<7>> {
+  BackgroundColor #1168bd
+  FontColor #ffffff
+  BorderColor #0b4884
+  roundCorner 20
+}
+rectangle "==Container, Reusable, Modify, Core" <<7>>
+
+rectangle "." <<_transparent>> as 8
+8 .[#666666,thickness=2].> 8 : "<color:#666666>Relationship"
+
+
+@enduml

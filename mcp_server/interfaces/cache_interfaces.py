@@ -66,7 +66,7 @@ class CacheKey:
 # Core Cache Interfaces
 # ========================================
 
-class ICacheManager(ABC, ICache):
+class ICacheManager(ICache):
     """Enhanced cache manager interface"""
     
     @abstractmethod
@@ -268,7 +268,7 @@ class ICacheNotifier(ABC):
 # Distributed Cache Interfaces
 # ========================================
 
-class IDistributedCache(ABC, ICacheManager):
+class IDistributedCache(ICacheManager):
     """Interface for distributed caching"""
     
     @abstractmethod

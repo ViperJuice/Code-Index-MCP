@@ -1,0 +1,73 @@
+#\!/usr/bin/env python3
+"""
+Buffered MCP wrapper to ensure proper line-based communication
+"""
+import sys
+import subprocess
+import os
+import asyncio
+import json
+
+async def main():
+    # Set up environment
+    env = os.environ.copy()
+    env.update({
+        "MCP_DISABLE_RESOURCES": "true",
+        "PYTHONPATH": os.getcwd(),
+        "LOG_LEVEL": "ERROR",
+        "DATABASE_URL": f"sqlite:///{os.getcwd()}/code_index.db",
+        "PLUGIN_STARTUP_MODE": "minimal",
+        "MCP_FAST_STARTUP": "true",
+        "STARTUP_TIMEOUT": "20",
+        "PYTHONUNBUFFERED": "1"
+    })
+    
+    # Start the MCP server process
+    proc = await asyncio.create_subprocess_exec(
+        sys.executable, "-m", "mcp_server", "--transport", "stdio",
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,  # Suppress stderr
+        env=env
+    )
+    
+    async def copy_stdin():
+        """Copy stdin to process with proper line buffering"""
+        reader = asyncio.StreamReader()
+        protocol = asyncio.StreamReaderProtocol(reader)
+        await asyncio.get_event_loop().connect_read_pipe(lambda: protocol, sys.stdin)
+        
+        while True:
+            try:
+                line = await reader.readline()
+                if not line:
+                    break
+                proc.stdin.write(line)
+                await proc.stdin.drain()
+            except Exception:
+                break
+    
+    async def copy_stdout():
+        """Copy process stdout to stdout with proper flushing"""
+        while True:
+            try:
+                line = await proc.stdout.readline()
+                if not line:
+                    break
+                sys.stdout.buffer.write(line)
+                sys.stdout.flush()
+            except Exception:
+                break
+    
+    # Run both copy tasks concurrently
+    await asyncio.gather(
+        copy_stdin(),
+        copy_stdout(),
+        return_exceptions=True
+    )
+    
+    # Wait for process to complete
+    await proc.wait()
+
+if __name__ == "__main__":
+    asyncio.run(main())

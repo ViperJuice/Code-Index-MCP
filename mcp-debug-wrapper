@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Debug wrapper for MCP server to capture startup issues
+LOG_FILE="/tmp/mcp-debug-$(date +%s).log"
+
+echo "=== MCP Debug Wrapper Started ===" | tee -a "$LOG_FILE"
+echo "Time: $(date)" | tee -a "$LOG_FILE"
+echo "Command: $0 $@" | tee -a "$LOG_FILE"
+echo "Working directory: $(pwd)" | tee -a "$LOG_FILE"
+echo "Environment:" | tee -a "$LOG_FILE"
+env | grep -E "MCP|PYTHON|DATABASE|PLUGIN" | sort | tee -a "$LOG_FILE"
+echo "" | tee -a "$LOG_FILE"
+
+# Start the actual MCP server with full logging
+echo "Starting MCP server..." | tee -a "$LOG_FILE"
+exec /home/jenner/Code/Code-Index-MCP/mcp-auto 2>&1 | tee -a "$LOG_FILE"

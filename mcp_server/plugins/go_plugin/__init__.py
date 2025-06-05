@@ -1,0 +1,1 @@
+"""Go language plugin for Phase 5."""

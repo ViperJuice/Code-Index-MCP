@@ -1,0 +1,11 @@
+employee_id	first_name	last_name	department	salary	hire_date	is_manager
+E001	John	Doe	Engineering	85000	2020-01-15	false
+E002	Jane	Smith	Marketing	75000	2019-06-20	true
+E003	Robert	Johnson	Sales	65000	2021-03-10	false
+E004	Emily	Davis	Engineering	95000	2018-11-05	true
+E005	Michael	Brown	HR	70000	2020-08-22	false
+E006	Sarah	Wilson	Finance	80000	2019-12-01	true
+E007	David	Lee	Engineering	90000	2017-09-15	false
+E008	Lisa	Anderson	Marketing	72000	2021-01-08	false
+E009	James	Taylor	Sales	68000	2020-04-12	false
+E010	Jennifer	Martinez	Engineering	100000	2016-07-30	true

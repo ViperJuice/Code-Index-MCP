@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# MCP Debug Wrapper - Logs all interactions for debugging connection issues
+
+LOG_FILE="/tmp/mcp-debug-$(date +%s).log"
+echo "[$(date)] MCP Debug Wrapper Started" >> "$LOG_FILE"
+echo "[$(date)] Arguments: $@" >> "$LOG_FILE"
+echo "[$(date)] Environment:" >> "$LOG_FILE"
+env >> "$LOG_FILE"
+
+# Create a named pipe for bidirectional logging
+PIPE_IN="/tmp/mcp-in-$$"
+PIPE_OUT="/tmp/mcp-out-$$"
+mkfifo "$PIPE_IN" "$PIPE_OUT"
+
+# Cleanup on exit
+cleanup() {
+    rm -f "$PIPE_IN" "$PIPE_OUT"
+}
+trap cleanup EXIT
+
+# Start the actual MCP server in the background with pipes
+echo "[$(date)] Starting MCP server..." >> "$LOG_FILE"
+./mcp-auto < "$PIPE_IN" > "$PIPE_OUT" 2>> "$LOG_FILE" &
+MCP_PID=$!
+
+# Log stdin to file and forward to MCP
+(while IFS= read -r line; do
+    echo "[$(date)] <- STDIN: $line" >> "$LOG_FILE"
+    echo "$line"
+done) > "$PIPE_IN" &
+
+# Log stdout from MCP and forward to stdout
+(while IFS= read -r line; do
+    echo "[$(date)] -> STDOUT: $line" >> "$LOG_FILE"
+    echo "$line"
+done) < "$PIPE_OUT" &
+
+# Wait for the MCP process
+wait $MCP_PID
+EXIT_CODE=$?
+
+echo "[$(date)] MCP server exited with code: $EXIT_CODE" >> "$LOG_FILE"
+echo "[$(date)] Debug log saved to: $LOG_FILE" >&2
+
+exit $EXIT_CODE

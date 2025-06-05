@@ -1,6 +1,7 @@
 """Plugin manager implementation."""
 
 import logging
+import os
 import yaml
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Type
@@ -25,9 +26,10 @@ logger = logging.getLogger(__name__)
 class PluginManager(IPluginManager, ILifecycleManager):
     """High-level plugin management and lifecycle operations."""
     
-    def __init__(self, config: Optional[PluginSystemConfig] = None, sqlite_store: Optional[SQLiteStore] = None):
+    def __init__(self, config: Optional[PluginSystemConfig] = None, sqlite_store: Optional[SQLiteStore] = None, tool_manager=None):
         self.config = config or self._get_default_config()
         self.sqlite_store = sqlite_store
+        self.tool_manager = tool_manager  # MCP tool manager
         
         # Initialize components
         self._discovery = PluginDiscovery()
@@ -43,12 +45,15 @@ class PluginManager(IPluginManager, ILifecycleManager):
     
     def _get_default_config(self) -> PluginSystemConfig:
         """Get default plugin system configuration."""
+        # Check if lazy loading is enabled
+        lazy_loading = os.getenv("CODEX_LAZY_PLUGIN_LOADING", "false").lower() in ("true", "1", "yes")
+        
         return PluginSystemConfig(
             plugin_dirs=[
                 Path(__file__).parent.parent / "plugins"  # Default plugins directory
             ],
             auto_discover=True,
-            auto_load=True,
+            auto_load=not lazy_loading,  # Disable auto_load if lazy loading is enabled
             validate_interfaces=True
         )
     
@@ -117,6 +122,50 @@ class PluginManager(IPluginManager, ILifecycleManager):
                         
                 except Exception as e:
                     logger.error(f"Failed to load plugin {plugin_info.name}: {e}")
+
+    def prepare_plugins_for_lazy_loading(self, config_path: Optional[Path] = None) -> None:
+        """Prepare plugins for lazy loading - discover and register but don't initialize."""
+        if config_path:
+            self._load_config_file(config_path)
+        
+        if self.config.auto_discover:
+            # Discover plugins
+            discovered = self._discovery.discover_plugins(self.config.plugin_dirs)
+            logger.info(f"Discovered {len(discovered)} plugins for lazy loading")
+            
+            # Register each discovered plugin without initializing
+            for plugin_info in discovered:
+                if plugin_info.name in self.config.disabled_plugins:
+                    logger.info(f"Skipping disabled plugin: {plugin_info.name}")
+                    continue
+                
+                try:
+                    # Load the plugin class
+                    plugin_class = self._loader.load_plugin(plugin_info)
+                    
+                    # Register the plugin
+                    self._registry.register_plugin(plugin_info, plugin_class)
+                    
+                    # Get plugin config
+                    plugin_config = self.config.plugin_configs.get(
+                        plugin_info.name,
+                        PluginConfig()
+                    )
+                    
+                    # Create instance record without initialization
+                    instance = PluginInstance(
+                        info=plugin_info,
+                        config=plugin_config,
+                        instance=None,
+                        state=PluginState.DISCOVERED,  # New state for discovered but not loaded
+                        load_time=0
+                    )
+                    self._instances[plugin_info.name] = instance
+                    
+                    logger.debug(f"Prepared plugin {plugin_info.name} for lazy loading")
+                        
+                except Exception as e:
+                    logger.error(f"Failed to prepare plugin {plugin_info.name} for lazy loading: {e}")
     
     def load_plugins_safe(self, config_path: Optional[Path] = None) -> Result[List[PluginLoadResult]]:
         """Load plugins using Result pattern for error handling."""
@@ -439,6 +488,9 @@ class PluginManager(IPluginManager, ILifecycleManager):
             
             logger.info(f"Initialized plugin: {plugin_name}")
             
+            # Register MCP tools if available
+            self._register_plugin_tools(plugin_name, plugin_instance)
+            
             # Auto-start if configured
             if self.config.auto_load:
                 self.start_plugin(plugin_name)
@@ -622,3 +674,44 @@ class PluginManager(IPluginManager, ILifecycleManager):
                 active_plugins.append(name)
         
         return active_plugins
+    
+    def _register_plugin_tools(self, plugin_name: str, plugin_instance: IPlugin):
+        """Register MCP tools provided by a plugin."""
+        if not self.tool_manager:
+            return
+        
+        # Check if plugin provides MCP tools
+        if hasattr(plugin_instance, 'get_mcp_tools'):
+            try:
+                tools = plugin_instance.get_mcp_tools()
+                if tools:
+                    # Import the required classes
+                    from ..tools.base import MCPTool, ToolHandler
+                    
+                    # Register each tool
+                    for tool_def in tools:
+                        if isinstance(tool_def, dict):
+                            # Create MCPTool from dict
+                            tool = MCPTool(
+                                name=f"{plugin_name}_{tool_def['name']}",
+                                description=tool_def.get('description', ''),
+                                inputSchema=tool_def.get('inputSchema', {}),
+                                metadata={'plugin': plugin_name}
+                            )
+                            
+                            # Create handler wrapper
+                            handler_func = tool_def.get('handler')
+                            if handler_func:
+                                class PluginToolHandler(ToolHandler):
+                                    def __init__(self, func):
+                                        self.func = func
+                                    
+                                    async def execute(self, params):
+                                        return await self.func(params)
+                                
+                                handler = PluginToolHandler(handler_func)
+                                self.tool_manager.register_tool(tool, handler)
+                                logger.info(f"Registered MCP tool '{tool.name}' from plugin {plugin_name}")
+                        
+            except Exception as e:
+                logger.error(f"Failed to register MCP tools for plugin {plugin_name}: {e}")

@@ -2,6 +2,8 @@
 
 A high-performance code indexing and analysis server implementing the Model Context Protocol (MCP) for seamless integration with Claude and other MCP-compatible AI assistants.
 
+**Perfect Companion for Claude Code**: This project complements [Claude Code](https://claude.ai/code) and similar AI-powered coding agents by providing advanced indexing capabilities they don't have built-in. While Claude Code excels at understanding and modifying code, Code-Index-MCP adds deep code search, symbol lookup, and cross-repository analysis capabilities through the MCP protocol.
+
 ## 🎉 **IMPLEMENTATION COMPLETE!**
 
 **Status**: ✅ **Production Ready** - All 4 phases completed with 100% success rate
@@ -14,43 +16,44 @@ A high-performance code indexing and analysis server implementing the Model Cont
 
 ## 🚀 **Quick Start**
 
-### 🐳 Docker (Recommended - No Local Dependencies!)
+### ⚡ **Automated Setup (Recommended)**
 
-The easiest way to run Code-Index-MCP without installing Python, Tree-sitter, or other dependencies locally:
+**One command setup** - automatically handles Docker or local Python:
 
 ```bash
-# Clone the repository
+# Clone and setup
 git clone https://github.com/yourusername/Code-Index-MCP.git
 cd Code-Index-MCP
 
-# Run with Docker - no local setup needed!
-docker run -it --rm \
-  -v $(pwd):/workspace \
-  -v ~/.mcp:/root/.mcp \
-  -p 8765:8765 \
-  ghcr.io/code-index-mcp/mcp-server:latest
+# Automated setup - handles everything!
+./setup-mcp.sh
 
-# Or use docker-compose for a complete setup
-docker-compose up -d
+# Restart Claude Code to use the MCP server
 ```
 
-### Local Installation (Alternative)
+**What it does automatically**:
+- ✅ **Detects Docker** and builds image if available
+- ✅ **Falls back to Python** if Docker unavailable  
+- ✅ **Installs dependencies** as needed
+- ✅ **Tests the setup** to ensure it works
+- ✅ **Zero manual configuration** required
 
-If you prefer to install locally:
+### 🐳 **Manual Docker Setup** (Alternative)
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/Code-Index-MCP.git
-cd Code-Index-MCP
+# Build and run with Docker
+docker build -t code-index-mcp:latest .
+# MCP server auto-configured for Claude Code
+```
 
-# Install dependencies
+### 🐍 **Manual Local Setup** (Alternative)
+
+```bash
+# Install dependencies locally
 pip install -r requirements.txt
-
-# Start the MCP server
-./mcp
-
-# Or use Python module directly
-python -m mcp_server
+pip install -e .
+# MCP server auto-configured for Claude Code
+python -m mcp_server.stdio_server
 ```
 
 ### 🎯 **Automatic Indexing**
@@ -111,7 +114,7 @@ Or for local installation:
   "mcpServers": {
     "code-index": {
       "command": "python",
-      "args": ["-m", "mcp_server", "--transport", "stdio"],
+      "args": ["-m", "mcp_server.stdio_server"],
       "cwd": "/path/to/Code-Index-MCP",
       "env": {
         "CODEX_WORKSPACE_DIR": "/path/to/your/code"
@@ -121,20 +124,30 @@ Or for local installation:
 }
 ```
 
-#### **VS Code / Claude Code**
+#### **Claude Code**
 
-Create `.vscode/mcp.json` in your workspace:
+> **Note**: Claude Code only supports Tools and Prompts (not Resources). The server automatically disables resources when `MCP_DISABLE_RESOURCES=true` is set.
 
+Configure using the Claude CLI:
+```bash
+# Add the server
+claude mcp add code-index python -m mcp_server.stdio_server
+
+# Or use Docker
+claude mcp add code-index docker run -i --rm -e MCP_DISABLE_RESOURCES=true -v /path/to/code:/workspace ghcr.io/code-index-mcp/mcp-server:latest
+```
+
+Or add to `~/.claude.json`:
 ```json
 {
-  "mcp": {
-    "servers": {
-      "code-index": {
-        "command": "docker",
-        "args": ["run", "-i", "--rm", "-v", "${workspaceFolder}:/workspace", "ghcr.io/code-index-mcp/mcp-server:latest"],
-        "env": {
-          "CODEX_WORKSPACE_DIR": "/workspace"
-        }
+  "mcpServers": {
+    "code-index": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["-m", "mcp_server.stdio_server"],
+      "env": {
+        "MCP_DISABLE_RESOURCES": "true",
+        "CODEX_WORKSPACE_DIR": "/path/to/your/code"
       }
     }
   }
@@ -170,6 +183,249 @@ mcp-inspector mcp-config.json
 ```
 
 Open http://127.0.0.1:6274 to use the MCP Inspector web interface.
+
+## ⚙️ **MCP Configuration Guide**
+
+The `.mcp.json` file controls how Claude Code connects to and configures the Code-Index-MCP server. Users need to customize this file based on their specific needs.
+
+### **Configuration Structure**
+
+```json
+{
+  "mcpServers": {
+    "code-index": {
+      "command": "python|docker|node",     // The executable to run
+      "args": [...],                       // Command arguments
+      "cwd": "/path/to/working/dir",       // Working directory (optional)
+      "env": {                             // Environment variables
+        "KEY": "value"
+      }
+    }
+  }
+}
+```
+
+### **Key Configuration Options**
+
+#### **1. Execution Mode**
+
+**Local Python Mode** (Simple, requires Python installed):
+```json
+"command": "python",
+"args": ["-m", "mcp_server", "--transport", "stdio"]
+```
+
+**Docker Mode** (No dependencies needed):
+```json
+"command": "docker",
+"args": ["run", "-i", "--rm", "-v", "..."]
+```
+
+#### **2. Workspace Configuration**
+
+The most important setting - what code to index:
+
+```json
+"env": {
+  "CODEX_WORKSPACE_DIR": "/path/to/your/code"
+}
+```
+
+**Single Project:**
+```json
+"CODEX_WORKSPACE_DIR": "/home/user/my-project"
+```
+
+**Multiple Projects:**
+```json
+"CODEX_WORKSPACE_DIR": "/home/user/Code",
+"CODEX_ADDITIONAL_PATHS": "/home/user/Projects:/home/user/Templates"
+```
+
+#### **3. Volume Mounts (Docker Only)**
+
+Map host directories to container paths:
+
+```json
+"args": [
+  "run", "-i", "--rm",
+  "-v", "${HOME}/Code:/workspace",      // Main code directory
+  "-v", "${HOME}/.mcp:/root/.mcp",      // Index storage
+  "-v", "/path/to/templates:/templates" // Additional mounts
+]
+```
+
+#### **4. Performance Tuning**
+
+```json
+"env": {
+  "WORKER_COUNT": "8",              // Parallel processing threads
+  "CACHE_SIZE_MB": "2048",          // Memory cache size
+  "INDEXER_BATCH_SIZE": "500",      // Files per batch
+  "ENABLE_SEMANTIC_SEARCH": "true", // AI-powered search
+  "VOYAGE_API_KEY": "your-key"      // For embeddings
+}
+```
+
+### **Common Use Cases**
+
+#### **Web Developer Configuration**
+Focus on JS/TS/HTML/CSS with fast indexing:
+```json
+{
+  "mcpServers": {
+    "code-index": {
+      "command": "python",
+      "args": ["-m", "mcp_server"],
+      "env": {
+        "CODEX_WORKSPACE_DIR": "${HOME}/WebProjects",
+        "ENABLED_PLUGINS": "javascript,typescript,html,css",
+        "INDEXER_BATCH_SIZE": "1000"
+      }
+    }
+  }
+}
+```
+
+#### **Multi-Project Access**
+Access all your code with Docker:
+```json
+{
+  "mcpServers": {
+    "code-index": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-v", "${HOME}:/home",
+        "-v", "${HOME}/.mcp:/root/.mcp",
+        "code-index-mcp:local"
+      ],
+      "env": {
+        "CODEX_WORKSPACE_DIR": "/home"
+      }
+    }
+  }
+}
+```
+
+#### **Team Collaboration**
+Shared indexes with repository management:
+```json
+{
+  "mcpServers": {
+    "code-index": {
+      "command": "python",
+      "args": ["-m", "mcp_server"],
+      "env": {
+        "CODEX_WORKSPACE_DIR": "${PWD}",
+        "ENABLE_REPOSITORY_MANAGEMENT": "true",
+        "MCP_INDEX_BRANCH": "mcp-index",
+        "ENABLE_MCP_AUTO_INDEX": "true"
+      }
+    }
+  }
+}
+```
+
+### **Environment Variables Reference**
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `CODEX_WORKSPACE_DIR` | Primary directory to index | Current directory |
+| `CODEX_LOG_LEVEL` | Logging verbosity (DEBUG/INFO/WARNING/ERROR) | INFO |
+| `ENABLE_SEMANTIC_SEARCH` | Enable AI-powered search (requires embedding provider) | false |
+| `VOYAGE_API_KEY` | API key for Voyage AI embeddings (currently the only supported provider) | None |
+
+### **API Keys and External Services**
+
+**Important**: Code-Index-MCP only requires API keys for optional features:
+
+1. **Voyage AI API Key** (`VOYAGE_API_KEY`)
+   - **Required only if**: `ENABLE_SEMANTIC_SEARCH=true`
+   - **Purpose**: Generates code embeddings for semantic search
+   - **Get it from**: https://www.voyageai.com/
+   - **Note**: Currently, Voyage AI is the only supported embedding provider
+   
+2. **No Other API Keys Required**
+   - The project does **NOT** use OpenAI, Anthropic, Google, or other AI APIs
+   - All core functionality works without any API keys
+   - Only semantic search requires external API access
+
+**Future Enhancement**: The embedding system could be made model-agnostic to support:
+- OpenAI embeddings (`text-embedding-3-small/large`)
+- Cohere embeddings
+- Local embeddings (Sentence Transformers)
+- Custom embedding providers
+| `CACHE_SIZE_MB` | In-memory cache size | 512 |
+| `WORKER_COUNT` | Parallel processing threads | 4 |
+| `INDEXER_BATCH_SIZE` | Files indexed per batch | 100 |
+| `ENABLED_PLUGINS` | Comma-separated plugin list | All |
+| `DISABLED_PLUGINS` | Plugins to disable | None |
+| `ENABLE_REPOSITORY_MANAGEMENT` | Multi-repo features | false |
+| `MCP_INDEX_BRANCH` | Git branch for indexes | mcp-index |
+| `MCP_DISABLE_RESOURCES` | Disable resources capability (for Claude Code) | false |
+| `MCP_AUTO_INDEX` | Auto-index codebase on startup if empty | false |
+
+### **Configuration Tips**
+
+1. **Start Simple**: Use local Python mode first, then add features
+2. **Mount Parent Dirs**: For flexibility with Docker, mount parent directories
+3. **Use Environment Variables**: Reference system variables with `${VAR}`
+4. **Project-Specific**: Keep `.mcp.json` in your project for project-specific settings
+5. **Global Config**: Use `~/.claude/mcp.json` for system-wide settings
+
+### **Debugging Configuration Issues**
+
+If MCP isn't working, enable debug mode:
+
+```json
+"env": {
+  "CODEX_LOG_LEVEL": "DEBUG",
+  "MCP_DEBUG": "true"
+}
+```
+
+Then check Claude Code's output for error messages.
+
+#### **Startup Diagnostics**
+
+Run the startup checker to diagnose issues:
+```bash
+# Check all dependencies and configuration
+python -m mcp_server.startup_check
+
+# Or run with debug flag
+claude --mcp-debug
+
+# Check Claude Code logs for MCP errors
+claude --mcp-debug 2>&1 | grep -E "(Error|Failed|Missing)"
+```
+
+#### **Common Startup Errors**
+
+1. **Missing Dependencies (Local Mode)**
+   ```
+   Error: Missing dependency - No module named 'tree_sitter'
+   ```
+   **Solution**: Install dependencies with `pip install -r requirements.txt`
+
+2. **Docker Not Found (Docker Mode)**
+   ```
+   Error: Docker not found
+   ```
+   **Solution**: Either install Docker or switch to local Python mode in `.mcp.json`
+
+3. **Workspace Not Found**
+   ```
+   Error: Workspace directory not found: /path/to/code
+   ```
+   **Solution**: Update `CODEX_WORKSPACE_DIR` in `.mcp.json` to a valid path
+
+4. **Permission Denied**
+   ```
+   Error: Permission denied accessing /workspace
+   ```
+   **Solution**: Check Docker volume mount permissions or file ownership
 
 ## 🤖 **AI Agent Integration**
 
@@ -696,7 +952,7 @@ Code-Index-MCP/
 ├── mcp_server/            # Main application code
 │   ├── __init__.py
 │   ├── __main__.py        # Module entry point
-│   ├── server.py          # MCP server implementation
+│   ├── stdio_server.py    # MCP server implementation
 │   ├── protocol/          # MCP protocol implementation
 │   ├── transport/         # Transport layers (stdio, websocket)
 │   ├── tools/             # MCP tools

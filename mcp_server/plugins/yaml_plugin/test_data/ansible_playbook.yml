@@ -1,0 +1,268 @@
+---
+# Ansible Playbook for Web Server Setup
+- name: Configure Web Servers
+  hosts: webservers
+  become: yes
+  vars:
+    nginx_port: 80
+    ssl_port: 443
+    app_user: webapp
+    app_directory: /var/www/app
+    
+    # Package lists
+    system_packages:
+      - nginx
+      - git
+      - curl
+      - unzip
+      
+    php_packages:
+      - php-fpm
+      - php-mysql
+      - php-curl
+      - php-json
+      - php-mbstring
+
+  handlers:
+    - name: restart nginx
+      service:
+        name: nginx
+        state: restarted
+        
+    - name: restart php-fpm
+      service:
+        name: php7.4-fpm
+        state: restarted
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      tags: [packages]
+
+    - name: Install system packages
+      apt:
+        name: "{{ system_packages }}"
+        state: present
+      tags: [packages]
+
+    - name: Install PHP packages
+      apt:
+        name: "{{ php_packages }}"
+        state: present
+      notify: restart php-fpm
+      tags: [packages, php]
+
+    - name: Create application user
+      user:
+        name: "{{ app_user }}"
+        system: yes
+        shell: /bin/bash
+        home: "{{ app_directory }}"
+        create_home: yes
+      tags: [users]
+
+    - name: Create application directory structure
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0755'
+      loop:
+        - "{{ app_directory }}"
+        - "{{ app_directory }}/public"
+        - "{{ app_directory }}/logs"
+        - "{{ app_directory }}/config"
+      tags: [filesystem]
+
+    - name: Configure Nginx sites
+      template:
+        src: nginx-site.conf.j2
+        dest: /etc/nginx/sites-available/{{ item.name }}
+        backup: yes
+      loop:
+        - name: "default"
+          server_name: "{{ ansible_default_ipv4.address }}"
+          root: "{{ app_directory }}/public"
+          port: "{{ nginx_port }}"
+        - name: "ssl-site"
+          server_name: "{{ ansible_fqdn }}"
+          root: "{{ app_directory }}/public"
+          port: "{{ ssl_port }}"
+          ssl: true
+      notify: restart nginx
+      tags: [nginx, config]
+
+    - name: Enable Nginx sites
+      file:
+        src: /etc/nginx/sites-available/{{ item }}
+        dest: /etc/nginx/sites-enabled/{{ item }}
+        state: link
+      loop:
+        - default
+        - ssl-site
+      notify: restart nginx
+      tags: [nginx]
+
+    - name: Remove default Nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: restart nginx
+      tags: [nginx]
+
+    - name: Configure PHP-FPM pool
+      template:
+        src: php-fpm-pool.conf.j2
+        dest: /etc/php/7.4/fpm/pool.d/{{ app_user }}.conf
+        backup: yes
+      notify: restart php-fpm
+      tags: [php, config]
+
+    - name: Deploy application files
+      git:
+        repo: https://github.com/example/webapp.git
+        dest: "{{ app_directory }}/app"
+        version: main
+        force: yes
+      become_user: "{{ app_user }}"
+      tags: [deploy]
+
+    - name: Install Composer dependencies
+      composer:
+        command: install
+        working_dir: "{{ app_directory }}/app"
+        no_dev: yes
+        optimize_autoloader: yes
+      become_user: "{{ app_user }}"
+      tags: [deploy, composer]
+
+    - name: Set up application configuration
+      template:
+        src: app-config.php.j2
+        dest: "{{ app_directory }}/config/app.php"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0600'
+      tags: [config, deploy]
+
+    - name: Set up log rotation
+      template:
+        src: logrotate.conf.j2
+        dest: /etc/logrotate.d/{{ app_user }}
+      tags: [logging]
+
+    - name: Configure firewall
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - "{{ nginx_port }}"
+        - "{{ ssl_port }}"
+        - 22  # SSH
+      tags: [security, firewall]
+
+    - name: Start and enable services
+      service:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      loop:
+        - nginx
+        - php7.4-fpm
+      tags: [services]
+
+    - name: Health check
+      uri:
+        url: "http://{{ ansible_default_ipv4.address }}/health"
+        method: GET
+        status_code: 200
+      retries: 3
+      delay: 10
+      tags: [health-check]
+
+---
+# Database Server Configuration
+- name: Configure Database Servers
+  hosts: dbservers
+  become: yes
+  vars:
+    mysql_root_password: "{{ vault_mysql_root_password }}"
+    mysql_databases:
+      - name: webapp_prod
+        encoding: utf8mb4
+        collation: utf8mb4_unicode_ci
+      - name: webapp_staging
+        encoding: utf8mb4
+        collation: utf8mb4_unicode_ci
+    
+    mysql_users:
+      - name: webapp_user
+        password: "{{ vault_webapp_db_password }}"
+        priv: "webapp_prod.*:ALL/webapp_staging.*:ALL"
+        host: "%"
+
+  tasks:
+    - name: Install MySQL server
+      apt:
+        name:
+          - mysql-server
+          - mysql-client
+          - python3-pymysql
+        state: present
+      tags: [packages]
+
+    - name: Start and enable MySQL
+      service:
+        name: mysql
+        state: started
+        enabled: yes
+      tags: [services]
+
+    - name: Set MySQL root password
+      mysql_user:
+        name: root
+        password: "{{ mysql_root_password }}"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+      tags: [mysql, security]
+
+    - name: Create application databases
+      mysql_db:
+        name: "{{ item.name }}"
+        encoding: "{{ item.encoding }}"
+        collation: "{{ item.collation }}"
+        state: present
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+      loop: "{{ mysql_databases }}"
+      tags: [mysql, databases]
+
+    - name: Create application users
+      mysql_user:
+        name: "{{ item.name }}"
+        password: "{{ item.password }}"
+        priv: "{{ item.priv }}"
+        host: "{{ item.host }}"
+        state: present
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+      loop: "{{ mysql_users }}"
+      tags: [mysql, users]
+
+    - name: Configure MySQL
+      template:
+        src: mysql.cnf.j2
+        dest: /etc/mysql/mysql.conf.d/custom.cnf
+        backup: yes
+      notify:
+        - restart mysql
+      tags: [mysql, config]
+
+  handlers:
+    - name: restart mysql
+      service:
+        name: mysql
+        state: restarted

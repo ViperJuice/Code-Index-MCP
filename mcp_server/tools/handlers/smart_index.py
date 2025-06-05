@@ -6,20 +6,20 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 import json
 
-from mcp_server.tools.base import BaseTool
-from mcp_server.tools.schemas import ToolResult
+from mcp_server.tools.base import ToolHandler, ToolResult
 from mcp_server.indexer.index_engine import IndexEngine
 from mcp_server.config.settings import Settings
 
 
-class SmartIndexTool(BaseTool):
+class SmartIndexTool(ToolHandler):
     """Intelligently handles indexing with automatic setup and remote index usage."""
     
     name = "index_project"
     description = "Index a project with automatic setup and pre-built index support"
     
     def __init__(self, settings: Settings):
-        super().__init__(settings)
+        super().__init__()
+        self.settings = settings
         self.index_cache = {}
     
     async def execute(self, arguments: Dict[str, Any]) -> ToolResult:
@@ -224,3 +224,27 @@ class SmartIndexTool(BaseTool):
             },
             "required": ["path"]
         }
+
+
+def register_tool(registry) -> None:
+    """Register the smart_index tool with the registry."""
+    from mcp_server.tools.registry import ToolMetadata, ToolCapability
+    
+    metadata = ToolMetadata(
+        name="smart_index",
+        description="Intelligently handles indexing with automatic setup and pre-built index support",
+        version="1.0.0",
+        capabilities=[ToolCapability.INDEX],
+        tags=["index", "smart", "automatic", "git"],
+        author="MCP Team"
+    )
+    
+    # Create settings instance
+    settings = Settings()
+    tool = SmartIndexTool(settings)
+    registry.register(
+        name="smart_index",
+        handler=tool.execute,
+        schema=tool.json_schema,
+        metadata=metadata
+    )

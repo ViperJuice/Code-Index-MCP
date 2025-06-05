@@ -1,0 +1,95 @@
+@startuml
+set separator none
+title MCP Protocol Handler Components
+
+left to right direction
+skinparam ranksep 60
+skinparam nodesep 30
+
+skinparam {
+  arrowFontSize 10
+  defaultTextAlignment center
+  wrapWidth 200
+  maxMessageSize 100
+}
+
+hide stereotype
+
+skinparam component<<CodeIndexMCPServer.MCPProtocolHandler.CapabilityNegotiator>> {
+  BackgroundColor #e74c3c
+  FontColor #ffffff
+  BorderColor #a1352a
+  shadowing false
+}
+skinparam component<<CodeIndexMCPServer.MCPProtocolHandler.ErrorHandler>> {
+  BackgroundColor #e74c3c
+  FontColor #ffffff
+  BorderColor #a1352a
+  shadowing false
+}
+skinparam component<<CodeIndexMCPServer.MCPProtocolHandler.JSONRPCHandler>> {
+  BackgroundColor #1168bd
+  FontColor #ffffff
+  BorderColor #0b4884
+  shadowing false
+}
+skinparam component<<CodeIndexMCPServer.MCPProtocolHandler.MethodRouter>> {
+  BackgroundColor #1168bd
+  FontColor #ffffff
+  BorderColor #0b4884
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.ResourceManager>> {
+  BackgroundColor #9b59b6
+  FontColor #ffffff
+  BorderColor #6c3e7f
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.SessionManager>> {
+  BackgroundColor #e74c3c
+  FontColor #ffffff
+  BorderColor #a1352a
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.ToolManager>> {
+  BackgroundColor #9b59b6
+  FontColor #ffffff
+  BorderColor #6c3e7f
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.TransportLayer>> {
+  BackgroundColor #1168bd
+  FontColor #ffffff
+  BorderColor #0b4884
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.MCPProtocolHandler>> {
+  BorderColor #0b4884
+  FontColor #0b4884
+  shadowing false
+}
+
+rectangle "==Transport Layer\n<size:10>[Container: Python, aiohttp, asyncio]</size>\n\nWebSocket and stdio transport implementations" <<CodeIndexMCPServer.TransportLayer>> as CodeIndexMCPServer.TransportLayer
+rectangle "==Session Manager\n<size:10>[Container: Python]</size>\n\nMCP session lifecycle and capability negotiation" <<CodeIndexMCPServer.SessionManager>> as CodeIndexMCPServer.SessionManager
+rectangle "==Resource Manager\n<size:10>[Container: Python]</size>\n\nMCP resource abstraction for code elements" <<CodeIndexMCPServer.ResourceManager>> as CodeIndexMCPServer.ResourceManager
+rectangle "==Tool Manager\n<size:10>[Container: Python]</size>\n\nMCP tools exposing code operations" <<CodeIndexMCPServer.ToolManager>> as CodeIndexMCPServer.ToolManager
+
+rectangle "MCP Protocol Handler\n<size:10>[Container: Python, asyncio]</size>" <<CodeIndexMCPServer.MCPProtocolHandler>> {
+  component "==JSON-RPC Handler\n<size:10>[Component: Python]</size>\n\nParses and validates JSON-RPC 2.0 messages" <<CodeIndexMCPServer.MCPProtocolHandler.JSONRPCHandler>> as CodeIndexMCPServer.MCPProtocolHandler.JSONRPCHandler
+  component "==Method Router\n<size:10>[Component: Python]</size>\n\nRoutes MCP methods to appropriate handlers" <<CodeIndexMCPServer.MCPProtocolHandler.MethodRouter>> as CodeIndexMCPServer.MCPProtocolHandler.MethodRouter
+  component "==Error Handler\n<size:10>[Component: Python]</size>\n\nMCP-compliant error responses" <<CodeIndexMCPServer.MCPProtocolHandler.ErrorHandler>> as CodeIndexMCPServer.MCPProtocolHandler.ErrorHandler
+  component "==Capability Negotiator\n<size:10>[Component: Python]</size>\n\nHandles MCP capability exchange" <<CodeIndexMCPServer.MCPProtocolHandler.CapabilityNegotiator>> as CodeIndexMCPServer.MCPProtocolHandler.CapabilityNegotiator
+}
+
+CodeIndexMCPServer.MCPProtocolHandler.MethodRouter .[#666666,thickness=2].> CodeIndexMCPServer.MCPProtocolHandler.CapabilityNegotiator : "<color:#666666>initialize"
+CodeIndexMCPServer.MCPProtocolHandler.MethodRouter .[#666666,thickness=2].> CodeIndexMCPServer.ResourceManager : "<color:#666666>resources/*"
+CodeIndexMCPServer.MCPProtocolHandler.MethodRouter .[#666666,thickness=2].> CodeIndexMCPServer.ToolManager : "<color:#666666>tools/*"
+CodeIndexMCPServer.TransportLayer .[#666666,thickness=2].> CodeIndexMCPServer.MCPProtocolHandler.JSONRPCHandler : "<color:#666666>delivers messages"
+CodeIndexMCPServer.MCPProtocolHandler.JSONRPCHandler .[#666666,thickness=2].> CodeIndexMCPServer.SessionManager : "<color:#666666>session lookup"
+CodeIndexMCPServer.MCPProtocolHandler.CapabilityNegotiator .[#666666,thickness=2].> CodeIndexMCPServer.SessionManager : "<color:#666666>registers capabilities"
+CodeIndexMCPServer.MCPProtocolHandler.JSONRPCHandler .[#666666,thickness=2].> CodeIndexMCPServer.MCPProtocolHandler.MethodRouter : "<color:#666666>parsed requests"
+@enduml

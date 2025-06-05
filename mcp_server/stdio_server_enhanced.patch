@@ -1,0 +1,126 @@
+--- stdio_server.py.original
++++ stdio_server.py.enhanced
+@@ -15,6 +15,12 @@
+ sys.path.insert(0, str(project_root))
+ 
+ # Run startup checks first
++from mcp_server.utils.feature_flags import feature_manager
++from mcp_server.config.enhanced_settings import enhanced_settings
++from mcp_server.features import (
++    setup_cache, setup_health_monitoring, setup_metrics,
++    setup_rate_limiter, setup_memory_monitor
++)
+ try:
+     from mcp_server.startup_check import check_startup
+     # Set MCP_MODE for proper error formatting
+@@ -63,9 +69,25 @@ class StdioMCPServer:
+         self.resource_registry = None
+         self.prompt_registry = None
+         self.initialized = False
++        
++        # Feature integrations
++        self.cache_integration = None
++        self.health_monitor = None
++        self.metrics_collector = None
++        self.rate_limiter = None
++        self.memory_monitor = None
++        
++        # Initialize feature manager
++        feature_manager.initialize_from_env()
++        if enhanced_settings.debug:
++            feature_manager.print_feature_status()
+     
+     async def initialize(self):
+         """Initialize server components."""
++        # Apply enhanced settings
++        if enhanced_settings.log_level:
++            logging.getLogger().setLevel(enhanced_settings.log_level.upper())
++            
+         try:
+             logger.info("Initializing MCP stdio server...")
+             
+@@ -99,8 +121,25 @@ class StdioMCPServer:
+             self.protocol_handler = MCPProtocolHandler()
+             logger.info("Protocol handler initialized")
+             
++            # Initialize optional features
++            await self._initialize_features()
++            
+             # Check if we should auto-index
+-            if os.getenv("MCP_AUTO_INDEX", "").lower() in ("true", "1", "yes"):
++            if enhanced_settings.auto_index:
++                await self._auto_index_if_needed()
++            
++            self.initialized = True
++            logger.info("MCP stdio server initialization complete")
++            
++        except Exception as e:
++            logger.error(f"Failed to initialize server: {e}")
++            raise
++    
++    async def _initialize_features(self):
++        """Initialize optional features based on configuration."""
++        try:
++            # Set up caching
++            if feature_manager.is_enabled('cache'):
++                self.cache_integration = await setup_cache(self)
+                 await self._auto_index_if_needed()
+             
+             self.initialized = True
+@@ -154,7 +193,7 @@ class StdioMCPServer:
+         # Check if resources should be disabled for Claude Code compatibility
+-        disable_resources = os.getenv("MCP_DISABLE_RESOURCES", "").lower() in ("true", "1", "yes")
++        disable_resources = enhanced_settings.disable_resources
+         
+         capabilities = {
+             "tools": {
+@@ -282,6 +321,13 @@ class StdioMCPServer:
+             response = JSONRPCResponse(result=result, id=request.id)
+             return json.dumps(response.to_dict())
+             
++            # If caching is enabled, invalidate relevant caches
++            if self.cache_integration and result.get("success"):
++                # Clear caches that might be affected by new indexing
++                await self.cache_integration.clear_cache()
++                logger.debug("Cleared cache after successful indexing")
++            
++            response = JSONRPCResponse(result=result, id=request.id)
+         except Exception as e:
+             logger.error(f"Error handling tools/call: {e}")
+             import traceback
+@@ -376,6 +422,18 @@ class StdioMCPServer:
+             except Exception as e:
+                 logger.error(f"Error processing request: {e}")
+                 
++    async def shutdown(self):
++        """Shutdown server and cleanup resources."""
++        logger.info("Shutting down MCP server...")
++        
++        # Shutdown features
++        if self.cache_integration:
++            await self.cache_integration.shutdown()
++        
++        # Add other feature shutdowns here
++        
++        logger.info("Server shutdown complete")
++                
+ 
+ async def main():
+     """Main entry point for stdio server."""
+@@ -390,6 +448,15 @@ async def main():
+         logger.error(f"Server error: {e}")
+         import traceback
+         traceback.print_exc()
++    finally:
++        # Ensure cleanup on exit
++        try:
++            await server.shutdown()
++        except Exception as e:
++            logger.error(f"Error during shutdown: {e}")
++            
++        # Set up signal handlers for graceful shutdown
++        signal.signal(signal.SIGINT, signal_handler)
++        signal.signal(signal.SIGTERM, signal_handler)
+ 
+ 
+ if __name__ == "__main__":

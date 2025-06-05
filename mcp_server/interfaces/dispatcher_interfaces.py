@@ -243,7 +243,7 @@ class ILoadBalancer(ABC):
 # Caching Interfaces
 # ========================================
 
-class IDispatchCache(ABC, ICache):
+class IDispatchCache(ICache):
     """Interface for caching dispatch results"""
     
     @abstractmethod

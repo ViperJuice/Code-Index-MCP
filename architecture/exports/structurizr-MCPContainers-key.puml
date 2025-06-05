@@ -1,0 +1,125 @@
+@startuml
+set separator none
+
+skinparam {
+  shadowing false
+  arrowFontSize 15
+  defaultTextAlignment center
+  wrapWidth 100
+  maxMessageSize 100
+}
+hide stereotype
+
+skinparam rectangle<<_transparent>> {
+  BorderColor transparent
+  BackgroundColor transparent
+  FontColor transparent
+}
+
+skinparam rectangle<<1>> {
+  BackgroundColor #95a5a6
+  FontColor #ffffff
+  BorderColor #95a5a6
+  roundCorner 20
+}
+rectangle "==Container, New, Optional" <<1>>
+
+skinparam rectangle<<2>> {
+  BackgroundColor #e74c3c
+  FontColor #ffffff
+  BorderColor #a1352a
+  roundCorner 20
+}
+rectangle "==Container, New, Required" <<2>>
+
+skinparam rectangle<<3>> {
+  BackgroundColor #9b59b6
+  FontColor #ffffff
+  BorderColor #6c3e7f
+  roundCorner 20
+}
+rectangle "==Container, New, Required, Adapter" <<3>>
+
+skinparam rectangle<<4>> {
+  BackgroundColor #1168bd
+  FontColor #ffffff
+  BorderColor #0b4884
+  roundCorner 20
+}
+rectangle "==Container, New, Required, Core" <<4>>
+
+skinparam rectangle<<5>> {
+  BackgroundColor #27ae60
+  FontColor #ffffff
+  BorderColor #1b7943
+  roundCorner 20
+}
+rectangle "==Container, Reusable, AsIs" <<5>>
+
+skinparam database<<6>> {
+  BackgroundColor #438dd5
+  FontColor #ffffff
+  BorderColor #2e6295
+}
+database "==Container, Reusable, AsIs, Database" <<6>>
+
+skinparam rectangle<<7>> {
+  BackgroundColor #95a5a6
+  FontColor #ffffff
+  BorderColor #95a5a6
+  roundCorner 20
+}
+rectangle "==Container, Reusable, AsIs, Optional" <<7>>
+
+skinparam rectangle<<8>> {
+  BackgroundColor #2ecc71
+  FontColor #ffffff
+  BorderColor #208e4f
+  roundCorner 20
+}
+rectangle "==Container, Reusable, AsIs, Plugin" <<8>>
+
+skinparam rectangle<<9>> {
+  BackgroundColor #f1c40f
+  FontColor #000000
+  BorderColor #a8890a
+  roundCorner 20
+}
+rectangle "==Container, Reusable, MinorChanges" <<9>>
+
+skinparam rectangle<<10>> {
+  BackgroundColor #f39c12
+  FontColor #ffffff
+  BorderColor #aa6d0c
+  roundCorner 20
+}
+rectangle "==Container, Reusable, Modify" <<10>>
+
+skinparam rectangle<<11>> {
+  BackgroundColor #1168bd
+  FontColor #ffffff
+  BorderColor #0b4884
+  roundCorner 20
+}
+rectangle "==Container, Reusable, Modify, Core" <<11>>
+
+skinparam person<<12>> {
+  BackgroundColor #a23b72
+  FontColor #ffffff
+  BorderColor #71294f
+}
+person "==Software System, External, MCPClient" <<12>>
+
+skinparam rectangle<<13>> {
+  BackgroundColor #27ae60
+  FontColor #ffffff
+  BorderColor #1b7943
+  roundCorner 20
+}
+rectangle "==Software System, External, Reusable" <<13>>
+
+rectangle "." <<_transparent>> as 14
+14 .[#666666,thickness=2].> 14 : "<color:#666666>Relationship"
+
+
+@enduml

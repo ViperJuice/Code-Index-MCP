@@ -1,0 +1,80 @@
+@startuml
+set separator none
+title Complete MCP Server Architecture
+
+left to right direction
+skinparam ranksep 60
+skinparam nodesep 30
+
+skinparam {
+  arrowFontSize 10
+  defaultTextAlignment center
+  wrapWidth 200
+  maxMessageSize 100
+}
+
+hide stereotype
+
+skinparam rectangle<<CodeIndexMCPServer>> {
+  BackgroundColor #2e86ab
+  FontColor #ffffff
+  BorderColor #205d77
+  roundCorner 20
+  shadowing false
+}
+skinparam person<<Developer>> {
+  BackgroundColor #08427b
+  FontColor #ffffff
+  BorderColor #052e56
+  shadowing false
+}
+skinparam rectangle<<EmbeddingService>> {
+  BackgroundColor #27ae60
+  FontColor #ffffff
+  BorderColor #95a5a6
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<LocalCodeRepository>> {
+  BackgroundColor #27ae60
+  FontColor #ffffff
+  BorderColor #1b7943
+  roundCorner 20
+  shadowing false
+}
+skinparam person<<MCPClientClaudeLLM>> {
+  BackgroundColor #a23b72
+  FontColor #ffffff
+  BorderColor #71294f
+  shadowing false
+}
+skinparam rectangle<<MonitoringSystem>> {
+  BackgroundColor #ecf0f1
+  FontColor #7f8c8d
+  BorderColor #bdc3c7
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<VectorDatabase>> {
+  BackgroundColor #27ae60
+  FontColor #ffffff
+  BorderColor #95a5a6
+  roundCorner 20
+  shadowing false
+}
+
+person "==Developer\n<size:10>[Person]</size>\n\nSoftware developer using Claude or other MCP-enabled AI assistants for code assistance" <<Developer>> as Developer
+person "==MCP Client (Claude/LLM)\n<size:10>[Software System]</size>\n\nAI assistant that connects via Model Context Protocol" <<MCPClientClaudeLLM>> as MCPClientClaudeLLM
+rectangle "==Code-Index MCP Server\n<size:10>[Software System]</size>\n\nNative MCP server providing code indexing, search, and analysis as MCP resources and tools" <<CodeIndexMCPServer>> as CodeIndexMCPServer
+rectangle "==Local Code Repository\n<size:10>[Software System]</size>\n\nThe developer's local codebase being indexed and analyzed" <<LocalCodeRepository>> as LocalCodeRepository
+rectangle "==Embedding Service\n<size:10>[Software System]</size>\n\nOptional AI embeddings for semantic search (Voyage AI)" <<EmbeddingService>> as EmbeddingService
+rectangle "==Vector Database\n<size:10>[Software System]</size>\n\nOptional vector storage for semantic search (Qdrant)" <<VectorDatabase>> as VectorDatabase
+rectangle "==Monitoring System\n<size:10>[Software System]</size>\n\nMetrics and observability (Prometheus/Grafana)" <<MonitoringSystem>> as MonitoringSystem
+
+Developer .[#666666,thickness=2].> MCPClientClaudeLLM : "<color:#666666>requests code assistance"
+MCPClientClaudeLLM -[#e74c3c,thickness=3]-> CodeIndexMCPServer : "<color:#e74c3c>MCP protocol (JSON-RPC 2.0)"
+CodeIndexMCPServer .[#666666,thickness=2].> LocalCodeRepository : "<color:#666666>indexes and monitors"
+CodeIndexMCPServer .[#95a5a6,thickness=2].> EmbeddingService : "<color:#95a5a6>generates embeddings"
+CodeIndexMCPServer .[#95a5a6,thickness=2].> VectorDatabase : "<color:#95a5a6>stores/queries vectors"
+CodeIndexMCPServer .[#bdc3c7,thickness=1].> MonitoringSystem : "<color:#bdc3c7>reports metrics"
+@enduml

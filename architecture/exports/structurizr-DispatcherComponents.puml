@@ -1,0 +1,86 @@
+@startuml
+set separator none
+title Dispatcher Components (Reusable)
+
+left to right direction
+skinparam ranksep 60
+skinparam nodesep 30
+
+skinparam {
+  arrowFontSize 10
+  defaultTextAlignment center
+  wrapWidth 200
+  maxMessageSize 100
+}
+
+hide stereotype
+
+skinparam component<<CodeIndexMCPServer.Dispatcher.DispatcherCache>> {
+  BackgroundColor #27ae60
+  FontColor #ffffff
+  BorderColor #1b7943
+  shadowing false
+}
+skinparam component<<CodeIndexMCPServer.Dispatcher.DispatcherCore>> {
+  BackgroundColor #f39c12
+  FontColor #ffffff
+  BorderColor #aa6d0c
+  shadowing false
+}
+skinparam component<<CodeIndexMCPServer.Dispatcher.PluginRouter>> {
+  BackgroundColor #27ae60
+  FontColor #ffffff
+  BorderColor #1b7943
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.PluginSystem>> {
+  BackgroundColor #27ae60
+  FontColor #ffffff
+  BorderColor #1b7943
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.ResourceManager>> {
+  BackgroundColor #9b59b6
+  FontColor #ffffff
+  BorderColor #6c3e7f
+  roundCorner 20
+  shadowing false
+}
+skinparam component<<CodeIndexMCPServer.Dispatcher.ResultAggregator>> {
+  BackgroundColor #27ae60
+  FontColor #ffffff
+  BorderColor #1b7943
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.ToolManager>> {
+  BackgroundColor #9b59b6
+  FontColor #ffffff
+  BorderColor #6c3e7f
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.Dispatcher>> {
+  BorderColor #0b4884
+  FontColor #0b4884
+  shadowing false
+}
+
+rectangle "==Resource Manager\n<size:10>[Container: Python]</size>\n\nMCP resource abstraction for code elements" <<CodeIndexMCPServer.ResourceManager>> as CodeIndexMCPServer.ResourceManager
+rectangle "==Tool Manager\n<size:10>[Container: Python]</size>\n\nMCP tools exposing code operations" <<CodeIndexMCPServer.ToolManager>> as CodeIndexMCPServer.ToolManager
+rectangle "==Plugin System\n<size:10>[Container: Python]</size>\n\nManages language-specific code analyzers" <<CodeIndexMCPServer.PluginSystem>> as CodeIndexMCPServer.PluginSystem
+
+rectangle "Dispatcher\n<size:10>[Container: Python]</size>" <<CodeIndexMCPServer.Dispatcher>> {
+  component "==Dispatcher Core\n<size:10>[Component: Python]</size>\n\nCore request routing logic" <<CodeIndexMCPServer.Dispatcher.DispatcherCore>> as CodeIndexMCPServer.Dispatcher.DispatcherCore
+  component "==Plugin Router\n<size:10>[Component: Python]</size>\n\nRoutes to language plugins by file type" <<CodeIndexMCPServer.Dispatcher.PluginRouter>> as CodeIndexMCPServer.Dispatcher.PluginRouter
+  component "==Result Aggregator\n<size:10>[Component: Python]</size>\n\nAggregates results from multiple plugins" <<CodeIndexMCPServer.Dispatcher.ResultAggregator>> as CodeIndexMCPServer.Dispatcher.ResultAggregator
+  component "==Dispatcher Cache\n<size:10>[Component: Python]</size>\n\nIn-memory result cache" <<CodeIndexMCPServer.Dispatcher.DispatcherCache>> as CodeIndexMCPServer.Dispatcher.DispatcherCache
+}
+
+CodeIndexMCPServer.ResourceManager .[#666666,thickness=2].> CodeIndexMCPServer.Dispatcher.DispatcherCore : "<color:#666666>lookup symbols"
+CodeIndexMCPServer.ToolManager .[#666666,thickness=2].> CodeIndexMCPServer.Dispatcher.DispatcherCore : "<color:#666666>calls search()"
+CodeIndexMCPServer.Dispatcher.DispatcherCore .[#666666,thickness=2].> CodeIndexMCPServer.Dispatcher.PluginRouter : "<color:#666666>routes requests"
+CodeIndexMCPServer.Dispatcher.PluginRouter .[#666666,thickness=2].> CodeIndexMCPServer.PluginSystem : "<color:#666666>gets plugins"
+CodeIndexMCPServer.Dispatcher.DispatcherCore .[#666666,thickness=2].> CodeIndexMCPServer.Dispatcher.ResultAggregator : "<color:#666666>combines results"
+CodeIndexMCPServer.Dispatcher.DispatcherCore .[#666666,thickness=2].> CodeIndexMCPServer.Dispatcher.DispatcherCache : "<color:#666666>caches results"
+@enduml

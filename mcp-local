@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# MCP Server Local Python Wrapper for Claude Code
+# This script runs the MCP server using local Python installation only
+
+# Configuration
+WORKDIR="/home/jenner/Code/Code-Index-MCP"
+
+# Function to run MCP server locally
+run_local() {
+    # Set environment variables
+    export PYTHONPATH="$WORKDIR"
+    export MCP_DISABLE_RESOURCES="true"
+    
+    # Change to working directory
+    cd "$WORKDIR"
+    
+    # Check if Python dependencies are available
+    if ! python3 -c "import mcp_server" &> /dev/null; then
+        echo "Error: MCP server Python package not found." >&2
+        echo "Please install dependencies with:" >&2
+        echo "  pip install -r requirements.txt" >&2
+        echo "Or:" >&2
+        echo "  pip install -e ." >&2
+        exit 1
+    fi
+    
+    # Run MCP server locally
+    exec python3 -m mcp_server --transport stdio
+}
+
+# Main execution
+run_local "$@"

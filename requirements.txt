@@ -1,4 +1,18 @@
 # Core dependencies
+tree-sitter>=0.20.0
+tree-sitter-languages>=1.7.0
+
+# Tree-sitter language parsers
+tree-sitter-c-sharp>=0.20.0
+tree-sitter-bash>=0.20.0
+tree-sitter-haskell>=0.14.0
+tree-sitter-scala>=0.19.0
+tree-sitter-lua>=0.0.14
+tree-sitter-yaml>=0.5.0
+tree-sitter-toml>=0.5.1
+tree-sitter-json>=0.19.0
+tree-sitter-markdown>=0.3.2
+tree-sitter-csv>=0.1.1
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
 pytest-cov>=4.1.0
@@ -66,6 +80,10 @@ pytest-httpx>=0.22.0
 aiofiles>=23.2.1
 asynctest>=0.13.0
 
+# WebSocket support
+aiohttp>=3.9.0
+websockets>=12.0
+
 # Code quality
 pylint>=2.17.5
 pydocstyle>=6.3.0
@@ -74,3 +92,16 @@ radon>=6.0.1
 # Type stubs
 types-requests>=2.31.0
 types-setuptools>=68.1.0
+
+jsonschema>=4.17.0
+
+# Repository management dependencies (standard library - listed for completeness)
+# sqlite3 - Database operations (standard library)
+# json - JSON serialization (standard library) 
+# datetime - Date/time handling (standard library)
+# pathlib - Path operations (standard library)
+
+# Additional MCP dependencies
+pydantic>=2.0.0
+click>=8.0.0
+watchdog>=4.0.0

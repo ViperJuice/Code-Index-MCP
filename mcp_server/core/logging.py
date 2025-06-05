@@ -45,8 +45,8 @@ def setup_logging(
     )
     
     # Set levels for third-party libraries to reduce noise
-    logging.getLogger("uvicorn").setLevel(logging.WARNING)
-    logging.getLogger("fastapi").setLevel(logging.WARNING)
+    logging.getLogger("websockets").setLevel(logging.WARNING)
+    logging.getLogger("asyncio").setLevel(logging.WARNING)
     
     # Log startup message
     logger = logging.getLogger(__name__)

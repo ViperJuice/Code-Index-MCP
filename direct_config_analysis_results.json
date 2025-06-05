@@ -1,0 +1,404 @@
+{
+  "kubernetes_analysis": [
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/helm/pkg/cmd/testdata/testcharts/lib-chart/templates/_deployment.yaml",
+      "type": "kubernetes_manifest",
+      "parsed": false,
+      "error": "while parsing a flow node\nexpected the node content, but found '-'\n  in \"<unicode string>\", line 1, column 3:\n    {{- define \"common.deployment.tpl\" -}}\n      ^",
+      "line_count": 19,
+      "size_bytes": 512
+    },
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/helm/pkg/cmd/testdata/testcharts/chart-with-lib-dep/templates/deployment.yaml",
+      "type": "kubernetes_manifest",
+      "parsed": false,
+      "error": "while scanning a simple key\n  in \"<unicode string>\", line 39, column 1:\n    {{ toYaml .Values.resources | in ... \n    ^\ncould not find expected ':'\n  in \"<unicode string>\", line 40, column 5:\n        {{- with .Values.nodeSelector }}\n        ^",
+      "line_count": 52,
+      "size_bytes": 1558
+    },
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/helm/pkg/cmd/testdata/testcharts/chart-with-template-lib-archive-dep/templates/deployment.yaml",
+      "type": "kubernetes_manifest",
+      "parsed": false,
+      "error": "while scanning a simple key\n  in \"<unicode string>\", line 39, column 1:\n    {{ toYaml .Values.resources | in ... \n    ^\ncould not find expected ':'\n  in \"<unicode string>\", line 40, column 5:\n        {{- with .Values.nodeSelector }}\n        ^",
+      "line_count": 52,
+      "size_bytes": 1501
+    },
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/helm/pkg/cmd/testdata/testcharts/chart-with-template-lib-dep/templates/deployment.yaml",
+      "type": "kubernetes_manifest",
+      "parsed": false,
+      "error": "while scanning a simple key\n  in \"<unicode string>\", line 39, column 1:\n    {{ toYaml .Values.resources | in ... \n    ^\ncould not find expected ':'\n  in \"<unicode string>\", line 40, column 5:\n        {{- with .Values.nodeSelector }}\n        ^",
+      "line_count": 52,
+      "size_bytes": 1461
+    },
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/helm/pkg/cmd/testdata/testcharts/chart-with-template-lib-dep/charts/common/templates/_deployment.yaml",
+      "type": "kubernetes_manifest",
+      "parsed": false,
+      "error": "while parsing a flow node\nexpected the node content, but found '-'\n  in \"<unicode string>\", line 1, column 3:\n    {{- define \"common.deployment.tpl\" -}}\n      ^",
+      "line_count": 19,
+      "size_bytes": 474
+    }
+  ],
+  "helm_analysis": [
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/helm/pkg/chart/v2/util/testdata/dependent-chart-with-all-in-requirements-yaml/Chart.yaml",
+      "type": "helm_chart",
+      "parsed": true,
+      "line_count": 25,
+      "size_bytes": 523,
+      "chart_type": "chart_metadata",
+      "name": "frobnitz",
+      "version": "1.2.3",
+      "api_version": "v1",
+      "dependencies": [
+        {
+          "name": "alpine",
+          "version": "0.1.0",
+          "repository": "https://example.com/charts"
+        },
+        {
+          "name": "mariner",
+          "version": "4.3.2",
+          "repository": "https://example.com/charts"
+        }
+      ]
+    },
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/helm/pkg/chart/v2/util/testdata/dependent-chart-with-all-in-requirements-yaml/charts/alpine/Chart.yaml",
+      "type": "helm_chart",
+      "parsed": true,
+      "line_count": 6,
+      "size_bytes": 115,
+      "chart_type": "chart_metadata",
+      "name": "alpine",
+      "version": "0.1.0",
+      "api_version": "v1",
+      "dependencies": []
+    },
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/helm/pkg/chart/v2/util/testdata/dependent-chart-with-all-in-requirements-yaml/charts/alpine/charts/mast1/Chart.yaml",
+      "type": "helm_chart",
+      "parsed": true,
+      "line_count": 6,
+      "size_bytes": 92,
+      "chart_type": "chart_metadata",
+      "name": "mast1",
+      "version": "0.1.0",
+      "api_version": "v1",
+      "dependencies": []
+    },
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/helm/pkg/chart/v2/util/testdata/chart-with-dependency-aliased-twice/Chart.yaml",
+      "type": "helm_chart",
+      "parsed": true,
+      "line_count": 15,
+      "size_bytes": 224,
+      "chart_type": "chart_metadata",
+      "name": "chart-with-dependency-aliased-twice",
+      "version": "1.0.0",
+      "api_version": "v2",
+      "dependencies": [
+        {
+          "name": "child",
+          "alias": "foo",
+          "version": "1.0.0"
+        },
+        {
+          "name": "child",
+          "alias": "bar",
+          "version": "1.0.0"
+        }
+      ]
+    },
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/helm/pkg/chart/v2/util/testdata/chart-with-dependency-aliased-twice/charts/child/Chart.yaml",
+      "type": "helm_chart",
+      "parsed": true,
+      "line_count": 7,
+      "size_bytes": 79,
+      "chart_type": "chart_metadata",
+      "name": "child",
+      "version": "1.0.0",
+      "api_version": "v2",
+      "dependencies": []
+    },
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/helm/pkg/chart/v2/util/testdata/dependent-chart-with-all-in-requirements-yaml/values.yaml",
+      "type": "helm_chart",
+      "parsed": true,
+      "line_count": 7,
+      "size_bytes": 97,
+      "chart_type": "values",
+      "value_keys": [
+        "name",
+        "section"
+      ]
+    },
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/helm/pkg/chart/v2/util/testdata/dependent-chart-with-all-in-requirements-yaml/charts/alpine/values.yaml",
+      "type": "helm_chart",
+      "parsed": true,
+      "line_count": 3,
+      "size_bytes": 33,
+      "chart_type": "values",
+      "value_keys": [
+        "name"
+      ]
+    },
+    null,
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/helm/pkg/chart/v2/util/testdata/chart-with-dependency-aliased-twice/values.yaml",
+      "type": "helm_chart",
+      "parsed": true,
+      "line_count": 8,
+      "size_bytes": 67,
+      "chart_type": "values",
+      "value_keys": [
+        "foo",
+        "bar"
+      ]
+    },
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/helm/pkg/chart/v2/util/testdata/dependent-chart-with-mixed-requirements-yaml/values.yaml",
+      "type": "helm_chart",
+      "parsed": true,
+      "line_count": 7,
+      "size_bytes": 97,
+      "chart_type": "values",
+      "value_keys": [
+        "name",
+        "section"
+      ]
+    }
+  ],
+  "github_actions_analysis": [
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/helm/.github/workflows/codeql-analysis.yml",
+      "type": "github_action",
+      "name": "CodeQL",
+      "parsed": true,
+      "line_count": 76,
+      "size_bytes": 2652,
+      "job_count": 1,
+      "job_names": [
+        "analyze"
+      ]
+    },
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/helm/.github/workflows/golangci-lint.yml",
+      "type": "github_action",
+      "name": "golangci-lint",
+      "parsed": true,
+      "line_count": 28,
+      "size_bytes": 757,
+      "job_count": 1,
+      "job_names": [
+        "golangci"
+      ]
+    },
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/helm/.github/workflows/scorecards.yml",
+      "type": "github_action",
+      "name": "Scorecard supply-chain security",
+      "parsed": true,
+      "line_count": 70,
+      "size_bytes": 2882,
+      "job_count": 1,
+      "job_names": [
+        "analysis"
+      ]
+    },
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/helm/.github/workflows/release.yml",
+      "type": "github_action",
+      "name": "release",
+      "parsed": true,
+      "line_count": 110,
+      "size_bytes": 4020,
+      "job_count": 2,
+      "job_names": [
+        "release",
+        "canary-release"
+      ]
+    },
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/helm/.github/workflows/build-test.yml",
+      "type": "github_action",
+      "name": "build-test",
+      "parsed": true,
+      "line_count": 35,
+      "size_bytes": 853,
+      "job_count": 1,
+      "job_names": [
+        "build"
+      ]
+    },
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/helm/.github/workflows/stale-issue-bot.yaml",
+      "type": "github_action",
+      "name": "Close stale issues",
+      "parsed": true,
+      "line_count": 20,
+      "size_bytes": 642,
+      "job_count": 1,
+      "job_names": [
+        "stale"
+      ]
+    },
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/starter-workflows/.github/workflows/lint.yaml",
+      "type": "github_action",
+      "name": "Lint",
+      "parsed": true,
+      "line_count": 32,
+      "size_bytes": 649,
+      "job_count": 1,
+      "job_names": [
+        "pre-commit"
+      ]
+    },
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/starter-workflows/.github/workflows/sync-ghes.yaml",
+      "type": "github_action",
+      "name": "Sync workflows for GHES",
+      "parsed": true,
+      "line_count": 36,
+      "size_bytes": 930,
+      "job_count": 1,
+      "job_names": [
+        "sync"
+      ]
+    },
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/starter-workflows/.github/workflows/validate-data.yaml",
+      "type": "github_action",
+      "name": "Validate Data",
+      "parsed": true,
+      "line_count": 26,
+      "size_bytes": 514,
+      "job_count": 1,
+      "job_names": [
+        "validate-data"
+      ]
+    }
+  ],
+  "docker_compose_analysis": [
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/compose/pkg/e2e/fixtures/project-volume-bind-test/docker-compose.yml",
+      "type": "docker_compose",
+      "version": "unknown",
+      "parsed": true,
+      "line_count": 15,
+      "size_bytes": 228,
+      "service_count": 1,
+      "service_names": [
+        "frontend"
+      ],
+      "services": [
+        {
+          "name": "frontend",
+          "image": "nginx",
+          "has_volumes": true
+        }
+      ]
+    },
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/compose/pkg/e2e/fixtures/profiles/docker-compose.yaml",
+      "type": "docker_compose",
+      "version": "unknown",
+      "parsed": true,
+      "line_count": 15,
+      "size_bytes": 233,
+      "service_count": 3,
+      "service_names": [
+        "foo",
+        "bar",
+        "db"
+      ],
+      "services": [
+        {
+          "name": "foo",
+          "image": "alpine"
+        },
+        {
+          "name": "bar",
+          "image": "alpine"
+        },
+        {
+          "name": "db",
+          "image": "alpine"
+        }
+      ]
+    },
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/compose/pkg/e2e/fixtures/build-test/secrets/compose.yml",
+      "type": "docker_compose",
+      "version": "unknown",
+      "parsed": true,
+      "line_count": 16,
+      "size_bytes": 254,
+      "service_count": 1,
+      "service_names": [
+        "ssh"
+      ],
+      "services": [
+        {
+          "name": "ssh",
+          "image": "build-test-secret"
+        }
+      ]
+    },
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/compose/pkg/compose/testdata/compose.yaml",
+      "type": "docker_compose",
+      "version": "unknown",
+      "parsed": true,
+      "line_count": 6,
+      "size_bytes": 68,
+      "service_count": 2,
+      "service_names": [
+        "service1",
+        "service2"
+      ],
+      "services": [
+        {
+          "name": "service1",
+          "image": "nginx"
+        },
+        {
+          "name": "service2",
+          "image": "mysql"
+        }
+      ]
+    },
+    {
+      "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/compose/pkg/compose/testdata/publish/compose.yaml",
+      "type": "docker_compose",
+      "version": "unknown",
+      "parsed": true,
+      "line_count": 7,
+      "size_bytes": 85,
+      "service_count": 1,
+      "service_names": [
+        "test"
+      ],
+      "services": [
+        {
+          "name": "test"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "kubernetes_files_analyzed": 5,
+    "kubernetes_parsed_successfully": 0,
+    "helm_files_analyzed": 10,
+    "helm_parsed_successfully": 9,
+    "github_actions_analyzed": 9,
+    "github_actions_parsed_successfully": 9,
+    "docker_compose_analyzed": 5,
+    "docker_compose_parsed_successfully": 5
+  }
+}

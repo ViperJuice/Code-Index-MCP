@@ -1,0 +1,344 @@
+{
+  "total_symbols": 988,
+  "languages": {
+    "go-mod": 380,
+    "go": 408,
+    "js": 36,
+    "python": 64,
+    "gradle": 20,
+    "maven": 14,
+    "java": 66
+  },
+  "semantic_search_enabled": false,
+  "semantic_queries": {
+    "function that handles HTTP requests": {
+      "semantic": false,
+      "count": 281,
+      "results": [
+        {
+          "file": "test_repos/golang-example/slog-handler-guide/indenthandler2/indent_handler.go",
+          "symbol": "WithAttrs",
+          "kind": "function",
+          "line": 63,
+          "language": "go",
+          "signature": "func (h *IndentHandler) WithAttrs(attrs []slog.Attr) slog.Handler {",
+          "context": "\t}\n\treturn h.withGroupOrAttrs(groupOrAttrs{group: name})\n}\n\nfunc (h *IndentHandler) WithAttrs(attrs []slog.Attr) slog.Handler {\n\tif len(attrs) == 0 {\n\t\treturn h",
+          "score": 4
+        },
+        {
+          "file": "test_repos/golang-example/slog-handler-guide/indenthandler1/indent_handler.go",
+          "symbol": "WithAttrs",
+          "kind": "function",
+          "line": 54,
+          "language": "go",
+          "signature": "func (h *IndentHandler) WithAttrs(attrs []slog.Attr) slog.Handler {",
+          "context": "\t// TODO: implement.\n\treturn h\n}\n\nfunc (h *IndentHandler) WithAttrs(attrs []slog.Attr) slog.Handler {\n\t// TODO: implement.\n\treturn h",
+          "score": 4
+        },
+        {
+          "file": "test_repos/golang-example/slog-handler-guide/indenthandler3/indent_handler.go",
+          "symbol": "WithAttrs",
+          "kind": "function",
+          "line": 66,
+          "language": "go",
+          "signature": "func (h *IndentHandler) WithAttrs(attrs []slog.Attr) slog.Handler {",
+          "context": "//!-WithGroup\n\n// !+WithAttrs\nfunc (h *IndentHandler) WithAttrs(attrs []slog.Attr) slog.Handler {\n\tif len(attrs) == 0 {\n\t\treturn h\n\t}",
+          "score": 4
+        }
+      ]
+    },
+    "code that validates user input": {
+      "semantic": false,
+      "count": 20,
+      "results": [
+        {
+          "file": "test_repos/golang-example/slog-handler-guide/indenthandler2/indent_handler.go",
+          "symbol": "WithAttrs",
+          "kind": "function",
+          "line": 63,
+          "language": "go",
+          "signature": "func (h *IndentHandler) WithAttrs(attrs []slog.Attr) slog.Handler {",
+          "context": "\t}\n\treturn h.withGroupOrAttrs(groupOrAttrs{group: name})\n}\n\nfunc (h *IndentHandler) WithAttrs(attrs []slog.Attr) slog.Handler {\n\tif len(attrs) == 0 {\n\t\treturn h",
+          "score": 3
+        },
+        {
+          "file": "test_repos/golang-example/slog-handler-guide/indenthandler1/indent_handler.go",
+          "symbol": "WithAttrs",
+          "kind": "function",
+          "line": 54,
+          "language": "go",
+          "signature": "func (h *IndentHandler) WithAttrs(attrs []slog.Attr) slog.Handler {",
+          "context": "\t// TODO: implement.\n\treturn h\n}\n\nfunc (h *IndentHandler) WithAttrs(attrs []slog.Attr) slog.Handler {\n\t// TODO: implement.\n\treturn h",
+          "score": 3
+        },
+        {
+          "file": "test_repos/golang-example/slog-handler-guide/indenthandler3/indent_handler.go",
+          "symbol": "WithAttrs",
+          "kind": "function",
+          "line": 66,
+          "language": "go",
+          "signature": "func (h *IndentHandler) WithAttrs(attrs []slog.Attr) slog.Handler {",
+          "context": "//!-WithGroup\n\n// !+WithAttrs\nfunc (h *IndentHandler) WithAttrs(attrs []slog.Attr) slog.Handler {\n\tif len(attrs) == 0 {\n\t\treturn h\n\t}",
+          "score": 3
+        }
+      ]
+    },
+    "method for database operations": {
+      "semantic": false,
+      "count": 40,
+      "results": [
+        {
+          "file": "test_repos/golang-example/ragserver/ragserver-langchaingo/go.mod",
+          "symbol": "cloud.google.com/go/aiplatform",
+          "kind": "dependency",
+          "line": 10,
+          "language": "go-mod",
+          "signature": "require cloud.google.com/go/aiplatform v1.67.0 // indirect",
+          "context": "require (\n\tcloud.google.com/go v0.113.0 // indirect\n\tcloud.google.com/go/ai v0.6.0 // indirect\n\tcloud.google.com/go/aiplatform v1.67.0 // indirect\n\tcloud.google.com/go/auth v0.4.1 // indirect\n\tcloud.google.com/go/auth/oauth2adapt v0.2.2 // indirect\n\tcloud.google.com/go/compute/metadata v0.5.0 // indirect",
+          "score": 3
+        },
+        {
+          "file": "test_repos/go-examples/ragserver/ragserver-langchaingo/go.mod",
+          "symbol": "cloud.google.com/go/aiplatform",
+          "kind": "dependency",
+          "line": 10,
+          "language": "go-mod",
+          "signature": "require cloud.google.com/go/aiplatform v1.67.0 // indirect",
+          "context": "require (\n\tcloud.google.com/go v0.113.0 // indirect\n\tcloud.google.com/go/ai v0.6.0 // indirect\n\tcloud.google.com/go/aiplatform v1.67.0 // indirect\n\tcloud.google.com/go/auth v0.4.1 // indirect\n\tcloud.google.com/go/auth/oauth2adapt v0.2.2 // indirect\n\tcloud.google.com/go/compute/metadata v0.5.0 // indirect",
+          "score": 3
+        },
+        {
+          "file": "test_repos/flask-app/app/main/forms.py",
+          "symbol": "NameForm",
+          "kind": "class",
+          "line": 10,
+          "language": "python",
+          "signature": "class NameForm:",
+          "context": "from ..models import Role, User\n\n\nclass NameForm(FlaskForm):\n    name = StringField('What is your name?', validators=[DataRequired()])\n    submit = SubmitField('Submit')\n",
+          "score": 3
+        }
+      ]
+    },
+    "error handling logic": {
+      "semantic": false,
+      "count": 45,
+      "results": [
+        {
+          "file": "test_repos/golang-example/ragserver/ragserver-genkit/go.mod",
+          "symbol": "github.com/go-openapi/errors",
+          "kind": "dependency",
+          "line": 23,
+          "language": "go-mod",
+          "signature": "require github.com/go-openapi/errors v0.22.0 // indirect",
+          "context": "\tgithub.com/go-logr/logr v1.4.1 // indirect\n\tgithub.com/go-logr/stdr v1.2.2 // indirect\n\tgithub.com/go-openapi/analysis v0.21.2 // indirect\n\tgithub.com/go-openapi/errors v0.22.0 // indirect\n\tgithub.com/go-openapi/jsonpointer v0.19.5 // indirect\n\tgithub.com/go-openapi/jsonreference v0.19.6 // indirect\n\tgithub.com/go-openapi/loads v0.21.1 // indirect",
+          "score": 3
+        },
+        {
+          "file": "test_repos/golang-example/ragserver/ragserver-genkit/go.mod",
+          "symbol": "github.com/pkg/errors",
+          "kind": "dependency",
+          "line": 43,
+          "language": "go-mod",
+          "signature": "require github.com/pkg/errors v0.9.1 // indirect",
+          "context": "\tgithub.com/mailru/easyjson v0.7.7 // indirect\n\tgithub.com/mitchellh/mapstructure v1.5.0 // indirect\n\tgithub.com/oklog/ulid v1.3.1 // indirect\n\tgithub.com/pkg/errors v0.9.1 // indirect\n\tgithub.com/weaviate/weaviate v1.26.0-rc.1 // indirect\n\tgithub.com/weaviate/weaviate-go-client/v4 v4.15.0 // indirect\n\tgithub.com/wk8/go-ordered-map/v2 v2.1.8 // indirect",
+          "score": 3
+        },
+        {
+          "file": "test_repos/golang-example/ragserver/ragserver/weaviate.go",
+          "symbol": "combinedWeaviateError",
+          "kind": "function",
+          "line": 51,
+          "language": "go",
+          "signature": "func combinedWeaviateError(result *models.GraphQLResponse, err error) error {",
+          "context": "// combinedWeaviateError generates an error if err is non-nil or result has\n// errors, and returns an error (or nil if there's no error). It's useful for\n// the results of the Weaviate GraphQL API's \"Do\" calls.\nfunc combinedWeaviateError(result *models.GraphQLResponse, err error) error {\n\tif err != nil {\n\t\treturn err\n\t}",
+          "score": 3
+        }
+      ]
+    },
+    "configuration initialization": {
+      "semantic": false,
+      "count": 0,
+      "results": []
+    },
+    "authentication and authorization": {
+      "semantic": false,
+      "count": 94,
+      "results": [
+        {
+          "file": "test_repos/golang-example/appengine-hello/app.go",
+          "symbol": "helloHandler",
+          "kind": "function",
+          "line": 19,
+          "language": "go",
+          "signature": "func helloHandler(w http.ResponseWriter, r *http.Request) {",
+          "context": "\t// Handle all requests with path /hello with the helloHandler function.\n\thttp.HandleFunc(\"/hello\", helloHandler)\n}\n\nfunc helloHandler(w http.ResponseWriter, r *http.Request) {\n\tfmt.Fprintln(w, \"Hello from the Go app\")\n}",
+          "score": 3
+        },
+        {
+          "file": "test_repos/golang-example/template/main.go",
+          "symbol": "indexHandler",
+          "kind": "function",
+          "line": 43,
+          "language": "go",
+          "signature": "func indexHandler(w http.ResponseWriter, r *http.Request) {",
+          "context": "}\n\n// indexHandler is an HTTP handler that serves the index page.\nfunc indexHandler(w http.ResponseWriter, r *http.Request) {\n\tdata := &Index{\n\t\tTitle: \"Image gallery\",\n\t\tBody:  \"Welcome to the image gallery.\",",
+          "score": 3
+        },
+        {
+          "file": "test_repos/golang-example/template/main.go",
+          "symbol": "imageHandler",
+          "kind": "function",
+          "line": 70,
+          "language": "go",
+          "signature": "func imageHandler(w http.ResponseWriter, r *http.Request) {",
+          "context": "}\n\n// imageHandler is an HTTP handler that serves the image pages.\nfunc imageHandler(w http.ResponseWriter, r *http.Request) {\n\tdata, ok := images[strings.TrimPrefix(r.URL.Path, \"/image/\")]\n\tif !ok {\n\t\thttp.NotFound(w, r)",
+          "score": 3
+        }
+      ]
+    },
+    "data transformation functions": {
+      "semantic": false,
+      "count": 10,
+      "results": [
+        {
+          "file": "test_repos/golang-example/ragserver/ragserver-genkit/go.mod",
+          "symbol": "cloud.google.com/go/compute/metadata",
+          "kind": "dependency",
+          "line": 12,
+          "language": "go-mod",
+          "signature": "require cloud.google.com/go/compute/metadata v0.4.0 // indirect",
+          "context": "\tcloud.google.com/go/ai v0.8.1-0.20240711230438-265963bd5b91 // indirect\n\tcloud.google.com/go/auth v0.7.0 // indirect\n\tcloud.google.com/go/auth/oauth2adapt v0.2.2 // indirect\n\tcloud.google.com/go/compute/metadata v0.4.0 // indirect\n\tcloud.google.com/go/longrunning v0.5.9 // indirect\n\tgithub.com/PuerkitoBio/purell v1.1.1 // indirect\n\tgithub.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect",
+          "score": 3
+        },
+        {
+          "file": "test_repos/golang-example/ragserver/ragserver/go.mod",
+          "symbol": "cloud.google.com/go/compute/metadata",
+          "kind": "dependency",
+          "line": 17,
+          "language": "go-mod",
+          "signature": "require cloud.google.com/go/compute/metadata v0.5.0 // indirect",
+          "context": "\tcloud.google.com/go/ai v0.8.0 // indirect\n\tcloud.google.com/go/auth v0.9.1 // indirect\n\tcloud.google.com/go/auth/oauth2adapt v0.2.4 // indirect\n\tcloud.google.com/go/compute/metadata v0.5.0 // indirect\n\tcloud.google.com/go/longrunning v0.5.7 // indirect\n\tgithub.com/PuerkitoBio/purell v1.1.1 // indirect\n\tgithub.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect",
+          "score": 3
+        },
+        {
+          "file": "test_repos/golang-example/ragserver/ragserver-langchaingo/go.mod",
+          "symbol": "cloud.google.com/go/compute/metadata",
+          "kind": "dependency",
+          "line": 13,
+          "language": "go-mod",
+          "signature": "require cloud.google.com/go/compute/metadata v0.5.0 // indirect",
+          "context": "\tcloud.google.com/go/aiplatform v1.67.0 // indirect\n\tcloud.google.com/go/auth v0.4.1 // indirect\n\tcloud.google.com/go/auth/oauth2adapt v0.2.2 // indirect\n\tcloud.google.com/go/compute/metadata v0.5.0 // indirect\n\tcloud.google.com/go/iam v1.1.7 // indirect\n\tcloud.google.com/go/longrunning v0.5.7 // indirect\n\tcloud.google.com/go/vertexai v0.10.0 // indirect",
+          "score": 3
+        }
+      ]
+    },
+    "API endpoint definitions": {
+      "semantic": false,
+      "count": 87,
+      "results": [
+        {
+          "file": "test_repos/golang-example/ragserver/ragserver-genkit/go.mod",
+          "symbol": "github.com/go-openapi/analysis",
+          "kind": "dependency",
+          "line": 22,
+          "language": "go-mod",
+          "signature": "require github.com/go-openapi/analysis v0.21.2 // indirect",
+          "context": "\tgithub.com/felixge/httpsnoop v1.0.4 // indirect\n\tgithub.com/go-logr/logr v1.4.1 // indirect\n\tgithub.com/go-logr/stdr v1.2.2 // indirect\n\tgithub.com/go-openapi/analysis v0.21.2 // indirect\n\tgithub.com/go-openapi/errors v0.22.0 // indirect\n\tgithub.com/go-openapi/jsonpointer v0.19.5 // indirect\n\tgithub.com/go-openapi/jsonreference v0.19.6 // indirect",
+          "score": 3
+        },
+        {
+          "file": "test_repos/golang-example/ragserver/ragserver-genkit/go.mod",
+          "symbol": "github.com/go-openapi/errors",
+          "kind": "dependency",
+          "line": 23,
+          "language": "go-mod",
+          "signature": "require github.com/go-openapi/errors v0.22.0 // indirect",
+          "context": "\tgithub.com/go-logr/logr v1.4.1 // indirect\n\tgithub.com/go-logr/stdr v1.2.2 // indirect\n\tgithub.com/go-openapi/analysis v0.21.2 // indirect\n\tgithub.com/go-openapi/errors v0.22.0 // indirect\n\tgithub.com/go-openapi/jsonpointer v0.19.5 // indirect\n\tgithub.com/go-openapi/jsonreference v0.19.6 // indirect\n\tgithub.com/go-openapi/loads v0.21.1 // indirect",
+          "score": 3
+        },
+        {
+          "file": "test_repos/golang-example/ragserver/ragserver-genkit/go.mod",
+          "symbol": "github.com/go-openapi/jsonpointer",
+          "kind": "dependency",
+          "line": 24,
+          "language": "go-mod",
+          "signature": "require github.com/go-openapi/jsonpointer v0.19.5 // indirect",
+          "context": "\tgithub.com/go-logr/stdr v1.2.2 // indirect\n\tgithub.com/go-openapi/analysis v0.21.2 // indirect\n\tgithub.com/go-openapi/errors v0.22.0 // indirect\n\tgithub.com/go-openapi/jsonpointer v0.19.5 // indirect\n\tgithub.com/go-openapi/jsonreference v0.19.6 // indirect\n\tgithub.com/go-openapi/loads v0.21.1 // indirect\n\tgithub.com/go-openapi/spec v0.20.4 // indirect",
+          "score": 3
+        }
+      ]
+    },
+    "logging and debugging utilities": {
+      "semantic": false,
+      "count": 94,
+      "results": [
+        {
+          "file": "test_repos/golang-example/appengine-hello/app.go",
+          "symbol": "helloHandler",
+          "kind": "function",
+          "line": 19,
+          "language": "go",
+          "signature": "func helloHandler(w http.ResponseWriter, r *http.Request) {",
+          "context": "\t// Handle all requests with path /hello with the helloHandler function.\n\thttp.HandleFunc(\"/hello\", helloHandler)\n}\n\nfunc helloHandler(w http.ResponseWriter, r *http.Request) {\n\tfmt.Fprintln(w, \"Hello from the Go app\")\n}",
+          "score": 3
+        },
+        {
+          "file": "test_repos/golang-example/template/main.go",
+          "symbol": "indexHandler",
+          "kind": "function",
+          "line": 43,
+          "language": "go",
+          "signature": "func indexHandler(w http.ResponseWriter, r *http.Request) {",
+          "context": "}\n\n// indexHandler is an HTTP handler that serves the index page.\nfunc indexHandler(w http.ResponseWriter, r *http.Request) {\n\tdata := &Index{\n\t\tTitle: \"Image gallery\",\n\t\tBody:  \"Welcome to the image gallery.\",",
+          "score": 3
+        },
+        {
+          "file": "test_repos/golang-example/template/main.go",
+          "symbol": "imageHandler",
+          "kind": "function",
+          "line": 70,
+          "language": "go",
+          "signature": "func imageHandler(w http.ResponseWriter, r *http.Request) {",
+          "context": "}\n\n// imageHandler is an HTTP handler that serves the image pages.\nfunc imageHandler(w http.ResponseWriter, r *http.Request) {\n\tdata, ok := images[strings.TrimPrefix(r.URL.Path, \"/image/\")]\n\tif !ok {\n\t\thttp.NotFound(w, r)",
+          "score": 3
+        }
+      ]
+    },
+    "test helper functions": {
+      "semantic": false,
+      "count": 64,
+      "results": [
+        {
+          "file": "test_repos/golang-example/hello/reverse/reverse_test.go",
+          "symbol": "TestString",
+          "kind": "function",
+          "line": 8,
+          "language": "go",
+          "signature": "func TestString(t *testing.T) {",
+          "context": "package reverse\n\nimport \"testing\"\n\nfunc TestString(t *testing.T) {\n\tfor _, c := range []struct {\n\t\tin, want string",
+          "score": 3
+        },
+        {
+          "file": "test_repos/golang-example/slog-handler-guide/indenthandler2/indent_handler_test.go",
+          "symbol": "TestSlogtest",
+          "kind": "function",
+          "line": 19,
+          "language": "go",
+          "signature": "func TestSlogtest(t *testing.T) {",
+          "context": "\t\"log/slog\"\n\t\"testing/slogtest\"\n)\n\nfunc TestSlogtest(t *testing.T) {\n\tvar buf bytes.Buffer\n\terr := slogtest.TestHandler(New(&buf, nil), func() []map[string]any {",
+          "score": 3
+        },
+        {
+          "file": "test_repos/golang-example/slog-handler-guide/indenthandler2/indent_handler_test.go",
+          "symbol": "Test",
+          "kind": "function",
+          "line": 29,
+          "language": "go",
+          "signature": "func Test(t *testing.T) {",
+          "context": "\t\tt.Error(err)\n\t}\n}\n\nfunc Test(t *testing.T) {\n\tvar buf bytes.Buffer\n\tl := slog.New(New(&buf, nil))",
+          "score": 3
+        }
+      ]
+    }
+  }
+}

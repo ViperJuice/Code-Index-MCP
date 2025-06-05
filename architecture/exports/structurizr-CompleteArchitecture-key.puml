@@ -1,0 +1,78 @@
+@startuml
+set separator none
+
+skinparam {
+  shadowing false
+  arrowFontSize 15
+  defaultTextAlignment center
+  wrapWidth 100
+  maxMessageSize 100
+}
+hide stereotype
+
+skinparam rectangle<<_transparent>> {
+  BorderColor transparent
+  BackgroundColor transparent
+  FontColor transparent
+}
+
+skinparam person<<1>> {
+  BackgroundColor #08427b
+  FontColor #ffffff
+  BorderColor #052e56
+}
+person "==Person" <<1>>
+
+skinparam rectangle<<2>> {
+  BackgroundColor #2e86ab
+  FontColor #ffffff
+  BorderColor #205d77
+  roundCorner 20
+}
+rectangle "==Software System, CoreSystem, MCPNative" <<2>>
+
+skinparam rectangle<<3>> {
+  BackgroundColor #ecf0f1
+  FontColor #7f8c8d
+  BorderColor #bdc3c7
+  roundCorner 20
+}
+rectangle "==Software System, External, Future" <<3>>
+
+skinparam person<<4>> {
+  BackgroundColor #a23b72
+  FontColor #ffffff
+  BorderColor #71294f
+}
+person "==Software System, External, MCPClient" <<4>>
+
+skinparam rectangle<<5>> {
+  BackgroundColor #27ae60
+  FontColor #ffffff
+  BorderColor #95a5a6
+  roundCorner 20
+}
+rectangle "==Software System, External, Optional, Reusable" <<5>>
+
+skinparam rectangle<<6>> {
+  BackgroundColor #27ae60
+  FontColor #ffffff
+  BorderColor #1b7943
+  roundCorner 20
+}
+rectangle "==Software System, External, Reusable" <<6>>
+
+rectangle "." <<_transparent>> as 7
+7 .[#666666,thickness=2].> 7 : "<color:#666666>Relationship"
+
+rectangle "." <<_transparent>> as 8
+8 .[#bdc3c7,thickness=1].> 8 : "<color:#bdc3c7>Future"
+
+rectangle "." <<_transparent>> as 9
+9 .[#95a5a6,thickness=2].> 9 : "<color:#95a5a6>Optional"
+
+rectangle "." <<_transparent>> as 10
+10 -[#e74c3c,thickness=3]-> 10 : "<color:#e74c3c>Primary"
+
+
+@enduml

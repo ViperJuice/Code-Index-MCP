@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# MCP Server Python-Only Launcher (bypasses Docker for debugging)
+
+set -euo pipefail
+
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+cd "$PROJECT_DIR"
+
+# Set environment for fast startup
+export MCP_DISABLE_RESOURCES=true
+export PYTHONPATH="$PROJECT_DIR"
+export LOG_LEVEL=INFO
+export DATABASE_URL="sqlite:///$PROJECT_DIR/code_index.db"
+export PLUGIN_STARTUP_MODE=lazy
+export MCP_FAST_STARTUP=true
+export STARTUP_TIMEOUT=30
+
+# Launch Python directly
+exec python -m mcp_server --transport stdio

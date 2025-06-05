@@ -1,0 +1,114 @@
+{
+  "// Example 1: Simple Local Mode": {
+    "mcpServers": {
+      "code-index": {
+        "command": "python",
+        "args": ["-m", "mcp_server.stdio_server"],
+        "cwd": "/home/jenner/Code/Code-Index-MCP",
+        "env": {
+          "CODEX_WORKSPACE_DIR": "/home/jenner/Code/Code-Index-MCP"
+        }
+      }
+    }
+  },
+
+  "// Example 2: Docker with Current Directory": {
+    "mcpServers": {
+      "code-index": {
+        "command": "docker",
+        "args": [
+          "run", "-i", "--rm",
+          "-v", "${PWD}:/workspace",
+          "-v", "${HOME}/.mcp:/root/.mcp",
+          "-e", "CODEX_WORKSPACE_DIR=/workspace",
+          "code-index-mcp:local"
+        ]
+      }
+    }
+  },
+
+  "// Example 3: Multiple Workspace Access": {
+    "mcpServers": {
+      "code-index": {
+        "command": "docker",
+        "args": [
+          "run", "-i", "--rm",
+          "-v", "${HOME}/Code:/code",
+          "-v", "${HOME}/Projects:/projects",
+          "-v", "${HOME}/Templates:/templates",
+          "-v", "${HOME}/.mcp:/root/.mcp",
+          "-e", "CODEX_WORKSPACE_DIR=/code",
+          "-e", "CODEX_ADDITIONAL_PATHS=/projects:/templates",
+          "code-index-mcp:local"
+        ]
+      }
+    }
+  },
+
+  "// Example 4: High Performance Configuration": {
+    "mcpServers": {
+      "code-index": {
+        "command": "python",
+        "args": ["-m", "mcp_server.stdio_server"],
+        "cwd": "/home/jenner/Code/Code-Index-MCP",
+        "env": {
+          "CODEX_WORKSPACE_DIR": "${CODEX_WORKSPACE_DIR:-/home/jenner/Code}",
+          "CODEX_LOG_LEVEL": "WARNING",
+          "ENABLE_SEMANTIC_SEARCH": "true",
+          "VOYAGE_API_KEY": "${VOYAGE_API_KEY}",
+          "CACHE_SIZE_MB": "2048",
+          "INDEXER_BATCH_SIZE": "500",
+          "WORKER_COUNT": "8"
+        }
+      }
+    }
+  },
+
+  "// Example 5: Development Mode with Debugging": {
+    "mcpServers": {
+      "code-index": {
+        "command": "python",
+        "args": ["-m", "mcp_server.stdio_server"],
+        "cwd": "/home/jenner/Code/Code-Index-MCP",
+        "env": {
+          "CODEX_WORKSPACE_DIR": "/home/jenner/Code/Code-Index-MCP",
+          "CODEX_LOG_LEVEL": "DEBUG",
+          "MCP_DEBUG": "true",
+          "PYTHONUNBUFFERED": "1"
+        }
+      }
+    }
+  },
+
+  "// Example 6: Remote Repository Analysis": {
+    "mcpServers": {
+      "code-index": {
+        "command": "docker",
+        "args": [
+          "run", "-i", "--rm",
+          "-v", "/tmp/analysis:/workspace",
+          "-v", "${HOME}/.mcp:/root/.mcp",
+          "-e", "CODEX_WORKSPACE_DIR=/workspace",
+          "-e", "ENABLE_REPOSITORY_MANAGEMENT=true",
+          "-e", "REPOSITORY_AUTO_CLONE=true",
+          "code-index-mcp:local"
+        ]
+      }
+    }
+  },
+
+  "// Example 7: Specific Language Focus": {
+    "mcpServers": {
+      "code-index": {
+        "command": "python",
+        "args": ["-m", "mcp_server.stdio_server"],
+        "cwd": "/home/jenner/Code/Code-Index-MCP",
+        "env": {
+          "CODEX_WORKSPACE_DIR": "/home/jenner/RustProjects",
+          "ENABLED_PLUGINS": "rust,go,c,cpp",
+          "DISABLED_PLUGINS": "html,css,dart"
+        }
+      }
+    }
+  }
+}

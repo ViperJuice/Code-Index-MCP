@@ -250,7 +250,7 @@ class ITextSearcher(ABC):
 # Repository Interfaces
 # ========================================
 
-class ISymbolRepository(ABC, IAsyncRepository[SymbolDefinition]):
+class ISymbolRepository(IAsyncRepository[SymbolDefinition]):
     """Repository for symbol definitions"""
     
     @abstractmethod
@@ -273,7 +273,7 @@ class ISymbolRepository(ABC, IAsyncRepository[SymbolDefinition]):
         """Search symbols"""
         pass
 
-class IFileRepository(ABC, IAsyncRepository[IndexedFile]):
+class IFileRepository(IAsyncRepository[IndexedFile]):
     """Repository for indexed files"""
     
     @abstractmethod
@@ -296,7 +296,7 @@ class IFileRepository(ABC, IAsyncRepository[IndexedFile]):
         """Get file statistics"""
         pass
 
-class IReferenceRepository(ABC, IAsyncRepository[SymbolReference]):
+class IReferenceRepository(IAsyncRepository[SymbolReference]):
     """Repository for symbol references"""
     
     @abstractmethod

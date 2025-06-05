@@ -1,0 +1,64 @@
+# Stack configuration for myproject
+resolver: lts-20.26
+
+# Local packages
+packages:
+- .
+- ../shared-lib
+- subprojects/parser
+
+# Extra dependencies not in the snapshot
+extra-deps:
+- servant-0.20@sha256:7ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1,5467
+- servant-server-0.20@sha256:8ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1,5847
+- some-extra-package-1.2.3
+
+# Override default flag values for local packages and extra-deps
+flags:
+  myproject:
+    dev-mode: true
+    use-postgres: true
+  shared-lib:
+    fast-build: false
+
+# Extra package databases
+extra-package-dbs: []
+
+# Control whether we use the GHC packaged with stack
+system-ghc: false
+
+# Require a specific version of stack
+require-stack-version: ">= 2.9"
+
+# Extra directories to be included
+extra-include-dirs:
+- /usr/local/include
+
+extra-lib-dirs:
+- /usr/local/lib
+
+# Allow newer versions of packages
+allow-newer: true
+
+# Docker configuration
+docker:
+  enable: false
+  image: fpco/stack-build:lts-20.26
+
+# Nix configuration
+nix:
+  enable: false
+  packages:
+    - zlib
+    - postgresql
+
+# Build configuration
+build:
+  library-profiling: false
+  executable-profiling: false
+  copy-bins: true
+  
+# GHC options
+ghc-options:
+  "$locals": -Wall -Wcompat -Widentities
+  "$everything": -O2

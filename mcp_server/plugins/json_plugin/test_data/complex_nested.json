@@ -1,0 +1,151 @@
+{
+  "api": {
+    "version": "v2",
+    "endpoints": {
+      "users": {
+        "base_url": "/api/v2/users",
+        "methods": ["GET", "POST", "PUT", "DELETE"],
+        "authentication": {
+          "required": true,
+          "types": ["bearer", "api_key"],
+          "scopes": {
+            "read": "users:read",
+            "write": "users:write",
+            "admin": "users:admin"
+          }
+        },
+        "rate_limiting": {
+          "requests_per_minute": 100,
+          "burst_limit": 20,
+          "window_size": "60s"
+        }
+      },
+      "products": {
+        "base_url": "/api/v2/products",
+        "methods": ["GET", "POST"],
+        "pagination": {
+          "default_limit": 25,
+          "max_limit": 100,
+          "supported_formats": ["offset", "cursor"]
+        },
+        "filtering": {
+          "supported_fields": ["category", "price", "availability"],
+          "operators": ["eq", "gt", "lt", "in", "contains"]
+        }
+      }
+    },
+    "global_settings": {
+      "cors": {
+        "enabled": true,
+        "origins": ["https://example.com", "https://app.example.com"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "headers": ["Content-Type", "Authorization", "X-API-Key"]
+      },
+      "security": {
+        "helmet": {
+          "enabled": true,
+          "options": {
+            "contentSecurityPolicy": false,
+            "crossOriginEmbedderPolicy": false
+          }
+        },
+        "rate_limiting": {
+          "global_limit": 1000,
+          "window": "1h",
+          "skip_successful_requests": false
+        }
+      }
+    }
+  },
+  "database": {
+    "connections": {
+      "primary": {
+        "type": "postgresql",
+        "host": "localhost",
+        "port": 5432,
+        "database": "awesome_app",
+        "pool": {
+          "min": 2,
+          "max": 10,
+          "idle_timeout": 30000
+        }
+      },
+      "cache": {
+        "type": "redis",
+        "host": "localhost",
+        "port": 6379,
+        "db": 0,
+        "ttl": 3600
+      }
+    },
+    "migrations": {
+      "directory": "./migrations",
+      "table_name": "migrations",
+      "auto_run": false
+    }
+  },
+  "logging": {
+    "level": "info",
+    "transports": [
+      {
+        "type": "console",
+        "format": "json",
+        "colorize": true
+      },
+      {
+        "type": "file",
+        "filename": "logs/app.log",
+        "max_size": "10m",
+        "max_files": 5,
+        "tailable": true
+      }
+    ],
+    "metadata": {
+      "service": "awesome-app",
+      "version": "1.2.3",
+      "environment": "production"
+    }
+  },
+  "features": {
+    "user_management": {
+      "enabled": true,
+      "registration": {
+        "enabled": true,
+        "email_verification": true,
+        "allowed_domains": ["@company.com", "@partner.com"]
+      },
+      "profiles": {
+        "custom_fields": ["department", "role", "location"],
+        "avatar_upload": true,
+        "max_avatar_size": "2MB"
+      }
+    },
+    "analytics": {
+      "enabled": true,
+      "providers": ["google_analytics", "mixpanel"],
+      "events": [
+        "user_login",
+        "page_view",
+        "button_click",
+        "form_submit"
+      ],
+      "sampling_rate": 0.1
+    },
+    "notifications": {
+      "email": {
+        "enabled": true,
+        "provider": "sendgrid",
+        "templates": {
+          "welcome": "d-123456789",
+          "reset_password": "d-987654321",
+          "order_confirmation": "d-456789123"
+        }
+      },
+      "push": {
+        "enabled": false,
+        "provider": "firebase",
+        "topics": ["general", "promotions", "updates"]
+      }
+    }
+  }
+}

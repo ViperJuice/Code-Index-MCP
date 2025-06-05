@@ -1,0 +1,115 @@
+# Phase 5 Development Environment
+version: '3.8'
+
+services:
+  # Development container with all Phase 5 tools
+  mcp-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"  # MCP server
+      - "8001:8001"  # Development server
+    environment:
+      # Development settings
+      - DEVELOPMENT=true
+      - LOG_LEVEL=DEBUG
+      - PYTHONPATH=/app
+      
+      # Database configuration
+      - DATABASE_URL=sqlite:///app/data/code_index.db
+      
+      # Redis configuration
+      - REDIS_URL=redis://redis:6379
+      - CACHE_BACKEND=redis
+      
+      # Qdrant configuration
+      - QDRANT_URL=http://qdrant:6333
+      - SEMANTIC_COLLECTION_NAME=code-index-dev
+      
+      # Phase 5 specific
+      - VOYAGE_AI_API_KEY=${VOYAGE_AI_API_KEY:-demo-key}
+      - PHASE5_DEVELOPMENT=true
+      - PARALLEL_WORKERS=4
+      
+    volumes:
+      - .:/app
+      - /var/run/docker.sock:/var/run/docker.sock  # For Docker in Docker
+      - ~/.gitconfig:/root/.gitconfig:ro
+      - ~/.ssh:/root/.ssh:ro
+    depends_on:
+      - redis
+      - qdrant
+    networks:
+      - phase5-dev
+    tty: true
+    stdin_open: true
+    working_dir: /app
+
+  # Redis for development
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-dev-data:/data
+    networks:
+      - phase5-dev
+
+  # Qdrant for development
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant-dev-data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    networks:
+      - phase5-dev
+
+  # Additional development workers for testing distributed processing
+  worker1:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    environment:
+      - WORKER_ID=1
+      - REDIS_URL=redis://redis:6379
+      - WORKER_MODE=true
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+    networks:
+      - phase5-dev
+    profiles:
+      - workers
+
+  worker2:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    environment:
+      - WORKER_ID=2
+      - REDIS_URL=redis://redis:6379
+      - WORKER_MODE=true
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+    networks:
+      - phase5-dev
+    profiles:
+      - workers
+
+volumes:
+  redis-dev-data:
+  qdrant-dev-data:
+
+networks:
+  phase5-dev:
+    driver: bridge

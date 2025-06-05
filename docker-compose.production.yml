@@ -20,6 +20,9 @@ services:
     volumes:
       - ./logs:/var/log/mcp-server
       - ./uploads:/app/uploads
+      - ./data:/app/data
+      - ./repositories:/app/repositories
+      - mcp_database:/app/database  # Persistent database storage
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -156,6 +159,8 @@ volumes:
   grafana_data:
     driver: local
   loki_data:
+    driver: local
+  mcp_database:
     driver: local
 
 networks:

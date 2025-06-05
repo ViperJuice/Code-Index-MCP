@@ -1,0 +1,293 @@
+{
+  "summary": {
+    "total_projects_tested": 20,
+    "successful_parsing": 16,
+    "error_count": 0,
+    "project_info_detection_rate": 0.5625,
+    "total_package_references": 30
+  },
+  "project_types": {
+    "exe": 5,
+    "web": 1,
+    "library": 1
+  },
+  "target_frameworks": {
+    "$(DefaultNetCoreTargetFramework)": 2,
+    "net10.0": 1,
+    "net9.0": 2
+  },
+  "sdks": {
+    "Microsoft.NET.Sdk": 13,
+    "Microsoft.NET.Sdk.Razor": 1,
+    "Microsoft.NET.Sdk.Web": 1
+  },
+  "feature_counts": {
+    "is_wpf": 0,
+    "is_winforms": 0,
+    "is_aspnetcore": 1,
+    "uses_ef_core": 0
+  },
+  "detailed_results": [
+    {
+      "csproj_file": "aspnetcore/eng/tools/RepoTasks/RepoTasks.csproj",
+      "test_cs_file": "CreateFrameworkListFile.cs",
+      "target_framework": null,
+      "project_type": null,
+      "framework_version": null,
+      "has_project_info": false,
+      "csproj_size": 3190,
+      "csproj_lines": 60,
+      "sdk": "Microsoft.NET.Sdk",
+      "xml_target_frameworks": "$(DefaultNetCoreTargetFramework)",
+      "package_references_count": 8,
+      "sample_packages": [
+        "Newtonsoft.Json:$(NewtonsoftJsonVersion)",
+        "NuGet.Packaging:$(NuGetPackagingVersion)",
+        "Microsoft.Extensions.DependencyModel:$(MicrosoftExtensionsDependencyModelVersion)",
+        "Microsoft.Build.Framework:$(MicrosoftBuildFrameworkVersion)",
+        "Microsoft.Build.Tasks.Core:$(MicrosoftBuildTasksCoreVersion)"
+      ]
+    },
+    {
+      "csproj_file": "aspnetcore/eng/tools/BaselineGenerator/BaselineGenerator.csproj",
+      "test_cs_file": "Program.cs",
+      "target_framework": "$(DefaultNetCoreTargetFramework)",
+      "project_type": "exe",
+      "framework_version": null,
+      "has_project_info": true,
+      "csproj_size": 440,
+      "csproj_lines": 14,
+      "sdk": "Microsoft.NET.Sdk",
+      "xml_target_framework": "$(DefaultNetCoreTargetFramework)",
+      "xml_output_type": "Exe",
+      "package_references_count": 1,
+      "sample_packages": [
+        "NuGet.Protocol:6.9.1"
+      ]
+    },
+    {
+      "csproj_file": "aspnetcore/eng/tools/HelixTestRunner/HelixTestRunner.csproj",
+      "test_cs_file": "Program.cs",
+      "target_framework": "net10.0",
+      "project_type": "exe",
+      "framework_version": null,
+      "has_project_info": true,
+      "csproj_size": 1291,
+      "csproj_lines": 32,
+      "xml_target_framework": "net10.0",
+      "xml_output_type": "Exe",
+      "package_references_count": 1,
+      "sample_packages": [
+        "System.CommandLine:2.0.0-beta1.20158.1"
+      ]
+    },
+    {
+      "csproj_file": "aspnetcore/src/Testing/test/Microsoft.AspNetCore.InternalTesting.Tests.csproj",
+      "test_cs_file": "TestPlatformHelperTest.cs",
+      "target_framework": null,
+      "project_type": null,
+      "framework_version": null,
+      "has_project_info": false,
+      "csproj_size": 813,
+      "csproj_lines": 23,
+      "sdk": "Microsoft.NET.Sdk",
+      "xml_target_frameworks": "$(DefaultNetCoreTargetFramework);net472",
+      "package_references_count": 0,
+      "sample_packages": []
+    },
+    {
+      "csproj_file": "aspnetcore/src/Testing/src/Microsoft.AspNetCore.InternalTesting.csproj",
+      "test_cs_file": "RetryAttribute.cs",
+      "target_framework": null,
+      "project_type": null,
+      "framework_version": null,
+      "has_project_info": false,
+      "csproj_size": 3754,
+      "csproj_lines": 73,
+      "sdk": "Microsoft.NET.Sdk",
+      "xml_target_frameworks": "$(DefaultNetCoreTargetFramework);$(DefaultNetFxTargetFramework);netstandard2.0",
+      "package_references_count": 0,
+      "sample_packages": []
+    },
+    {
+      "csproj_file": "aspnetcore/src/ObjectPool/perf/Microbenchmarks/Microsoft.Extensions.ObjectPool.Microbenchmark.csproj",
+      "test_cs_file": "DrainRefillMultiTheaded.cs",
+      "target_framework": "$(DefaultNetCoreTargetFramework)",
+      "project_type": "exe",
+      "framework_version": null,
+      "has_project_info": true,
+      "csproj_size": 619,
+      "csproj_lines": 18,
+      "sdk": "Microsoft.NET.Sdk",
+      "xml_target_framework": "$(DefaultNetCoreTargetFramework)",
+      "xml_output_type": "Exe",
+      "package_references_count": 0,
+      "sample_packages": []
+    },
+    {
+      "csproj_file": "aspnetcore/src/ObjectPool/test/Microsoft.Extensions.ObjectPool.Tests.csproj",
+      "test_cs_file": "ThreadingTest.cs",
+      "target_framework": null,
+      "project_type": null,
+      "framework_version": null,
+      "has_project_info": false,
+      "csproj_size": 311,
+      "csproj_lines": 12,
+      "sdk": "Microsoft.NET.Sdk",
+      "xml_target_frameworks": "$(DefaultNetCoreTargetFramework);$(DefaultNetFxTargetFramework)",
+      "package_references_count": 0,
+      "sample_packages": []
+    },
+    {
+      "csproj_file": "aspnetcore/src/ObjectPool/src/Microsoft.Extensions.ObjectPool.csproj",
+      "test_cs_file": "IPooledObjectPolicy.cs",
+      "target_framework": null,
+      "project_type": null,
+      "framework_version": null,
+      "has_project_info": false,
+      "csproj_size": 808,
+      "csproj_lines": 21,
+      "sdk": "Microsoft.NET.Sdk",
+      "xml_target_frameworks": "$(DefaultNetFxTargetFramework);netstandard2.0;$(DefaultNetCoreTargetFramework)",
+      "package_references_count": 0,
+      "sample_packages": []
+    },
+    {
+      "csproj_file": "Umbraco-CMS/templates/Umbraco.Templates.csproj",
+      "test_cs_file": "UmbracoExtension/Constants.cs",
+      "target_framework": "net9.0",
+      "project_type": null,
+      "framework_version": null,
+      "has_project_info": true,
+      "csproj_size": 3461,
+      "csproj_lines": 69,
+      "sdk": "Microsoft.NET.Sdk",
+      "package_references_count": 1,
+      "sample_packages": [
+        "Umbraco.JsonSchema.Extensions"
+      ]
+    },
+    {
+      "csproj_file": "Umbraco-CMS/templates/UmbracoExtension/Umbraco.Extension.csproj",
+      "test_cs_file": "Constants.cs",
+      "target_framework": "net9.0",
+      "project_type": null,
+      "framework_version": null,
+      "has_project_info": true,
+      "csproj_size": 2582,
+      "csproj_lines": 57,
+      "sdk": "Microsoft.NET.Sdk.Razor",
+      "xml_target_framework": "net9.0",
+      "package_references_count": 4,
+      "sample_packages": [
+        "Umbraco.Cms.Web.Website:UMBRACO_VERSION_FROM_TEMPLATE",
+        "Umbraco.Cms.Web.Common:UMBRACO_VERSION_FROM_TEMPLATE",
+        "Umbraco.Cms.Api.Common:UMBRACO_VERSION_FROM_TEMPLATE",
+        "Umbraco.Cms.Api.Management:UMBRACO_VERSION_FROM_TEMPLATE"
+      ]
+    },
+    {
+      "csproj_file": "Umbraco-CMS/tests/Umbraco.Tests.Benchmarks/Umbraco.Tests.Benchmarks.csproj",
+      "test_cs_file": "ModelToSqlExpressionHelperBenchmarks.cs",
+      "target_framework": null,
+      "project_type": "exe",
+      "framework_version": null,
+      "has_project_info": true,
+      "csproj_size": 932,
+      "csproj_lines": 29,
+      "sdk": "Microsoft.NET.Sdk",
+      "xml_output_type": "Exe",
+      "package_references_count": 3,
+      "sample_packages": [
+        "BenchmarkDotNet",
+        "Microsoft.Extensions.Logging.Debug",
+        "Moq"
+      ]
+    },
+    {
+      "csproj_file": "Umbraco-CMS/tests/Umbraco.TestData/Umbraco.TestData.csproj",
+      "test_cs_file": "SegmentTestController.cs",
+      "target_framework": null,
+      "project_type": null,
+      "framework_version": null,
+      "has_project_info": false,
+      "csproj_size": 540,
+      "csproj_lines": 19,
+      "sdk": "Microsoft.NET.Sdk",
+      "package_references_count": 1,
+      "sample_packages": [
+        "Bogus"
+      ]
+    },
+    {
+      "csproj_file": "Umbraco-CMS/tests/Umbraco.Tests.Integration/Umbraco.Tests.Integration.csproj",
+      "test_cs_file": "GlobalSetupTeardown.cs",
+      "target_framework": null,
+      "project_type": "web",
+      "framework_version": null,
+      "has_project_info": true,
+      "csproj_size": 16881,
+      "csproj_lines": 299,
+      "sdk": "Microsoft.NET.Sdk",
+      "package_references_count": 5,
+      "sample_packages": [
+        "Bogus",
+        "Microsoft.AspNetCore.Mvc.Testing",
+        "Microsoft.NET.Test.Sdk",
+        "Moq",
+        "NUnit3TestAdapter"
+      ],
+      "is_aspnetcore": true
+    },
+    {
+      "csproj_file": "Umbraco-CMS/tests/Umbraco.Tests.Common/Umbraco.Tests.Common.csproj",
+      "test_cs_file": "TestConstants.cs",
+      "target_framework": null,
+      "project_type": null,
+      "framework_version": null,
+      "has_project_info": false,
+      "csproj_size": 1097,
+      "csproj_lines": 31,
+      "sdk": "Microsoft.NET.Sdk",
+      "package_references_count": 4,
+      "sample_packages": [
+        "AutoFixture.AutoMoq",
+        "AutoFixture.NUnit3",
+        "Moq",
+        "NUnit"
+      ]
+    },
+    {
+      "csproj_file": "Umbraco-CMS/tests/Umbraco.Tests.AcceptanceTest.UmbracoProject/Umbraco.Tests.AcceptanceTest.UmbracoProject.csproj",
+      "test_cs_file": "SQLiteMemoryComposer.cs",
+      "target_framework": null,
+      "project_type": "library",
+      "framework_version": null,
+      "has_project_info": true,
+      "csproj_size": 399,
+      "csproj_lines": 10,
+      "sdk": "Microsoft.NET.Sdk.Web",
+      "xml_output_type": "Library",
+      "package_references_count": 0,
+      "sample_packages": []
+    },
+    {
+      "csproj_file": "Umbraco-CMS/tools/Umbraco.JsonSchema/Umbraco.JsonSchema.csproj",
+      "test_cs_file": "Options.cs",
+      "target_framework": null,
+      "project_type": "exe",
+      "framework_version": null,
+      "has_project_info": true,
+      "csproj_size": 830,
+      "csproj_lines": 27,
+      "sdk": "Microsoft.NET.Sdk",
+      "xml_output_type": "Exe",
+      "package_references_count": 2,
+      "sample_packages": [
+        "CommandLineParser",
+        "NJsonSchema"
+      ]
+    }
+  ],
+  "errors": []
+}

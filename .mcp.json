@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "code-index": {
+      "command": "python",
+      "args": ["-m", "mcp_server", "--transport", "stdio"],
+      "cwd": "/home/jenner/Code/Code-Index-MCP",
+      "env": {
+        "PYTHONPATH": "/home/jenner/Code/Code-Index-MCP",
+        "MCP_DISABLE_RESOURCES": "true",
+        "LOG_LEVEL": "ERROR",
+        "DATABASE_URL": "sqlite:////home/jenner/Code/Code-Index-MCP/code_index.db",
+        "PLUGIN_STARTUP_MODE": "minimal",
+        "MCP_FAST_STARTUP": "true",
+        "STARTUP_TIMEOUT": "20",
+        "PYTHONUNBUFFERED": "1"
+      },
+      "timeout": 300000
+    }
+  }
+}

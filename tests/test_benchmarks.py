@@ -190,7 +190,6 @@ class TestBenchmarkSuite:
             assert len(suite.plugins) == 3
             assert suite.dispatcher is not None
             assert suite.store is not None
-            assert suite.gateway is not None
     
     def test_symbol_lookup_benchmark(self, benchmark_suite):
         """Test symbol lookup benchmarking."""

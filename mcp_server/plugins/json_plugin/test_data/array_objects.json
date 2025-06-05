@@ -1,0 +1,140 @@
+{
+  "products": [
+    {
+      "id": 1,
+      "name": "Wireless Headphones",
+      "category": "electronics",
+      "price": 99.99,
+      "currency": "USD",
+      "availability": {
+        "in_stock": true,
+        "quantity": 150,
+        "warehouses": ["US-East", "US-West", "EU-Central"]
+      },
+      "specifications": {
+        "bluetooth_version": "5.0",
+        "battery_life": "30 hours",
+        "noise_cancellation": true,
+        "weight": "250g"
+      },
+      "reviews": [
+        {
+          "user_id": "user123",
+          "rating": 5,
+          "comment": "Excellent sound quality!",
+          "date": "2023-11-15",
+          "verified_purchase": true
+        },
+        {
+          "user_id": "user456",
+          "rating": 4,
+          "comment": "Good value for money",
+          "date": "2023-11-10",
+          "verified_purchase": true
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Smart Watch",
+      "category": "wearables",
+      "price": 299.99,
+      "currency": "USD",
+      "availability": {
+        "in_stock": false,
+        "quantity": 0,
+        "expected_restock": "2023-12-01",
+        "warehouses": []
+      },
+      "specifications": {
+        "display": "1.4 inch OLED",
+        "battery_life": "7 days",
+        "water_resistance": "IP68",
+        "connectivity": ["Bluetooth", "WiFi", "LTE"]
+      },
+      "reviews": []
+    }
+  ],
+  "categories": [
+    {
+      "id": "electronics",
+      "name": "Electronics",
+      "description": "Electronic devices and gadgets",
+      "parent": null,
+      "subcategories": [
+        {
+          "id": "audio",
+          "name": "Audio",
+          "description": "Audio equipment and accessories"
+        },
+        {
+          "id": "computers",
+          "name": "Computers",
+          "description": "Laptops, desktops, and accessories"
+        }
+      ]
+    },
+    {
+      "id": "wearables",
+      "name": "Wearables",
+      "description": "Wearable technology and accessories",
+      "parent": "electronics",
+      "subcategories": []
+    }
+  ],
+  "users": [
+    {
+      "id": "user123",
+      "username": "tech_lover",
+      "email": "tech@example.com",
+      "profile": {
+        "first_name": "Alice",
+        "last_name": "Johnson",
+        "age": 28,
+        "location": {
+          "country": "USA",
+          "state": "California",
+          "city": "San Francisco"
+        },
+        "preferences": {
+          "newsletter": true,
+          "notifications": {
+            "email": true,
+            "push": false,
+            "sms": false
+          }
+        }
+      },
+      "purchase_history": [
+        {
+          "order_id": "ORD-001",
+          "date": "2023-11-15",
+          "items": [
+            {
+              "product_id": 1,
+              "quantity": 1,
+              "price": 99.99
+            }
+          ],
+          "total": 99.99,
+          "status": "delivered"
+        }
+      ]
+    }
+  ],
+  "configuration": {
+    "api_version": "2.1",
+    "last_updated": "2023-11-20T10:30:00Z",
+    "features": {
+      "real_time_inventory": true,
+      "price_alerts": true,
+      "wishlist": true,
+      "comparison_tool": false
+    },
+    "limits": {
+      "max_cart_items": 50,
+      "max_wishlist_items": 100,
+      "session_timeout": 1800
+    }
+  }
+}

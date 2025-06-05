@@ -1,0 +1,30 @@
+{
+  "plugin": {
+    "name": "json",
+    "language": "json",
+    "version": "1.0.0",
+    "type": "hybrid",
+    "author": "MCP Code Index",
+    "description": "Comprehensive JSON plugin with schema detection, JSONPath support, and nested object navigation"
+  },
+  "extensions": [
+    ".json",
+    ".jsonc",
+    ".json5",
+    ".jsonl",
+    ".ndjson"
+  ],
+  "features": {
+    "tree_sitter_support": true,
+    "caching": true,
+    "async_processing": true,
+    "semantic_analysis": true
+  },
+  "patterns": {},
+  "node_types": {},
+  "performance": {
+    "max_file_size": 10485760,
+    "cache_ttl": 3600,
+    "batch_size": 100
+  }
+}

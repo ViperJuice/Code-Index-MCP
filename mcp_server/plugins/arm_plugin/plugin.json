@@ -1,0 +1,51 @@
+{
+    "name": "ARM Assembly",
+    "version": "1.0.0",
+    "description": "Comprehensive ARM Assembly language plugin supporting ARM, Thumb, and AArch64 architectures",
+    "author": "Code-Index-MCP",
+    "type": "language",
+    "language": "arm",
+    "file_extensions": [".s", ".S", ".arm", ".asm"],
+    "class_name": "ARMAssemblyPlugin",
+    "dependencies": [],
+    "config_schema": {
+        "properties": {
+            "enable_simd_analysis": {
+                "type": "boolean",
+                "default": true,
+                "description": "Enable SIMD/NEON instruction analysis"
+            },
+            "track_register_usage": {
+                "type": "boolean",
+                "default": true,
+                "description": "Track register usage statistics"
+            },
+            "detect_frameworks": {
+                "type": "boolean",
+                "default": true,
+                "description": "Detect embedded frameworks and platforms"
+            }
+        }
+    },
+    "metadata": {
+        "architectures": ["arm", "thumb", "aarch64"],
+        "features": [
+            "Symbol extraction (labels, functions, macros, directives)",
+            "Architecture detection (ARM/Thumb/AArch64)",
+            "Register usage tracking",
+            "Instruction categorization",
+            "Framework detection (STM32, Arduino, RTOS, etc.)",
+            "SIMD/NEON support",
+            "Boot code patterns",
+            "Interrupt handler detection"
+        ],
+        "use_cases": [
+            "Embedded systems development",
+            "Mobile application development",
+            "IoT device programming",
+            "Kernel and driver development",
+            "Performance optimization",
+            "Security research"
+        ]
+    }
+}

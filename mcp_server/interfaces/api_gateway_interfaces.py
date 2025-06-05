@@ -179,7 +179,7 @@ class IAuthMiddleware(ABC):
 # Request Validation
 # ========================================
 
-class IRequestValidator(ABC, IValidator):
+class IRequestValidator(IValidator):
     """Interface for request validation"""
     
     @abstractmethod

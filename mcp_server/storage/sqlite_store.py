@@ -249,7 +249,20 @@ class SQLiteStore:
     
     # Repository operations
     def create_repository(self, path: str, name: str, metadata: Optional[Dict] = None) -> int:
-        """Create a new repository entry."""
+        """Create a new repository entry with enhanced metadata support."""
+        # Enhance metadata with defaults for better tracking
+        enhanced_metadata = {
+            "created_at": datetime.now().isoformat(),
+            "type": "local",  # local, reference, temporary, external
+            "language": None,
+            "purpose": None,
+            "temporary": False,
+            "cleanup_after": None,
+            "indexed_files_count": 0,
+            "last_accessed": datetime.now().isoformat(),
+            **(metadata or {})
+        }
+        
         with self._get_connection() as conn:
             cursor = conn.execute(
                 """INSERT INTO repositories (path, name, metadata) 
@@ -258,7 +271,7 @@ class SQLiteStore:
                    name=excluded.name, 
                    metadata=excluded.metadata,
                    updated_at=CURRENT_TIMESTAMP""",
-                (path, name, json.dumps(metadata or {}))
+                (path, name, json.dumps(enhanced_metadata))
             )
             if cursor.lastrowid:
                 return cursor.lastrowid
@@ -276,6 +289,222 @@ class SQLiteStore:
             )
             row = cursor.fetchone()
             return dict(row) if row else None
+
+    def list_repositories(self, filter_metadata: Optional[Dict] = None) -> List[Dict]:
+        """List all repositories with optional metadata filtering."""
+        with self._get_connection() as conn:
+            cursor = conn.execute("SELECT * FROM repositories ORDER BY created_at DESC")
+            repos = [dict(row) for row in cursor.fetchall()]
+            
+            # Parse metadata and apply filtering
+            filtered_repos = []
+            for repo in repos:
+                try:
+                    repo['metadata'] = json.loads(repo['metadata']) if repo['metadata'] else {}
+                except json.JSONDecodeError:
+                    repo['metadata'] = {}
+                
+                # Apply filtering if provided
+                if filter_metadata:
+                    match = True
+                    for key, value in filter_metadata.items():
+                        if key not in repo['metadata'] or repo['metadata'][key] != value:
+                            match = False
+                            break
+                    if match:
+                        filtered_repos.append(repo)
+                else:
+                    filtered_repos.append(repo)
+            
+            return filtered_repos
+
+    def get_temporary_repositories(self) -> List[Dict]:
+        """Get all temporary repositories that can be cleaned up."""
+        return self.list_repositories(filter_metadata={"temporary": True})
+
+    def get_repositories_by_type(self, repo_type: str) -> List[Dict]:
+        """Get repositories by type (local, reference, temporary, external)."""
+        return self.list_repositories(filter_metadata={"type": repo_type})
+
+    def update_repository_metadata(self, repository_id: int, metadata_updates: Dict) -> bool:
+        """Update repository metadata."""
+        with self._get_connection() as conn:
+            # Get current metadata
+            cursor = conn.execute("SELECT metadata FROM repositories WHERE id = ?", (repository_id,))
+            row = cursor.fetchone()
+            if not row:
+                return False
+            
+            try:
+                current_metadata = json.loads(row[0]) if row[0] else {}
+            except json.JSONDecodeError:
+                current_metadata = {}
+            
+            # Merge updates
+            current_metadata.update(metadata_updates)
+            current_metadata["last_accessed"] = datetime.now().isoformat()
+            
+            # Update database
+            cursor = conn.execute(
+                "UPDATE repositories SET metadata = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (json.dumps(current_metadata), repository_id)
+            )
+            return cursor.rowcount > 0
+
+    def delete_repository(self, repository_id: int, cascade: bool = True) -> Dict[str, int]:
+        """
+        Delete a repository and optionally cascade to related data.
+        
+        Returns:
+            Dictionary with counts of deleted items
+        """
+        stats = {"repositories": 0, "files": 0, "symbols": 0, "references": 0, "embeddings": 0}
+        
+        with self._get_connection() as conn:
+            if cascade:
+                # Get file IDs for this repository
+                cursor = conn.execute(
+                    "SELECT id FROM files WHERE repository_id = ?", (repository_id,)
+                )
+                file_ids = [row[0] for row in cursor.fetchall()]
+                
+                if file_ids:
+                    file_ids_str = ",".join(str(fid) for fid in file_ids)
+                    
+                    # Delete embeddings
+                    cursor = conn.execute(f"DELETE FROM embeddings WHERE file_id IN ({file_ids_str})")
+                    stats["embeddings"] = cursor.rowcount
+                    
+                    # Get symbol IDs for this repository
+                    cursor = conn.execute(f"SELECT id FROM symbols WHERE file_id IN ({file_ids_str})")
+                    symbol_ids = [row[0] for row in cursor.fetchall()]
+                    
+                    if symbol_ids:
+                        symbol_ids_str = ",".join(str(sid) for sid in symbol_ids)
+                        
+                        # Delete symbol references
+                        cursor = conn.execute(f"DELETE FROM symbol_references WHERE symbol_id IN ({symbol_ids_str})")
+                        stats["references"] += cursor.rowcount
+                        
+                        # Delete file-based references  
+                        cursor = conn.execute(f"DELETE FROM symbol_references WHERE file_id IN ({file_ids_str})")
+                        stats["references"] += cursor.rowcount
+                        
+                        # Delete trigrams
+                        cursor = conn.execute(f"DELETE FROM symbol_trigrams WHERE symbol_id IN ({symbol_ids_str})")
+                        
+                        # Delete symbols
+                        cursor = conn.execute(f"DELETE FROM symbols WHERE file_id IN ({file_ids_str})")
+                        stats["symbols"] = cursor.rowcount
+                    
+                    # Delete imports
+                    cursor = conn.execute(f"DELETE FROM imports WHERE file_id IN ({file_ids_str})")
+                    
+                    # Delete files
+                    cursor = conn.execute("DELETE FROM files WHERE repository_id = ?", (repository_id,))
+                    stats["files"] = cursor.rowcount
+            
+            # Delete repository
+            cursor = conn.execute("DELETE FROM repositories WHERE id = ?", (repository_id,))
+            stats["repositories"] = cursor.rowcount
+            
+            return stats
+
+    def cleanup_expired_repositories(self) -> Dict[str, Any]:
+        """Clean up repositories that have expired."""
+        cleanup_stats = {"cleaned_repos": [], "total_deleted": {"repositories": 0, "files": 0, "symbols": 0, "references": 0, "embeddings": 0}}
+        
+        # Get repositories that should be cleaned up
+        temp_repos = self.get_temporary_repositories()
+        current_time = datetime.now()
+        
+        for repo in temp_repos:
+            metadata = repo.get('metadata', {})
+            cleanup_after = metadata.get('cleanup_after')
+            
+            if cleanup_after:
+                try:
+                    cleanup_time = datetime.fromisoformat(cleanup_after)
+                    if current_time > cleanup_time:
+                        # Time to clean up this repository
+                        delete_stats = self.delete_repository(repo['id'], cascade=True)
+                        cleanup_stats["cleaned_repos"].append({
+                            "repository": repo['name'],
+                            "path": repo['path'],
+                            "cleanup_time": cleanup_after,
+                            "deleted": delete_stats
+                        })
+                        
+                        # Add to totals
+                        for key, value in delete_stats.items():
+                            cleanup_stats["total_deleted"][key] += value
+                            
+                except ValueError:
+                    # Invalid date format, skip
+                    continue
+        
+        return cleanup_stats
+
+    def get_repository_stats(self, repository_id: Optional[int] = None) -> Dict[str, Any]:
+        """Get statistics for repositories."""
+        with self._get_connection() as conn:
+            if repository_id:
+                # Stats for specific repository
+                cursor = conn.execute("""
+                    SELECT 
+                        r.name, r.path, r.metadata,
+                        COUNT(DISTINCT f.id) as file_count,
+                        COUNT(DISTINCT s.id) as symbol_count,
+                        COUNT(DISTINCT sr.id) as reference_count,
+                        COUNT(DISTINCT e.id) as embedding_count,
+                        SUM(f.size) as total_size
+                    FROM repositories r
+                    LEFT JOIN files f ON r.id = f.repository_id
+                    LEFT JOIN symbols s ON f.id = s.file_id
+                    LEFT JOIN symbol_references sr ON s.id = sr.symbol_id
+                    LEFT JOIN embeddings e ON f.id = e.file_id
+                    WHERE r.id = ?
+                    GROUP BY r.id
+                """, (repository_id,))
+                
+                row = cursor.fetchone()
+                if row:
+                    stats = dict(row)
+                    try:
+                        stats['metadata'] = json.loads(stats['metadata']) if stats['metadata'] else {}
+                    except json.JSONDecodeError:
+                        stats['metadata'] = {}
+                    return stats
+                return {}
+            else:
+                # Stats for all repositories
+                cursor = conn.execute("""
+                    SELECT 
+                        r.id, r.name, r.path, r.metadata,
+                        COUNT(DISTINCT f.id) as file_count,
+                        COUNT(DISTINCT s.id) as symbol_count,
+                        COUNT(DISTINCT sr.id) as reference_count,
+                        COUNT(DISTINCT e.id) as embedding_count,
+                        SUM(f.size) as total_size
+                    FROM repositories r
+                    LEFT JOIN files f ON r.id = f.repository_id
+                    LEFT JOIN symbols s ON f.id = s.file_id
+                    LEFT JOIN symbol_references sr ON s.id = sr.symbol_id
+                    LEFT JOIN embeddings e ON f.id = e.file_id
+                    GROUP BY r.id
+                    ORDER BY r.created_at DESC
+                """)
+                
+                stats = []
+                for row in cursor.fetchall():
+                    repo_stats = dict(row)
+                    try:
+                        repo_stats['metadata'] = json.loads(repo_stats['metadata']) if repo_stats['metadata'] else {}
+                    except json.JSONDecodeError:
+                        repo_stats['metadata'] = {}
+                    stats.append(repo_stats)
+                
+                return {"repositories": stats}
     
     # File operations
     def store_file(self, repository_id: int, path: str, relative_path: str,

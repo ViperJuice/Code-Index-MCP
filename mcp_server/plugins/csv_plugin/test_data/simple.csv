@@ -1,0 +1,6 @@
+name,age,city,active
+John Doe,30,New York,true
+Jane Smith,25,Los Angeles,true
+Bob Johnson,35,Chicago,false
+Alice Brown,28,Houston,true
+Charlie Wilson,42,Phoenix,false

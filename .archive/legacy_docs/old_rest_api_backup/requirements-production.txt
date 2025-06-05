@@ -1,0 +1,81 @@
+# Production Requirements for MCP Server
+# This file contains production-optimized dependencies with specific versions
+# for stability and security in production deployments.
+
+# Core Web Framework
+fastapi==0.115.12
+uvicorn[standard]==0.34.2
+gunicorn==23.0.0
+
+# Database & Storage
+asyncpg==0.29.0              # PostgreSQL async driver
+sqlalchemy[asyncio]==2.0.35   # ORM with async support
+alembic==1.14.0               # Database migrations
+
+# Redis & Caching
+redis[hiredis]==6.2.0         # Redis client with C extensions
+aioredis==2.0.1               # Async Redis client
+
+# Authentication & Security
+PyJWT==2.10.1                 # JWT tokens
+passlib[bcrypt]==1.7.4        # Password hashing
+python-multipart==0.0.20      # Form data parsing
+cryptography==44.0.0          # Additional crypto functions
+
+# Data Validation & Serialization
+pydantic==2.11.5              # Data validation
+pydantic-settings==2.8.0      # Settings management
+
+# Language Processing & Tree-sitter
+tree-sitter==0.24.0           # Parser generator
+tree-sitter-languages==1.10.2 # All language grammars bundle (includes all below)
+tree-sitter-python==0.23.6    # Python grammar
+tree-sitter-javascript==0.23.7 # JavaScript grammar
+tree-sitter-typescript==0.23.6 # TypeScript grammar (used by JS plugin)
+tree-sitter-c==0.23.5         # C grammar
+tree-sitter-cpp==0.23.6       # C++ grammar
+tree-sitter-html==0.23.5      # HTML grammar (used by HTML/CSS plugin)
+tree-sitter-css==0.23.4       # CSS grammar (used by HTML/CSS plugin)
+# Note: Dart plugin uses regex-based parsing, no tree-sitter-dart needed
+jedi==0.19.2                  # Python analysis
+
+# Monitoring & Metrics
+prometheus-client==0.21.1     # Prometheus metrics
+structlog==24.4.0             # Structured logging
+
+# HTTP Client
+httpx==0.28.1                 # Modern HTTP client
+aiofiles==24.1.0              # Async file operations
+
+# Testing (for production health checks)
+pytest==8.3.5                 # Testing framework
+pytest-asyncio==0.25.0        # Async testing
+
+# Configuration & Environment
+python-dotenv==1.0.1          # Environment variable loading
+click==8.2.1                  # CLI framework
+
+# Performance & Optimization
+orjson==3.10.13                # Fast JSON serialization
+msgpack==1.1.0                # Binary serialization
+
+# Development & Debugging (production-safe)
+rich==14.0.0                  # Pretty printing for logs
+typing-extensions==4.13.2     # Extended typing support
+
+# Optional: Advanced search capabilities
+# Uncomment if semantic search is enabled
+# sentence-transformers==3.2.1
+# faiss-cpu==1.9.0
+# numpy==2.2.1
+
+# Optional: Task queue
+# Uncomment if using Celery for background tasks
+# celery[redis]==5.4.0
+# flower==2.0.1
+
+# Optional: Advanced monitoring
+# Uncomment for additional monitoring capabilities
+# sentry-sdk[fastapi]==2.19.2
+# opentelemetry-api==1.29.0
+# opentelemetry-sdk==1.29.0

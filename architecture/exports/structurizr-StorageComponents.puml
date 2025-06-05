@@ -1,0 +1,87 @@
+@startuml
+set separator none
+title Storage Components (100% Reusable)
+
+left to right direction
+skinparam ranksep 60
+skinparam nodesep 30
+
+skinparam {
+  arrowFontSize 10
+  defaultTextAlignment center
+  wrapWidth 200
+  maxMessageSize 100
+}
+
+hide stereotype
+
+skinparam rectangle<<CodeIndexMCPServer.CPlugin>> {
+  BackgroundColor #2ecc71
+  FontColor #ffffff
+  BorderColor #208e4f
+  roundCorner 20
+  shadowing false
+}
+skinparam component<<CodeIndexMCPServer.StorageLayer.FTS5Engine>> {
+  BackgroundColor #27ae60
+  FontColor #ffffff
+  BorderColor #1b7943
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.JavaScriptPlugin>> {
+  BackgroundColor #2ecc71
+  FontColor #ffffff
+  BorderColor #208e4f
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.PythonPlugin>> {
+  BackgroundColor #2ecc71
+  FontColor #ffffff
+  BorderColor #208e4f
+  roundCorner 20
+  shadowing false
+}
+skinparam component<<CodeIndexMCPServer.StorageLayer.QueryBuilder>> {
+  BackgroundColor #27ae60
+  FontColor #ffffff
+  BorderColor #1b7943
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.ResourceManager>> {
+  BackgroundColor #9b59b6
+  FontColor #ffffff
+  BorderColor #6c3e7f
+  roundCorner 20
+  shadowing false
+}
+skinparam component<<CodeIndexMCPServer.StorageLayer.SQLiteStore>> {
+  BackgroundColor #27ae60
+  FontColor #ffffff
+  BorderColor #1b7943
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.StorageLayer>> {
+  BorderColor #2e6295
+  FontColor #2e6295
+  shadowing false
+}
+
+rectangle "==Resource Manager\n<size:10>[Container: Python]</size>\n\nMCP resource abstraction for code elements" <<CodeIndexMCPServer.ResourceManager>> as CodeIndexMCPServer.ResourceManager
+rectangle "==Python Plugin\n<size:10>[Container: Python, Tree-sitter, Jedi]</size>\n\nPython code analysis with Tree-sitter and Jedi" <<CodeIndexMCPServer.PythonPlugin>> as CodeIndexMCPServer.PythonPlugin
+rectangle "==JavaScript Plugin\n<size:10>[Container: Python, Tree-sitter]</size>\n\nJavaScript/TypeScript analysis" <<CodeIndexMCPServer.JavaScriptPlugin>> as CodeIndexMCPServer.JavaScriptPlugin
+rectangle "==C Plugin\n<size:10>[Container: Python, Tree-sitter]</size>\n\nC code analysis" <<CodeIndexMCPServer.CPlugin>> as CodeIndexMCPServer.CPlugin
+
+rectangle "Storage Layer\n<size:10>[Container: SQLite, Python]</size>" <<CodeIndexMCPServer.StorageLayer>> {
+  component "==SQLite Store\n<size:10>[Component: Python, SQLite]</size>\n\nMain persistence layer" <<CodeIndexMCPServer.StorageLayer.SQLiteStore>> as CodeIndexMCPServer.StorageLayer.SQLiteStore
+  component "==FTS5 Engine\n<size:10>[Component: SQLite FTS5]</size>\n\nFull-text search engine" <<CodeIndexMCPServer.StorageLayer.FTS5Engine>> as CodeIndexMCPServer.StorageLayer.FTS5Engine
+  component "==Query Builder\n<size:10>[Component: Python]</size>\n\nSQL query construction" <<CodeIndexMCPServer.StorageLayer.QueryBuilder>> as CodeIndexMCPServer.StorageLayer.QueryBuilder
+}
+
+CodeIndexMCPServer.ResourceManager .[#666666,thickness=2].> CodeIndexMCPServer.StorageLayer.SQLiteStore : "<color:#666666>queries files"
+CodeIndexMCPServer.PythonPlugin .[#666666,thickness=2].> CodeIndexMCPServer.StorageLayer.SQLiteStore : "<color:#666666>stores symbols"
+CodeIndexMCPServer.JavaScriptPlugin .[#666666,thickness=2].> CodeIndexMCPServer.StorageLayer.SQLiteStore : "<color:#666666>stores symbols"
+CodeIndexMCPServer.CPlugin .[#666666,thickness=2].> CodeIndexMCPServer.StorageLayer.SQLiteStore : "<color:#666666>stores symbols"
+CodeIndexMCPServer.StorageLayer.SQLiteStore .[#666666,thickness=2].> CodeIndexMCPServer.StorageLayer.FTS5Engine : "<color:#666666>full-text search"
+CodeIndexMCPServer.StorageLayer.SQLiteStore .[#666666,thickness=2].> CodeIndexMCPServer.StorageLayer.QueryBuilder : "<color:#666666>builds queries"
+@enduml

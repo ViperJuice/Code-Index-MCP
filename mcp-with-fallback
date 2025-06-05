@@ -1,0 +1,12 @@
+#\!/bin/bash
+
+# MCP launcher with fallback options
+
+# First try the simple launcher
+exec /home/jenner/Code/Code-Index-MCP/mcp-simple
+
+# If that fails, try Python directly
+exec python -m mcp_server --transport stdio 2>/dev/null
+
+# Final fallback
+echo '{"jsonrpc": "2.0", "error": {"code": -32603, "message": "MCP server failed to start"}, "id": null}'

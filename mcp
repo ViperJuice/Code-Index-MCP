@@ -7,6 +7,10 @@ Usage:
     mcp --transport ws     # Start with WebSocket transport
     mcp index build        # Build index for current directory
     mcp --help             # Show help
+    
+Debug:
+    mcp --mcp-debug        # Run with debug output
+    MCP_DEBUG=true mcp     # Alternative debug mode
 """
 
 import sys
@@ -15,8 +19,37 @@ import os
 # Add the project root to Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Import and run the main module
-from mcp_server.__main__ import main
+# Check for debug mode
+if "--mcp-debug" in sys.argv or os.environ.get("MCP_DEBUG"):
+    os.environ["MCP_DEBUG"] = "true"
+    # Remove the flag from argv so it doesn't interfere with click
+    sys.argv = [arg for arg in sys.argv if arg != "--mcp-debug"]
 
-if __name__ == "__main__":
+try:
+    # Import and run the main module
+    from mcp_server.__main__ import main
     main()
+except ImportError as e:
+    print(f"Error: Missing dependency - {e}", file=sys.stderr)
+    print("\nPlease install dependencies with:", file=sys.stderr)
+    print("  pip install -r requirements.txt", file=sys.stderr)
+    print("\nOr use Docker to avoid dependency issues:", file=sys.stderr)
+    print("  docker run -it --rm -v $(pwd):/workspace code-index-mcp", file=sys.stderr)
+    sys.exit(1)
+except FileNotFoundError as e:
+    if "docker" in str(e).lower():
+        print("Error: Docker not found", file=sys.stderr)
+        print("\nEither:", file=sys.stderr)
+        print("  1. Install Docker: https://docs.docker.com/get-docker/", file=sys.stderr)
+        print("  2. Use local Python mode instead (change .mcp.json)", file=sys.stderr)
+    else:
+        print(f"Error: {e}", file=sys.stderr)
+    sys.exit(1)
+except Exception as e:
+    if os.environ.get("MCP_DEBUG"):
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+    else:
+        print(f"Error: {e}", file=sys.stderr)
+        print("\nFor more details, run with --mcp-debug flag", file=sys.stderr)
+    sys.exit(1)

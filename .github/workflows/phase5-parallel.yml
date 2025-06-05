@@ -1,0 +1,38 @@
+name: Phase 5 Parallel Build
+
+on:
+  push:
+    branches: [ feature/phase5-* ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  language-plugins:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        plugin: [rust, go, jvm, ruby, php]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Test ${{ matrix.plugin }} plugin
+        run: |
+          pip install -r requirements.txt
+          pytest tests/test_${{ matrix.plugin }}_plugin.py
+
+  vector-search:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Test vector enhancements
+        run: |
+          pip install -r requirements.txt
+          pytest tests/test_vector_enhancement.py
+
+  distributed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Test distributed processing
+        run: |
+          pip install -r requirements.txt
+          pytest tests/test_distributed.py

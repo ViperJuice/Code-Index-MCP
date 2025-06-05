@@ -1,0 +1,213 @@
+# Application Configuration File
+# This demonstrates various TOML features
+
+# Basic server configuration
+[server]
+host = "0.0.0.0"
+port = 8080
+debug = false
+workers = 4
+
+# Nested configuration
+[server.tls]
+enabled = true
+cert_file = "/etc/ssl/certs/server.crt"
+key_file = "/etc/ssl/private/server.key"
+protocols = ["TLSv1.2", "TLSv1.3"]
+
+[server.limits]
+max_connections = 1000
+request_timeout = 30  # seconds
+keepalive_timeout = 65
+max_request_size = 10485760  # 10MB in bytes
+
+# Database configuration with inline tables
+[database]
+primary = { host = "db1.example.com", port = 5432, name = "app_db", user = "app_user" }
+replica = { host = "db2.example.com", port = 5432, name = "app_db", user = "app_reader" }
+
+# Connection pool settings
+[database.pool]
+min_size = 10
+max_size = 50
+acquire_timeout = 3.0
+idle_timeout = 600.0
+max_lifetime = 3600.0
+
+# Logging configuration
+[logging]
+level = "INFO"
+format = "json"
+output = "stdout"
+
+# Structured logging targets
+[[logging.handlers]]
+name = "file"
+level = "DEBUG"
+path = "/var/log/app/debug.log"
+rotation = "daily"
+retention = 7
+
+[[logging.handlers]]
+name = "errors"
+level = "ERROR"
+path = "/var/log/app/errors.log"
+rotation = "size"
+max_size = "100MB"
+
+# Cache configuration
+[cache]
+backend = "redis"
+ttl = 3600
+
+[cache.redis]
+host = "localhost"
+port = 6379
+db = 0
+password = ""
+pool_size = 20
+
+# Feature flags
+[features]
+new_ui = true
+experimental_api = false
+beta_features = ["search_v2", "analytics", "export"]
+
+# Multi-environment configuration
+[environments.development]
+debug = true
+hot_reload = true
+mock_external_services = true
+
+[environments.staging]
+debug = false
+hot_reload = false
+mock_external_services = false
+api_rate_limit = 1000
+
+[environments.production]
+debug = false
+hot_reload = false
+mock_external_services = false
+api_rate_limit = 10000
+enable_metrics = true
+enable_tracing = true
+
+# Scheduled tasks using array of tables
+[[tasks]]
+name = "cleanup"
+schedule = "0 2 * * *"  # 2 AM daily
+command = "cleanup_old_data"
+enabled = true
+
+[[tasks]]
+name = "backup"
+schedule = "0 */6 * * *"  # Every 6 hours
+command = "backup_database"
+enabled = true
+options = { compression = true, encryption = true }
+
+[[tasks]]
+name = "report"
+schedule = "0 9 * * MON"  # Every Monday at 9 AM
+command = "generate_weekly_report"
+enabled = true
+recipients = ["admin@example.com", "team@example.com"]
+
+# Complex nested structure
+[services.api]
+base_url = "https://api.example.com"
+version = "v2"
+timeout = 30
+
+[services.api.endpoints.users]
+list = "/users"
+get = "/users/{id}"
+create = "/users"
+update = "/users/{id}"
+delete = "/users/{id}"
+
+[services.api.endpoints.products]
+list = "/products"
+get = "/products/{id}"
+search = "/products/search"
+
+# Authentication settings
+[auth]
+jwt_secret = "your-secret-key-here"
+token_expiry = 86400  # 24 hours
+refresh_token_expiry = 604800  # 7 days
+
+[auth.oauth.providers.github]
+client_id = "github-client-id"
+client_secret = "github-client-secret"
+redirect_uri = "https://app.example.com/auth/github/callback"
+scopes = ["user:email", "read:user"]
+
+[auth.oauth.providers.google]
+client_id = "google-client-id"
+client_secret = "google-client-secret"
+redirect_uri = "https://app.example.com/auth/google/callback"
+scopes = ["openid", "email", "profile"]
+
+# Inline array and mixed types
+[monitoring]
+enabled = true
+providers = ["prometheus", "datadog", "custom"]
+metrics = [
+    { name = "http_requests", type = "counter", labels = ["method", "endpoint", "status"] },
+    { name = "response_time", type = "histogram", buckets = [0.1, 0.5, 1.0, 2.0, 5.0] },
+    { name = "active_connections", type = "gauge" }
+]
+
+# Multi-line strings
+[templates]
+welcome_email = """
+Dear {{name}},
+
+Welcome to our application! We're excited to have you on board.
+
+This is a multi-line string template that preserves formatting
+and can span multiple lines without escaping.
+
+Best regards,
+The Team
+"""
+
+error_page = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Error {{code}}</title>
+</head>
+<body>
+    <h1>Oops! Something went wrong.</h1>
+    <p>Error code: {{code}}</p>
+    <p>{{message}}</p>
+</body>
+</html>
+'''
+
+# Date and time values
+[deployment]
+created_at = 2024-01-15T10:30:00Z
+updated_at = 2024-01-20T15:45:30Z
+scheduled_maintenance = 2024-02-01T02:00:00-08:00
+
+# Mixed array types (though not recommended)
+[metadata]
+tags = ["production", "web", "api", 2024, true]
+versions = [1, 2, 3, "4.0-beta", "5.0-rc1"]
+
+# Unicode support
+[i18n]
+default_language = "en"
+supported_languages = ["en", "es", "fr", "de", "日本語", "中文", "한국어"]
+
+[i18n.messages.en]
+greeting = "Hello, World!"
+farewell = "Goodbye!"
+
+[i18n.messages."日本語"]
+greeting = "こんにちは、世界！"
+farewell = "さようなら！"

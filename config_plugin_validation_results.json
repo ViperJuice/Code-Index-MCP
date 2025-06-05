@@ -1,0 +1,1051 @@
+{
+  "yaml_plugin_results": {
+    "kubernetes_manifests": [],
+    "helm_charts": [
+      {
+        "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/helm/pkg/chart/v2/util/testdata/dependent-chart-with-all-in-requirements-yaml/Chart.yaml",
+        "type": "helm",
+        "parsed_successfully": true,
+        "line_count": 25,
+        "size_bytes": 523,
+        "structure_analysis": {
+          "chart_name": "frobnitz",
+          "chart_version": "1.2.3",
+          "api_version": "v1",
+          "dependencies_count": 2,
+          "top_level_keys": [
+            "apiVersion",
+            "name",
+            "description",
+            "version",
+            "keywords",
+            "maintainers",
+            "sources",
+            "home",
+            "icon",
+            "dependencies"
+          ],
+          "total_keys": 10,
+          "nested_depth": 3
+        }
+      }
+    ],
+    "github_actions": [
+      {
+        "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/helm/.github/workflows/build-test.yml",
+        "type": "github_action",
+        "parsed_successfully": true,
+        "line_count": 35,
+        "size_bytes": 853,
+        "structure_analysis": {
+          "workflow_name": "build-test",
+          "triggers": null,
+          "jobs_count": 1,
+          "job_names": [
+            "build"
+          ],
+          "top_level_keys": [
+            "name",
+            true,
+            "permissions",
+            "jobs"
+          ],
+          "total_keys": 4,
+          "nested_depth": 6
+        }
+      }
+    ],
+    "docker_compose": [
+      {
+        "file": "/home/jenner/Code/Code-Index-MCP/test_repos/config_test/compose/pkg/e2e/fixtures/profiles/docker-compose.yaml",
+        "type": "docker_compose",
+        "parsed_successfully": true,
+        "line_count": 15,
+        "size_bytes": 233,
+        "structure_analysis": {
+          "version": null,
+          "services_count": 3,
+          "service_names": [
+            "foo",
+            "bar",
+            "db"
+          ],
+          "has_networks": false,
+          "has_volumes": false,
+          "top_level_keys": [
+            "services"
+          ],
+          "total_keys": 1,
+          "nested_depth": 4
+        }
+      }
+    ],
+    "generic_yaml": []
+  },
+  "json_plugin_results": {
+    "package_managers": [],
+    "api_schemas": [
+      {
+        "file": "helm/pkg/chart/v2/util/testdata/test-values-invalid.schema.json",
+        "parsed_successfully": true,
+        "size_bytes": 24,
+        "structure": {
+          "top_level_keys": [],
+          "total_keys": 0,
+          "nested_depth": 0
+        },
+        "category": "api_schema"
+      },
+      {
+        "file": "helm/pkg/chart/v2/util/testdata/test-values.schema.json",
+        "parsed_successfully": true,
+        "size_bytes": 1226,
+        "structure": {
+          "top_level_keys": [
+            "$schema",
+            "properties",
+            "required",
+            "title",
+            "type"
+          ],
+          "total_keys": 5,
+          "nested_depth": 6
+        },
+        "category": "api_schema"
+      },
+      {
+        "file": "helm/pkg/cmd/testdata/testcharts/chart-with-schema-negative/values.schema.json",
+        "parsed_successfully": true,
+        "size_bytes": 1226,
+        "structure": {
+          "top_level_keys": [
+            "$schema",
+            "properties",
+            "required",
+            "title",
+            "type"
+          ],
+          "total_keys": 5,
+          "nested_depth": 6
+        },
+        "category": "api_schema"
+      },
+      {
+        "file": "helm/pkg/cmd/testdata/testcharts/chart-with-schema-negative-skip-validation/values.schema.json",
+        "parsed_successfully": true,
+        "size_bytes": 1226,
+        "structure": {
+          "top_level_keys": [
+            "$schema",
+            "properties",
+            "required",
+            "title",
+            "type"
+          ],
+          "total_keys": 5,
+          "nested_depth": 6
+        },
+        "category": "api_schema"
+      },
+      {
+        "file": "helm/pkg/cmd/testdata/testcharts/chart-with-schema/values.schema.json",
+        "parsed_successfully": true,
+        "size_bytes": 1226,
+        "structure": {
+          "top_level_keys": [
+            "$schema",
+            "properties",
+            "required",
+            "title",
+            "type"
+          ],
+          "total_keys": 5,
+          "nested_depth": 6
+        },
+        "category": "api_schema"
+      },
+      {
+        "file": "helm/pkg/cmd/testdata/testcharts/chart-with-schema-and-subchart/values.schema.json",
+        "parsed_successfully": true,
+        "size_bytes": 307,
+        "structure": {
+          "top_level_keys": [
+            "$schema",
+            "title",
+            "type",
+            "properties",
+            "required"
+          ],
+          "total_keys": 5,
+          "nested_depth": 3
+        },
+        "category": "api_schema"
+      },
+      {
+        "file": "helm/pkg/cmd/testdata/testcharts/chart-with-schema-and-subchart/charts/subchart-with-schema/values.schema.json",
+        "parsed_successfully": true,
+        "size_bytes": 245,
+        "structure": {
+          "top_level_keys": [
+            "$schema",
+            "title",
+            "type",
+            "properties",
+            "required"
+          ],
+          "total_keys": 5,
+          "nested_depth": 3
+        },
+        "category": "api_schema"
+      },
+      {
+        "file": "helm/pkg/action/testdata/charts/chart-with-schema-negative/values.schema.json",
+        "parsed_successfully": true,
+        "size_bytes": 1226,
+        "structure": {
+          "top_level_keys": [
+            "$schema",
+            "properties",
+            "required",
+            "title",
+            "type"
+          ],
+          "total_keys": 5,
+          "nested_depth": 6
+        },
+        "category": "api_schema"
+      },
+      {
+        "file": "helm/pkg/action/testdata/charts/chart-with-schema/values.schema.json",
+        "parsed_successfully": true,
+        "size_bytes": 1226,
+        "structure": {
+          "top_level_keys": [
+            "$schema",
+            "properties",
+            "required",
+            "title",
+            "type"
+          ],
+          "total_keys": 5,
+          "nested_depth": 6
+        },
+        "category": "api_schema"
+      },
+      {
+        "file": "kubernetes/vendor/github.com/google/gnostic-models/jsonschema/schema.json",
+        "parsed_successfully": true,
+        "size_bytes": 4375,
+        "structure": {
+          "top_level_keys": [
+            "id",
+            "$schema",
+            "description",
+            "definitions",
+            "type",
+            "properties",
+            "dependencies",
+            "default"
+          ],
+          "total_keys": 8,
+          "nested_depth": 6
+        },
+        "category": "api_schema"
+      }
+    ],
+    "configuration_files": [
+      {
+        "file": "helm/pkg/cmd/testdata/output/status-with-resources.json",
+        "parsed_successfully": true,
+        "size_bytes": 154,
+        "structure": {
+          "top_level_keys": [
+            "name",
+            "info",
+            "namespace"
+          ],
+          "total_keys": 3,
+          "nested_depth": 2
+        },
+        "category": "configuration"
+      },
+      {
+        "file": "helm/pkg/cmd/testdata/output/get-metadata.json",
+        "parsed_successfully": true,
+        "size_bytes": 457,
+        "structure": {
+          "top_level_keys": [
+            "name",
+            "chart",
+            "version",
+            "appVersion",
+            "annotations",
+            "dependencies",
+            "namespace",
+            "revision",
+            "status",
+            "deployedAt"
+          ],
+          "total_keys": 10,
+          "nested_depth": 3
+        },
+        "category": "configuration"
+      },
+      {
+        "file": "helm/pkg/cmd/testdata/output/history.json",
+        "parsed_successfully": true,
+        "size_bytes": 292,
+        "structure": {
+          "top_level_keys": [],
+          "total_keys": 0,
+          "nested_depth": 2
+        },
+        "category": "configuration"
+      },
+      {
+        "file": "helm/pkg/cmd/testdata/output/values.json",
+        "parsed_successfully": true,
+        "size_bytes": 17,
+        "structure": {
+          "top_level_keys": [
+            "name"
+          ],
+          "total_keys": 1,
+          "nested_depth": 1
+        },
+        "category": "configuration"
+      },
+      {
+        "file": "helm/pkg/cmd/testdata/output/status.json",
+        "parsed_successfully": true,
+        "size_bytes": 178,
+        "structure": {
+          "top_level_keys": [
+            "name",
+            "info",
+            "namespace"
+          ],
+          "total_keys": 3,
+          "nested_depth": 2
+        },
+        "category": "configuration"
+      },
+      {
+        "file": "helm/pkg/repo/testdata/local-index.json",
+        "parsed_successfully": true,
+        "size_bytes": 1538,
+        "structure": {
+          "top_level_keys": [
+            "apiVersion",
+            "entries"
+          ],
+          "total_keys": 2,
+          "nested_depth": 5
+        },
+        "category": "configuration"
+      },
+      {
+        "file": "kubernetes/vendor/go.opentelemetry.io/otel/renovate.json",
+        "parsed_successfully": true,
+        "size_bytes": 689,
+        "structure": {
+          "top_level_keys": [
+            "$schema",
+            "extends",
+            "ignorePaths",
+            "labels",
+            "postUpdateOptions",
+            "packageRules"
+          ],
+          "total_keys": 6,
+          "nested_depth": 4
+        },
+        "category": "configuration"
+      },
+      {
+        "file": "kubernetes/vendor/github.com/google/gnostic-models/openapiv2/openapi-2.0.json",
+        "parsed_successfully": true,
+        "size_bytes": 40310,
+        "structure": {
+          "top_level_keys": [
+            "title",
+            "id",
+            "$schema",
+            "type",
+            "required",
+            "additionalProperties",
+            "patternProperties",
+            "properties",
+            "definitions"
+          ],
+          "total_keys": 9,
+          "nested_depth": 8
+        },
+        "category": "configuration"
+      },
+      {
+        "file": "kubernetes/vendor/sigs.k8s.io/kustomize/kyaml/openapi/kustomizationapi/swagger.json",
+        "parsed_successfully": true,
+        "size_bytes": 3182,
+        "structure": {
+          "top_level_keys": [
+            "definitions"
+          ],
+          "total_keys": 1,
+          "nested_depth": 6
+        },
+        "category": "configuration"
+      },
+      {
+        "file": "kubernetes/test/kubemark/resources/heapster_template.json",
+        "parsed_successfully": true,
+        "size_bytes": 1582,
+        "structure": {
+          "top_level_keys": [
+            "kind",
+            "apiVersion",
+            "metadata",
+            "spec"
+          ],
+          "total_keys": 4,
+          "nested_depth": 8
+        },
+        "category": "configuration"
+      }
+    ]
+  },
+  "markdown_plugin_results": {
+    "readme_files": [
+      {
+        "file": "helm/README.md",
+        "size_bytes": 4598,
+        "line_count": 87,
+        "structure": {
+          "headers": {
+            "h1": 1,
+            "h2": 6,
+            "h3": 2,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 33,
+          "images": 6
+        },
+        "category": "readme"
+      },
+      {
+        "file": "helm/pkg/chart/v2/util/testdata/dependent-chart-with-all-in-requirements-yaml/README.md",
+        "size_bytes": 153,
+        "line_count": 12,
+        "structure": {
+          "headers": {
+            "h1": 1,
+            "h2": 2,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 0,
+          "images": 0
+        },
+        "category": "readme"
+      },
+      {
+        "file": "helm/pkg/chart/v2/util/testdata/dependent-chart-with-all-in-requirements-yaml/charts/alpine/README.md",
+        "size_bytes": 309,
+        "line_count": 10,
+        "structure": {
+          "headers": {
+            "h1": 0,
+            "h2": 0,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 0,
+          "images": 0
+        },
+        "category": "readme"
+      },
+      {
+        "file": "helm/pkg/chart/v2/util/testdata/dependent-chart-with-all-in-requirements-yaml/docs/README.md",
+        "size_bytes": 41,
+        "line_count": 2,
+        "structure": {
+          "headers": {
+            "h1": 0,
+            "h2": 0,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 0,
+          "images": 0
+        },
+        "category": "readme"
+      },
+      {
+        "file": "helm/pkg/chart/v2/util/testdata/dependent-chart-with-mixed-requirements-yaml/README.md",
+        "size_bytes": 153,
+        "line_count": 12,
+        "structure": {
+          "headers": {
+            "h1": 1,
+            "h2": 2,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 0,
+          "images": 0
+        },
+        "category": "readme"
+      },
+      {
+        "file": "helm/pkg/chart/v2/util/testdata/dependent-chart-with-mixed-requirements-yaml/charts/alpine/README.md",
+        "size_bytes": 309,
+        "line_count": 10,
+        "structure": {
+          "headers": {
+            "h1": 0,
+            "h2": 0,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 0,
+          "images": 0
+        },
+        "category": "readme"
+      },
+      {
+        "file": "helm/pkg/chart/v2/util/testdata/dependent-chart-with-mixed-requirements-yaml/docs/README.md",
+        "size_bytes": 41,
+        "line_count": 2,
+        "structure": {
+          "headers": {
+            "h1": 0,
+            "h2": 0,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 0,
+          "images": 0
+        },
+        "category": "readme"
+      },
+      {
+        "file": "helm/pkg/chart/v2/util/testdata/dependent-chart-alias/README.md",
+        "size_bytes": 153,
+        "line_count": 12,
+        "structure": {
+          "headers": {
+            "h1": 1,
+            "h2": 2,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 0,
+          "images": 0
+        },
+        "category": "readme"
+      },
+      {
+        "file": "helm/pkg/chart/v2/util/testdata/dependent-chart-alias/charts/alpine/README.md",
+        "size_bytes": 309,
+        "line_count": 10,
+        "structure": {
+          "headers": {
+            "h1": 0,
+            "h2": 0,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 0,
+          "images": 0
+        },
+        "category": "readme"
+      },
+      {
+        "file": "helm/pkg/chart/v2/util/testdata/dependent-chart-alias/docs/README.md",
+        "size_bytes": 41,
+        "line_count": 2,
+        "structure": {
+          "headers": {
+            "h1": 0,
+            "h2": 0,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 0,
+          "images": 0
+        },
+        "category": "readme"
+      },
+      {
+        "file": "helm/pkg/chart/v2/util/testdata/dependent-chart-no-requirements-yaml/README.md",
+        "size_bytes": 153,
+        "line_count": 12,
+        "structure": {
+          "headers": {
+            "h1": 1,
+            "h2": 2,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 0,
+          "images": 0
+        },
+        "category": "readme"
+      },
+      {
+        "file": "helm/pkg/chart/v2/util/testdata/dependent-chart-no-requirements-yaml/charts/alpine/README.md",
+        "size_bytes": 309,
+        "line_count": 10,
+        "structure": {
+          "headers": {
+            "h1": 0,
+            "h2": 0,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 0,
+          "images": 0
+        },
+        "category": "readme"
+      },
+      {
+        "file": "helm/pkg/chart/v2/util/testdata/dependent-chart-no-requirements-yaml/docs/README.md",
+        "size_bytes": 41,
+        "line_count": 2,
+        "structure": {
+          "headers": {
+            "h1": 0,
+            "h2": 0,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 0,
+          "images": 0
+        },
+        "category": "readme"
+      },
+      {
+        "file": "helm/pkg/chart/v2/util/testdata/frobnitz/README.md",
+        "size_bytes": 153,
+        "line_count": 12,
+        "structure": {
+          "headers": {
+            "h1": 1,
+            "h2": 2,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 0,
+          "images": 0
+        },
+        "category": "readme"
+      },
+      {
+        "file": "helm/pkg/chart/v2/util/testdata/frobnitz/charts/alpine/README.md",
+        "size_bytes": 309,
+        "line_count": 10,
+        "structure": {
+          "headers": {
+            "h1": 0,
+            "h2": 0,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 0,
+          "images": 0
+        },
+        "category": "readme"
+      },
+      {
+        "file": "helm/pkg/chart/v2/util/testdata/frobnitz/docs/README.md",
+        "size_bytes": 41,
+        "line_count": 2,
+        "structure": {
+          "headers": {
+            "h1": 0,
+            "h2": 0,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 0,
+          "images": 0
+        },
+        "category": "readme"
+      },
+      {
+        "file": "helm/pkg/chart/v2/util/testdata/dependent-chart-helmignore/charts/alpine/README.md",
+        "size_bytes": 309,
+        "line_count": 10,
+        "structure": {
+          "headers": {
+            "h1": 0,
+            "h2": 0,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 0,
+          "images": 0
+        },
+        "category": "readme"
+      },
+      {
+        "file": "helm/pkg/chart/v2/util/testdata/three-level-dependent-chart/README.md",
+        "size_bytes": 435,
+        "line_count": 17,
+        "structure": {
+          "headers": {
+            "h1": 1,
+            "h2": 0,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 0,
+          "images": 0
+        },
+        "category": "readme"
+      },
+      {
+        "file": "helm/pkg/chart/v2/util/testdata/subpop/README.md",
+        "size_bytes": 403,
+        "line_count": 18,
+        "structure": {
+          "headers": {
+            "h1": 0,
+            "h2": 1,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 2,
+          "links": 0,
+          "images": 0
+        },
+        "category": "readme"
+      },
+      {
+        "file": "helm/pkg/chart/v2/loader/testdata/frobnitz.v2.reqs/README.md",
+        "size_bytes": 153,
+        "line_count": 12,
+        "structure": {
+          "headers": {
+            "h1": 1,
+            "h2": 2,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 0,
+          "images": 0
+        },
+        "category": "readme"
+      },
+      {
+        "file": "helm/pkg/chart/v2/loader/testdata/frobnitz.v2.reqs/charts/alpine/README.md",
+        "size_bytes": 309,
+        "line_count": 10,
+        "structure": {
+          "headers": {
+            "h1": 0,
+            "h2": 0,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 0,
+          "images": 0
+        },
+        "category": "readme"
+      },
+      {
+        "file": "helm/pkg/chart/v2/loader/testdata/frobnitz.v2.reqs/docs/README.md",
+        "size_bytes": 41,
+        "line_count": 2,
+        "structure": {
+          "headers": {
+            "h1": 0,
+            "h2": 0,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 0,
+          "images": 0
+        },
+        "category": "readme"
+      },
+      {
+        "file": "helm/pkg/chart/v2/loader/testdata/frobnitz_with_bom/README.md",
+        "size_bytes": 156,
+        "line_count": 12,
+        "structure": {
+          "headers": {
+            "h1": 0,
+            "h2": 2,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 0,
+          "images": 0
+        },
+        "category": "readme"
+      },
+      {
+        "file": "helm/pkg/chart/v2/loader/testdata/frobnitz_with_bom/charts/alpine/README.md",
+        "size_bytes": 312,
+        "line_count": 10,
+        "structure": {
+          "headers": {
+            "h1": 0,
+            "h2": 0,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 0,
+          "images": 0
+        },
+        "category": "readme"
+      }
+    ],
+    "documentation": [
+      {
+        "file": "helm/SECURITY.md",
+        "size_bytes": 171,
+        "line_count": 3,
+        "structure": {
+          "headers": {
+            "h1": 1,
+            "h2": 0,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 1,
+          "images": 0
+        },
+        "category": "documentation"
+      },
+      {
+        "file": "helm/CONTRIBUTING.md",
+        "size_bytes": 19857,
+        "line_count": 364,
+        "structure": {
+          "headers": {
+            "h1": 2,
+            "h2": 12,
+            "h3": 8,
+            "h4": 1,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 10,
+          "links": 24,
+          "images": 0
+        },
+        "category": "documentation"
+      },
+      {
+        "file": "helm/ADOPTERS.md",
+        "size_bytes": 917,
+        "line_count": 26,
+        "structure": {
+          "headers": {
+            "h1": 1,
+            "h2": 0,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 15,
+          "images": 0
+        },
+        "category": "documentation"
+      },
+      {
+        "file": "helm/code-of-conduct.md",
+        "size_bytes": 137,
+        "line_count": 4,
+        "structure": {
+          "headers": {
+            "h1": 1,
+            "h2": 0,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 1,
+          "images": 0
+        },
+        "category": "documentation"
+      },
+      {
+        "file": "helm/.github/issue_template.md",
+        "size_bytes": 276,
+        "line_count": 10,
+        "structure": {
+          "headers": {
+            "h1": 0,
+            "h2": 0,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 0,
+          "images": 0
+        },
+        "category": "documentation"
+      },
+      {
+        "file": "helm/.github/pull_request_template.md",
+        "size_bytes": 761,
+        "line_count": 13,
+        "structure": {
+          "headers": {
+            "h1": 0,
+            "h2": 0,
+            "h3": 0,
+            "h4": 0,
+            "h5": 0,
+            "h6": 0
+          },
+          "code_blocks": 0,
+          "links": 3,
+          "images": 0
+        },
+        "category": "documentation"
+      }
+    ],
+    "changelogs": []
+  },
+  "csv_plugin_results": {
+    "data_files": [
+      {
+        "file": "kubernetes/test/integration/auth/testdata/tokens.csv",
+        "parsed_successfully": true,
+        "row_count": 2,
+        "column_count": 3,
+        "has_header": true,
+        "size_bytes": 28,
+        "headers": [
+          "abc123",
+          "alice",
+          "1"
+        ],
+        "sample_data": [
+          "xyz987",
+          "bob",
+          "2"
+        ]
+      },
+      {
+        "file": "kubernetes/hack/testdata/auth-tokens.csv",
+        "parsed_successfully": true,
+        "row_count": 1,
+        "column_count": 4,
+        "has_header": true,
+        "size_bytes": 36,
+        "headers": [
+          "admin-token",
+          "admin",
+          "",
+          "system:masters"
+        ],
+        "sample_data": []
+      }
+    ]
+  },
+  "validation_report": "Configuration Plugin Validation Report\n==================================================\n\nPlugin Performance Summary:\n\nYAML Plugin:\n  Files analyzed: 3\n  Successfully parsed: 3\n  Success rate: 100.0%\n  Kubernetes manifests: 0\n  Helm charts: 1\n  GitHub Actions: 1\n  Docker Compose: 1\n\nJSON Plugin:\n  Files analyzed: 20\n  Successfully parsed: 20\n  Success rate: 100.0%\n  Package managers: 0\n  API schemas: 10\n  Configuration files: 10\n\nMarkdown Plugin:\n  Files analyzed: 30\n  README files: 24\n  Documentation: 6\n  Changelogs: 0\n\nCSV Plugin:\n  Files analyzed: 2\n  Successfully parsed: 2\n  Success rate: 100.0%\n\nDevOps Configuration Excellence:\n\nOur plugins demonstrate strong capabilities for:\n  \u2713 Kubernetes manifest analysis and validation\n  \u2713 Helm chart dependency tracking\n  \u2713 GitHub Actions workflow parsing\n  \u2713 Docker Compose service configuration\n  \u2713 Package manager configuration (JSON)\n  \u2713 API schema validation (JSON)\n  \u2713 Documentation structure analysis (Markdown)\n  \u2713 Data file processing (CSV)\n\nPlugin Strengths:\n  \u2022 High success rates for well-formed configuration files\n  \u2022 Detailed structure analysis for nested configurations\n  \u2022 Proper handling of DevOps-specific file formats\n  \u2022 Comprehensive metadata extraction\n  \u2022 Support for multiple configuration variants\n",
+  "summary": {
+    "total_files_tested": 55,
+    "plugins_tested": [
+      "YAML",
+      "JSON",
+      "Markdown",
+      "CSV"
+    ],
+    "devops_formats_supported": [
+      "Kubernetes manifests",
+      "Helm charts",
+      "GitHub Actions",
+      "Docker Compose",
+      "Package configurations",
+      "API schemas",
+      "Documentation",
+      "Data files"
+    ]
+  }
+}

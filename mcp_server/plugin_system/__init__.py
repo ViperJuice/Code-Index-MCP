@@ -10,6 +10,7 @@ from .models import (
     PluginState,
     PluginType,
     PluginSystemConfig,
+    PluginInstance,
     PluginError,
     PluginNotFoundError,
     PluginLoadError,
@@ -35,6 +36,7 @@ __all__ = [
     'PluginState',
     'PluginType',
     'PluginSystemConfig',
+    'PluginInstance',
     
     # Exceptions
     'PluginError',

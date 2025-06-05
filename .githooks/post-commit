@@ -1,0 +1,49 @@
+#!/bin/bash
+# Git post-commit hook - Updates MCP index after every commit
+# This provides real-time indexing without waiting for push
+
+set -e
+
+# Configuration
+MCP_INDEX_DIR="${MCP_INDEX_DIR:-$HOME/.mcp/indexes/$(basename $(pwd))}"
+ENABLE_AUTO_INDEX="${ENABLE_MCP_AUTO_INDEX:-true}"
+
+# Skip if disabled
+if [ "$ENABLE_AUTO_INDEX" != "true" ]; then
+    exit 0
+fi
+
+# Colors
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Run in background to not block commit
+{
+    # Get current commit
+    current_commit=$(git rev-parse HEAD)
+    
+    # Check if MCP server is available
+    if command -v python -m mcp_server &> /dev/null; then
+        # Get changed files in this commit
+        changed_files=$(git diff-tree --no-commit-id --name-only -r "$current_commit")
+        
+        if [ -n "$changed_files" ]; then
+            echo -e "${YELLOW}Updating MCP index for commit $current_commit...${NC}"
+            
+            # Create index directory if needed
+            mkdir -p "$MCP_INDEX_DIR"
+            
+            # Run incremental index update (silent mode)
+            python -m mcp_server index update \
+                --path "$MCP_INDEX_DIR" \
+                --files <(echo "$changed_files") \
+                --commit "$current_commit" \
+                --background &
+            
+            echo -e "${GREEN}✓ Index update started in background${NC}"
+        fi
+    fi
+} &
+
+exit 0

@@ -18,6 +18,7 @@ try:
     import redis.asyncio as aioredis
     REDIS_AVAILABLE = True
 except ImportError:
+    aioredis = None  # type: ignore
     REDIS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
@@ -368,12 +369,12 @@ class RedisCacheBackend(CacheBackend):
         self.redis_url = redis_url
         self.prefix = prefix
         self.db = db
-        self._redis: Optional[aioredis.Redis] = None
+        self._redis: Optional[Any] = None  # aioredis.Redis when available
         self._hits = 0
         self._misses = 0
         self._lock = asyncio.Lock()
     
-    async def _get_redis(self) -> aioredis.Redis:
+    async def _get_redis(self) -> Any:  # aioredis.Redis when available
         """Get Redis connection, creating if necessary."""
         if self._redis is None:
             self._redis = aioredis.from_url(

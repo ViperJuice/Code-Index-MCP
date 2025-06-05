@@ -1,0 +1,266 @@
+[build-system]
+requires = ["hatchling>=1.21.0", "hatch-vcs>=0.3.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcp-server"
+dynamic = ["version"]
+description = "A comprehensive code indexing and analysis server"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [
+    { name = "MCP Team", email = "team@example.com" },
+]
+maintainers = [
+    { name = "Lead Developer", email = "lead@example.com" },
+]
+keywords = [
+    "code-analysis",
+    "indexing",
+    "tree-sitter",
+    "mcp",
+    "language-server"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.dependencies]
+# Core dependencies
+fastapi = ">=0.104.0"
+uvicorn = { version = ">=0.24.0", extras = ["standard"] }
+pydantic = ">=2.0.0"
+pydantic-settings = ">=2.0.0"
+
+# Database
+sqlalchemy = ">=2.0.0"
+alembic = ">=1.12.0"
+asyncpg = ">=0.29.0"
+aiosqlite = ">=0.19.0"
+
+# Caching
+redis = ">=5.0.0"
+aiocache = { version = ">=0.12.0", extras = ["redis", "memcached"] }
+
+# Task queue
+celery = { version = ">=5.3.0", extras = ["redis"] }
+flower = ">=2.0.0"
+
+# Utilities
+httpx = ">=0.25.0"
+aiofiles = ">=23.0.0"
+python-multipart = ">=0.0.6"
+python-jose = { version = ">=3.3.0", extras = ["cryptography"] }
+passlib = { version = ">=1.7.4", extras = ["bcrypt"] }
+
+# Monitoring
+prometheus-client = ">=0.19.0"
+opentelemetry-api = ">=1.21.0"
+opentelemetry-sdk = ">=1.21.0"
+opentelemetry-instrumentation-fastapi = ">=0.43b0"
+
+# Development tools
+python-dotenv = ">=1.0.0"
+
+[project.optional-dependencies]
+# Development dependencies
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.7.0",
+    "pre-commit>=3.5.0",
+    "ipython>=8.17.0",
+    "rich>=13.7.0",
+]
+
+# Documentation
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.4.0",
+    "mkdocstrings[python]>=0.24.0",
+    "mkdocs-gen-files>=0.5.0",
+    "mkdocs-literate-nav>=0.6.0",
+]
+
+# Testing
+test = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "pytest-timeout>=2.2.0",
+    "pytest-xdist>=3.5.0",
+    "hypothesis>=6.92.0",
+    "faker>=20.0.0",
+    "factory-boy>=3.3.0",
+]
+
+# Machine Learning (optional)
+ml = [
+    "torch>=2.1.0",
+    "transformers>=4.36.0",
+    "sentence-transformers>=2.2.0",
+    "qdrant-client>=1.7.0",
+]
+
+# Type checking
+types = [
+    "types-redis",
+    "types-aiofiles",
+    "types-python-jose",
+    "types-passlib",
+    "types-python-multipart",
+]
+
+[project.urls]
+Homepage = "https://github.com/example/mcp-server"
+Documentation = "https://mcp-server.readthedocs.io"
+Repository = "https://github.com/example/mcp-server.git"
+Issues = "https://github.com/example/mcp-server/issues"
+Changelog = "https://github.com/example/mcp-server/blob/main/CHANGELOG.md"
+
+[project.scripts]
+mcp-server = "mcp_server.cli:main"
+mcp-migrate = "mcp_server.migrations:run"
+mcp-worker = "mcp_server.worker:start"
+
+[project.entry-points."mcp_server.plugins"]
+python = "mcp_server.plugins.python_plugin:Plugin"
+javascript = "mcp_server.plugins.js_plugin:Plugin"
+rust = "mcp_server.plugins.rust_plugin:Plugin"
+go = "mcp_server.plugins.go_plugin:Plugin"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/mcp_server/_version.py"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/tests",
+    "/docs",
+    "README.md",
+    "LICENSE",
+]
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.ruff]
+target-version = "py38"
+line-length = 100
+fix = true
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "C",    # flake8-comprehensions
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+]
+ignore = [
+    "E501", # line too long
+    "B008", # do not perform function calls in argument defaults
+    "C901", # too complex
+    "W191", # indentation contains tabs
+]
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.isort]
+known-third-party = ["fastapi", "pydantic", "starlette"]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+no_implicit_reexport = false
+namespace_packages = true
+check_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--ignore=docs",
+    "--ignore=build",
+    "--cov=mcp_server",
+    "--cov-branch",
+    "--cov-report=term-missing:skip-covered",
+    "--cov-report=html",
+    "--cov-report=xml",
+]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+
+[tool.coverage.run]
+source = ["src/mcp_server"]
+branch = true
+
+[tool.coverage.report]
+precision = 2
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if __name__ == .__main__.:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
+
+[tool.poetry]
+# Alternative Poetry configuration (if using Poetry)
+name = "mcp-server"
+version = "0.1.0"
+description = "MCP Server"
+authors = ["MCP Team"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+fastapi = "^0.104.0"
+uvicorn = "^0.24.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+black = "^23.0.0"
+ruff = "^0.1.0"

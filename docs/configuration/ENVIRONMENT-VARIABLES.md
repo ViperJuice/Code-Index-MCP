@@ -371,6 +371,48 @@ MCP_CACHE_SIZE=10000
 VOYAGEAI_API_KEY=your-api-key-here
 ```
 
+## Model Context Protocol (MCP) Configuration
+
+### `MCP_DISABLE_RESOURCES`
+- **Description**: Disable resource capabilities for Claude Code compatibility
+- **Type**: Boolean (`true`/`false`, `1`/`0`, `yes`/`no`)
+- **Default**: `false`
+- **Use Case**: Claude Code only supports Tools and Prompts, not Resources
+- **Example**: 
+  ```bash
+  export MCP_DISABLE_RESOURCES=true  # Required for Claude Code
+  ```
+
+### `MCP_DEBUG`
+- **Description**: Enable MCP protocol debugging output
+- **Type**: Boolean (`true`/`false`)
+- **Default**: `false`
+- **Example**: 
+  ```bash
+  export MCP_DEBUG=true
+  ```
+
+### `MCP_CLIENT_TYPE`
+- **Description**: Identifies the MCP client type for compatibility adjustments
+- **Type**: String
+- **Default**: None
+- **Valid Values**: `"claude-code"`, `"cursor"`, `"mcp-inspector"`
+- **Example**: 
+  ```bash
+  export MCP_CLIENT_TYPE="claude-code"
+  ```
+
+### `MCP_AUTO_INDEX`
+- **Description**: Automatically index codebase on startup if database is empty
+- **Type**: Boolean (`true`/`false`, `1`/`0`, `yes`/`no`)
+- **Default**: `false`
+- **Use Case**: Useful for first-time setup or container deployments
+- **Note**: Currently indexes up to 100 Python files to avoid slow startup
+- **Example**: 
+  ```bash
+  export MCP_AUTO_INDEX=true  # Auto-index on first run
+  ```
+
 ## Best Practices
 
 1. **Security**: Never commit sensitive API keys to version control

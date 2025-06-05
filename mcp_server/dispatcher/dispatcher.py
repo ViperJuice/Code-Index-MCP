@@ -7,21 +7,27 @@ from datetime import datetime
 from ..plugin_base import IPlugin, SymbolDef, SearchResult, Reference
 from .plugin_router import PluginRouter, FileTypeMatcher, PluginCapability
 from .result_aggregator import ResultAggregator, AggregatedResult, AggregationStats
+from ..plugin_system.models import PluginInstance, PluginConfig, PluginState
 
 logger = logging.getLogger(__name__)
 
 class Dispatcher:
     """Enhanced dispatcher with advanced routing and result aggregation capabilities."""
     
-    def __init__(self, plugins: list[IPlugin], enable_advanced_features: bool = True):
+    def __init__(self, plugins: list[IPlugin], storage=None, enable_advanced_features: bool = True, plugin_manager=None):
         """Initialize the dispatcher.
         
         Args:
             plugins: List of plugins to manage
+            storage: Storage backend for persisting index data
             enable_advanced_features: Whether to enable advanced routing and aggregation
+            plugin_manager: Plugin manager for lazy loading (optional)
         """
         self._plugins = plugins
         self._by_lang = {p.lang: p for p in plugins}
+        self._storage = storage
+        self._plugin_manager = plugin_manager  # For lazy loading
+        self._lazy_plugins_cache = {}  # Cache for lazy-loaded plugins
         
         # Cache for file hashes to avoid re-indexing unchanged files
         self._file_cache = {}  # path -> (mtime, size, content_hash)
@@ -104,6 +110,90 @@ class Dispatcher:
         """Get the result aggregator (if advanced features enabled)."""
         return self._aggregator if self._enable_advanced else None
 
+    def _get_or_load_plugin_for_file(self, path: Path) -> Optional[IPlugin]:
+        """Get or lazy-load a plugin for the given file path."""
+        # First try existing plugins
+        for p in self._plugins:
+            if p.supports(path):
+                return p
+        
+        # If no plugin found and we have a plugin manager, try lazy loading
+        if self._plugin_manager:
+            # Determine file language/type
+            file_extension = path.suffix.lower()
+            
+            # Map extensions to plugin names (simplified mapping)
+            extension_to_plugin = {
+                '.py': 'Python',
+                '.js': 'Js', 
+                '.ts': 'Js',
+                '.java': 'Jvm',
+                '.kt': 'Jvm',
+                '.go': 'Go',
+                '.rs': 'Rust',
+                '.c': 'C',
+                '.cpp': 'Cpp',
+                '.h': 'C',
+                '.cs': 'Csharp',
+                '.rb': 'Ruby',
+                '.php': 'Php',
+                '.dart': 'Dart',
+                '.yaml': 'Yaml',
+                '.yml': 'Yaml',
+                '.json': 'Json',
+                '.md': 'Markdown',
+                '.hs': 'Haskell',
+                '.scala': 'Scala',
+                '.lua': 'Lua',
+                '.toml': 'Toml',
+                '.csv': 'Csv',
+                '.html': 'Html Css',
+                '.css': 'Html Css',
+                '.sh': 'Bash',
+                '.bash': 'Bash',
+                '.asm': 'Asm',
+                '.s': 'Asm'
+            }
+            
+            plugin_name = extension_to_plugin.get(file_extension)
+            if plugin_name and plugin_name not in self._lazy_plugins_cache:
+                try:
+                    logger.info(f"Lazy loading plugin {plugin_name} for file {path}")
+                    
+                    # First check if plugin exists in instances (from discovery)
+                    if plugin_name not in self._plugin_manager._instances:
+                        # Discover plugins first if not already done
+                        discovered = self._plugin_manager._discovery.discover_plugins(
+                            self._plugin_manager.config.plugin_dirs
+                        )
+                        
+                        # Find and register the specific plugin we need
+                        for plugin_info in discovered:
+                            if plugin_info.name == plugin_name:
+                                plugin_class = self._plugin_manager._loader.load_plugin(plugin_info)
+                                self._plugin_manager._registry.register_plugin(plugin_info, plugin_class)
+                                
+                                instance = PluginInstance(
+                                    info=plugin_info,
+                                    config=PluginConfig(),
+                                    instance=None,
+                                    state=PluginState.DISCOVERED,
+                                    load_time=0
+                                )
+                                self._plugin_manager._instances[plugin_name] = instance
+                                break
+                    
+                    # Now initialize the specific plugin
+                    plugin_instance = self._plugin_manager.initialize_plugin(plugin_name, {})
+                    self._lazy_plugins_cache[plugin_name] = plugin_instance
+                    self._plugins.append(plugin_instance)
+                    self._by_lang[plugin_instance.lang] = plugin_instance
+                    return plugin_instance
+                except Exception as e:
+                    logger.warning(f"Failed to lazy load plugin {plugin_name}: {e}")
+        
+        return None
+
     def _match_plugin(self, path: Path) -> IPlugin:
         """Match a plugin for the given file path."""
         if self._enable_advanced and self._router:
@@ -113,10 +203,10 @@ class Dispatcher:
                 return route_result.plugin
             raise RuntimeError(f"No plugin found for {path}")
         else:
-            # Fallback to basic matching
-            for p in self._plugins:
-                if p.supports(path):
-                    return p
+            # Try to get or lazy-load a plugin
+            plugin = self._get_or_load_plugin_for_file(path)
+            if plugin:
+                return plugin
             raise RuntimeError(f"No plugin for {path}")
     
     def get_plugins_for_file(self, path: Path) -> List[Tuple[IPlugin, float]]:
@@ -357,6 +447,52 @@ class Dispatcher:
             start_time = time.time()
             logger.info(f"Indexing {path} with {plugin.lang} plugin")
             shard = plugin.indexFile(path, content)
+            
+            # Save to storage if available
+            if self._storage and shard:
+                try:
+                    # Get or create repository (assuming current directory)
+                    repo_path = str(Path.cwd())
+                    repo = self._storage.get_repository(repo_path)
+                    if not repo:
+                        repo_id = self._storage.create_repository(repo_path, Path(repo_path).name)
+                    else:
+                        repo_id = repo['id']
+                    
+                    # Store file
+                    try:
+                        relative_path = str(path.relative_to(Path.cwd()))
+                    except ValueError:
+                        # If path is not relative to cwd, use absolute path
+                        relative_path = str(path)
+                    file_id = self._storage.store_file(
+                        repository_id=repo_id,
+                        path=str(path),
+                        relative_path=relative_path,
+                        language=plugin.lang,
+                        size=len(content),
+                        hash=self._get_file_hash(content)
+                    )
+                    
+                    # Store symbols
+                    symbols = shard.get('symbols', [])
+                    for symbol in symbols:
+                        if isinstance(symbol, dict):
+                            self._storage.store_symbol(
+                                file_id=file_id,
+                                name=symbol.get('name', ''),
+                                kind=symbol.get('kind', 'unknown'),
+                                line_start=symbol.get('line_start', 0),
+                                line_end=symbol.get('line_end', 0),
+                                signature=symbol.get('signature'),
+                                documentation=symbol.get('documentation'),
+                                metadata=symbol.get('metadata', {})
+                            )
+                    
+                    logger.debug(f"Saved {len(symbols)} symbols for {path}")
+                    
+                except Exception as e:
+                    logger.error(f"Failed to save index data for {path}: {e}", exc_info=True)
             
             # Record performance if advanced features enabled
             if self._enable_advanced and self._router:

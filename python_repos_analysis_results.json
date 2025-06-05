@@ -1,0 +1,240 @@
+{
+  "django": {
+    "repository": "django",
+    "path": "/home/jenner/Code/Code-Index-MCP/test_repos/django",
+    "python_analysis": {
+      "total_files": 2839,
+      "processed_files": 5,
+      "symbols_found": 0,
+      "errors": [],
+      "sample_symbols": []
+    },
+    "yaml_analysis": {
+      "total_files": 15,
+      "processed_files": 3,
+      "structures_found": 41,
+      "errors": [],
+      "sample_structures": [
+        {
+          "file": ".readthedocs.yml",
+          "structure": "{'symbol': 'version', 'kind': 'key', 'signature': 'version: 2', 'line': 4, 'span': (4, 4), 'path': 'version', 'value_type': 'int', 'document': 0}"
+        },
+        {
+          "file": "FUNDING.yml",
+          "structure": "{'symbol': 'custom', 'kind': 'key', 'signature': 'custom: \"https://www.djangoproject.com/fundraising/\"', 'line': 1, 'span': (1, 1), 'path': 'custom', 'value_type': 'str', 'document': 0}"
+        },
+        {
+          "file": "schedules.yml",
+          "structure": "{'symbol': 'name', 'kind': 'key', 'signature': 'name: \"Schedule\"', 'line': 1, 'span': (1, 1), 'path': 'name', 'value_type': 'str', 'document': 0, 'schema': 'github-actions', 'workflow_name': 'Schedule'}"
+        }
+      ]
+    },
+    "json_analysis": {
+      "total_files": 54,
+      "processed_files": 3,
+      "structures_found": 96,
+      "errors": [],
+      "sample_structures": [
+        {
+          "file": "package.json",
+          "structure": "{'symbol': 'name', 'kind': 'property', 'signature': '\"name\": string', 'line': 2, 'span': (2, 2), 'docstring': None, 'scope': None, 'modifiers': [], 'metadata': {'json_path': '$', 'value_type': 'string', 'depth': 0, 'parent_type': 'object', 'schema_type': 'npm_package', 'required': True}}"
+        },
+        {
+          "file": "tenant.json",
+          "structure": "{'symbol': 'pk', 'kind': 'property', 'signature': '$[0].pk: integer', 'line': 3, 'span': (3, 3), 'docstring': None, 'scope': '$[0]', 'modifiers': [], 'metadata': {'json_path': '$[0]', 'value_type': 'integer', 'depth': 1, 'parent_type': 'object'}}"
+        },
+        {
+          "file": "staticfiles_v1.json",
+          "structure": "{'symbol': 'version', 'kind': 'property', 'signature': '\"version\": string', 'line': 2, 'span': (2, 2), 'docstring': None, 'scope': None, 'modifiers': [], 'metadata': {'json_path': '$', 'value_type': 'string', 'depth': 0, 'parent_type': 'object'}}"
+        }
+      ]
+    },
+    "toml_analysis": {
+      "total_files": 1,
+      "processed_files": 1,
+      "structures_found": 46,
+      "errors": [],
+      "sample_structures": [
+        {
+          "file": "pyproject.toml",
+          "structure": "{'symbol': 'build-system', 'kind': 'module', 'signature': '[build-system]', 'line': 1, 'span': (1, 1), 'docstring': None, 'scope': None, 'modifiers': [], 'metadata': {'is_table': True, 'path': ['build-system'], 'depth': 1}}"
+        }
+      ]
+    }
+  },
+  "requests": {
+    "repository": "requests",
+    "path": "/home/jenner/Code/Code-Index-MCP/test_repos/requests",
+    "python_analysis": {
+      "total_files": 36,
+      "processed_files": 5,
+      "symbols_found": 0,
+      "errors": [],
+      "sample_symbols": []
+    },
+    "yaml_analysis": {
+      "total_files": 9,
+      "processed_files": 3,
+      "structures_found": 57,
+      "errors": [],
+      "sample_structures": [
+        {
+          "file": "FUNDING.yml",
+          "structure": "{'symbol': 'custom', 'kind': 'array', 'signature': 'custom: [1 items]', 'line': 1, 'span': (1, 1), 'path': 'custom', 'value_type': 'list', 'document': 0, 'array_length': 1}"
+        },
+        {
+          "file": "dependabot.yml",
+          "structure": "{'symbol': 'version', 'kind': 'key', 'signature': 'version: 2', 'line': 1, 'span': (1, 1), 'path': 'version', 'value_type': 'int', 'document': 0}"
+        },
+        {
+          "file": "codeql-analysis.yml",
+          "structure": "{'symbol': 'name', 'kind': 'key', 'signature': 'name: \"CodeQL\"', 'line': 6, 'span': (6, 6), 'path': 'name', 'value_type': 'str', 'document': 0, 'schema': 'github-actions', 'workflow_name': 'CodeQL'}"
+        }
+      ]
+    },
+    "json_analysis": {
+      "total_files": 0,
+      "processed_files": 0,
+      "structures_found": 0,
+      "errors": [],
+      "sample_structures": []
+    },
+    "toml_analysis": {
+      "total_files": 1,
+      "processed_files": 1,
+      "structures_found": 16,
+      "errors": [],
+      "sample_structures": [
+        {
+          "file": "pyproject.toml",
+          "structure": "{'symbol': 'tool.isort', 'kind': 'module', 'signature': '[tool.isort]', 'line': 1, 'span': (1, 1), 'docstring': None, 'scope': None, 'modifiers': [], 'metadata': {'is_table': True, 'path': ['tool', 'isort'], 'depth': 2}}"
+        }
+      ]
+    }
+  },
+  "flask": {
+    "repository": "flask",
+    "path": "/home/jenner/Code/Code-Index-MCP/test_repos/flask",
+    "python_analysis": {
+      "total_files": 83,
+      "processed_files": 5,
+      "symbols_found": 0,
+      "errors": [],
+      "sample_symbols": []
+    },
+    "yaml_analysis": {
+      "total_files": 7,
+      "processed_files": 3,
+      "structures_found": 53,
+      "errors": [],
+      "sample_structures": [
+        {
+          "file": "config.yml",
+          "structure": "{'symbol': 'blank_issues_enabled', 'kind': 'key', 'signature': 'blank_issues_enabled: False', 'line': 1, 'span': (1, 1), 'path': 'blank_issues_enabled', 'value_type': 'bool', 'document': 0}"
+        },
+        {
+          "file": ".readthedocs.yaml",
+          "structure": "{'symbol': 'version', 'kind': 'key', 'signature': 'version: 2', 'line': 1, 'span': (1, 1), 'path': 'version', 'value_type': 'int', 'document': 0}"
+        },
+        {
+          "file": ".pre-commit-config.yaml",
+          "structure": "{'symbol': 'repos', 'kind': 'array', 'signature': 'repos: [3 items]', 'line': 1, 'span': (1, 1), 'path': 'repos', 'value_type': 'list', 'document': 0, 'array_length': 3}"
+        }
+      ]
+    },
+    "json_analysis": {
+      "total_files": 2,
+      "processed_files": 2,
+      "structures_found": 13,
+      "errors": [],
+      "sample_structures": [
+        {
+          "file": "config.json",
+          "structure": "{'symbol': 'TEST_KEY', 'kind': 'property', 'signature': '\"TEST_KEY\": string', 'line': 2, 'span': (2, 2), 'docstring': None, 'scope': None, 'modifiers': [], 'metadata': {'json_path': '$', 'value_type': 'string', 'depth': 0, 'parent_type': 'object'}}"
+        },
+        {
+          "file": "devcontainer.json",
+          "structure": "{'symbol': 'name', 'kind': 'property', 'signature': '\"name\": string', 'line': 2, 'span': (2, 2), 'docstring': None, 'scope': None, 'modifiers': [], 'metadata': {'json_path': '$', 'value_type': 'string', 'depth': 0, 'parent_type': 'object'}}"
+        }
+      ]
+    },
+    "toml_analysis": {
+      "total_files": 5,
+      "processed_files": 5,
+      "structures_found": 306,
+      "errors": [],
+      "sample_structures": [
+        {
+          "file": "pyproject.toml",
+          "structure": "{'symbol': 'project', 'kind': 'module', 'signature': '[project]', 'line': 1, 'span': (1, 1), 'docstring': None, 'scope': None, 'modifiers': [], 'metadata': {'is_table': True, 'path': ['project'], 'depth': 1}}"
+        },
+        {
+          "file": "pyproject.toml",
+          "structure": "{'symbol': 'project', 'kind': 'module', 'signature': '[project]', 'line': 1, 'span': (1, 1), 'docstring': None, 'scope': None, 'modifiers': [], 'metadata': {'is_table': True, 'path': ['project'], 'depth': 1}}"
+        },
+        {
+          "file": "pyproject.toml",
+          "structure": "{'symbol': 'project', 'kind': 'module', 'signature': '[project]', 'line': 1, 'span': (1, 1), 'docstring': None, 'scope': None, 'modifiers': [], 'metadata': {'is_table': True, 'path': ['project'], 'depth': 1}}"
+        },
+        {
+          "file": "pyproject.toml",
+          "structure": "{'symbol': 'project', 'kind': 'module', 'signature': '[project]', 'line': 1, 'span': (1, 1), 'docstring': None, 'scope': None, 'modifiers': [], 'metadata': {'is_table': True, 'path': ['project'], 'depth': 1}}"
+        },
+        {
+          "file": "config.toml",
+          "structure": "{'symbol': 'TEST_KEY', 'kind': 'variable', 'signature': 'TEST_KEY=\"foo\"', 'line': 1, 'span': (1, 1), 'docstring': None, 'scope': None, 'modifiers': [], 'metadata': {'raw_value': '\"foo\"'}}"
+        }
+      ]
+    }
+  },
+  "fastapi": {
+    "repository": "fastapi",
+    "path": "/home/jenner/Code/Code-Index-MCP/test_repos/fastapi",
+    "python_analysis": {
+      "total_files": 1130,
+      "processed_files": 5,
+      "symbols_found": 0,
+      "errors": [],
+      "sample_symbols": []
+    },
+    "yaml_analysis": {
+      "total_files": 63,
+      "processed_files": 3,
+      "structures_found": 66,
+      "errors": [],
+      "sample_structures": [
+        {
+          "file": "FUNDING.yml",
+          "structure": "{'symbol': 'github', 'kind': 'array', 'signature': 'github: [1 items]', 'line': 1, 'span': (1, 1), 'path': 'github', 'value_type': 'list', 'document': 0, 'array_length': 1}"
+        },
+        {
+          "file": "labeler.yml",
+          "structure": "{'symbol': 'docs', 'kind': 'array', 'signature': 'docs: [1 items]', 'line': 1, 'span': (1, 1), 'path': 'docs', 'value_type': 'list', 'document': 0, 'array_length': 1}"
+        },
+        {
+          "file": "dependabot.yml",
+          "structure": "{'symbol': 'version', 'kind': 'key', 'signature': 'version: 2', 'line': 1, 'span': (1, 1), 'path': 'version', 'value_type': 'int', 'document': 0}"
+        }
+      ]
+    },
+    "json_analysis": {
+      "total_files": 0,
+      "processed_files": 0,
+      "structures_found": 0,
+      "errors": [],
+      "sample_structures": []
+    },
+    "toml_analysis": {
+      "total_files": 1,
+      "processed_files": 1,
+      "structures_found": 97,
+      "errors": [],
+      "sample_structures": [
+        {
+          "file": "pyproject.toml",
+          "structure": "{'symbol': 'build-system', 'kind': 'module', 'signature': '[build-system]', 'line': 1, 'span': (1, 1), 'docstring': None, 'scope': None, 'modifiers': [], 'metadata': {'is_table': True, 'path': ['build-system'], 'depth': 1}}"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,898 @@
+[
+  {
+    "file_path": "/home/jenner/Code/Code-Index-MCP/test_repos/csharp_test/aspnetcore/src/Localization/Localization/test/Microsoft.Extensions.Localization.RootNamespace.Tests/Controllers/ValuesController.cs",
+    "file_size": 217,
+    "line_count": 8,
+    "symbol_count": 1,
+    "symbol_types": {
+      "class": 1
+    },
+    "interesting_features": [],
+    "framework_info": {},
+    "complexity_indicators": {
+      "symbols_per_line": 0.125,
+      "method_to_class_ratio": 0.0,
+      "property_usage": 0,
+      "has_multiple_namespaces": false
+    },
+    "top_symbols": [
+      {
+        "name": "ValuesController",
+        "type": "class",
+        "line": 6,
+        "signature": "public class ValuesController"
+      }
+    ]
+  },
+  {
+    "file_path": "/home/jenner/Code/Code-Index-MCP/test_repos/csharp_test/aspnetcore/src/Grpc/JsonTranscoding/test/testassets/Sandbox/Controllers/ValuesController.cs",
+    "file_size": 900,
+    "line_count": 43,
+    "symbol_count": 8,
+    "symbol_types": {
+      "function": 5,
+      "class": 1,
+      "field": 1,
+      "namespace": 1
+    },
+    "interesting_features": [
+      "Generic types (1 found)",
+      "Attributes usage (6 symbols)",
+      "Inheritance (1 classes)"
+    ],
+    "framework_info": {
+      "target_framework": "$(DefaultNetCoreTargetFramework)",
+      "project_type": null,
+      "framework_version": null
+    },
+    "complexity_indicators": {
+      "symbols_per_line": 0.18604651162790697,
+      "method_to_class_ratio": 5.0,
+      "property_usage": 0,
+      "has_multiple_namespaces": false
+    },
+    "top_symbols": [
+      {
+        "name": "Get",
+        "type": "function",
+        "line": 14,
+        "signature": "public IEnumerable<string> Get()",
+        "attributes": [
+          "controller",
+          "Route",
+          "HttpGet",
+          "ApiController"
+        ],
+        "generic": true
+      },
+      {
+        "name": "Get",
+        "type": "function",
+        "line": 21,
+        "signature": "public string Get(int id)",
+        "attributes": [
+          "HttpGet"
+        ]
+      },
+      {
+        "name": "Post",
+        "type": "function",
+        "line": 28,
+        "signature": "public void Post([FromBody]string value)",
+        "attributes": [
+          "FromBody",
+          "HttpPost",
+          "HttpGet"
+        ]
+      },
+      {
+        "name": "Put",
+        "type": "function",
+        "line": 34,
+        "signature": "public void Put(int id, [FromBody]string value)",
+        "attributes": [
+          "HttpPost",
+          "HttpPut",
+          "FromBody"
+        ]
+      },
+      {
+        "name": "Delete",
+        "type": "function",
+        "line": 40,
+        "signature": "public void Delete(int id)",
+        "attributes": [
+          "HttpPut",
+          "FromBody",
+          "HttpDelete"
+        ]
+      }
+    ]
+  },
+  {
+    "file_path": "/home/jenner/Code/Code-Index-MCP/test_repos/csharp_test/aspnetcore/src/Identity/samples/IdentitySample.DefaultUI/Controllers/HomeController.cs",
+    "file_size": 347,
+    "line_count": 15,
+    "symbol_count": 3,
+    "symbol_types": {
+      "function": 2,
+      "class": 1
+    },
+    "interesting_features": [
+      "Attributes usage (2 symbols)",
+      "Inheritance (1 classes)"
+    ],
+    "framework_info": {
+      "target_framework": "$(DefaultNetCoreTargetFramework)",
+      "project_type": null,
+      "framework_version": null
+    },
+    "complexity_indicators": {
+      "symbols_per_line": 0.2,
+      "method_to_class_ratio": 2.0,
+      "property_usage": 0,
+      "has_multiple_namespaces": false
+    },
+    "top_symbols": [
+      {
+        "name": "Index",
+        "type": "function",
+        "line": 11,
+        "signature": "public IActionResult Index()",
+        "attributes": [
+          "HttpGet"
+        ]
+      },
+      {
+        "name": "View",
+        "type": "function",
+        "line": 13,
+        "signature": "return View();",
+        "attributes": [
+          "HttpGet"
+        ]
+      },
+      {
+        "name": "HomeController",
+        "type": "class",
+        "line": 8,
+        "signature": "public class HomeController : Controller",
+        "inherits_from": [
+          "Controller"
+        ]
+      }
+    ]
+  },
+  {
+    "file_path": "/home/jenner/Code/Code-Index-MCP/test_repos/csharp_test/aspnetcore/src/Servers/Kestrel/samples/Http2SampleApp/TimingMiddleware.cs",
+    "file_size": 1552,
+    "line_count": 52,
+    "symbol_count": 12,
+    "symbol_types": {
+      "function": 6,
+      "class": 2,
+      "field": 3,
+      "namespace": 1
+    },
+    "interesting_features": [
+      "Async/await pattern (methods: Invoke, _next, _next)"
+    ],
+    "framework_info": {
+      "target_framework": "$(DefaultNetCoreTargetFramework)",
+      "project_type": null,
+      "framework_version": null
+    },
+    "complexity_indicators": {
+      "symbols_per_line": 0.23076923076923078,
+      "method_to_class_ratio": 3.0,
+      "property_usage": 0,
+      "has_multiple_namespaces": false
+    },
+    "top_symbols": [
+      {
+        "name": "TimingMiddleware",
+        "type": "function",
+        "line": 16,
+        "signature": "public TimingMiddleware(RequestDelegate next)"
+      },
+      {
+        "name": "Invoke",
+        "type": "function",
+        "line": 21,
+        "signature": "public async Task Invoke(HttpContext httpContext)"
+      },
+      {
+        "name": "Stopwatch",
+        "type": "function",
+        "line": 27,
+        "signature": "var stopWatch = new Stopwatch();"
+      },
+      {
+        "name": "_next",
+        "type": "function",
+        "line": 30,
+        "signature": "await _next(httpContext);"
+      },
+      {
+        "name": "_next",
+        "type": "function",
+        "line": 40,
+        "signature": "await _next(httpContext);"
+      }
+    ]
+  },
+  {
+    "file_path": "/home/jenner/Code/Code-Index-MCP/test_repos/csharp_test/aspnetcore/src/Servers/Kestrel/Core/src/Middleware/LoggingMultiplexedConnectionMiddleware.cs",
+    "file_size": 5124,
+    "line_count": 130,
+    "symbol_count": 42,
+    "symbol_types": {
+      "function": 19,
+      "class": 3,
+      "property": 7,
+      "field": 13
+    },
+    "interesting_features": [
+      "Async/await pattern (methods: OnConnectionAsync, AcceptAsync, ConnectAsync)",
+      "Generic types (4 found)",
+      "LINQ expressions (9 symbols)",
+      "Inheritance (2 classes)"
+    ],
+    "framework_info": {
+      "target_framework": "$(DefaultNetCoreTargetFramework)",
+      "project_type": null,
+      "framework_version": null
+    },
+    "complexity_indicators": {
+      "symbols_per_line": 0.3230769230769231,
+      "method_to_class_ratio": 6.333333333333333,
+      "property_usage": 7,
+      "has_multiple_namespaces": false
+    },
+    "top_symbols": [
+      {
+        "name": "LoggingMultiplexedConnectionMiddleware",
+        "type": "function",
+        "line": 17,
+        "signature": "public LoggingMultiplexedConnectionMiddleware(MultiplexedConnectionDelegate multiplexedNext, ILogger..."
+      },
+      {
+        "name": "ArgumentNullException",
+        "type": "function",
+        "line": 19,
+        "signature": "_multiplexedNext = multiplexedNext ?? throw new ArgumentNullException(nameof(multiplexedNext));"
+      },
+      {
+        "name": "ArgumentNullException",
+        "type": "function",
+        "line": 20,
+        "signature": "_logger = logger ?? throw new ArgumentNullException(nameof(logger));"
+      },
+      {
+        "name": "OnConnectionAsync",
+        "type": "function",
+        "line": 23,
+        "signature": "public Task OnConnectionAsync(MultiplexedConnectionContext context)"
+      },
+      {
+        "name": "_multiplexedNext",
+        "type": "function",
+        "line": 25,
+        "signature": "return _multiplexedNext(new LoggingMultiplexedConnectionContext(context, _logger));"
+      }
+    ]
+  },
+  {
+    "file_path": "/home/jenner/Code/Code-Index-MCP/test_repos/csharp_test/aspnetcore/src/DefaultBuilder/samples/SampleApp/Startup.cs",
+    "file_size": 2463,
+    "line_count": 60,
+    "symbol_count": 10,
+    "symbol_types": {
+      "function": 5,
+      "class": 1,
+      "field": 3,
+      "namespace": 1
+    },
+    "interesting_features": [
+      "Async/await pattern (methods: ShowConfig, ShowConfig, ShowConfig)",
+      "Attributes usage (2 symbols)"
+    ],
+    "framework_info": {
+      "target_framework": "$(DefaultNetCoreTargetFramework)",
+      "project_type": null,
+      "framework_version": null
+    },
+    "complexity_indicators": {
+      "symbols_per_line": 0.16666666666666666,
+      "method_to_class_ratio": 5.0,
+      "property_usage": 0,
+      "has_multiple_namespaces": false
+    },
+    "top_symbols": [
+      {
+        "name": "ConfigureServices",
+        "type": "function",
+        "line": 10,
+        "signature": "public void ConfigureServices(IServiceCollection services)"
+      },
+      {
+        "name": "Configure",
+        "type": "function",
+        "line": 15,
+        "signature": "public void Configure(IApplicationBuilder app, IConfiguration config)"
+      },
+      {
+        "name": "ShowConfig",
+        "type": "function",
+        "line": 47,
+        "signature": "await ShowConfig(context.Response, config);",
+        "attributes": [
+          "key"
+        ]
+      },
+      {
+        "name": "ShowConfig",
+        "type": "function",
+        "line": 52,
+        "signature": "private static async Task ShowConfig(HttpResponse response, IConfiguration config)"
+      },
+      {
+        "name": "ShowConfig",
+        "type": "function",
+        "line": 57,
+        "signature": "await ShowConfig(response, pair);"
+      }
+    ]
+  },
+  {
+    "file_path": "/home/jenner/Code/Code-Index-MCP/test_repos/csharp_test/Umbraco-CMS/templates/UmbracoExtension/Controllers/UmbracoExtensionApiController.cs",
+    "file_size": 1652,
+    "line_count": 49,
+    "symbol_count": 7,
+    "symbol_types": {
+      "function": 4,
+      "class": 1,
+      "field": 2
+    },
+    "interesting_features": [
+      "Attributes usage (7 symbols)",
+      "LINQ expressions (2 symbols)",
+      "Inheritance (1 classes)"
+    ],
+    "framework_info": {
+      "target_framework": "net9.0",
+      "project_type": null,
+      "framework_version": null
+    },
+    "complexity_indicators": {
+      "symbols_per_line": 0.14285714285714285,
+      "method_to_class_ratio": 4.0,
+      "property_usage": 0,
+      "has_multiple_namespaces": false
+    },
+    "top_symbols": [
+      {
+        "name": "UmbracoExtensionApiController",
+        "type": "function",
+        "line": 18,
+        "signature": "public UmbracoExtensionApiController(IBackOfficeSecurityAccessor backOfficeSecurityAccessor)",
+        "attributes": [
+          "ApiVersion",
+          "ApiExplorerSettings"
+        ]
+      },
+      {
+        "name": "Ping",
+        "type": "function",
+        "line": 26,
+        "signature": "public string Ping() => \"Pong\";",
+        "attributes": [
+          "HttpGet"
+        ]
+      },
+      {
+        "name": "WhatsTheTimeMrWolf",
+        "type": "function",
+        "line": 31,
+        "signature": "public DateTime WhatsTheTimeMrWolf() => DateTime.Now;",
+        "attributes": [
+          "HttpGet"
+        ]
+      },
+      {
+        "name": "WhatsMyName",
+        "type": "function",
+        "line": 35,
+        "signature": "public string WhatsMyName()",
+        "attributes": [
+          "HttpGet"
+        ]
+      },
+      {
+        "name": "UmbracoExtensionApiController",
+        "type": "class",
+        "line": 13,
+        "signature": "public class UmbracoExtensionApiController : UmbracoExtensionApiControllerBase",
+        "attributes": [
+          "ApiVersion",
+          "ApiExplorerSettings"
+        ],
+        "inherits_from": [
+          "UmbracoExtensionApiControllerBase"
+        ]
+      }
+    ]
+  },
+  {
+    "file_path": "/home/jenner/Code/Code-Index-MCP/test_repos/csharp_test/Umbraco-CMS/src/Umbraco.Cms.Api.Delivery/Controllers/Content/ByIdContentApiController.cs",
+    "file_size": 2173,
+    "line_count": 57,
+    "symbol_count": 11,
+    "symbol_types": {
+      "function": 8,
+      "class": 1,
+      "field": 2
+    },
+    "interesting_features": [
+      "Async/await pattern (methods: ByIdV20, HandleRequest, HandleRequest)",
+      "Generic types (2 found)",
+      "Attributes usage (6 symbols)",
+      "LINQ expressions (1 symbols)",
+      "Inheritance (1 classes)"
+    ],
+    "framework_info": {},
+    "complexity_indicators": {
+      "symbols_per_line": 0.19298245614035087,
+      "method_to_class_ratio": 8.0,
+      "property_usage": 0,
+      "has_multiple_namespaces": false
+    },
+    "top_symbols": [
+      {
+        "name": "ByIdContentApiController",
+        "type": "function",
+        "line": 15,
+        "signature": "public ByIdContentApiController(",
+        "attributes": [
+          "ApiVersion"
+        ]
+      },
+      {
+        "name": "ByIdV20",
+        "type": "function",
+        "line": 33,
+        "signature": "public async Task<IActionResult> ByIdV20(Guid id)",
+        "attributes": [
+          "ProducesResponseType",
+          "HttpGet",
+          "MapToApiVersion"
+        ],
+        "generic": true
+      },
+      {
+        "name": "HandleRequest",
+        "type": "function",
+        "line": 34,
+        "signature": "=> await HandleRequest(id);",
+        "attributes": [
+          "ProducesResponseType",
+          "HttpGet",
+          "MapToApiVersion"
+        ]
+      },
+      {
+        "name": "HandleRequest",
+        "type": "function",
+        "line": 36,
+        "signature": "private async Task<IActionResult> HandleRequest(Guid id)",
+        "attributes": [
+          "ProducesResponseType",
+          "HttpGet",
+          "MapToApiVersion"
+        ],
+        "generic": true
+      },
+      {
+        "name": "NotFound",
+        "type": "function",
+        "line": 42,
+        "signature": "return NotFound();"
+      }
+    ]
+  },
+  {
+    "file_path": "/home/jenner/Code/Code-Index-MCP/test_repos/csharp_test/Umbraco-CMS/tests/Umbraco.Tests.UnitTests/TestHelpers/TestNuCacheContentService.cs",
+    "file_size": 4962,
+    "line_count": 109,
+    "symbol_count": 35,
+    "symbol_types": {
+      "function": 31,
+      "class": 1,
+      "property": 3
+    },
+    "interesting_features": [
+      "Generic types (10 found)",
+      "LINQ expressions (18 symbols)",
+      "Inheritance (1 classes)"
+    ],
+    "framework_info": {},
+    "complexity_indicators": {
+      "symbols_per_line": 0.3211009174311927,
+      "method_to_class_ratio": 31.0,
+      "property_usage": 3,
+      "has_multiple_namespaces": false
+    },
+    "top_symbols": [
+      {
+        "name": "TestNuCacheContentService",
+        "type": "function",
+        "line": 13,
+        "signature": "//     public TestNuCacheContentService(params ContentNodeKit[] kits)"
+      },
+      {
+        "name": "TestNuCacheContentService",
+        "type": "function",
+        "line": 18,
+        "signature": "//     public TestNuCacheContentService("
+      },
+      {
+        "name": "NoopPublishedModelFactory",
+        "type": "function",
+        "line": 26,
+        "signature": "//     private IPublishedModelFactory PublishedModelFactory { get; } = new NoopPublishedModelFactory..."
+      },
+      {
+        "name": "GetContentSource",
+        "type": "function",
+        "line": 34,
+        "signature": "//     public ContentNodeKit GetContentSource(int id)"
+      },
+      {
+        "name": "GetAllContentSources",
+        "type": "function",
+        "line": 37,
+        "signature": "//     public IEnumerable<ContentNodeKit> GetAllContentSources()",
+        "generic": true
+      }
+    ]
+  },
+  {
+    "file_path": "/home/jenner/Code/Code-Index-MCP/test_repos/csharp_test/Umbraco-CMS/tests/Umbraco.Tests.Integration/Testing/TestConflictingRouteService.cs",
+    "file_size": 293,
+    "line_count": 12,
+    "symbol_count": 3,
+    "symbol_types": {
+      "function": 1,
+      "class": 1,
+      "field": 1
+    },
+    "interesting_features": [
+      "Inheritance (1 classes)"
+    ],
+    "framework_info": {},
+    "complexity_indicators": {
+      "symbols_per_line": 0.25,
+      "method_to_class_ratio": 1.0,
+      "property_usage": 0,
+      "has_multiple_namespaces": false
+    },
+    "top_symbols": [
+      {
+        "name": "HasConflictingRoutes",
+        "type": "function",
+        "line": 7,
+        "signature": "public bool HasConflictingRoutes(out string controllername)"
+      },
+      {
+        "name": "TestConflictingRouteService",
+        "type": "class",
+        "line": 5,
+        "signature": "public class TestConflictingRouteService : IConflictingRouteService",
+        "inherits_from": [
+          "IConflictingRouteService"
+        ]
+      },
+      {
+        "name": "false",
+        "type": "field",
+        "line": 10,
+        "signature": "return false;"
+      }
+    ]
+  },
+  {
+    "file_path": "/home/jenner/Code/Code-Index-MCP/test_repos/csharp_test/OrchardCore/src/OrchardCore/OrchardCore.Abstractions/Modules/Module.cs",
+    "file_size": 5707,
+    "line_count": 157,
+    "symbol_count": 28,
+    "symbol_types": {
+      "function": 9,
+      "class": 1,
+      "property": 7,
+      "field": 11
+    },
+    "interesting_features": [
+      "Generic types (5 found)",
+      "Attributes usage (2 symbols)",
+      "LINQ expressions (1 symbols)"
+    ],
+    "framework_info": {},
+    "complexity_indicators": {
+      "symbols_per_line": 0.17834394904458598,
+      "method_to_class_ratio": 9.0,
+      "property_usage": 7,
+      "has_multiple_namespaces": false
+    },
+    "top_symbols": [
+      {
+        "name": "Module",
+        "type": "function",
+        "line": 25,
+        "signature": "public Module(string assemblyName, bool isApplication = false)"
+      },
+      {
+        "name": "AssemblyName",
+        "type": "function",
+        "line": 29,
+        "signature": "Assembly = Assembly.Load(new AssemblyName(assemblyName));"
+      },
+      {
+        "name": "Asset",
+        "type": "function",
+        "line": 32,
+        "signature": ".Select(a => new Asset(a.Asset)).ToArray();"
+      },
+      {
+        "name": "ModuleAttribute",
+        "type": "function",
+        "line": 43,
+        "signature": "?? new ModuleAttribute() { Name = assemblyName };"
+      },
+      {
+        "name": "ModuleAttribute",
+        "type": "function",
+        "line": 99,
+        "signature": "ModuleInfo = new ModuleAttribute();"
+      }
+    ]
+  },
+  {
+    "file_path": "/home/jenner/Code/Code-Index-MCP/test_repos/csharp_test/OrchardCore/src/OrchardCore/OrchardCore.Notifications.Core/Services/CacheNotificationEventsHandler.cs",
+    "file_size": 638,
+    "line_count": 24,
+    "symbol_count": 4,
+    "symbol_types": {
+      "function": 2,
+      "class": 1,
+      "field": 1
+    },
+    "interesting_features": [
+      "Async/await pattern (methods: SentAsync)",
+      "Inheritance (1 classes)"
+    ],
+    "framework_info": {},
+    "complexity_indicators": {
+      "symbols_per_line": 0.16666666666666666,
+      "method_to_class_ratio": 2.0,
+      "property_usage": 0,
+      "has_multiple_namespaces": false
+    },
+    "top_symbols": [
+      {
+        "name": "CacheNotificationEventsHandler",
+        "type": "function",
+        "line": 10,
+        "signature": "public CacheNotificationEventsHandler(ITagCache tagCache)"
+      },
+      {
+        "name": "SentAsync",
+        "type": "function",
+        "line": 15,
+        "signature": "public override Task SentAsync(NotificationContext context)"
+      },
+      {
+        "name": "CacheNotificationEventsHandler",
+        "type": "class",
+        "line": 6,
+        "signature": "public sealed class CacheNotificationEventsHandler : NotificationEventsHandler",
+        "inherits_from": [
+          "NotificationEventsHandler"
+        ]
+      },
+      {
+        "name": "_tagCache",
+        "type": "field",
+        "line": 8,
+        "signature": "private readonly ITagCache _tagCache;"
+      }
+    ]
+  },
+  {
+    "file_path": "/home/jenner/Code/Code-Index-MCP/test_repos/csharp_test/OrchardCore/src/OrchardCore/OrchardCore.Notifications.Core/Services/NotificationEventsHandler.cs",
+    "file_size": 849,
+    "line_count": 18,
+    "symbol_count": 8,
+    "symbol_types": {
+      "function": 7,
+      "class": 1
+    },
+    "interesting_features": [
+      "Async/await pattern (methods: CreatingAsync, CreatedAsync, SendingAsync)",
+      "LINQ expressions (7 symbols)",
+      "Inheritance (1 classes)"
+    ],
+    "framework_info": {},
+    "complexity_indicators": {
+      "symbols_per_line": 0.4444444444444444,
+      "method_to_class_ratio": 7.0,
+      "property_usage": 0,
+      "has_multiple_namespaces": false
+    },
+    "top_symbols": [
+      {
+        "name": "CreatingAsync",
+        "type": "function",
+        "line": 5,
+        "signature": "public virtual Task CreatingAsync(NotificationContext context) => Task.CompletedTask;"
+      },
+      {
+        "name": "CreatedAsync",
+        "type": "function",
+        "line": 7,
+        "signature": "public virtual Task CreatedAsync(NotificationContext context) => Task.CompletedTask;"
+      },
+      {
+        "name": "SendingAsync",
+        "type": "function",
+        "line": 9,
+        "signature": "public virtual Task SendingAsync(INotificationMethodProvider provider, NotificationContext context) ..."
+      },
+      {
+        "name": "SentAsync",
+        "type": "function",
+        "line": 11,
+        "signature": "public virtual Task SentAsync(INotificationMethodProvider provider, NotificationContext context) => ..."
+      },
+      {
+        "name": "FailedAsync",
+        "type": "function",
+        "line": 13,
+        "signature": "public virtual Task FailedAsync(INotificationMethodProvider provider, NotificationContext context) =..."
+      }
+    ]
+  },
+  {
+    "file_path": "/home/jenner/Code/Code-Index-MCP/test_repos/csharp_test/abp/modules/feature-management/src/Volo.Abp.FeatureManagement.Application.Contracts/Volo/Abp/FeatureManagement/IFeatureAppService.cs",
+    "file_size": 467,
+    "line_count": 14,
+    "symbol_count": 4,
+    "symbol_types": {
+      "function": 3,
+      "class": 1
+    },
+    "interesting_features": [
+      "Async/await pattern (methods: GetAsync, UpdateAsync, DeleteAsync)",
+      "Generic types (1 found)",
+      "Attributes usage (3 symbols)",
+      "Inheritance (1 classes)"
+    ],
+    "framework_info": {},
+    "complexity_indicators": {
+      "symbols_per_line": 0.2857142857142857,
+      "method_to_class_ratio": 3.0,
+      "property_usage": 0,
+      "has_multiple_namespaces": false
+    },
+    "top_symbols": [
+      {
+        "name": "GetAsync",
+        "type": "function",
+        "line": 9,
+        "signature": "Task<GetFeatureListResultDto> GetAsync([NotNull] string providerName, string providerKey);",
+        "attributes": [
+          "NotNull"
+        ],
+        "generic": true
+      },
+      {
+        "name": "UpdateAsync",
+        "type": "function",
+        "line": 11,
+        "signature": "Task UpdateAsync([NotNull] string providerName, string providerKey, UpdateFeaturesDto input);",
+        "attributes": [
+          "NotNull"
+        ]
+      },
+      {
+        "name": "DeleteAsync",
+        "type": "function",
+        "line": 13,
+        "signature": "Task DeleteAsync([NotNull] string providerName, string providerKey);",
+        "attributes": [
+          "NotNull"
+        ]
+      },
+      {
+        "name": "IFeatureAppService",
+        "type": "class",
+        "line": 7,
+        "signature": "public interface IFeatureAppService : IApplicationService",
+        "inherits_from": [
+          "IApplicationService"
+        ]
+      }
+    ]
+  },
+  {
+    "file_path": "/home/jenner/Code/Code-Index-MCP/test_repos/csharp_test/abp/modules/feature-management/src/Volo.Abp.FeatureManagement.Application/Volo/Abp/FeatureManagement/FeatureAppService.cs",
+    "file_size": 5191,
+    "line_count": 142,
+    "symbol_count": 21,
+    "symbol_types": {
+      "function": 11,
+      "class": 1,
+      "property": 3,
+      "field": 5,
+      "import": 1
+    },
+    "interesting_features": [
+      "Async/await pattern (methods: GetAsync, CheckProviderPolicy, UpdateAsync)",
+      "Generic types (2 found)",
+      "Attributes usage (10 symbols)",
+      "Inheritance (1 classes)"
+    ],
+    "framework_info": {
+      "target_framework": "net9.0",
+      "project_type": null,
+      "framework_version": null
+    },
+    "complexity_indicators": {
+      "symbols_per_line": 0.14788732394366197,
+      "method_to_class_ratio": 11.0,
+      "property_usage": 3,
+      "has_multiple_namespaces": false
+    },
+    "top_symbols": [
+      {
+        "name": "FeatureAppService",
+        "type": "function",
+        "line": 19,
+        "signature": "public FeatureAppService(IFeatureManager featureManager,",
+        "attributes": [
+          "Authorize"
+        ]
+      },
+      {
+        "name": "GetAsync",
+        "type": "function",
+        "line": 28,
+        "signature": "public virtual async Task<GetFeatureListResultDto> GetAsync([NotNull] string providerName, string pr...",
+        "attributes": [
+          "NotNull"
+        ],
+        "generic": true
+      },
+      {
+        "name": "CheckProviderPolicy",
+        "type": "function",
+        "line": 30,
+        "signature": "await CheckProviderPolicy(providerName, providerKey);",
+        "attributes": [
+          "NotNull"
+        ]
+      },
+      {
+        "name": "CreateFeatureGroupDto",
+        "type": "function",
+        "line": 66,
+        "signature": "private FeatureGroupDto CreateFeatureGroupDto(FeatureGroupDefinition groupDefinition)"
+      },
+      {
+        "name": "CreateFeatureDto",
+        "type": "function",
+        "line": 76,
+        "signature": "private FeatureDto CreateFeatureDto(FeatureNameValueWithGrantedProvider featureNameValueWithGrantedP..."
+      }
+    ]
+  }
+]

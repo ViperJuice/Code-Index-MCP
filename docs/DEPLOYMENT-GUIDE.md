@@ -1,246 +1,202 @@
-# Code-Index-MCP Deployment Guide
+# Production Deployment Guide
 
-This guide covers deployment strategies for Code-Index-MCP across different environments, from local development to production-scale deployments.
+## 🚀 Production Deployment Overview
 
-## Table of Contents
+The MCP server requires Docker for production deployment due to complex dependencies including tree-sitter language parsers, SQLite with FTS5, and repository management capabilities.
 
-1. [Prerequisites](#prerequisites)
-2. [Local Development](#local-development)
-3. [Docker Deployment](#docker-deployment)
-4. [Production Deployment](#production-deployment)
-5. [Scaling Considerations](#scaling-considerations)
-6. [Monitoring and Observability](#monitoring-and-observability)
-7. [Security Best Practices](#security-best-practices)
-8. [Troubleshooting](#troubleshooting)
+## ⚠️ Why Docker is Required
 
-## Prerequisites
+**Complex Dependencies:**
+- Tree-sitter language parsers (C/C++ native extensions)
+- SQLite with FTS5 full-text search support
+- Git and file system monitoring tools
+- Platform-specific compilation requirements
 
-### System Requirements
+**Repository Management:**
+- External repository indexing and cleanup
+- File system monitoring for changes
+- Git repository operations
+- Cross-language pattern discovery
 
-- **Python**: 3.10 or higher
-- **Node.js**: 16.x or higher (for tree-sitter bindings)
-- **Redis**: 7.0 or higher (optional, for caching)
-- **PostgreSQL**: 14 or higher (optional, for persistent storage)
-- **Memory**: Minimum 2GB RAM, 8GB+ recommended for large codebases
-- **Storage**: SSD recommended, space depends on codebase size
+## 🐳 Production vs Development Containers
 
-### Required Dependencies
+### **Development Container (DO NOT use in production)**
+- Contains debugging tools and utilities
+- Runs as root user (security risk)
+- Larger image size (~800MB+)
+- Debug logging enabled
+- Development environment variables
 
-```bash
-# System packages
-apt-get update && apt-get install -y \
-    build-essential \
-    python3-dev \
-    git \
-    curl \
-    libssl-dev \
-    libffi-dev
+### **Production Container (Use this)**
+- Multi-stage build with minimal runtime
+- Non-root user for security
+- Optimized image size (~400MB)
+- Production logging configuration
+- Security hardening
 
-# Python packages (from requirements.txt)
-pip install -r requirements.txt
-```
+## 📋 Production Deployment Steps
 
-## Local Development
+### **1. Environment Configuration**
 
-### 1. Environment Setup
+Create `.env.production`:
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/code-index-mcp.git
-cd code-index-mcp
+# Core Configuration
+MCP_ENVIRONMENT=production
+PYTHONUNBUFFERED=1
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-npm install  # For tree-sitter grammars
-
-# Install development dependencies
-pip install -e ".[dev]"
-```
-
-### 2. Configuration
-
-Create a `.env` file for local development:
-
-```env
-# Server Configuration
-MCP_HOST=0.0.0.0
-MCP_PORT=8000
-MCP_WORKERS=4
-
-# Database Configuration
-DATABASE_URL=sqlite:///./code_index.db
-# For PostgreSQL: postgresql://user:password@localhost/codeindex
-
-# Redis Configuration (optional)
-REDIS_URL=redis://localhost:6379/0
-
-# Indexing Configuration
-MAX_FILE_SIZE=10485760  # 10MB
-SUPPORTED_EXTENSIONS=.py,.js,.ts,.jsx,.tsx,.c,.cpp,.h,.hpp,.dart,.html,.css
-IGNORE_PATTERNS=node_modules,__pycache__,.git,dist,build
-
-# Logging
-LOG_LEVEL=INFO
-LOG_FORMAT=json
+# Repository Management
+ENABLE_REPOSITORY_MANAGEMENT=true
+REPOSITORY_AUTO_CLEANUP=true
+DEFAULT_REPOSITORY_TTL_DAYS=30
 
 # Security
-SECRET_KEY=your-secret-key-here
-CORS_ORIGINS=["http://localhost:3000"]
+DB_PASSWORD=your_secure_db_password_here
+REDIS_PASSWORD=your_secure_redis_password_here
+GRAFANA_ADMIN_PASSWORD=your_secure_grafana_password_here
+
+# Optional: Database Configuration
+# DATABASE_URL=postgresql://user:pass@localhost/dbname
+# REDIS_URL=redis://localhost:6379/0
+
+# Optional: Monitoring
+# SENTRY_DSN=https://your-sentry-dsn
+# PROMETHEUS_ENABLED=true
 ```
 
-### 3. Running Locally
+### **2. Production Build**
 
 ```bash
-# Start the MCP server
-python -m mcp_server.gateway
+# Build production container
+docker build -f Dockerfile.production -t mcp-server:production .
 
-# Or with uvicorn for development with auto-reload
-uvicorn mcp_server.gateway:app --reload --host 0.0.0.0 --port 8000
-
-# Start the file watcher (in another terminal)
-python -m mcp_server.watcher /path/to/your/codebase
+# Or use docker-compose
+docker-compose -f docker-compose.production.yml build
 ```
 
-### 4. Development Tools
+### **3. Production Startup**
 
 ```bash
-# Run tests
-pytest tests/
-
-# Run linting
-flake8 mcp_server/
-black mcp_server/ --check
-
-# Run type checking
-mypy mcp_server/
-
-# Generate API documentation
-python -m mcp_server.gateway --generate-openapi > openapi.json
-```
-
-## Docker Deployment
-
-### 1. Dockerfile
-
-Create a `Dockerfile`:
-
-```dockerfile
-FROM python:3.11-slim
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    git \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Node.js for tree-sitter
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get install -y nodejs
-
-# Set working directory
-WORKDIR /app
-
-# Copy dependency files
-COPY requirements.txt package.json package-lock.json ./
-
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Install Node dependencies
-RUN npm ci
-
-# Copy application code
-COPY . .
-
-# Create non-root user
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
-USER appuser
-
-# Expose port
-EXPOSE 8000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-# Run the application
-CMD ["python", "-m", "mcp_server.gateway"]
-```
-
-### 2. Docker Compose
-
-Create `docker-compose.yml`:
-
-```yaml
-version: '3.8'
-
-services:
-  mcp-server:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql://postgres:password@db:5432/codeindex
-      - REDIS_URL=redis://redis:6379/0
-    volumes:
-      - ./codebase:/codebase:ro
-      - index-data:/app/data
-    depends_on:
-      - db
-      - redis
-    restart: unless-stopped
-
-  db:
-    image: postgres:15
-    environment:
-      - POSTGRES_DB=codeindex
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    volumes:
-      - redis-data:/data
-    restart: unless-stopped
-
-  watcher:
-    build: .
-    command: python -m mcp_server.watcher /codebase
-    volumes:
-      - ./codebase:/codebase:ro
-    depends_on:
-      - mcp-server
-    restart: unless-stopped
-
-volumes:
-  postgres-data:
-  redis-data:
-  index-data:
-```
-
-### 3. Running with Docker
-
-```bash
-# Build and start services
-docker-compose up -d
+# Start all services
+docker-compose -f docker-compose.production.yml up -d
 
 # View logs
-docker-compose logs -f mcp-server
+docker-compose -f docker-compose.production.yml logs -f mcp-server
 
-# Scale workers
-docker-compose up -d --scale mcp-server=3
-
-# Stop services
-docker-compose down
+# Health check
+curl http://localhost:8000/health
 ```
+
+## 🏗️ Production Architecture
+
+The production setup includes:
+
+### **Core Services**
+- **MCP Server**: Main application with repository management
+- **PostgreSQL**: Primary database (optional, can use SQLite)
+- **Redis**: Caching and session storage (optional)
+- **Nginx**: Reverse proxy and SSL termination
+
+### **Monitoring Stack**
+- **Prometheus**: Metrics collection
+- **Grafana**: Dashboards and visualization
+- **Loki**: Log aggregation (optional)
+
+### **Security Features**
+- Non-root container execution
+- Health checks and automatic restart
+- SSL/TLS termination
+- Network isolation
+
+## 📊 Resource Requirements
+
+### **Minimum Requirements**
+- **CPU**: 2 cores
+- **Memory**: 4GB RAM
+- **Storage**: 20GB SSD
+- **Network**: 1Gbps
+
+### **Recommended for Production**
+- **CPU**: 4+ cores
+- **Memory**: 8GB+ RAM
+- **Storage**: 100GB+ SSD
+- **Network**: 10Gbps
+
+### **Scaling Considerations**
+- Each repository adds ~50-200MB to database
+- Vector embeddings require ~1KB per code symbol
+- SQLite handles up to 100GB databases efficiently
+- Consider PostgreSQL for >50GB or high concurrency
+
+## 🔐 Security Configuration
+
+### **Container Security**
+```dockerfile
+# Non-root user
+USER mcp
+
+# Read-only root filesystem
+# Minimal attack surface
+# No shell access in production
+```
+
+### **Network Security**
+```yaml
+# Internal network isolation
+networks:
+  mcp-network:
+    driver: bridge
+
+# Firewall configuration (recommended)
+# - Allow 80/443 (HTTP/HTTPS)
+# - Block direct database access
+# - Restrict monitoring ports
+```
+
+### **Data Security**
+- Database encryption at rest
+- TLS encryption in transit
+- Secure password policies
+- Regular security updates
+
+## 🔄 Repository Management in Production
+
+### **External Repository Workflow**
+
+```bash
+# 1. Add reference repository via MCP
+{
+  "tool": "add_reference_repository",
+  "arguments": {
+    "path": "/app/repositories/golang-examples",
+    "name": "Go Reference Code",
+    "language": "go",
+    "purpose": "python_to_go_translation",
+    "days_to_keep": 30
+  }
+}
+
+# 2. Repositories are automatically cleaned after TTL
+# 3. Vector embeddings allow cross-language pattern discovery
+```
+
+### **Storage Layout**
+```
+/app/
+├── data/                     # SQLite database
+│   └── code_index.db        # All repositories in one database
+├── repositories/            # External repository storage
+│   ├── golang-examples/    # Cloned reference repositories
+│   └── rust-patterns/      # Temporary translation references
+├── uploads/                 # File upload staging
+└── logs/                   # Application logs
+```
+
+### **Cleanup Automation**
+- Automatic cleanup based on TTL
+- Metadata-driven repository removal
+- Vector embedding cleanup
+- Storage optimization
 
 ## Production Deployment
 

@@ -1,0 +1,210 @@
+#!/bin/bash
+
+# MCP Server Auto-Launcher
+# Automatically detects and launches the best available MCP server option:
+# 1. Docker container (preferred)
+# 2. Local Python installation (fallback)
+
+set -euo pipefail
+
+# Configuration
+DOCKER_IMAGE="code-index-mcp-mcp-server"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_FILE="${PROJECT_DIR}/mcp-auto.log"
+
+# Logging function
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $*" >> "$LOG_FILE"
+    echo "$*" >&2
+}
+
+# Check if Docker is available and working
+check_docker() {
+    if ! command -v docker >/dev/null 2>&1; then
+        log "Docker command not found"
+        return 1
+    fi
+    
+    if ! docker info >/dev/null 2>&1; then
+        log "Docker daemon not running"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Check if Docker image exists
+check_docker_image() {
+    if docker image inspect "$DOCKER_IMAGE" >/dev/null 2>&1; then
+        return 0
+    else
+        log "Docker image $DOCKER_IMAGE not found"
+        return 1
+    fi
+}
+
+# Build Docker image if it doesn't exist
+build_docker_image() {
+    log "Building Docker image $DOCKER_IMAGE..."
+    cd "$PROJECT_DIR"
+    
+    if docker compose -f docker-compose.mcp.yml build >/dev/null 2>&1; then
+        log "Docker image built successfully"
+        return 0
+    else
+        log "Failed to build Docker image"
+        return 1
+    fi
+}
+
+# Launch Docker container
+launch_docker() {
+    log "Launching MCP server via Docker..."
+    
+    # Stop any existing container
+    docker stop mcp-code-index >/dev/null 2>&1 || true
+    docker rm mcp-code-index >/dev/null 2>&1 || true
+    
+    # Run container with stdio mode
+    exec docker run --rm -i \
+        --name mcp-code-index \
+        --volume "${PROJECT_DIR}:/code:ro" \
+        --volume "${PROJECT_DIR}/data:/app/data" \
+        --env MCP_DISABLE_RESOURCES=true \
+        --env PYTHONPATH=/app \
+        --env LOG_LEVEL=INFO \
+        --env DATABASE_URL=sqlite:///app/data/code_index.db \
+        --env SEMANTIC_SEARCH_ENABLED=true \
+        --env METRICS_ENABLED=true \
+        --env HEALTH_ENABLED=true \
+        --env CACHE_ENABLED=true \
+        --env RATE_LIMIT_ENABLED=true \
+        --env MEMORY_MONITOR_ENABLED=true \
+        --env GRACEFUL_SHUTDOWN_ENABLED=true \
+        --env CACHE_BACKEND=memory \
+        --env INDEXING_MAX_WORKERS=8 \
+        --env INDEXING_BATCH_SIZE=50 \
+        --env MCP_MODE=1 \
+        --env ENABLE_WATCHER=true \
+        --env ENABLE_API_GATEWAY=true \
+        --env PLUGIN_LAZY_LOADING=true \
+        --env STARTUP_TIMEOUT=300 \
+        --env PLUGIN_STARTUP_MODE=minimal \
+        --env MCP_FAST_STARTUP=true \
+        "$DOCKER_IMAGE" \
+        python -m mcp_server --transport stdio
+}
+
+# Check if Python environment is available
+check_python() {
+    if ! command -v python >/dev/null 2>&1; then
+        log "Python command not found"
+        return 1
+    fi
+    
+    # Check if mcp_server module is available
+    if ! python -c "import mcp_server" >/dev/null 2>&1; then
+        log "mcp_server module not found in Python environment"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Launch local Python server
+launch_python() {
+    log "Python environment is available, launching local server for fast startup..."
+    log "Launching MCP server via local Python..."
+    cd "$PROJECT_DIR"
+    
+    export MCP_DISABLE_RESOURCES=true
+    export PYTHONPATH="$PROJECT_DIR"
+    export LOG_LEVEL=INFO
+    export DATABASE_URL="sqlite:///$(pwd)/code_index.db"
+    export SEMANTIC_SEARCH_ENABLED=true
+    export METRICS_ENABLED=true
+    export HEALTH_ENABLED=true
+    export CACHE_ENABLED=true
+    export RATE_LIMIT_ENABLED=true
+    export MEMORY_MONITOR_ENABLED=true
+    export GRACEFUL_SHUTDOWN_ENABLED=true
+    export CACHE_BACKEND=memory
+    export INDEXING_MAX_WORKERS=8
+    export INDEXING_BATCH_SIZE=50
+    export MCP_MODE=1
+    export ENABLE_WATCHER=true
+    export ENABLE_API_GATEWAY=true
+    export PLUGIN_LAZY_LOADING=true
+    export STARTUP_TIMEOUT=300
+    export PLUGIN_STARTUP_MODE=minimal
+    export MCP_FAST_STARTUP=true
+    
+    log "Launching MCP server via local Python..."
+    log "Current directory: $(pwd)"
+    log "Python path: $(which python)"
+    log "About to exec: python -m mcp_server --transport stdio"
+    
+    exec python -m mcp_server --transport stdio
+}
+
+# Main execution logic
+main() {
+    log "=== MCP Auto-Launcher Starting ==="
+    log "Project directory: $PROJECT_DIR"
+    
+    # Ensure data directory exists
+    mkdir -p "${PROJECT_DIR}/data"
+    
+    # Strategy 1: Try Docker first (production ready)
+    if check_docker; then
+        log "Docker is available"
+        
+        if check_docker_image; then
+            log "Docker image found, launching container..."
+            launch_docker
+            exit 0
+        else
+            log "Docker image not found, attempting to build..."
+            if build_docker_image && check_docker_image; then
+                log "Docker image built successfully, launching container..."
+                launch_docker
+                exit 0
+            else
+                log "Failed to build Docker image, falling back to Python..."
+            fi
+        fi
+    else
+        log "Docker not available, checking Python..."
+    fi
+    
+    # Strategy 2: Fallback to Python
+    if check_python; then
+        log "Python environment is available, launching local server..."
+        launch_python
+        exit 0
+    else
+        log "Python environment not available"
+    fi
+    
+    # No options available
+    log "ERROR: Neither Docker nor Python environment is available"
+    echo "ERROR: Cannot start MCP server - no valid launch method found" >&2
+    echo "Please ensure either:" >&2
+    echo "  1. Docker is installed and running, OR" >&2
+    echo "  2. Python is available with mcp_server module installed" >&2
+    exit 1
+}
+
+# Handle interrupts gracefully
+cleanup() {
+    log "Received interrupt signal, cleaning up..."
+    # Stop Docker container if running
+    docker stop mcp-code-index >/dev/null 2>&1 || true
+    docker rm mcp-code-index >/dev/null 2>&1 || true
+    exit 130
+}
+
+trap cleanup INT TERM
+
+# Run main function
+main "$@"

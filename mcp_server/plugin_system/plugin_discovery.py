@@ -210,7 +210,27 @@ class PluginDiscovery(IPluginDiscovery):
                     'c': ['.c', '.h'],
                     'cpp': ['.cpp', '.cc', '.cxx', '.hpp', '.h'],
                     'dart': ['.dart'],
-                    'html_css': ['.html', '.htm', '.css', '.scss', '.sass']
+                    'html_css': ['.html', '.htm', '.css', '.scss', '.sass'],
+                    'go': ['.go'],
+                    'rust': ['.rs'],
+                    'java': ['.java'],
+                    'kotlin': ['.kt', '.kts'],
+                    'jvm': ['.java', '.kt', '.kts', '.scala', '.groovy'],
+                    'php': ['.php'],
+                    'ruby': ['.rb', '.rake'],
+                    'arm': ['.s', '.S', '.arm', '.asm'],
+                    'mips': ['.s', '.S', '.mips'],
+                    'avr': ['.s', '.S', '.avr'],
+                    'bash': ['.sh', '.bash', '.zsh', '.fish'],
+                    'json': ['.json', '.jsonc'],
+                    'yaml': ['.yaml', '.yml'],
+                    'markdown': ['.md', '.mdx'],
+                    'csharp': ['.cs', '.csx'],
+                    'haskell': ['.hs', '.lhs'],
+                    'scala': ['.scala', '.sc'],
+                    'lua': ['.lua'],
+                    'toml': ['.toml'],
+                    'csv': ['.csv', '.tsv', '.tab']
                 }
                 
                 file_extensions = extension_map.get(language, [])
@@ -301,6 +321,23 @@ class PluginDiscovery(IPluginDiscovery):
             'cpp': ['.cpp', '.cc', '.cxx', '.hpp', '.h'],
             'dart': ['.dart'],
             'html': ['.html', '.htm'],
-            'css': ['.css', '.scss', '.sass']
+            'css': ['.css', '.scss', '.sass'],
+            'go': ['.go'],
+            'rust': ['.rs'],
+            'java': ['.java'],
+            'kotlin': ['.kt', '.kts'],
+            'php': ['.php'],
+            'ruby': ['.rb', '.rake'],
+            'arm': ['.s', '.S', '.arm', '.asm'],
+            'bash': ['.sh', '.bash', '.zsh', '.fish'],
+            'json': ['.json', '.jsonc'],
+            'yaml': ['.yaml', '.yml'],
+            'markdown': ['.md', '.mdx'],
+            'csharp': ['.cs', '.csx'],
+            'haskell': ['.hs', '.lhs'],
+            'scala': ['.scala', '.sc'],
+            'lua': ['.lua'],
+            'toml': ['.toml'],
+            'csv': ['.csv', '.tsv', '.tab']
         }
         return extension_map.get(language.lower(), [])

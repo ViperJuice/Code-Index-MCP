@@ -1,0 +1,219 @@
+@startuml
+set separator none
+title Native MCP Server Container Architecture
+
+left to right direction
+skinparam ranksep 60
+skinparam nodesep 30
+
+skinparam {
+  arrowFontSize 10
+  defaultTextAlignment center
+  wrapWidth 200
+  maxMessageSize 100
+}
+
+hide stereotype
+
+skinparam rectangle<<CodeIndexMCPServer.CPlugin>> {
+  BackgroundColor #2ecc71
+  FontColor #ffffff
+  BorderColor #208e4f
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.CPlugin>> {
+  BackgroundColor #2ecc71
+  FontColor #ffffff
+  BorderColor #208e4f
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.DartPlugin>> {
+  BackgroundColor #2ecc71
+  FontColor #ffffff
+  BorderColor #208e4f
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.Dispatcher>> {
+  BackgroundColor #1168bd
+  FontColor #ffffff
+  BorderColor #0b4884
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.FileWatcher>> {
+  BackgroundColor #f39c12
+  FontColor #ffffff
+  BorderColor #aa6d0c
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.HTMLCSSPlugin>> {
+  BackgroundColor #2ecc71
+  FontColor #ffffff
+  BorderColor #208e4f
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.IndexEngine>> {
+  BackgroundColor #f1c40f
+  FontColor #000000
+  BorderColor #a8890a
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.JavaScriptPlugin>> {
+  BackgroundColor #2ecc71
+  FontColor #ffffff
+  BorderColor #208e4f
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<LocalCodeRepository>> {
+  BackgroundColor #27ae60
+  FontColor #ffffff
+  BorderColor #1b7943
+  roundCorner 20
+  shadowing false
+}
+skinparam person<<MCPClientClaudeLLM>> {
+  BackgroundColor #a23b72
+  FontColor #ffffff
+  BorderColor #71294f
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.MCPProtocolHandler>> {
+  BackgroundColor #1168bd
+  FontColor #ffffff
+  BorderColor #0b4884
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.PluginSystem>> {
+  BackgroundColor #27ae60
+  FontColor #ffffff
+  BorderColor #1b7943
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.PromptManager>> {
+  BackgroundColor #95a5a6
+  FontColor #ffffff
+  BorderColor #95a5a6
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.PythonPlugin>> {
+  BackgroundColor #2ecc71
+  FontColor #ffffff
+  BorderColor #208e4f
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.ResourceManager>> {
+  BackgroundColor #9b59b6
+  FontColor #ffffff
+  BorderColor #6c3e7f
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.SemanticIndexerService>> {
+  BackgroundColor #95a5a6
+  FontColor #ffffff
+  BorderColor #95a5a6
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.SessionManager>> {
+  BackgroundColor #e74c3c
+  FontColor #ffffff
+  BorderColor #a1352a
+  roundCorner 20
+  shadowing false
+}
+skinparam database<<CodeIndexMCPServer.StorageLayer>> {
+  BackgroundColor #438dd5
+  FontColor #ffffff
+  BorderColor #2e6295
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.ToolManager>> {
+  BackgroundColor #9b59b6
+  FontColor #ffffff
+  BorderColor #6c3e7f
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.TransportLayer>> {
+  BackgroundColor #1168bd
+  FontColor #ffffff
+  BorderColor #0b4884
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer>> {
+  BorderColor #205d77
+  FontColor #205d77
+  shadowing false
+}
+
+person "==MCP Client (Claude/LLM)\n<size:10>[Software System]</size>\n\nAI assistant that connects via Model Context Protocol" <<MCPClientClaudeLLM>> as MCPClientClaudeLLM
+rectangle "==Local Code Repository\n<size:10>[Software System]</size>\n\nThe developer's local codebase being indexed and analyzed" <<LocalCodeRepository>> as LocalCodeRepository
+
+rectangle "Code-Index MCP Server\n<size:10>[Software System]</size>" <<CodeIndexMCPServer>> {
+  rectangle "==Session Manager\n<size:10>[Container: Python]</size>\n\nMCP session lifecycle and capability negotiation" <<CodeIndexMCPServer.SessionManager>> as CodeIndexMCPServer.SessionManager
+  rectangle "==Resource Manager\n<size:10>[Container: Python]</size>\n\nMCP resource abstraction for code elements" <<CodeIndexMCPServer.ResourceManager>> as CodeIndexMCPServer.ResourceManager
+  rectangle "==Tool Manager\n<size:10>[Container: Python]</size>\n\nMCP tools exposing code operations" <<CodeIndexMCPServer.ToolManager>> as CodeIndexMCPServer.ToolManager
+  rectangle "==Prompt Manager\n<size:10>[Container: Python]</size>\n\nMCP prompt templates for code analysis" <<CodeIndexMCPServer.PromptManager>> as CodeIndexMCPServer.PromptManager
+  rectangle "==Dispatcher\n<size:10>[Container: Python]</size>\n\nRoutes requests to appropriate language plugins" <<CodeIndexMCPServer.Dispatcher>> as CodeIndexMCPServer.Dispatcher
+  rectangle "==Plugin System\n<size:10>[Container: Python]</size>\n\nManages language-specific code analyzers" <<CodeIndexMCPServer.PluginSystem>> as CodeIndexMCPServer.PluginSystem
+  rectangle "==MCP Protocol Handler\n<size:10>[Container: Python, asyncio]</size>\n\nJSON-RPC 2.0 protocol implementation for MCP" <<CodeIndexMCPServer.MCPProtocolHandler>> as CodeIndexMCPServer.MCPProtocolHandler
+  database "==Storage Layer\n<size:10>[Container: SQLite, Python]</size>\n\nSQLite database with FTS5 for fast search" <<CodeIndexMCPServer.StorageLayer>> as CodeIndexMCPServer.StorageLayer
+  rectangle "==Index Engine\n<size:10>[Container: Python, Tree-sitter]</size>\n\nCode parsing and indexing engine" <<CodeIndexMCPServer.IndexEngine>> as CodeIndexMCPServer.IndexEngine
+  rectangle "==File Watcher\n<size:10>[Container: Python, Watchdog]</size>\n\nMonitors file system for changes" <<CodeIndexMCPServer.FileWatcher>> as CodeIndexMCPServer.FileWatcher
+  rectangle "==Python Plugin\n<size:10>[Container: Python, Tree-sitter, Jedi]</size>\n\nPython code analysis with Tree-sitter and Jedi" <<CodeIndexMCPServer.PythonPlugin>> as CodeIndexMCPServer.PythonPlugin
+  rectangle "==JavaScript Plugin\n<size:10>[Container: Python, Tree-sitter]</size>\n\nJavaScript/TypeScript analysis" <<CodeIndexMCPServer.JavaScriptPlugin>> as CodeIndexMCPServer.JavaScriptPlugin
+  rectangle "==C Plugin\n<size:10>[Container: Python, Tree-sitter]</size>\n\nC code analysis" <<CodeIndexMCPServer.CPlugin>> as CodeIndexMCPServer.CPlugin
+  rectangle "==C++ Plugin\n<size:10>[Container: Python, Tree-sitter]</size>\n\nC++ code analysis" <<CodeIndexMCPServer.CPlugin>> as CodeIndexMCPServer.CPlugin
+  rectangle "==Dart Plugin\n<size:10>[Container: Python, Regex]</size>\n\nDart/Flutter code analysis" <<CodeIndexMCPServer.DartPlugin>> as CodeIndexMCPServer.DartPlugin
+  rectangle "==HTML/CSS Plugin\n<size:10>[Container: Python, Tree-sitter]</size>\n\nWeb markup and styles analysis" <<CodeIndexMCPServer.HTMLCSSPlugin>> as CodeIndexMCPServer.HTMLCSSPlugin
+  rectangle "==Semantic Indexer Service\n<size:10>[Container: Python, Voyage AI, Qdrant]</size>\n\nAI-powered semantic search" <<CodeIndexMCPServer.SemanticIndexerService>> as CodeIndexMCPServer.SemanticIndexerService
+  rectangle "==Transport Layer\n<size:10>[Container: Python, aiohttp, asyncio]</size>\n\nWebSocket and stdio transport implementations" <<CodeIndexMCPServer.TransportLayer>> as CodeIndexMCPServer.TransportLayer
+}
+
+CodeIndexMCPServer.ResourceManager .[#666666,thickness=2].> CodeIndexMCPServer.FileWatcher : "<color:#666666>subscribes"
+CodeIndexMCPServer.ToolManager .[#666666,thickness=2].> CodeIndexMCPServer.IndexEngine : "<color:#666666>triggers indexing"
+CodeIndexMCPServer.PythonPlugin .[#666666,thickness=2].> CodeIndexMCPServer.PluginSystem : "<color:#666666>parses code"
+CodeIndexMCPServer.JavaScriptPlugin .[#666666,thickness=2].> CodeIndexMCPServer.PluginSystem : "<color:#666666>parses code"
+CodeIndexMCPServer.CPlugin .[#666666,thickness=2].> CodeIndexMCPServer.PluginSystem : "<color:#666666>parses code"
+MCPClientClaudeLLM .[#666666,thickness=2].> CodeIndexMCPServer.TransportLayer : "<color:#666666>JSON-RPC 2.0 messages"
+CodeIndexMCPServer.TransportLayer .[#666666,thickness=2].> CodeIndexMCPServer.MCPProtocolHandler : "<color:#666666>delivers messages"
+CodeIndexMCPServer.MCPProtocolHandler .[#666666,thickness=2].> CodeIndexMCPServer.SessionManager : "<color:#666666>manages sessions"
+CodeIndexMCPServer.MCPProtocolHandler .[#666666,thickness=2].> CodeIndexMCPServer.ResourceManager : "<color:#666666>resources/* methods"
+CodeIndexMCPServer.MCPProtocolHandler .[#666666,thickness=2].> CodeIndexMCPServer.ToolManager : "<color:#666666>tools/* methods"
+CodeIndexMCPServer.MCPProtocolHandler .[#666666,thickness=2].> CodeIndexMCPServer.PromptManager : "<color:#666666>prompts/* methods"
+CodeIndexMCPServer.ResourceManager .[#666666,thickness=2].> CodeIndexMCPServer.StorageLayer : "<color:#666666>queries indexed data"
+CodeIndexMCPServer.ResourceManager .[#666666,thickness=2].> CodeIndexMCPServer.Dispatcher : "<color:#666666>gets symbols/files"
+CodeIndexMCPServer.ToolManager .[#666666,thickness=2].> CodeIndexMCPServer.Dispatcher : "<color:#666666>executes operations"
+CodeIndexMCPServer.Dispatcher .[#666666,thickness=2].> CodeIndexMCPServer.PluginSystem : "<color:#666666>routes to plugins"
+CodeIndexMCPServer.PluginSystem .[#666666,thickness=2].> CodeIndexMCPServer.PythonPlugin : "<color:#666666>manages"
+CodeIndexMCPServer.PluginSystem .[#666666,thickness=2].> CodeIndexMCPServer.JavaScriptPlugin : "<color:#666666>manages"
+CodeIndexMCPServer.PluginSystem .[#666666,thickness=2].> CodeIndexMCPServer.CPlugin : "<color:#666666>manages"
+CodeIndexMCPServer.PluginSystem .[#666666,thickness=2].> CodeIndexMCPServer.CPlugin : "<color:#666666>manages"
+CodeIndexMCPServer.PluginSystem .[#666666,thickness=2].> CodeIndexMCPServer.DartPlugin : "<color:#666666>manages"
+CodeIndexMCPServer.PluginSystem .[#666666,thickness=2].> CodeIndexMCPServer.HTMLCSSPlugin : "<color:#666666>manages"
+CodeIndexMCPServer.PythonPlugin .[#666666,thickness=2].> CodeIndexMCPServer.StorageLayer : "<color:#666666>stores symbols"
+CodeIndexMCPServer.JavaScriptPlugin .[#666666,thickness=2].> CodeIndexMCPServer.StorageLayer : "<color:#666666>stores symbols"
+CodeIndexMCPServer.CPlugin .[#666666,thickness=2].> CodeIndexMCPServer.StorageLayer : "<color:#666666>stores symbols"
+CodeIndexMCPServer.CPlugin .[#666666,thickness=2].> CodeIndexMCPServer.StorageLayer : "<color:#666666>stores symbols"
+CodeIndexMCPServer.DartPlugin .[#666666,thickness=2].> CodeIndexMCPServer.StorageLayer : "<color:#666666>stores symbols"
+CodeIndexMCPServer.HTMLCSSPlugin .[#666666,thickness=2].> CodeIndexMCPServer.StorageLayer : "<color:#666666>stores symbols"
+CodeIndexMCPServer.IndexEngine .[#666666,thickness=2].> CodeIndexMCPServer.StorageLayer : "<color:#666666>persists indices"
+CodeIndexMCPServer.IndexEngine .[#666666,thickness=2].> CodeIndexMCPServer.SemanticIndexerService : "<color:#666666>semantic search"
+CodeIndexMCPServer.Dispatcher .[#666666,thickness=2].> CodeIndexMCPServer.IndexEngine : "<color:#666666>triggers indexing"
+CodeIndexMCPServer.FileWatcher .[#666666,thickness=2].> LocalCodeRepository : "<color:#666666>monitors changes"
+CodeIndexMCPServer.FileWatcher .[#666666,thickness=2].> CodeIndexMCPServer.IndexEngine : "<color:#666666>triggers reindex"
+CodeIndexMCPServer.FileWatcher .[#666666,thickness=2].> CodeIndexMCPServer.ResourceManager : "<color:#666666>notifies changes"
+@enduml

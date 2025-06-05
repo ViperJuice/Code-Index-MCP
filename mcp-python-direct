@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Direct Python MCP launcher - Bypasses Docker for fastest startup
+
+# Set up environment
+export MCP_DISABLE_RESOURCES=true
+export PYTHONPATH="/home/jenner/Code/Code-Index-MCP"
+export LOG_LEVEL=INFO
+export DATABASE_URL="sqlite:///home/jenner/Code/Code-Index-MCP/code_index.db"
+export PLUGIN_STARTUP_MODE=minimal
+export MCP_FAST_STARTUP=true
+export STARTUP_TIMEOUT=60
+
+# Run directly with Python
+cd /home/jenner/Code/Code-Index-MCP
+exec python -m mcp_server --transport stdio

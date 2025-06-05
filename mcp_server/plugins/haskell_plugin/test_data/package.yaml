@@ -1,0 +1,144 @@
+name:                myproject
+version:             0.1.0.0
+github:              "example/myproject"
+license:             BSD3
+author:              "Example Author"
+maintainer:          "author@example.com"
+copyright:           "2024 Example Author"
+
+extra-source-files:
+- README.md
+- CHANGELOG.md
+
+synopsis:            A sample Haskell project with comprehensive features
+category:            Web
+
+description:         |
+  This project demonstrates various Haskell features including
+  web frameworks, parsing libraries, and functional patterns.
+  
+  It includes examples of:
+  - Servant web framework
+  - Database integration
+  - Parser combinators
+  - Command-line tools
+
+dependencies:
+- base >= 4.14 && < 5
+
+default-extensions:
+- OverloadedStrings
+- RecordWildCards
+- DeriveGeneric
+- DerivingStrategies
+- GeneralizedNewtypeDeriving
+- StandaloneDeriving
+- FlexibleContexts
+- FlexibleInstances
+- MultiParamTypeClasses
+- ScopedTypeVariables
+
+ghc-options:
+- -Wall
+- -Wcompat
+- -Widentities
+- -Wincomplete-uni-patterns
+- -Wincomplete-record-updates
+- -Wredundant-constraints
+- -fhide-source-paths
+
+library:
+  source-dirs: src
+  exposed-modules:
+  - MyProject
+  - MyProject.Types
+  - MyProject.Utils
+  - MyProject.Web.Server
+  - MyProject.Web.Handlers
+  - MyProject.Database
+  - MyProject.Parser
+  dependencies:
+  - aeson >= 1.5 && < 2.2
+  - containers >= 0.6 && < 0.7
+  - text >= 1.2 && < 2.1
+  - bytestring >= 0.10 && < 0.12
+  - time >= 1.9 && < 1.13
+  - mtl >= 2.2 && < 2.4
+  - transformers >= 0.5 && < 0.7
+  - servant >= 0.18 && < 0.21
+  - servant-server >= 0.18 && < 0.21
+  - wai >= 3.2 && < 3.3
+  - warp >= 3.3 && < 3.4
+  - postgresql-simple >= 0.6 && < 0.7
+  - parsec >= 3.1 && < 3.2
+
+executables:
+  myproject-server:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - myproject
+    - optparse-applicative >= 0.16 && < 0.18
+    - yaml >= 0.11 && < 0.12
+
+  myproject-cli:
+    main:                CLI.hs
+    source-dirs:         cli
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    dependencies:
+    - myproject
+    - optparse-applicative >= 0.16 && < 0.18
+
+tests:
+  myproject-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - myproject
+    - hspec >= 2.7 && < 2.11
+    - QuickCheck >= 2.14 && < 2.15
+    - quickcheck-instances >= 0.3 && < 0.4
+    - hedgehog >= 1.0 && < 1.3
+    build-tools:
+    - hspec-discover
+
+benchmarks:
+  myproject-bench:
+    main:                Bench.hs
+    source-dirs:         bench
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - myproject
+    - criterion >= 1.5 && < 1.7
+    - deepseq >= 1.4 && < 1.5
+
+when:
+- condition: flag(dev-mode)
+  ghc-options:
+  - -Werror
+  cpp-options:
+  - -DDEV_MODE
+
+flags:
+  dev-mode:
+    description: Enable development mode
+    manual: true
+    default: false
+  
+  use-postgres:
+    description: Use PostgreSQL instead of SQLite
+    manual: false
+    default: true

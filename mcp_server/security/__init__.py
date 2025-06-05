@@ -11,12 +11,8 @@ from .auth_manager import (
     AuthenticationError, AuthorizationError, SecurityError
 )
 
-from .security_middleware import (
-    SecurityHeaders, RateLimitMiddleware, SecurityHeadersMiddleware,
-    AuthenticationMiddleware, AuthorizationMiddleware, RequestValidationMiddleware,
-    SecurityMiddlewareStack, get_current_user, get_current_active_user,
-    require_permission, require_role
-)
+# Security middleware has been moved to production module
+# from .security_middleware import (...)
 
 __all__ = [
     # Models
@@ -26,13 +22,9 @@ __all__ = [
     
     # Auth Manager
     "AuthManager", "IAuthenticator", "IAuthorizer", "PasswordManager", "RateLimiter",
-    "AuthenticationError", "AuthorizationError", "SecurityError",
+    "AuthenticationError", "AuthorizationError", "SecurityError"
     
-    # Middleware
-    "SecurityHeaders", "RateLimitMiddleware", "SecurityHeadersMiddleware",
-    "AuthenticationMiddleware", "AuthorizationMiddleware", "RequestValidationMiddleware",
-    "SecurityMiddlewareStack", "get_current_user", "get_current_active_user",
-    "require_permission", "require_role"
+    # Note: Middleware components have been moved to mcp_server.production.middleware
 ]
 
 # Version information

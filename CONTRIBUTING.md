@@ -251,6 +251,26 @@ When making changes:
 3. Update API documentation
 4. Add entries to CHANGELOG.md
 
+### AI-Agent Documentation Workflow
+This project uses an AI-powered documentation workflow with Claude commands:
+
+1. **Update Table of Contents**
+   - Command: `.claude/commands/update-table-of-contents.md`
+   - Updates the markdown table of contents across documentation files
+   - Run this after adding new sections or reorganizing docs
+
+2. **Update Documents**
+   - Command: `.claude/commands/update-documents.md`
+   - Synchronizes documentation changes across related files
+   - Ensures consistency in documentation
+
+3. **Execute Next Steps**
+   - Command: `.claude/commands/do-next-steps.md`
+   - Runs parallel execution of pending documentation tasks
+   - Handles batch updates efficiently
+
+**Note**: These commands are designed to work with AI agents like Claude Code and Cursor. Include them in your workflow for easier documentation management.
+
 ### Architecture Changes
 If your changes affect architecture:
 1. Update C4 diagrams in `architecture/`

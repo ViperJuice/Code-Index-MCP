@@ -1,11 +1,12 @@
 # MCP Index Sharing Guide
 
-This guide explains how the MCP server automatically handles index sharing across developers and environments.
+This guide explains how the MCP server automatically handles index sharing across developers and environments. **Updated for Version 2.0 with embedding model compatibility validation.**
 
 ## Overview
 
 The MCP server now features **automatic index management** that:
 - **Automatically downloads** pre-built indexes from git remotes
+- **Validates compatibility** before importing (NEW in v2.0)
 - **Builds locally** when no remote index exists
 - **Shares indexes** via git branches with zero configuration
 - **Updates incrementally** using git hooks
@@ -15,9 +16,10 @@ The MCP server now features **automatic index management** that:
 When an AI assistant requests to index a codebase, the MCP server automatically:
 
 1. **Checks for existing local index** → Uses it immediately
-2. **Checks for remote pre-built index** → Downloads in seconds
-3. **Falls back to local building** → One-time indexing
-4. **Sets up git hooks** → For automatic future updates
+2. **Checks for remote pre-built index** → Downloads and validates compatibility
+3. **Validates embedding model compatibility** → Ensures optimal search quality (NEW)
+4. **Falls back to local building** → One-time indexing if incompatible/missing
+5. **Sets up git hooks** → For automatic future updates
 
 This happens transparently - no manual intervention required!
 
@@ -134,9 +136,11 @@ jobs:
 ├── cache/                 # Vector embeddings (if enabled)
 │   ├── embeddings.qdrant  # Semantic search vectors
 │   └── ast_cache/         # Parsed AST cache
-├── index_metadata.json    # Index version and settings
+├── index_metadata.json    # Index version and embedding model info (v2.0+)
 └── .last_indexed_commit   # Git commit tracking
 ```
+
+**New in v2.0**: `index_metadata.json` now includes comprehensive embedding model information for compatibility validation.
 
 ### Where Indexes Live
 
@@ -161,14 +165,20 @@ git push origin main
 ### 2. Manual Sharing
 
 ```bash
-# Export index
+# Export index with model metadata (v2.0+)
 python -m mcp_server index build --output ./export --compress
 
 # Share via any method (S3, shared drive, etc.)
 scp export.tar.gz teammate@server:/shared/
 
-# Import index
-python -m mcp_server index import /shared/export.tar.gz
+# Import with automatic compatibility validation
+python -m mcp_server index import-index /shared/export.tar.gz
+
+# Check compatibility without importing
+python -m mcp_server index import-index /shared/export.tar.gz --dry-run
+
+# Force import if compatibility check fails
+python -m mcp_server index import-index /shared/export.tar.gz --force
 ```
 
 ### 3. Container-Based Sharing
@@ -197,16 +207,19 @@ python -m mcp_server index build \
   --compress \
   --incremental
 
-# Import pre-built index
-python -m mcp_server index import ./index.tar.gz
+# Import pre-built index with compatibility validation (v2.0+)
+python -m mcp_server index import-index ./index.tar.gz
+
+# Check compatibility before importing
+python -m mcp_server index import-index ./index.tar.gz --dry-run
 
 # Update index with changed files
 python -m mcp_server index update \
   --files changed_files.txt \
   --commit abc123
 
-# Verify index integrity
-python -m mcp_server index verify --path ~/.mcp/indexes/myproject
+# Verify index integrity and compatibility
+python -m mcp_server index verify --path ~/.mcp/indexes/myproject --check-compatibility
 ```
 
 ### Smart Wrapper Script
@@ -304,9 +317,14 @@ MCP_INDEX_DIR=/custom/path      # Custom location
 # Check if mcp-index branch exists
 git ls-remote origin mcp-index
 
-# Manually fetch and extract
+# Manually fetch and validate
 git fetch origin mcp-index
 git checkout origin/mcp-index -- mcp-index-latest.tar.gz
+
+# Check compatibility before extracting (v2.0+)
+python -m mcp_server index import-index mcp-index-latest.tar.gz --dry-run
+
+# Extract if compatible
 tar -xzf mcp-index-latest.tar.gz -C ~/.mcp/indexes/project
 ```
 
@@ -381,10 +399,11 @@ WORKDIR /app
 The MCP index sharing system provides:
 
 ✅ **Automatic index management** - No manual setup needed
+✅ **Compatibility validation** - Prevents embedding model mismatches (NEW v2.0)
 ✅ **Team collaboration** - Shared indexes via git
 ✅ **Local-first approach** - Your compute, not cloud
 ✅ **Incremental updates** - Only reindex changes
 ✅ **Zero configuration** - Works out of the box
 ✅ **Free hosting** - Via GitHub branches/releases
 
-Just use MCP normally - indexing happens automatically!
+Just use MCP normally - indexing happens automatically with guaranteed compatibility!

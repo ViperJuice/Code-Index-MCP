@@ -1,0 +1,47 @@
+{
+  "plugin": {
+    "name": "markdown",
+    "language": "markdown",
+    "version": "1.0.0",
+    "type": "hybrid",
+    "author": "MCP Server Team",
+    "description": "Comprehensive Markdown plugin with support for GitHub-flavored Markdown, front matter, and MDX"
+  },
+  "extensions": [
+    ".md",
+    ".markdown",
+    ".mdx",
+    ".mkd"
+  ],
+  "features": {
+    "tree_sitter_support": true,
+    "caching": true,
+    "async_processing": true,
+    "semantic_analysis": true
+  },
+  "patterns": {
+    "function": "^```(\\w+)",
+    "class": "^(#{1,6})\\s+(.+)$",
+    "variable": "^\\[([^\\]]+)\\]:\\s*(.+)$",
+    "import": "\\[([^\\]]+)\\]\\(([^)]+)\\)"
+  },
+  "node_types": {
+    "function": [
+      "fenced_code_block",
+      "indented_code_block"
+    ],
+    "class": [
+      "atx_heading",
+      "setext_heading"
+    ],
+    "variable": [
+      "link_reference_definition",
+      "image_reference_definition"
+    ]
+  },
+  "performance": {
+    "max_file_size": 10485760,
+    "cache_ttl": 3600,
+    "batch_size": 100
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "plugin": {
+    "name": "toml",
+    "language": "toml",
+    "version": "1.0.0",
+    "type": "tree-sitter",
+    "author": "MCP Server Team",
+    "description": "Comprehensive TOML language support with Tree-sitter"
+  },
+  "extensions": [".toml", ".lock"],
+  "special_files": ["Cargo.toml", "pyproject.toml", "poetry.lock", "config.toml"],
+  "features": {
+    "tree_sitter_support": true,
+    "caching": true,
+    "async_processing": true,
+    "semantic_analysis": true,
+    "cargo_enhanced_parsing": true,
+    "pyproject_enhanced_parsing": true,
+    "path_extraction": true,
+    "inline_table_support": true,
+    "array_table_support": true,
+    "multiline_string_detection": true,
+    "date_time_recognition": true
+  },
+  "patterns": {
+    "section": "^\\[(\\S+)\\]",
+    "array_section": "^\\[\\[(\\S+)\\]\\]",
+    "key_value": "^(\\w+)\\s*=\\s*(.+)$",
+    "inline_table": "(\\w+)\\s*=\\s*\\{",
+    "dotted_key": "^([\\w.]+)\\s*=\\s*(.+)$"
+  },
+  "cargo_patterns": {
+    "package": "^\\[package\\]",
+    "dependencies": "^\\[(dev-)?dependencies\\]",
+    "features": "^\\[features\\]",
+    "workspace": "^\\[workspace\\]"
+  },
+  "pyproject_patterns": {
+    "build_system": "^\\[build-system\\]",
+    "project": "^\\[project\\]",
+    "tool": "^\\[tool\\.(\\w+)\\]",
+    "poetry": "^\\[tool\\.poetry\\]"
+  },
+  "node_types": {
+    "table": ["table"],
+    "table_array": ["table_array_element"],
+    "pair": ["pair"],
+    "inline_table": ["inline_table"],
+    "array": ["array"],
+    "string": ["string", "multi_line_string"],
+    "number": ["integer", "float"],
+    "boolean": ["boolean"],
+    "date": ["offset_date_time", "local_date_time", "local_date", "local_time"]
+  },
+  "performance": {
+    "max_file_size": 10485760,
+    "cache_ttl": 3600,
+    "batch_size": 100,
+    "parse_timeout": 5000
+  },
+  "indexing": {
+    "extract_comments": true,
+    "extract_values": true,
+    "extract_types": true,
+    "max_nesting_depth": 10,
+    "index_array_elements": false
+  }
+}

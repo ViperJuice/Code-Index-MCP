@@ -1,0 +1,46 @@
+{
+  "plugin": {
+    "name": "haskell",
+    "language": "haskell",
+    "version": "1.0.0",
+    "type": "hybrid",
+    "author": "MCP Server Team",
+    "description": "Comprehensive Haskell language plugin with support for type signatures, type classes, ADTs, and functional programming patterns"
+  },
+  "extensions": [
+    ".hs",
+    ".lhs",
+    ".hsc"
+  ],
+  "features": {
+    "tree_sitter_support": true,
+    "caching": true,
+    "async_processing": true,
+    "semantic_analysis": true
+  },
+  "patterns": {
+    "function": "^\\s*(\\w+)\\s*::\\s*.*?\\n\\s*\\1\\s*=",
+    "class": "^\\s*class\\s+(?:\\([^)]*\\)\\s*=>\\s*)?(\\w+)",
+    "variable": "^\\s*(\\w+)\\s*=",
+    "import": "^\\s*import\\s+(?:qualified\\s+)?(\\S+)"
+  },
+  "node_types": {
+    "function": [
+      "function_declaration",
+      "function_signature"
+    ],
+    "class": [
+      "class_declaration",
+      "instance_declaration"
+    ],
+    "variable": [
+      "value_binding",
+      "pattern_binding"
+    ]
+  },
+  "performance": {
+    "max_file_size": 10485760,
+    "cache_ttl": 3600,
+    "batch_size": 100
+  }
+}

@@ -1,16 +1,22 @@
-"""Semantic code indexing using Voyage AI embeddings and Qdrant."""
+"""Semantic code indexing using model-agnostic embeddings and Qdrant."""
 
 from __future__ import annotations
 
 from pathlib import Path
 import hashlib
+import asyncio
 from dataclasses import dataclass
-from typing import Iterable, Any
+from typing import Iterable, Any, Optional
 
-import voyageai
 from qdrant_client import QdrantClient, models
 
 from .treesitter_wrapper import TreeSitterWrapper
+from mcp_server.semantic.providers import EmbeddingProviderFactory
+from mcp_server.interfaces.embedding_interfaces import (
+    EmbeddingConfig,
+    EmbeddingType,
+    IEmbeddingProvider
+)
 
 
 @dataclass
@@ -23,13 +29,33 @@ class SymbolEntry:
 
 
 class SemanticIndexer:
-    """Index code using Voyage Code 3 embeddings stored in Qdrant."""
+    """Index code using model-agnostic embeddings stored in Qdrant."""
 
-    def __init__(self, collection: str = "code-index", qdrant_path: str = ":memory:") -> None:
+    def __init__(
+        self, 
+        collection: str = "code-index", 
+        qdrant_path: str = ":memory:",
+        model_name: str = "voyage-code-3",
+        dimension: int = 1024
+    ) -> None:
         self.collection = collection
         self.qdrant = QdrantClient(location=qdrant_path)
         self.wrapper = TreeSitterWrapper()
-        self.voyage = voyageai.Client()
+        
+        # Initialize embedding provider
+        self.model_name = model_name
+        self.dimension = dimension
+        self.provider: Optional[IEmbeddingProvider] = None
+        self._provider_initialized = False
+        
+        # Create factory and config
+        self.factory = EmbeddingProviderFactory()
+        self.config = EmbeddingConfig(
+            model_name=model_name,
+            dimension=dimension,
+            batch_size=100,
+            normalize=True
+        )
 
         self._ensure_collection()
 
@@ -39,8 +65,27 @@ class SemanticIndexer:
         if not exists:
             self.qdrant.recreate_collection(
                 collection_name=self.collection,
-                vectors_config=models.VectorParams(size=1024, distance=models.Distance.COSINE),
+                vectors_config=models.VectorParams(size=self.dimension, distance=models.Distance.COSINE),
             )
+    
+    def _ensure_provider(self) -> None:
+        """Ensure embedding provider is initialized."""
+        if not self._provider_initialized:
+            # Run async initialization in sync context
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(self._initialize_provider())
+            finally:
+                loop.close()
+    
+    async def _initialize_provider(self) -> None:
+        """Initialize the embedding provider."""
+        self.provider = self.factory.create_provider(self.model_name, self.config)
+        result = await self.provider.initialize(self.config)
+        if not result.is_ok():
+            raise RuntimeError(f"Failed to initialize embedding provider: {result.error}")
+        self._provider_initialized = True
 
     # ------------------------------------------------------------------
     def _symbol_id(self, file: str, name: str, line: int) -> int:
@@ -83,13 +128,21 @@ class SemanticIndexer:
         # Generate embeddings and upsert into Qdrant
         texts = ["\n".join(lines[s.line - 1 : s.span[1]]) for s in symbols]
         if texts:
-            embeds = self.voyage.embed(
-                texts,
-                model="voyage-code-3",
-                input_type="document",
-                output_dimension=1024,
-                output_dtype="float",
-            ).embeddings
+            # Ensure provider is initialized
+            self._ensure_provider()
+            
+            # Generate embeddings using async provider
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(
+                    self.provider.embed_batch(texts, EmbeddingType.CODE)
+                )
+                if not result.is_ok():
+                    raise RuntimeError(f"Failed to generate embeddings: {result.error}")
+                embeds = result.value.embeddings
+            finally:
+                loop.close()
 
             points = []
             for sym, vec in zip(symbols, embeds):
@@ -124,14 +177,22 @@ class SemanticIndexer:
     # ------------------------------------------------------------------
     def query(self, text: str, limit: int = 5) -> Iterable[dict[str, Any]]:
         """Query indexed code snippets using a natural language description."""
-
-        embedding = self.voyage.embed(
-            [text],
-            model="voyage-code-3",
-            input_type="document",
-            output_dimension=1024,
-            output_dtype="float",
-        ).embeddings[0]
+        
+        # Ensure provider is initialized
+        self._ensure_provider()
+        
+        # Generate query embedding
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(
+                self.provider.embed_batch([text], EmbeddingType.QUERY)
+            )
+            if not result.is_ok():
+                raise RuntimeError(f"Failed to generate query embedding: {result.error}")
+            embedding = result.value.embeddings[0]
+        finally:
+            loop.close()
 
         results = self.qdrant.search(
             collection_name=self.collection,

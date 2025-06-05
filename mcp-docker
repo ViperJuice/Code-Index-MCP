@@ -1,0 +1,90 @@
+#!/bin/bash
+
+# MCP Server Docker Wrapper for Claude Code with Local Fallback
+# This script runs the MCP server in a Docker container for dependency isolation
+# If Docker is not available, it falls back to local Python installation
+
+# Configuration
+CONTAINER_NAME="mcp-code-index"
+IMAGE_NAME="code-index-mcp:latest"
+WORKDIR="/home/jenner/Code/Code-Index-MCP"
+CODE_MOUNT="/code"
+
+# Function to check if Docker is available
+is_docker_available() {
+    if command -v docker &> /dev/null && docker info &> /dev/null 2>&1; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Function to build image if it doesn't exist
+ensure_image() {
+    if ! docker image inspect "$IMAGE_NAME" &> /dev/null; then
+        echo "Building MCP Docker image..." >&2
+        cd "$WORKDIR"
+        docker build -t "$IMAGE_NAME" .
+    fi
+}
+
+# Function to stop existing container
+cleanup_container() {
+    if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+        docker rm -f "$CONTAINER_NAME" &> /dev/null || true
+    fi
+}
+
+# Function to run MCP server with Docker
+run_docker() {
+    ensure_image
+    cleanup_container
+    
+    # Run MCP server in Docker container
+    exec docker run --rm \
+        --name "$CONTAINER_NAME" \
+        --volume "$WORKDIR:$CODE_MOUNT:ro" \
+        --volume "$WORKDIR/data:/app/data" \
+        --env MCP_DISABLE_RESOURCES=true \
+        --env PYTHONPATH=/app \
+        --env LOG_LEVEL=INFO \
+        --interactive \
+        "$IMAGE_NAME" \
+        python -m mcp_server --transport stdio
+}
+
+# Function to run MCP server locally
+run_local() {
+    echo "Docker not available, falling back to local Python installation..." >&2
+    
+    # Set environment variables
+    export PYTHONPATH="$WORKDIR"
+    export MCP_DISABLE_RESOURCES="true"
+    
+    # Change to working directory
+    cd "$WORKDIR"
+    
+    # Check if Python dependencies are available
+    if ! python3 -c "import mcp_server" &> /dev/null; then
+        echo "Error: MCP server Python package not found." >&2
+        echo "Please install dependencies with: pip install -r requirements.txt" >&2
+        exit 1
+    fi
+    
+    # Run MCP server locally
+    exec python3 -m mcp_server --transport stdio
+}
+
+# Main execution
+main() {
+    if is_docker_available; then
+        echo "Using Docker for MCP server..." >&2
+        run_docker
+    else
+        echo "Docker not available, using local installation..." >&2
+        run_local
+    fi
+}
+
+# Execute main function
+main "$@"

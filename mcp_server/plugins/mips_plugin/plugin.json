@@ -1,0 +1,25 @@
+{
+  "name": "MIPS Assembly",
+  "version": "1.0.0",
+  "description": "MIPS Assembly language support with regex-based parsing",
+  "author": "Code Index MCP",
+  "type": "language",
+  "language": "mips",
+  "file_extensions": [".s", ".S", ".mips"],
+  "class_name": "MIPSPlugin",
+  "dependencies": [],
+  "config_schema": {},
+  "metadata": {
+    "architecture": "MIPS processor",
+    "parser_type": "regex",
+    "supports_tree_sitter": false,
+    "features": [
+      "Function and label detection",
+      "Data segment variable tracking", 
+      "Macro definition support",
+      "System call recognition",
+      "Register alias resolution",
+      "Section-aware parsing (.text, .data, .bss, .rodata)"
+    ]
+  }
+}

@@ -71,3 +71,40 @@ class ConfigError(MCPError):
         """
         self.config_key = config_key
         super().__init__(f"Configuration error for '{config_key}': {message}", details)
+
+class ValidationError(MCPError):
+    """Exception raised for validation errors."""
+    
+    def __init__(self, message: str, field: Optional[str] = None, details: Optional[Any] = None):
+        """
+        Initialize validation error.
+        
+        Args:
+            message: Error message
+            field: Field that failed validation (optional)
+            details: Additional error details (optional)
+        """
+        self.field = field
+        if field:
+            super().__init__(f"Validation error for field '{field}': {message}", details)
+        else:
+            super().__init__(f"Validation error: {message}", details)
+
+
+class ToolError(MCPError):
+    """Exception raised for tool-related errors."""
+    
+    def __init__(self, message: str, tool_name: Optional[str] = None, details: Optional[Any] = None):
+        """
+        Initialize tool error.
+        
+        Args:
+            message: Error message
+            tool_name: Name of the tool that caused the error (optional)
+            details: Additional error details (optional)
+        """
+        self.tool_name = tool_name
+        if tool_name:
+            super().__init__(f"Tool '{tool_name}': {message}", details)
+        else:
+            super().__init__(f"Tool error: {message}", details)

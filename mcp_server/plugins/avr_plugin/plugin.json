@@ -1,0 +1,27 @@
+{
+  "name": "AVR Assembly",
+  "version": "1.0.0", 
+  "description": "AVR Assembly language support with regex-based parsing for AVR 8-bit microcontrollers",
+  "author": "Code Index MCP",
+  "type": "language",
+  "language": "avr",
+  "file_extensions": [".s", ".S", ".avr"],
+  "class_name": "AVRPlugin",
+  "dependencies": [],
+  "config_schema": {},
+  "metadata": {
+    "architecture": "AVR 8-bit microcontroller",
+    "parser_type": "regex",
+    "supports_tree_sitter": false,
+    "common_mcus": ["ATmega328P", "ATmega2560", "ATtiny85", "ATmega32U4"],
+    "features": [
+      "Function and label detection",
+      "Interrupt vector recognition",
+      "I/O register definitions",
+      "Macro definition support", 
+      "Register alias tracking (.def)",
+      "Section-aware parsing (.text, .data, .bss, .eeprom)",
+      "AVR-specific register knowledge"
+    ]
+  }
+}

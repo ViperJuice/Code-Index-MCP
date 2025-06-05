@@ -1,0 +1,97 @@
+{
+  // Main application configuration
+  "app": {
+    "name": "Awesome App",
+    "version": "1.2.3",
+    "environment": "development", // Can be: development, staging, production
+    "debug": true // Enable debug mode for development
+  },
+  
+  // Server configuration
+  "server": {
+    "host": "localhost",
+    "port": 3000,
+    "ssl": {
+      "enabled": false, // Set to true in production
+      "cert_path": "/path/to/cert.pem",
+      "key_path": "/path/to/key.pem"
+    }
+  },
+  
+  /* Database configuration section
+     Supports multiple database connections */
+  "database": {
+    "default": "postgres", // Primary database connection
+    "connections": {
+      "postgres": {
+        "host": "localhost",
+        "port": 5432,
+        "database": "awesome_app_dev",
+        "username": "dev_user",
+        "password": "dev_password",
+        "pool": {
+          "min": 2,
+          "max": 10
+        }
+      },
+      "redis": {
+        "host": "localhost",
+        "port": 6379,
+        "db": 0 // Redis database number
+      }
+    }
+  },
+  
+  // Authentication and security settings
+  "auth": {
+    "jwt": {
+      "secret": "super-secret-jwt-key", // Change in production!
+      "expires_in": "24h"
+    },
+    "oauth": {
+      "google": {
+        "client_id": "your-google-client-id",
+        "client_secret": "your-google-client-secret",
+        "enabled": true
+      },
+      "github": {
+        "client_id": "your-github-client-id", 
+        "client_secret": "your-github-client-secret",
+        "enabled": false // Disabled in development
+      }
+    }
+  },
+  
+  // Feature flags for enabling/disabling functionality
+  "features": {
+    "user_registration": true,
+    "email_verification": false, // Disabled in dev to speed up testing
+    "password_reset": true,
+    "admin_panel": true,
+    "analytics": false, // No tracking in development
+    "rate_limiting": false // Disabled for easier testing
+  },
+  
+  // External service configurations
+  "services": {
+    "email": {
+      "provider": "console", // Use 'console' for dev, 'sendgrid' for prod
+      "from_address": "noreply@example.com",
+      "sendgrid": {
+        "api_key": "your-sendgrid-api-key"
+      }
+    },
+    "storage": {
+      "provider": "local", // Can be: local, s3, gcs
+      "local": {
+        "upload_path": "./uploads"
+      },
+      "s3": {
+        "bucket": "your-s3-bucket",
+        "region": "us-east-1",
+        "access_key": "your-access-key",
+        "secret_key": "your-secret-key"
+      }
+    }
+  }
+}

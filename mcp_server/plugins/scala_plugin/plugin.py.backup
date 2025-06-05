@@ -1,0 +1,495 @@
+"""Scala language plugin for JVM functional programming support."""
+
+from __future__ import annotations
+
+import re
+import json
+from pathlib import Path
+from typing import Optional, List, Dict, Any
+import hashlib
+
+from ...plugin_base import (
+    IPlugin,
+    IndexShard,
+    SymbolDef,
+    Reference,
+    SearchResult,
+    SearchOpts,
+)
+
+from ...utils.fuzzy_indexer import FuzzyIndexer
+from ...storage.sqlite_store import SQLiteStore
+
+
+class ScalaParser:
+    """Parser for Scala source files using regex patterns."""
+    
+    def __init__(self):
+        # Scala syntax patterns
+        # Object declarations
+        self.object_pattern = re.compile(
+            r'^\s*(?:case\s+)?object\s+(\w+)',
+            re.MULTILINE
+        )
+        # Class declarations
+        self.class_pattern = re.compile(
+            r'^\s*(?:abstract\s+|sealed\s+|final\s+)?(?:case\s+)?class\s+(\w+)',
+            re.MULTILINE
+        )
+        # Trait declarations
+        self.trait_pattern = re.compile(
+            r'^\s*(?:sealed\s+)?trait\s+(\w+)',
+            re.MULTILINE
+        )
+        # Method/function declarations
+        self.def_pattern = re.compile(
+            r'^\s*(?:override\s+|private\s+|protected\s+|final\s+)?def\s+(\w+)',
+            re.MULTILINE
+        )
+        # Val declarations
+        self.val_pattern = re.compile(
+            r'^\s*(?:override\s+|private\s+|protected\s+|final\s+)?val\s+(\w+)',
+            re.MULTILINE
+        )
+        # Var declarations
+        self.var_pattern = re.compile(
+            r'^\s*(?:override\s+|private\s+|protected\s+|final\s+)?var\s+(\w+)',
+            re.MULTILINE
+        )
+        # Type declarations
+        self.type_pattern = re.compile(
+            r'^\s*type\s+(\w+)',
+            re.MULTILINE
+        )
+        # Package declaration
+        self.package_pattern = re.compile(
+            r'^\s*package\s+([a-zA-Z_][\w.]*)',
+            re.MULTILINE
+        )
+        # Import statements
+        self.import_pattern = re.compile(
+            r'^\s*import\s+([a-zA-Z_][\w.]*(?:\.\{[^}]+\}|\.\*)?)',
+            re.MULTILINE
+        )
+    
+    def parse_scala_file(self, content: str) -> Dict[str, List[Dict[str, Any]]]:
+        """Parse Scala file content and extract symbols."""
+        symbols = {
+            'objects': [],
+            'classes': [],
+            'traits': [],
+            'methods': [],
+            'vals': [],
+            'vars': [],
+            'types': [],
+            'package': None,
+            'imports': []
+        }
+        
+        lines = content.split('\n')
+        
+        # Parse package declaration
+        package_match = self.package_pattern.search(content)
+        if package_match:
+            symbols['package'] = package_match.group(1)
+        
+        # Parse imports
+        for match in self.import_pattern.finditer(content):
+            symbols['imports'].append(match.group(1))
+        
+        # Parse objects
+        for match in self.object_pattern.finditer(content):
+            line_num = content[:match.start()].count('\n') + 1
+            obj_name = match.group(1)
+            is_case = 'case object' in match.group(0)
+            symbols['objects'].append({
+                'name': obj_name,
+                'line': line_num,
+                'signature': f"{'case ' if is_case else ''}object {obj_name}",
+                'is_case': is_case
+            })
+        
+        # Parse classes
+        for match in self.class_pattern.finditer(content):
+            line_num = content[:match.start()].count('\n') + 1
+            class_name = match.group(1)
+            full_match = match.group(0)
+            is_case = 'case class' in full_match
+            is_abstract = 'abstract' in full_match
+            is_sealed = 'sealed' in full_match
+            is_final = 'final' in full_match
+            
+            modifiers = []
+            if is_abstract: modifiers.append('abstract')
+            if is_sealed: modifiers.append('sealed')
+            if is_final: modifiers.append('final')
+            if is_case: modifiers.append('case')
+            
+            symbols['classes'].append({
+                'name': class_name,
+                'line': line_num,
+                'signature': f"{' '.join(modifiers)} class {class_name}".strip(),
+                'is_case': is_case,
+                'is_abstract': is_abstract,
+                'is_sealed': is_sealed,
+                'is_final': is_final
+            })
+        
+        # Parse traits
+        for match in self.trait_pattern.finditer(content):
+            line_num = content[:match.start()].count('\n') + 1
+            trait_name = match.group(1)
+            is_sealed = 'sealed' in match.group(0)
+            symbols['traits'].append({
+                'name': trait_name,
+                'line': line_num,
+                'signature': f"{'sealed ' if is_sealed else ''}trait {trait_name}",
+                'is_sealed': is_sealed
+            })
+        
+        # Parse methods
+        for match in self.def_pattern.finditer(content):
+            line_num = content[:match.start()].count('\n') + 1
+            method_name = match.group(1)
+            symbols['methods'].append({
+                'name': method_name,
+                'line': line_num,
+                'signature': f"def {method_name}"
+            })
+        
+        # Parse vals
+        for match in self.val_pattern.finditer(content):
+            line_num = content[:match.start()].count('\n') + 1
+            val_name = match.group(1)
+            symbols['vals'].append({
+                'name': val_name,
+                'line': line_num,
+                'signature': f"val {val_name}"
+            })
+        
+        # Parse vars
+        for match in self.var_pattern.finditer(content):
+            line_num = content[:match.start()].count('\n') + 1
+            var_name = match.group(1)
+            symbols['vars'].append({
+                'name': var_name,
+                'line': line_num,
+                'signature': f"var {var_name}"
+            })
+        
+        # Parse type aliases
+        for match in self.type_pattern.finditer(content):
+            line_num = content[:match.start()].count('\n') + 1
+            type_name = match.group(1)
+            symbols['types'].append({
+                'name': type_name,
+                'line': line_num,
+                'signature': f"type {type_name}"
+            })
+        
+        return symbols
+
+
+class Plugin(IPlugin):
+    lang = "scala"
+
+    def __init__(self, sqlite_store: Optional[SQLiteStore] = None) -> None:
+        self._parser = ScalaParser()
+        self._indexer = FuzzyIndexer(sqlite_store=sqlite_store)
+        self._sqlite_store = sqlite_store
+        self._repository_id = None
+        
+        # Create or get repository if SQLite is enabled
+        if self._sqlite_store:
+            self._repository_id = self._sqlite_store.create_repository(
+                str(Path.cwd()), 
+                Path.cwd().name,
+                {"language": "scala"}
+            )
+        
+        self._preindex()
+
+    def _preindex(self) -> None:
+        """Pre-index all Scala files in the current directory."""
+        for ext in ["*.scala", "*.sc"]:
+            for path in Path(".").rglob(ext):
+                try:
+                    text = path.read_text()
+                    self._indexer.add_file(str(path), text)
+                except Exception:
+                    continue
+
+    def supports(self, path: str | Path) -> bool:
+        """Return True if file extension matches Scala files."""
+        path_obj = Path(path) if isinstance(path, str) else path
+        return path_obj.suffix in [".scala", ".sc"] or path_obj.name == "build.sbt"
+
+    def indexFile(self, path: str | Path, content: str) -> IndexShard:
+        """Index a Scala file and extract symbols."""
+        if isinstance(path, str):
+            path = Path(path)
+        
+        self._indexer.add_file(str(path), content)
+        
+        # Store file in SQLite if available
+        file_id = None
+        if self._sqlite_store and self._repository_id:
+            file_hash = hashlib.sha256(content.encode('utf-8')).hexdigest()
+            # Handle relative path calculation safely
+            try:
+                if path.is_absolute():
+                    relative_path = str(path.relative_to(Path.cwd()))
+                else:
+                    relative_path = str(path)
+            except ValueError:
+                # If path is not under current directory, use the filename
+                relative_path = path.name
+            
+            file_id = self._sqlite_store.store_file(
+                self._repository_id,
+                str(path),
+                relative_path,
+                language="scala",
+                size=len(content),
+                hash=file_hash
+            )
+
+        symbols: List[Dict[str, Any]] = []
+        
+        # Handle build.sbt files
+        if path.name == "build.sbt":
+            return self._parse_build_sbt(path, content, file_id)
+        
+        # Parse Scala source files
+        parsed_symbols = self._parser.parse_scala_file(content)
+        
+        # Process all symbol types
+        for symbol_type, symbol_list in parsed_symbols.items():
+            if symbol_type in ['package', 'imports'] or not symbol_list:
+                continue
+                
+            for symbol_data in symbol_list:
+                name = symbol_data['name']
+                line = symbol_data['line']
+                signature = symbol_data['signature']
+                
+                # Determine symbol kind
+                if symbol_type == 'objects':
+                    kind = "object"
+                elif symbol_type == 'classes':
+                    kind = "class"
+                elif symbol_type == 'traits':
+                    kind = "trait"
+                elif symbol_type == 'methods':
+                    kind = "method"
+                elif symbol_type == 'vals':
+                    kind = "val"
+                elif symbol_type == 'vars':
+                    kind = "var"
+                elif symbol_type == 'types':
+                    kind = "type"
+                else:
+                    kind = "unknown"
+                
+                # Store symbol in SQLite if available
+                if self._sqlite_store and file_id:
+                    symbol_id = self._sqlite_store.store_symbol(
+                        file_id,
+                        name,
+                        kind,
+                        line,
+                        line + 1,  # End line approximation
+                        signature=signature
+                    )
+                    # Add to fuzzy indexer with metadata
+                    self._indexer.add_symbol(
+                        name, 
+                        str(path), 
+                        line,
+                        {"symbol_id": symbol_id, "file_id": file_id}
+                    )
+
+                symbols.append({
+                    "symbol": name,
+                    "kind": kind,
+                    "signature": signature,
+                    "line": line,
+                    "span": (line, line + 1),
+                })
+        
+        return {
+            "file": str(path), 
+            "symbols": symbols, 
+            "language": self.lang,
+            "package": parsed_symbols.get('package'),
+            "imports": parsed_symbols.get('imports', [])
+        }
+
+    def _parse_build_sbt(self, path: Path, content: str, file_id: Optional[int]) -> IndexShard:
+        """Parse build.sbt file for project configuration."""
+        symbols = []
+        lines = content.split('\n')
+        
+        # Simple patterns for build.sbt
+        name_pattern = re.compile(r'^\s*name\s*:=\s*"([^"]+)"')
+        version_pattern = re.compile(r'^\s*version\s*:=\s*"([^"]+)"')
+        scala_version_pattern = re.compile(r'^\s*scalaVersion\s*:=\s*"([^"]+)"')
+        library_pattern = re.compile(r'^\s*libraryDependencies\s*\+=\s*"([^"]+)"\s*%%?\s*"([^"]+)"\s*%\s*"([^"]+)"')
+        
+        for line_num, line in enumerate(lines, 1):
+            # Project name
+            name_match = name_pattern.match(line)
+            if name_match:
+                project_name = name_match.group(1)
+                symbols.append({
+                    "symbol": project_name,
+                    "kind": "project",
+                    "signature": f'name := "{project_name}"',
+                    "line": line_num,
+                    "span": (line_num, line_num),
+                })
+                
+                if self._sqlite_store and file_id:
+                    symbol_id = self._sqlite_store.store_symbol(
+                        file_id,
+                        project_name,
+                        "project",
+                        line_num,
+                        line_num,
+                        signature=f'name := "{project_name}"'
+                    )
+                    self._indexer.add_symbol(
+                        project_name, 
+                        str(path), 
+                        line_num,
+                        {"symbol_id": symbol_id, "file_id": file_id}
+                    )
+            
+            # Scala version
+            scala_version_match = scala_version_pattern.match(line)
+            if scala_version_match:
+                scala_version = scala_version_match.group(1)
+                symbols.append({
+                    "symbol": scala_version,
+                    "kind": "version",
+                    "signature": f'scalaVersion := "{scala_version}"',
+                    "line": line_num,
+                    "span": (line_num, line_num),
+                })
+                
+                if self._sqlite_store and file_id:
+                    symbol_id = self._sqlite_store.store_symbol(
+                        file_id,
+                        scala_version,
+                        "version",
+                        line_num,
+                        line_num,
+                        signature=f'scalaVersion := "{scala_version}"'
+                    )
+                    self._indexer.add_symbol(
+                        scala_version, 
+                        str(path), 
+                        line_num,
+                        {"symbol_id": symbol_id, "file_id": file_id}
+                    )
+            
+            # Library dependencies
+            library_match = library_pattern.match(line)
+            if library_match:
+                org = library_match.group(1)
+                artifact = library_match.group(2)
+                version = library_match.group(3)
+                dep_name = f"{org}::{artifact}"
+                symbols.append({
+                    "symbol": dep_name,
+                    "kind": "dependency",
+                    "signature": f'"{org}" %% "{artifact}" % "{version}"',
+                    "line": line_num,
+                    "span": (line_num, line_num),
+                })
+                
+                if self._sqlite_store and file_id:
+                    symbol_id = self._sqlite_store.store_symbol(
+                        file_id,
+                        dep_name,
+                        "dependency",
+                        line_num,
+                        line_num,
+                        signature=f'"{org}" %% "{artifact}" % "{version}"'
+                    )
+                    self._indexer.add_symbol(
+                        dep_name, 
+                        str(path), 
+                        line_num,
+                        {"symbol_id": symbol_id, "file_id": file_id}
+                    )
+        
+        return {"file": str(path), "symbols": symbols, "language": "sbt"}
+
+    def getDefinition(self, symbol: str) -> SymbolDef | None:
+        """Get definition location for a Scala symbol."""
+        for ext in ["*.scala", "*.sc"]:
+            for path in Path(".").rglob(ext):
+                try:
+                    content = path.read_text()
+                    parsed_symbols = self._parser.parse_scala_file(content)
+                    
+                    # Search through all symbol types
+                    for symbol_type, symbol_list in parsed_symbols.items():
+                        if symbol_type in ['package', 'imports']:
+                            continue
+                        
+                        for symbol_data in symbol_list:
+                            if symbol_data['name'] == symbol:
+                                return {
+                                    "symbol": symbol,
+                                    "kind": symbol_type.rstrip('s'),  # Remove plural
+                                    "language": self.lang,
+                                    "signature": symbol_data['signature'],
+                                    "doc": "",  # Scaladoc extraction would need more sophisticated parsing
+                                    "defined_in": str(path),
+                                    "line": symbol_data['line'],
+                                    "span": (symbol_data['line'], symbol_data['line'] + 1),
+                                }
+                except Exception:
+                    continue
+        return None
+
+    def findReferences(self, symbol: str) -> List[Reference]:
+        """Find references to a Scala symbol."""
+        refs: List[Reference] = []
+        seen: set[tuple[str, int]] = set()
+        
+        # Simple text-based reference finding
+        symbol_pattern = re.compile(r'\b' + re.escape(symbol) + r'\b')
+        
+        for ext in ["*.scala", "*.sc"]:
+            for path in Path(".").rglob(ext):
+                try:
+                    content = path.read_text()
+                    lines = content.split('\n')
+                    
+                    for line_num, line in enumerate(lines, 1):
+                        if symbol_pattern.search(line):
+                            key = (str(path), line_num)
+                            if key not in seen:
+                                refs.append(Reference(file=str(path), line=line_num))
+                                seen.add(key)
+                except Exception:
+                    continue
+        
+        return refs
+
+    def search(self, query: str, opts: SearchOpts | None = None) -> List[SearchResult]:
+        """Search for Scala symbols and code patterns."""
+        limit = 20
+        if opts and "limit" in opts:
+            limit = opts["limit"]
+        if opts and opts.get("semantic"):
+            return []
+        return self._indexer.search(query, limit=limit)
+    
+    def get_indexed_count(self) -> int:
+        """Return the number of indexed files."""
+        stats = self._indexer.get_stats()
+        return stats.get('files', 0)

@@ -1,0 +1,112 @@
+[package]
+name = "mcp-server"
+version = "0.1.0"
+authors = ["MCP Team <team@example.com>"]
+edition = "2021"
+description = "A comprehensive code indexing server"
+license = "MIT"
+repository = "https://github.com/example/mcp-server"
+keywords = ["indexing", "code-analysis", "mcp"]
+categories = ["development-tools"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+async-trait = "0.1"
+
+# Web framework
+axum = { version = "0.7", features = ["ws", "json"] }
+tower = { version = "0.4", features = ["full"] }
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+
+# Database
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "postgres"] }
+sea-orm = { version = "0.12", features = ["sqlx-sqlite", "runtime-tokio-rustls"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Optional dependencies
+qdrant-client = { version = "1.7", optional = true }
+redis = { version = "0.24", features = ["tokio-comp"], optional = true }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+mockito = "1.2"
+proptest = "1.4"
+tokio-test = "0.4"
+
+[build-dependencies]
+cc = "1.0"
+bindgen = "0.69"
+
+[features]
+default = ["sqlite", "redis-cache"]
+full = ["sqlite", "postgres", "redis-cache", "vector-search", "metrics"]
+sqlite = ["sqlx/sqlite"]
+postgres = ["sqlx/postgres"]
+redis-cache = ["redis"]
+vector-search = ["qdrant-client"]
+metrics = ["prometheus", "opentelemetry"]
+
+# Development features
+dev = ["mock-data", "test-utils"]
+mock-data = []
+test-utils = []
+
+# Experimental features
+experimental = ["gpu-acceleration", "wasm-plugins"]
+gpu-acceleration = []
+wasm-plugins = ["wasmtime"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.bench]
+inherits = "release"
+debug = true
+
+[[bin]]
+name = "mcp-server"
+path = "src/main.rs"
+
+[[bin]]
+name = "mcp-cli"
+path = "src/cli.rs"
+required-features = ["cli"]
+
+[[bench]]
+name = "indexing_benchmark"
+harness = false
+
+[workspace]
+members = [
+    "crates/core",
+    "crates/plugins",
+    "crates/storage",
+]
+
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1.35", features = ["full"] }

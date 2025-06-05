@@ -1,0 +1,68 @@
+@startuml
+set separator none
+
+skinparam {
+  shadowing false
+  arrowFontSize 15
+  defaultTextAlignment center
+  wrapWidth 100
+  maxMessageSize 100
+}
+hide stereotype
+
+skinparam rectangle<<_transparent>> {
+  BorderColor transparent
+  BackgroundColor transparent
+  FontColor transparent
+}
+
+skinparam component<<1>> {
+  BackgroundColor #e74c3c
+  FontColor #ffffff
+  BorderColor #a1352a
+}
+component "==Component, New" <<1>>
+
+skinparam component<<2>> {
+  BackgroundColor #9b59b6
+  FontColor #ffffff
+  BorderColor #6c3e7f
+}
+component "==Component, New, Adapter" <<2>>
+
+skinparam component<<3>> {
+  BackgroundColor #1168bd
+  FontColor #ffffff
+  BorderColor #0b4884
+}
+component "==Component, New, Core" <<3>>
+
+skinparam rectangle<<4>> {
+  BackgroundColor #1168bd
+  FontColor #ffffff
+  BorderColor #0b4884
+  roundCorner 20
+}
+rectangle "==Container, New, Required, Core" <<4>>
+
+skinparam rectangle<<5>> {
+  BackgroundColor #f1c40f
+  FontColor #000000
+  BorderColor #a8890a
+  roundCorner 20
+}
+rectangle "==Container, Reusable, MinorChanges" <<5>>
+
+skinparam rectangle<<6>> {
+  BackgroundColor #1168bd
+  FontColor #ffffff
+  BorderColor #0b4884
+  roundCorner 20
+}
+rectangle "==Container, Reusable, Modify, Core" <<6>>
+
+rectangle "." <<_transparent>> as 7
+7 .[#666666,thickness=2].> 7 : "<color:#666666>Relationship"
+
+
+@enduml

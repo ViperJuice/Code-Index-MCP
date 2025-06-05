@@ -1,0 +1,106 @@
+name: Build and Release MCP Index
+on:
+  push:
+    tags:
+      - 'v*'
+  release:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for manual index build'
+        required: false
+        default: 'latest'
+
+jobs:
+  build-index:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for better context
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install MCP Server
+      run: |
+        pip install -e .
+        pip install -r requirements.txt
+
+    - name: Build MCP Index
+      run: |
+        # Create index export directory
+        mkdir -p mcp-index-export
+        
+        # Build the index
+        python -m mcp_server index build \
+          --output ./mcp-index-export \
+          --include-embeddings \
+          --compress
+
+    - name: Create index archive
+      run: |
+        TIMESTAMP=$(date -u +"%Y%m%d-%H%M%S")
+        INDEX_NAME="mcp-index-${GITHUB_REF_NAME:-latest}-${TIMESTAMP}.tar.gz"
+        tar -czf "${INDEX_NAME}" -C mcp-index-export .
+        echo "INDEX_FILE=${INDEX_NAME}" >> $GITHUB_ENV
+        echo "INDEX_SIZE=$(du -h ${INDEX_NAME} | cut -f1)" >> $GITHUB_ENV
+
+    - name: Upload to release
+      if: github.event_name == 'release'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./${{ env.INDEX_FILE }}
+        asset_name: ${{ env.INDEX_FILE }}
+        asset_content_type: application/gzip
+
+    - name: Create release (if tag push)
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref_name }}
+        release_name: Release ${{ github.ref_name }}
+        body: |
+          ## MCP Index Information
+          - Index Size: ${{ env.INDEX_SIZE }}
+          - Build Time: ${{ env.TIMESTAMP }}
+          - Includes semantic embeddings
+          
+          ### Quick Start
+          ```bash
+          # Download pre-built index
+          curl -L https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ env.INDEX_FILE }} -o mcp-index.tar.gz
+          tar -xzf mcp-index.tar.gz -C ~/.mcp/indexes/
+          ```
+        draft: false
+        prerelease: false
+
+    - name: Upload to new release
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./${{ env.INDEX_FILE }}
+        asset_name: ${{ env.INDEX_FILE }}
+        asset_content_type: application/gzip
+
+    - name: Update latest index pointer
+      if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+      run: |
+        # Create a latest pointer for easy downloads
+        echo "${{ github.sha }}" > LATEST_INDEX
+        echo "${{ env.INDEX_FILE }}" >> LATEST_INDEX
+        # Would upload to a known location for latest builds

@@ -1,0 +1,289 @@
+name: MCP Index Cloud Management
+
+on:
+  push:
+    branches: [main, master]
+  release:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: 'Force rebuild even if compatible artifact exists'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  manage-index-artifact:
+    runs-on: ubuntu-latest
+    
+    env:
+      # Standardized cloud settings - use default embedding model for consistency
+      EMBEDDING_MODEL: "voyage-code-3"
+      EMBEDDING_PROVIDER: "voyage"
+      EMBEDDING_DIMENSION: "1024"
+      VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      
+      # Disable local model fallbacks in cloud
+      DISABLE_LOCAL_MODELS: "true"
+      DISABLE_MOCK_PROVIDER: "true"
+      
+      # Cloud-optimized settings
+      MCP_ENVIRONMENT: "cloud"
+      PYTHONPATH: ${{ github.workspace }}
+    
+    steps:
+    - name: Checkout source code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Need full history for git operations
+        
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run:  < /dev/null | 
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -e .
+        
+    - name: Validate embedding model configuration
+      run: |
+        echo "🔍 Validating cloud embedding model configuration..."
+        python -c "
+        from mcp_server.config.settings import Settings
+        settings = Settings.from_environment()
+        semantic = settings.semantic_search
+        print(f'Model: {semantic.embedding_model}')
+        print(f'Provider: {semantic.embedding_provider}') 
+        print(f'Dimension: {semantic.embedding_dimension}')
+        assert semantic.embedding_model == 'voyage-code-3', f'Expected voyage-code-3, got {semantic.embedding_model}'
+        assert semantic.embedding_provider == 'voyage', f'Expected voyage, got {semantic.embedding_provider}'
+        assert semantic.embedding_dimension == 1024, f'Expected 1024, got {semantic.embedding_dimension}'
+        print('✅ Cloud configuration validated')
+        "
+        
+    - name: Check for existing compatible artifact
+      id: check_artifact
+      run: |
+        echo "🔍 Checking for existing compatible artifacts..."
+        
+        # Check if mcp-index branch exists
+        if git ls-remote --exit-code origin mcp-index > /dev/null 2>&1; then
+          echo "Found mcp-index branch, checking compatibility..."
+          
+          # Fetch and check metadata
+          git fetch origin mcp-index
+          git checkout origin/mcp-index -- index_metadata.json 2>/dev/null || {
+            echo "No metadata found"
+            echo "compatible=false" >> $GITHUB_OUTPUT
+            exit 0
+          }
+          
+          # Check compatibility
+          COMPATIBLE=$(python -c "
+        import json
+        try:
+            with open('index_metadata.json') as f:
+                metadata = json.load(f)
+            
+            embedding_model = metadata.get('embedding_model', {})
+            model_name = embedding_model.get('model_name', '')
+            provider = embedding_model.get('provider', '')
+            dimension = embedding_model.get('dimension', 0)
+            
+            if model_name == 'voyage-code-3' and provider == 'voyage' and dimension == 1024:
+                print('true')
+            else:
+                print('false')
+        except:
+            print('false')
+        " 2>/dev/null)
+          
+          echo "compatible=$COMPATIBLE" >> $GITHUB_OUTPUT
+          
+          if [ "$COMPATIBLE" = "true" ]; then
+            # Check if update needed
+            LAST_COMMIT=""
+            if [ -f ".last_indexed_commit" ]; then
+              git checkout origin/mcp-index -- .last_indexed_commit 2>/dev/null || true
+              LAST_COMMIT=$(cat .last_indexed_commit 2>/dev/null || echo "")
+            fi
+            
+            CURRENT_COMMIT="${{ github.sha }}"
+            if [ "$LAST_COMMIT" = "$CURRENT_COMMIT" ]; then
+              echo "needs_update=false" >> $GITHUB_OUTPUT
+              echo "✅ Compatible artifact already up to date"
+            else
+              echo "needs_update=true" >> $GITHUB_OUTPUT
+              echo "🔄 Compatible artifact needs update"
+            fi
+          else
+            echo "needs_update=true" >> $GITHUB_OUTPUT
+            echo "⚠️ Existing artifact incompatible, will create new one"
+          fi
+        else
+          echo "compatible=false" >> $GITHUB_OUTPUT
+          echo "needs_update=true" >> $GITHUB_OUTPUT
+          echo "📦 No mcp-index branch found, will create new one"
+        fi
+        
+    - name: Build index artifact
+      if: steps.check_artifact.outputs.needs_update == 'true' || github.event.inputs.force_rebuild == 'true'
+      run: |
+        echo "🔨 Building index artifact with standardized cloud settings..."
+        
+        # Create output directory
+        mkdir -p ./index-output
+        
+        # Build index with cloud-optimized settings
+        python -m mcp_server index build \
+          --path . \
+          --output ./index-output \
+          --include-embeddings \
+          --compress \
+          --show-progress
+          
+        echo "✅ Index artifact built successfully"
+        
+    - name: Update mcp-index branch
+      if: steps.check_artifact.outputs.needs_update == 'true' || github.event.inputs.force_rebuild == 'true'
+      run: |
+        echo "📤 Updating mcp-index branch..."
+        
+        # Configure git
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        
+        # Find the generated archive
+        ARCHIVE_FILE=$(find ./index-output -name "*.tar.gz" | head -1)
+        if [ -z "$ARCHIVE_FILE" ]; then
+          echo "❌ No archive file found"
+          exit 1
+        fi
+        
+        echo "Found archive: $ARCHIVE_FILE"
+        
+        # Switch to mcp-index branch
+        if git show-ref --verify --quiet refs/remotes/origin/mcp-index; then
+          git checkout -B mcp-index origin/mcp-index
+        else
+          git checkout --orphan mcp-index
+          git rm -rf . 2>/dev/null || true
+        fi
+        
+        # Copy artifact and create metadata
+        cp "$ARCHIVE_FILE" "./mcp-index-latest.tar.gz"
+        
+        # Extract metadata from archive
+        tar -xzf "$ARCHIVE_FILE" --wildcards "*/index_metadata.json" -O > index_metadata.json 2>/dev/null || {
+          # Create fallback metadata
+          cat > index_metadata.json << METADATA_EOF
+        {
+          "version": "2.0", 
+          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%S.000000)",
+          "created_by": "GitHub Actions (cloud build)",
+          "embedding_model": {
+            "model_name": "voyage-code-3",
+            "provider": "voyage",
+            "dimension": 1024
+          }
+        }
+        METADATA_EOF
+        }
+        
+        # Record source commit
+        echo "${{ github.sha }}" > .last_indexed_commit
+        
+        # Create informative README
+        cat > README.md << README_EOF
+        # MCP Index Artifacts (Cloud Build)
+        
+        This branch contains pre-built MCP index artifacts generated by GitHub Actions.
+        
+        ## Standardized Cloud Configuration
+        
+        - **Model**: voyage-code-3 (standardized for team consistency)
+        - **Provider**: voyage
+        - **Dimension**: 1024d
+        - **Last Updated**: $(date -u +%Y-%m-%d\ %H:%M:%S\ UTC)
+        - **Source Commit**: ${{ github.sha }}
+        - **Built By**: GitHub Actions
+        
+        ## Why Standardized Settings?
+        
+        Cloud builds use voyage-code-3 as the default embedding model to ensure:
+        - ✅ **Team Consistency**: All team members get compatible artifacts
+        - ✅ **Reliable Performance**: Proven model with excellent code understanding
+        - ✅ **Predictable Behavior**: No variation between different developer setups
+        
+        ## Usage
+        
+        Download and import the latest artifact:
+        
+        \`\`\`bash
+        # Automatic import with compatibility validation
+        python -m mcp_server index import-index mcp-index-latest.tar.gz
+        
+        # Check compatibility first
+        python -m mcp_server index import-index mcp-index-latest.tar.gz --dry-run
+        
+        # Force import if using different embedding model locally
+        python -m mcp_server index import-index mcp-index-latest.tar.gz --force
+        \`\`\`
+        
+        ## Local Development
+        
+        If you use a different embedding model locally, the system will:
+        1. Detect the incompatibility
+        2. Automatically reindex with your local settings
+        3. Create a compatible index for your configuration
+        
+        This ensures optimal search quality regardless of your local model choice.
+        README_EOF
+        
+        # Commit changes
+        git add .
+        if git commit -m "🤖 Update cloud index artifact (voyage-code-3)
+
+        - Model: voyage-code-3 (voyage, 1024d)
+        - Source commit: ${{ github.sha }}
+        - Generated: $(date -u +%Y-%m-%d\ %H:%M:%S\ UTC)
+        - Built by: GitHub Actions (standardized cloud settings)
+        - Trigger: ${{ github.event_name }}"; then
+          
+          echo "✅ Index artifact committed"
+          
+          # Push to remote
+          git push origin mcp-index
+          echo "🚀 Index artifact pushed to remote"
+        else
+          echo "ℹ️ No changes to commit"
+        fi
+        
+    - name: Create release artifact
+      if: github.event_name == 'release'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./index-output/mcp-index-latest.tar.gz
+        asset_name: mcp-index-${{ github.event.release.tag_name }}-voyage-code-3.tar.gz
+        asset_content_type: application/gzip
+        
+    - name: Summary
+      if: always()
+      run: |
+        echo "📋 MCP Index Cloud Management Summary"
+        echo "=================================="
+        echo "Event: ${{ github.event_name }}"
+        echo "Standardized Model: voyage-code-3 (voyage, 1024d)"
+        echo "Compatible Check: ${{ steps.check_artifact.outputs.compatible }}"
+        echo "Needs Update: ${{ steps.check_artifact.outputs.needs_update }}"
+        echo "Force Rebuild: ${{ github.event.inputs.force_rebuild || 'false' }}"
+        echo ""
+        echo "This workflow ensures team consistency by using standardized"
+        echo "embedding model settings for all cloud-generated artifacts."

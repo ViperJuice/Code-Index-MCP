@@ -1,0 +1,11 @@
+date,product,quantity,price,total,customer_id,region
+2024-01-15,Laptop,2,999.99,1999.98,C001,North
+2024-01-16,Mouse,10,29.99,299.90,C002,South
+2024-01-16,Keyboard,5,79.99,399.95,C003,East
+2024-01-17,Monitor,3,299.99,899.97,C001,North
+2024-01-18,Laptop,1,999.99,999.99,C004,West
+2024-01-19,Mouse,25,29.99,749.75,C005,South
+2024-01-20,Headphones,8,149.99,1199.92,C002,South
+2024-01-21,Webcam,4,89.99,359.96,C003,East
+2024-01-22,Laptop,2,999.99,1999.98,C006,North
+2024-01-23,Keyboard,7,79.99,559.93,C004,West

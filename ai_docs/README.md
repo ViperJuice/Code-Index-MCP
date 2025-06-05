@@ -53,10 +53,16 @@ JSON Web Token implementation for secure API access. Provides stateless authenti
 ### [Prometheus](./prometheus_overview.md)
 Metrics collection and monitoring. Tracks indexing performance, API latency, and system health.
 
+## Model Context Protocol
+
+### [MCP](./MCP.md)
+Overview of Model Context Protocol (MCP) clients and their feature support matrix. Essential reference for understanding MCP ecosystem and client capabilities.
+
 ## Quick Reference
 
 | Technology | Purpose | Key Features |
 |------------|---------|--------------|
+| MCP | Model Context Protocol | Client integration, tools/resources/prompts support |
 | FastAPI | REST API Framework | Async, auto-validation, OpenAPI |
 | Tree-sitter | Code Parsing | Incremental, error-tolerant, multi-language |
 | SQLite FTS5 | Full-text Search | Fast queries, boolean operators, ranking |

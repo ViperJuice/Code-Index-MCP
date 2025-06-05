@@ -1,0 +1,102 @@
+@startuml
+set separator none
+title Resource Manager Components
+
+left to right direction
+skinparam ranksep 60
+skinparam nodesep 30
+
+skinparam {
+  arrowFontSize 10
+  defaultTextAlignment center
+  wrapWidth 200
+  maxMessageSize 100
+}
+
+hide stereotype
+
+skinparam rectangle<<CodeIndexMCPServer.Dispatcher>> {
+  BackgroundColor #1168bd
+  FontColor #ffffff
+  BorderColor #0b4884
+  roundCorner 20
+  shadowing false
+}
+skinparam component<<CodeIndexMCPServer.ResourceManager.FileResourceHandler>> {
+  BackgroundColor #9b59b6
+  FontColor #ffffff
+  BorderColor #6c3e7f
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.FileWatcher>> {
+  BackgroundColor #f39c12
+  FontColor #ffffff
+  BorderColor #aa6d0c
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.MCPProtocolHandler>> {
+  BackgroundColor #1168bd
+  FontColor #ffffff
+  BorderColor #0b4884
+  roundCorner 20
+  shadowing false
+}
+skinparam component<<CodeIndexMCPServer.ResourceManager.ResourceRegistry>> {
+  BackgroundColor #1168bd
+  FontColor #ffffff
+  BorderColor #0b4884
+  shadowing false
+}
+skinparam component<<CodeIndexMCPServer.ResourceManager.SearchResourceHandler>> {
+  BackgroundColor #9b59b6
+  FontColor #ffffff
+  BorderColor #6c3e7f
+  shadowing false
+}
+skinparam database<<CodeIndexMCPServer.StorageLayer>> {
+  BackgroundColor #438dd5
+  FontColor #ffffff
+  BorderColor #2e6295
+  shadowing false
+}
+skinparam component<<CodeIndexMCPServer.ResourceManager.SubscriptionManager>> {
+  BackgroundColor #e74c3c
+  FontColor #ffffff
+  BorderColor #999999
+  shadowing false
+}
+skinparam component<<CodeIndexMCPServer.ResourceManager.SymbolResourceHandler>> {
+  BackgroundColor #9b59b6
+  FontColor #ffffff
+  BorderColor #6c3e7f
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.ResourceManager>> {
+  BorderColor #6c3e7f
+  FontColor #6c3e7f
+  shadowing false
+}
+
+rectangle "==MCP Protocol Handler\n<size:10>[Container: Python, asyncio]</size>\n\nJSON-RPC 2.0 protocol implementation for MCP" <<CodeIndexMCPServer.MCPProtocolHandler>> as CodeIndexMCPServer.MCPProtocolHandler
+rectangle "==Dispatcher\n<size:10>[Container: Python]</size>\n\nRoutes requests to appropriate language plugins" <<CodeIndexMCPServer.Dispatcher>> as CodeIndexMCPServer.Dispatcher
+database "==Storage Layer\n<size:10>[Container: SQLite, Python]</size>\n\nSQLite database with FTS5 for fast search" <<CodeIndexMCPServer.StorageLayer>> as CodeIndexMCPServer.StorageLayer
+rectangle "==File Watcher\n<size:10>[Container: Python, Watchdog]</size>\n\nMonitors file system for changes" <<CodeIndexMCPServer.FileWatcher>> as CodeIndexMCPServer.FileWatcher
+
+rectangle "Resource Manager\n<size:10>[Container: Python]</size>" <<CodeIndexMCPServer.ResourceManager>> {
+  component "==Resource Registry\n<size:10>[Component: Python]</size>\n\nManages available MCP resources" <<CodeIndexMCPServer.ResourceManager.ResourceRegistry>> as CodeIndexMCPServer.ResourceManager.ResourceRegistry
+  component "==File Resource Handler\n<size:10>[Component: Python]</size>\n\nHandles code://file/* resources" <<CodeIndexMCPServer.ResourceManager.FileResourceHandler>> as CodeIndexMCPServer.ResourceManager.FileResourceHandler
+  component "==Symbol Resource Handler\n<size:10>[Component: Python]</size>\n\nHandles code://symbol/* resources" <<CodeIndexMCPServer.ResourceManager.SymbolResourceHandler>> as CodeIndexMCPServer.ResourceManager.SymbolResourceHandler
+  component "==Search Resource Handler\n<size:10>[Component: Python]</size>\n\nHandles code://search resources" <<CodeIndexMCPServer.ResourceManager.SearchResourceHandler>> as CodeIndexMCPServer.ResourceManager.SearchResourceHandler
+  component "==Subscription Manager\n<size:10>[Component: Python]</size>\n\nManages resource change subscriptions" <<CodeIndexMCPServer.ResourceManager.SubscriptionManager>> as CodeIndexMCPServer.ResourceManager.SubscriptionManager
+}
+
+CodeIndexMCPServer.MCPProtocolHandler .[#666666,thickness=2].> CodeIndexMCPServer.ResourceManager.ResourceRegistry : "<color:#666666>resources/*"
+CodeIndexMCPServer.ResourceManager.ResourceRegistry .[#666666,thickness=2].> CodeIndexMCPServer.ResourceManager.FileResourceHandler : "<color:#666666>file resources"
+CodeIndexMCPServer.ResourceManager.ResourceRegistry .[#666666,thickness=2].> CodeIndexMCPServer.ResourceManager.SymbolResourceHandler : "<color:#666666>symbol resources"
+CodeIndexMCPServer.ResourceManager.ResourceRegistry .[#666666,thickness=2].> CodeIndexMCPServer.ResourceManager.SearchResourceHandler : "<color:#666666>search resources"
+CodeIndexMCPServer.ResourceManager.FileResourceHandler .[#666666,thickness=2].> CodeIndexMCPServer.StorageLayer : "<color:#666666>queries files"
+CodeIndexMCPServer.ResourceManager.SymbolResourceHandler .[#666666,thickness=2].> CodeIndexMCPServer.Dispatcher : "<color:#666666>lookup symbols"
+CodeIndexMCPServer.ResourceManager.SearchResourceHandler .[#666666,thickness=2].> CodeIndexMCPServer.Dispatcher : "<color:#666666>search code"
+CodeIndexMCPServer.ResourceManager.SubscriptionManager .[#666666,thickness=2].> CodeIndexMCPServer.FileWatcher : "<color:#666666>subscribes"
+@enduml

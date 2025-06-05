@@ -73,7 +73,7 @@ python -m mcp_server index verify     # Verify index integrity
    - Discovery: Automatic plugin loading from `plugins/` directory
 
 2. **MCP Protocol Implementation**
-   - Gateway: FastAPI-based in `mcp_server/mcp_gateway.py`
+   - Server: Main implementation in `mcp_server/stdio_server.py`
    - Transport: Stdio and WebSocket support
    - Sessions: Managed via `SessionManager`
    - Tools/Resources: Registry pattern for extensibility
@@ -134,25 +134,31 @@ python -m mcp_server index verify     # Verify index integrity
 
 ## RECENT_CHANGES
 
-### Documentation Consolidation (2025-06-03)
-- Merged 6 AI agent files into README.md
-- Moved Phase 5 docs to `docs/phase5/`
-- Standardized all CLAUDE.md files
-- Updated markdown-table-of-contents.md
+### Seamless Index Compatibility (2025-06-04)
+- Implemented auto-reindexing fallback for incompatible artifacts
+- Added smart git hooks for automatic artifact creation/updates
+- Created GitHub Actions workflow with standardized embedding model
+- Enhanced CLI with seamless compatibility resolution
+- Features delivered:
+  - ✅ Auto-reindex on compatibility failure (no manual intervention)
+  - ✅ Smart git hooks detect embedding model and manage artifacts
+  - ✅ GitHub Actions uses voyage-code-3 for team consistency
+  - ✅ Comprehensive CLI options for all workflow scenarios
 
-### Production Features (2025-06-02)
-- Added health check system
-- Implemented monitoring with Prometheus
-- Created production Docker configuration
-- Added Kubernetes deployment manifests
+### Phase 2 Enhancement (2025-06-03)
+- Embedding provider system refactored to support 7 providers
+- Added Google, HuggingFace, Local, and Mock providers
+- Implemented auto-dimension detection from HuggingFace Hub
+- Enhanced error handling with helpful debug output
+- Maintained Voyage AI as default, NV-Embed-v2 as HF default
 
 ## DEVELOPMENT_PRIORITIES
 
 ### Immediate (This Week)
-1. Execute cleanup actions from markdown-table-of-contents.md
-2. Update stale planning documents
-3. Add missing SECURITY.md and TROUBLESHOOTING.md
-4. Create plugin development guide
+1. ✅ Enhanced index metadata with embedding model compatibility validation
+2. ✅ Updated documentation for index sharing with v2.0 features
+3. ✅ Comprehensive CLI commands for import/export with validation
+4. Create plugin development guide consolidating all language patterns
 
 ### Short Term (This Month)
 1. Optimize vector search performance
@@ -189,8 +195,7 @@ python -m mcp_server index verify     # Verify index integrity
 ## QUICK_REFERENCE
 
 ### Key Files
-- `mcp_server/server.py` - Main MCP server
-- `mcp_server/mcp_gateway.py` - FastAPI gateway
+- `mcp_server/stdio_server.py` - Main MCP server with all features
 - `mcp_server/plugin_base.py` - Plugin interface
 - `mcp_server/dispatcher/dispatcher.py` - Request routing
 - `mcp_server/tools/handlers/` - Tool implementations

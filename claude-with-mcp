@@ -1,0 +1,39 @@
+#!/bin/bash
+# Claude Code with Code-Index-MCP integration
+
+# Get the directory where this script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Set workspace directory (can be overridden)
+export CODEX_WORKSPACE_DIR="${CODEX_WORKSPACE_DIR:-$(pwd)}"
+
+# Set Python path
+export PYTHONPATH="${SCRIPT_DIR}:${PYTHONPATH}"
+
+# Check if we're in a dev container
+if [ -f /.dockerenv ]; then
+    echo "Running in container - using local MCP server"
+    # For containers, we might need to adjust paths
+    MCP_CONFIG="${SCRIPT_DIR}/claude-code-mcp-config.json"
+else
+    MCP_CONFIG="${SCRIPT_DIR}/claude-code-mcp-config.json"
+fi
+
+# Launch Claude Code with MCP configuration
+# Note: Claude Code CLI might support --mcp-config flag or environment variable
+if [ -n "$1" ]; then
+    # Pass through any arguments
+    claude "$@"
+else
+    # Interactive mode
+    echo "Starting Claude Code with Code-Index-MCP server..."
+    echo "Workspace: $CODEX_WORKSPACE_DIR"
+    echo ""
+    echo "MCP Tools available:"
+    echo "  - search_code: Search for code patterns"
+    echo "  - lookup_symbol: Find symbol definitions"
+    echo "  - find_references: Find all references to a symbol"
+    echo "  - index_file: Index or re-index files"
+    echo ""
+    claude
+fi

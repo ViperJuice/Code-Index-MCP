@@ -3,13 +3,14 @@
     "code-index": {
       "command": "python",
       "args": [
-        "-m", "mcp_server",
-        "--transport", "stdio"
+        "-m", "mcp_server.stdio_server"
       ],
       "cwd": "/home/jenner/Code/Code-Index-MCP",
       "env": {
         "CODEX_WORKSPACE_DIR": "/home/jenner/Code/Code-Index-MCP",
-        "CODEX_LOG_LEVEL": "INFO"
+        "CODEX_LOG_LEVEL": "INFO",
+        "PLUGIN_LAZY_LOADING": "true",
+        "MCP_DISABLE_FEATURES": "cache,metrics,health,memory,rate_limit"
       }
     }
   }

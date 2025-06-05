@@ -1,0 +1,154 @@
+# Application Configuration
+app:
+  name: "My Application"
+  version: "1.2.3"
+  debug: false
+  
+  # Server configuration
+  server:
+    host: "0.0.0.0"
+    port: 8080
+    ssl:
+      enabled: true
+      cert_file: "/path/to/cert.pem"
+      key_file: "/path/to/key.pem"
+    
+    # Connection limits
+    limits:
+      max_connections: 1000
+      timeout: 30s
+      read_timeout: 10s
+      write_timeout: 10s
+
+# Database configuration with anchors
+database: &database_config
+  driver: "postgresql"
+  host: "localhost"
+  port: 5432
+  name: "myapp"
+  user: "dbuser"
+  password: "secretpassword"
+  pool:
+    max_open: 25
+    max_idle: 10
+    max_lifetime: "1h"
+  ssl_mode: "require"
+
+# Cache configuration
+cache:
+  redis:
+    host: "localhost"
+    port: 6379
+    db: 0
+    password: ""
+    pool_size: 10
+    ttl: "1h"
+  
+  memory:
+    max_size: "100MB"
+    ttl: "10m"
+
+# Logging configuration
+logging:
+  level: "info"
+  format: "json"
+  outputs:
+    - console
+    - file
+  
+  file:
+    path: "/var/log/app.log"
+    max_size: "100MB"
+    max_backups: 7
+    max_age: "30d"
+    compress: true
+
+# Feature flags
+features:
+  new_ui: true
+  beta_features: false
+  analytics: true
+  monitoring: true
+
+# External services
+services:
+  # Email service
+  email:
+    provider: "sendgrid"
+    api_key: "${EMAIL_API_KEY}"
+    from_address: "noreply@example.com"
+    templates:
+      welcome: "d-1234567890abcdef"
+      reset_password: "d-fedcba0987654321"
+  
+  # Payment service
+  payment:
+    provider: "stripe"
+    public_key: "${STRIPE_PUBLIC_KEY}"
+    secret_key: "${STRIPE_SECRET_KEY}"
+    webhook_secret: "${STRIPE_WEBHOOK_SECRET}"
+    currency: "usd"
+  
+  # Analytics
+  analytics:
+    google_analytics: "${GA_TRACKING_ID}"
+    mixpanel: "${MIXPANEL_TOKEN}"
+
+# Development settings (inherits from database config)
+development:
+  database:
+    <<: *database_config
+    name: "myapp_dev"
+    host: "localhost"
+  
+  debug: true
+  hot_reload: true
+
+# Testing settings
+testing:
+  database:
+    <<: *database_config
+    name: "myapp_test"
+    host: "localhost"
+  
+  mock_services: true
+  test_data: true
+
+# List of supported languages
+supported_languages:
+  - code: "en"
+    name: "English"
+    default: true
+  - code: "es"
+    name: "Español"
+    default: false
+  - code: "fr"
+    name: "Français"
+    default: false
+
+# Complex nested structure
+api:
+  v1:
+    enabled: true
+    base_path: "/api/v1"
+    rate_limit:
+      requests_per_minute: 100
+      burst: 10
+    endpoints:
+      users:
+        get: true
+        post: true
+        put: true
+        delete: false
+      posts:
+        get: true
+        post: true
+        put: true
+        delete: true
+  
+  v2:
+    enabled: false
+    base_path: "/api/v2"
+    rate_limit:
+      requests_per_minute: 200
+      burst: 20

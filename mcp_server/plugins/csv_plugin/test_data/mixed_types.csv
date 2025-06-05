@@ -1,0 +1,11 @@
+id,value,status,timestamp
+1,100,active,2024-01-01 10:00:00
+2,abc,inactive,2024-01-02 11:30:00
+3,200.5,active,not a date
+4,,pending,2024-01-04 09:15:00
+5,300,ERROR,2024-01-05 14:20:00
+6,"mixed,value",active,
+7,400,,2024-01-07 16:45:00
+eight,500,active,2024-01-08 08:00:00
+9,600.75,completed,2024-01-09 12:00:00
+10,null,active,null

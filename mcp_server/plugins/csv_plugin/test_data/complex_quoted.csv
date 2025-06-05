@@ -1,0 +1,11 @@
+id,description,notes,tags
+1,"Simple description","Basic note","tag1,tag2"
+2,"Description with, comma","Note with ""quotes""","tag3"
+3,"Multi-line
+description","Another
+multi-line
+note","tag4,tag5,tag6"
+4,"Description with ""embedded"" quotes","Note with 'single' quotes","tag7"
+5,"Complex: comma, quotes "", and
+newlines","All special chars: , "" '
+combined","tag8,tag9"

@@ -1,0 +1,46 @@
+{
+  "yaml_analysis": {
+    "files_processed": 0,
+    "successful_parses": 0,
+    "errors": [],
+    "k8s_resources": [],
+    "helm_charts": [],
+    "ci_cd_configs": []
+  },
+  "json_analysis": {
+    "files_processed": 0,
+    "successful_parses": 0,
+    "errors": [],
+    "package_configs": [],
+    "config_files": []
+  },
+  "markdown_analysis": {
+    "files_processed": 0,
+    "successful_parses": 0,
+    "errors": [],
+    "readme_files": [],
+    "documentation": [],
+    "changelogs": []
+  },
+  "csv_analysis": [],
+  "devops_patterns": {
+    "kubernetes_manifests": 147,
+    "docker_configs": 2,
+    "ci_cd_pipelines": 4,
+    "helm_charts": 460,
+    "github_actions": 0,
+    "infrastructure_as_code": 2
+  },
+  "performance_metrics": {
+    "total_files_discovered": 7599,
+    "total_files_processed": 0,
+    "successful_parses": 0,
+    "success_rate": 0.0,
+    "file_type_distribution": {
+      "yaml": 5989,
+      "json": 975,
+      "markdown": 633,
+      "csv": 2
+    }
+  }
+}

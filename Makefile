@@ -2,9 +2,18 @@
 .PHONY: docker-up docker-down docker-dev docker-prod docker-test docker-logs docker-health
 .PHONY: test-dormant test-real-world test-semantic test-redis test-advanced test-cross-lang
 .PHONY: setup-env setup-dev-env setup-prod-env backup restore clean-docker
+.PHONY: dev-setup dev-run dev-test dev-clean run index typecheck test-watch
 
 help:
 	@echo "Available commands:"
+	@echo ""
+	@echo "🚀 Quick Start (Developer Shortcuts):"
+	@echo "  dev-setup       Complete dev environment setup"
+	@echo "  dev-run         Run with hot reload and debug"
+	@echo "  dev-test        Run tests in watch mode"
+	@echo "  dev-clean       Clean all temporary files"
+	@echo "  run             Run the MCP server"
+	@echo "  index           Index current directory"
 	@echo ""
 	@echo "🐍 Python Development:"
 	@echo "  install          Install dependencies"
@@ -279,3 +288,42 @@ clean-docker:
 	docker-compose down -v --remove-orphans
 	docker system prune -f
 	@echo "✅ Docker cleanup completed"
+# Developer Shortcuts
+dev-setup: install setup-hooks
+	@echo "✅ Development environment ready\!"
+
+dev-run: 
+	python -m mcp_server --debug --reload
+
+dev-test:
+	pytest-watch tests/ 2>/dev/null || pytest tests/
+
+dev-clean: clean-pyc clean-test clean-cache
+	@echo "✅ Cleaned all temporary files"
+
+run:
+	python -m mcp_server
+
+index:
+	python -m mcp_server index build
+
+typecheck:
+	mypy mcp_server/ --strict
+
+test-watch:
+	pytest-watch tests/
+
+setup-hooks:
+	pre-commit install 2>/dev/null || echo "pre-commit not installed, skipping hooks"
+
+clean-pyc:
+	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+	find . -type f -name '*.pyc' -delete 2>/dev/null || true
+
+clean-test:
+	rm -rf .pytest_cache htmlcov .coverage coverage.xml
+
+clean-cache:
+	rm -rf .mypy_cache .ruff_cache
+	find . -type d -name '.cache' -exec rm -rf {} + 2>/dev/null || true
+EOF < /dev/null

@@ -1,0 +1,24 @@
+{
+  "toml_validation": {
+    "cargo_symbols": 31,
+    "package_info": {
+      "name": "serde",
+      "version": "1.0.216",
+      "edition": "2018"
+    },
+    "dependencies": 3,
+    "features": 6
+  },
+  "lua_validation": {
+    "kong_symbols": 23,
+    "love2d_callbacks": 4,
+    "rockspec_deps": 22
+  },
+  "cross_language": {
+    "config_sections": 5,
+    "api_methods": 3,
+    "total_symbols": 27
+  },
+  "validation_status": "PASSED",
+  "timestamp": "2025-06-04"
+}

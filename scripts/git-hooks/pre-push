@@ -1,0 +1,273 @@
+#!/bin/bash
+
+# MCP Index Smart Artifact Management
+# This pre-push hook manages index artifacts intelligently:
+# - Creates artifacts if none exist for current embedding model
+# - Updates compatible artifacts with latest changes
+# - Skips if compatible artifact already exists and is current
+
+set -e
+
+# Configuration
+MCP_INDEX_BRANCH="${MCP_INDEX_BRANCH:-mcp-index}"
+MCP_INDEX_DIR="${MCP_INDEX_DIR:-$HOME/.mcp/indexes/$(basename $(pwd))}"
+ENABLE_MCP_INDEX_PUSH="${ENABLE_MCP_INDEX_PUSH:-true}"
+
+# Color output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+log() {
+    echo -e "${BLUE}[MCP-Index]${NC} $1"
+}
+
+warn() {
+    echo -e "${YELLOW}[MCP-Index]${NC} $1"
+}
+
+error() {
+    echo -e "${RED}[MCP-Index]${NC} $1"
+}
+
+success() {
+    echo -e "${GREEN}[MCP-Index]${NC} $1"
+}
+
+# Check if MCP index management is enabled
+if [ "$ENABLE_MCP_INDEX_PUSH" != "true" ]; then
+    log "MCP index push disabled, skipping..."
+    exit 0
+fi
+
+# Check if pushing to main/master branch
+while read oldrev newrev refname; do
+    branch_name=$(echo $refname | sed 's/refs\/heads\///')
+    
+    if [[ "$branch_name" != "main" && "$branch_name" != "master" ]]; then
+        log "Not pushing to main/master branch ($branch_name), skipping index management"
+        continue
+    fi
+    
+    log "Managing index artifacts for $branch_name branch push..."
+    
+    # Get current embedding model settings
+    if command -v python > /dev/null 2>&1; then
+        CURRENT_MODEL=$(python -c "
+from mcp_server.config.settings import Settings
+try:
+    settings = Settings.from_environment()
+    print(f'{settings.semantic_search.embedding_model}:{settings.semantic_search.embedding_provider}:{settings.semantic_search.embedding_dimension}')
+except Exception as e:
+    print('voyage-code-3:voyage:1024')  # fallback to default
+" 2>/dev/null || echo "voyage-code-3:voyage:1024")
+    else
+        CURRENT_MODEL="voyage-code-3:voyage:1024"
+    fi
+    
+    IFS=':' read -r MODEL_NAME PROVIDER DIMENSION <<< "$CURRENT_MODEL"
+    log "Current embedding model: $MODEL_NAME ($PROVIDER, ${DIMENSION}d)"
+    
+    # Check if mcp-index branch exists on remote
+    if git ls-remote --exit-code origin $MCP_INDEX_BRANCH > /dev/null 2>&1; then
+        log "Found existing $MCP_INDEX_BRANCH branch, checking for compatible artifacts..."
+        
+        # Fetch the index branch
+        git fetch origin $MCP_INDEX_BRANCH:tmp-index-check 2>/dev/null || {
+            warn "Could not fetch $MCP_INDEX_BRANCH branch"
+            git branch -D tmp-index-check 2>/dev/null || true
+            continue
+        }
+        
+        # Check out the index branch temporarily
+        current_branch=$(git branch --show-current)
+        git checkout tmp-index-check > /dev/null 2>&1
+        
+        # Look for compatible artifacts
+        COMPATIBLE_ARTIFACT=""
+        NEEDS_UPDATE=false
+        
+        if [ -f "index_metadata.json" ]; then
+            # Check if the metadata indicates compatibility
+            if python -c "
+import json, sys
+try:
+    with open('index_metadata.json') as f:
+        metadata = json.load(f)
+    
+    embedding_model = metadata.get('embedding_model', {})
+    model_name = embedding_model.get('model_name', '')
+    provider = embedding_model.get('provider', '')
+    dimension = embedding_model.get('dimension', 0)
+    
+    if model_name == '$MODEL_NAME' and provider == '$PROVIDER' and dimension == $DIMENSION:
+        print('COMPATIBLE')
+    else:
+        print('INCOMPATIBLE')
+except:
+    print('UNKNOWN')
+" 2>/dev/null | grep -q "COMPATIBLE"; then
+                log "Found compatible artifact for current embedding model"
+                COMPATIBLE_ARTIFACT="index_metadata.json"
+                
+                # Check if update is needed (compare commit hashes)
+                LAST_INDEXED_COMMIT=""
+                if [ -f ".last_indexed_commit" ]; then
+                    LAST_INDEXED_COMMIT=$(cat .last_indexed_commit)
+                fi
+                
+                if [ "$LAST_INDEXED_COMMIT" != "$newrev" ]; then
+                    log "Index needs update (last indexed: ${LAST_INDEXED_COMMIT:0:8}, current: ${newrev:0:8})"
+                    NEEDS_UPDATE=true
+                else
+                    success "Index is already up to date for current commit"
+                    NEEDS_UPDATE=false
+                fi
+            else
+                warn "Existing artifact uses different embedding model, will create new one"
+            fi
+        else
+            log "No metadata found, will create new artifact"
+        fi
+        
+        # Return to original branch
+        git checkout "$current_branch" > /dev/null 2>&1
+        git branch -D tmp-index-check > /dev/null 2>&1
+        
+        # Skip if compatible and up-to-date
+        if [ "$COMPATIBLE_ARTIFACT" != "" ] && [ "$NEEDS_UPDATE" = false ]; then
+            success "Compatible index artifact already exists and is current"
+            continue
+        fi
+    else
+        log "No $MCP_INDEX_BRANCH branch found, will create new one with artifact"
+    fi
+    
+    # Build/update index artifact
+    log "Building index artifact with current settings..."
+    
+    # Create temporary directory for export
+    TEMP_EXPORT_DIR=$(mktemp -d)
+    trap "rm -rf $TEMP_EXPORT_DIR" EXIT
+    
+    # Build index with current settings
+    if python -m mcp_server index build \
+        --path . \
+        --output "$TEMP_EXPORT_DIR" \
+        --include-embeddings \
+        --compress \
+        --quiet 2>/dev/null; then
+        
+        success "Index built successfully"
+        
+        # Find the generated archive
+        ARCHIVE_FILE=$(find "$TEMP_EXPORT_DIR" -name "*.tar.gz" | head -1)
+        if [ -z "$ARCHIVE_FILE" ]; then
+            # If no archive, look for directory
+            if [ -d "$TEMP_EXPORT_DIR" ]; then
+                # Create archive manually
+                ARCHIVE_FILE="$TEMP_EXPORT_DIR/index-$(date +%Y%m%d_%H%M%S).tar.gz"
+                cd "$TEMP_EXPORT_DIR"
+                tar -czf "$(basename $ARCHIVE_FILE)" *
+                cd - > /dev/null
+            else
+                error "No index output found"
+                continue
+            fi
+        fi
+        
+        # Prepare index branch
+        if git show-ref --verify --quiet refs/heads/$MCP_INDEX_BRANCH; then
+            git checkout $MCP_INDEX_BRANCH
+        else
+            git checkout --orphan $MCP_INDEX_BRANCH
+            git rm -rf . 2>/dev/null || true
+        fi
+        
+        # Copy artifact and metadata
+        cp "$ARCHIVE_FILE" "./mcp-index-latest.tar.gz"
+        
+        # Extract metadata for easy access
+        if command -v tar > /dev/null 2>&1; then
+            tar -xzf "$ARCHIVE_FILE" --wildcards "*/index_metadata.json" -O > index_metadata.json 2>/dev/null || {
+                # Fallback: create minimal metadata
+                cat > index_metadata.json << EOF
+{
+  "version": "2.0",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%S.000000)",
+  "embedding_model": {
+    "model_name": "$MODEL_NAME",
+    "provider": "$PROVIDER", 
+    "dimension": $DIMENSION
+  }
+}
+EOF
+            }
+        fi
+        
+        # Record the commit that was indexed
+        echo "$newrev" > .last_indexed_commit
+        
+        # Create README for the index branch
+        cat > README.md << EOF
+# MCP Index Artifacts
+
+This branch contains pre-built MCP index artifacts for faster setup.
+
+## Current Artifact
+
+- **Model**: $MODEL_NAME
+- **Provider**: $PROVIDER
+- **Dimension**: ${DIMENSION}d
+- **Last Updated**: $(date -u +%Y-%m-%d\ %H:%M:%S\ UTC)
+- **Source Commit**: ${newrev:0:8}
+
+## Usage
+
+Download and import the latest artifact:
+
+\`\`\`bash
+# Automatic import (recommended)
+python -m mcp_server index import-index mcp-index-latest.tar.gz
+
+# Check compatibility first
+python -m mcp_server index import-index mcp-index-latest.tar.gz --dry-run
+\`\`\`
+
+This artifact is automatically generated and updated on each push to main.
+EOF
+        
+        # Commit the new/updated artifact
+        git add .
+        if git commit -m "Update index artifact for $MODEL_NAME model
+
+- Model: $MODEL_NAME ($PROVIDER, ${DIMENSION}d)
+- Source commit: ${newrev:0:8}
+- Generated: $(date -u +%Y-%m-%d\ %H:%M:%S\ UTC)
+- Auto-created by git pre-push hook"; then
+            
+            success "Index artifact committed to $MCP_INDEX_BRANCH branch"
+            
+            # Push the index branch
+            if git push origin $MCP_INDEX_BRANCH 2>/dev/null; then
+                success "Index artifact pushed to remote"
+            else
+                warn "Could not push index artifact (check permissions)"
+            fi
+        else
+            warn "No changes to commit for index artifact"
+        fi
+        
+        # Return to original branch
+        git checkout "$current_branch" > /dev/null 2>&1
+        
+    else
+        error "Failed to build index artifact"
+        continue
+    fi
+    
+done
+
+exit 0

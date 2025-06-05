@@ -1,8 +1,90 @@
 {
+  "mcpServers": {
+    "code-index": {
+      "command": "/home/jenner/Code/Code-Index-MCP/mcp-docker",
+      "args": [],
+      "env": {
+        "MCP_DISABLE_RESOURCES": "true"
+      }
+    }
+  },
   "permissions": {
     "allow": [
-      "Read(*)"
+      "Bash(grep:*)",
+      "WebFetch(domain:modelcontextprotocol.io)",
+      "Bash(mkdir:*)",
+      "Bash(find:*)",
+      "Bash(python:*)",
+      "Bash(rm:*)",
+      "Bash(cat:*)",
+      "Bash(ls:*)",
+      "Bash(docker-compose:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker cp:*)",
+      "Bash(wget:*)",
+      "Bash(unzip:*)",
+      "Bash(./structurizr.sh:*)",
+      "Bash(./tools/structurizr.sh:*)",
+      "Bash(chmod:*)",
+      "Bash(/workspaces/Code-Index-MCP/tools/structurizr.sh:*)",
+      "Bash(structurizr.sh:*)",
+      "Bash(pip install:*)",
+      "Bash(sudo chown:*)",
+      "Bash(cp:*)",
+      "Bash(awk:*)",
+      "Bash(timeout:*)",
+      "Bash(mv:*)",
+      "Bash(touch:*)",
+      "Bash(npm --version)",
+      "Bash(npm install:*)",
+      "Bash(mcp-inspector:*)",
+      "Bash(./scripts/setup-phase5-development.sh:*)",
+      "Bash(./scripts/setup-phase5-container.sh:*)",
+      "Bash(./scripts/start-development.sh:*)",
+      "Bash(git checkout:*)",
+      "Bash(./scripts/run-parallel-tests.sh:*)",
+      "Bash(pytest:*)",
+      "WebFetch(domain:www.anthropic.com)",
+      "Bash(claude mcp:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(hostname)",
+      "Bash(git config:*)",
+      "Bash(ssh-add:*)",
+      "Bash(ssh:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(true)",
+      "Bash(test:*)",
+      "Bash(tree:*)",
+      "Bash(env)",
+      "Bash(pip show:*)",
+      "Bash(sed:*)",
+      "WebFetch(domain:www.bentoml.com)",
+      "WebFetch(domain:huggingface.co)",
+      "Bash(./mcp-with-fallback:*)",
+      "Bash(docker build:*)",
+      "Bash(MCP_DEBUG=true python -m mcp_server --transport stdio)",
+      "Bash(PYTHONPATH=/home/jenner/Code/Code-Index-MCP timeout 5 python -m mcp_server --transport stdio 2 >& 1)",
+      "Bash(cursor:*)",
+      "WebFetch(domain:scottspence.com)",
+      "Bash(jq:*)",
+      "Bash(claude config get mcpServers)",
+      "mcp__code-index__search_code",
+      "mcp__code-index__lookup_symbol",
+      "mcp__code-index__index_file",
+      "mcp__code-index__get_file_outline",
+      "mcp__code-index__find_references",
+      "Bash(sqlite3:*)",
+      "Bash(pkill:*)",
+      "Bash(claude config list:*)",
+      "WebFetch(domain:docs.anthropic.com)"
     ],
     "deny": []
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "code-index"
+  ]
 }

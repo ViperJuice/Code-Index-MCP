@@ -123,8 +123,14 @@ class ServerCapabilities:
     @classmethod
     def get_default(cls) -> "ServerCapabilities":
         """Get default server capabilities."""
+        import os
+        
+        # Check if resources should be disabled for Claude Code compatibility
+        disable_resources = os.getenv("MCP_DISABLE_RESOURCES", "").lower() in ("true", "1", "yes")
+        
         return cls(
-            available_resource_types=["file", "project", "symbol", "search"],
+            provides_resources=not disable_resources,
+            available_resource_types=[] if disable_resources else ["file", "project", "symbol", "search"],
             available_tools=[
                 "code-indexer.index_file",
                 "code-indexer.lookup_symbol",

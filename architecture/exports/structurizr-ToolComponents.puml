@@ -1,0 +1,105 @@
+@startuml
+set separator none
+title Tool Manager Components
+
+left to right direction
+skinparam ranksep 60
+skinparam nodesep 30
+
+skinparam {
+  arrowFontSize 10
+  defaultTextAlignment center
+  wrapWidth 200
+  maxMessageSize 100
+}
+
+hide stereotype
+
+skinparam rectangle<<CodeIndexMCPServer.Dispatcher>> {
+  BackgroundColor #1168bd
+  FontColor #ffffff
+  BorderColor #0b4884
+  roundCorner 20
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.IndexEngine>> {
+  BackgroundColor #f1c40f
+  FontColor #000000
+  BorderColor #a8890a
+  roundCorner 20
+  shadowing false
+}
+skinparam component<<CodeIndexMCPServer.ToolManager.IndexingTool>> {
+  BackgroundColor #9b59b6
+  FontColor #ffffff
+  BorderColor #6c3e7f
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.MCPProtocolHandler>> {
+  BackgroundColor #1168bd
+  FontColor #ffffff
+  BorderColor #0b4884
+  roundCorner 20
+  shadowing false
+}
+skinparam component<<CodeIndexMCPServer.ToolManager.ReferenceFinderTool>> {
+  BackgroundColor #9b59b6
+  FontColor #ffffff
+  BorderColor #6c3e7f
+  shadowing false
+}
+skinparam component<<CodeIndexMCPServer.ToolManager.SearchCodeTool>> {
+  BackgroundColor #9b59b6
+  FontColor #ffffff
+  BorderColor #6c3e7f
+  shadowing false
+}
+skinparam component<<CodeIndexMCPServer.ToolManager.SymbolLookupTool>> {
+  BackgroundColor #9b59b6
+  FontColor #ffffff
+  BorderColor #6c3e7f
+  shadowing false
+}
+skinparam component<<CodeIndexMCPServer.ToolManager.ToolRegistry>> {
+  BackgroundColor #1168bd
+  FontColor #ffffff
+  BorderColor #0b4884
+  shadowing false
+}
+skinparam component<<CodeIndexMCPServer.ToolManager.ToolValidator>> {
+  BackgroundColor #e74c3c
+  FontColor #ffffff
+  BorderColor #a1352a
+  shadowing false
+}
+skinparam rectangle<<CodeIndexMCPServer.ToolManager>> {
+  BorderColor #6c3e7f
+  FontColor #6c3e7f
+  shadowing false
+}
+
+rectangle "==MCP Protocol Handler\n<size:10>[Container: Python, asyncio]</size>\n\nJSON-RPC 2.0 protocol implementation for MCP" <<CodeIndexMCPServer.MCPProtocolHandler>> as CodeIndexMCPServer.MCPProtocolHandler
+rectangle "==Dispatcher\n<size:10>[Container: Python]</size>\n\nRoutes requests to appropriate language plugins" <<CodeIndexMCPServer.Dispatcher>> as CodeIndexMCPServer.Dispatcher
+rectangle "==Index Engine\n<size:10>[Container: Python, Tree-sitter]</size>\n\nCode parsing and indexing engine" <<CodeIndexMCPServer.IndexEngine>> as CodeIndexMCPServer.IndexEngine
+
+rectangle "Tool Manager\n<size:10>[Container: Python]</size>" <<CodeIndexMCPServer.ToolManager>> {
+  component "==Tool Registry\n<size:10>[Component: Python]</size>\n\nRegistry of available MCP tools" <<CodeIndexMCPServer.ToolManager.ToolRegistry>> as CodeIndexMCPServer.ToolManager.ToolRegistry
+  component "==Search Code Tool\n<size:10>[Component: Python]</size>\n\nMCP tool for code search" <<CodeIndexMCPServer.ToolManager.SearchCodeTool>> as CodeIndexMCPServer.ToolManager.SearchCodeTool
+  component "==Symbol Lookup Tool\n<size:10>[Component: Python]</size>\n\nMCP tool for symbol definitions" <<CodeIndexMCPServer.ToolManager.SymbolLookupTool>> as CodeIndexMCPServer.ToolManager.SymbolLookupTool
+  component "==Reference Finder Tool\n<size:10>[Component: Python]</size>\n\nMCP tool for finding references" <<CodeIndexMCPServer.ToolManager.ReferenceFinderTool>> as CodeIndexMCPServer.ToolManager.ReferenceFinderTool
+  component "==Indexing Tool\n<size:10>[Component: Python]</size>\n\nMCP tool for automatic file indexing" <<CodeIndexMCPServer.ToolManager.IndexingTool>> as CodeIndexMCPServer.ToolManager.IndexingTool
+  component "==Tool Validator\n<size:10>[Component: Python]</size>\n\nValidates tool inputs against schemas" <<CodeIndexMCPServer.ToolManager.ToolValidator>> as CodeIndexMCPServer.ToolManager.ToolValidator
+}
+
+CodeIndexMCPServer.MCPProtocolHandler .[#666666,thickness=2].> CodeIndexMCPServer.ToolManager.ToolRegistry : "<color:#666666>tools/*"
+CodeIndexMCPServer.ToolManager.ToolRegistry .[#666666,thickness=2].> CodeIndexMCPServer.ToolManager.SearchCodeTool : "<color:#666666>search_code"
+CodeIndexMCPServer.ToolManager.ToolRegistry .[#666666,thickness=2].> CodeIndexMCPServer.ToolManager.SymbolLookupTool : "<color:#666666>lookup_symbol"
+CodeIndexMCPServer.ToolManager.ToolRegistry .[#666666,thickness=2].> CodeIndexMCPServer.ToolManager.ReferenceFinderTool : "<color:#666666>find_references"
+CodeIndexMCPServer.ToolManager.ToolRegistry .[#666666,thickness=2].> CodeIndexMCPServer.ToolManager.IndexingTool : "<color:#666666>index_file"
+CodeIndexMCPServer.ToolManager.SearchCodeTool .[#666666,thickness=2].> CodeIndexMCPServer.Dispatcher : "<color:#666666>calls search()"
+CodeIndexMCPServer.ToolManager.SymbolLookupTool .[#666666,thickness=2].> CodeIndexMCPServer.Dispatcher : "<color:#666666>calls lookup()"
+CodeIndexMCPServer.ToolManager.ReferenceFinderTool .[#666666,thickness=2].> CodeIndexMCPServer.Dispatcher : "<color:#666666>calls find_references()"
+CodeIndexMCPServer.ToolManager.IndexingTool .[#666666,thickness=2].> CodeIndexMCPServer.IndexEngine : "<color:#666666>triggers indexing"
+CodeIndexMCPServer.ToolManager.ToolValidator .[#666666,thickness=2].> CodeIndexMCPServer.ToolManager.ToolRegistry : "<color:#666666>validates inputs"
+CodeIndexMCPServer.Dispatcher .[#666666,thickness=2].> CodeIndexMCPServer.IndexEngine : "<color:#666666>triggers indexing"
+@enduml

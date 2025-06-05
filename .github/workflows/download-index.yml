@@ -1,0 +1,86 @@
+name: Download MCP Index
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize]
+  
+jobs:
+  download-index:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Fetch index branch
+      run: |
+        # Try to fetch the mcp-index branch
+        if git fetch origin mcp-index:mcp-index 2>/dev/null; then
+          echo "INDEX_EXISTS=true" >> $GITHUB_ENV
+        else
+          echo "INDEX_EXISTS=false" >> $GITHUB_ENV
+        fi
+    
+    - name: Download index from branch
+      if: env.INDEX_EXISTS == 'true'
+      run: |
+        # Get the index from the mcp-index branch
+        git checkout mcp-index -- mcp-index-latest.tar.gz index-metadata.json || true
+        
+        if [ -f mcp-index-latest.tar.gz ]; then
+          # Extract metadata
+          if [ -f index-metadata.json ]; then
+            echo "Index metadata:"
+            cat index-metadata.json
+          fi
+          
+          # Save as artifact
+          mkdir -p artifacts
+          mv mcp-index-latest.tar.gz artifacts/
+          mv index-metadata.json artifacts/ 2>/dev/null || true
+        fi
+        
+        # Return to original branch
+        git checkout -
+    
+    - name: Upload index artifact
+      if: env.INDEX_EXISTS == 'true'
+      uses: actions/upload-artifact@v3
+      with:
+        name: mcp-index
+        path: artifacts/
+        retention-days: 7
+    
+    - name: Comment on PR
+      if: github.event_name == 'pull_request' && env.INDEX_EXISTS == 'true'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          let metadata = {};
+          try {
+            metadata = JSON.parse(fs.readFileSync('artifacts/index-metadata.json', 'utf8'));
+          } catch (e) {
+            console.log('No metadata found');
+          }
+          
+          const comment = `### 🚀 MCP Index Available
+          
+          Pre-built index is available for this repository:
+          - **Commit**: ${metadata.commit || 'unknown'}
+          - **Size**: ${metadata.size || 'unknown'}
+          - **Updated**: ${metadata.timestamp || 'unknown'}
+          
+          To use locally:
+          \`\`\`bash
+          # Download from this workflow
+          gh run download ${{ github.run_id }} -n mcp-index
+          tar -xzf mcp-index-latest.tar.gz -C ~/.mcp/indexes/$(basename $(pwd))
+          \`\`\`
+          `;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });

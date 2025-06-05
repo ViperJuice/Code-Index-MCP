@@ -1,0 +1,19 @@
+#\!/bin/bash
+
+# Simple MCP launcher that suppresses startup check output
+
+cd "$(dirname "$0")"
+
+# Set environment for fast startup
+export MCP_DISABLE_RESOURCES=true
+export PYTHONPATH="$PWD"
+export LOG_LEVEL=ERROR  # Only show errors
+export DATABASE_URL="sqlite:///$PWD/code_index.db"
+export PLUGIN_STARTUP_MODE=minimal
+export MCP_FAST_STARTUP=true
+export STARTUP_TIMEOUT=30
+export PYTHONUNBUFFERED=1
+export MCP_SUPPRESS_STARTUP_CHECK=true  # Suppress startup check output
+
+# Launch Python with stderr redirected to /dev/null
+exec python -m mcp_server --transport stdio 2>/dev/null

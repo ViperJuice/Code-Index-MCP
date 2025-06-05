@@ -1,0 +1,4065 @@
+{
+  "summary": {
+    "total_repositories": 4,
+    "total_files_tested": 240,
+    "total_symbols_extracted": 3059,
+    "success_rate": 100.0,
+    "avg_symbols_per_file": 12.745833333333334
+  },
+  "performance": {
+    "avg_parsing_time": 0.0030212730169296266,
+    "max_parsing_time": 0.034717559814453125,
+    "min_parsing_time": 0.0001227855682373047,
+    "files_parsed_per_second": 330.98630755861035
+  },
+  "symbol_types_found": [
+    "class",
+    "field",
+    "function",
+    "import",
+    "namespace",
+    "property"
+  ],
+  "repository_results": {
+    "aspnetcore": {
+      "repo_name": "aspnetcore",
+      "total_files": 60,
+      "successfully_parsed": 60,
+      "total_symbols": 1004,
+      "avg_parsing_time": 0.00411151647567749,
+      "file_results": [
+        {
+          "file_path": "aspnetcore/eng/tools/RepoTasks/CreateFrameworkListFile.cs",
+          "file_size": 5571,
+          "line_count": 143,
+          "parsing_time": 0.006665706634521484,
+          "symbols_found": 31,
+          "symbol_breakdown": {
+            "function": 13,
+            "class": 1,
+            "property": 1,
+            "field": 14,
+            "namespace": 1,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Localization/Abstractions/src/StringLocalizerExtensions.cs",
+          "file_size": 2298,
+          "line_count": 60,
+          "parsing_time": 0.003331422805786133,
+          "symbols_found": 6,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1,
+            "field": 1,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Servers/Kestrel/perf/Microbenchmarks/NamedPipesTransportBenchmark.cs",
+          "file_size": 6051,
+          "line_count": 166,
+          "parsing_time": 0.007035255432128906,
+          "symbols_found": 34,
+          "symbol_breakdown": {
+            "function": 14,
+            "class": 2,
+            "property": 1,
+            "field": 17
+          },
+          "has_project_info": true,
+          "project_type": "exe",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Servers/Kestrel/Core/test/Http1/Http1ConnectionTestsBase.cs",
+          "file_size": 3096,
+          "line_count": 78,
+          "parsing_time": 0.0035674571990966797,
+          "symbols_found": 22,
+          "symbol_breakdown": {
+            "function": 5,
+            "class": 1,
+            "field": 15,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Servers/Kestrel/Core/src/Middleware/TlsListener.cs",
+          "file_size": 5937,
+          "line_count": 161,
+          "parsing_time": 0.007776737213134766,
+          "symbols_found": 16,
+          "symbol_breakdown": {
+            "function": 8,
+            "class": 2,
+            "field": 6
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Servers/IIS/IIS/test/IIS.NewShim.FunctionalTests/NewShimTests.cs",
+          "file_size": 1412,
+          "line_count": 38,
+          "parsing_time": 0.0017042160034179688,
+          "symbols_found": 9,
+          "symbol_breakdown": {
+            "function": 4,
+            "class": 1,
+            "field": 4
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Servers/Connections.Abstractions/src/Features/IConnectionLifetimeFeature.cs",
+          "file_size": 636,
+          "line_count": 22,
+          "parsing_time": 0.0011501312255859375,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1,
+            "property": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Shared/ServerInfrastructure/DuplexPipeStreamAdapter.cs",
+          "file_size": 1805,
+          "line_count": 60,
+          "parsing_time": 0.0026891231536865234,
+          "symbols_found": 16,
+          "symbol_breakdown": {
+            "function": 7,
+            "class": 1,
+            "property": 3,
+            "field": 4,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Grpc/JsonTranscoding/test/Microsoft.AspNetCore.Grpc.Swagger.Tests/Services/XmlDocServiceWithComments.cs",
+          "file_size": 1523,
+          "line_count": 48,
+          "parsing_time": 0.0018191337585449219,
+          "symbols_found": 7,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1,
+            "field": 2,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Razor/Razor.Runtime/src/Hosting/IRazorSourceChecksumMetadata.cs",
+          "file_size": 783,
+          "line_count": 25,
+          "parsing_time": 0.001959085464477539,
+          "symbols_found": 4,
+          "symbol_breakdown": {
+            "class": 1,
+            "property": 3
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Identity/test/Identity.Test/UserValidatorTest.cs",
+          "file_size": 2975,
+          "line_count": 94,
+          "parsing_time": 0.003505706787109375,
+          "symbols_found": 24,
+          "symbol_breakdown": {
+            "function": 9,
+            "class": 1,
+            "field": 14
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Identity/testassets/Identity.DefaultUI.WebSite/Pages/Privacy.cshtml.cs",
+          "file_size": 426,
+          "line_count": 15,
+          "parsing_time": 0.0008132457733154297,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Mvc/Mvc.TagHelpers/src/JavaScriptResources.cs",
+          "file_size": 2046,
+          "line_count": 58,
+          "parsing_time": 0.003359556198120117,
+          "symbols_found": 9,
+          "symbol_breakdown": {
+            "function": 6,
+            "class": 1,
+            "field": 2
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Mvc/test/WebSites/FormatterWebSite/Controllers/PolymorphicPropertyBindingController.cs",
+          "file_size": 557,
+          "line_count": 24,
+          "parsing_time": 0.0010900497436523438,
+          "symbols_found": 5,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1,
+            "property": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Mvc/test/WebSites/BasicWebSite/Controllers/ActionConstraints/ConsumesAttribute_WithFallbackActionController.cs",
+          "file_size": 836,
+          "line_count": 29,
+          "parsing_time": 0.001689910888671875,
+          "symbols_found": 7,
+          "symbol_breakdown": {
+            "function": 6,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Mvc/test/WebSites/RazorPagesWebSite/Models/RenderPartialModel.cs",
+          "file_size": 252,
+          "line_count": 9,
+          "parsing_time": 0.0006954669952392578,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "class": 1,
+            "property": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Mvc/test/Mvc.FunctionalTests/ControllerEndpointFiltersTest.cs",
+          "file_size": 3333,
+          "line_count": 87,
+          "parsing_time": 0.003974437713623047,
+          "symbols_found": 24,
+          "symbol_breakdown": {
+            "function": 7,
+            "class": 1,
+            "property": 1,
+            "field": 14,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Mvc/Mvc.Analyzers/src/AvoidHtmlPartialAnalyzer.cs",
+          "file_size": 1682,
+          "line_count": 45,
+          "parsing_time": 0.002132892608642578,
+          "symbols_found": 7,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1,
+            "field": 2,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Mvc/Mvc.DataAnnotations/test/DataAnnotationsClientModelValidatorProviderTest.cs",
+          "file_size": 5898,
+          "line_count": 158,
+          "parsing_time": 0.007720947265625,
+          "symbols_found": 49,
+          "symbol_breakdown": {
+            "function": 29,
+            "class": 4,
+            "property": 3,
+            "field": 13
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Mvc/Mvc.ViewFeatures/src/ValidateAntiForgeryTokenAttribute.cs",
+          "file_size": 2033,
+          "line_count": 50,
+          "parsing_time": 0.003962039947509766,
+          "symbols_found": 7,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 2,
+            "property": 1,
+            "field": 2
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Mvc/Mvc.RazorPages/src/Infrastructure/PageEndpointDataSourceIdMetadata.cs",
+          "file_size": 369,
+          "line_count": 14,
+          "parsing_time": 0.0008871555328369141,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1,
+            "property": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Mvc/Mvc.Core/test/Filters/FilterProviderTest.cs",
+          "file_size": 4802,
+          "line_count": 152,
+          "parsing_time": 0.004948139190673828,
+          "symbols_found": 44,
+          "symbol_breakdown": {
+            "function": 21,
+            "class": 1,
+            "field": 21,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Mvc/Mvc.Core/src/RequestSizeLimitAttribute.cs",
+          "file_size": 2150,
+          "line_count": 58,
+          "parsing_time": 0.00405573844909668,
+          "symbols_found": 9,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1,
+            "property": 1,
+            "field": 4
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Mvc/Mvc.Core/src/Filters/ActionFilterAttribute.cs",
+          "file_size": 2304,
+          "line_count": 69,
+          "parsing_time": 0.0032134056091308594,
+          "symbols_found": 10,
+          "symbol_breakdown": {
+            "function": 8,
+            "class": 1,
+            "property": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Mvc/Mvc.Core/src/ModelBinding/Binders/DoubleModelBinder.cs",
+          "file_size": 4092,
+          "line_count": 110,
+          "parsing_time": 0.004983425140380859,
+          "symbols_found": 15,
+          "symbol_breakdown": {
+            "function": 5,
+            "class": 1,
+            "field": 9
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Framework/AspNetCoreAnalyzers/src/Analyzers/Infrastructure/VirtualChars/AbstractVirtualCharService.ITextInfo.cs",
+          "file_size": 972,
+          "line_count": 31,
+          "parsing_time": 0.0017175674438476562,
+          "symbols_found": 10,
+          "symbol_breakdown": {
+            "function": 6,
+            "class": 4
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Logging.AzureAppServices/test/AzureDiagnosticsConfigurationProviderTests.cs",
+          "file_size": 2184,
+          "line_count": 68,
+          "parsing_time": 0.0024461746215820312,
+          "symbols_found": 17,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1,
+            "field": 11,
+            "import": 3
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Middleware/Rewrite/src/PatternSegments/QueryStringSegment.cs",
+          "file_size": 645,
+          "line_count": 19,
+          "parsing_time": 0.0010166168212890625,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "class": 1,
+            "field": 2
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Middleware/HealthChecks/test/testassets/HealthChecksSample/DbConnectionHealthCheck.cs",
+          "file_size": 2027,
+          "line_count": 57,
+          "parsing_time": 0.0033087730407714844,
+          "symbols_found": 12,
+          "symbol_breakdown": {
+            "function": 6,
+            "class": 1,
+            "property": 2,
+            "field": 2,
+            "namespace": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Middleware/Diagnostics/src/ExceptionHandler/ExceptionHandlerOptions.cs",
+          "file_size": 2102,
+          "line_count": 49,
+          "parsing_time": 0.00484919548034668,
+          "symbols_found": 4,
+          "symbol_breakdown": {
+            "class": 1,
+            "property": 3
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Middleware/OutputCaching/src/Policies/VaryByHeaderPolicy.cs",
+          "file_size": 1890,
+          "line_count": 64,
+          "parsing_time": 0.003488302230834961,
+          "symbols_found": 5,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1,
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Security/Authentication/Negotiate/test/Negotiate.Test/NegotiateHandlerTests.cs",
+          "file_size": 24361,
+          "line_count": 615,
+          "parsing_time": 0.03279519081115723,
+          "symbols_found": 233,
+          "symbol_breakdown": {
+            "function": 136,
+            "class": 4,
+            "property": 4,
+            "field": 89
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Security/samples/Identity.ExternalClaims/Extensions/UrlHelperExtensions.cs",
+          "file_size": 1155,
+          "line_count": 40,
+          "parsing_time": 0.0016570091247558594,
+          "symbols_found": 7,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1,
+            "field": 2,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Hosting/TestHost/src/ClientHandler.cs",
+          "file_size": 10275,
+          "line_count": 234,
+          "parsing_time": 0.013586282730102539,
+          "symbols_found": 32,
+          "symbol_breakdown": {
+            "function": 14,
+            "class": 1,
+            "property": 2,
+            "field": 15
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Configuration.KeyPerFile/test/ConfigurationProviderCommandLineTest.cs",
+          "file_size": 1430,
+          "line_count": 42,
+          "parsing_time": 0.001802682876586914,
+          "symbols_found": 9,
+          "symbol_breakdown": {
+            "function": 5,
+            "class": 1,
+            "field": 2,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/DataProtection/DataProtection/src/AuthenticatedEncryption/AuthenticatedEncryptorExtensions.cs",
+          "file_size": 2417,
+          "line_count": 54,
+          "parsing_time": 0.0032558441162109375,
+          "symbols_found": 14,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1,
+            "field": 10,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/SignalR/samples/ClientSample/Tcp/SocketSender.cs",
+          "file_size": 2787,
+          "line_count": 102,
+          "parsing_time": 0.0030493736267089844,
+          "symbols_found": 18,
+          "symbol_breakdown": {
+            "function": 6,
+            "class": 1,
+            "field": 9,
+            "namespace": 1,
+            "import": 1
+          },
+          "has_project_info": true,
+          "project_type": "exe",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/SignalR/common/Http.Connections/src/NegotiateMetadata.cs",
+          "file_size": 322,
+          "line_count": 11,
+          "parsing_time": 0.0007126331329345703,
+          "symbols_found": 1,
+          "symbol_breakdown": {
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/OpenApi/test/Microsoft.AspNetCore.OpenApi.Tests/Shared/SharedTypes.cs",
+          "file_size": 7358,
+          "line_count": 221,
+          "parsing_time": 0.009737253189086914,
+          "symbols_found": 37,
+          "symbol_breakdown": {
+            "function": 7,
+            "class": 10,
+            "property": 20
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Components/Authorization/src/IHostEnvironmentAuthenticationStateProvider.cs",
+          "file_size": 1163,
+          "line_count": 19,
+          "parsing_time": 0.0024886131286621094,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 2
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Components/WebAssembly/JSInterop/src/WebAssemblyJSRuntime.cs",
+          "file_size": 3457,
+          "line_count": 99,
+          "parsing_time": 0.004189252853393555,
+          "symbols_found": 10,
+          "symbol_breakdown": {
+            "function": 9,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Components/test/testassets/TestContentPackage/Services/AsyncOperationService.cs",
+          "file_size": 614,
+          "line_count": 24,
+          "parsing_time": 0.0009930133819580078,
+          "symbols_found": 5,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1,
+            "field": 1
+          },
+          "has_project_info": true,
+          "project_type": "library",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Components/Web/src/Web/ProgressEventArgs.cs",
+          "file_size": 1074,
+          "line_count": 32,
+          "parsing_time": 0.002246379852294922,
+          "symbols_found": 6,
+          "symbol_breakdown": {
+            "class": 1,
+            "property": 4,
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Components/Endpoints/src/FormMapping/Metadata/FormDataParameterMetadata.cs",
+          "file_size": 795,
+          "line_count": 25,
+          "parsing_time": 0.0013458728790283203,
+          "symbols_found": 11,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 2,
+            "property": 7,
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Components/Components/src/RenderTree/RenderTreeFrameArrayBuilder.cs",
+          "file_size": 5410,
+          "line_count": 168,
+          "parsing_time": 0.0066263675689697266,
+          "symbols_found": 12,
+          "symbol_breakdown": {
+            "function": 10,
+            "class": 2
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Http/Http.Results/src/NotFoundOfT.cs",
+          "file_size": 2669,
+          "line_count": 69,
+          "parsing_time": 0.003437042236328125,
+          "symbols_found": 9,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 2,
+            "field": 4
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Http/Http.Extensions/test/ValidationsGenerator/ValidationsGeneratorTestBase.cs",
+          "file_size": 27050,
+          "line_count": 586,
+          "parsing_time": 0.034717559814453125,
+          "symbols_found": 143,
+          "symbol_breakdown": {
+            "function": 56,
+            "class": 6,
+            "property": 1,
+            "field": 80
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Http/Http.Abstractions/src/Metadata/IFromFormMetadata.cs",
+          "file_size": 461,
+          "line_count": 15,
+          "parsing_time": 0.0013840198516845703,
+          "symbols_found": 1,
+          "symbol_breakdown": {
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Http/Routing/test/testassets/RoutingWebSite/Program.cs",
+          "file_size": 2104,
+          "line_count": 73,
+          "parsing_time": 0.002547025680541992,
+          "symbols_found": 12,
+          "symbol_breakdown": {
+            "function": 4,
+            "class": 1,
+            "field": 6,
+            "namespace": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Http/Routing/src/Constraints/NullRouteConstraint.cs",
+          "file_size": 770,
+          "line_count": 28,
+          "parsing_time": 0.0012984275817871094,
+          "symbols_found": 7,
+          "symbol_breakdown": {
+            "function": 4,
+            "class": 1,
+            "field": 2
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Shared/ErrorPage/Views/ErrorPage.cshtml",
+          "file_size": 6997,
+          "line_count": 161,
+          "parsing_time": 0.009848594665527344,
+          "symbols_found": 11,
+          "symbol_breakdown": {
+            "function": 2,
+            "property": 1,
+            "field": 8
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Identity/UI/src/Areas/Identity/Pages/V5/Account/Manage/_ViewImports.cshtml",
+          "file_size": 76,
+          "line_count": 1,
+          "parsing_time": 0.00037932395935058594,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Mvc/perf/benchmarkapps/BasicViews/Views/Home/Index.cshtml",
+          "file_size": 449,
+          "line_count": 21,
+          "parsing_time": 0.000392913818359375,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Mvc/test/WebSites/HtmlGenerationWebSite/Views/HtmlGeneration_Home/Order.cshtml",
+          "file_size": 5403,
+          "line_count": 120,
+          "parsing_time": 0.004228353500366211,
+          "symbols_found": 1,
+          "symbol_breakdown": {
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Mvc/test/WebSites/RazorWebSite/Views/FlushPoint/PageWithFlushBeforeLayout.cshtml",
+          "file_size": 99,
+          "line_count": 6,
+          "parsing_time": 0.00023317337036132812,
+          "symbols_found": 1,
+          "symbol_breakdown": {
+            "function": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Mvc/test/WebSites/BasicWebSite/Views/ViewDataProperty/_Layout.cshtml",
+          "file_size": 251,
+          "line_count": 10,
+          "parsing_time": 0.00022029876708984375,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Mvc/test/WebSites/TagHelpersWebSite/Views/Encoders/_ViewImports.cshtml",
+          "file_size": 92,
+          "line_count": 1,
+          "parsing_time": 0.00020742416381835938,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Mvc/test/WebSites/RazorPagesWebSite/Pages/TryValidateModel.cshtml",
+          "file_size": 454,
+          "line_count": 26,
+          "parsing_time": 0.0004990100860595703,
+          "symbols_found": 4,
+          "symbol_breakdown": {
+            "function": 1,
+            "property": 3
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Mvc/test/WebSites/RazorPagesWebSite/Pages/Redirects/RedirectFromPage.cshtml",
+          "file_size": 120,
+          "line_count": 5,
+          "parsing_time": 0.0002155303955078125,
+          "symbols_found": 1,
+          "symbol_breakdown": {
+            "function": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "aspnetcore/src/Security/samples/PathSchemeSelection/Views/Account/Login.cshtml",
+          "file_size": 1079,
+          "line_count": 29,
+          "parsing_time": 0.0010395050048828125,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        }
+      ],
+      "project_files_found": 598,
+      "unique_project_types": [
+        "library",
+        "exe"
+      ],
+      "performance_metrics": {
+        "max_parsing_time": 0.034717559814453125,
+        "min_parsing_time": 0.00020742416381835938,
+        "median_parsing_time": 0.0025178194046020508,
+        "files_with_errors": 0,
+        "avg_symbols_per_file": 16.733333333333334
+      }
+    },
+    "Umbraco-CMS": {
+      "repo_name": "Umbraco-CMS",
+      "total_files": 60,
+      "successfully_parsed": 60,
+      "total_symbols": 713,
+      "avg_parsing_time": 0.002870027224222819,
+      "file_results": [
+        {
+          "file_path": "Umbraco-CMS/templates/UmbracoExtension/Constants.cs",
+          "file_size": 129,
+          "line_count": 7,
+          "parsing_time": 0.00044417381286621094,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "class": 1,
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/tests/Umbraco.Tests.UnitTests/Umbraco.Web.Common/AspNetCore/AspNetCoreCookieManagerTests.cs",
+          "file_size": 2996,
+          "line_count": 91,
+          "parsing_time": 0.0036497116088867188,
+          "symbols_found": 35,
+          "symbol_breakdown": {
+            "function": 15,
+            "class": 1,
+            "field": 18,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/tests/Umbraco.Tests.UnitTests/Umbraco.Core/DeliveryApi/MultiNodeTreePickerValueConverterTests.cs",
+          "file_size": 16707,
+          "line_count": 298,
+          "parsing_time": 0.015538215637207031,
+          "symbols_found": 107,
+          "symbol_breakdown": {
+            "function": 37,
+            "class": 1,
+            "field": 68,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/tests/Umbraco.Tests.UnitTests/Umbraco.Core/PropertyEditors/BlockGridPropertyValueConverterTests.cs",
+          "file_size": 7430,
+          "line_count": 206,
+          "parsing_time": 0.00635075569152832,
+          "symbols_found": 38,
+          "symbol_breakdown": {
+            "function": 13,
+            "class": 1,
+            "field": 23,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/tests/Umbraco.Tests.Integration/Umbraco.Infrastructure/Persistence/Repositories/DomainRepositoryTest.cs",
+          "file_size": 13601,
+          "line_count": 419,
+          "parsing_time": 0.01219034194946289,
+          "symbols_found": 136,
+          "symbol_breakdown": {
+            "function": 37,
+            "class": 1,
+            "field": 98
+          },
+          "has_project_info": true,
+          "project_type": "web",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/tests/Umbraco.Tests.Integration/Umbraco.Web.Website/Security/MemberAuthorizeTests.cs",
+          "file_size": 5057,
+          "line_count": 130,
+          "parsing_time": 0.005682468414306641,
+          "symbols_found": 26,
+          "symbol_breakdown": {
+            "function": 10,
+            "class": 3,
+            "field": 12,
+            "import": 1
+          },
+          "has_project_info": true,
+          "project_type": "web",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/tests/Umbraco.Tests.Integration/Umbraco.Core/IO/FileSystemsTests.cs",
+          "file_size": 3713,
+          "line_count": 108,
+          "parsing_time": 0.004727363586425781,
+          "symbols_found": 21,
+          "symbol_breakdown": {
+            "function": 9,
+            "class": 3,
+            "field": 9
+          },
+          "has_project_info": true,
+          "project_type": "web",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/tests/Umbraco.Tests.Common/Builders/Interfaces/IWithLastPasswordChangeDateBuilder.cs",
+          "file_size": 239,
+          "line_count": 11,
+          "parsing_time": 0.0005331039428710938,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "class": 1,
+            "field": 1,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Cms.Api.Delivery/Controllers/Media/ByIdsMediaApiController.cs",
+          "file_size": 1537,
+          "line_count": 44,
+          "parsing_time": 0.0017840862274169922,
+          "symbols_found": 5,
+          "symbol_breakdown": {
+            "function": 4,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Infrastructure/Install/InstallHelper.cs",
+          "file_size": 5011,
+          "line_count": 111,
+          "parsing_time": 0.007163286209106445,
+          "symbols_found": 19,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1,
+            "field": 15
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Infrastructure/Persistence/Dtos/CreatedPackageSchemaDto.cs",
+          "file_size": 1181,
+          "line_count": 37,
+          "parsing_time": 0.0011448860168457031,
+          "symbols_found": 9,
+          "symbol_breakdown": {
+            "class": 1,
+            "property": 5,
+            "field": 2,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Infrastructure/Persistence/Repositories/Implement/MediaRepository.cs",
+          "file_size": 22408,
+          "line_count": 581,
+          "parsing_time": 0.026049375534057617,
+          "symbols_found": 114,
+          "symbol_breakdown": {
+            "function": 49,
+            "class": 2,
+            "field": 62,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Infrastructure/Extensions/DeliveryApiBlockReferenceExtensions.cs",
+          "file_size": 637,
+          "line_count": 16,
+          "parsing_time": 0.0009274482727050781,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Infrastructure/Logging/Viewer/SerilogExpressionsFunctions.cs",
+          "file_size": 395,
+          "line_count": 10,
+          "parsing_time": 0.0008244514465332031,
+          "symbols_found": 5,
+          "symbol_breakdown": {
+            "function": 4,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Infrastructure/Migrations/MigrationBase.cs",
+          "file_size": 716,
+          "line_count": 27,
+          "parsing_time": 0.0009136199951171875,
+          "symbols_found": 4,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Infrastructure/Migrations/Upgrade/UmbracoPremigrationPlan.cs",
+          "file_size": 3129,
+          "line_count": 71,
+          "parsing_time": 0.004352092742919922,
+          "symbols_found": 4,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1,
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Infrastructure/PropertyEditors/RichTextPropertyIndexValueFactory.cs",
+          "file_size": 5759,
+          "line_count": 135,
+          "parsing_time": 0.0075075626373291016,
+          "symbols_found": 17,
+          "symbol_breakdown": {
+            "function": 6,
+            "class": 1,
+            "field": 10
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Cms.Api.Management/Controllers/MediaType/CompositionReferenceMediaTypeController.cs",
+          "file_size": 1725,
+          "line_count": 43,
+          "parsing_time": 0.002036571502685547,
+          "symbols_found": 10,
+          "symbol_breakdown": {
+            "function": 4,
+            "class": 1,
+            "field": 5
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Cms.Api.Management/Controllers/Template/CreateTemplateController.cs",
+          "file_size": 1746,
+          "line_count": 45,
+          "parsing_time": 0.0020902156829833984,
+          "symbols_found": 5,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1,
+            "field": 2
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Cms.Api.Management/Controllers/MemberGroup/AllMemberGroupController.cs",
+          "file_size": 1445,
+          "line_count": 41,
+          "parsing_time": 0.001580953598022461,
+          "symbols_found": 5,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1,
+            "field": 2
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Cms.Api.Management/Controllers/DataType/Tree/ChildrenDataTypeTreeController.cs",
+          "file_size": 1024,
+          "line_count": 26,
+          "parsing_time": 0.0011432170867919922,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Cms.Api.Management/Mapping/PartialView/PartialViewViewModelsMapDefinition.cs",
+          "file_size": 4485,
+          "line_count": 96,
+          "parsing_time": 0.00418400764465332,
+          "symbols_found": 11,
+          "symbol_breakdown": {
+            "function": 9,
+            "class": 1,
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Cms.Api.Management/Security/Authorization/MustSatisfyRequirementAuthorizationHandler.cs",
+          "file_size": 3537,
+          "line_count": 78,
+          "parsing_time": 0.007243156433105469,
+          "symbols_found": 14,
+          "symbol_breakdown": {
+            "function": 8,
+            "class": 4,
+            "field": 2
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Cms.Api.Management/ViewModels/MediaType/MediaTypeConfigurationModel.cs",
+          "file_size": 182,
+          "line_count": 6,
+          "parsing_time": 0.00041556358337402344,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "class": 1,
+            "property": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Cms.Api.Management/ViewModels/Document/DocumentVariantRequestModel.cs",
+          "file_size": 173,
+          "line_count": 7,
+          "parsing_time": 0.0003361701965332031,
+          "symbols_found": 1,
+          "symbol_breakdown": {
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Cms.Api.Management/ViewModels/Media/Collection/MediaCollectionResponseModel.cs",
+          "file_size": 397,
+          "line_count": 9,
+          "parsing_time": 0.000606536865234375,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "class": 1,
+            "property": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Cms.Api.Management/ViewModels/Tree/RelationTypeTreeItemResponseModel.cs",
+          "file_size": 186,
+          "line_count": 6,
+          "parsing_time": 0.0003790855407714844,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "class": 1,
+            "property": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Cms.Persistence.Sqlite/UmbracoBuilderExtensions.cs",
+          "file_size": 3215,
+          "line_count": 68,
+          "parsing_time": 0.003568887710571289,
+          "symbols_found": 7,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1,
+            "field": 3
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Web.Common/Extensions/WebHostEnvironmentExtensions.cs",
+          "file_size": 2017,
+          "line_count": 44,
+          "parsing_time": 0.003655672073364258,
+          "symbols_found": 5,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1,
+            "field": 2
+          },
+          "has_project_info": true,
+          "project_type": "web",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Web.Website/Extensions/UmbracoApplicationBuilder.Website.cs",
+          "file_size": 1603,
+          "line_count": 47,
+          "parsing_time": 0.0021262168884277344,
+          "symbols_found": 8,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1,
+            "field": 4
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/RuntimeLevel.cs",
+          "file_size": 968,
+          "line_count": 39,
+          "parsing_time": 0.0018031597137451172,
+          "symbols_found": 1,
+          "symbol_breakdown": {
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/Cache/NotificationHandlers/Implement/DictionaryItemSavedDistributedCacheNotificationHandler.cs",
+          "file_size": 921,
+          "line_count": 22,
+          "parsing_time": 0.0014302730560302734,
+          "symbols_found": 4,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1,
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/Models/RelationType.cs",
+          "file_size": 3515,
+          "line_count": 121,
+          "parsing_time": 0.004393339157104492,
+          "symbols_found": 13,
+          "symbol_breakdown": {
+            "function": 8,
+            "class": 1,
+            "field": 4
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/Models/ContentVariation.cs",
+          "file_size": 901,
+          "line_count": 36,
+          "parsing_time": 0.0013995170593261719,
+          "symbols_found": 1,
+          "symbol_breakdown": {
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/Models/ContentEditing/ContentCreateResult.cs",
+          "file_size": 127,
+          "line_count": 5,
+          "parsing_time": 0.0004448890686035156,
+          "symbols_found": 1,
+          "symbol_breakdown": {
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/Models/Packaging/CompiledPackageContentBase.cs",
+          "file_size": 602,
+          "line_count": 20,
+          "parsing_time": 0.0010035037994384766,
+          "symbols_found": 4,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1,
+            "property": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/DeliveryApi/ISortHandler.cs",
+          "file_size": 502,
+          "line_count": 14,
+          "parsing_time": 0.0008668899536132812,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/Events/IEventMessagesFactory.cs",
+          "file_size": 200,
+          "line_count": 11,
+          "parsing_time": 0.000370025634765625,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/Persistence/Repositories/IServerRegistrationRepository.cs",
+          "file_size": 269,
+          "line_count": 10,
+          "parsing_time": 0.0005207061767578125,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/Runtime/IMainDomKeyGenerator.cs",
+          "file_size": 314,
+          "line_count": 12,
+          "parsing_time": 0.0008051395416259766,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 2
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/Configuration/UmbracoSettings/IImagingAutoFillUploadField.cs",
+          "file_size": 389,
+          "line_count": 17,
+          "parsing_time": 0.0007102489471435547,
+          "symbols_found": 6,
+          "symbol_breakdown": {
+            "class": 1,
+            "property": 5
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/Webhooks/LegacyEvents/Content/LegacyContentRolledBack.cs",
+          "file_size": 1867,
+          "line_count": 47,
+          "parsing_time": 0.002698659896850586,
+          "symbols_found": 6,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1,
+            "field": 3
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/Security/NoopHtmlSanitizer.cs",
+          "file_size": 139,
+          "line_count": 6,
+          "parsing_time": 0.0003039836883544922,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/Services/IEntitySearchService.cs",
+          "file_size": 353,
+          "line_count": 12,
+          "parsing_time": 0.0007565021514892578,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1,
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/Services/IDictionaryPermissionService.cs",
+          "file_size": 317,
+          "line_count": 10,
+          "parsing_time": 0.0006041526794433594,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/Services/FileSystem/IPartialViewFolderService.cs",
+          "file_size": 451,
+          "line_count": 13,
+          "parsing_time": 0.0007829666137695312,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/Notifications/WebhookDeletedNotification .cs",
+          "file_size": 306,
+          "line_count": 12,
+          "parsing_time": 0.000606536865234375,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/Notifications/UserPasswordResetNotification.cs",
+          "file_size": 288,
+          "line_count": 9,
+          "parsing_time": 0.0006206035614013672,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/Logging/ILoggingConfiguration.cs",
+          "file_size": 492,
+          "line_count": 19,
+          "parsing_time": 0.0009050369262695312,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "class": 1,
+            "property": 2
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/Installer/Steps/TelemetryIdentifierStep.cs",
+          "file_size": 1511,
+          "line_count": 44,
+          "parsing_time": 0.001970052719116211,
+          "symbols_found": 8,
+          "symbol_breakdown": {
+            "function": 4,
+            "class": 1,
+            "field": 3
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Web.UI/Views/_ViewImports.cshtml",
+          "file_size": 241,
+          "line_count": 6,
+          "parsing_time": 0.0003364086151123047,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Web.UI/Views/Partials/blockgrid/default.cshtml",
+          "file_size": 419,
+          "line_count": 11,
+          "parsing_time": 0.00033545494079589844,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/EmbeddedResources/BlockGrid/items.cshtml",
+          "file_size": 1397,
+          "line_count": 35,
+          "parsing_time": 0.0015869140625,
+          "symbols_found": 1,
+          "symbol_breakdown": {
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/EmbeddedResources/BlockGrid/areas.cshtml",
+          "file_size": 469,
+          "line_count": 13,
+          "parsing_time": 0.00040221214294433594,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/EmbeddedResources/BlockGrid/Components/umbBlockGridDemoImageBlock.cshtml",
+          "file_size": 437,
+          "line_count": 12,
+          "parsing_time": 0.00045680999755859375,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "field": 2
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/EmbeddedResources/Snippets/ListChildPagesFromCurrentPage.cshtml",
+          "file_size": 1169,
+          "line_count": 31,
+          "parsing_time": 0.0023534297943115234,
+          "symbols_found": 1,
+          "symbol_breakdown": {
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/EmbeddedResources/Snippets/Login.cshtml",
+          "file_size": 4186,
+          "line_count": 107,
+          "parsing_time": 0.004090070724487305,
+          "symbols_found": 4,
+          "symbol_breakdown": {
+            "function": 1,
+            "field": 3
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/EmbeddedResources/Snippets/ListDescendantsFromCurrentPage.cshtml",
+          "file_size": 3339,
+          "line_count": 85,
+          "parsing_time": 0.005435466766357422,
+          "symbols_found": 5,
+          "symbol_breakdown": {
+            "function": 2,
+            "field": 3
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/EmbeddedResources/Snippets/ListChildPagesOrderedByName.cshtml",
+          "file_size": 1266,
+          "line_count": 30,
+          "parsing_time": 0.0024504661560058594,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "function": 1,
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "Umbraco-CMS/src/Umbraco.Core/EmbeddedResources/Snippets/Breadcrumb.cshtml",
+          "file_size": 1257,
+          "line_count": 30,
+          "parsing_time": 0.0026090145111083984,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "function": 2,
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        }
+      ],
+      "project_files_found": 30,
+      "unique_project_types": [
+        "web"
+      ],
+      "performance_metrics": {
+        "max_parsing_time": 0.026049375534057617,
+        "min_parsing_time": 0.0003039836883544922,
+        "median_parsing_time": 0.0014148950576782227,
+        "files_with_errors": 0,
+        "avg_symbols_per_file": 11.883333333333333
+      }
+    },
+    "OrchardCore": {
+      "repo_name": "OrchardCore",
+      "total_files": 60,
+      "successfully_parsed": 60,
+      "total_symbols": 692,
+      "avg_parsing_time": 0.0026154359181722003,
+      "file_results": [
+        {
+          "file_path": "OrchardCore/test/OrchardCore.Tests.Modules/Examples.Modules.AssyAttrib.Bravo/Root.cs",
+          "file_size": 182,
+          "line_count": 6,
+          "parsing_time": 0.0006811618804931641,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "class": 2,
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/test/OrchardCore.Tests/Html/HtmlSanitizerTests.cs",
+          "file_size": 2428,
+          "line_count": 68,
+          "parsing_time": 0.002293109893798828,
+          "symbols_found": 19,
+          "symbol_breakdown": {
+            "function": 6,
+            "class": 1,
+            "field": 12
+          },
+          "has_project_info": true,
+          "project_type": "web",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/test/OrchardCore.Tests.Pages/OrchardCore.Modules.Pages/Module.Pages/Startup.cs",
+          "file_size": 785,
+          "line_count": 24,
+          "parsing_time": 0.0009236335754394531,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore/OrchardCore.Email.Core/Services/EmailServiceEventsBase.cs",
+          "file_size": 632,
+          "line_count": 19,
+          "parsing_time": 0.0009620189666748047,
+          "symbols_found": 6,
+          "symbol_breakdown": {
+            "function": 5,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore/OrchardCore.ResourceManagement.Abstractions/ResourceDefinition.cs",
+          "file_size": 11252,
+          "line_count": 367,
+          "parsing_time": 0.012180805206298828,
+          "symbols_found": 92,
+          "symbol_breakdown": {
+            "function": 33,
+            "class": 1,
+            "property": 16,
+            "field": 42
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore/OrchardCore.Mvc.Core/Routing/IAreaControllerRouteMapper.cs",
+          "file_size": 293,
+          "line_count": 10,
+          "parsing_time": 0.0005431175231933594,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1,
+            "property": 1
+          },
+          "has_project_info": true,
+          "project_type": "web",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore/OrchardCore.Workflows.Abstractions/Models/WorkflowContext.cs",
+          "file_size": 200,
+          "line_count": 11,
+          "parsing_time": 0.0003724098205566406,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1,
+            "property": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore/OrchardCore.HealthChecks.Abstractions/Services/IHealthChecksResponseWriter.cs",
+          "file_size": 253,
+          "line_count": 9,
+          "parsing_time": 0.0004088878631591797,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore/OrchardCore.Infrastructure.Abstractions/Documents/Options/IDocumentSharedOptions.cs",
+          "file_size": 135,
+          "line_count": 6,
+          "parsing_time": 0.00029969215393066406,
+          "symbols_found": 1,
+          "symbol_breakdown": {
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore/OrchardCore.Users.Abstractions/Events/IRegistrationFormEvents.cs",
+          "file_size": 862,
+          "line_count": 25,
+          "parsing_time": 0.0014674663543701172,
+          "symbols_found": 4,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore/OrchardCore/Modules/ModularBackgroundService.cs",
+          "file_size": 17237,
+          "line_count": 433,
+          "parsing_time": 0.020857810974121094,
+          "symbols_found": 51,
+          "symbol_breakdown": {
+            "function": 12,
+            "class": 1,
+            "field": 38
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore/OrchardCore.ContentManagement.Abstractions/Handlers/ContentContextBase.cs",
+          "file_size": 250,
+          "line_count": 11,
+          "parsing_time": 0.0005056858062744141,
+          "symbols_found": 4,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1,
+            "property": 1,
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore/OrchardCore.Abstractions/ShellOptionConstants.cs",
+          "file_size": 239,
+          "line_count": 8,
+          "parsing_time": 0.0004968643188476562,
+          "symbols_found": 6,
+          "symbol_breakdown": {
+            "class": 1,
+            "field": 4,
+            "namespace": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore/OrchardCore.Abstractions/Json/Dynamic/JsonDynamicValue.cs",
+          "file_size": 24147,
+          "line_count": 813,
+          "parsing_time": 0.02822279930114746,
+          "symbols_found": 168,
+          "symbol_breakdown": {
+            "function": 145,
+            "class": 1,
+            "field": 22
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore/OrchardCore.Setup.Core/Extensions/ServiceCollectionExtensions.cs",
+          "file_size": 592,
+          "line_count": 22,
+          "parsing_time": 0.0008628368377685547,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1,
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore/OrchardCore.Search.AzureAI.Core/Models/AzureAISearchIndexSettings.cs",
+          "file_size": 1149,
+          "line_count": 36,
+          "parsing_time": 0.0016155242919921875,
+          "symbols_found": 10,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1,
+            "property": 7
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore/OrchardCore.ContentLocalization.Abstractions/Handlers/IContentLocalizationPartHandler.cs",
+          "file_size": 303,
+          "line_count": 9,
+          "parsing_time": 0.0005407333374023438,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore/OrchardCore.Infrastructure/Cache/CacheContextProviders/RouteCacheContextProvider.cs",
+          "file_size": 859,
+          "line_count": 26,
+          "parsing_time": 0.0011010169982910156,
+          "symbols_found": 6,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1,
+            "field": 2
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore/OrchardCore.ContentTypes.Abstractions/Events/IContentDefinitionHandler.cs",
+          "file_size": 1839,
+          "line_count": 38,
+          "parsing_time": 0.004961967468261719,
+          "symbols_found": 6,
+          "symbol_breakdown": {
+            "function": 4,
+            "class": 2
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore/OrchardCore.Search.Lucene.Core/QueryProviders/Filters/GeoDistanceFilterProvider.cs",
+          "file_size": 6906,
+          "line_count": 210,
+          "parsing_time": 0.007375955581665039,
+          "symbols_found": 61,
+          "symbol_breakdown": {
+            "function": 15,
+            "class": 1,
+            "field": 45
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore/OrchardCore.Email.Abstractions/MailMessageValidationContext.cs",
+          "file_size": 399,
+          "line_count": 17,
+          "parsing_time": 0.0005803108215332031,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1,
+            "property": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore/OrchardCore.DisplayManagement/Notify/NotifyJsonSerializerOptions.cs",
+          "file_size": 210,
+          "line_count": 8,
+          "parsing_time": 0.00044989585876464844,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1,
+            "property": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore/OrchardCore.DisplayManagement.Liquid/LiquidViewParser.cs",
+          "file_size": 5159,
+          "line_count": 89,
+          "parsing_time": 0.0044097900390625,
+          "symbols_found": 10,
+          "symbol_breakdown": {
+            "function": 5,
+            "class": 2,
+            "property": 1,
+            "field": 1,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Themes/Deployment/ThemesDeploymentStep.cs",
+          "file_size": 328,
+          "line_count": 14,
+          "parsing_time": 0.0006153583526611328,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.OpenId/ViewModels/OpenIdValidationSettingsViewModel.cs",
+          "file_size": 344,
+          "line_count": 16,
+          "parsing_time": 0.0005822181701660156,
+          "symbols_found": 6,
+          "symbol_breakdown": {
+            "class": 1,
+            "property": 5
+          },
+          "has_project_info": true,
+          "project_type": "web",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Localization/GraphQL/CultureQueryObjectType.cs",
+          "file_size": 803,
+          "line_count": 26,
+          "parsing_time": 0.0009331703186035156,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.AdminMenu/Services/AdminMenuService.cs",
+          "file_size": 2007,
+          "line_count": 57,
+          "parsing_time": 0.0025877952575683594,
+          "symbols_found": 16,
+          "symbol_breakdown": {
+            "function": 8,
+            "class": 1,
+            "field": 7
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.ContentFields/Handlers/YoutubeFieldHandler.cs",
+          "file_size": 1518,
+          "line_count": 45,
+          "parsing_time": 0.0016756057739257812,
+          "symbols_found": 8,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1,
+            "field": 4
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Admin/AdminThemeSelector.cs",
+          "file_size": 1295,
+          "line_count": 44,
+          "parsing_time": 0.001905202865600586,
+          "symbols_found": 9,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1,
+            "field": 5
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Deployment.Remote/Services/RemoteInstanceDeploymentTargetProvider.cs",
+          "file_size": 1373,
+          "line_count": 38,
+          "parsing_time": 0.0019979476928710938,
+          "symbols_found": 8,
+          "symbol_breakdown": {
+            "function": 4,
+            "class": 1,
+            "field": 3
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Forms/Models/FormInputElementPart.cs",
+          "file_size": 259,
+          "line_count": 11,
+          "parsing_time": 0.0005738735198974609,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "class": 1,
+            "property": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Liquid/Filters/JsonFilter.cs",
+          "file_size": 1830,
+          "line_count": 49,
+          "parsing_time": 0.002244710922241211,
+          "symbols_found": 12,
+          "symbol_breakdown": {
+            "function": 7,
+            "class": 1,
+            "field": 3,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.ContentTypes/Editors/ContentTypeSettingsDisplayDriver.cs",
+          "file_size": 4484,
+          "line_count": 130,
+          "parsing_time": 0.0049092769622802734,
+          "symbols_found": 23,
+          "symbol_breakdown": {
+            "function": 10,
+            "class": 1,
+            "field": 12
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Contents/Migrations.cs",
+          "file_size": 738,
+          "line_count": 24,
+          "parsing_time": 0.0012352466583251953,
+          "symbols_found": 4,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1,
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Contents/AdminNodes/ContentTypesAdminNodeViewModel.cs",
+          "file_size": 416,
+          "line_count": 15,
+          "parsing_time": 0.000629425048828125,
+          "symbols_found": 7,
+          "symbol_breakdown": {
+            "class": 2,
+            "property": 5
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Placements/ViewModels/ShapePlacementViewModel.cs",
+          "file_size": 129,
+          "line_count": 6,
+          "parsing_time": 0.0002846717834472656,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "class": 1,
+            "property": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Sitemaps/Builders/CustomPathSitemapSourceModifiedDateProvider.cs",
+          "file_size": 360,
+          "line_count": 11,
+          "parsing_time": 0.0006334781646728516,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Menu/Migrations.cs",
+          "file_size": 2404,
+          "line_count": 81,
+          "parsing_time": 0.003259897232055664,
+          "symbols_found": 14,
+          "symbol_breakdown": {
+            "function": 6,
+            "class": 1,
+            "field": 6,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Taxonomies/TermShapes.cs",
+          "file_size": 13526,
+          "line_count": 315,
+          "parsing_time": 0.015134334564208984,
+          "symbols_found": 42,
+          "symbol_breakdown": {
+            "function": 4,
+            "class": 1,
+            "field": 37
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Media.Indexing.OpenXML/Startup.cs",
+          "file_size": 435,
+          "line_count": 13,
+          "parsing_time": 0.0005996227264404297,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Redis/HealthChecks/RedisHealthCheck.cs",
+          "file_size": 1813,
+          "line_count": 51,
+          "parsing_time": 0.002452373504638672,
+          "symbols_found": 7,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1,
+            "field": 4
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Search.Lucene/Manifest.cs",
+          "file_size": 1160,
+          "line_count": 37,
+          "parsing_time": 0.0013964176177978516,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Workflows/ResourceManagementOptionsConfiguration.cs",
+          "file_size": 3124,
+          "line_count": 80,
+          "parsing_time": 0.0026941299438476562,
+          "symbols_found": 5,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1,
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Workflows/Drivers/WhileLoopTaskDisplayDriver.cs",
+          "file_size": 683,
+          "line_count": 19,
+          "parsing_time": 0.0008652210235595703,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Users/CustomUserSettingsPermissions.cs",
+          "file_size": 1406,
+          "line_count": 33,
+          "parsing_time": 0.002026081085205078,
+          "symbols_found": 6,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1,
+            "field": 2
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Users/Services/PhoneProviderTwoFactorOptionsConfiguration.cs",
+          "file_size": 846,
+          "line_count": 26,
+          "parsing_time": 0.0010635852813720703,
+          "symbols_found": 4,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1,
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Users/Deployment/AllUsersDeploymentSource.cs",
+          "file_size": 1821,
+          "line_count": 54,
+          "parsing_time": 0.002277374267578125,
+          "symbols_found": 9,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1,
+            "field": 4,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Microsoft.Authentication/Recipes/AzureADSettingsStep.cs",
+          "file_size": 1330,
+          "line_count": 42,
+          "parsing_time": 0.0017185211181640625,
+          "symbols_found": 11,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 2,
+            "property": 4,
+            "field": 3
+          },
+          "has_project_info": true,
+          "project_type": "web",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Notifications/Manifest.cs",
+          "file_size": 750,
+          "line_count": 30,
+          "parsing_time": 0.0007541179656982422,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Media/TagHelpers/ImageTagHelper.cs",
+          "file_size": 2163,
+          "line_count": 67,
+          "parsing_time": 0.002849578857421875,
+          "symbols_found": 14,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1,
+            "property": 2,
+            "field": 9
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/test/OrchardCore.Tests.Pages/OrchardCore.Modules.Pages/Module.Pages/Views/_ViewImports.cshtml",
+          "file_size": 212,
+          "line_count": 4,
+          "parsing_time": 0.00020122528076171875,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Rules/Views/Items/ContentTypeCondition.Fields.Edit.cshtml",
+          "file_size": 930,
+          "line_count": 21,
+          "parsing_time": 0.0007562637329101562,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.ContentFields/Views/BooleanField.DisplayOption.cshtml",
+          "file_size": 150,
+          "line_count": 4,
+          "parsing_time": 0.00026679039001464844,
+          "symbols_found": 1,
+          "symbol_breakdown": {
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Forms/Views/Items/BindModelStateTask.Fields.Design.cshtml",
+          "file_size": 198,
+          "line_count": 5,
+          "parsing_time": 0.00023627281188964844,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Contents/Views/AuditTrailPart.Edit.cshtml",
+          "file_size": 477,
+          "line_count": 11,
+          "parsing_time": 0.0005993843078613281,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Sitemaps/Views/SitemapPart.Edit.cshtml",
+          "file_size": 2853,
+          "line_count": 53,
+          "parsing_time": 0.0024824142456054688,
+          "symbols_found": 1,
+          "symbol_breakdown": {
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Search.AzureAI/Views/AzureAISearchIndexSettings.Buttons.SummaryAdmin.cshtml",
+          "file_size": 1036,
+          "line_count": 31,
+          "parsing_time": 0.0009417533874511719,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.AuditTrail/Views/AuditTrailEventDetail.DetailAdmin.cshtml",
+          "file_size": 1082,
+          "line_count": 32,
+          "parsing_time": 0.000911712646484375,
+          "symbols_found": 1,
+          "symbol_breakdown": {
+            "function": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Users/Views/UserInfo.cshtml",
+          "file_size": 437,
+          "line_count": 21,
+          "parsing_time": 0.0003948211669921875,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "OrchardCore/src/OrchardCore.Modules/OrchardCore.Microsoft.Authentication/Views/Items/MicrosoftAccountDeploymentStep.Edit.cshtml",
+          "file_size": 42,
+          "line_count": 1,
+          "parsing_time": 0.0001227855682373047,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        }
+      ],
+      "project_files_found": 227,
+      "unique_project_types": [
+        "web"
+      ],
+      "performance_metrics": {
+        "max_parsing_time": 0.02822279930114746,
+        "min_parsing_time": 0.0001227855682373047,
+        "median_parsing_time": 0.0009374618530273438,
+        "files_with_errors": 0,
+        "avg_symbols_per_file": 11.533333333333333
+      }
+    },
+    "abp": {
+      "repo_name": "abp",
+      "total_files": 60,
+      "successfully_parsed": 60,
+      "total_symbols": 650,
+      "avg_parsing_time": 0.002488112449645996,
+      "file_results": [
+        {
+          "file_path": "abp/modules/feature-management/test/Volo.Abp.FeatureManagement.MongoDB.Tests/Volo/Abp/FeatureManagement/MongoDB/FeatureManagementStore_Tests.cs",
+          "file_size": 220,
+          "line_count": 9,
+          "parsing_time": 0.0005731582641601562,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "class": 1,
+            "field": 1,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/virtual-file-explorer/src/Volo.Abp.VirtualFileExplorer.Installer/Volo/Abp/VirtualFileExplorer/AbpVirtualFileExplorerInstallerModule.cs",
+          "file_size": 486,
+          "line_count": 18,
+          "parsing_time": 0.0007205009460449219,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/identityserver/src/Volo.Abp.IdentityServer.MongoDB/Volo/Abp/IdentityServer/MongoDB/MongoPersistentGrantRepository.cs",
+          "file_size": 4322,
+          "line_count": 103,
+          "parsing_time": 0.004644155502319336,
+          "symbols_found": 23,
+          "symbol_breakdown": {
+            "function": 20,
+            "class": 1,
+            "field": 1,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/basic-theme/test/Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.Demo/Pages/Components/Paginator.cshtml.cs",
+          "file_size": 434,
+          "line_count": 14,
+          "parsing_time": 0.0005800724029541016,
+          "symbols_found": 4,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1,
+            "property": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/identity/test/Volo.Abp.Identity.Domain.Tests/Volo/Abp/Identity/Distributed_User_Change_Event_Tests.cs",
+          "file_size": 2261,
+          "line_count": 62,
+          "parsing_time": 0.0025568008422851562,
+          "symbols_found": 14,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1,
+            "field": 8,
+            "import": 2
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/identity/src/Volo.Abp.Identity.Application/Volo/Abp/Identity/AbpIdentityApplicationModuleAutoMapperProfile.cs",
+          "file_size": 369,
+          "line_count": 15,
+          "parsing_time": 0.0006029605865478516,
+          "symbols_found": 4,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1,
+            "field": 1,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/cms-kit/test/Volo.CmsKit.MongoDB.Tests/MongoDB/MongoTestCollection.cs",
+          "file_size": 202,
+          "line_count": 9,
+          "parsing_time": 0.00034737586975097656,
+          "symbols_found": 4,
+          "symbol_breakdown": {
+            "class": 1,
+            "field": 2,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/cms-kit/src/Volo.CmsKit.Common.Web/Pages/CmsKit/Components/Contents/ContentParser.cs",
+          "file_size": 4673,
+          "line_count": 121,
+          "parsing_time": 0.0048711299896240234,
+          "symbols_found": 20,
+          "symbol_breakdown": {
+            "function": 6,
+            "class": 1,
+            "field": 13
+          },
+          "has_project_info": true,
+          "project_type": "library",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/cms-kit/src/Volo.CmsKit.Admin.Web/Pages/CmsKit/BlogPosts/Update.cshtml.cs",
+          "file_size": 2908,
+          "line_count": 87,
+          "parsing_time": 0.00323486328125,
+          "symbols_found": 23,
+          "symbol_breakdown": {
+            "function": 4,
+            "class": 2,
+            "property": 10,
+            "field": 5,
+            "import": 2
+          },
+          "has_project_info": true,
+          "project_type": "library",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/cms-kit/src/Volo.CmsKit.Public.HttpApi.Client/ClientProxies/Volo/CmsKit/Public/MarkedItems/MarkedItemPublicClientProxy.cs",
+          "file_size": 216,
+          "line_count": 7,
+          "parsing_time": 0.0005581378936767578,
+          "symbols_found": 1,
+          "symbol_breakdown": {
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/cms-kit/src/Volo.CmsKit.Admin.Application.Contracts/Volo/CmsKit/Admin/Menus/PageLookupDto.cs",
+          "file_size": 224,
+          "line_count": 12,
+          "parsing_time": 0.00039505958557128906,
+          "symbols_found": 5,
+          "symbol_breakdown": {
+            "class": 1,
+            "property": 2,
+            "field": 1,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/audit-logging/src/Volo.Abp.AuditLogging.EntityFrameworkCore/Volo/Abp/AuditLogging/AbpAuditLoggingEfCoreQueryableExtensions.cs",
+          "file_size": 798,
+          "line_count": 33,
+          "parsing_time": 0.0011074542999267578,
+          "symbols_found": 5,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1,
+            "field": 2
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/openiddict/app/OpenIddict.Demo.Client.Mvc/OpenIddictMvcModule.cs",
+          "file_size": 314,
+          "line_count": 14,
+          "parsing_time": 0.0004000663757324219,
+          "symbols_found": 1,
+          "symbol_breakdown": {
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/openiddict/src/Volo.Abp.OpenIddict.Domain/Volo/Abp/OpenIddict/Authorizations/AbpOpenIddictAuthorizationStore.cs",
+          "file_size": 15777,
+          "line_count": 403,
+          "parsing_time": 0.0180814266204834,
+          "symbols_found": 51,
+          "symbol_breakdown": {
+            "function": 25,
+            "class": 1,
+            "property": 2,
+            "field": 22,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/docs/src/Volo.Docs.Application.Contracts/Volo/Docs/Documents/IDocumentAppService.cs",
+          "file_size": 863,
+          "line_count": 26,
+          "parsing_time": 0.0010671615600585938,
+          "symbols_found": 7,
+          "symbol_breakdown": {
+            "function": 6,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/docs/src/Volo.Docs.Web/Areas/Documents/DocumentNavigationController.cs",
+          "file_size": 2398,
+          "line_count": 80,
+          "parsing_time": 0.0025568008422851562,
+          "symbols_found": 11,
+          "symbol_breakdown": {
+            "function": 4,
+            "class": 1,
+            "field": 5,
+            "import": 1
+          },
+          "has_project_info": true,
+          "project_type": "library",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/account/src/Volo.Abp.Account.Web/Pages/Account/Register.cshtml.cs",
+          "file_size": 9189,
+          "line_count": 263,
+          "parsing_time": 0.010950565338134766,
+          "symbols_found": 60,
+          "symbol_breakdown": {
+            "function": 23,
+            "class": 3,
+            "property": 15,
+            "field": 18,
+            "import": 1
+          },
+          "has_project_info": true,
+          "project_type": "library",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/blogging/src/Volo.Blogging.Admin.Application.Contracts/Volo/Blogging/Admin/BloggingAdminApplicationContractsModule.cs",
+          "file_size": 414,
+          "line_count": 16,
+          "parsing_time": 0.0007107257843017578,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/permission-management/test/Volo.Abp.PermissionManagement.Domain.Tests/Volo/Abp/PermissionManagement/CalculateHash_Tests.cs",
+          "file_size": 1487,
+          "line_count": 43,
+          "parsing_time": 0.0018000602722167969,
+          "symbols_found": 11,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1,
+            "field": 4,
+            "import": 3
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/templates/app/aspnet-core/src/MyCompanyName.MyProjectName.Blazor.WebApp.Tiered.Client/Program.cs",
+          "file_size": 609,
+          "line_count": 22,
+          "parsing_time": 0.000698089599609375,
+          "symbols_found": 4,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1,
+            "field": 2
+          },
+          "has_project_info": true,
+          "project_type": "web",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/templates/maui/src/MyCompanyName.MyProjectName/Platforms/iOS/AppDelegate.cs",
+          "file_size": 221,
+          "line_count": 9,
+          "parsing_time": 0.0004305839538574219,
+          "symbols_found": 4,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1,
+            "field": 1,
+            "import": 1
+          },
+          "has_project_info": true,
+          "project_type": "exe",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/templates/app-nolayers/aspnet-core/MyCompanyName.MyProjectName.Host.Mongo/Data/MyProjectNameDbContext.cs",
+          "file_size": 533,
+          "line_count": 22,
+          "parsing_time": 0.0007028579711914062,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1,
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/test/AbpPerfTest/AbpPerfTest.WithoutAbp/Controllers/HomeController.cs",
+          "file_size": 276,
+          "line_count": 14,
+          "parsing_time": 0.0004069805145263672,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/test/Volo.Abp.AspNetCore.Mvc.Tests/Volo/Abp/AspNetCore/Mvc/ExceptionHandling/AbpAuthorizationExceptionTestController_Tests.cs",
+          "file_size": 2186,
+          "line_count": 67,
+          "parsing_time": 0.0026361942291259766,
+          "symbols_found": 18,
+          "symbol_breakdown": {
+            "function": 6,
+            "class": 1,
+            "field": 7,
+            "import": 4
+          },
+          "has_project_info": true,
+          "project_type": "web",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/test/Volo.Abp.EventBus.Tests/Volo/Abp/EventBus/EventHandlerInvoker_Tests.cs",
+          "file_size": 4121,
+          "line_count": 128,
+          "parsing_time": 0.004960298538208008,
+          "symbols_found": 43,
+          "symbol_breakdown": {
+            "function": 18,
+            "class": 5,
+            "property": 5,
+            "field": 12,
+            "import": 3
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/test/Volo.Abp.MongoDB.Tests.SecondContext/Volo/Abp/MongoDB/TestApp/FifthContext/FifthDbContextMultiTenantDummyEntity.cs",
+          "file_size": 295,
+          "line_count": 12,
+          "parsing_time": 0.0005466938018798828,
+          "symbols_found": 4,
+          "symbol_breakdown": {
+            "class": 1,
+            "property": 1,
+            "field": 1,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/test/Volo.Abp.Http.Client.IdentityModel.Web.Tests/Volo/Abp/Http/Client/IdentityModel/Web/HttpContextIdentityModelRemoteServiceHttpClientAuthenticator_Tests.cs",
+          "file_size": 979,
+          "line_count": 25,
+          "parsing_time": 0.0017910003662109375,
+          "symbols_found": 8,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1,
+            "field": 3,
+            "import": 2
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/test/Volo.Abp.EntityFrameworkCore.Tests/Volo/Abp/EntityFrameworkCore/Domain/TestEntityExtensionConfigurator.cs",
+          "file_size": 2376,
+          "line_count": 67,
+          "parsing_time": 0.0028350353240966797,
+          "symbols_found": 6,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1,
+            "field": 2,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/src/Volo.Abp.AspNetCore.Mvc.UI.Theme.Shared.Demo/Views/Components/Themes/Shared/Demos/TooltipsDemo/TooltipsDemoViewComponent.cs",
+          "file_size": 637,
+          "line_count": 19,
+          "parsing_time": 0.0008203983306884766,
+          "symbols_found": 4,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1,
+            "field": 1
+          },
+          "has_project_info": true,
+          "project_type": "library",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/src/Volo.Abp.MemoryDb/Volo/Abp/Domain/Repositories/MemoryDb/MemoryDatabase.cs",
+          "file_size": 1315,
+          "line_count": 39,
+          "parsing_time": 0.0017478466033935547,
+          "symbols_found": 8,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1,
+            "field": 4,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/src/Volo.Abp.Core/Volo/Abp/AbpApplicationCreationOptions.cs",
+          "file_size": 972,
+          "line_count": 34,
+          "parsing_time": 0.0016591548919677734,
+          "symbols_found": 8,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1,
+            "property": 4
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/src/Volo.Abp.Core/Volo/Abp/Modularity/IModuleLifecycleContributor.cs",
+          "file_size": 608,
+          "line_count": 16,
+          "parsing_time": 0.0009396076202392578,
+          "symbols_found": 5,
+          "symbol_breakdown": {
+            "function": 4,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/src/Volo.Abp.AspNetCore.Bundling/Volo/Abp/AspNetCore/Bundling/IBundleManager.cs",
+          "file_size": 349,
+          "line_count": 12,
+          "parsing_time": 0.00047016143798828125,
+          "symbols_found": 1,
+          "symbol_breakdown": {
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/src/Volo.Abp.Localization/Volo/Abp/Localization/ILocalizationResourceContributor.cs",
+          "file_size": 601,
+          "line_count": 20,
+          "parsing_time": 0.0008473396301269531,
+          "symbols_found": 5,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1,
+            "property": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/src/Volo.Abp.AspNetCore.Mvc.UI.Packages/Volo/Abp/AspNetCore/Mvc/UI/Packages/AbpAspNetCoreMvcUiPackagesModule.cs",
+          "file_size": 2086,
+          "line_count": 52,
+          "parsing_time": 0.0022704601287841797,
+          "symbols_found": 16,
+          "symbol_breakdown": {
+            "function": 15,
+            "class": 1
+          },
+          "has_project_info": true,
+          "project_type": "library",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/src/Volo.Abp.AspNetCore.Mvc/Volo/Abp/AspNetCore/Mvc/AbpActionContextExtensions.cs",
+          "file_size": 572,
+          "line_count": 19,
+          "parsing_time": 0.0008168220520019531,
+          "symbols_found": 1,
+          "symbol_breakdown": {
+            "class": 1
+          },
+          "has_project_info": true,
+          "project_type": "web",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/src/Volo.Abp.Json.SystemTextJson/Volo/Abp/Json/SystemTextJson/JsonConverters/AbpNullableDateTimeConverter.cs",
+          "file_size": 2731,
+          "line_count": 91,
+          "parsing_time": 0.0030672550201416016,
+          "symbols_found": 18,
+          "symbol_breakdown": {
+            "function": 8,
+            "class": 1,
+            "field": 8,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/src/Volo.Abp.Localization.Abstractions/Volo/Abp/Localization/LocalizableStringExtensions.cs",
+          "file_size": 593,
+          "line_count": 19,
+          "parsing_time": 0.0011718273162841797,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/src/Volo.Abp.ObjectExtending/Volo/Abp/ObjectExtending/Modularity/ExtensionPropertyUiFormConfiguration.cs",
+          "file_size": 213,
+          "line_count": 9,
+          "parsing_time": 0.0004248619079589844,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "class": 1,
+            "property": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/src/Volo.Abp.Settings/Volo/Abp/Settings/NullDynamicSettingDefinitionStore.cs",
+          "file_size": 1065,
+          "line_count": 30,
+          "parsing_time": 0.0013680458068847656,
+          "symbols_found": 10,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1,
+            "field": 6,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/src/Volo.Abp.RabbitMQ/Volo/Abp/RabbitMQ/RabbitMqConnections.cs",
+          "file_size": 789,
+          "line_count": 33,
+          "parsing_time": 0.0010063648223876953,
+          "symbols_found": 9,
+          "symbol_breakdown": {
+            "function": 3,
+            "class": 1,
+            "field": 4,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/src/Volo.Abp.UI.Navigation/Volo/Abp/Ui/Navigation/ApplicationMenuGroupList.cs",
+          "file_size": 641,
+          "line_count": 36,
+          "parsing_time": 0.0007996559143066406,
+          "symbols_found": 7,
+          "symbol_breakdown": {
+            "function": 5,
+            "class": 1,
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/src/Volo.Abp.GlobalFeatures/Volo/Abp/GlobalFeatures/RequireGlobalFeaturesSimpleStateChecker.cs",
+          "file_size": 1470,
+          "line_count": 43,
+          "parsing_time": 0.0016036033630371094,
+          "symbols_found": 8,
+          "symbol_breakdown": {
+            "function": 4,
+            "class": 1,
+            "property": 1,
+            "field": 1,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/src/Volo.Abp.BlazoriseUI/Components/EntityActions.razor.cs",
+          "file_size": 2052,
+          "line_count": 71,
+          "parsing_time": 0.002214670181274414,
+          "symbols_found": 15,
+          "symbol_breakdown": {
+            "function": 5,
+            "class": 1,
+            "property": 6,
+            "field": 2,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/src/Volo.Abp.Ddd.Application.Contracts/Volo/Abp/Application/Dtos/ExtensibleCreationAuditedEntityWithUserDto.cs",
+          "file_size": 1820,
+          "line_count": 55,
+          "parsing_time": 0.002574920654296875,
+          "symbols_found": 10,
+          "symbol_breakdown": {
+            "function": 4,
+            "class": 4,
+            "field": 1,
+            "import": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/src/Volo.Abp.EntityFrameworkCore/Volo/Abp/EntityFrameworkCore/ValueConverters/AbpJsonValueConverter.cs",
+          "file_size": 1021,
+          "line_count": 36,
+          "parsing_time": 0.0015454292297363281,
+          "symbols_found": 8,
+          "symbol_breakdown": {
+            "function": 6,
+            "class": 1,
+            "field": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/src/Volo.Abp.Cli.Core/Volo/Abp/Cli/ProjectModification/ModuleWithMastersInfo.cs",
+          "file_size": 206,
+          "line_count": 8,
+          "parsing_time": 0.0004401206970214844,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "class": 1,
+            "property": 1
+          },
+          "has_project_info": true,
+          "project_type": "web",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/src/Volo.Abp.Cli.Core/Volo/Abp/Cli/ProjectBuilding/Templates/App/AppNoLayersProTemplate.cs",
+          "file_size": 550,
+          "line_count": 20,
+          "parsing_time": 0.0006716251373291016,
+          "symbols_found": 4,
+          "symbol_breakdown": {
+            "function": 1,
+            "class": 1,
+            "field": 2
+          },
+          "has_project_info": true,
+          "project_type": "web",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/src/Volo.Abp.Emailing/Volo/Abp/Emailing/IEmailSenderConfiguration.cs",
+          "file_size": 293,
+          "line_count": 13,
+          "parsing_time": 0.0005707740783691406,
+          "symbols_found": 3,
+          "symbol_breakdown": {
+            "function": 2,
+            "class": 1
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/src/Volo.Abp.AspNetCore.Mvc.UI.Bootstrap/TagHelpers/Card/AbpCardBodyTagHelperService.cs",
+          "file_size": 1425,
+          "line_count": 40,
+          "parsing_time": 0.0014612674713134766,
+          "symbols_found": 10,
+          "symbol_breakdown": {
+            "function": 5,
+            "class": 1,
+            "field": 3,
+            "import": 1
+          },
+          "has_project_info": true,
+          "project_type": "library",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/feature-management/src/Volo.Abp.FeatureManagement.Web/Pages/FeatureManagement/_ViewImports.cshtml",
+          "file_size": 206,
+          "line_count": 4,
+          "parsing_time": 0.0002570152282714844,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/basic-theme/test/Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.Demo/Pages/Components/Cards.cshtml",
+          "file_size": 25971,
+          "line_count": 595,
+          "parsing_time": 0.021634817123413086,
+          "symbols_found": 124,
+          "symbol_breakdown": {
+            "field": 124
+          },
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/basic-theme/test/Volo.Abp.AspNetCore.Mvc.UI.Theme.Basic.Demo/Pages/Components/Grids/Index.cshtml",
+          "file_size": 624,
+          "line_count": 13,
+          "parsing_time": 0.0005362033843994141,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/identity/src/Volo.Abp.Identity.Web/Pages/Identity/Roles/EditModal.cshtml",
+          "file_size": 3365,
+          "line_count": 70,
+          "parsing_time": 0.003676176071166992,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/cms-kit/src/Volo.CmsKit.Admin.Web/Pages/CmsKit/Comments/Approve/Index.cshtml",
+          "file_size": 2849,
+          "line_count": 75,
+          "parsing_time": 0.0023164749145507812,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/setting-management/src/Volo.Abp.SettingManagement.Web/Pages/SettingManagement/Components/TimeZoneSettingGroup/Default.cshtml",
+          "file_size": 874,
+          "line_count": 21,
+          "parsing_time": 0.0007693767547607422,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/docs/src/Volo.Docs.Web/Pages/Documents/Search.cshtml",
+          "file_size": 4236,
+          "line_count": 98,
+          "parsing_time": 0.005359172821044922,
+          "symbols_found": 2,
+          "symbol_breakdown": {
+            "function": 1,
+            "field": 1
+          },
+          "has_project_info": true,
+          "project_type": "library",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/modules/blogging/src/Volo.Blogging.Admin.Web/Pages/_ViewImports.cshtml",
+          "file_size": 241,
+          "line_count": 5,
+          "parsing_time": 0.0002613067626953125,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/templates/app-nolayers/aspnet-core/MyCompanyName.MyProjectName.Blazor.Server.Mongo/Components/Pages/_ViewImports.cshtml",
+          "file_size": 206,
+          "line_count": 4,
+          "parsing_time": 0.0002956390380859375,
+          "symbols_found": 0,
+          "symbol_breakdown": {},
+          "has_project_info": false,
+          "project_type": null,
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        },
+        {
+          "file_path": "abp/framework/src/Volo.Abp.AspNetCore.Mvc.UI.Theme.Shared.Demo/Views/Components/Themes/Shared/Demos/CardsDemo/Default.cshtml",
+          "file_size": 15124,
+          "line_count": 305,
+          "parsing_time": 0.014922142028808594,
+          "symbols_found": 24,
+          "symbol_breakdown": {
+            "field": 24
+          },
+          "has_project_info": true,
+          "project_type": "library",
+          "framework_version": null,
+          "packages_found": 0,
+          "errors": []
+        }
+      ],
+      "project_files_found": 628,
+      "unique_project_types": [
+        "web",
+        "library",
+        "exe"
+      ],
+      "performance_metrics": {
+        "max_parsing_time": 0.021634817123413086,
+        "min_parsing_time": 0.0002570152282714844,
+        "median_parsing_time": 0.0010367631912231445,
+        "files_with_errors": 0,
+        "avg_symbols_per_file": 10.833333333333334
+      }
+    }
+  },
+  "plugin_capabilities": {
+    "supports_csproj_parsing": true,
+    "supports_project_detection": true,
+    "supports_multiple_extensions": true,
+    "framework_detection": false
+  }
+}

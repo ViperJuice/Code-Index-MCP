@@ -180,4 +180,6 @@ def wrap_index_handler(original_handler):
     
     This function is called by the tool registry to enhance the handler.
     """
-    return SmartIndexWrapper(original_handler)
+    wrapper = SmartIndexWrapper(original_handler)
+    # Return the actual callable method, not the instance
+    return wrapper.__call__
