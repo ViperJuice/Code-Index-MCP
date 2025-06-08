@@ -17,12 +17,10 @@ from unittest.mock import Mock, patch
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 # Import our modules
 from mcp_server.gateway import app
-from mcp_server.dispatcher import Dispatcher
+from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from mcp_server.storage.sqlite_store import SQLiteStore
 from mcp_server.watcher import FileWatcher
 from mcp_server.plugin_base import IPlugin, SymbolDef, SearchResult
