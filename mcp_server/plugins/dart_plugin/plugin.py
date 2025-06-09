@@ -190,7 +190,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
             )
             return Result.error_result(error)
 
-    def search(self, query: str, options: Dict[str, Any]) -> Result[List[SearchResultInterface]]:
+    def search_with_result(self, query: str, options: Dict[str, Any]) -> Result[List[SearchResultInterface]]:
         """Search for code patterns using Result pattern (IDartPlugin interface)"""
         try:
             limit = options.get("limit", 20)
@@ -404,7 +404,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
             ]
         return []
 
-    def search(self, query: str, opts: SearchOpts | None = None) -> list[SearchResult]:
+    def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:
         """Search for code snippets matching a query (legacy interface)"""
         options = {}
         if opts:

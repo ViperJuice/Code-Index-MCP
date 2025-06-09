@@ -1,0 +1,104 @@
+@startuml
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define INTERNAL <<Internal>>
+!define ASYNC <<async>>
+
+package "mcp_server.plugins.go_plugin" <<Component>> {
+    ' Main Plugin Class
+    class GoPlugin implements IPlugin #LightGreen {
+        -_sqlite_store: SQLiteStore
+        -_parser: TreeSitterParser
+        -_module_resolver: ModuleResolver
+        -_package_analyzer: PackageAnalyzer
+        -_interface_checker: InterfaceChecker
+        +__init__(sqlite_store: SQLiteStore)
+        +extract_symbols(content: str, file_path: str): Result
+        +search_symbols(query: str, limit: int): List<Symbol>
+        +get_language(): str
+        +get_file_extensions(): List<str>
+        -_extract_functions(tree: TreeNode): List<FunctionSymbol]
+        -_extract_types(tree: TreeNode): List<TypeSymbol]
+        -_extract_interfaces(tree: TreeNode): List<InterfaceSymbol]
+        -_extract_imports(tree: TreeNode): List<Import]
+    }
+    
+    ' Module System Support
+    class ModuleResolver INTERNAL {
+        -_go_mod_path: Optional<Path>
+        -_module_cache: Dict<str, Module]
+        +find_go_mod(start_path: Path): Optional<Path>
+        +parse_go_mod(mod_path: Path): GoModule
+        +resolve_import(import_path: str): ResolvedPackage
+        +get_module_dependencies(): List<Dependency]
+        +is_standard_library(import_path: str): bool
+    }
+    
+    ' Package Analysis
+    class PackageAnalyzer INTERNAL {
+        -_package_cache: Dict<str, Package]
+        +analyze_package(path: Path): Package
+        +get_package_exports(pkg: Package): List<Symbol]
+        +find_init_functions(pkg: Package): List<Function]
+        +extract_constants(tree: TreeNode): List<Constant]
+        +extract_variables(tree: TreeNode): List<Variable]
+    }
+    
+    ' Interface Satisfaction
+    class InterfaceChecker INTERNAL {
+        -_type_methods: Dict<str, List<Method]]
+        +check_interface_satisfaction(type: str, interface: str): bool
+        +get_type_methods(type_name: str): List<Method]
+        +get_interface_methods(interface_name: str): List<Method]
+        +find_implementations(interface: str): List<str]
+        +check_method_signature_match(m1: Method, m2: Method): bool
+    }
+    
+    ' Data Models
+    class GoModule INTERNAL {
+        +module_name: str
+        +go_version: str
+        +dependencies: List<Dependency]
+        +replace_directives: Dict<str, str]
+    }
+    
+    class Package INTERNAL {
+        +name: str
+        +path: str
+        +imports: List<str]
+        +files: List<str]
+        +is_main: bool
+    }
+    
+    class Method INTERNAL {
+        +name: str
+        +receiver: Optional<str]
+        +parameters: List<Parameter]
+        +returns: List<Type]
+        +is_exported: bool
+    }
+    
+    ' Relationships
+    GoPlugin --> ModuleResolver : resolves modules
+    GoPlugin --> PackageAnalyzer : analyzes packages
+    GoPlugin --> InterfaceChecker : checks interfaces
+    ModuleResolver --> GoModule : parses modules
+    PackageAnalyzer --> Package : creates packages
+    InterfaceChecker --> Method : compares methods
+    
+    ' External dependencies
+    GoPlugin ..> TreeSitterParser : parses Go
+    GoPlugin ..> SQLiteStore : stores symbols
+}
+
+' Note about Go-specific features
+note bottom of GoPlugin
+  Go-specific capabilities:
+  - go.mod module resolution
+  - Package-based organization
+  - Interface satisfaction checking
+  - Exported/unexported symbol tracking
+  - Built-in type recognition
+  - goroutine and channel detection
+end note
+
+@enduml

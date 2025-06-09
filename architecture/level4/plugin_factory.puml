@@ -1,0 +1,107 @@
+@startuml
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define INTERNAL <<Internal>>
+!define ASYNC <<async>>
+
+package "mcp_server.plugins" <<Component>> {
+    ' Plugin Factory Pattern
+    interface IPluginFactory COMPONENT_INTERFACE #LightGreen {
+        +create_plugin(language: str, store: SQLiteStore, semantic: bool): IPlugin
+        +get_supported_languages(): List<str>
+        +get_language_for_file(path: Path): Optional<str>
+    }
+    
+    class PluginFactory implements IPluginFactory {
+        -{static} _instance: Optional[PluginFactory]
+        -{static} _plugin_cache: Dict<str, IPlugin>
+        -_language_registry: LanguageRegistry
+        +{static} get_instance(): PluginFactory
+        +create_plugin(language: str, store: SQLiteStore, semantic: bool): IPlugin
+        +get_supported_languages(): List<str>
+        +get_language_for_file(path: Path): Optional<str>
+        -_create_enhanced_plugin(language: str, store: SQLiteStore, semantic: bool): IPlugin
+        -_create_generic_plugin(config: LanguageConfig, store: SQLiteStore, semantic: bool): IPlugin
+    }
+    
+    ' Language Registry
+    class LanguageRegistry INTERNAL {
+        -_configs: Dict<str, LanguageConfig>
+        +get_config(language: str): Optional<LanguageConfig]
+        +get_all_languages(): List<str>
+        +find_language_by_extension(ext: str): Optional<str]
+        +is_enhanced_plugin(language: str): bool
+    }
+    
+    class LanguageConfig INTERNAL {
+        +name: str
+        +extensions: List<str>
+        +parser_name: str
+        +queries: Dict<str, str]
+        +is_enhanced: bool
+        +metadata: Dict[str, Any]
+    }
+    
+    ' Plugin Cache Manager
+    class PluginCacheManager INTERNAL {
+        -_cache: OrderedDict<str, Tuple<IPlugin, float>>
+        -_max_size: int = 20
+        -_ttl_seconds: int = 300
+        +get(key: str): Optional<IPlugin>
+        +put(key: str, plugin: IPlugin): void
+        +evict_expired(): void
+        -_evict_lru(): void
+    }
+    
+    ' Enhanced Plugin Loaders
+    class EnhancedPluginLoader INTERNAL {
+        +load_python_plugin(store: SQLiteStore, semantic: bool): PythonPlugin
+        +load_javascript_plugin(store: SQLiteStore, semantic: bool): JavaScriptPlugin
+        +load_c_plugin(store: SQLiteStore, semantic: bool): CPlugin
+        +load_cpp_plugin(store: SQLiteStore, semantic: bool): CppPlugin
+        +load_dart_plugin(store: SQLiteStore, semantic: bool): DartPlugin
+        +load_html_css_plugin(store: SQLiteStore, semantic: bool): HtmlCssPlugin
+    }
+    
+    ' Specialized Plugin Loaders
+    class SpecializedPluginLoader INTERNAL {
+        +load_java_plugin(store: SQLiteStore, semantic: bool): JavaPlugin
+        +load_go_plugin(store: SQLiteStore, semantic: bool): GoPlugin
+        +load_rust_plugin(store: SQLiteStore, semantic: bool): RustPlugin
+        +load_csharp_plugin(store: SQLiteStore, semantic: bool): CSharpPlugin
+        +load_swift_plugin(store: SQLiteStore, semantic: bool): SwiftPlugin
+        +load_kotlin_plugin(store: SQLiteStore, semantic: bool): KotlinPlugin
+        +load_typescript_plugin(store: SQLiteStore, semantic: bool): TypeScriptPlugin
+    }
+    
+    ' Document Plugin Loaders
+    class DocumentPluginLoader INTERNAL {
+        +load_markdown_plugin(store: SQLiteStore): MarkdownPlugin
+        +load_plaintext_plugin(store: SQLiteStore): PlainTextPlugin
+    }
+    
+    ' Relationships
+    PluginFactory --> LanguageRegistry : queries configs
+    PluginFactory --> PluginCacheManager : caches plugins
+    PluginFactory --> EnhancedPluginLoader : loads enhanced
+    PluginFactory --> SpecializedPluginLoader : loads specialized
+    PluginFactory --> DocumentPluginLoader : loads documents
+    PluginFactory ..> GenericTreeSitterPlugin : creates generic
+    LanguageRegistry --> LanguageConfig : manages
+    
+    ' External dependencies
+    PluginFactory ..> IPlugin : creates
+    PluginFactory ..> SQLiteStore : passes to plugins
+}
+
+' Note about supported languages
+note bottom of PluginFactory
+  Supports 48+ languages:
+  - 6 Enhanced: Python, JS, C, C++, Dart, HTML/CSS
+  - 7 Specialized: Java, Go, Rust, C#, Swift, Kotlin, TypeScript
+  - 2 Document: Markdown, PlainText
+  - 35+ Generic: Ruby, PHP, Scala, Haskell, etc.
+  
+  Uses lazy loading and caching for performance
+end note
+
+@enduml

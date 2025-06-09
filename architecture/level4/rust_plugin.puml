@@ -1,0 +1,114 @@
+@startuml
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define INTERNAL <<Internal>>
+!define ASYNC <<async>>
+
+package "mcp_server.plugins.rust_plugin" <<Component>> {
+    ' Main Plugin Class
+    class RustPlugin implements IPlugin #LightGreen {
+        -_sqlite_store: SQLiteStore
+        -_parser: TreeSitterParser
+        -_cargo_integration: CargoIntegration
+        -_module_resolver: ModuleResolver
+        -_trait_analyzer: TraitAnalyzer
+        +__init__(sqlite_store: SQLiteStore)
+        +extract_symbols(content: str, file_path: str): Result
+        +search_symbols(query: str, limit: int): List<Symbol>
+        +get_language(): str
+        +get_file_extensions(): List<str>
+        -_extract_functions(tree: TreeNode): List<FunctionSymbol]
+        -_extract_structs(tree: TreeNode): List<StructSymbol]
+        -_extract_traits(tree: TreeNode): List<TraitSymbol]
+        -_extract_impls(tree: TreeNode): List<ImplBlock]
+    }
+    
+    ' Cargo Integration
+    class CargoIntegration INTERNAL {
+        -_cargo_toml_path: Optional<Path>
+        -_workspace_root: Optional<Path>
+        +find_cargo_toml(start_path: Path): Optional<Path>
+        +parse_cargo_toml(toml_path: Path): CargoProject
+        +get_dependencies(): List<Dependency]
+        +get_workspace_members(): List<str]
+        +resolve_crate_path(crate_name: str): Optional<Path]
+    }
+    
+    ' Module Resolution
+    class ModuleResolver INTERNAL {
+        -_module_tree: Dict<str, Module]
+        +resolve_module_path(use_stmt: str, context: RustContext): ResolvedModule
+        +build_module_tree(root: Path): ModuleTree
+        +find_module_file(module_path: str): Optional<Path]
+        +extract_pub_items(module: Module): List<Symbol]
+        +resolve_use_statement(use_node: TreeNode): List<Import]
+    }
+    
+    ' Trait System Analysis
+    class TraitAnalyzer INTERNAL {
+        -_trait_impls: Dict<str, List<TraitImpl]]
+        -_generic_constraints: Dict<str, List<Constraint]]
+        +analyze_trait(trait_node: TreeNode): Trait
+        +find_trait_implementations(trait_name: str): List<ImplBlock]
+        +check_trait_bounds(type: str, bounds: List<str]): bool
+        +extract_associated_types(trait: Trait): List<AssociatedType]
+        +analyze_lifetime_parameters(node: TreeNode): List<Lifetime]
+    }
+    
+    ' Data Models
+    class CargoProject INTERNAL {
+        +name: str
+        +version: str
+        +dependencies: Dict<str, Dependency]
+        +dev_dependencies: Dict<str, Dependency]
+        +features: Dict<str, List<str]]
+        +workspace: Optional<WorkspaceConfig]
+    }
+    
+    class Module INTERNAL {
+        +name: str
+        +path: str
+        +visibility: Visibility
+        +submodules: List<Module]
+        +items: List<Symbol]
+    }
+    
+    class TraitImpl INTERNAL {
+        +trait_name: str
+        +implementing_type: str
+        +generic_params: List<GenericParam]
+        +methods: List<Method]
+        +associated_types: Dict<str, Type]
+    }
+    
+    class Visibility <<enumeration>> {
+        PUBLIC
+        CRATE
+        SUPER
+        PRIVATE
+    }
+    
+    ' Relationships
+    RustPlugin --> CargoIntegration : integrates Cargo
+    RustPlugin --> ModuleResolver : resolves modules
+    RustPlugin --> TraitAnalyzer : analyzes traits
+    CargoIntegration --> CargoProject : parses projects
+    ModuleResolver --> Module : builds tree
+    TraitAnalyzer --> TraitImpl : tracks implementations
+    
+    ' External dependencies
+    RustPlugin ..> TreeSitterParser : parses Rust
+    RustPlugin ..> SQLiteStore : stores symbols
+}
+
+' Note about Rust-specific features
+note bottom of RustPlugin
+  Rust-specific capabilities:
+  - Cargo.toml dependency tracking
+  - Module tree resolution (mod, use)
+  - Trait system analysis
+  - Lifetime parameter tracking
+  - Macro expansion awareness
+  - Visibility modifiers (pub, crate, etc.)
+end note
+
+@enduml

@@ -1,0 +1,115 @@
+@startuml
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define INTERNAL <<Internal>>
+!define ASYNC <<async>>
+
+package "mcp_server.plugins.swift_plugin" <<Component>> {
+    ' Main Plugin Class
+    class SwiftPlugin implements IPlugin #LightGreen {
+        -_sqlite_store: SQLiteStore
+        -_parser: TreeSitterParser
+        -_module_analyzer: ModuleAnalyzer
+        -_protocol_checker: ProtocolChecker
+        -_objc_bridge: ObjectiveCBridge
+        +__init__(sqlite_store: SQLiteStore)
+        +extract_symbols(content: str, file_path: str): Result
+        +search_symbols(query: str, limit: int): List<Symbol>
+        +get_language(): str
+        +get_file_extensions(): List<str>
+        -_extract_classes(tree: TreeNode): List<ClassSymbol]
+        -_extract_structs(tree: TreeNode): List<StructSymbol]
+        -_extract_protocols(tree: TreeNode): List<ProtocolSymbol]
+        -_extract_extensions(tree: TreeNode): List<ExtensionSymbol]
+    }
+    
+    ' Module System Analysis
+    class ModuleAnalyzer INTERNAL {
+        -_module_map: Dict<str, Module]
+        -_import_graph: Dict<str, List<str]]
+        +analyze_module_structure(project_root: Path): ModuleStructure
+        +resolve_import(import_stmt: str): ResolvedModule
+        +find_module_interface(module: str): ModuleInterface
+        +extract_public_symbols(module: Module): List<Symbol]
+        +detect_circular_imports(): List<List<str]]
+    }
+    
+    ' Protocol Conformance
+    class ProtocolChecker INTERNAL {
+        -_protocol_conformances: Dict<str, List<Protocol]]
+        -_protocol_extensions: Dict<str, List<Extension]]
+        +check_protocol_conformance(type: str, protocol: str): bool
+        +get_required_methods(protocol: str): List<Method]
+        +find_protocol_witnesses(type: str, protocol: str): List<Witness]
+        +analyze_associated_types(protocol: Protocol): List<AssociatedType]
+        +check_protocol_composition(node: TreeNode): List<Protocol]
+    }
+    
+    ' Objective-C Interop
+    class ObjectiveCBridge INTERNAL {
+        -_bridged_types: Dict<str, str]
+        -_objc_classes: List<ObjCClass]
+        +detect_objc_bridge(node: TreeNode): bool
+        +map_swift_to_objc_type(swift_type: str): str
+        +find_objc_selectors(class_node: TreeNode): List<Selector]
+        +analyze_objc_attributes(node: TreeNode): List<ObjCAttribute]
+        +generate_objc_header(swift_class: Class): str
+    }
+    
+    ' Data Models
+    class Module INTERNAL {
+        +name: str
+        +path: str
+        +imports: List<str]
+        +exported_symbols: List<Symbol]
+        +is_framework: bool
+    }
+    
+    class Protocol INTERNAL {
+        +name: str
+        +requirements: List<Requirement]
+        +associated_types: List<AssociatedType]
+        +inherited_protocols: List<str]
+        +is_class_bound: bool
+    }
+    
+    class Extension INTERNAL {
+        +extended_type: str
+        +constraints: List<TypeConstraint]
+        +adopted_protocols: List<str]
+        +methods: List<Method]
+        +computed_properties: List<Property]
+    }
+    
+    class PropertyWrapper INTERNAL {
+        +name: str
+        +wrapped_value_type: Type
+        +projected_value_type: Optional<Type]
+        +init_parameters: List<Parameter]
+    }
+    
+    ' Relationships
+    SwiftPlugin --> ModuleAnalyzer : analyzes modules
+    SwiftPlugin --> ProtocolChecker : checks protocols
+    SwiftPlugin --> ObjectiveCBridge : bridges Obj-C
+    ModuleAnalyzer --> Module : creates modules
+    ProtocolChecker --> Protocol : tracks protocols
+    ObjectiveCBridge --> ObjCClass : maps classes
+    
+    ' External dependencies
+    SwiftPlugin ..> TreeSitterParser : parses Swift
+    SwiftPlugin ..> SQLiteStore : stores symbols
+}
+
+' Note about Swift-specific features
+note bottom of SwiftPlugin
+  Swift-specific capabilities:
+  - Protocol conformance checking
+  - Module system understanding
+  - Extension tracking
+  - Associated type resolution
+  - Property wrapper support
+  - Objective-C interoperability
+  - Access control levels
+end note
+
+@enduml

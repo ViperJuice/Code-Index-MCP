@@ -1,0 +1,51 @@
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies with enhanced tree-sitter support
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
+    curl \
+    libcurl4-openssl-dev \
+    # Additional dependencies for tree-sitter compatibility
+    libstdc++6 \
+    python3-dev \
+    # Clean up
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+COPY pyproject.toml .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY mcp_server/ ./mcp_server/
+COPY tests/ ./tests/
+COPY pytest.ini .
+COPY .coveragerc .
+
+# Install the package in development mode
+RUN pip install -e .
+
+# Verify tree-sitter-languages installation and list supported languages
+RUN python -c "import tree_sitter_languages; \
+    langs = tree_sitter_languages.get_language_names(); \
+    print(f'✅ tree-sitter-languages loaded successfully with {len(langs)} languages'); \
+    print('Supported languages:', ', '.join(sorted(langs)[:10]), '...')"
+
+# Create volume for code indexing
+VOLUME ["/code"]
+
+# Expose API port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
+
+# Default command runs the server
+CMD ["uvicorn", "mcp_server.gateway:app", "--host", "0.0.0.0", "--port", "8000"]

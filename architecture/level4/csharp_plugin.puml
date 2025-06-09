@@ -1,0 +1,118 @@
+@startuml
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define INTERNAL <<Internal>>
+!define ASYNC <<async>>
+
+package "mcp_server.plugins.csharp_plugin" <<Component>> {
+    ' Main Plugin Class
+    class CSharpPlugin implements IPlugin #LightGreen {
+        -_sqlite_store: SQLiteStore
+        -_parser: TreeSitterParser
+        -_namespace_resolver: NamespaceResolver
+        -_type_analyzer: TypeAnalyzer
+        -_nuget_integration: NuGetIntegration
+        +__init__(sqlite_store: SQLiteStore)
+        +extract_symbols(content: str, file_path: str): Result
+        +search_symbols(query: str, limit: int): List<Symbol>
+        +get_language(): str
+        +get_file_extensions(): List<str>
+        -_extract_classes(tree: TreeNode): List<ClassSymbol]
+        -_extract_interfaces(tree: TreeNode): List<InterfaceSymbol]
+        -_extract_methods(tree: TreeNode): List<MethodSymbol]
+        -_extract_properties(tree: TreeNode): List<PropertySymbol]
+    }
+    
+    ' Namespace Resolution
+    class NamespaceResolver INTERNAL {
+        -_namespace_tree: Dict<str, Namespace]
+        -_using_directives: List<UsingDirective]
+        +resolve_type(type_name: str, context: CSharpContext): ResolvedType
+        +build_namespace_tree(project_root: Path): NamespaceTree
+        +get_namespace_types(namespace: str): List<Type]
+        +resolve_using_alias(alias: str): str
+        +find_extension_methods(type: str): List<Method]
+    }
+    
+    ' Type System Analysis
+    class TypeAnalyzer INTERNAL {
+        -_type_hierarchy: Dict<str, List<str]]
+        -_generic_types: Dict<str, GenericTypeInfo]
+        +analyze_type_hierarchy(class_node: TreeNode): TypeInfo
+        +resolve_generic_constraints(type_params: List<TypeParam]): List<Constraint]
+        +check_nullable_reference(type: Type): bool
+        +analyze_async_method(method: TreeNode): AsyncMethodInfo
+        +extract_attributes(node: TreeNode): List<Attribute]
+    }
+    
+    ' NuGet Integration
+    class NuGetIntegration INTERNAL {
+        -_packages_config: Optional<Path]
+        -_csproj_files: List<Path]
+        +find_package_references(project_path: Path): List<PackageReference]
+        +parse_packages_config(config_path: Path): List<Package]
+        +parse_csproj_references(csproj_path: Path): List<PackageReference]
+        +resolve_assembly_path(assembly_name: str): Optional<Path]
+        +get_package_types(package: Package): List<Type]
+    }
+    
+    ' Data Models
+    class CSharpContext INTERNAL {
+        +current_namespace: str
+        +using_directives: List<str]
+        +using_aliases: Dict<str, str]
+        +available_types: Set<str]
+        +assembly_references: List<str]
+    }
+    
+    class TypeInfo INTERNAL {
+        +name: str
+        +namespace: str
+        +base_types: List<str]
+        +interfaces: List<str]
+        +generic_parameters: List<TypeParam]
+        +access_modifier: AccessModifier
+    }
+    
+    class AsyncMethodInfo INTERNAL {
+        +method_name: str
+        +return_type: str
+        +is_async: bool
+        +awaitable_calls: List<str]
+        +configures_await: bool
+    }
+    
+    class AccessModifier <<enumeration>> {
+        PUBLIC
+        PRIVATE
+        PROTECTED
+        INTERNAL
+        PROTECTED_INTERNAL
+        PRIVATE_PROTECTED
+    }
+    
+    ' Relationships
+    CSharpPlugin --> NamespaceResolver : resolves namespaces
+    CSharpPlugin --> TypeAnalyzer : analyzes types
+    CSharpPlugin --> NuGetIntegration : integrates NuGet
+    NamespaceResolver --> CSharpContext : uses context
+    TypeAnalyzer --> TypeInfo : creates type info
+    NuGetIntegration --> PackageReference : manages packages
+    
+    ' External dependencies
+    CSharpPlugin ..> TreeSitterParser : parses C#
+    CSharpPlugin ..> SQLiteStore : stores symbols
+}
+
+' Note about C#-specific features
+note bottom of CSharpPlugin
+  C#-specific capabilities:
+  - Full namespace resolution
+  - NuGet package integration
+  - Generic type constraints
+  - async/await pattern detection
+  - LINQ query comprehension
+  - Nullable reference types
+  - Attribute processing
+end note
+
+@enduml

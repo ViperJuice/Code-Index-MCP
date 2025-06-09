@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional, Dict, List, Set, Tuple, Any
 import ctypes
 import logging
+import re
 
 from tree_sitter import Language, Parser, Node
 import tree_sitter_languages
@@ -819,7 +820,7 @@ class Plugin(IPlugin):
         
         return refs
 
-    def search(self, query: str, opts: SearchOpts | None = None) -> list[SearchResult]:
+    def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:
         """Search for code snippets matching a query."""
         limit = 20
         if opts and "limit" in opts:

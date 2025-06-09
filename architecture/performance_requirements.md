@@ -1,7 +1,7 @@
 # Performance Requirements
 
 ## Overview
-This document defines the performance requirements and targets for the MCP Server system, including both SQLite-based indexing and Memgraph-based graph analysis.
+This document defines the performance requirements and targets for Code-Index-MCP with 48-language support, including SQLite-based indexing, Qdrant vector search, and multi-language plugin management.
 
 ## Response Time Requirements
 
@@ -26,7 +26,8 @@ This document defines the performance requirements and targets for the MCP Serve
 - **Maximum Files**: 1M+ files per repository
 - **Maximum File Size**: 10MB per file
 - **Concurrent Users**: 100+ simultaneous queries
-- **Plugin Support**: 20+ active language plugins
+- **Language Support**: 48 languages (6 enhanced + 42 generic)
+- **Plugin Instances**: Lazy-loaded, cached per language
 
 ### Resource Limits
 - **Memory Usage**: < 2GB for 100K files
@@ -99,20 +100,34 @@ This document defines the performance requirements and targets for the MCP Serve
 - Serialization: 10ms
 
 ### Backend (Processing)
-- Plugin Discovery: 20ms
-- File Parsing: 50ms/file
+- Plugin Factory: 5ms (cached), 50ms (first load)
+- Tree-sitter Parsing: 30-100ms/file (varies by language)
 - Index Update: 20ms/file
-- Embedding: 500ms/file
-- Search: 100ms base + 10ms/plugin
-- Graph Update: 30ms/file
-- Graph Traversal: 50ms per hop
-- Pattern Matching: 200ms for complex queries
+- Embedding Generation: 200-500ms/file (Voyage AI)
+- Vector Search: 50ms (Qdrant ANN)
+- Hybrid Search: 150ms (FTS5 + Vector)
+- Query Cache Lookup: < 1ms
+- Language Detection: < 5ms
+
+## 48-Language Optimization Strategies
+
+### Plugin Management
+- **Lazy Loading**: Load language parsers only when needed
+- **Instance Pooling**: Reuse parser instances across requests
+- **Query Caching**: Cache tree-sitter queries per language
+- **Memory Limits**: Unload unused parsers after 5 minutes
+
+### Multi-Language Performance
+- **Parallel Indexing**: Process different languages concurrently
+- **Language-Specific Indices**: Separate FTS5 tables per language
+- **Batch Processing**: Group files by language for efficiency
+- **Smart Routing**: Direct queries to relevant language indices
 
 ## Implementation Guidelines
 
 1. **Profile First**: Measure before optimizing
-2. **Cache Aggressively**: But invalidate correctly
-3. **Parallelize**: Use all available cores
+2. **Cache Aggressively**: Plugin instances, queries, and results
+3. **Parallelize**: Use all cores for multi-language processing
 4. **Stream Results**: Don't load everything in memory
-5. **Index Smartly**: Right data structure for each query type
-6. **Monitor Continuously**: Track performance in production
+5. **Index Smartly**: Language-specific optimization strategies
+6. **Monitor Continuously**: Track per-language performance metrics

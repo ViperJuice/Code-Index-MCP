@@ -1,0 +1,154 @@
+@startuml Document Processing System Architecture
+!include shared_interfaces.puml
+
+package "Document Processing Core" {
+    abstract class BaseDocumentPlugin {
+        # chunkSizeTarget: int
+        # chunkOverlap: int
+        # sqlite_store: SQLiteStore
+        + {abstract} createDocumentChunks(content): Chunk[]
+        + {abstract} extractDocumentStructure(content): Structure
+        + indexFile(path, content): IndexShard
+        + generateDocumentSymbols(structure): Symbol[]
+        # optimizeChunkSize(content): int
+        # preserveSemanticBoundaries(text): string[]
+    }
+    
+    interface IDocumentProcessor {
+        + processDocument(content): ProcessedDocument
+        + extractMetadata(content): Metadata
+        + createSearchableChunks(content): Chunk[]
+    }
+    
+    interface IChunkStrategy {
+        + chunk(content, structure): Chunk[]
+        + validateChunk(chunk): bool
+        + mergeSmallChunks(chunks): Chunk[]
+    }
+    
+    interface IStructureExtractor {
+        + extractStructure(content): DocumentStructure
+        + findSections(content): Section[]
+        + buildHierarchy(sections): Tree
+    }
+    
+    class DocumentChunk {
+        + id: string
+        + content: string
+        + type: ChunkType
+        + metadata: ChunkMetadata
+        + embedding: float[]
+        + contextBefore: string
+        + contextAfter: string
+    }
+    
+    class ChunkMetadata {
+        + documentPath: string
+        + sectionHierarchy: string[]
+        + chunkIndex: int
+        + totalChunks: int
+        + hasCode: bool
+        + language: string
+        + keywords: string[]
+    }
+    
+    class DocumentStructure {
+        + title: string
+        + sections: Section[]
+        + metadata: Metadata
+        + outline: TreeNode
+        + crossReferences: Reference[]
+    }
+    
+    enum ChunkType {
+        HEADING
+        PARAGRAPH
+        CODE_BLOCK
+        LIST
+        TABLE
+        METADATA
+    }
+}
+
+package "Document Plugins" {
+    class MarkdownPlugin {
+        - markdownParser: MarkdownParser
+        - sectionExtractor: SectionExtractor
+        + createDocumentChunks(content): Chunk[]
+        + extractDocumentStructure(content): Structure
+        + parseMarkdownElements(content): Element[]
+    }
+    
+    class PlainTextPlugin {
+        - nlpProcessor: NLPProcessor
+        - paragraphDetector: ParagraphDetector
+        + createDocumentChunks(content): Chunk[]
+        + extractDocumentStructure(content): Structure
+        + inferDocumentStructure(content): Structure
+    }
+}
+
+package "Shared Components" {
+    class ChunkOptimizer {
+        + optimizeChunks(chunks): Chunk[]
+        + balanceChunkSizes(chunks): Chunk[]
+        + ensureContextOverlap(chunks): Chunk[]
+        + validateSemanticCoherence(chunk): bool
+    }
+    
+    class MetadataExtractor {
+        + extractFrontmatter(content): Metadata
+        + inferMetadata(content): Metadata
+        + parseYAML(content): dict
+        + parseTOML(content): dict
+    }
+    
+    class SemanticDocumentChunker {
+        - embedder: Embedder
+        + chunkBySimilarity(content): Chunk[]
+        + measureSemanticDistance(c1, c2): float
+        + findOptimalBoundaries(content): int[]
+    }
+}
+
+package "Integration Layer" {
+    class DocumentAwareDispatcher {
+        + routeDocument(path): IPlugin
+        + handleDocumentQuery(query): SearchResult[]
+        + extractSectionQuery(query): SectionQuery
+    }
+    
+    class DocumentSearchEnhancer {
+        + enhanceQuery(query): EnhancedQuery
+        + parseNaturalLanguage(query): QueryIntent
+        + findRelevantSections(query): Section[]
+        + rankDocumentResults(results): Result[]
+    }
+}
+
+' Relationships
+MarkdownPlugin --|> BaseDocumentPlugin
+PlainTextPlugin --|> BaseDocumentPlugin
+BaseDocumentPlugin ..|> IDocumentProcessor
+BaseDocumentPlugin ..|> IPlugin
+
+BaseDocumentPlugin --> DocumentChunk : creates
+BaseDocumentPlugin --> DocumentStructure : extracts
+DocumentChunk --> ChunkMetadata : contains
+
+MarkdownPlugin ..> IChunkStrategy : implements
+PlainTextPlugin ..> IChunkStrategy : implements
+
+ChunkOptimizer --> DocumentChunk : optimizes
+MetadataExtractor --> BaseDocumentPlugin : used by
+SemanticDocumentChunker --> BaseDocumentPlugin : enhances
+
+DocumentAwareDispatcher --> BaseDocumentPlugin : routes to
+DocumentSearchEnhancer --> DocumentAwareDispatcher : enhances
+
+' External Integration
+BaseDocumentPlugin ..> SQLiteStore : persists to
+BaseDocumentPlugin ..> SemanticIndexer : indexes with
+DocumentAwareDispatcher ..> EnhancedDispatcher : extends
+
+@enduml

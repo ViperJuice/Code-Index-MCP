@@ -227,7 +227,7 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
                 )
             )
     
-    def search(self, query: str, options: Dict[str, Any]) -> Result[List[PluginSearchResult]]:
+    def search_with_result(self, query: str, options: Dict[str, Any]) -> Result[List[PluginSearchResult]]:
         """Search for code patterns."""
         try:
             # Convert options to old format
@@ -237,7 +237,7 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
             if "limit" in options:
                 opts["limit"] = options["limit"]
             
-            results = self.search_legacy(query, opts)
+            results = self.search(query, opts)
             plugin_results = []
             
             for result in results:
@@ -1182,7 +1182,7 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
         
         return refs
 
-    def search_legacy(self, query: str, opts: SearchOpts | None = None) -> list[SearchResult]:
+    def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:
         """Search for code snippets matching a query."""
         limit = 20
         if opts and "limit" in opts:
@@ -1199,13 +1199,11 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
         search_results = []
         for result in results:
             if isinstance(result, dict):
-                # Convert dict result to SearchResult-like object
+                # Convert dict result to SearchResult format
                 search_results.append({
                     'file': result.get('file', ''),
                     'line': result.get('line', 1),
-                    'content': result.get('content', ''),
-                    'score': result.get('score', 1.0),
-                    'match': result.get('match', query)
+                    'snippet': result.get('snippet', result.get('content', ''))
                 })
             else:
                 search_results.append(result)

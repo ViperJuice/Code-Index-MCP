@@ -1,5 +1,14 @@
-"""C++ language plugin for MCP server."""
+"""C++ plugin for Code-Index-MCP."""
 
-from .plugin import Plugin
+import os
 
-__all__ = ['Plugin']
+# Use semantic plugin if enabled, otherwise fallback to basic plugin
+if os.getenv("SEMANTIC_SEARCH_ENABLED", "false").lower() == "true":
+    try:
+        from .plugin_semantic import CppPluginSemantic as Plugin
+    except ImportError:
+        from .plugin import Plugin
+else:
+    from .plugin import Plugin
+
+__all__ = ["Plugin"]

@@ -1,0 +1,96 @@
+@startuml Markdown Plugin Architecture
+!include shared_interfaces.puml
+!include shared_utilities.puml
+
+package "Markdown Plugin" {
+    class MarkdownPlugin {
+        - parser: MarkdownParser
+        - sectionExtractor: SectionExtractor
+        - chunkStrategy: ChunkStrategy
+        - frontmatterParser: FrontmatterParser
+        + indexFile(path, content): IndexShard
+        + supports(path): bool
+        + search(query, opts): SearchResult[]
+        + createDocumentChunks(content): Chunk[]
+    }
+    
+    class MarkdownParser {
+        - grammar: TreeSitterGrammar
+        + parse(content): MarkdownAST
+        + extractHeadings(): Heading[]
+        + extractCodeBlocks(): CodeBlock[]
+        + extractLinks(): Link[]
+        + extractTables(): Table[]
+    }
+    
+    class SectionExtractor {
+        + extractSections(ast): Section[]
+        + buildHierarchy(sections): SectionTree
+        + findSectionByHeading(heading): Section
+        + getSectionContent(section): string
+    }
+    
+    class ChunkStrategy {
+        - maxChunkSize: int
+        - overlapSize: int
+        + chunkDocument(sections): Chunk[]
+        + chunkSection(section): Chunk[]
+        + preserveCodeBlocks(content): string[]
+        + addContextMetadata(chunk): Chunk
+    }
+    
+    class FrontmatterParser {
+        + parse(content): Metadata
+        + extractYAML(content): dict
+        + extractTOML(content): dict
+        + extractJSON(content): dict
+    }
+    
+    class Section {
+        + id: string
+        + heading: string
+        + level: int
+        + content: string
+        + parent: Section
+        + children: Section[]
+        + startLine: int
+        + endLine: int
+    }
+    
+    class Chunk {
+        + id: string
+        + content: string
+        + sectionId: string
+        + metadata: ChunkMetadata
+        + startLine: int
+        + endLine: int
+    }
+    
+    class ChunkMetadata {
+        + heading: string
+        + level: int
+        + parentSection: string
+        + hasCode: bool
+        + hasLinks: bool
+        + hasTables: bool
+        + wordCount: int
+    }
+}
+
+' Relationships
+MarkdownPlugin --> MarkdownParser : uses
+MarkdownPlugin --> SectionExtractor : uses
+MarkdownPlugin --> ChunkStrategy : uses
+MarkdownPlugin --> FrontmatterParser : uses
+MarkdownPlugin --|> BaseDocumentPlugin
+
+SectionExtractor --> Section : creates
+ChunkStrategy --> Chunk : creates
+Chunk --> ChunkMetadata : contains
+
+' External dependencies
+MarkdownPlugin ..> IPlugin : implements
+MarkdownPlugin ..> TreeSitter : uses
+MarkdownPlugin ..> SemanticIndexer : integrates
+
+@enduml

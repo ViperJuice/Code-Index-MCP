@@ -1,0 +1,116 @@
+@startuml
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define INTERNAL <<Internal>>
+!define ASYNC <<async>>
+
+package "mcp_server.plugins.kotlin_plugin" <<Component>> {
+    ' Main Plugin Class
+    class KotlinPlugin implements IPlugin #LightGreen {
+        -_sqlite_store: SQLiteStore
+        -_parser: TreeSitterParser
+        -_null_safety_analyzer: NullSafetyAnalyzer
+        -_coroutines_analyzer: CoroutinesAnalyzer
+        -_java_interop: JavaInterop
+        +__init__(sqlite_store: SQLiteStore)
+        +extract_symbols(content: str, file_path: str): Result
+        +search_symbols(query: str, limit: int): List<Symbol>
+        +get_language(): str
+        +get_file_extensions(): List<str>
+        -_extract_classes(tree: TreeNode): List<ClassSymbol]
+        -_extract_objects(tree: TreeNode): List<ObjectSymbol]
+        -_extract_functions(tree: TreeNode): List<FunctionSymbol]
+        -_extract_extensions(tree: TreeNode): List<ExtensionFunction]
+    }
+    
+    ' Null Safety Analysis
+    class NullSafetyAnalyzer INTERNAL {
+        -_nullable_types: Set<str]
+        -_null_checks: Dict<str, List<NullCheck]]
+        +analyze_nullability(node: TreeNode): NullabilityInfo
+        +detect_nullable_type(type_node: TreeNode): bool
+        +find_null_assertions(function: TreeNode): List<NullAssertion]
+        +check_safe_calls(expression: TreeNode): List<SafeCall]
+        +analyze_elvis_operators(node: TreeNode): List<ElvisOperator]
+    }
+    
+    ' Coroutines Support
+    class CoroutinesAnalyzer INTERNAL {
+        -_suspend_functions: List<SuspendFunction]
+        -_coroutine_scopes: List<CoroutineScope]
+        +analyze_suspend_function(func_node: TreeNode): SuspendFunction
+        +detect_coroutine_builders(node: TreeNode): List<CoroutineBuilder]
+        +find_flow_operations(node: TreeNode): List<FlowOperation]
+        +analyze_structured_concurrency(node: TreeNode): ConcurrencyInfo
+        +check_dispatcher_usage(node: TreeNode): List<Dispatcher]
+    }
+    
+    ' Java Interoperability
+    class JavaInterop INTERNAL {
+        -_java_annotations: Dict<str, List<Annotation]]
+        -_platform_types: Set<str]
+        +analyze_java_annotations(node: TreeNode): List<JavaAnnotation]
+        +detect_platform_types(type: Type): bool
+        +generate_jvm_signatures(method: Method): JvmSignature
+        +find_java_static_methods(class_node: TreeNode): List<Method]
+        +check_throws_annotation(method: TreeNode): List<Exception]
+    }
+    
+    ' Data Models
+    class NullabilityInfo INTERNAL {
+        +type_name: str
+        +is_nullable: bool
+        +null_checks: List<NullCheck]
+        +safe_calls: List<SafeCall]
+        +smart_casts: List<SmartCast]
+    }
+    
+    class SuspendFunction INTERNAL {
+        +name: str
+        +parameters: List<Parameter]
+        +return_type: Type
+        +coroutine_context: Optional<str]
+        +is_inline: bool
+    }
+    
+    class ExtensionFunction INTERNAL {
+        +receiver_type: str
+        +function_name: str
+        +type_parameters: List<TypeParam]
+        +is_operator: bool
+        +is_infix: bool
+    }
+    
+    class DataClass INTERNAL {
+        +name: str
+        +properties: List<Property]
+        +has_copy: bool
+        +has_component_functions: bool
+        +custom_equals: bool
+    }
+    
+    ' Relationships
+    KotlinPlugin --> NullSafetyAnalyzer : analyzes null safety
+    KotlinPlugin --> CoroutinesAnalyzer : analyzes coroutines
+    KotlinPlugin --> JavaInterop : handles Java interop
+    NullSafetyAnalyzer --> NullabilityInfo : creates info
+    CoroutinesAnalyzer --> SuspendFunction : tracks suspending
+    JavaInterop --> JavaAnnotation : processes annotations
+    
+    ' External dependencies
+    KotlinPlugin ..> TreeSitterParser : parses Kotlin
+    KotlinPlugin ..> SQLiteStore : stores symbols
+}
+
+' Note about Kotlin-specific features
+note bottom of KotlinPlugin
+  Kotlin-specific capabilities:
+  - Null safety analysis (?, !!)
+  - Coroutines and suspend functions
+  - Extension functions
+  - Data class detection
+  - Java interoperability
+  - Inline and reified functions
+  - Delegated properties
+end note
+
+@enduml

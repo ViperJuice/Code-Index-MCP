@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  # Development container with Claude Code and all tools
+  dev:
+    build: 
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
+      - "8001:8001"  # Additional port for development
+    environment:
+      # Database configuration
+      - DATABASE_URL=sqlite:///app/data/code_index.db
+      
+      # Redis cache configuration
+      - REDIS_URL=redis://redis:6379
+      - CACHE_BACKEND=redis
+      - CACHE_DEFAULT_TTL=3600
+      
+      # Development settings
+      - LOG_LEVEL=DEBUG
+      - PYTHONPATH=/app
+      - NODE_ENV=development
+      
+      # Claude Code environment
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      
+    volumes:
+      # Mount source code for live development
+      - .:/app
+      # Mount your home code directory for indexing
+      - ~/code:/code:ro
+      # Persist data, logs, and test results
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./test_results:/app/test_results
+    depends_on:
+      - redis
+      - qdrant
+    stdin_open: true
+    tty: true
+    networks:
+      - mcp-network
+    command: /bin/bash
+
+  # Redis cache service
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Qdrant vector database (for semantic search)
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    restart: unless-stopped
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  redis-data:
+  qdrant-data:
+
+networks:
+  mcp-network:
+    driver: bridge

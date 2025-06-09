@@ -1,0 +1,105 @@
+@startuml Plain Text Plugin Architecture
+!include shared_interfaces.puml
+!include shared_utilities.puml
+
+package "Plain Text Plugin" {
+    class PlainTextPlugin {
+        - nlpProcessor: NLPProcessor
+        - paragraphDetector: ParagraphDetector
+        - topicExtractor: TopicExtractor
+        - sentenceSplitter: SentenceSplitter
+        - semanticChunker: SemanticChunker
+        + indexFile(path, content): IndexShard
+        + supports(path): bool
+        + search(query, opts): SearchResult[]
+        + processNaturalLanguage(content): ProcessedText
+    }
+    
+    class NLPProcessor {
+        - tokenizer: Tokenizer
+        - posTagger: POSTagger
+        + tokenize(text): Token[]
+        + extractKeywords(text): Keyword[]
+        + detectLanguage(text): string
+        + analyzeComplexity(text): ComplexityScore
+    }
+    
+    class ParagraphDetector {
+        - minParagraphLength: int
+        - paragraphSeparators: string[]
+        + detectParagraphs(text): Paragraph[]
+        + inferStructure(paragraphs): DocumentStructure
+        + groupRelatedParagraphs(paragraphs): ParagraphGroup[]
+    }
+    
+    class TopicExtractor {
+        - topicModel: TopicModel
+        - minTopicCoherence: float
+        + extractTopics(text): Topic[]
+        + findMainThemes(paragraphs): Theme[]
+        + calculateTopicSimilarity(t1, t2): float
+        + groupByTopic(paragraphs): TopicGroup[]
+    }
+    
+    class SentenceSplitter {
+        - abbreviations: Set<string>
+        - sentenceEnders: string[]
+        + splitSentences(text): Sentence[]
+        + detectBoundaries(text): int[]
+        + handleAbbreviations(text): string
+        + preserveFormatting(sentences): Sentence[]
+    }
+    
+    class SemanticChunker {
+        - targetChunkSize: int
+        - coherenceThreshold: float
+        + createSemanticChunks(paragraphs): Chunk[]
+        + measureCoherence(p1, p2): float
+        + optimizeChunkBoundaries(chunks): Chunk[]
+        + addOverlap(chunks): Chunk[]
+    }
+    
+    class ProcessedText {
+        + paragraphs: Paragraph[]
+        + sentences: Sentence[]
+        + topics: Topic[]
+        + chunks: Chunk[]
+        + metadata: TextMetadata
+    }
+    
+    class Paragraph {
+        + id: string
+        + content: string
+        + sentences: Sentence[]
+        + topic: Topic
+        + startPos: int
+        + endPos: int
+    }
+    
+    class TextChunk {
+        + id: string
+        + content: string
+        + paragraphs: Paragraph[]
+        + coherenceScore: float
+        + metadata: ChunkMetadata
+    }
+}
+
+' Relationships
+PlainTextPlugin --> NLPProcessor : uses
+PlainTextPlugin --> ParagraphDetector : uses
+PlainTextPlugin --> TopicExtractor : uses
+PlainTextPlugin --> SentenceSplitter : uses
+PlainTextPlugin --> SemanticChunker : uses
+PlainTextPlugin --|> BaseDocumentPlugin
+
+ParagraphDetector --> Paragraph : creates
+SemanticChunker --> TextChunk : creates
+PlainTextPlugin --> ProcessedText : produces
+
+' External dependencies
+PlainTextPlugin ..> IPlugin : implements
+PlainTextPlugin ..> SemanticIndexer : integrates
+NLPProcessor ..> "External NLP Library" : may use
+
+@enduml

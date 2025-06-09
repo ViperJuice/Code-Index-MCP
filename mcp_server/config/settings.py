@@ -6,7 +6,7 @@ import os
 import secrets
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Union
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, validator, model_validator
 from urllib.parse import urlparse
 
 from .environment import Environment, get_environment, get_env_var, is_production
@@ -253,7 +253,7 @@ class LoggingSettings(BaseModel):
     """Logging configuration settings."""
     
     # Log Level
-    level: str = Field(default="INFO", regex="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$")
+    level: str = Field(default="INFO", pattern="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$")
     
     # Log Format
     format: str = Field(default="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -329,6 +329,14 @@ class Settings(BaseModel):
     dynamic_plugin_loading: bool = Field(default=True)
     semantic_search_enabled: bool = Field(default=False)
     
+    # Semantic Search Configuration
+    voyage_api_key: Optional[str] = Field(default=None)
+    qdrant_host: str = Field(default="localhost")
+    qdrant_port: int = Field(default=6333)
+    qdrant_grpc_port: int = Field(default=6334)
+    semantic_embedding_model: str = Field(default="voyage-code-3")
+    semantic_collection_name: str = Field(default="code-embeddings")
+    
     @classmethod
     def from_environment(cls) -> "Settings":
         """Create settings from environment variables."""
@@ -341,7 +349,14 @@ class Settings(BaseModel):
             host=get_env_var("HOST", "0.0.0.0"),
             port=int(get_env_var("PORT", "8000")),
             environment=env,
-            debug=get_env_var("DEBUG", "false").lower() == "true"
+            debug=get_env_var("DEBUG", "false").lower() == "true",
+            semantic_search_enabled=get_env_var("SEMANTIC_SEARCH_ENABLED", "false").lower() == "true",
+            voyage_api_key=get_env_var("VOYAGE_AI_API_KEY"),
+            qdrant_host=get_env_var("QDRANT_HOST", "localhost"),
+            qdrant_port=int(get_env_var("QDRANT_PORT", "6333")),
+            qdrant_grpc_port=int(get_env_var("QDRANT_GRPC_PORT", "6334")),
+            semantic_embedding_model=get_env_var("SEMANTIC_EMBEDDING_MODEL", "voyage-code-3"),
+            semantic_collection_name=get_env_var("SEMANTIC_COLLECTION_NAME", "code-embeddings")
         )
         
         # Environment-specific overrides
@@ -354,21 +369,18 @@ class Settings(BaseModel):
         
         return settings
     
-    @root_validator
-    def validate_production_settings(cls, values):
+    @model_validator(mode='after')
+    def validate_production_settings(self):
         """Validate settings for production environment."""
-        env = values.get("environment")
-        
-        if env == Environment.PRODUCTION:
+        if self.environment == Environment.PRODUCTION:
             # Production validation
-            if values.get("debug", False):
+            if self.debug:
                 raise ValueError("Debug mode must be disabled in production")
             
-            security = values.get("security")
-            if security and len(security.jwt_secret_key) < 32:
+            if self.security and len(self.security.jwt_secret_key) < 32:
                 raise ValueError("JWT secret key must be at least 32 characters in production")
         
-        return values
+        return self
     
     def get_database_url(self) -> str:
         """Get the database connection URL."""

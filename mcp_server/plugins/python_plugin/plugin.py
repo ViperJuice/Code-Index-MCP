@@ -168,7 +168,7 @@ class Plugin(IPlugin):
         return refs
 
     # ------------------------------------------------------------------
-    def search(self, query: str, opts: SearchOpts | None = None) -> list[SearchResult]:
+    def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:
         limit = 20
         if opts and "limit" in opts:
             limit = opts["limit"]
@@ -180,6 +180,6 @@ class Plugin(IPlugin):
     def get_indexed_count(self) -> int:
         """Return the number of indexed files."""
         # The fuzzy indexer tracks files internally
-        if hasattr(self._indexer, '_file_contents'):
-            return len(self._indexer._file_contents)
+        if hasattr(self._indexer, 'index'):
+            return len(self._indexer.index)
         return 0

@@ -1,0 +1,211 @@
+{
+  "repositories": {
+    "rust": {
+      "success": true,
+      "files_available": 98,
+      "files_indexed": 5,
+      "indexing_time": 0.0006837844848632812,
+      "symbol_search": {
+        "main": 5,
+        "search": 5,
+        "Searcher": 2,
+        "Config": 5
+      },
+      "semantic_search": {
+        "data processing": 0,
+        "error handling": 0,
+        "configuration": 0,
+        "utility function": 0
+      },
+      "plugins_loaded": 6,
+      "languages": [
+        "c",
+        "cpp",
+        "dart",
+        "html_css",
+        "js",
+        "python",
+        "rust"
+      ]
+    },
+    "go": {
+      "success": true,
+      "files_available": 36,
+      "files_indexed": 5,
+      "indexing_time": 0.0003879070281982422,
+      "symbol_search": {
+        "Command": 5,
+        "Execute": 5,
+        "NewCommand": 1
+      },
+      "semantic_search": {
+        "data processing": 0,
+        "error handling": 0,
+        "configuration": 0,
+        "utility function": 0
+      },
+      "plugins_loaded": 6,
+      "languages": [
+        "c",
+        "cpp",
+        "dart",
+        "go",
+        "html_css",
+        "js",
+        "python",
+        "rust"
+      ]
+    },
+    "python": {
+      "success": true,
+      "files_available": 36,
+      "files_indexed": 5,
+      "indexing_time": 0.015193939208984375,
+      "symbol_search": {
+        "get": 5,
+        "post": 5,
+        "Session": 5,
+        "Response": 5
+      },
+      "semantic_search": {
+        "data processing": 0,
+        "error handling": 0,
+        "configuration": 0,
+        "utility function": 0
+      },
+      "plugins_loaded": 6,
+      "languages": [
+        "c",
+        "cpp",
+        "dart",
+        "go",
+        "html_css",
+        "js",
+        "python",
+        "rust"
+      ]
+    },
+    "javascript": {
+      "success": true,
+      "files_available": 54,
+      "files_indexed": 5,
+      "indexing_time": 0.13935256004333496,
+      "symbol_search": {
+        "map": 5,
+        "filter": 5,
+        "reduce": 5,
+        "forEach": 3
+      },
+      "semantic_search": {
+        "data processing": 0,
+        "error handling": 1,
+        "configuration": 2,
+        "utility function": 1
+      },
+      "plugins_loaded": 7,
+      "languages": [
+        "c",
+        "cpp",
+        "dart",
+        "go",
+        "html_css",
+        "javascript",
+        "js",
+        "python",
+        "rust"
+      ]
+    },
+    "typescript": {
+      "success": true,
+      "files_available": 187,
+      "files_indexed": 5,
+      "indexing_time": 0.11876416206359863,
+      "symbol_search": {
+        "Connection": 5,
+        "TextDocument": 3,
+        "LanguageServer": 4
+      },
+      "semantic_search": {
+        "data processing": 0,
+        "error handling": 1,
+        "configuration": 3,
+        "utility function": 2
+      },
+      "plugins_loaded": 8,
+      "languages": [
+        "c",
+        "cpp",
+        "dart",
+        "go",
+        "html_css",
+        "javascript",
+        "js",
+        "python",
+        "rust",
+        "typescript"
+      ]
+    }
+  },
+  "cross_language": {
+    "error": {
+      "total": 20,
+      "by_language": {
+        ".js": 11,
+        ".c": 5,
+        ".py": 4
+      }
+    },
+    "config": {
+      "total": 20,
+      "by_language": {
+        ".js": 11,
+        ".py": 4,
+        ".c": 5
+      }
+    },
+    "parse": {
+      "total": 20,
+      "by_language": {
+        ".js": 13,
+        ".ts": 1,
+        ".py": 3,
+        ".c": 3
+      }
+    },
+    "handle": {
+      "total": 20,
+      "by_language": {
+        ".js": 11,
+        ".ts": 2,
+        ".py": 4,
+        ".c": 3
+      }
+    },
+    "create": {
+      "total": 20,
+      "by_language": {
+        ".js": 17,
+        ".py": 3
+      }
+    }
+  },
+  "summary": {
+    "successful_repos": 5,
+    "total_files": 25,
+    "indexing_time": 0.2743823528289795,
+    "languages": [
+      "c",
+      "cpp",
+      "dart",
+      "go",
+      "html_css",
+      "javascript",
+      "js",
+      "python",
+      "rust",
+      "typescript"
+    ],
+    "symbol_results": 78,
+    "semantic_results": 10
+  }
+}

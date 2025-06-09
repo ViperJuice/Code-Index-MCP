@@ -37,8 +37,8 @@ def setup_logging(
         format=log_format,
         datefmt=date_format,
         handlers=[
-            # Console handler
-            logging.StreamHandler(sys.stdout),
+            # Console handler - use stderr to avoid interfering with MCP protocol on stdout
+            logging.StreamHandler(sys.stderr),
             # File handler
             logging.FileHandler(log_path, mode='a', encoding='utf-8')
         ]

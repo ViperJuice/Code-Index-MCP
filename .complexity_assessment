@@ -1,0 +1,16 @@
+# Codebase Complexity Assessment
+# Generated: 2025-06-08
+
+# Raw metrics
+TOTAL_LINES=136016
+EXTERNAL_DEPS=181
+TEST_FILES=170
+PLUGIN_COUNT=48
+ASYNC_COMPONENTS=15
+
+# Complexity calculation (1-5 scale)
+# Base complexity: 2 (substantial Python codebase)
+# +1 for high line count (>100k)
+# +1 for many dependencies (>100)
+# +1 for extensive plugin architecture (>20 plugins)
+CODEBASE_COMPLEXITY=5

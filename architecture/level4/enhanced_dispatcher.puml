@@ -1,0 +1,28 @@
+@startuml Enhanced Dispatcher Component
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Enhanced Dispatcher - Component Diagram
+
+Container_Boundary(dispatcher, "Enhanced Dispatcher") {
+    Component(router, "Plugin Router", "Python", "Routes requests to appropriate plugins with advanced features")
+    Component(factory, "Plugin Factory", "Python", "Dynamically creates language plugins on demand")
+    Component(registry, "Language Registry", "Python", "Stores configuration for 46+ languages")
+    Component(cache, "Query Cache", "Python", "Caches parsed tree-sitter queries")
+    Component(aggregator, "Result Aggregator", "Python", "Aggregates search results from multiple plugins")
+    Component(stats, "Statistics Tracker", "Python", "Tracks operations and performance metrics")
+    
+    Rel(router, factory, "Requests plugins")
+    Rel(factory, registry, "Reads language configs")
+    Rel(factory, cache, "Uses cached queries")
+    Rel(router, aggregator, "Sends results")
+    Rel(router, stats, "Records metrics")
+}
+
+Component_Ext(plugins, "Language Plugins", "Python", "46+ language-specific or generic plugins")
+Component_Ext(storage, "SQLite Store", "SQLite", "Persistent storage for indexed data")
+
+Rel(router, plugins, "Dispatches to")
+Rel(plugins, storage, "Stores/retrieves data")
+Rel(factory, plugins, "Creates instances")
+
+@enduml

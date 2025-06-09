@@ -1,7 +1,7 @@
 # Data Model
 
 ## Overview
-This document defines the data structures and storage schema for the MCP Server's dual storage system: Local Index Store (SQLite) and Graph Store (Memgraph).
+This document defines the data structures and storage schema for Code-Index-MCP's multi-language indexing system. The system uses SQLite for symbol storage with FTS5 for text search, and Qdrant for vector embeddings to support semantic search across 48 programming languages.
 
 ## Core Entities
 
@@ -125,26 +125,68 @@ CREATE TABLE symbol_trigrams (
 CREATE INDEX idx_trigrams ON symbol_trigrams(trigram);
 ```
 
-## Embedding Storage
+## Language Configuration
 
-### Code Embeddings
+### Language Registry
 ```sql
-CREATE TABLE embeddings (
+CREATE TABLE languages (
     id INTEGER PRIMARY KEY,
-    file_id INTEGER,
-    symbol_id INTEGER,
-    chunk_start INTEGER,
-    chunk_end INTEGER,
-    embedding BLOB NOT NULL, -- Serialized vector
-    model_version TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    metadata JSON,
-    FOREIGN KEY (file_id) REFERENCES files(id),
-    FOREIGN KEY (symbol_id) REFERENCES symbols(id)
+    name TEXT UNIQUE NOT NULL,
+    file_extensions JSON NOT NULL, -- [".py", ".pyw"]
+    parser_type TEXT NOT NULL, -- "enhanced" or "generic"
+    tree_sitter_grammar TEXT,
+    query_patterns JSON, -- Language-specific queries
+    metadata JSON
 );
 
-CREATE INDEX idx_embeddings_file ON embeddings(file_id);
-CREATE INDEX idx_embeddings_symbol ON embeddings(symbol_id);
+-- Insert 48 supported languages
+INSERT INTO languages (name, file_extensions, parser_type) VALUES
+    ('python', '["*.py", "*.pyw"]', 'enhanced'),
+    ('javascript', '["*.js", "*.jsx", "*.mjs"]', 'enhanced'),
+    ('c', '["*.c", "*.h"]', 'enhanced'),
+    ('cpp', '["*.cpp", "*.hpp", "*.cc", "*.cxx"]', 'enhanced'),
+    ('dart', '["*.dart"]', 'enhanced'),
+    ('html', '["*.html", "*.htm"]', 'enhanced'),
+    ('css', '["*.css", "*.scss", "*.sass"]', 'enhanced'),
+    ('go', '["*.go"]', 'generic'),
+    ('rust', '["*.rs"]', 'generic'),
+    ('java', '["*.java"]', 'generic'),
+    -- ... 38 more languages
+;
+```
+
+## Vector Storage (Qdrant)
+
+### Collection Schema
+```json
+{
+    "collection_name": "code-embeddings-{language}",
+    "vectors": {
+        "size": 1024,
+        "distance": "Cosine"
+    },
+    "payload_schema": {
+        "file_path": "keyword",
+        "symbol_name": "keyword", 
+        "symbol_kind": "keyword",
+        "language": "keyword",
+        "line": "integer",
+        "signature": "text",
+        "content": "text"
+    }
+}
+```
+
+### Embedding Metadata
+```json
+{
+    "model": "voyage-code-3",
+    "embedding_dimension": 1024,
+    "indexed_at": "2025-06-07T00:00:00Z",
+    "file_hash": "sha256:...",
+    "language": "python",
+    "symbol_type": "function"
+}
 ```
 
 ## Cache Tables

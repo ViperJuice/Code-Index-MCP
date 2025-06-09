@@ -1,0 +1,120 @@
+@startuml
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define INTERNAL <<Internal>>
+!define ASYNC <<async>>
+
+package "mcp_server.plugins.typescript_plugin" <<Component>> {
+    ' Main Plugin Class
+    class TypeScriptPlugin implements IPlugin #LightGreen {
+        -_sqlite_store: SQLiteStore
+        -_parser: TreeSitterParser
+        -_type_system: TypeSystem
+        -_tsconfig_parser: TSConfigParser
+        -_declaration_handler: DeclarationHandler
+        +__init__(sqlite_store: SQLiteStore)
+        +extract_symbols(content: str, file_path: str): Result
+        +search_symbols(query: str, limit: int): List<Symbol>
+        +get_language(): str
+        +get_file_extensions(): List<str>
+        -_extract_interfaces(tree: TreeNode): List<InterfaceSymbol]
+        -_extract_types(tree: TreeNode): List<TypeAlias]
+        -_extract_enums(tree: TreeNode): List<EnumSymbol]
+        -_extract_namespaces(tree: TreeNode): List<NamespaceSymbol]
+    }
+    
+    ' Type System Support
+    class TypeSystem INTERNAL {
+        -_type_definitions: Dict<str, TypeDefinition]
+        -_generic_instances: Dict<str, GenericInstance]
+        +analyze_type_annotation(node: TreeNode): Type
+        +resolve_union_types(union_node: TreeNode): UnionType
+        +resolve_intersection_types(intersect_node: TreeNode): IntersectionType
+        +infer_type_from_usage(expr_node: TreeNode): Type
+        +check_type_compatibility(source: Type, target: Type): bool
+        +resolve_mapped_types(mapped_node: TreeNode): MappedType
+    }
+    
+    ' TSConfig Integration
+    class TSConfigParser INTERNAL {
+        -_tsconfig_path: Optional<Path]
+        -_compiler_options: CompilerOptions
+        -_project_references: List<ProjectReference]
+        +find_tsconfig(start_path: Path): Optional<Path]
+        +parse_tsconfig(config_path: Path): TSConfig
+        +resolve_path_mappings(import_path: str): str
+        +get_included_files(): List<Path]
+        +check_strict_mode(): StrictModeFlags
+    }
+    
+    ' Declaration File Handler
+    class DeclarationHandler INTERNAL {
+        -_declaration_files: Dict<str, DeclarationFile]
+        -_ambient_modules: Dict<str, Module]
+        +parse_declaration_file(dts_path: Path): DeclarationFile
+        +resolve_module_augmentation(module: str): List<Augmentation]
+        +find_global_declarations(): List<GlobalDeclaration]
+        +merge_declarations(symbols: List<Symbol]): List<MergedSymbol]
+        +extract_declare_statements(node: TreeNode): List<DeclareStatement]
+    }
+    
+    ' Data Models
+    class TypeDefinition INTERNAL {
+        +name: str
+        +type_parameters: List<TypeParameter]
+        +constraint: Optional<Type]
+        +default_type: Optional<Type]
+        +is_conditional: bool
+    }
+    
+    class TSConfig INTERNAL {
+        +compiler_options: CompilerOptions
+        +files: List<str]
+        +include: List<str]
+        +exclude: List<str]
+        +extends: Optional<str]
+        +references: List<ProjectReference]
+    }
+    
+    class CompilerOptions INTERNAL {
+        +target: str
+        +module: str
+        +strict: bool
+        +esModuleInterop: bool
+        +paths: Dict<str, List<str]]
+        +types: List<str]
+        +lib: List<str]
+    }
+    
+    class DecoratorInfo INTERNAL {
+        +name: str
+        +arguments: List<Expression]
+        +target_type: DecoratorTarget
+        +is_parameter_decorator: bool
+    }
+    
+    ' Relationships
+    TypeScriptPlugin --> TypeSystem : uses type system
+    TypeScriptPlugin --> TSConfigParser : parses config
+    TypeScriptPlugin --> DeclarationHandler : handles .d.ts
+    TypeSystem --> TypeDefinition : manages types
+    TSConfigParser --> TSConfig : parses config
+    DeclarationHandler --> DeclarationFile : processes declarations
+    
+    ' External dependencies
+    TypeScriptPlugin ..> TreeSitterParser : parses TypeScript
+    TypeScriptPlugin ..> SQLiteStore : stores symbols
+}
+
+' Note about TypeScript-specific features
+note bottom of TypeScriptPlugin
+  TypeScript-specific capabilities:
+  - Full type system support (unions, intersections, mapped)
+  - tsconfig.json integration
+  - Declaration file (.d.ts) parsing
+  - Module augmentation
+  - Decorator metadata
+  - Type inference
+  - Project references
+end note
+
+@enduml

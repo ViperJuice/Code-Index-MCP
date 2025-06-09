@@ -1,0 +1,105 @@
+@startuml
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define INTERNAL <<Internal>>
+!define ASYNC <<async>>
+
+package "mcp_server.plugins.java_plugin" <<Component>> {
+    ' Main Plugin Class
+    class JavaPlugin implements IPlugin #LightGreen {
+        -_sqlite_store: SQLiteStore
+        -_parser: TreeSitterParser
+        -_import_resolver: ImportResolver
+        -_type_analyzer: TypeAnalyzer
+        -_build_system: BuildSystemAnalyzer
+        +__init__(sqlite_store: SQLiteStore)
+        +extract_symbols(content: str, file_path: str): Result
+        +search_symbols(query: str, limit: int): List<Symbol>
+        +get_language(): str
+        +get_file_extensions(): List<str>
+        -_extract_imports(tree: TreeNode): List<Import>
+        -_extract_classes(tree: TreeNode): List<ClassSymbol]
+        -_extract_methods(tree: TreeNode): List<MethodSymbol>
+        -_extract_interfaces(tree: TreeNode): List<InterfaceSymbol]
+    }
+    
+    ' Import Resolution
+    class ImportResolver INTERNAL {
+        -_classpath: List<str>
+        -_maven_repos: List<str>
+        -_gradle_cache: str
+        +resolve_import(import_stmt: str, context: JavaContext): ResolvedImport
+        +find_class_in_classpath(class_name: str): Optional<str>
+        +parse_wildcard_imports(import_stmt: str): List<str>
+        +get_package_hierarchy(file_path: str): str
+    }
+    
+    ' Type System Analysis
+    class TypeAnalyzer INTERNAL {
+        -_type_cache: Dict<str, JavaType]
+        +analyze_type(node: TreeNode): JavaType
+        +resolve_generics(type_node: TreeNode): List<GenericType]
+        +check_inheritance(child: str, parent: str): bool
+        +extract_type_parameters(node: TreeNode): List<str]
+        +resolve_method_signature(method: TreeNode): MethodSignature
+    }
+    
+    ' Build System Integration
+    class BuildSystemAnalyzer INTERNAL {
+        -_project_root: Path
+        +detect_build_system(path: Path): BuildSystem
+        +parse_maven_pom(pom_path: Path): MavenProject
+        +parse_gradle_build(build_path: Path): GradleProject
+        +get_dependencies(): List<Dependency]
+        +get_source_paths(): List<Path]
+        +get_classpath(): List<str]
+    }
+    
+    ' Data Models
+    class JavaContext INTERNAL {
+        +package_name: str
+        +imports: List<Import]
+        +class_hierarchy: Dict<str, List<str>>
+        +available_types: Set<str>
+    }
+    
+    class JavaType INTERNAL {
+        +name: str
+        +package: str
+        +generics: List<GenericType]
+        +is_primitive: bool
+        +is_array: bool
+        +dimensions: int
+    }
+    
+    class BuildSystem <<enumeration>> {
+        MAVEN
+        GRADLE
+        ANT
+        NONE
+    }
+    
+    ' Relationships
+    JavaPlugin --> ImportResolver : resolves imports
+    JavaPlugin --> TypeAnalyzer : analyzes types
+    JavaPlugin --> BuildSystemAnalyzer : integrates build
+    ImportResolver --> JavaContext : uses context
+    TypeAnalyzer --> JavaType : creates types
+    BuildSystemAnalyzer --> BuildSystem : detects type
+    
+    ' External dependencies
+    JavaPlugin ..> TreeSitterParser : parses Java
+    JavaPlugin ..> SQLiteStore : stores symbols
+}
+
+' Note about Java-specific features
+note bottom of JavaPlugin
+  Java-specific capabilities:
+  - Full import resolution (including wildcards)
+  - Maven/Gradle integration
+  - Generic type analysis
+  - Interface/implementation tracking
+  - Annotation processing
+  - Package hierarchy understanding
+end note
+
+@enduml

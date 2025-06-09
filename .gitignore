@@ -84,13 +84,59 @@ logs/
 *.temp
 .cache/
 
-# Docker and data
-data/
-backup/
+# =============================================================================
+# AI AGENT GUIDANCE AND DEVELOPER TOOLS - SHARED WITH TEAM
+# =============================================================================
+# These files help other developers understand and work with the project:
+# 
+# CLAUDE.md                    - AI agent navigation stub
+# AGENTS.md                    - Primary AI agent configuration  
+# .claude/commands/            - Custom Claude Code commands
+# .claude.json                 - Claude Desktop integration example
+# .mcp.json                    - MCP server tool definitions
+# 
+# DO NOT add these to .gitignore - they are valuable for team collaboration
+
+# =============================================================================
+# LOCAL AI SETTINGS - USER-SPECIFIC (DO IGNORE)
+# =============================================================================
+.claude/settings.local.json
+.claude/user-*.json
+
+# Personal IDE configuration (user-specific - DO IGNORE)
+.cursor/
+.vscode/settings.json
+.idea/workspace.xml
+
+# Local development databases and data (DO IGNORE)
+*.db
+*.sqlite
+*.sqlite3
+test_*.db
+cache_*.db
+
+# Local environment files with secrets (DO IGNORE)
+.env
+.env.local
+.env.development.local
+.env.production.local
+
+# =============================================================================
+# TEMPLATE/EXAMPLE FILES - SHARED WITH TEAM  
+# =============================================================================
+# Keep these files so other developers have configuration examples:
+!.env.example
+!.env.*.example
+!.env.*.template
+!docker-compose.*.example
+!config.*.template
+
+# Local test data and results (DO IGNORE)
 test_workspace/
 test_results/
+rapid_test_report.json
 
-# AI Guidance files - DO NOT IGNORE
-# CLAUDE.md
-# AGENTS.md
-# Any AI-related documentation should be tracked
+# Local data directories (DO IGNORE)
+data/
+backup/
+cache/

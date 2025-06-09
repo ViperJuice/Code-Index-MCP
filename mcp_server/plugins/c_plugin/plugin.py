@@ -589,7 +589,7 @@ class Plugin(IPlugin):
         
         return refs
 
-    def search(self, query: str, opts: SearchOpts | None = None) -> list[SearchResult]:
+    def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:
         """Search for code snippets matching a query."""
         limit = 20
         if opts and "limit" in opts:

@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "code-index-mcp": {
+      "type": "stdio",
+      "command": "python3",
+      "args": ["mcp_server_cli.py"],
+      "cwd": "/home/jenner/code/Code-Index-MCP",
+      "env": {
+        "PYTHONPATH": "/home/jenner/code/Code-Index-MCP",
+        "LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}

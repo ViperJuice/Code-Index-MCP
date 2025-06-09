@@ -900,7 +900,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
         
         return refs
 
-    def search(self, query: str, opts: SearchOpts | None = None) -> list[SearchResult]:
+    def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:
         """Search for code snippets matching a query."""
         limit = 20
         if opts and "limit" in opts:
@@ -1040,7 +1040,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
             )
             return Result.error_result(error)
     
-    def search(self, query: str, options: Dict[str, Any]) -> Result[List[InterfaceSearchResult]]:
+    def search_with_result(self, query: str, options: Dict[str, Any]) -> Result[List[InterfaceSearchResult]]:
         """Search for code patterns"""
         try:
             # Convert options to SearchOpts format

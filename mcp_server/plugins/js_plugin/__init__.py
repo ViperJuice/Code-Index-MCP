@@ -1,5 +1,14 @@
 """JavaScript/TypeScript plugin for Code-Index-MCP."""
 
-from .plugin import Plugin
+import os
+
+# Use semantic plugin if enabled, otherwise fallback to basic plugin
+if os.getenv("SEMANTIC_SEARCH_ENABLED", "false").lower() == "true":
+    try:
+        from .plugin_semantic import JsPluginSemantic as Plugin
+    except ImportError:
+        from .plugin import Plugin
+else:
+    from .plugin import Plugin
 
 __all__ = ["Plugin"]

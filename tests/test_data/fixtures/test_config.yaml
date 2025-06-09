@@ -1,0 +1,26 @@
+test_settings:
+  chunk_size: 500
+  overlap: 50
+  enable_semantic: false
+  
+mock_api_responses:
+  voyage_embedding:
+    model: "voyage-2"
+    dimension: 1024
+  qdrant_collection:
+    name: "test_collection"
+    vector_size: 1024
+    
+test_documents:
+  simple:
+    title: "Simple Test Document"
+    sections: 2
+    expected_chunks: 1
+  complex:
+    title: "Complex Test Document"  
+    sections: 5
+    expected_chunks: 3
+  unicode:
+    title: "Unicode Test Document"
+    sections: 1
+    expected_chunks: 1

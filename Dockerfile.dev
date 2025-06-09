@@ -1,0 +1,72 @@
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies including Node.js
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
+    curl \
+    libcurl4-openssl-dev \
+    # Node.js repository setup
+    ca-certificates \
+    gnupg \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
+    && apt-get update \
+    && apt-get install -y nodejs \
+    # Additional dev tools
+    vim \
+    nano \
+    less \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Claude Code globally
+RUN npm install -g @anthropic-ai/claude-code
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+COPY pyproject.toml .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY mcp_server/ ./mcp_server/
+COPY tests/ ./tests/
+COPY pytest.ini .
+COPY .coveragerc .
+COPY .claude.json .
+COPY .mcp.json .
+COPY mcp_server_cli.py .
+
+# Install the package in development mode
+RUN pip install -e .
+
+# Install any npm dependencies if package.json exists
+COPY package*.json ./
+RUN if [ -f package.json ]; then npm install; fi
+
+# Copy any other configuration files
+COPY plugins.yaml .
+COPY tox.ini .
+COPY Makefile .
+
+# Create necessary directories
+RUN mkdir -p /app/data /app/logs /app/test_results
+
+# Create volume for code indexing
+VOLUME ["/code", "/app/data", "/app/logs"]
+
+# Expose API port
+EXPOSE 8000
+
+# Set environment variables for development
+ENV PYTHONPATH=/app
+ENV LOG_LEVEL=INFO
+ENV DATABASE_URL=sqlite:///app/data/code_index.db
+
+# Default command runs bash for development
+CMD ["/bin/bash"]

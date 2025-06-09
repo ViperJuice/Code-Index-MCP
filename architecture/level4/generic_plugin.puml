@@ -1,0 +1,112 @@
+@startuml
+!define ASYNC <<async>>
+!define COMPONENT_INTERFACE <<Component Interface>>
+
+package "mcp_server.plugins.generic" <<Component>> {
+    ' Generic Plugin Implementation
+    class GenericTreeSitterPlugin extends PluginWithSemanticSearch {
+        -_language_config: LanguageConfig
+        -_parser: Optional[Parser]
+        -_language: Optional[Language]
+        -_query_cache: Dict<str, Query>
+        -_ast_cache: LRUCache<str, Tree>
+        
+        +__init__(config: LanguageConfig, store: SQLiteStore, semantic: bool)
+        +get_parser(): Parser
+        +indexFile(path: Path, content: str): IndexShard
+        +ASYNC indexFileAsync(path: Path, content: str): IndexShard
+        +search(query: str, opts: SearchOpts): Iterable<SearchResult>
+        +getDefinition(file: str, line: int, col: int): Optional<SymbolDef]
+        +getReferences(symbol: str, file: str): List<Reference>
+        
+        -_load_language(): Language
+        -_get_or_create_query(pattern: str): Query
+        -_extract_symbols(tree: Tree, content: str, path: str): List<Dict]
+        -_extract_imports(tree: Tree, content: str): List<str]
+        -_parse_with_cache(content: str): Tree
+    }
+    
+    ' Tree-sitter Integration
+    class TreeSitterManager INTERNAL {
+        -{static} _loaded_languages: Dict<str, Language>
+        -{static} _language_lock: Lock
+        
+        +{static} get_language(name: str): Language
+        +{static} create_parser(language: Language): Parser
+        +{static} is_language_available(name: str): bool
+        -{static} _load_language_library(name: str): Language
+    }
+    
+    ' Query Management
+    class QueryManager INTERNAL {
+        -_queries: Dict<str, Dict<str, str]]
+        
+        +get_query(language: str, query_type: str): Optional<str]
+        +get_default_queries(): Dict<str, str]
+        +merge_queries(default: Dict, custom: Dict): Dict<str, str]
+    }
+    
+    ' Symbol Extraction
+    class SymbolExtractor INTERNAL {
+        -_language: str
+        -_queries: Dict<str, Query]
+        
+        +extract_functions(tree: Tree, content: str): List<Symbol]
+        +extract_classes(tree: Tree, content: str): List<Symbol]
+        +extract_variables(tree: Tree, content: str): List<Symbol]
+        +extract_imports(tree: Tree, content: str): List<Import]
+        -_node_to_symbol(node: Node, content: str, kind: str): Symbol
+    }
+    
+    ' AST Cache
+    class ASTCache INTERNAL {
+        -_cache: OrderedDict<str, Tuple<Tree, str]]
+        -_max_size: int = 100
+        
+        +get(content_hash: str): Optional<Tree]
+        +put(content_hash: str, tree: Tree): void
+        +clear(): void
+        -_compute_hash(content: str): str
+    }
+    
+    ' Relationships
+    GenericTreeSitterPlugin --> TreeSitterManager : gets parser
+    GenericTreeSitterPlugin --> QueryManager : gets queries
+    GenericTreeSitterPlugin --> SymbolExtractor : extracts symbols
+    GenericTreeSitterPlugin --> ASTCache : caches ASTs
+    SymbolExtractor --> TreeSitterManager : uses parser
+    
+    ' External relationships
+    GenericTreeSitterPlugin ..> LanguageConfig : configured by
+    GenericTreeSitterPlugin ..> IndexShard : produces
+    GenericTreeSitterPlugin ..> SearchResult : returns
+}
+
+' Supported Languages Note
+note right of GenericTreeSitterPlugin
+  Generic plugin handles 42 languages:
+  - Go, Rust, Ruby, Java, Swift, Kotlin
+  - PHP, Scala, Haskell, Clojure, Elixir
+  - Erlang, F#, OCaml, Lua, Perl, R
+  - Julia, Nim, Zig, Crystal, D, V
+  - Vala, Verilog, VHDL, SystemVerilog
+  - Assembly, Bash, Fish, PowerShell
+  - SQL, GraphQL, JSON, YAML, TOML
+  - XML, Markdown, LaTeX, Dockerfile
+  - Makefile, CMake
+end note
+
+' Query Examples
+note bottom of QueryManager
+  Default queries for all languages:
+  - Functions: (function_declaration)
+  - Classes: (class_declaration)
+  - Variables: (variable_declaration)
+  
+  Enhanced queries for specific languages:
+  - Go: (method_declaration) (interface_type)
+  - Rust: (impl_item) (trait_item)
+  - Java: (interface_declaration) (enum_declaration)
+end note
+
+@enduml

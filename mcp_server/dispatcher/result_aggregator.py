@@ -215,13 +215,15 @@ class SimpleAggregationStrategy(IAggregationStrategy):
 class SmartAggregationStrategy(IAggregationStrategy):
     """Smart aggregation strategy with semantic similarity and context merging."""
     
-    def __init__(self, similarity_threshold: float = 0.8):
+    def __init__(self, similarity_threshold: float = 0.8, enable_document_chunking: bool = True):
         """Initialize smart aggregation strategy.
         
         Args:
             similarity_threshold: Threshold for considering results similar
+            enable_document_chunking: Enable special handling for document chunks
         """
         self.similarity_threshold = similarity_threshold
+        self.enable_document_chunking = enable_document_chunking
     
     def aggregate(self, results_by_plugin: Dict[IPlugin, List[SearchResult]], 
                  criteria: RankingCriteria) -> List[AggregatedResult]:
@@ -312,12 +314,41 @@ class SmartAggregationStrategy(IAggregationStrategy):
         # Same file and close line numbers
         if result1['file'] == result2['file']:
             line_diff = abs(result1['line'] - result2['line'])
-            if line_diff <= 2:  # Within 2 lines
+            
+            # Special handling for documentation files - larger chunks
+            if self.enable_document_chunking and self._is_documentation_file(result1['file']):
+                if line_diff <= 10:  # Within 10 lines for docs
+                    return True
+            elif line_diff <= 2:  # Within 2 lines for code
                 return True
         
         # Similar snippets
         snippet_similarity = SequenceMatcher(None, result1['snippet'], result2['snippet']).ratio()
         if snippet_similarity >= self.similarity_threshold:
+            return True
+        
+        return False
+    
+    def _is_documentation_file(self, file_path: str) -> bool:
+        """Check if a file is a documentation file."""
+        doc_extensions = {'.md', '.rst', '.txt', '.adoc', '.textile'}
+        doc_names = {'readme', 'changelog', 'contributing', 'license', 'install', 'setup', 'guide', 'tutorial'}
+        
+        path_lower = file_path.lower()
+        
+        # Check extension
+        for ext in doc_extensions:
+            if path_lower.endswith(ext):
+                return True
+        
+        # Check filename
+        filename = Path(file_path).stem.lower()
+        for doc_name in doc_names:
+            if doc_name in filename:
+                return True
+        
+        # Check if in docs directory
+        if '/docs/' in path_lower or '/documentation/' in path_lower:
             return True
         
         return False
@@ -390,11 +421,43 @@ class SmartAggregationStrategy(IAggregationStrategy):
     
     def _merge_context(self, group: List[Tuple[IPlugin, SearchResult]]) -> List[str]:
         """Merge context lines from similar results."""
-        all_snippets = [result['snippet'] for _, result in group]
+        if not group:
+            return []
         
-        # For now, just return unique snippets
-        # Could be enhanced to actually merge surrounding context
-        return list(set(all_snippets))
+        _, primary_result = group[0]
+        
+        # Check if this is a documentation file
+        if self.enable_document_chunking and self._is_documentation_file(primary_result['file']):
+            # For documentation, merge snippets into larger context
+            snippets_by_line = {}
+            for _, result in group:
+                snippets_by_line[result['line']] = result['snippet']
+            
+            # Sort by line number and merge adjacent snippets
+            sorted_lines = sorted(snippets_by_line.keys())
+            merged_snippets = []
+            current_snippet = []
+            last_line = -100
+            
+            for line in sorted_lines:
+                if line - last_line <= 3:  # Adjacent or close lines
+                    current_snippet.append(snippets_by_line[line])
+                else:
+                    # Start new snippet group
+                    if current_snippet:
+                        merged_snippets.append('\n'.join(current_snippet))
+                    current_snippet = [snippets_by_line[line]]
+                last_line = line
+            
+            # Add final snippet group
+            if current_snippet:
+                merged_snippets.append('\n'.join(current_snippet))
+            
+            return merged_snippets[:5]  # Limit to 5 merged contexts
+        else:
+            # For code files, return unique snippets
+            all_snippets = [result['snippet'] for _, result in group]
+            return list(dict.fromkeys(all_snippets))[:5]  # Preserve order, limit to 5
     
     def _calculate_avg_similarity(self, group: List[Tuple[IPlugin, SearchResult]]) -> float:
         """Calculate average similarity within a group."""

@@ -1,18 +1,14 @@
-"""
-Dart/Flutter plugin for the MCP server.
+"""Dart plugin for Code-Index-MCP."""
 
-This plugin provides code intelligence for Dart and Flutter projects including:
-- Symbol extraction (classes, functions, methods, variables, enums, mixins, extensions)
-- Flutter-specific features (widgets, state classes, build methods)
-- Import/export tracking
-- Documentation extraction
-- Search and reference finding
+import os
 
-The plugin uses regex-based parsing since tree-sitter-dart is not currently
-available in the tree-sitter-languages package, but is structured to easily
-upgrade to tree-sitter parsing when available.
-"""
-
-from .plugin import Plugin
+# Use semantic plugin if enabled, otherwise fallback to basic plugin
+if os.getenv("SEMANTIC_SEARCH_ENABLED", "false").lower() == "true":
+    try:
+        from .plugin_semantic import DartPluginSemantic as Plugin
+    except ImportError:
+        from .plugin import Plugin
+else:
+    from .plugin import Plugin
 
 __all__ = ["Plugin"]

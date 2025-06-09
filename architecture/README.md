@@ -1,170 +1,157 @@
-# Code-Index-MCP Architecture Guide
+# Code-Index-MCP Architecture Documentation
 
 ## Overview
+This directory contains the comprehensive architecture documentation for Code-Index-MCP using the C4 model. The system now supports **48 programming languages** through a combination of enhanced specific plugins and a generic tree-sitter based plugin system.
 
-This architecture follows the C4 model with four levels of abstraction, from high-level system context down to detailed code design. Each level provides increasing detail while maintaining clear boundaries and relationships.
+## Current Architecture Status
+- **Implementation**: 85% Complete - Core System Operational
+- **Languages Supported**: 48+ (15 specialized plugins + 35+ via generic plugin)
+- **Semantic Search**: Voyage AI embeddings with graceful Qdrant fallback
+- **Storage**: SQLite with FTS5 + optional Qdrant for vectors
+- **Real-time Updates**: File system monitoring with Watchdog
+- **Performance**: Query caching, lazy loading, optimized routing
 
-## Navigation Guide
+## Architecture Documentation Structure
 
-### Starting Point: System Context (Level 1)
-**File**: `level1_context.dsl`
-- Shows how MCP Server fits in the broader ecosystem
-- Identifies external systems and users
-- Defines system boundaries and responsibilities
+### 📄 Unified C4 Model
+- **workspace.dsl** - Complete Structurizr DSL workspace containing all C4 levels:
+  - Level 1: System Context
+  - Level 2: Container Diagram
+  - Level 3: Component Diagrams
+  - Level 4: Code (see PlantUML diagrams)
+  - Dynamic Views: Indexing and Search flows
+  - Deployment View: Production setup
 
-### Container Architecture (Level 2)
-**File**: `level2_containers.dsl`
-- 14 containers including API Gateway, Dispatcher, Plugin System, Graph Store
-- Shows technical architecture and data flow
-- Identifies integration points and storage systems
+### 📋 Supporting Documentation
+- **data_model.md** - Data structures, schemas, and storage design
+- **performance_requirements.md** - Performance specifications and benchmarks
+- **security_model.md** - Security architecture and considerations
+- **AGENTS.md** - AI agent-specific architecture guidance
+- **CLAUDE.md** - Navigation stub for AI agents
 
-### Component Details (Level 3)
-**File**: `level3_mcp_components.dsl`
-- Internal structure of each container
-- Component interfaces listed in properties
-- References to Level 4 PlantUML files for each component
+### 📊 Level 4 - Code Diagrams (PlantUML)
+The `level4/` directory contains detailed class and interface diagrams:
 
-### Code Design (Level 4)
-**Directory**: `level4/`
-- Detailed PlantUML class diagrams
-- Interface definitions with method signatures
-- Implementation classes and internal structures
-- Cross-component contracts
+#### Core System Components
+- **api_gateway_actual.puml** - FastAPI/MCP gateway implementation
+- **dispatcher_actual.puml** - Request routing and caching
+- **enhanced_dispatcher.puml** - Enhanced dispatcher with dynamic loading
+- **indexer_actual.puml** - Indexing engine details
+- **storage_actual.puml** - SQLite and Qdrant integration
+- **file_watcher.puml** - File system monitoring
 
-## Implementation Status
+#### Plugin System
+- **plugin_system_actual.puml** - Plugin architecture overview
+- **plugin_factory.puml** - Dynamic plugin creation system
+- **generic_plugin.puml** - GenericTreeSitterPlugin architecture
+- **python_plugin_actual.puml** - Enhanced Python plugin
+- **js_plugin_actual.puml** - JavaScript/TypeScript plugin
+- **c_plugin_actual.puml** - C language plugin
+- **shared_interfaces.puml** - Common plugin interfaces
+- **shared_utilities.puml** - Utility classes
 
-**IMPORTANT**: The current implementation is a prototype that implements ~20% of the designed architecture. See `IMPLEMENTATION_GAP_ANALYSIS.md` for details.
+## Key Architectural Components
 
-### Actual Implementation Diagrams
-For the current implementation state, refer to:
-- `level3_mcp_components_actual.dsl` - Shows implementation status with color coding
-- `level4/*_actual.puml` - Actual implementation details for each component
-- `IMPLEMENTATION_GAP_ANALYSIS.md` - Detailed gap analysis
-
-### Implementation Coverage
-- ✅ Basic API, Dispatcher, Python Plugin, Indexers
-- ⚠️ File Watcher (partial)
-- 🔶 Other language plugins (stubs)
-- ❌ Graph Store, Cache, Security, Config, Queue, etc.
-
-## How to Read the Architecture
-
-### Top-Down Approach
-1. Start with `level1_context.dsl` to understand the system's purpose
-2. Move to `level2_containers.dsl` to see technical building blocks
-3. Dive into `level3_mcp_components.dsl` for component details
-4. Reference specific `level4/*.puml` files for implementation details
-
-### Component-Focused Approach
-1. Find the component of interest in `level3_mcp_components.dsl`
-2. Note its `interfaces` and `level4` properties
-3. Open the referenced PlantUML file for detailed design
-4. Check `shared_interfaces.puml` for cross-cutting concerns
-
-### Interface-Driven Navigation
-1. Start with `level4/shared_interfaces.puml` for common contracts
-2. Find components that implement specific interfaces
-3. Trace relationships through component boundaries
-4. Verify interface usage in implementation files
-
-## Key Architectural Decisions
-
-### Dual Storage Strategy
-- **SQLite + FTS5**: Fast text search and basic indexing
-- **Memgraph**: Graph relationships and context analysis
-
-### Plugin Architecture
-- All plugins implement `IPlugin` interface
-- Language-specific analysis in separate components
-- Dynamic loading and lifecycle management
-
-### Component Interfaces
-- Public interfaces marked with `<<Component Interface>>`
-- Internal interfaces marked with `<<Internal>>`
-- Cross-cutting concerns in shared interfaces
-
-### Async Design
-- Methods marked with `<<async>>` for concurrent operations
-- Event-driven file watching
-- Batch processing for performance
-
-## PlantUML File Guide
-
-### Core Infrastructure
-- `shared_interfaces.puml`: Common types, logging, metrics, security
-- `api_gateway.puml`: HTTP endpoints, auth, validation
-- `dispatcher.puml`: Request routing, plugin coordination
-
-### Plugin System
-- `plugin_system.puml`: Plugin framework and lifecycle
-- `python_plugin.puml`: Example language plugin implementation
-- Additional plugin files for each supported language
-
-### Data Processing
-- `indexer.puml`: Code indexing and search
-- `graph_store.puml`: Graph database operations
-- `file_watcher.puml`: File system monitoring
-
-### Utilities
-- `shared_utilities.puml`: Tree-sitter wrapper, common parsing
-
-## Viewing the Diagrams
-
-### Structurizr DSL (Levels 1-3)
-```bash
-docker run --rm -p 8080:8080 \
-  -v "$(pwd)/architecture":/usr/local/structurizr \
-  structurizr/lite
+### 1. Language Support Architecture
+```
+┌─────────────────────────────────────────────────────┐
+│                 Plugin Framework                      │
+├─────────────────────────────────────────────────────┤
+│  Plugin Factory → Language Registry → Plugin Cache   │
+├─────────────────┬─────────────────┬─────────────────┤
+│ Enhanced Plugins │ Specialized     │ Generic Plugin  │
+├─────────────────┼─────────────────┼─────────────────┤
+│ • Python        │ • Java          │ • Ruby          │
+│ • JavaScript    │ • Go            │ • PHP           │
+│ • C/C++         │ • Rust          │ • Scala         │
+│ • Dart          │ • C#            │ • Haskell       │
+│ • HTML/CSS      │ • Swift         │ • Elixir        │
+│                 │ • Kotlin        │ • Erlang        │
+│                 │ • TypeScript    │ • F#            │
+│                 │                 │ • ... 28 more   │
+├─────────────────┼─────────────────┼─────────────────┤
+│ Document Plugins│                 │                 │
+├─────────────────┤                 │                 │
+│ • Markdown      │                 │                 │
+│ • PlainText     │                 │                 │
+└─────────────────┴─────────────────┴─────────────────┘
 ```
 
-### PlantUML (Level 4)
-- Use PlantUML extension in VS Code
-- Or online at http://www.plantuml.com/plantuml
-- Or with Docker: `docker run -p 8080:8080 plantuml/plantuml-server`
+### 2. Plugin Factory Pattern
+- **Dynamic Loading**: Plugins loaded on-demand based on file type
+- **Caching**: Plugin instances cached for performance
+- **Configuration**: Language-specific settings in registry
+- **Fallback**: Generic tree-sitter plugin for unsupported extensions
 
-## Making Changes
+### 3. Semantic Search Integration
+- **Embeddings**: Voyage AI (voyage-code-3 model)
+- **Vector Storage**: Qdrant for similarity search
+- **Hybrid Search**: Combines FTS5 lexical + vector semantic search
+- **Cross-language**: Unified search across all 48 languages
 
-### Adding a Component
-1. Add to `level3_mcp_components.dsl` with interface properties
-2. Create corresponding `level4/component_name.puml`
-3. Define public interfaces as `<<Component Interface>>`
-4. Update relationships in both DSL and PlantUML
+### 4. Performance Optimizations
+- **Lazy Loading**: Parsers loaded only when needed
+- **Query Caching**: AST queries cached per language
+- **Parallel Processing**: Multi-threaded indexing
+- **Incremental Updates**: Only changed files re-indexed
 
-### Adding an Interface
-1. Determine if shared or component-specific
-2. Add to appropriate PlantUML file
-3. Mark with correct stereotype
-4. Update implementing classes
+## Viewing the Architecture
 
-### Modifying Relationships
-1. Update Structurizr DSL for component relationships
-2. Verify interface dependencies in PlantUML
-3. Ensure consistency across levels
+### Structurizr DSL
+To view the C4 diagrams from workspace.dsl:
 
-## Best Practices
+1. **Using Structurizr Lite** (recommended):
+   ```bash
+   docker run -it --rm -p 8080:8080 \
+     -v /app/architecture:/usr/local/structurizr \
+     structurizr/lite
+   ```
+   Then open http://localhost:8080
 
-### Interface Design
-- Keep interfaces focused and cohesive
-- Use async methods for I/O operations
-- Document exceptions with `throws` or `{exceptions=}`
-- Include type parameters for generic interfaces
+2. **Using Structurizr CLI**:
+   ```bash
+   structurizr-cli export -workspace workspace.dsl -format plantuml
+   ```
 
-### Component Boundaries
-- Public interfaces form component contracts
-- Internal classes should not be referenced externally
-- Use dependency injection for cross-component usage
-- Maintain clear separation of concerns
+3. **Online**: Upload workspace.dsl to https://structurizr.com/dsl
 
-### Documentation
-- Each interface should have a clear purpose
-- Methods should be self-documenting
-- Complex logic should have implementation notes
-- Keep PlantUML files focused on one component
+### PlantUML Diagrams
+View the Level 4 diagrams in the `level4/` directory using:
+- PlantUML extension in VS Code
+- Online at http://www.plantuml.com/plantuml
+- Command line: `plantuml level4/*.puml`
 
 ## Architecture Principles
 
-1. **Local-First**: Core functionality works offline
-2. **Plugin Isolation**: Plugins can't affect system stability
-3. **Interface Segregation**: Many specific interfaces over few general ones
-4. **Async by Default**: Non-blocking operations for scalability
-5. **Fail-Safe**: Graceful degradation on component failure
+1. **Plugin-Based Extensibility**: Easy to add new language support
+2. **Local-First Processing**: All indexing happens locally
+3. **Performance at Scale**: Handles large codebases efficiently
+4. **Language Agnostic Core**: Same interfaces for all languages
+5. **Semantic Understanding**: AI-powered code comprehension
+
+## Recent Updates (June 2025)
+
+### Major Enhancements
+- **48+ Language Support**: 15 specialized plugins + 35+ via GenericTreeSitterPlugin
+- **Enhanced Dispatcher**: Dynamic plugin loading with lazy initialization
+- **Plugin Factory Pattern**: Automatic language detection and plugin creation
+- **Query Caching**: Significant performance improvements for tree-sitter queries
+- **Robust Error Handling**: Graceful degradation when services unavailable
+- **Path Resolution**: Fixed relative/absolute path handling
+- **Plugin Compatibility**: Resolved interface issues between plugins and dispatcher
+- **Specialized Plugins**: Added Java, Go, Rust, C#, Swift, Kotlin, TypeScript support
+- **Document Processing**: Markdown and PlainText plugins for documentation indexing
+
+### Production-Ready Features
+- **Dynamic Loading**: Plugins loaded on-demand for optimal performance
+- **Fallback Mechanisms**: System continues working even without external services
+- **Cross-Language Search**: Unified search across all supported languages
+- **Real-World Testing**: Validated with large codebases (httpie, lodash, etc.)
+
+## Next Steps
+
+For extending the architecture:
+1. Review workspace.dsl for system overview
+2. Check data_model.md for storage schemas
+3. See performance_requirements.md for benchmarks
+4. Refer to AGENTS.md for AI integration patterns

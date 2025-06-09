@@ -1,0 +1,198 @@
+CHANGELOG
+=========
+
+All notable changes to the Code Index MCP Server project will be documented in this file.
+
+The format is based on Keep a Changelog (https://keepachangelog.com/en/1.0.0/),
+and this project adheres to Semantic Versioning (https://semver.org/spec/v2.0.0.html).
+
+[Unreleased]
+------------
+
+### Added
+- Experimental support for WebAssembly parsing
+- New `--parallel` flag for faster indexing on multi-core systems
+- API endpoint for bulk symbol lookup
+- Configurable memory limits for indexing operations
+
+### Changed
+- Improved Python type hint analysis accuracy
+- Optimized database queries for 30% faster search performance
+- Updated Tree-sitter grammars to latest versions
+
+### Fixed
+- Memory leak in long-running indexing operations
+- Incorrect line numbers in minified JavaScript files
+- Race condition in file watcher during rapid changes
+
+[2.5.0] - 2024-01-15
+--------------------
+
+### Added
+- Semantic search powered by OpenAI embeddings
+- Support for Swift and Kotlin languages
+- Real-time collaboration features (beta)
+- GraphQL API alongside REST
+- Prometheus metrics endpoint
+- Docker compose setup for easy deployment
+
+### Changed
+- Migrated from SQLite to PostgreSQL for better concurrency
+- Redesigned plugin architecture for better performance
+- Improved JavaScript JSX parsing accuracy
+- Enhanced Go module resolution
+
+### Deprecated
+- Legacy XML configuration format (use YAML instead)
+- Python 3.7 support (minimum is now 3.8)
+
+### Fixed
+- Critical security vulnerability in authentication module
+- File handle leak in Windows environments
+- Incorrect parsing of C++ template syntax
+- Unicode handling in file paths
+
+### Security
+- Updated all dependencies to patch CVE-2024-XXXXX
+- Added rate limiting to prevent DoS attacks
+- Implemented CSRF protection for web interface
+
+[2.4.2] - 2023-12-01
+--------------------
+
+### Fixed
+- Hotfix for database migration issue in 2.4.1
+- Restored accidentally removed API endpoints
+- Fixed plugin loading order dependency
+
+[2.4.1] - 2023-11-30
+--------------------
+
+### Changed
+- Performance improvements for large repositories
+- Reduced memory usage during indexing by 40%
+
+### Fixed
+- Issue with parsing TypeScript decorators
+- Incorrect symbol resolution in nested Python classes
+- File watcher not detecting deletions on macOS
+
+[2.4.0] - 2023-11-15
+--------------------
+
+### Added
+- Full-text search with regex support
+- C# language plugin with Roslyn integration
+- Incremental indexing for faster updates
+- Web-based search interface
+- Export/import functionality for indexes
+
+### Changed
+- Switched to more efficient B-tree index structure
+- Improved error messages and logging
+- Better handling of binary files
+
+### Removed
+- Deprecated v1 API endpoints
+- Support for Python 3.6
+
+[2.3.0] - 2023-10-01
+--------------------
+
+### Added
+- Ruby language support
+- Cross-reference analysis
+- Custom query language for advanced searches
+- Batch processing API
+- Health check endpoint
+
+### Changed
+- Refactored storage layer for extensibility
+- Improved startup time by lazy loading plugins
+- Better memory management for large files
+
+### Fixed
+- Thread safety issues in concurrent indexing
+- Incorrect parsing of JavaScript async generators
+- Symbol search not working with special characters
+
+[2.2.0] - 2023-08-15
+--------------------
+
+### Added
+- Rust language support with full trait analysis
+- Git integration for tracking file history
+- Code complexity metrics
+- REST API authentication
+- Plugin marketplace (experimental)
+
+### Changed
+- Unified configuration format across all plugins
+- Improved Java annotation processing
+- Better handling of symbolic links
+
+### Fixed
+- Stack overflow in deeply nested code structures
+- Incorrect line endings on Windows
+- Missing imports in Python stub files
+
+[2.1.0] - 2023-07-01
+--------------------
+
+### Added
+- TypeScript support with .d.ts file handling
+- Workspace/project concept for multi-repo setups
+- Code snippet extraction
+- JSON and YAML configuration support
+
+### Changed
+- Restructured CLI commands for clarity
+- Improved C++ template parsing
+- Better error recovery in malformed files
+
+### Deprecated
+- Old plugin API (v1) - will be removed in 3.0.0
+
+[2.0.0] - 2023-05-15
+--------------------
+
+### Added
+- Complete rewrite with plugin architecture
+- Support for Go, Java, and C++ languages
+- Real-time file watching
+- RESTful API
+- Distributed indexing support
+
+### Changed
+- BREAKING: New API incompatible with 1.x
+- BREAKING: Changed configuration format
+- Switched from process-based to thread-based parallelism
+- New storage format for better performance
+
+### Removed
+- Legacy indexing engine
+- Support for Python 2.7
+
+[1.5.0] - 2023-03-01
+--------------------
+
+### Added
+- Basic TypeScript support
+- Symbol renaming functionality
+- Search history
+- Auto-save configuration
+
+### Fixed
+- Performance regression in 1.4.x
+- Memory issues with large files
+- Incorrect Python decorator handling
+
+[1.0.0] - 2022-12-01
+--------------------
+
+### Added
+- Initial stable release
+- Python and JavaScript support
+- Basic indexing and search
+- Command-line interface
+- File watching (experimental)
