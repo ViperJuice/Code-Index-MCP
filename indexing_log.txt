@@ -1,0 +1,16 @@
+🚀 Starting complete repository indexing
+======================================================================
+
+📊 Phase 1: SQLite Indexing
+==================================================
+Traceback (most recent call last):
+  File "/app/index_complete.py", line 241, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/app/index_complete.py", line 220, in main
+    all_files = index_sqlite(root_path)
+                ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/index_complete.py", line 52, in index_sqlite
+    repo_id = store.ensure_repository(str(root_path), "Code-Index-MCP")
+              ^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'SQLiteStore' object has no attribute 'ensure_repository'. Did you mean: 'create_repository'?

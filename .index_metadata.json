@@ -1,22 +1,10 @@
 {
-  "created_at": "2025-06-09T16:45:00Z",
-  "git_commit": "601af5ab25b5efabb82b1c9282e3f3145bba731d",
   "embedding_model": "voyage-code-3",
-  "embedding_dimensions": 1024,
+  "model_dimension": 1024,
   "distance_metric": "cosine",
-  "semantic_search_enabled": true,
-  "sqlite_version": "3.40+",
-  "qdrant_version": "1.7+",
-  "index_version": "1.0.0",
-  "total_files": 429,
-  "total_symbols": 31270,
-  "languages_supported": [
-    "python", "javascript", "typescript", "c", "cpp", "dart", "html", "css",
-    "go", "rust", "java", "kotlin", "swift", "ruby", "php", "scala", "clojure",
-    "haskell", "elixir", "erlang", "ocaml", "fsharp", "nim", "zig", "d", "v",
-    "lua", "perl", "r", "julia", "bash", "powershell", "dockerfile", "makefile",
-    "cmake", "json", "yaml", "toml", "xml", "graphql", "sql", "markdown",
-    "latex", "restructuredtext", "objective-c"
-  ],
-  "notes": "Initial index metadata for development artifact management system"
+  "created_at": "2025-06-09T13:56:49.484805",
+  "qdrant_path": "./vector_index.qdrant",
+  "collection_name": "code-index",
+  "compatibility_hash": "1a8eb12939e6a631",
+  "git_commit": "1be2b2fab71fbd400e0e5a6ab2a9b62fbb87cb98"
 }

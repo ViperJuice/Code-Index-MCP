@@ -10,10 +10,14 @@ Usage:
 
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Add project root to Python path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
+
+# Load environment variables from .env file
+load_dotenv()
 
 from mcp_server.cli import cli
 

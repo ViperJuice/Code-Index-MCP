@@ -65,11 +65,23 @@ class SemanticIndexer:
         
         # Support both memory and HTTP URLs
         if qdrant_path.startswith("http"):
+            # For HTTP URLs, parse properly
             self.qdrant = QdrantClient(url=qdrant_path)
+        elif qdrant_path == ":memory:":
+            # Memory mode
+            self.qdrant = QdrantClient(location=":memory:")
         else:
-            self.qdrant = QdrantClient(location=qdrant_path)
+            # Local file path - use path parameter to avoid IDNA issues
+            self.qdrant = QdrantClient(path=qdrant_path)
         self.wrapper = TreeSitterWrapper()
-        self.voyage = voyageai.Client()
+        
+        # Initialize Voyage AI client with proper API key handling
+        api_key = os.environ.get('VOYAGE_API_KEY') or os.environ.get('VOYAGE_AI_API_KEY')
+        if api_key:
+            self.voyage = voyageai.Client(api_key=api_key)
+        else:
+            # Let voyageai.Client() look for VOYAGE_API_KEY environment variable
+            self.voyage = voyageai.Client()
 
         self._ensure_collection()
         self._update_metadata()

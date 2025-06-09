@@ -145,3 +145,6 @@ rapid_test_report.json
 data/
 backup/
 cache/
+
+# Test repositories (git submodules)
+test_repos/
