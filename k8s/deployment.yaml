@@ -1,220 +1,117 @@
-# MCP Server Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mcp-server
-  namespace: mcp-server
+  name: code-index-mcp
   labels:
-    app: mcp-server
-    version: v1.0.0
+    app: code-index-mcp
+    version: v1
 spec:
   replicas: 3
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 1
-      maxSurge: 1
   selector:
     matchLabels:
-      app: mcp-server
+      app: code-index-mcp
   template:
     metadata:
       labels:
-        app: mcp-server
-        version: v1.0.0
+        app: code-index-mcp
+        version: v1
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port: "8001"
+        prometheus.io/port: "8000"
         prometheus.io/path: "/metrics"
     spec:
-      serviceAccountName: mcp-server-sa
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
-        runAsGroup: 1000
-        fsGroup: 1000
+      serviceAccountName: code-index-mcp
       containers:
-      - name: mcp-server
-        image: your-registry/mcp-server:latest
+      - name: code-index-mcp
+        image: code-index-mcp:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8000
           name: http
           protocol: TCP
-        - containerPort: 8001
-          name: metrics
-          protocol: TCP
         env:
-        # Load configuration from ConfigMap
-        - name: MCP_ENVIRONMENT
-          valueFrom:
-            configMapKeyRef:
-              name: mcp-server-config
-              key: MCP_ENVIRONMENT
-        - name: HOST
-          valueFrom:
-            configMapKeyRef:
-              name: mcp-server-config
-              key: HOST
-        - name: PORT
-          valueFrom:
-            configMapKeyRef:
-              name: mcp-server-config
-              key: PORT
-        - name: WORKERS
-          valueFrom:
-            configMapKeyRef:
-              name: mcp-server-config
-              key: WORKERS
-        - name: LOG_LEVEL
-          valueFrom:
-            configMapKeyRef:
-              name: mcp-server-config
-              key: LOG_LEVEL
-        - name: PROMETHEUS_ENABLED
-          valueFrom:
-            configMapKeyRef:
-              name: mcp-server-config
-              key: PROMETHEUS_ENABLED
-        - name: PROMETHEUS_PORT
-          valueFrom:
-            configMapKeyRef:
-              name: mcp-server-config
-              key: PROMETHEUS_PORT
-        
-        # Load secrets
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
-              name: mcp-server-secrets
-              key: DATABASE_URL
-        - name: JWT_SECRET_KEY
+              name: code-index-mcp-secrets
+              key: database-url
+        - name: VOYAGE_AI_API_KEY
           valueFrom:
             secretKeyRef:
-              name: mcp-server-secrets
-              key: JWT_SECRET_KEY
-        - name: DEFAULT_ADMIN_EMAIL
+              name: code-index-mcp-secrets
+              key: voyage-ai-api-key
+              optional: true
+        - name: QDRANT_URL
           valueFrom:
-            secretKeyRef:
-              name: mcp-server-secrets
-              key: DEFAULT_ADMIN_EMAIL
-        - name: DEFAULT_ADMIN_PASSWORD
+            configMapKeyRef:
+              name: code-index-mcp-config
+              key: qdrant-url
+              optional: true
+        - name: LOG_LEVEL
           valueFrom:
-            secretKeyRef:
-              name: mcp-server-secrets
-              key: DEFAULT_ADMIN_PASSWORD
-        - name: REDIS_URL
+            configMapKeyRef:
+              name: code-index-mcp-config
+              key: log-level
+        - name: MAX_WORKERS
           valueFrom:
-            secretKeyRef:
-              name: mcp-server-secrets
-              key: REDIS_URL
-        - name: CORS_ALLOWED_ORIGINS
-          valueFrom:
-            secretKeyRef:
-              name: mcp-server-secrets
-              key: CORS_ALLOWED_ORIGINS
-        
-        # Resource limits and requests
+            configMapKeyRef:
+              name: code-index-mcp-config
+              key: max-workers
         resources:
           requests:
             memory: "512Mi"
-            cpu: "250m"
+            cpu: "500m"
           limits:
             memory: "2Gi"
-            cpu: "1000m"
-        
-        # Health checks
+            cpu: "2000m"
         livenessProbe:
           httpGet:
             path: /health
-            port: 8000
+            port: http
           initialDelaySeconds: 30
-          periodSeconds: 30
-          timeoutSeconds: 10
-          failureThreshold: 3
-        
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 8000
-          initialDelaySeconds: 15
-          periodSeconds: 15
-          timeoutSeconds: 5
-          failureThreshold: 3
-        
-        # Startup probe for slow startup
-        startupProbe:
-          httpGet:
-            path: /health
-            port: 8000
-          initialDelaySeconds: 10
           periodSeconds: 10
           timeoutSeconds: 5
-          failureThreshold: 12
-        
-        # Volume mounts for logs
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
         volumeMounts:
-        - name: log-volume
-          mountPath: /var/log/mcp-server
-        
-        # Security context
-        securityContext:
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          capabilities:
-            drop:
-            - ALL
-      
+        - name: data
+          mountPath: /app/data
+        - name: config
+          mountPath: /app/config
+          readOnly: true
       volumes:
-      - name: log-volume
-        emptyDir: {}
-      
-      # Node selection and tolerations
-      nodeSelector:
-        kubernetes.io/os: linux
-      
-      tolerations:
-      - key: "node.kubernetes.io/not-ready"
-        operator: "Exists"
-        effect: "NoExecute"
-        tolerationSeconds: 300
-      - key: "node.kubernetes.io/unreachable"
-        operator: "Exists"
-        effect: "NoExecute"
-        tolerationSeconds: 300
-
+      - name: data
+        persistentVolumeClaim:
+          claimName: code-index-mcp-data
+      - name: config
+        configMap:
+          name: code-index-mcp-config
 ---
-# ServiceAccount for MCP Server
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: mcp-server-sa
-  namespace: mcp-server
+  name: code-index-mcp
   labels:
-    app: mcp-server
-
+    app: code-index-mcp
 ---
-# ClusterRole for MCP Server (if needed for cluster-wide resources)
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+apiVersion: v1
+kind: PersistentVolumeClaim
 metadata:
-  name: mcp-server-role
-rules:
-- apiGroups: [""]
-  resources: ["nodes", "nodes/proxy", "services", "endpoints", "pods"]
-  verbs: ["get", "list", "watch"]
-
----
-# ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: mcp-server-binding
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: mcp-server-role
-subjects:
-- kind: ServiceAccount
-  name: mcp-server-sa
-  namespace: mcp-server
+  name: code-index-mcp-data
+  labels:
+    app: code-index-mcp
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: fast-ssd
