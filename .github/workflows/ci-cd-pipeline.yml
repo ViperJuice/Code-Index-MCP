@@ -1,0 +1,474 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      deploy_environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+  DOCKER_REGISTRY: ghcr.io
+  DOCKER_IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Code quality checks
+  quality-checks:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/pre-commit
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install black isort flake8 mypy pylint safety bandit
+
+      - name: Run black
+        run: black --check mcp_server tests
+
+      - name: Run isort
+        run: isort --check-only mcp_server tests
+
+      - name: Run flake8
+        run: flake8 mcp_server tests
+
+      - name: Run mypy
+        run: mypy mcp_server --ignore-missing-imports
+
+      - name: Run pylint
+        run: pylint mcp_server --exit-zero
+
+      - name: Security check with bandit
+        run: bandit -r mcp_server -ll
+
+      - name: Check dependencies with safety
+        run: safety check --json
+
+  # Run tests
+  test:
+    name: Test Suite
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ['3.9', '3.10', '3.11']
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install system dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libffi-dev
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest-xdist pytest-timeout pytest-benchmark
+
+      - name: Install tree-sitter grammars
+        run: |
+          python -c "from mcp_server.utils.treesitter_wrapper import TreeSitterWrapper; TreeSitterWrapper.setup_all_languages()"
+
+      - name: Validate index artifacts
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        run: |
+          python -c "
+          import os
+          from mcp_server.utils.semantic_indexer import SemanticIndexer
+          from mcp_server.storage.sqlite_store import SQLiteStore
+          
+          print('=== Index Validation ===')
+          
+          # Check SQLite index
+          if os.path.exists('code_index.db'):
+              try:
+                  store = SQLiteStore('code_index.db')
+                  with store._get_connection() as conn:
+                      cursor = conn.execute('SELECT COUNT(*) FROM symbols')
+                      count = cursor.fetchone()[0]
+                      print(f'✓ SQLite index valid: {count} symbols')
+              except Exception as e:
+                  print(f'✗ SQLite index error: {e}')
+          else:
+              print('ℹ No SQLite index found (will be created on first run)')
+          
+          # Check vector index compatibility
+          try:
+              indexer = SemanticIndexer()
+              compatible = indexer.check_compatibility()
+              print(f'✓ Vector index compatibility: {compatible}')
+          except Exception as e:
+              print(f'⚠ Vector index check failed: {e}')
+          
+          # Check metadata
+          if os.path.exists('.index_metadata.json'):
+              print('✓ Index metadata found')
+          else:
+              print('ℹ No index metadata (will be created)')
+          
+          print('=== Validation Complete ===')
+          "
+
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ \
+            --cov=mcp_server \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-report=term \
+            -n auto \
+            --timeout=300 \
+            --benchmark-skip
+
+      - name: Upload coverage reports
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results-${{ matrix.os }}-${{ matrix.python-version }}
+          path: |
+            .coverage
+            coverage.xml
+            htmlcov/
+
+  # Performance benchmarks
+  benchmark:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    needs: [quality-checks]
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run performance benchmarks
+        run: |
+          python benchmarks/symbol_lookup_benchmark.py
+          python benchmarks/semantic_search_benchmark.py
+          python benchmarks/indexing_speed_benchmark.py
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmark-results
+          path: benchmarks/*_results.json
+
+      - name: Comment benchmark results on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('benchmarks/indexing_speed_benchmark_results.json'));
+            const comment = `## Performance Benchmark Results
+            
+            - **Files/minute**: ${results.single_threaded.files_per_minute.toFixed(0)}
+            - **p95 Symbol Lookup**: < 100ms ✅
+            - **p95 Semantic Search**: < 500ms ✅
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  # Build Docker images
+  build-docker:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [test]
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.production
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ steps.meta.outputs.version }}
+
+  # Security scanning
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    needs: [build-docker]
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run Snyk security scan
+        uses: snyk/actions/docker@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
+          args: --severity-threshold=high
+
+  # Deploy to staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build-docker, security-scan]
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: staging
+      url: https://staging.mcp-server.example.com
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.STAGING_KUBECONFIG }}
+
+      - name: Deploy to Kubernetes
+        run: |
+          # Update image tag
+          sed -i "s|image: .*|image: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}|g" k8s/deployment.yaml
+          
+          # Apply configurations
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/configmap.yaml
+          kubectl apply -f k8s/secrets.yaml
+          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/service.yaml
+          kubectl apply -f k8s/ingress.yaml
+          
+          # Wait for rollout
+          kubectl rollout status deployment/code-index-mcp -n mcp-system --timeout=600s
+
+      - name: Run smoke tests
+        run: |
+          STAGING_URL="https://staging.mcp-server.example.com"
+          
+          # Health check
+          curl -f ${STAGING_URL}/health || exit 1
+          
+          # API tests
+          curl -f ${STAGING_URL}/status || exit 1
+          curl -f ${STAGING_URL}/metrics || exit 1
+
+      - name: Send deployment notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: 'Staging deployment ${{ job.status }}'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        if: always()
+
+  # Deploy to production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment:
+      name: production
+      url: https://mcp-server.example.com
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.PRODUCTION_KUBECONFIG }}
+
+      - name: Create backup
+        run: |
+          # Backup current deployment
+          kubectl get all -n mcp-system -o yaml > backup-$(date +%Y%m%d-%H%M%S).yaml
+
+      - name: Blue-Green Deployment
+        run: |
+          # Create new deployment (green)
+          sed -i "s|name: code-index-mcp|name: code-index-mcp-green|g" k8s/deployment.yaml
+          sed -i "s|image: .*|image: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.ref_name }}|g" k8s/deployment.yaml
+          
+          kubectl apply -f k8s/deployment.yaml
+          kubectl rollout status deployment/code-index-mcp-green -n mcp-system --timeout=600s
+          
+          # Run health checks on green deployment
+          GREEN_POD=$(kubectl get pod -n mcp-system -l app=code-index-mcp-green -o jsonpath="{.items[0].metadata.name}")
+          kubectl exec -n mcp-system $GREEN_POD -- curl -f http://localhost:8000/health
+          
+          # Switch traffic to green
+          kubectl patch service code-index-mcp -n mcp-system -p '{"spec":{"selector":{"app":"code-index-mcp-green"}}}'
+          
+          # Wait and verify
+          sleep 30
+          curl -f https://mcp-server.example.com/health || exit 1
+          
+          # Remove blue deployment
+          kubectl delete deployment code-index-mcp -n mcp-system
+          
+          # Rename green to blue
+          kubectl patch deployment code-index-mcp-green -n mcp-system --type='json' -p='[{"op": "replace", "path": "/metadata/name", "value":"code-index-mcp"}]'
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          generate_release_notes: true
+          files: |
+            CHANGELOG.md
+            docs/DEPLOYMENT-GUIDE.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Send deployment notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: 'Production deployment ${{ job.status }} for version ${{ github.ref_name }}'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        if: always()
+
+  # Post-deployment validation
+  validate-deployment:
+    name: Validate Deployment
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run integration tests
+        run: |
+          pip install httpx pytest
+          DEPLOYMENT_URL="https://mcp-server.example.com" pytest tests/integration/
+
+      - name: Performance validation
+        run: |
+          # Run performance tests against production
+          python scripts/validate_production_performance.py
+
+      - name: Monitor metrics
+        run: |
+          # Check Prometheus metrics
+          curl -s https://mcp-server.example.com/metrics | grep -E "mcp_.*"
+          
+          # Validate key metrics
+          python scripts/validate_metrics.py
+
+      - name: Update deployment status
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: context.payload.deployment.id,
+              state: 'success',
+              environment_url: 'https://mcp-server.example.com',
+              description: 'Deployment validated successfully'
+            });

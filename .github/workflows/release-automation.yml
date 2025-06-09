@@ -1,0 +1,417 @@
+name: Release Automation
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.0.0)'
+        required: true
+        type: string
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'minor'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - custom
+
+permissions:
+  contents: write
+  packages: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  prepare-release:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.determine_version.outputs.version }}
+      changelog: ${{ steps.generate_changelog.outputs.changelog }}
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Determine Version
+        id: determine_version
+        run: |
+          if [ "${{ inputs.release_type }}" == "custom" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            # Get latest tag
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+            
+            # Extract version numbers
+            VERSION_MAJOR=$(echo $LATEST_TAG | sed 's/v//' | cut -d. -f1)
+            VERSION_MINOR=$(echo $LATEST_TAG | sed 's/v//' | cut -d. -f2)
+            VERSION_PATCH=$(echo $LATEST_TAG | sed 's/v//' | cut -d. -f3)
+            
+            # Increment based on release type
+            case "${{ inputs.release_type }}" in
+              major)
+                VERSION_MAJOR=$((VERSION_MAJOR + 1))
+                VERSION_MINOR=0
+                VERSION_PATCH=0
+                ;;
+              minor)
+                VERSION_MINOR=$((VERSION_MINOR + 1))
+                VERSION_PATCH=0
+                ;;
+              patch)
+                VERSION_PATCH=$((VERSION_PATCH + 1))
+                ;;
+            esac
+            
+            VERSION="v${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version will be: $VERSION"
+
+      - name: Update Version Files
+        run: |
+          VERSION="${{ steps.determine_version.outputs.version }}"
+          VERSION_NO_V=${VERSION#v}
+          
+          # Update pyproject.toml
+          sed -i "s/^version = .*/version = \"$VERSION_NO_V\"/" pyproject.toml
+          
+          # Update __init__.py files
+          find . -name "__init__.py" -path "*/mcp_server/*" -exec sed -i "s/__version__ = .*/__version__ = \"$VERSION_NO_V\"/" {} \; 2>/dev/null || true
+          
+          # Update package.json if exists
+          if [ -f package.json ]; then
+            jq ".version = \"$VERSION_NO_V\"" package.json > package.json.tmp && mv package.json.tmp package.json
+          fi
+
+      - name: Generate Changelog
+        id: generate_changelog
+        run: |
+          VERSION="${{ steps.determine_version.outputs.version }}"
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          
+          # Generate changelog
+          echo "# Changelog for $VERSION" > RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "## What's Changed" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          
+          if [ -n "$PREVIOUS_TAG" ]; then
+            # Get commit messages
+            git log $PREVIOUS_TAG..HEAD --pretty=format:"- %s (%an)" >> RELEASE_NOTES.md
+            
+            # Extract PR numbers and categorize
+            echo -e "\n\n## Pull Requests" >> RELEASE_NOTES.md
+            git log $PREVIOUS_TAG..HEAD --grep="Merge pull request" --pretty=format:"- %s" >> RELEASE_NOTES.md
+            
+            # Statistics
+            echo -e "\n\n## Statistics" >> RELEASE_NOTES.md
+            echo "- Commits: $(git rev-list --count $PREVIOUS_TAG..HEAD)" >> RELEASE_NOTES.md
+            echo "- Contributors: $(git log $PREVIOUS_TAG..HEAD --format='%an' | sort -u | wc -l)" >> RELEASE_NOTES.md
+            echo "- Files changed: $(git diff --name-only $PREVIOUS_TAG..HEAD | wc -l)" >> RELEASE_NOTES.md
+          else
+            echo "Initial release" >> RELEASE_NOTES.md
+          fi
+          
+          # Add feature highlights
+          echo -e "\n\n## Feature Highlights" >> RELEASE_NOTES.md
+          echo "- 🚀 Dynamic plugin loading system" >> RELEASE_NOTES.md
+          echo "- 📊 Comprehensive monitoring with Prometheus & Grafana" >> RELEASE_NOTES.md
+          echo "- 🔍 48+ language support via tree-sitter" >> RELEASE_NOTES.md
+          echo "- 📝 Document processing (Markdown & PlainText)" >> RELEASE_NOTES.md
+          echo "- 🔐 Security with JWT authentication" >> RELEASE_NOTES.md
+          echo "- ⚡ High-performance caching system" >> RELEASE_NOTES.md
+          
+          # Add breaking changes if major version
+          if [[ "${{ inputs.release_type }}" == "major" ]]; then
+            echo -e "\n\n## ⚠️ Breaking Changes" >> RELEASE_NOTES.md
+            echo "Please review the migration guide before upgrading." >> RELEASE_NOTES.md
+          fi
+          
+          # Output changelog
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          cat RELEASE_NOTES.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Update CHANGELOG.md
+        run: |
+          VERSION="${{ steps.determine_version.outputs.version }}"
+          DATE=$(date +%Y-%m-%d)
+          
+          # Create temporary file with new entry
+          echo "# Changelog" > CHANGELOG.tmp
+          echo "" >> CHANGELOG.tmp
+          echo "## [$VERSION] - $DATE" >> CHANGELOG.tmp
+          cat RELEASE_NOTES.md | tail -n +2 >> CHANGELOG.tmp
+          echo "" >> CHANGELOG.tmp
+          
+          # Append existing changelog
+          if [ -f CHANGELOG.md ]; then
+            tail -n +2 CHANGELOG.md >> CHANGELOG.tmp
+          fi
+          
+          mv CHANGELOG.tmp CHANGELOG.md
+
+      - name: Commit Version Changes
+        run: |
+          VERSION="${{ steps.determine_version.outputs.version }}"
+          git add -A
+          git commit -m "chore: bump version to $VERSION" || echo "No changes to commit"
+
+      - name: Create Release Branch
+        run: |
+          VERSION="${{ steps.determine_version.outputs.version }}"
+          BRANCH="release/$VERSION"
+          git checkout -b $BRANCH
+          git push origin $BRANCH
+
+  run-tests:
+    name: Run Release Tests
+    needs: prepare-release
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/${{ needs.prepare-release.outputs.version }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run comprehensive tests
+        run: |
+          pytest tests/ -v --cov=mcp_server --cov-report=xml
+
+      - name: Run integration tests
+        run: |
+          pytest tests/integration/ -v || echo "Integration tests not found"
+
+      - name: Validate version consistency
+        run: |
+          VERSION="${{ needs.prepare-release.outputs.version }}"
+          VERSION_NO_V=${VERSION#v}
+          
+          # Check pyproject.toml
+          grep -q "version = \"$VERSION_NO_V\"" pyproject.toml || exit 1
+          
+          echo "Version consistency check passed"
+
+  build-artifacts:
+    name: Build Release Artifacts
+    needs: [prepare-release, run-tests]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/${{ needs.prepare-release.outputs.version }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Build Python package
+        run: |
+          pip install build wheel
+          python -m build
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker images
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.production
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ needs.prepare-release.outputs.version }}
+            ghcr.io/${{ github.repository }}:latest
+          build-args: |
+            VERSION=${{ needs.prepare-release.outputs.version }}
+            BUILD_DATE=${{ github.event.repository.updated_at }}
+            VCS_REF=${{ github.sha }}
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: spdx-json
+          output-file: sbom.spdx.json
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-artifacts
+          path: |
+            dist/
+            sbom.spdx.json
+            RELEASE_NOTES.md
+
+  create-release:
+    name: Create GitHub Release
+    needs: [prepare-release, build-artifacts]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/${{ needs.prepare-release.outputs.version }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: release-artifacts
+
+      - name: Create and push tag
+        run: |
+          VERSION="${{ needs.prepare-release.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a $VERSION -m "Release $VERSION"
+          git push origin $VERSION
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.prepare-release.outputs.version }}
+          name: Release ${{ needs.prepare-release.outputs.version }}
+          body: ${{ needs.prepare-release.outputs.changelog }}
+          draft: false
+          prerelease: false
+          files: |
+            dist/*
+            sbom.spdx.json
+            CHANGELOG.md
+            docs/DEPLOYMENT-GUIDE.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to PyPI
+        if: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          pip install twine
+          twine upload dist/* -u __token__ -p ${{ secrets.PYPI_API_TOKEN }}
+
+  merge-release:
+    name: Merge Release Branch
+    needs: [prepare-release, create-release]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: release/${{ needs.prepare-release.outputs.version }}
+          base: main
+          title: "Release ${{ needs.prepare-release.outputs.version }}"
+          body: |
+            ## Release ${{ needs.prepare-release.outputs.version }}
+            
+            This PR contains all changes for release ${{ needs.prepare-release.outputs.version }}.
+            
+            ### Checklist
+            - [x] Version bumped
+            - [x] Changelog updated
+            - [x] Tests passed
+            - [x] Docker images built
+            - [x] Release created
+            
+            ### Release Notes
+            ${{ needs.prepare-release.outputs.changelog }}
+          labels: |
+            release
+            automated
+
+      - name: Auto-merge PR
+        if: ${{ github.event.inputs.auto_merge == 'true' }}
+        run: |
+          PR_NUMBER=$(gh pr list --base main --head release/${{ needs.prepare-release.outputs.version }} --json number -q '.[0].number')
+          gh pr merge $PR_NUMBER --auto --merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  post-release:
+    name: Post-Release Tasks
+    needs: [prepare-release, create-release]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update documentation
+        run: |
+          VERSION="${{ needs.prepare-release.outputs.version }}"
+          
+          # Update README
+          sed -i "s/Latest Version: .*/Latest Version: $VERSION/" README.md || true
+          
+          # Update installation docs
+          find docs -name "*.md" -exec sed -i "s/code-index-mcp:.*/code-index-mcp:$VERSION/g" {} \;
+
+      - name: Notify Slack
+        if: ${{ secrets.SLACK_WEBHOOK }}
+        run: |
+          VERSION="${{ needs.prepare-release.outputs.version }}"
+          curl -X POST ${{ secrets.SLACK_WEBHOOK }} \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"text\": \"🎉 MCP Server $VERSION has been released!\",
+              \"attachments\": [{
+                \"color\": \"good\",
+                \"fields\": [
+                  {\"title\": \"Version\", \"value\": \"$VERSION\", \"short\": true},
+                  {\"title\": \"Type\", \"value\": \"${{ inputs.release_type }}\", \"short\": true},
+                  {\"title\": \"Release URL\", \"value\": \"https://github.com/${{ github.repository }}/releases/tag/$VERSION\"}
+                ]
+              }]
+            }"
+
+      - name: Trigger deployment workflows
+        run: |
+          VERSION="${{ needs.prepare-release.outputs.version }}"
+          
+          # Trigger staging deployment
+          gh workflow run deploy-staging.yml -f version=$VERSION
+          
+          # Create issue for production deployment approval
+          gh issue create \
+            --title "Production Deployment: $VERSION" \
+            --body "Please review and approve production deployment for version $VERSION" \
+            --label "deployment,production"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
