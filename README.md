@@ -15,6 +15,8 @@ Modular, extensible local-first code indexer designed to enhance Claude Code and
 - **⚡ Real-Time Updates**: File system monitoring for instant index updates
 - **🧠 Semantic Search**: AI-powered code search with Voyage AI embeddings
 - **📊 Rich Code Intelligence**: Symbol resolution, type inference, dependency tracking
+- **📦 Portable Index Management**: Zero-cost index sharing via GitHub Artifacts
+- **🔄 Automatic Index Sync**: Pull indexes on clone, push on changes
 
 ## 🏗️ Architecture
 
@@ -142,30 +144,98 @@ MCP_WORKSPACE_ROOT=.
 MCP_MAX_FILE_SIZE=10485760  # 10MB
 ```
 
-## 🗂️ Index Artifact Management
+## 🗂️ Index Management
 
-**Zero Reindex Time for Developers** - This project includes pre-built index artifacts that are committed to the repository, eliminating the need for new developers to spend time reindexing.
+### For This Repository
 
-### How It Works
+This project uses GitHub Actions Artifacts for efficient index sharing, eliminating reindexing time while keeping the repository lean.
 
-1. **Pre-built Indexes**: The repository includes:
-   - `code_index.db` - SQLite database with all symbols (70MB)
-   - `vector_index.qdrant/` - Vector embeddings for semantic search
-   - `.index_metadata.json` - Compatibility and version info
+```bash
+# First time setup - pull latest indexes
+python mcp_cli.py artifact pull --latest
 
-2. **Automatic Compatibility**: The system checks embedding model compatibility:
+# After making changes - rebuild locally
+python mcp_cli.py index rebuild
+
+# Share your indexes with the team
+python mcp_cli.py artifact push
+
+# Check sync status
+python mcp_cli.py artifact sync
+```
+
+### For ANY Repository (MCP Index Kit)
+
+Enable portable index management in any repository with zero GitHub compute costs:
+
+#### Quick Install
+
+```bash
+# One-line install
+curl -sSL https://raw.githubusercontent.com/yourusername/mcp-index-kit/main/install.sh | bash
+
+# Or via npm
+npm install -g mcp-index-kit
+mcp-index init
+```
+
+#### How It Works
+
+1. **Zero-Cost Architecture**:
+   - All indexing happens on developer machines
+   - Indexes stored as GitHub Artifacts (free for public repos)
+   - Automatic download on clone, upload on push
+   - No GitHub Actions compute required
+
+2. **Portable Design**:
+   - Single command setup for any repository
+   - Auto-detected by MCP servers and tools
+   - Works with all 48 supported languages
+   - Enable/disable per repository
+
+3. **Usage**:
    ```bash
-   # Check if your local config is compatible with committed indexes
-   python mcp_cli.py index check-compatibility
+   # Initialize in your repo
+   cd your-repo
+   mcp-index init
+
+   # Build index locally
+   mcp-index build
+
+   # Push to GitHub Artifacts
+   mcp-index push
+
+   # Pull latest index
+   mcp-index pull
+
+   # Auto sync
+   mcp-index sync
    ```
 
-3. **Smart Rebuilding**: Indexes are automatically rebuilt when:
-   - Embedding model changes
-   - Significant code changes occur
-   - Manual rebuild requested
+#### Configuration
 
-### CLI Management
+Edit `.mcp-index.json` in your repository:
 
+```json
+{
+  "enabled": true,
+  "auto_download": true,
+  "artifact_retention_days": 30,
+  "github_artifacts": {
+    "enabled": true,
+    "max_size_mb": 100
+  }
+}
+```
+
+See [mcp-index-kit](./mcp-index-kit/) for full documentation
+
+
+# View artifact details
+python mcp_cli.py artifact info 12345
+```
+
+#### Index Management
 ```bash
 # Check index status
 python mcp_cli.py index status
@@ -173,10 +243,10 @@ python mcp_cli.py index status
 # Check compatibility
 python mcp_cli.py index check-compatibility
 
-# Rebuild if needed
+# Rebuild indexes locally
 python mcp_cli.py index rebuild
 
-# Create backup before major changes
+# Create backup
 python mcp_cli.py index backup my_backup
 
 # Restore from backup
@@ -185,18 +255,49 @@ python mcp_cli.py index restore my_backup
 
 ### GitHub Actions Integration
 
-- **Pull Requests**: Automatically validate index compatibility
-- **Merges to Main**: Rebuild and commit updated indexes if needed
-- **Manual Trigger**: Force rebuild via GitHub Actions
+- **Pull Requests**: Validates developer-provided indexes (no rebuilding)
+- **Merges to Main**: Promotes validated indexes to artifacts
+- **Cost-Efficient**: Uses free GitHub Actions Artifacts storage
+- **Auto-Cleanup**: Old artifacts cleaned up after 30 days
+
+### Storage & Cost
+
+- **GitHub Actions Artifacts**: FREE for public repos, included in private repo quotas
+- **Retention**: 7 days for PR artifacts, 30 days for main branch
+- **Size Limits**: 500MB per artifact (compressed)
+- **Automatic Compression**: ~70% size reduction with tar.gz
+
+### Developer Workflow
+
+1. **Clone Repository**
+   ```bash
+   git clone https://github.com/yourusername/Code-Index-MCP.git
+   cd Code-Index-MCP
+   ```
+
+2. **Get Latest Indexes**
+   ```bash
+   python mcp_cli.py artifact pull --latest
+   ```
+
+3. **Make Your Changes**
+   - Edit code as normal
+   - Indexes update automatically via file watcher
+
+4. **Share Updates**
+   ```bash
+   # Your indexes are already updated locally
+   python mcp_cli.py artifact push
+   ```
 
 ### Embedding Model Compatibility
 
 The system tracks embedding model versions to ensure compatibility:
 - **Current model**: `voyage-code-3` (1024 dimensions)
 - **Distance metric**: Cosine similarity
-- **Auto-rebuild**: Triggered when model changes
+- **Auto-detection**: System checks compatibility before download
 
-If you use a different embedding model, the system will detect incompatibility and offer to rebuild indexes with your configuration.
+If you use a different embedding model, the system will detect incompatibility and rebuild locally with your configuration.
 
 ## 💻 Development
 

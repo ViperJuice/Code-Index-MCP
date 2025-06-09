@@ -7,6 +7,7 @@ including index management, diagnostics, and maintenance operations.
 
 import click
 from .index_management import index
+from .artifact_commands import artifact
 
 
 @click.group()
@@ -18,6 +19,7 @@ def cli():
 
 # Register command groups
 cli.add_command(index)
+cli.add_command(artifact)
 
 
 if __name__ == '__main__':

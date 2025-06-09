@@ -19,6 +19,7 @@ from mcp.server.stdio import stdio_server
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from mcp_server.plugin_system import PluginManager
 from mcp_server.storage.sqlite_store import SQLiteStore
+from mcp_server.utils.index_discovery import IndexDiscovery
 from pathlib import Path
 import logging
 
@@ -47,9 +48,41 @@ async def initialize_services():
     global dispatcher, plugin_manager, sqlite_store
     
     try:
-        # Initialize SQLite store
-        logger.info("Initializing SQLite store...")
-        sqlite_store = SQLiteStore("code_index.db")
+        # Check for portable index first
+        workspace_root = Path.cwd()
+        discovery = IndexDiscovery(workspace_root)
+        
+        if discovery.is_index_enabled():
+            logger.info("MCP portable index detected")
+            
+            # Try to use existing index
+            index_path = discovery.get_local_index_path()
+            
+            if not index_path and discovery.should_download_index():
+                logger.info("Attempting to download index from GitHub artifacts...")
+                if discovery.download_latest_index():
+                    index_path = discovery.get_local_index_path()
+                    logger.info("Successfully downloaded index")
+                else:
+                    logger.info("Could not download index, will use default")
+            
+            if index_path:
+                logger.info(f"Using portable index: {index_path}")
+                sqlite_store = SQLiteStore(str(index_path))
+                
+                # Log index metadata
+                metadata = discovery.get_index_metadata()
+                if metadata:
+                    logger.info(f"Index version: {metadata.get('version', 'unknown')}")
+                    logger.info(f"Index created: {metadata.get('created_at', 'unknown')}")
+                    logger.info(f"Indexed files: {metadata.get('indexed_files', 'unknown')}")
+            else:
+                logger.info("No portable index found, using default")
+                sqlite_store = SQLiteStore("code_index.db")
+        else:
+            # Initialize SQLite store with default
+            logger.info("Initializing SQLite store with default path...")
+            sqlite_store = SQLiteStore("code_index.db")
         
         # Initialize plugin manager
         logger.info("Initializing plugin system...")

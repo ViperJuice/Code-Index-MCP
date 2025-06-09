@@ -1,0 +1,343 @@
+name: Index Artifact Management
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'validate'
+        type: choice
+        options:
+          - validate
+          - promote
+          - cleanup
+          - list
+      artifact_name:
+        description: 'Artifact name (for promote/validate)'
+        required: false
+        type: string
+      retention_days:
+        description: 'Retention days for promoted artifacts'
+        required: false
+        default: '30'
+        type: string
+  
+  workflow_call:
+    inputs:
+      index_path:
+        description: 'Path to index files'
+        required: true
+        type: string
+      artifact_suffix:
+        description: 'Suffix for artifact name'
+        required: false
+        default: ''
+        type: string
+      retention_days:
+        description: 'Days to retain artifact'
+        required: false
+        default: '7'
+        type: number
+    secrets:
+      GITHUB_TOKEN:
+        required: true
+
+env:
+  COMPRESSION_LEVEL: '9'
+  MAX_ARTIFACT_SIZE_MB: '500'
+  INDEX_FILES: |
+    code_index.db
+    vector_index.qdrant/
+    .index_metadata.json
+
+jobs:
+  upload-index-artifact:
+    name: Upload Index Artifact
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_call'
+    outputs:
+      artifact_name: ${{ steps.upload.outputs.artifact_name }}
+      artifact_size: ${{ steps.compress.outputs.size }}
+      checksum: ${{ steps.compress.outputs.checksum }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Prepare artifact metadata
+        id: metadata
+        run: |
+          # Generate artifact name
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          COMMIT_SHORT=$(git rev-parse --short HEAD)
+          SUFFIX="${{ inputs.artifact_suffix }}"
+          if [ -n "$SUFFIX" ]; then
+            ARTIFACT_NAME="index-${COMMIT_SHORT}-${SUFFIX}-${TIMESTAMP}"
+          else
+            ARTIFACT_NAME="index-${COMMIT_SHORT}-${TIMESTAMP}"
+          fi
+          echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+          
+          # Get index stats
+          if [ -f "${{ inputs.index_path }}/code_index.db" ]; then
+            DB_SIZE=$(stat -c%s "${{ inputs.index_path }}/code_index.db" 2>/dev/null || stat -f%z "${{ inputs.index_path }}/code_index.db" 2>/dev/null || echo "0")
+            echo "db_size=$DB_SIZE" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Compress index files
+        id: compress
+        run: |
+          cd "${{ inputs.index_path }}"
+          
+          # Create compressed archive
+          echo "Creating compressed archive..."
+          tar -czf index-archive.tar.gz \
+            --exclude='*.log' \
+            --exclude='*.tmp' \
+            ${{ env.INDEX_FILES }} 2>/dev/null || true
+          
+          # Calculate checksum
+          CHECKSUM=$(sha256sum index-archive.tar.gz | cut -d' ' -f1)
+          echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
+          
+          # Get compressed size
+          SIZE=$(stat -c%s index-archive.tar.gz 2>/dev/null || stat -f%z index-archive.tar.gz 2>/dev/null)
+          SIZE_MB=$((SIZE / 1024 / 1024))
+          echo "size=$SIZE_MB MB" >> $GITHUB_OUTPUT
+          
+          # Check size limit
+          if [ $SIZE_MB -gt ${{ env.MAX_ARTIFACT_SIZE_MB }} ]; then
+            echo "❌ Compressed archive too large: ${SIZE_MB}MB > ${MAX_ARTIFACT_SIZE_MB}MB"
+            exit 1
+          fi
+          
+          # Create metadata file
+          cat > artifact-metadata.json <<EOF
+          {
+            "artifact_name": "${{ steps.metadata.outputs.artifact_name }}",
+            "commit": "$(git rev-parse HEAD)",
+            "branch": "$(git branch --show-current)",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "compressed_size": $SIZE,
+            "checksum": "$CHECKSUM",
+            "files_included": $(echo '${{ env.INDEX_FILES }}' | jq -R -s -c 'split("\n") | map(select(length > 0))'),
+            "compression_level": ${{ env.COMPRESSION_LEVEL }},
+            "index_stats": {
+              "db_size": ${{ steps.metadata.outputs.db_size || 0 }}
+            }
+          }
+          EOF
+      
+      - name: Upload artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.metadata.outputs.artifact_name }}
+          path: |
+            ${{ inputs.index_path }}/index-archive.tar.gz
+            ${{ inputs.index_path }}/artifact-metadata.json
+          retention-days: ${{ inputs.retention_days }}
+          compression-level: 0  # Already compressed
+      
+      - name: Output summary
+        run: |
+          echo "### 📦 Index Artifact Uploaded" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Name:** \`${{ steps.metadata.outputs.artifact_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Size:** ${{ steps.compress.outputs.size }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Checksum:** \`${{ steps.compress.outputs.checksum }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Retention:** ${{ inputs.retention_days }} days" >> $GITHUB_STEP_SUMMARY
+
+  validate-artifact:
+    name: Validate Index Artifact
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'validate'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ./artifact-download
+      
+      - name: Validate artifact
+        run: |
+          cd artifact-download
+          
+          # Check files exist
+          if [ ! -f "index-archive.tar.gz" ] || [ ! -f "artifact-metadata.json" ]; then
+            echo "❌ Missing required files"
+            exit 1
+          fi
+          
+          # Read metadata
+          EXPECTED_CHECKSUM=$(jq -r '.checksum' artifact-metadata.json)
+          ACTUAL_CHECKSUM=$(sha256sum index-archive.tar.gz | cut -d' ' -f1)
+          
+          # Verify checksum
+          if [ "$EXPECTED_CHECKSUM" != "$ACTUAL_CHECKSUM" ]; then
+            echo "❌ Checksum mismatch!"
+            echo "Expected: $EXPECTED_CHECKSUM"
+            echo "Actual: $ACTUAL_CHECKSUM"
+            exit 1
+          fi
+          
+          # Extract and validate contents
+          tar -tzf index-archive.tar.gz > /dev/null
+          echo "✅ Artifact validated successfully"
+          
+          # Display metadata
+          echo "### 📋 Artifact Metadata" >> $GITHUB_STEP_SUMMARY
+          jq . artifact-metadata.json >> $GITHUB_STEP_SUMMARY
+
+  promote-artifact:
+    name: Promote Artifact
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'promote'
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ./artifact-download
+      
+      - name: Re-upload with extended retention
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}-promoted
+          path: ./artifact-download/*
+          retention-days: ${{ inputs.retention_days }}
+      
+      - name: Summary
+        run: |
+          echo "### ✅ Artifact Promoted" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Original:** \`${{ inputs.artifact_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Promoted:** \`${{ inputs.artifact_name }}-promoted\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **New Retention:** ${{ inputs.retention_days }} days" >> $GITHUB_STEP_SUMMARY
+
+  cleanup-artifacts:
+    name: Cleanup Old Artifacts
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'cleanup' || github.event_name == 'schedule'
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: List and cleanup artifacts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pip install PyGithub
+          
+          python << 'EOF'
+          import os
+          from datetime import datetime, timedelta
+          from github import Github
+          
+          g = Github(os.environ['GITHUB_TOKEN'])
+          repo = g.get_repo(os.environ['GITHUB_REPOSITORY'])
+          
+          # Configuration
+          MAX_AGE_DAYS = 30
+          KEEP_LATEST_COUNT = 5
+          PROMOTED_SUFFIX = '-promoted'
+          
+          cutoff_date = datetime.now() - timedelta(days=MAX_AGE_DAYS)
+          
+          # Get all artifacts
+          artifacts = list(repo.get_artifacts())
+          index_artifacts = [a for a in artifacts if a.name.startswith('index-')]
+          
+          # Separate promoted and regular artifacts
+          promoted = [a for a in index_artifacts if PROMOTED_SUFFIX in a.name]
+          regular = [a for a in index_artifacts if PROMOTED_SUFFIX not in a.name]
+          
+          # Sort by created date (newest first)
+          regular.sort(key=lambda x: x.created_at, reverse=True)
+          
+          # Keep latest N artifacts
+          to_delete = []
+          
+          # Delete old regular artifacts (keep latest N)
+          for i, artifact in enumerate(regular):
+              if i >= KEEP_LATEST_COUNT and artifact.created_at < cutoff_date:
+                  to_delete.append(artifact)
+          
+          # Delete very old promoted artifacts
+          for artifact in promoted:
+              if artifact.created_at < cutoff_date:
+                  to_delete.append(artifact)
+          
+          # Perform deletion
+          print(f"Found {len(index_artifacts)} index artifacts")
+          print(f"Will delete {len(to_delete)} old artifacts")
+          
+          for artifact in to_delete:
+              print(f"Deleting: {artifact.name} (created: {artifact.created_at})")
+              artifact.delete()
+          
+          print(f"\nCleanup complete. Remaining artifacts: {len(index_artifacts) - len(to_delete)}")
+          EOF
+
+  list-artifacts:
+    name: List Available Artifacts
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'list'
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: List artifacts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pip install PyGithub tabulate
+          
+          python << 'EOF'
+          import os
+          from datetime import datetime
+          from github import Github
+          from tabulate import tabulate
+          
+          g = Github(os.environ['GITHUB_TOKEN'])
+          repo = g.get_repo(os.environ['GITHUB_REPOSITORY'])
+          
+          # Get all index artifacts
+          artifacts = list(repo.get_artifacts())
+          index_artifacts = [a for a in artifacts if a.name.startswith('index-')]
+          
+          # Sort by created date (newest first)
+          index_artifacts.sort(key=lambda x: x.created_at, reverse=True)
+          
+          # Prepare table data
+          table_data = []
+          for artifact in index_artifacts[:20]:  # Show latest 20
+              age_days = (datetime.now() - artifact.created_at.replace(tzinfo=None)).days
+              size_mb = artifact.size_in_bytes / 1024 / 1024
+              promoted = "Yes" if "-promoted" in artifact.name else "No"
+              
+              table_data.append([
+                  artifact.name,
+                  f"{size_mb:.1f} MB",
+                  artifact.created_at.strftime("%Y-%m-%d %H:%M"),
+                  f"{age_days} days",
+                  promoted
+              ])
+          
+          # Print table
+          print("## 📦 Available Index Artifacts\n")
+          headers = ["Name", "Size", "Created", "Age", "Promoted"]
+          print(tabulate(table_data, headers=headers, tablefmt="pipe"))
+          
+          # Summary
+          print(f"\nTotal artifacts: {len(index_artifacts)}")
+          total_size_mb = sum(a.size_in_bytes for a in index_artifacts) / 1024 / 1024
+          print(f"Total size: {total_size_mb:.1f} MB")
+          EOF

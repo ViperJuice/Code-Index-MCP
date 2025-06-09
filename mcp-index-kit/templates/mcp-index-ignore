@@ -1,0 +1,110 @@
+# MCP Index Ignore Patterns
+# One pattern per line, supports gitignore syntax
+
+# Version control
+.git/
+.svn/
+.hg/
+
+# Dependencies
+node_modules/
+vendor/
+venv/
+.env/
+__pycache__/
+*.pyc
+.bundle/
+bower_components/
+
+# Build outputs
+dist/
+build/
+target/
+out/
+*.min.js
+*.min.css
+_site/
+.next/
+.nuxt/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Test files (optional - remove if you want to index tests)
+test/
+tests/
+spec/
+__tests__/
+*.test.js
+*.spec.js
+*.test.ts
+*.spec.ts
+
+# Documentation (optional - remove if you want to index docs)
+# docs/
+# *.md
+
+# Large files
+*.zip
+*.tar.gz
+*.iso
+*.exe
+*.dll
+*.so
+*.dylib
+*.jar
+*.war
+*.ear
+
+# Media files
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.ico
+*.svg
+*.mp4
+*.mp3
+*.avi
+*.mov
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.cache
+*.bak
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Package manager files
+package-lock.json
+yarn.lock
+Gemfile.lock
+composer.lock
+Cargo.lock
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Config files with secrets
+.env
+.env.*
+secrets.yml
+secrets.json
+
+# MCP Index itself (prevent recursion)
+.mcp-index/
+mcp-index-archive.tar.gz

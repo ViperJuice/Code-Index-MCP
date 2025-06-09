@@ -128,8 +128,8 @@ jobs:
               This ensures optimal search performance with your changes.`
             })
 
-  rebuild-indexes:
-    name: Rebuild Indexes
+  validate-and-promote-indexes:
+    name: Validate and Promote Indexes
     runs-on: ubuntu-latest
     if: |
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
@@ -154,176 +154,119 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Setup Qdrant for indexing
+      - name: Check for uploaded artifacts
+        id: check_artifacts
         run: |
-          # Create directory for Qdrant storage
-          mkdir -p vector_index.qdrant
-
-      - name: Backup existing indexes
-        run: |
-          if [ -f "code_index.db" ]; then
-            cp code_index.db code_index.db.backup
-          fi
-          if [ -d "vector_index.qdrant" ]; then
-            cp -r vector_index.qdrant vector_index.qdrant.backup
-          fi
-
-      - name: Rebuild SQLite index
-        run: |
-          python -c "
-          import os
-          import logging
-          from mcp_server.storage.sqlite_store import SQLiteStore
-          from mcp_server.dispatcher.dispatcher import Dispatcher
+          # Look for recently uploaded index artifacts
+          echo "Checking for developer-uploaded index artifacts..."
           
-          logging.basicConfig(level=logging.INFO)
-          
-          # Remove old index if exists
-          if os.path.exists('code_index.db'):
-              os.remove('code_index.db')
-          
-          # Initialize new index
-          store = SQLiteStore('code_index.db')
-          dispatcher = Dispatcher(store)
-          
-          # Index all supported files
-          import glob
-          from pathlib import Path
-          
-          patterns = ['**/*.py', '**/*.js', '**/*.ts', '**/*.md', '**/*.java', 
-                     '**/*.go', '**/*.rs', '**/*.c', '**/*.cpp', '**/*.h', 
-                     '**/*.hpp', '**/*.cs', '**/*.swift', '**/*.kt', 
-                     '**/*.dart', '**/*.html', '**/*.css']
-          
-          files_indexed = 0
-          for pattern in patterns:
-              for file_path in glob.glob(pattern, recursive=True):
-                  if 'test_repos' in file_path or '.git' in file_path:
-                      continue
-                  try:
-                      result = dispatcher.index_file(file_path)
-                      if result and result.get('symbols_found', 0) > 0:
-                          files_indexed += 1
-                          if files_indexed % 100 == 0:
-                              print(f'Indexed {files_indexed} files...')
-                  except Exception as e:
-                      print(f'Error indexing {file_path}: {e}')
-          
-          print(f'Completed indexing {files_indexed} files')
-          "
-
-      - name: Rebuild vector index
-        env:
-          SEMANTIC_SEARCH_ENABLED: "true"
-          VOYAGE_AI_API_KEY: ${{ secrets.VOYAGE_AI_API_KEY }}
-        run: |
-          python -c "
-          import os
-          import logging
-          from mcp_server.utils.semantic_indexer import SemanticIndexer
-          import glob
-          
-          if not os.getenv('VOYAGE_AI_API_KEY'):
-              print('VOYAGE_AI_API_KEY not available, skipping vector indexing')
-              exit(0)
-          
-          logging.basicConfig(level=logging.INFO)
-          
-          # Remove old vector index
-          import shutil
-          if os.path.exists('vector_index.qdrant'):
-              shutil.rmtree('vector_index.qdrant')
-          
-          # Initialize semantic indexer
-          indexer = SemanticIndexer()
-          
-          # Index Python files as example
-          python_files = glob.glob('**/*.py', recursive=True)
-          python_files = [f for f in python_files if 'test_repos' not in f and '.git' not in f]
-          
-          files_indexed = 0
-          for file_path in python_files[:100]:  # Limit for CI performance
-              try:
-                  from pathlib import Path
-                  result = indexer.index_file(Path(file_path))
-                  files_indexed += 1
-                  if files_indexed % 10 == 0:
-                      print(f'Vector indexed {files_indexed} files...')
-              except Exception as e:
-                  print(f'Error vector indexing {file_path}: {e}')
-          
-          print(f'Completed vector indexing {files_indexed} files')
-          "
-
-      - name: Validate rebuilt indexes
-        run: |
-          python -c "
-          import os
-          from mcp_server.storage.sqlite_store import SQLiteStore
-          from mcp_server.utils.semantic_indexer import SemanticIndexer
-          
-          # Test SQLite index
-          if os.path.exists('code_index.db'):
-              store = SQLiteStore('code_index.db')
-              print('✓ SQLite index validated')
-          else:
-              print('✗ SQLite index missing')
-              exit(1)
-          
-          # Test vector index
-          if os.path.exists('vector_index.qdrant'):
-              try:
-                  indexer = SemanticIndexer()
-                  print('✓ Vector index validated')
-              except Exception as e:
-                  print(f'✗ Vector index validation failed: {e}')
-          else:
-              print('⚠ Vector index not created (API key may be missing)')
-          
-          # Check metadata
-          if os.path.exists('.index_metadata.json'):
-              print('✓ Index metadata validated')
-          else:
-              print('✗ Index metadata missing')
-              exit(1)
-          "
-
-      - name: Commit updated indexes
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          
-          # Add index artifacts
-          git add code_index.db || true
-          git add vector_index.qdrant/ || true
-          git add .index_metadata.json || true
-          
-          # Check if there are changes to commit
-          if git diff --staged --quiet; then
-            echo "No index changes to commit"
+          # This would use the artifact management workflow
+          # For now, check if indexes exist in the repository
+          if [ -f "code_index.db" ] && [ -f ".index_metadata.json" ]; then
+            echo "found=true" >> $GITHUB_OUTPUT
+            echo "✅ Found index artifacts to validate"
           else
-            git commit -m "chore: update index artifacts
-
-            - Rebuilt SQLite index with latest symbols
-            - Updated vector embeddings for semantic search
-            - Refreshed index metadata for compatibility
-
-            🤖 Automated index update"
-            
-            git push
+            echo "found=false" >> $GITHUB_OUTPUT
+            echo "❌ No index artifacts found"
           fi
 
-      - name: Cleanup on failure
-        if: failure()
+      - name: Validate index artifacts
+        if: steps.check_artifacts.outputs.found == 'true'
         run: |
-          # Restore backups if available
-          if [ -f "code_index.db.backup" ]; then
-            mv code_index.db.backup code_index.db
-          fi
-          if [ -d "vector_index.qdrant.backup" ]; then
-            rm -rf vector_index.qdrant
-            mv vector_index.qdrant.backup vector_index.qdrant
+          python -c "
+          import os
+          import json
+          from pathlib import Path
+          from mcp_server.storage.sqlite_store import SQLiteStore
+          
+          print('🔍 Validating index artifacts...')
+          
+          # Validate SQLite index
+          if Path('code_index.db').exists():
+              try:
+                  store = SQLiteStore('code_index.db')
+                  with store._get_connection() as conn:
+                      cursor = conn.execute('SELECT COUNT(*) FROM files')
+                      file_count = cursor.fetchone()[0]
+                      cursor = conn.execute('SELECT COUNT(*) FROM symbols')
+                      symbol_count = cursor.fetchone()[0]
+                  
+                  print(f'✅ SQLite index valid: {file_count} files, {symbol_count} symbols')
+              except Exception as e:
+                  print(f'❌ SQLite validation failed: {e}')
+                  exit(1)
+          else:
+              print('❌ SQLite index missing')
+              exit(1)
+          
+          # Validate metadata
+          if Path('.index_metadata.json').exists():
+              with open('.index_metadata.json', 'r') as f:
+                  metadata = json.load(f)
+              print(f'✅ Index metadata valid: {metadata.get(\"embedding_model\", \"unknown\")} model')
+          else:
+              print('⚠️  Index metadata missing')
+          
+          # Validate vector index (if exists)
+          if Path('vector_index.qdrant').exists():
+              print('✅ Vector index found')
+          else:
+              print('ℹ️  Vector index not included (optional)')
+          
+          print('\\n✅ All validations passed!')
+          "
+
+      - name: Upload indexes as artifacts
+        if: steps.check_artifacts.outputs.found == 'true' && github.event_name == 'push'
+        run: |
+          # Trigger artifact upload workflow
+          echo "📤 Uploading validated indexes as artifacts..."
+          
+          # Use the artifact management script
+          python scripts/index-artifact-upload.py --method direct
+
+      - name: Fallback - Build minimal index
+        if: steps.check_artifacts.outputs.found == 'false'
+        run: |
+          echo "⚠️  No developer-provided indexes found"
+          echo "ℹ️  In production, indexes should be built locally and pushed"
+          echo "ℹ️  Use: mcp_cli.py artifact push"
+          
+          # Create minimal index for compatibility
+          python -c "
+          from mcp_server.storage.sqlite_store import SQLiteStore
+          store = SQLiteStore('code_index.db')
+          print('Created minimal SQLite index')
+          "
+          
+          # Create minimal metadata
+          echo '{"version": "minimal", "note": "Rebuild locally with full indexing"}' > .index_metadata.json
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### 📊 Index Management Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.check_artifacts.outputs.found }}" == "true" ]; then
+            echo "✅ Developer-provided indexes validated successfully" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Developers should build indexes locally to avoid GitHub compute usage:" >> $GITHUB_STEP_SUMMARY
+            echo '```bash' >> $GITHUB_STEP_SUMMARY
+            echo 'python mcp_cli.py index rebuild' >> $GITHUB_STEP_SUMMARY
+            echo 'python mcp_cli.py artifact push' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ No developer indexes found - created minimal index" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "To provide indexes with your PR:" >> $GITHUB_STEP_SUMMARY
+            echo '```bash' >> $GITHUB_STEP_SUMMARY
+            echo '# Build indexes locally' >> $GITHUB_STEP_SUMMARY
+            echo 'python mcp_cli.py index rebuild' >> $GITHUB_STEP_SUMMARY
+            echo '# Include in commit' >> $GITHUB_STEP_SUMMARY
+            echo 'git add code_index.db .index_metadata.json' >> $GITHUB_STEP_SUMMARY
+            echo 'git commit -m "chore: update indexes"' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
           fi
 
   validate-pr-indexes:

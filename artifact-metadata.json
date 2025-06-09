@@ -1,0 +1,25 @@
+{
+  "version": "1.0",
+  "timestamp": "2025-06-09T17:48:54.057583Z",
+  "commit": "9b29d7e2f33213c7b4a98cb5f06a2937c3b6a612",
+  "branch": "main",
+  "checksum": "0a4ce0727a91d4c3dd329d0d4e7fd2784fc4e7ef03703f8c9f1c8fb77560c8da",
+  "compressed_size": 20372780,
+  "index_stats": {
+    "sqlite": {
+      "size_bytes": 57294848,
+      "size_mb": 54.6,
+      "files": 312,
+      "symbols": 0
+    },
+    "vector": {
+      "size_bytes": 6252002,
+      "size_mb": 6.0
+    }
+  },
+  "compatibility": {
+    "embedding_model": "voyage-code-3",
+    "embedding_dimension": 1024,
+    "distance_metric": "cosine"
+  }
+}

@@ -11,6 +11,7 @@ from .plugin_base import SymbolDef, SearchResult
 from .storage.sqlite_store import SQLiteStore
 from .watcher import FileWatcher
 from .core.logging import setup_logging
+from .utils.index_discovery import IndexDiscovery
 from .plugin_system import PluginManager, PluginSystemConfig
 from .security import (
     SecurityConfig, AuthManager, SecurityMiddlewareStack,
@@ -143,9 +144,42 @@ async def startup_event():
         )
         query_cache = QueryResultCache(cache_manager, query_cache_config)
         logger.info("Query result cache initialized successfully")
-        # Initialize SQLite store
-        logger.info("Initializing SQLite store...")
-        sqlite_store = SQLiteStore("code_index.db")
+        # Check for portable index first
+        workspace_root = Path(".")
+        discovery = IndexDiscovery(workspace_root)
+        
+        if discovery.is_index_enabled():
+            logger.info("MCP portable index detected")
+            
+            # Try to use existing index
+            index_path = discovery.get_local_index_path()
+            
+            if not index_path and discovery.should_download_index():
+                logger.info("Attempting to download index from GitHub artifacts...")
+                if discovery.download_latest_index():
+                    index_path = discovery.get_local_index_path()
+                    logger.info("Successfully downloaded index from artifacts")
+                else:
+                    logger.info("Could not download index, will use default")
+            
+            if index_path:
+                logger.info(f"Using portable index: {index_path}")
+                sqlite_store = SQLiteStore(str(index_path))
+                
+                # Log index info
+                info = discovery.get_index_info()
+                if info['metadata']:
+                    meta = info['metadata']
+                    logger.info(f"Index created: {meta.get('created_at', 'unknown')}")
+                    logger.info(f"Index commit: {meta.get('commit', 'unknown')[:8]}")
+            else:
+                logger.info("No portable index found, using default")
+                sqlite_store = SQLiteStore("code_index.db")
+        else:
+            # Initialize SQLite store with default
+            logger.info("Initializing SQLite store with default path...")
+            sqlite_store = SQLiteStore("code_index.db")
+        
         logger.info("SQLite store initialized successfully")
         
         # Initialize plugin system with dynamic discovery

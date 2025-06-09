@@ -1,0 +1,35 @@
+{
+  "name": "mcp-index-kit",
+  "version": "1.0.0",
+  "description": "Portable index management for repositories using MCP Code Indexer",
+  "main": "scripts/init.js",
+  "bin": {
+    "mcp-index": "./bin/mcp-index"
+  },
+  "scripts": {
+    "postinstall": "node scripts/post-install.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/mcp-index-kit.git"
+  },
+  "keywords": [
+    "mcp",
+    "code-index",
+    "github-actions",
+    "indexing"
+  ],
+  "author": "MCP Team",
+  "license": "MIT",
+  "files": [
+    "bin/",
+    "scripts/",
+    "templates/",
+    ".github/",
+    "install.sh",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
