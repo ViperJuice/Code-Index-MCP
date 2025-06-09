@@ -142,6 +142,62 @@ MCP_WORKSPACE_ROOT=.
 MCP_MAX_FILE_SIZE=10485760  # 10MB
 ```
 
+## 🗂️ Index Artifact Management
+
+**Zero Reindex Time for Developers** - This project includes pre-built index artifacts that are committed to the repository, eliminating the need for new developers to spend time reindexing.
+
+### How It Works
+
+1. **Pre-built Indexes**: The repository includes:
+   - `code_index.db` - SQLite database with all symbols (70MB)
+   - `vector_index.qdrant/` - Vector embeddings for semantic search
+   - `.index_metadata.json` - Compatibility and version info
+
+2. **Automatic Compatibility**: The system checks embedding model compatibility:
+   ```bash
+   # Check if your local config is compatible with committed indexes
+   python mcp_cli.py index check-compatibility
+   ```
+
+3. **Smart Rebuilding**: Indexes are automatically rebuilt when:
+   - Embedding model changes
+   - Significant code changes occur
+   - Manual rebuild requested
+
+### CLI Management
+
+```bash
+# Check index status
+python mcp_cli.py index status
+
+# Check compatibility
+python mcp_cli.py index check-compatibility
+
+# Rebuild if needed
+python mcp_cli.py index rebuild
+
+# Create backup before major changes
+python mcp_cli.py index backup my_backup
+
+# Restore from backup
+python mcp_cli.py index restore my_backup
+```
+
+### GitHub Actions Integration
+
+- **Pull Requests**: Automatically validate index compatibility
+- **Merges to Main**: Rebuild and commit updated indexes if needed
+- **Manual Trigger**: Force rebuild via GitHub Actions
+
+### Embedding Model Compatibility
+
+The system tracks embedding model versions to ensure compatibility:
+- **Current model**: `voyage-code-3` (1024 dimensions)
+- **Distance metric**: Cosine similarity
+- **Auto-rebuild**: Triggered when model changes
+
+If you use a different embedding model, the system will detect incompatibility and offer to rebuild indexes with your configuration.
+
 ## 💻 Development
 
 ### Creating a New Language Plugin

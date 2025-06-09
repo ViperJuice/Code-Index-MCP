@@ -1,0 +1,92 @@
+# Plugin Manifest Format Specification
+# This file documents the structure of plugin.yaml manifest files
+
+# Required fields
+name: "Example Plugin"  # Human-readable plugin name
+version: "1.0.0"       # Semantic version
+
+# Plugin metadata
+metadata:
+  author: "Author Name"
+  email: "author@example.com"
+  description: "Brief description of what the plugin does"
+  url: "https://github.com/example/plugin"
+  license: "MIT"
+  
+# Plugin type and capabilities
+type: "language"  # Options: language, tool, integration, analyzer, formatter
+languages:        # For language plugins
+  - python
+  - javascript
+
+# Entry point configuration
+entry_point: "mcp_server.plugins.example_plugin.plugin.ExamplePlugin"  # Full class path
+
+# Supported file extensions
+file_extensions:
+  - ".py"
+  - ".pyw"
+  - ".pyi"
+
+# Feature declarations
+features:
+  - "symbol_extraction"
+  - "semantic_search"
+  - "type_inference"
+  - "dependency_analysis"
+
+# Dependencies
+dependencies:
+  - "tree-sitter>=0.20.0"
+  - "pyyaml>=6.0"
+
+# Configuration schema
+config_schema:
+  enable_semantic:
+    type: boolean
+    default: true
+    description: "Enable semantic search features"
+  
+  cache_size:
+    type: integer
+    default: 1000
+    minimum: 100
+    maximum: 10000
+    description: "Maximum number of cached results"
+  
+  max_file_size:
+    type: integer
+    default: 10485760  # 10MB
+    description: "Maximum file size to process (bytes)"
+
+# Resource limits
+resource_limits:
+  max_memory_mb: 512
+  max_cpu_percent: 50
+  timeout_seconds: 30
+
+# Health check configuration
+health_check:
+  enabled: true
+  interval_seconds: 60
+  timeout_seconds: 5
+  endpoint: "/health"  # For web-based plugins
+
+# Lifecycle hooks (optional)
+hooks:
+  pre_init: "setup_environment"
+  post_init: "initialize_resources"
+  pre_shutdown: "cleanup_resources"
+
+# Example configurations
+examples:
+  - name: "Basic Configuration"
+    config:
+      enable_semantic: true
+      cache_size: 500
+  
+  - name: "High Performance"
+    config:
+      enable_semantic: false
+      cache_size: 2000
+      max_file_size: 5242880  # 5MB

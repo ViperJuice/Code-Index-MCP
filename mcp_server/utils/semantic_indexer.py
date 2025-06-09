@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 import hashlib
+import json
+import os
 from dataclasses import dataclass
 from typing import Iterable, Any, Optional, Union
+from datetime import datetime
 import re
 
 import voyageai
@@ -54,8 +57,12 @@ class SemanticIndexer:
         "guide": 1.2,         # Guide content
     }
 
-    def __init__(self, collection: str = "code-index", qdrant_path: str = ":memory:") -> None:
+    def __init__(self, collection: str = "code-index", qdrant_path: str = "./vector_index.qdrant") -> None:
         self.collection = collection
+        self.qdrant_path = qdrant_path
+        self.embedding_model = "voyage-code-3"
+        self.metadata_file = ".index_metadata.json"
+        
         # Support both memory and HTTP URLs
         if qdrant_path.startswith("http"):
             self.qdrant = QdrantClient(url=qdrant_path)
@@ -65,6 +72,7 @@ class SemanticIndexer:
         self.voyage = voyageai.Client()
 
         self._ensure_collection()
+        self._update_metadata()
 
     # ------------------------------------------------------------------
     def _ensure_collection(self) -> None:
@@ -74,6 +82,67 @@ class SemanticIndexer:
                 collection_name=self.collection,
                 vectors_config=models.VectorParams(size=1024, distance=models.Distance.COSINE),
             )
+
+    # ------------------------------------------------------------------
+    def _update_metadata(self) -> None:
+        """Update index metadata with current model and configuration."""
+        metadata = {
+            "embedding_model": self.embedding_model,
+            "model_dimension": 1024,
+            "distance_metric": "cosine",
+            "created_at": datetime.now().isoformat(),
+            "qdrant_path": self.qdrant_path,
+            "collection_name": self.collection,
+            "compatibility_hash": self._generate_compatibility_hash(),
+            "git_commit": self._get_git_commit_hash()
+        }
+        
+        try:
+            with open(self.metadata_file, 'w') as f:
+                json.dump(metadata, f, indent=2)
+        except Exception as e:
+            # Don't fail if metadata can't be written
+            pass
+
+    # ------------------------------------------------------------------
+    def _generate_compatibility_hash(self) -> str:
+        """Generate a hash for compatibility checking."""
+        compatibility_string = f"{self.embedding_model}:1024:cosine"
+        return hashlib.sha256(compatibility_string.encode()).hexdigest()[:16]
+
+    # ------------------------------------------------------------------
+    def _get_git_commit_hash(self) -> Optional[str]:
+        """Get current git commit hash if available."""
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                capture_output=True,
+                text=True,
+                cwd="."
+            )
+            if result.returncode == 0:
+                return result.stdout.strip()
+        except Exception:
+            pass
+        return None
+
+    # ------------------------------------------------------------------
+    def check_compatibility(self, other_metadata_file: str = ".index_metadata.json") -> bool:
+        """Check if current configuration is compatible with existing index."""
+        if not os.path.exists(other_metadata_file):
+            return True  # No existing metadata, assume compatible
+        
+        try:
+            with open(other_metadata_file, 'r') as f:
+                other_metadata = json.load(f)
+            
+            current_hash = self._generate_compatibility_hash()
+            other_hash = other_metadata.get("compatibility_hash")
+            
+            return current_hash == other_hash
+        except Exception:
+            return False  # If we can't read metadata, assume incompatible
 
     # ------------------------------------------------------------------
     def _symbol_id(self, file: str, name: str, line: int) -> int:

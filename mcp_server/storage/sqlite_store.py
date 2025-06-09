@@ -220,6 +220,22 @@ class SQLiteStore:
                 status TEXT
             );
             
+            -- Index Configuration
+            CREATE TABLE IF NOT EXISTS index_config (
+                id INTEGER PRIMARY KEY,
+                config_key TEXT UNIQUE NOT NULL,
+                config_value TEXT NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                description TEXT
+            );
+            
+            -- Insert initial index configuration
+            INSERT OR IGNORE INTO index_config (config_key, config_value, description) VALUES
+                ('embedding_model', 'voyage-code-3', 'Current embedding model used for vector search'),
+                ('model_dimension', '1024', 'Embedding vector dimension'),
+                ('distance_metric', 'cosine', 'Distance metric for vector similarity'),
+                ('index_version', '1.0', 'Index schema version');
+            
             -- Insert initial schema version
             INSERT INTO schema_version (version, description) 
             VALUES (1, 'Initial schema creation');

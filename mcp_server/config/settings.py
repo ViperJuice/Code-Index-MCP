@@ -350,7 +350,7 @@ class Settings(BaseModel):
             port=int(get_env_var("PORT", "8000")),
             environment=env,
             debug=get_env_var("DEBUG", "false").lower() == "true",
-            semantic_search_enabled=get_env_var("SEMANTIC_SEARCH_ENABLED", "false").lower() == "true",
+            semantic_search_enabled=get_env_var("SEMANTIC_SEARCH_ENABLED", "true").lower() == "true",
             voyage_api_key=get_env_var("VOYAGE_AI_API_KEY"),
             qdrant_host=get_env_var("QDRANT_HOST", "localhost"),
             qdrant_port=int(get_env_var("QDRANT_PORT", "6333")),

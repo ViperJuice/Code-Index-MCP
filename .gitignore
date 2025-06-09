@@ -41,6 +41,11 @@ env/
 *.sqlite3
 *.db
 
+# Index artifacts (DO TRACK - for development efficiency)
+!code_index.db
+!vector_index.qdrant/
+!.index_metadata.json
+
 # Environment variables
 .env
 .env.local
@@ -109,11 +114,11 @@ logs/
 .idea/workspace.xml
 
 # Local development databases and data (DO IGNORE)
-*.db
-*.sqlite
-*.sqlite3
+# Note: Main index artifacts are tracked above
 test_*.db
 cache_*.db
+*.tmp.db
+*.backup.db
 
 # Local environment files with secrets (DO IGNORE)
 .env

@@ -1,10 +1,8 @@
 #!/bin/bash
-#
-# Production deployment script for Code-Index-MCP
-# This script handles the complete production deployment process
-#
-
 set -euo pipefail
+
+# Production Deployment Script for MCP Server
+# This script handles the complete production deployment process
 
 # Color codes for output
 RED='\033[0;31m'
@@ -14,12 +12,14 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-DEPLOYMENT_ENV="${DEPLOYMENT_ENV:-production}"
-DOCKER_REGISTRY="${DOCKER_REGISTRY:-}"
-VERSION="${VERSION:-latest}"
-NAMESPACE="${NAMESPACE:-code-index-mcp}"
+DEPLOYMENT_ENV=${DEPLOYMENT_ENV:-production}
+NAMESPACE=${NAMESPACE:-mcp-system}
+DEPLOYMENT_NAME=${DEPLOYMENT_NAME:-code-index-mcp}
+DOCKER_REGISTRY=${DOCKER_REGISTRY:-ghcr.io}
+DOCKER_IMAGE=${DOCKER_IMAGE:-$DOCKER_REGISTRY/your-org/code-index-mcp}
+ROLLBACK_ON_FAILURE=${ROLLBACK_ON_FAILURE:-true}
+HEALTH_CHECK_RETRIES=${HEALTH_CHECK_RETRIES:-10}
+HEALTH_CHECK_INTERVAL=${HEALTH_CHECK_INTERVAL:-30}
 
 # Functions
 log_info() {
@@ -42,337 +42,417 @@ check_prerequisites() {
     log_info "Checking prerequisites..."
     
     # Check required tools
-    local required_tools=("docker" "docker-compose" "git")
-    if [[ "$DEPLOYMENT_ENV" == "kubernetes" ]]; then
-        required_tools+=("kubectl" "helm")
-    fi
-    
-    for tool in "${required_tools[@]}"; do
-        if ! command -v "$tool" &> /dev/null; then
-            log_error "$tool is not installed"
+    for tool in kubectl docker helm jq curl; do
+        if ! command -v $tool &> /dev/null; then
+            log_error "$tool is required but not installed"
             exit 1
         fi
     done
     
-    # Check Docker daemon
-    if ! docker info &> /dev/null; then
-        log_error "Docker daemon is not running"
+    # Check Kubernetes connectivity
+    if ! kubectl cluster-info &> /dev/null; then
+        log_error "Cannot connect to Kubernetes cluster"
         exit 1
     fi
     
-    # Check environment variables
-    if [[ -z "${DATABASE_URL:-}" ]]; then
-        log_error "DATABASE_URL environment variable is not set"
-        exit 1
+    # Check namespace exists
+    if ! kubectl get namespace $NAMESPACE &> /dev/null; then
+        log_warning "Namespace $NAMESPACE does not exist, creating..."
+        kubectl create namespace $NAMESPACE
     fi
     
     log_success "Prerequisites check passed"
 }
 
-build_images() {
-    log_info "Building Docker images..."
+create_backup() {
+    log_info "Creating backup of current deployment..."
     
-    cd "$PROJECT_ROOT"
+    BACKUP_DIR="backups/$(date +%Y%m%d-%H%M%S)"
+    mkdir -p $BACKUP_DIR
     
-    # Build production image
-    docker build \
-        -f Dockerfile.production \
-        -t code-index-mcp:${VERSION} \
-        -t code-index-mcp:latest \
-        --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
-        --build-arg VERSION=${VERSION} \
-        .
+    # Backup current deployment
+    kubectl get deployment $DEPLOYMENT_NAME -n $NAMESPACE -o yaml > $BACKUP_DIR/deployment.yaml 2>/dev/null || true
+    kubectl get service -n $NAMESPACE -o yaml > $BACKUP_DIR/services.yaml 2>/dev/null || true
+    kubectl get configmap -n $NAMESPACE -o yaml > $BACKUP_DIR/configmaps.yaml 2>/dev/null || true
+    kubectl get ingress -n $NAMESPACE -o yaml > $BACKUP_DIR/ingress.yaml 2>/dev/null || true
     
-    # Tag for registry if specified
-    if [[ -n "$DOCKER_REGISTRY" ]]; then
-        docker tag code-index-mcp:${VERSION} ${DOCKER_REGISTRY}/code-index-mcp:${VERSION}
-        docker tag code-index-mcp:latest ${DOCKER_REGISTRY}/code-index-mcp:latest
-    fi
+    # Save current image version
+    CURRENT_IMAGE=$(kubectl get deployment $DEPLOYMENT_NAME -n $NAMESPACE -o jsonpath="{.spec.template.spec.containers[0].image}" 2>/dev/null || echo "none")
+    echo $CURRENT_IMAGE > $BACKUP_DIR/current_image.txt
     
-    log_success "Docker images built successfully"
+    log_success "Backup created in $BACKUP_DIR"
+    echo $BACKUP_DIR
 }
 
-run_tests() {
-    log_info "Running production tests..."
+pre_deployment_checks() {
+    log_info "Running pre-deployment checks..."
     
-    # Run smoke tests
-    docker run --rm \
-        -e DATABASE_URL="$DATABASE_URL" \
-        code-index-mcp:${VERSION} \
-        python -m pytest tests/test_smoke.py -v
-    
-    # Run health check
-    docker run --rm \
-        --name code-index-mcp-test \
-        -d \
-        -p 8000:8000 \
-        code-index-mcp:${VERSION}
-    
-    sleep 5
-    
-    # Check health endpoint
-    if curl -f http://localhost:8000/health > /dev/null 2>&1; then
-        log_success "Health check passed"
-    else
-        log_error "Health check failed"
-        docker stop code-index-mcp-test
+    # Check if image exists
+    if ! docker manifest inspect $DOCKER_IMAGE:$VERSION &> /dev/null; then
+        log_error "Docker image $DOCKER_IMAGE:$VERSION not found"
         exit 1
     fi
     
-    docker stop code-index-mcp-test
+    # Check resource availability
+    AVAILABLE_CPU=$(kubectl top nodes -n $NAMESPACE --no-headers | awk '{sum+=$3} END {print 100-sum}')
+    AVAILABLE_MEM=$(kubectl top nodes -n $NAMESPACE --no-headers | awk '{sum+=$5} END {print 100-sum}')
     
-    log_success "Production tests passed"
-}
-
-push_images() {
-    if [[ -z "$DOCKER_REGISTRY" ]]; then
-        log_warning "No Docker registry specified, skipping push"
-        return
+    if (( $(echo "$AVAILABLE_CPU < 20" | bc -l) )); then
+        log_warning "Low CPU availability: ${AVAILABLE_CPU}%"
     fi
     
-    log_info "Pushing images to registry..."
-    
-    docker push ${DOCKER_REGISTRY}/code-index-mcp:${VERSION}
-    docker push ${DOCKER_REGISTRY}/code-index-mcp:latest
-    
-    log_success "Images pushed to registry"
-}
-
-deploy_docker_compose() {
-    log_info "Deploying with Docker Compose..."
-    
-    cd "$PROJECT_ROOT"
-    
-    # Create deployment directory
-    DEPLOY_DIR="/opt/code-index-mcp"
-    sudo mkdir -p "$DEPLOY_DIR"
-    
-    # Copy necessary files
-    sudo cp docker-compose.production.yml "$DEPLOY_DIR/docker-compose.yml"
-    sudo cp .env.production "$DEPLOY_DIR/.env" || true
-    
-    # Deploy
-    cd "$DEPLOY_DIR"
-    sudo docker-compose down || true
-    sudo docker-compose up -d
-    
-    # Wait for services to be ready
-    sleep 10
-    
-    # Check deployment
-    if sudo docker-compose ps | grep -q "Up"; then
-        log_success "Docker Compose deployment successful"
-    else
-        log_error "Docker Compose deployment failed"
-        sudo docker-compose logs
-        exit 1
+    if (( $(echo "$AVAILABLE_MEM < 20" | bc -l) )); then
+        log_warning "Low memory availability: ${AVAILABLE_MEM}%"
     fi
+    
+    log_success "Pre-deployment checks completed"
 }
 
-deploy_kubernetes() {
-    log_info "Deploying to Kubernetes..."
+update_configuration() {
+    log_info "Updating configuration..."
     
-    cd "$PROJECT_ROOT/k8s"
+    # Update ConfigMaps
+    if [ -f "k8s/configmap.yaml" ]; then
+        kubectl apply -f k8s/configmap.yaml
+    fi
     
-    # Create namespace
-    kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+    # Update Secrets (if changed)
+    if [ -f "k8s/secrets.yaml" ]; then
+        kubectl apply -f k8s/secrets.yaml
+    fi
     
-    # Apply configurations
-    kubectl apply -n "$NAMESPACE" -f configmap.yaml
-    kubectl apply -n "$NAMESPACE" -f secrets.yaml
-    kubectl apply -n "$NAMESPACE" -f deployment.yaml
-    kubectl apply -n "$NAMESPACE" -f service.yaml
-    kubectl apply -n "$NAMESPACE" -f ingress.yaml
+    # Update environment-specific configs
+    if [ -f "k8s/environments/$DEPLOYMENT_ENV/config.yaml" ]; then
+        kubectl apply -f k8s/environments/$DEPLOYMENT_ENV/config.yaml
+    fi
     
-    # Wait for deployment
-    kubectl rollout status deployment/code-index-mcp -n "$NAMESPACE" --timeout=300s
+    log_success "Configuration updated"
+}
+
+deploy_application() {
+    log_info "Deploying application version $VERSION..."
     
-    # Check pods
-    if kubectl get pods -n "$NAMESPACE" | grep -q "Running"; then
-        log_success "Kubernetes deployment successful"
+    # Update deployment manifest with new image
+    sed "s|image: .*|image: $DOCKER_IMAGE:$VERSION|g" k8s/deployment.yaml > /tmp/deployment.yaml
+    
+    # Apply deployment strategy based on environment
+    if [ "$DEPLOYMENT_ENV" == "production" ]; then
+        # Blue-Green deployment for production
+        deploy_blue_green
     else
-        log_error "Kubernetes deployment failed"
-        kubectl describe pods -n "$NAMESPACE"
-        exit 1
+        # Rolling update for other environments
+        deploy_rolling_update
     fi
 }
 
-run_migrations() {
-    log_info "Running database migrations..."
+deploy_rolling_update() {
+    log_info "Performing rolling update..."
     
-    if [[ "$DEPLOYMENT_ENV" == "kubernetes" ]]; then
-        # Run as Kubernetes job
-        kubectl run migrations \
-            --image=code-index-mcp:${VERSION} \
-            --rm -i --restart=Never \
-            -n "$NAMESPACE" \
-            -- python -m mcp_server.storage.migrations
-    else
-        # Run with Docker
-        docker run --rm \
-            -e DATABASE_URL="$DATABASE_URL" \
-            code-index-mcp:${VERSION} \
-            python -m mcp_server.storage.migrations
-    fi
+    # Apply the deployment
+    kubectl apply -f /tmp/deployment.yaml
     
-    log_success "Migrations completed"
-}
-
-setup_monitoring() {
-    log_info "Setting up monitoring..."
-    
-    if [[ "$DEPLOYMENT_ENV" == "kubernetes" ]]; then
-        # Deploy Prometheus ServiceMonitor
-        cat <<EOF | kubectl apply -f -
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: code-index-mcp
-  namespace: $NAMESPACE
-spec:
-  selector:
-    matchLabels:
-      app: code-index-mcp
-  endpoints:
-  - port: metrics
-    interval: 30s
-EOF
-    else
-        # Ensure Prometheus scrape config exists
-        PROMETHEUS_CONFIG="/etc/prometheus/prometheus.yml"
-        if [[ -f "$PROMETHEUS_CONFIG" ]]; then
-            log_info "Adding Prometheus scrape config..."
-            # Add scrape config if not exists
-            if ! grep -q "code-index-mcp" "$PROMETHEUS_CONFIG"; then
-                cat <<EOF | sudo tee -a "$PROMETHEUS_CONFIG"
-  - job_name: 'code-index-mcp'
-    static_configs:
-    - targets: ['localhost:8000']
-EOF
-                # Reload Prometheus
-                sudo systemctl reload prometheus || true
-            fi
+    # Wait for rollout to complete
+    if ! kubectl rollout status deployment/$DEPLOYMENT_NAME -n $NAMESPACE --timeout=600s; then
+        log_error "Rollout failed"
+        if [ "$ROLLBACK_ON_FAILURE" == "true" ]; then
+            rollback_deployment
         fi
+        exit 1
     fi
     
-    log_success "Monitoring setup completed"
+    log_success "Rolling update completed"
 }
 
-verify_deployment() {
-    log_info "Verifying deployment..."
+deploy_blue_green() {
+    log_info "Performing blue-green deployment..."
     
-    # Get service URL
-    if [[ "$DEPLOYMENT_ENV" == "kubernetes" ]]; then
-        SERVICE_URL=$(kubectl get ingress -n "$NAMESPACE" -o jsonpath='{.items[0].spec.rules[0].host}')
-    else
-        SERVICE_URL="localhost:8000"
+    # Create green deployment
+    GREEN_DEPLOYMENT="${DEPLOYMENT_NAME}-green"
+    sed "s|name: $DEPLOYMENT_NAME|name: $GREEN_DEPLOYMENT|g" /tmp/deployment.yaml > /tmp/deployment-green.yaml
+    
+    # Deploy green
+    kubectl apply -f /tmp/deployment-green.yaml
+    
+    # Wait for green deployment
+    if ! kubectl rollout status deployment/$GREEN_DEPLOYMENT -n $NAMESPACE --timeout=600s; then
+        log_error "Green deployment failed"
+        kubectl delete deployment $GREEN_DEPLOYMENT -n $NAMESPACE
+        exit 1
     fi
     
-    # Check endpoints
-    local endpoints=("/health" "/api/v1/status" "/metrics")
+    # Run health checks on green
+    if ! health_check_deployment $GREEN_DEPLOYMENT; then
+        log_error "Health check failed on green deployment"
+        kubectl delete deployment $GREEN_DEPLOYMENT -n $NAMESPACE
+        exit 1
+    fi
     
-    for endpoint in "${endpoints[@]}"; do
-        if curl -f "http://${SERVICE_URL}${endpoint}" > /dev/null 2>&1; then
-            log_success "Endpoint ${endpoint} is responding"
-        else
-            log_warning "Endpoint ${endpoint} is not responding"
+    # Switch traffic to green
+    kubectl patch service $DEPLOYMENT_NAME -n $NAMESPACE -p "{\"spec\":{\"selector\":{\"app\":\"$GREEN_DEPLOYMENT\"}}}"
+    
+    # Wait for traffic switch
+    sleep 30
+    
+    # Verify traffic switch
+    if ! health_check_service; then
+        log_error "Service health check failed after traffic switch"
+        # Switch back to blue
+        kubectl patch service $DEPLOYMENT_NAME -n $NAMESPACE -p "{\"spec\":{\"selector\":{\"app\":\"$DEPLOYMENT_NAME\"}}}"
+        kubectl delete deployment $GREEN_DEPLOYMENT -n $NAMESPACE
+        exit 1
+    fi
+    
+    # Delete blue deployment
+    kubectl delete deployment $DEPLOYMENT_NAME -n $NAMESPACE --ignore-not-found=true
+    
+    # Rename green to blue
+    kubectl get deployment $GREEN_DEPLOYMENT -n $NAMESPACE -o json | \
+        jq ".metadata.name=\"$DEPLOYMENT_NAME\" | .metadata.labels.app=\"$DEPLOYMENT_NAME\" | .spec.selector.matchLabels.app=\"$DEPLOYMENT_NAME\" | .spec.template.metadata.labels.app=\"$DEPLOYMENT_NAME\"" | \
+        kubectl apply -f -
+    
+    # Delete green deployment
+    kubectl delete deployment $GREEN_DEPLOYMENT -n $NAMESPACE --ignore-not-found=true
+    
+    # Update service selector back to original
+    kubectl patch service $DEPLOYMENT_NAME -n $NAMESPACE -p "{\"spec\":{\"selector\":{\"app\":\"$DEPLOYMENT_NAME\"}}}"
+    
+    log_success "Blue-green deployment completed"
+}
+
+health_check_deployment() {
+    local deployment=$1
+    log_info "Running health checks on $deployment..."
+    
+    # Get a pod from the deployment
+    POD=$(kubectl get pods -n $NAMESPACE -l app=$deployment -o jsonpath="{.items[0].metadata.name}")
+    
+    if [ -z "$POD" ]; then
+        log_error "No pods found for deployment $deployment"
+        return 1
+    fi
+    
+    # Check pod readiness
+    kubectl wait --for=condition=ready pod/$POD -n $NAMESPACE --timeout=300s
+    
+    # Run internal health check
+    kubectl exec -n $NAMESPACE $POD -- curl -f http://localhost:8000/health || return 1
+    
+    # Check metrics endpoint
+    kubectl exec -n $NAMESPACE $POD -- curl -f http://localhost:8000/metrics || return 1
+    
+    log_success "Health checks passed for $deployment"
+    return 0
+}
+
+health_check_service() {
+    log_info "Running service health checks..."
+    
+    # Get service endpoint
+    SERVICE_URL=$(kubectl get ingress -n $NAMESPACE -o jsonpath="{.items[0].spec.rules[0].host}")
+    
+    if [ -z "$SERVICE_URL" ]; then
+        SERVICE_URL="localhost"
+        kubectl port-forward -n $NAMESPACE service/$DEPLOYMENT_NAME 8080:8000 &
+        PF_PID=$!
+        sleep 5
+        SERVICE_URL="http://localhost:8080"
+    fi
+    
+    # Perform health checks
+    local retry_count=0
+    while [ $retry_count -lt $HEALTH_CHECK_RETRIES ]; do
+        if curl -f "${SERVICE_URL}/health" &> /dev/null; then
+            log_success "Service health check passed"
+            [ ! -z "${PF_PID:-}" ] && kill $PF_PID 2>/dev/null || true
+            return 0
         fi
+        
+        retry_count=$((retry_count + 1))
+        log_warning "Health check attempt $retry_count/$HEALTH_CHECK_RETRIES failed, retrying..."
+        sleep $HEALTH_CHECK_INTERVAL
     done
     
-    # Run smoke test
-    log_info "Running smoke test..."
-    curl -X POST "http://${SERVICE_URL}/api/v1/reindex" \
-        -H "Content-Type: application/json" \
-        -d '{"paths": ["/tmp/test"], "recursive": false}' || true
-    
-    log_success "Deployment verification completed"
+    [ ! -z "${PF_PID:-}" ] && kill $PF_PID 2>/dev/null || true
+    return 1
 }
 
-create_backup() {
-    log_info "Creating backup of previous deployment..."
+run_smoke_tests() {
+    log_info "Running smoke tests..."
     
-    BACKUP_DIR="/var/backups/code-index-mcp"
-    sudo mkdir -p "$BACKUP_DIR"
+    # Get service URL
+    SERVICE_URL=$(kubectl get ingress -n $NAMESPACE -o jsonpath="{.items[0].spec.rules[0].host}")
+    SERVICE_URL="https://${SERVICE_URL}"
     
-    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-    BACKUP_FILE="${BACKUP_DIR}/backup_${TIMESTAMP}.tar.gz"
+    # Test endpoints
+    endpoints=("/health" "/ready" "/status" "/metrics")
+    for endpoint in "${endpoints[@]}"; do
+        if ! curl -f "${SERVICE_URL}${endpoint}" &> /dev/null; then
+            log_error "Smoke test failed for ${endpoint}"
+            return 1
+        fi
+        log_info "✓ ${endpoint}"
+    done
     
-    # Backup database
-    if [[ "$DEPLOYMENT_ENV" == "kubernetes" ]]; then
-        kubectl exec -n "$NAMESPACE" deployment/code-index-mcp -- \
-            sqlite3 /app/data/index.db .dump > "${BACKUP_DIR}/db_${TIMESTAMP}.sql"
-    else
-        docker exec code-index-mcp \
-            sqlite3 /app/data/index.db .dump > "${BACKUP_DIR}/db_${TIMESTAMP}.sql" || true
+    # Test API functionality
+    if ! curl -f "${SERVICE_URL}/search?q=test&semantic=false" &> /dev/null; then
+        log_error "API functionality test failed"
+        return 1
     fi
     
-    # Create tarball
-    sudo tar -czf "$BACKUP_FILE" -C "$BACKUP_DIR" "db_${TIMESTAMP}.sql" 2>/dev/null || true
-    
-    log_success "Backup created: $BACKUP_FILE"
+    log_success "All smoke tests passed"
 }
 
+update_monitoring() {
+    log_info "Updating monitoring configuration..."
+    
+    # Update Prometheus rules
+    if [ -f "monitoring/prometheus/alerts.yml" ]; then
+        kubectl create configmap prometheus-alerts -n $NAMESPACE \
+            --from-file=monitoring/prometheus/alerts.yml \
+            --dry-run=client -o yaml | kubectl apply -f -
+    fi
+    
+    # Update Grafana dashboards
+    if [ -d "monitoring/grafana/dashboards" ]; then
+        kubectl create configmap grafana-dashboards -n $NAMESPACE \
+            --from-file=monitoring/grafana/dashboards/ \
+            --dry-run=client -o yaml | kubectl apply -f -
+    fi
+    
+    # Reload Prometheus
+    kubectl exec -n $NAMESPACE deployment/prometheus -- kill -HUP 1 2>/dev/null || true
+    
+    log_success "Monitoring configuration updated"
+}
+
+rollback_deployment() {
+    log_error "Initiating rollback..."
+    
+    # Get the backup directory
+    LATEST_BACKUP=$(ls -td backups/* | head -1)
+    
+    if [ -d "$LATEST_BACKUP" ]; then
+        # Restore deployment
+        kubectl apply -f $LATEST_BACKUP/deployment.yaml
+        
+        # Wait for rollback
+        kubectl rollout status deployment/$DEPLOYMENT_NAME -n $NAMESPACE --timeout=300s
+        
+        log_success "Rollback completed"
+    else
+        log_error "No backup found for rollback"
+        kubectl rollout undo deployment/$DEPLOYMENT_NAME -n $NAMESPACE
+    fi
+}
+
+post_deployment_tasks() {
+    log_info "Running post-deployment tasks..."
+    
+    # Clear caches
+    kubectl exec -n $NAMESPACE deployment/$DEPLOYMENT_NAME -- curl -X POST http://localhost:8000/cache/clear 2>/dev/null || true
+    
+    # Run database migrations
+    kubectl exec -n $NAMESPACE deployment/$DEPLOYMENT_NAME -- python -m mcp_server.migrations 2>/dev/null || true
+    
+    # Update deployment annotations
+    kubectl annotate deployment $DEPLOYMENT_NAME -n $NAMESPACE \
+        deployment.kubernetes.io/revision="$(date +%s)" \
+        deployment.mcp/version="$VERSION" \
+        deployment.mcp/deployed-by="$USER" \
+        deployment.mcp/deployed-at="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        --overwrite
+    
+    # Send notifications
+    send_deployment_notification "success"
+    
+    log_success "Post-deployment tasks completed"
+}
+
+send_deployment_notification() {
+    local status=$1
+    
+    # Slack notification
+    if [ ! -z "$SLACK_WEBHOOK" ]; then
+        curl -X POST $SLACK_WEBHOOK \
+            -H 'Content-Type: application/json' \
+            -d "{
+                \"text\": \"MCP Server Deployment\",
+                \"attachments\": [{
+                    \"color\": \"$([ "$status" == "success" ] && echo "good" || echo "danger")\",
+                    \"fields\": [
+                        {\"title\": \"Environment\", \"value\": \"$DEPLOYMENT_ENV\", \"short\": true},
+                        {\"title\": \"Version\", \"value\": \"$VERSION\", \"short\": true},
+                        {\"title\": \"Status\", \"value\": \"$status\", \"short\": true},
+                        {\"title\": \"Deployed By\", \"value\": \"$USER\", \"short\": true}
+                    ]
+                }]
+            }" 2>/dev/null || true
+    fi
+    
+    # Email notification
+    if [ ! -z "$NOTIFICATION_EMAIL" ]; then
+        echo "MCP Server deployed to $DEPLOYMENT_ENV (version: $VERSION, status: $status)" | \
+            mail -s "MCP Server Deployment Notification" $NOTIFICATION_EMAIL 2>/dev/null || true
+    fi
+}
+
+cleanup() {
+    log_info "Cleaning up..."
+    
+    # Remove temporary files
+    rm -f /tmp/deployment*.yaml
+    
+    # Kill any port-forward processes
+    pkill -f "kubectl port-forward" 2>/dev/null || true
+    
+    log_success "Cleanup completed"
+}
+
+# Main deployment flow
 main() {
-    log_info "Starting Code-Index-MCP production deployment..."
-    log_info "Environment: $DEPLOYMENT_ENV"
+    log_info "Starting MCP Server deployment to $DEPLOYMENT_ENV"
     log_info "Version: $VERSION"
     
-    # Deployment steps
-    check_prerequisites
-    create_backup
-    build_images
-    run_tests
-    push_images
+    # Trap for cleanup on exit
+    trap cleanup EXIT
     
-    # Deploy based on environment
-    if [[ "$DEPLOYMENT_ENV" == "kubernetes" ]]; then
-        deploy_kubernetes
-    else
-        deploy_docker_compose
+    # Check version parameter
+    if [ -z "${VERSION:-}" ]; then
+        log_error "VERSION not specified"
+        echo "Usage: VERSION=v1.0.0 $0"
+        exit 1
     fi
     
-    run_migrations
-    setup_monitoring
-    verify_deployment
+    # Run deployment steps
+    check_prerequisites
+    BACKUP_DIR=$(create_backup)
+    pre_deployment_checks
+    update_configuration
+    deploy_application
+    
+    # Post-deployment validation
+    if ! health_check_service; then
+        log_error "Post-deployment health check failed"
+        if [ "$ROLLBACK_ON_FAILURE" == "true" ]; then
+            rollback_deployment
+        fi
+        exit 1
+    fi
+    
+    if ! run_smoke_tests; then
+        log_error "Smoke tests failed"
+        if [ "$ROLLBACK_ON_FAILURE" == "true" ]; then
+            rollback_deployment
+        fi
+        exit 1
+    fi
+    
+    update_monitoring
+    post_deployment_tasks
     
     log_success "Deployment completed successfully!"
-    log_info "Service is available at: http://${SERVICE_URL:-localhost:8000}"
+    log_info "Backup available at: $BACKUP_DIR"
 }
 
-# Parse command line arguments
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --env)
-            DEPLOYMENT_ENV="$2"
-            shift 2
-            ;;
-        --version)
-            VERSION="$2"
-            shift 2
-            ;;
-        --registry)
-            DOCKER_REGISTRY="$2"
-            shift 2
-            ;;
-        --namespace)
-            NAMESPACE="$2"
-            shift 2
-            ;;
-        --help)
-            echo "Usage: $0 [options]"
-            echo "Options:"
-            echo "  --env ENV          Deployment environment (docker-compose|kubernetes)"
-            echo "  --version VERSION  Version to deploy"
-            echo "  --registry URL     Docker registry URL"
-            echo "  --namespace NS     Kubernetes namespace"
-            exit 0
-            ;;
-        *)
-            log_error "Unknown option: $1"
-            exit 1
-            ;;
-    esac
-done
-
-# Run main deployment
-main
+# Run main function
+main "$@"

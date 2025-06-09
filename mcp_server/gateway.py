@@ -1,10 +1,11 @@
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, Response
 from fastapi.responses import JSONResponse, PlainTextResponse
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 import logging
 import os
 import time
+import threading
 from .dispatcher import Dispatcher
 from .plugin_base import SymbolDef, SearchResult
 from .storage.sqlite_store import SQLiteStore
@@ -20,6 +21,7 @@ from .metrics import (
     get_metrics_collector, get_health_checker, HealthStatus
 )
 from .metrics.middleware import setup_metrics_middleware, get_business_metrics
+from .metrics.prometheus_exporter import get_prometheus_exporter
 from .cache import (
     CacheManagerFactory, CacheConfig, CacheBackendType, 
     QueryResultCache, QueryCacheConfig, QueryType
@@ -34,6 +36,7 @@ dispatcher: Dispatcher | None = None
 sqlite_store: SQLiteStore | None = None
 file_watcher: FileWatcher | None = None
 plugin_manager: PluginManager | None = None
+plugin_loader = None  # Dynamic plugin loader
 auth_manager: AuthManager | None = None
 security_config: SecurityConfig | None = None
 cache_manager = None
@@ -50,7 +53,7 @@ setup_metrics_middleware(app, enable_detailed_metrics=True)
 @app.on_event("startup")
 async def startup_event():
     """Initialize the dispatcher and register plugins on startup."""
-    global dispatcher, sqlite_store, file_watcher, plugin_manager, auth_manager, security_config, cache_manager, query_cache
+    global dispatcher, sqlite_store, file_watcher, plugin_manager, plugin_loader, auth_manager, security_config, cache_manager, query_cache
     
     try:
         # Initialize security configuration
@@ -145,25 +148,54 @@ async def startup_event():
         sqlite_store = SQLiteStore("code_index.db")
         logger.info("SQLite store initialized successfully")
         
-        # Initialize plugin manager with SQLite store
-        logger.info("Initializing plugin system...")
+        # Initialize plugin system with dynamic discovery
+        logger.info("Initializing plugin system with dynamic discovery...")
+        from .plugin_system.discovery import get_plugin_discovery
+        from .plugin_system.loader import get_plugin_loader
+        
+        # Discover all available plugins
+        plugin_discovery = get_plugin_discovery()
+        discovered = plugin_discovery.discover_plugins()
+        logger.info(f"Discovered {len(discovered)} plugins: {list(discovered.keys())}")
+        
+        # Initialize plugin loader
+        plugin_loader = get_plugin_loader()
+        
+        # Load plugins based on configuration or all discovered plugins
         config_path = Path("plugins.yaml")
-        plugin_manager = PluginManager(sqlite_store=sqlite_store)
-        
-        # Load plugins from configuration using safe method for better error handling
-        logger.info("Loading plugins...")
-        load_result = plugin_manager.load_plugins_safe(config_path if config_path.exists() else None)
-        
-        if not load_result.success:
-            logger.error(f"Plugin loading failed: {load_result.error.message}")
-            logger.error(f"Error details: {load_result.error.details}")
-            # Continue with any successfully loaded plugins
+        if config_path.exists():
+            # Load specific plugins from config
+            import yaml
+            with open(config_path, 'r') as f:
+                plugin_config = yaml.safe_load(f)
+            
+            enabled_languages = plugin_config.get('enabled_languages', list(discovered.keys()))
+            logger.info(f"Loading plugins for languages: {enabled_languages}")
         else:
-            logger.info(f"Plugin loading completed: {load_result.metadata}")
+            # Load all discovered plugins
+            enabled_languages = list(discovered.keys())
+            logger.info("No plugins.yaml found, loading all discovered plugins")
         
-        # Get active plugin instances
-        active_plugins = plugin_manager.get_active_plugins()
-        plugin_instances = list(active_plugins.values())
+        # Load plugins
+        plugin_instances = []
+        for language in enabled_languages:
+            try:
+                plugin = plugin_loader.load_plugin(language)
+                if plugin:
+                    plugin_instances.append(plugin)
+                    logger.info(f"Successfully loaded plugin for {language}")
+            except Exception as e:
+                logger.error(f"Failed to load plugin for {language}: {e}")
+        
+        logger.info(f"Loaded {len(plugin_instances)} plugins")
+        
+        # Create plugin manager for compatibility
+        plugin_manager = PluginManager(sqlite_store=sqlite_store)
+        # Register loaded plugins with manager
+        for plugin in plugin_instances:
+            if hasattr(plugin, 'get_language'):
+                lang = plugin.get_language()
+                plugin_manager._plugins[lang] = plugin
         
         logger.info(f"Loaded {len(plugin_instances)} active plugins")
         
@@ -468,6 +500,52 @@ def get_metrics() -> str:
     except Exception as e:
         logger.error(f"Failed to get metrics: {e}", exc_info=True)
         raise HTTPException(500, f"Failed to get metrics: {str(e)}")
+
+@app.get("/metrics")
+def get_prometheus_metrics() -> Response:
+    """Prometheus metrics endpoint."""
+    try:
+        prometheus_exporter = get_prometheus_exporter()
+        
+        # Update build info
+        prometheus_exporter.set_build_info(
+            version="1.0.0",
+            commit=os.getenv("GIT_COMMIT", "unknown"),
+            build_time=os.getenv("BUILD_TIME", "unknown")
+        )
+        
+        # Update system metrics
+        import psutil
+        process = psutil.Process()
+        memory_info = process.memory_info()
+        prometheus_exporter.set_memory_usage(memory_info.rss, memory_info.vms)
+        prometheus_exporter.set_cpu_usage(process.cpu_percent())
+        prometheus_exporter.set_active_threads(threading.active_count())
+        
+        # Update plugin metrics
+        if plugin_loader:
+            stats = plugin_loader.get_statistics()
+            for lang, plugin in plugin_loader.get_active_plugins().items():
+                prometheus_exporter.plugin_status.labels(
+                    plugin=plugin.__class__.__name__,
+                    language=lang
+                ).set(1)
+        
+        # Update file watcher metrics
+        if file_watcher:
+            # This would need to be implemented in FileWatcher
+            # prometheus_exporter.set_files_watched(file_watcher.get_watched_count())
+            pass
+        
+        # Generate metrics
+        metrics = prometheus_exporter.generate_metrics()
+        return Response(
+            content=metrics,
+            media_type=prometheus_exporter.get_content_type()
+        )
+    except Exception as e:
+        logger.error(f"Failed to generate Prometheus metrics: {e}", exc_info=True)
+        raise HTTPException(500, f"Failed to generate metrics: {str(e)}")
 
 @app.get("/metrics/json")
 def get_metrics_json(current_user: User = Depends(require_permission(Permission.READ))) -> Dict[str, Any]:

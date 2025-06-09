@@ -24,6 +24,9 @@ from .interfaces import (
     ILifecycleManager,
     IPluginManager
 )
+from .discovery import PluginDiscovery, get_plugin_discovery
+from .loader import PluginLoader, get_plugin_loader
+from .config import PluginConfigManager, get_config_manager
 
 __all__ = [
     # Main class
@@ -49,5 +52,13 @@ __all__ = [
     'IPluginLoader',
     'IPluginRegistry',
     'ILifecycleManager',
-    'IPluginManager'
+    'IPluginManager',
+    
+    # Dynamic plugin system
+    'PluginDiscovery',
+    'get_plugin_discovery',
+    'PluginLoader',
+    'get_plugin_loader',
+    'PluginConfigManager',
+    'get_config_manager'
 ]

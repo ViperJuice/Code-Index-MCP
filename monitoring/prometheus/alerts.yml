@@ -1,0 +1,103 @@
+groups:
+  - name: mcp_server_alerts
+    interval: 30s
+    rules:
+      # High error rate
+      - alert: HighErrorRate
+        expr: rate(mcp_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value }} errors/sec (threshold: 0.1)"
+
+      # Plugin failures
+      - alert: PluginLoadFailure
+        expr: mcp_plugin_status == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Plugin {{ $labels.plugin }} failed to load"
+          description: "Plugin {{ $labels.plugin }} for language {{ $labels.language }} is not active"
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: mcp_memory_usage_bytes{type="rss"} > 2147483648  # 2GB
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ humanize $value }} (threshold: 2GB)"
+
+      # Slow request latency
+      - alert: SlowRequestLatency
+        expr: histogram_quantile(0.95, rate(mcp_request_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow request latency detected"
+          description: "95th percentile latency is {{ $value }}s (threshold: 1s)"
+
+      # Low cache hit rate
+      - alert: LowCacheHitRate
+        expr: (mcp_cache_hits_total / (mcp_cache_hits_total + mcp_cache_misses_total)) < 0.5
+        for: 15m
+        labels:
+          severity: info
+        annotations:
+          summary: "Low cache hit rate"
+          description: "Cache hit rate is {{ $value | humanizePercentage }} (threshold: 50%)"
+
+      # Database connection issues
+      - alert: DatabaseConnectionPoolExhausted
+        expr: mcp_database_connections > 90
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "{{ $value }} connections in use (threshold: 90)"
+
+      # File watcher issues
+      - alert: FileWatcherStopped
+        expr: up{job="mcp_server"} == 1 and mcp_files_watched == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "File watcher may have stopped"
+          description: "No files are being watched despite server being up"
+
+      # Indexing performance
+      - alert: SlowIndexing
+        expr: histogram_quantile(0.95, rate(mcp_indexing_duration_seconds_bucket[5m])) > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow file indexing detected"
+          description: "95th percentile indexing time is {{ $value }}s (threshold: 5s)"
+
+      # Search performance
+      - alert: SlowSearchQueries
+        expr: histogram_quantile(0.95, rate(mcp_search_duration_seconds_bucket[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow search queries detected"
+          description: "95th percentile search time is {{ $value }}s (threshold: 500ms)"
+
+      # Service health
+      - alert: MCPServerDown
+        expr: up{job="mcp_server"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MCP Server is down"
+          description: "MCP Server has been down for more than 1 minute"
