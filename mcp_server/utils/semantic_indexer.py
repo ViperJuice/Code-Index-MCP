@@ -7,14 +7,19 @@ import hashlib
 import json
 import os
 from dataclasses import dataclass
-from typing import Iterable, Any, Optional, Union
+from typing import Iterable, Any, Optional, Union, List, Dict
 from datetime import datetime
 import re
+import logging
 
 import voyageai
 from qdrant_client import QdrantClient, models
+from qdrant_client.http.models import Filter, FieldCondition, MatchValue
 
 from .treesitter_wrapper import TreeSitterWrapper
+from ..core.path_resolver import PathResolver
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -57,11 +62,12 @@ class SemanticIndexer:
         "guide": 1.2,         # Guide content
     }
 
-    def __init__(self, collection: str = "code-index", qdrant_path: str = "./vector_index.qdrant") -> None:
+    def __init__(self, collection: str = "code-index", qdrant_path: str = "./vector_index.qdrant", path_resolver: Optional[PathResolver] = None) -> None:
         self.collection = collection
         self.qdrant_path = qdrant_path
         self.embedding_model = "voyage-code-3"
         self.metadata_file = ".index_metadata.json"
+        self.path_resolver = path_resolver or PathResolver()
         
         # Support both memory and HTTP URLs
         if qdrant_path.startswith("http"):
@@ -81,7 +87,17 @@ class SemanticIndexer:
             self.voyage = voyageai.Client(api_key=api_key)
         else:
             # Let voyageai.Client() look for VOYAGE_API_KEY environment variable
-            self.voyage = voyageai.Client()
+            try:
+                self.voyage = voyageai.Client()
+            except Exception as e:
+                raise RuntimeError(
+                    "Semantic search requires Voyage AI API key. "
+                    "Configure it using one of these methods:\n"
+                    "1. Create .mcp.json with env.VOYAGE_AI_API_KEY for Claude Code\n"
+                    "2. Set VOYAGE_AI_API_KEY environment variable\n"
+                    "3. Add VOYAGE_AI_API_KEY to .env file\n"
+                    "Get your API key from: https://www.voyageai.com/"
+                )
 
         self._ensure_collection()
         self._update_metadata()
@@ -157,8 +173,22 @@ class SemanticIndexer:
             return False  # If we can't read metadata, assume incompatible
 
     # ------------------------------------------------------------------
-    def _symbol_id(self, file: str, name: str, line: int) -> int:
-        h = hashlib.sha1(f"{file}:{name}:{line}".encode("utf-8")).digest()[:8]
+    def _symbol_id(self, file: str, name: str, line: int, content_hash: Optional[str] = None) -> int:
+        """Generate ID using relative path and optional content hash."""
+        # Normalize file path to relative
+        try:
+            relative_path = self.path_resolver.normalize_path(file)
+        except ValueError:
+            # File might already be relative
+            relative_path = str(file).replace('\\', '/')
+        
+        # Include content hash if provided for better deduplication
+        if content_hash:
+            id_str = f"{relative_path}:{name}:{line}:{content_hash[:8]}"
+        else:
+            id_str = f"{relative_path}:{name}:{line}"
+        
+        h = hashlib.sha1(id_str.encode("utf-8")).digest()[:8]
         return int.from_bytes(h, "big", signed=False)
 
     # ------------------------------------------------------------------
@@ -207,16 +237,30 @@ class SemanticIndexer:
 
             points = []
             for sym, vec in zip(symbols, embeds):
+                # Compute content hash for this symbol
+                symbol_content = "\n".join(lines[sym.line - 1 : sym.span[1]])
+                content_hash = hashlib.sha256(symbol_content.encode()).hexdigest()
+                
+                # Use relative path in payload
+                relative_path = self.path_resolver.normalize_path(path)
+                
                 payload = {
-                    "file": str(path),
+                    "file": str(path),  # Keep absolute for backward compatibility
+                    "relative_path": relative_path,
+                    "content_hash": content_hash,
                     "symbol": sym.symbol,
                     "kind": sym.kind,
                     "signature": sym.signature,
                     "line": sym.line,
                     "span": list(sym.span),
                     "language": "python",
+                    "is_deleted": False,
                 }
-                points.append(models.PointStruct(id=self._symbol_id(str(path), sym.symbol, sym.line), vector=vec, payload=payload))
+                points.append(models.PointStruct(
+                    id=self._symbol_id(str(path), sym.symbol, sym.line, content_hash), 
+                    vector=vec, 
+                    payload=payload
+                ))
 
             self.qdrant.upsert(collection_name=self.collection, points=points)
 
@@ -268,26 +312,32 @@ class SemanticIndexer:
         line: int,
         span: tuple[int, int],
         doc: str | None = None,
-        content: str = ""
+        content: str = "",
+        metadata: dict[str, Any] | None = None
     ) -> None:
         """Index a single code symbol with its embedding.
         
         Args:
             file: Source file path
             name: Symbol name
-            kind: Symbol type (function, class, etc.)
+            kind: Symbol type (function, class, chunk, etc.)
             signature: Symbol signature
             line: Line number where symbol is defined
             span: Line span of the symbol
             doc: Optional documentation string
             content: Symbol content for embedding generation
+            metadata: Additional metadata to store with the symbol
         """
-        # Create embedding text from available information
-        embedding_text = f"{kind} {name}\n{signature}"
-        if doc:
-            embedding_text += f"\n{doc}"
-        if content:
-            embedding_text += f"\n{content}"
+        # For chunks, content already contains contextual embedding text
+        if kind == "chunk":
+            embedding_text = content
+        else:
+            # Create embedding text from available information
+            embedding_text = f"{kind} {name}\n{signature}"
+            if doc:
+                embedding_text += f"\n{doc}"
+            if content:
+                embedding_text += f"\n{content}"
         
         # Generate embedding
         try:
@@ -299,10 +349,18 @@ class SemanticIndexer:
                 output_dtype="float",
             ).embeddings[0]
             
+            # Compute content hash
+            content_hash = hashlib.sha256(content.encode()).hexdigest() if content else None
+            
+            # Use relative path
+            relative_path = self.path_resolver.normalize_path(file)
+            
             # Create point for Qdrant
-            point_id = self._symbol_id(file, name, line)
+            point_id = self._symbol_id(file, name, line, content_hash)
             payload = {
-                "file": file,
+                "file": file,  # Keep absolute for backward compatibility
+                "relative_path": relative_path,
+                "content_hash": content_hash,
                 "symbol": name,
                 "kind": kind,
                 "signature": signature,
@@ -310,7 +368,12 @@ class SemanticIndexer:
                 "span": list(span),
                 "doc": doc,
                 "language": "python",  # This should be parameterized
+                "is_deleted": False,
             }
+            
+            # Add custom metadata if provided
+            if metadata:
+                payload.update(metadata)
             
             point = models.PointStruct(
                 id=point_id,
@@ -324,6 +387,14 @@ class SemanticIndexer:
                 points=[point]
             )
         except Exception as e:
+            if "API key" in str(e) or "authentication" in str(e).lower():
+                raise RuntimeError(
+                    f"Semantic indexing failed due to API key issue: {e}\n"
+                    "Configure Voyage AI API key using:\n"
+                    "1. .mcp.json with env.VOYAGE_AI_API_KEY for Claude Code\n"
+                    "2. VOYAGE_AI_API_KEY environment variable\n"
+                    "3. VOYAGE_AI_API_KEY in .env file"
+                )
             raise RuntimeError(f"Failed to index symbol {name}: {e}")
     
     # ------------------------------------------------------------------
@@ -503,9 +574,17 @@ class SemanticIndexer:
             # Create unique ID for section
             section_id = self._document_section_id(str(path), section.title, section.start_line)
             
+            # Use relative path
+            relative_path = self.path_resolver.normalize_path(path)
+            
+            # Compute content hash for section
+            section_hash = hashlib.sha256(section.content.encode()).hexdigest()
+            
             # Prepare payload
             payload = {
-                "file": str(path),
+                "file": str(path),  # Keep absolute for backward compatibility
+                "relative_path": relative_path,
+                "content_hash": section_hash,
                 "title": section.title,
                 "section_context": context_str,
                 "content": section.content[:500],  # Store preview
@@ -517,6 +596,7 @@ class SemanticIndexer:
                 "doc_type": doc_type,
                 "type": "document_section",
                 "language": "markdown" if doc_type in ["markdown", "readme"] else "text",
+                "is_deleted": False,
             }
             
             if metadata:
@@ -659,4 +739,253 @@ class SemanticIndexer:
             "total_files": len(indexed_files),
             "total_sections": total_sections
         }
+    
+    # ------------------------------------------------------------------
+    # File operation methods for path management
+    # ------------------------------------------------------------------
+    
+    def remove_file(self, file_path: Union[str, Path]) -> int:
+        """Remove all embeddings for a file from the index.
+        
+        Args:
+            file_path: File path (absolute or relative)
+            
+        Returns:
+            Number of points removed
+        """
+        # Normalize to relative path
+        try:
+            relative_path = self.path_resolver.normalize_path(file_path)
+        except ValueError:
+            # Path might already be relative
+            relative_path = str(file_path).replace('\\', '/')
+        
+        # Search for all points with this file
+        filter_condition = Filter(
+            must=[
+                FieldCondition(
+                    key="relative_path",
+                    match=MatchValue(value=relative_path)
+                )
+            ]
+        )
+        
+        # Get count before deletion for logging
+        search_result = self.qdrant.search(
+            collection_name=self.collection,
+            query_vector=[0.0] * 1024,  # Dummy vector
+            filter=filter_condition,
+            limit=1000,  # Get all matches
+            with_payload=False,
+            with_vectors=False
+        )
+        
+        point_ids = [point.id for point in search_result]
+        
+        if point_ids:
+            # Delete all points
+            self.qdrant.delete(
+                collection_name=self.collection,
+                points_selector=models.PointIdsList(points=point_ids)
+            )
+            logger.info(f"Removed {len(point_ids)} embeddings for file: {relative_path}")
+        
+        return len(point_ids)
+    
+    def move_file(self, old_path: Union[str, Path], new_path: Union[str, Path], 
+                  content_hash: Optional[str] = None) -> int:
+        """Update all embeddings when a file is moved.
+        
+        Args:
+            old_path: Old file path
+            new_path: New file path
+            content_hash: Optional content hash for verification
+            
+        Returns:
+            Number of points updated
+        """
+        # Normalize paths
+        old_relative = self.path_resolver.normalize_path(old_path)
+        new_relative = self.path_resolver.normalize_path(new_path)
+        
+        # Find all points for the old file
+        filter_condition = Filter(
+            must=[
+                FieldCondition(
+                    key="relative_path",
+                    match=MatchValue(value=old_relative)
+                )
+            ]
+        )
+        
+        # Search for all points
+        search_result = self.qdrant.search(
+            collection_name=self.collection,
+            query_vector=[0.0] * 1024,  # Dummy vector
+            filter=filter_condition,
+            limit=1000,
+            with_payload=True,
+            with_vectors=False
+        )
+        
+        if not search_result:
+            logger.warning(f"No embeddings found for file: {old_relative}")
+            return 0
+        
+        # Update payloads with new path
+        updated_points = []
+        for point in search_result:
+            # Update payload
+            new_payload = point.payload.copy()
+            new_payload["relative_path"] = new_relative
+            new_payload["file"] = str(new_path)  # Update absolute path too
+            
+            # Verify content hash if provided
+            if content_hash and new_payload.get("content_hash") != content_hash:
+                logger.warning(f"Content hash mismatch for {old_relative} -> {new_relative}")
+                continue
+            
+            updated_points.append(
+                models.PointStruct(
+                    id=point.id,
+                    payload=new_payload,
+                    vector=[]  # Empty vector, we're only updating payload
+                )
+            )
+        
+        # Batch update payloads
+        if updated_points:
+            # Qdrant doesn't support payload-only updates directly,
+            # so we need to re-fetch vectors and update
+            point_ids = [p.id for p in updated_points]
+            
+            # Fetch full points with vectors
+            full_points = self.qdrant.retrieve(
+                collection_name=self.collection,
+                ids=point_ids,
+                with_payload=True,
+                with_vectors=True
+            )
+            
+            # Create new points with updated payloads
+            new_points = []
+            for i, full_point in enumerate(full_points):
+                new_points.append(
+                    models.PointStruct(
+                        id=full_point.id,
+                        vector=full_point.vector,
+                        payload=updated_points[i].payload
+                    )
+                )
+            
+            # Upsert updated points
+            self.qdrant.upsert(
+                collection_name=self.collection,
+                points=new_points
+            )
+            
+            logger.info(f"Updated {len(new_points)} embeddings: {old_relative} -> {new_relative}")
+        
+        return len(updated_points)
+    
+    def get_embeddings_by_content_hash(self, content_hash: str) -> List[Dict[str, Any]]:
+        """Get all embeddings with a specific content hash.
+        
+        Args:
+            content_hash: Content hash to search for
+            
+        Returns:
+            List of embedding metadata
+        """
+        filter_condition = Filter(
+            must=[
+                FieldCondition(
+                    key="content_hash",
+                    match=MatchValue(value=content_hash)
+                )
+            ]
+        )
+        
+        results = self.qdrant.search(
+            collection_name=self.collection,
+            query_vector=[0.0] * 1024,  # Dummy vector
+            filter=filter_condition,
+            limit=1000,
+            with_payload=True,
+            with_vectors=False
+        )
+        
+        return [
+            {
+                "id": res.id,
+                **res.payload
+            }
+            for res in results
+        ]
+    
+    def mark_file_deleted(self, file_path: Union[str, Path]) -> int:
+        """Mark all embeddings for a file as deleted (soft delete).
+        
+        Args:
+            file_path: File path to mark as deleted
+            
+        Returns:
+            Number of points marked as deleted
+        """
+        # This is similar to move_file but only updates is_deleted flag
+        relative_path = self.path_resolver.normalize_path(file_path)
+        
+        filter_condition = Filter(
+            must=[
+                FieldCondition(
+                    key="relative_path",
+                    match=MatchValue(value=relative_path)
+                )
+            ]
+        )
+        
+        # Search and update
+        search_result = self.qdrant.search(
+            collection_name=self.collection,
+            query_vector=[0.0] * 1024,
+            filter=filter_condition,
+            limit=1000,
+            with_payload=True,
+            with_vectors=False
+        )
+        
+        if not search_result:
+            return 0
+        
+        # Update is_deleted flag
+        point_ids = []
+        for point in search_result:
+            point.payload["is_deleted"] = True
+            point_ids.append(point.id)
+        
+        # Re-fetch and update (same process as move_file)
+        full_points = self.qdrant.retrieve(
+            collection_name=self.collection,
+            ids=point_ids,
+            with_payload=True,
+            with_vectors=True
+        )
+        
+        updated_points = []
+        for i, full_point in enumerate(full_points):
+            updated_points.append(
+                models.PointStruct(
+                    id=full_point.id,
+                    vector=full_point.vector,
+                    payload=search_result[i].payload
+                )
+            )
+        
+        self.qdrant.upsert(
+            collection_name=self.collection,
+            points=updated_points
+        )
+        
+        logger.info(f"Marked {len(updated_points)} embeddings as deleted for: {relative_path}")
+        return len(updated_points)
 

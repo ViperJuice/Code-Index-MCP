@@ -40,6 +40,11 @@ Each specialized plugin provides:
 - **Import Graph**: Dependency tracking and circular dependency detection
 - **Type Inference**: Understand implicit types and generics
 - **Build Context**: Resolve external dependencies from build files
+- **Contextual Embeddings**: Language-specific context for better semantic search
+  - Type-aware embeddings that understand generics, interfaces, traits
+  - Import-context embeddings that capture dependency relationships
+  - Framework-aware embeddings (e.g., React hooks, Spring annotations)
+  - Cross-file relationship embeddings for better code navigation
 
 ## Language-Specific Architectures
 
@@ -229,6 +234,32 @@ class IncrementalAnalyzer:
         self.apply_incremental_changes(diff)
 ```
 
+### 4. Contextual Embeddings Pattern
+```python
+class ContextualEmbeddingEnhancer:
+    """Enhances specialized plugins with contextual embeddings"""
+    
+    def __init__(self):
+        self._context_cache = {}
+        self._relationship_graph = {}
+    
+    def generate_contextual_embedding(self, symbol, plugin_context):
+        """Generate embeddings that understand language-specific context"""
+        # Combine symbol info with:
+        # - Type information from specialized plugin
+        # - Import/dependency context
+        # - Framework-specific patterns
+        # - Cross-file relationships
+        context = {
+            'symbol': symbol,
+            'type_info': plugin_context.type_analyzer.get_type(symbol),
+            'imports': plugin_context.import_resolver.get_dependencies(),
+            'references': plugin_context.get_references(symbol),
+            'framework': plugin_context.detect_framework_patterns()
+        }
+        return self.embed_with_context(context)
+```
+
 ## Integration Points
 
 ### 1. With Existing System
@@ -317,6 +348,44 @@ class LSPClient:
 
 All specialized plugins have been implemented and are available in the codebase.
 
+## Contextual Embeddings Benefits
+
+### Language-Specific Context Understanding
+Each specialized plugin enhances embeddings with:
+
+1. **Type Context** - Embeddings understand type hierarchies, generics, and constraints
+2. **Import Context** - Dependencies and module relationships inform similarity
+3. **Framework Context** - Framework-specific patterns improve search relevance
+4. **Cross-File Context** - Related code across files is semantically linked
+
+### Example: Java Plugin Contextual Embeddings
+```java
+// When embedding this method:
+public void processOrder(Order order) {
+    // The embedding includes:
+    // - Parameter type: Order (custom class)
+    // - Return type: void
+    // - Class context: OrderService
+    // - Imports: com.example.models.Order
+    // - Framework: Spring @Service annotation
+    // - Related methods: validateOrder, saveOrder
+}
+```
+
+### Example: TypeScript Plugin Contextual Embeddings
+```typescript
+// When embedding this React component:
+export const UserProfile: FC<UserProps> = ({ user }) => {
+    // The embedding includes:
+    // - Component type: React.FC
+    // - Props interface: UserProps
+    // - Imports: React, UserProps type
+    // - Framework: React functional component
+    // - Hooks used: useState, useEffect
+    // - Related components: UserAvatar, UserDetails
+}
+```
+
 ## Success Criteria
 
 Each specialized plugin must:
@@ -326,3 +395,5 @@ Each specialized plugin must:
 4. Provide accurate cross-file references
 5. Integrate with build systems
 6. Gracefully degrade when tools unavailable
+7. Generate rich contextual embeddings for semantic search
+8. Maintain <500ms for contextual embedding generation

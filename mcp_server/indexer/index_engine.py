@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set, Any, Tuple, Union
 
 from ..core.errors import PluginError
+from ..core.ignore_patterns import get_ignore_manager
 from ..plugin_system.interfaces import IPluginManager
 from ..storage.sqlite_store import SQLiteStore
 from ..utils.fuzzy_indexer import FuzzyIndexer
@@ -613,6 +614,9 @@ class IndexEngine:
         if not dir_path.exists() or not dir_path.is_dir():
             return files
         
+        # Get ignore manager for this directory
+        ignore_manager = get_ignore_manager(dir_path)
+        
         # Pattern matching function
         def matches_patterns(file_path: str, patterns: List[str]) -> bool:
             if not patterns:
@@ -628,6 +632,11 @@ class IndexEngine:
             for item in dir_path.rglob("*") if recursive else dir_path.iterdir():
                 if item.is_file():
                     file_path = str(item)
+                    
+                    # Check if file should be ignored based on .gitignore and .mcp-index-ignore
+                    if ignore_manager.should_ignore(item):
+                        logger.debug(f"Ignoring {file_path} due to ignore patterns")
+                        continue
                     
                     # Check size limit
                     if item.stat().st_size > options.max_file_size:

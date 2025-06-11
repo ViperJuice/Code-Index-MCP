@@ -91,41 +91,177 @@ Document Input → Plugin Detection → Structure Extraction → Smart Chunking 
 
 ## Search Capabilities
 
-### 1. Structure-Aware Search
+### 1. Hybrid Search System
+
+The system now combines multiple search strategies for optimal results:
+
+```python
+class HybridSearchEngine:
+    def search(self, query: str) -> List[SearchResult]:
+        # 1. BM25 full-text search
+        bm25_results = self.bm25_index.search(query, limit=50)
+        
+        # 2. Semantic vector search
+        query_embedding = self.embed_query(query)
+        vector_results = self.vector_store.search(query_embedding, limit=50)
+        
+        # 3. Combine and rerank
+        combined = self.merge_results(bm25_results, vector_results)
+        reranked = self.reranker.rerank(query, combined, limit=20)
+        
+        return reranked
+```
+
+### 2. BM25 Integration
+
+Full-text search using BM25 algorithm for keyword matching:
+
+```sql
+-- SQLite FTS5 with BM25 ranking
+CREATE VIRTUAL TABLE document_fts USING fts5(
+    content,
+    section_path,
+    document_title,
+    tokenize='porter unicode61',
+    content=document_chunks,
+    content_rowid=id
+);
+
+-- Search with BM25 ranking
+SELECT *, bm25(document_fts) as rank
+FROM document_fts
+WHERE document_fts MATCH ?
+ORDER BY rank DESC;
+```
+
+### 3. Contextual Embeddings Search
+
+Enhanced semantic search with context-aware embeddings:
+
+```python
+def create_contextual_embedding(chunk: DocumentChunk):
+    # Build context-enriched text
+    context_text = f"""
+    Document: {chunk.document_title}
+    Path: {' > '.join(chunk.section_hierarchy)}
+    Previous: {chunk.context_before[:100]}
+    
+    {chunk.content}
+    
+    Next: {chunk.context_after[:100]}
+    """
+    
+    # Generate embedding with context
+    return self.embedder.embed(context_text)
+```
+
+### 4. Reranking System
+
+Cross-encoder based reranking for improved relevance:
+
+```python
+class DocumentReranker:
+    def rerank(self, query: str, candidates: List[SearchResult], limit: int):
+        # Score each candidate with cross-encoder
+        scores = []
+        for candidate in candidates:
+            score = self.cross_encoder.predict([
+                query,
+                candidate.get_full_context()
+            ])
+            scores.append((score, candidate))
+        
+        # Sort by relevance score
+        scores.sort(key=lambda x: x[0], reverse=True)
+        return [result for _, result in scores[:limit]]
+```
+
+### 5. Structure-Aware Search
 - Return specific sections, not just files
 - Maintain document hierarchy in results
 - Provide breadcrumb navigation
+- Include relevance explanations
 
-### 2. Natural Language Queries
-- "How to install X" → Installation sections
-- "API documentation for Y" → API reference sections
-- "Examples of Z" → Code example sections
+### 6. Natural Language Queries
+- "How to install X" → Installation sections with context
+- "API documentation for Y" → API reference with examples
+- "Examples of Z" → Code snippets with explanations
+- Query understanding with intent detection
 
-### 3. Contextual Results
+### 7. Contextual Results
 - Include parent section information
 - Show surrounding context
 - Highlight relevant portions
+- Provide navigation to related sections
 
 ## Chunking Strategies
 
-### 1. Markdown Chunking
-```
-1. Split by top-level sections (# headings)
-2. If section > MAX_CHUNK_SIZE:
-   - Split by subsections (##, ###)
-   - Preserve code blocks intact
-   - Keep lists together
-3. Add overlap for context preservation
-4. Include section metadata in each chunk
+### 1. Adaptive Chunking System
+
+The system now implements adaptive chunking based on document characteristics:
+
+```python
+def determine_chunk_strategy(document):
+    size = len(document.content)
+    structure_complexity = analyze_structure(document)
+    
+    if size < 5000:  # Small documents
+        return SimpleChunkStrategy(chunk_size=1000, overlap=200)
+    elif size < 50000:  # Medium documents
+        return HierarchicalChunkStrategy(chunk_size=1500, overlap=300)
+    else:  # Large documents
+        return SemanticChunkStrategy(chunk_size=2000, overlap=400)
 ```
 
-### 2. Plain Text Chunking
+### 2. Markdown Chunking
 ```
-1. Detect paragraph boundaries
-2. Group related paragraphs by topic
-3. Respect sentence boundaries
-4. Use sliding window with overlap
-5. Preserve semantic coherence
+1. Analyze document size and structure
+2. Apply adaptive chunking:
+   - Small docs: Simple section-based splitting
+   - Medium docs: Hierarchical with subsection awareness
+   - Large docs: Semantic clustering with topic modeling
+3. For each chunk:
+   - Preserve complete sections when possible
+   - Maintain code blocks intact
+   - Keep lists and tables together
+   - Add contextual overlap (20% of chunk size)
+4. Generate contextual metadata for each chunk
+```
+
+### 3. Plain Text Chunking
+```
+1. Detect natural boundaries (paragraphs, topics)
+2. Apply size-aware chunking:
+   - Small: Paragraph-based with minimal overlap
+   - Medium: Topic-clustered with semantic coherence
+   - Large: Sliding window with dynamic boundaries
+3. Use NLP for boundary detection:
+   - Sentence segmentation
+   - Topic shift detection
+   - Semantic similarity measurement
+4. Preserve context with adaptive overlap
+```
+
+### 4. Contextual Embeddings
+
+Each chunk now includes contextual information for better semantic search:
+
+```python
+class ContextualChunk:
+    content: str  # The actual chunk text
+    context_before: str  # Previous chunk summary (100 chars)
+    context_after: str  # Next chunk summary (100 chars)
+    section_path: List[str]  # ["Installation", "Requirements"]
+    document_summary: str  # Brief document description
+    
+    def to_embedding_text(self):
+        return f"""
+        Document: {self.document_summary}
+        Section: {' > '.join(self.section_path)}
+        Context: {self.context_before}
+        Content: {self.content}
+        Following: {self.context_after}
+        """
 ```
 
 ## Integration Points
@@ -156,16 +292,64 @@ Document Input → Plugin Detection → Structure Extraction → Smart Chunking 
 - Cache document structure analysis
 - Reuse chunks for unchanged sections
 - Parallelize chunk generation
+- Adaptive chunk sizing based on document length
+- Smart boundary detection to minimize splits
 
 ### 2. Search Optimization
-- Index section headings for fast lookup
+- Dual-index strategy (BM25 + Vector)
 - Pre-compute document hierarchies
 - Cache frequently accessed sections
+- Batch embedding generation
+- Incremental index updates
 
 ### 3. Memory Management
-- Stream large documents
+- Stream large documents (>10MB)
 - Limit chunk size to prevent memory bloat
 - Use lazy loading for document trees
+- Efficient context window management
+- Pooled embedding generation
+
+### 4. Embedding Optimization
+```python
+class EmbeddingOptimizer:
+    def __init__(self):
+        self.batch_size = 32
+        self.context_cache = LRUCache(maxsize=1000)
+    
+    def batch_embed_chunks(self, chunks: List[DocumentChunk]):
+        # Group chunks for batch processing
+        batches = [chunks[i:i+self.batch_size] 
+                   for i in range(0, len(chunks), self.batch_size)]
+        
+        embeddings = []
+        for batch in batches:
+            # Check cache first
+            texts = []
+            cached_indices = []
+            for i, chunk in enumerate(batch):
+                cache_key = hash(chunk.to_embedding_text())
+                if cache_key in self.context_cache:
+                    embeddings.append(self.context_cache[cache_key])
+                    cached_indices.append(i)
+                else:
+                    texts.append(chunk.to_embedding_text())
+            
+            # Batch embed uncached chunks
+            if texts:
+                new_embeddings = self.embedder.embed_batch(texts)
+                # Update cache
+                for text, emb in zip(texts, new_embeddings):
+                    self.context_cache[hash(text)] = emb
+                embeddings.extend(new_embeddings)
+        
+        return embeddings
+```
+
+### 5. Index Management
+- Incremental updates for modified documents
+- Background reindexing for large changes
+- Separate indices per document type
+- Compression for vector storage
 
 ## API Extensions
 

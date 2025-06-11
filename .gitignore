@@ -41,8 +41,8 @@ env/
 *.sqlite3
 *.db
 
-# Index artifacts (DO TRACK - for development efficiency)
-!code_index.db
+# Index artifacts (tracked selectively)
+# code_index.db is too large for Git - use scripts/download_index.sh
 !vector_index.qdrant/
 !.index_metadata.json
 
@@ -107,6 +107,7 @@ logs/
 # =============================================================================
 .claude/settings.local.json
 .claude/user-*.json
+.mcp.local.json
 
 # Personal IDE configuration (user-specific - DO IGNORE)
 .cursor/

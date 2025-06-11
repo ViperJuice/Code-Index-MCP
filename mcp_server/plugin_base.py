@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TypedDict, Iterable
+from typing import Iterable
+from typing_extensions import TypedDict
 from pathlib import Path
 
 class IndexShard(TypedDict):

@@ -106,17 +106,11 @@ except ImportError:
     logger.info("Kotlin plugin not available, will use generic")
 
 try:
-    from .plaintext_plugin import PlainTextPlugin as PlainTextPluginClass
+    # Try simple text plugin first for config files
+    from .simple_text_plugin import SimpleTextPlugin
     # Create a wrapper that provides the correct initialization
     def create_plaintext_plugin(sqlite_store=None, enable_semantic=True):
-        config = LANGUAGE_CONFIGS.get('plaintext', {
-            "code": "plaintext",
-            "name": "Plain Text",
-            "extensions": [".txt", ".text", ".log", ".readme"],
-            "symbols": [],
-            "query": ""
-        })
-        return PlainTextPluginClass(config, sqlite_store, enable_semantic)
+        return SimpleTextPlugin(sqlite_store)
     SPECIFIC_PLUGINS['plaintext'] = create_plaintext_plugin
 except ImportError:
     logger.info("Plain text plugin not available, will use generic")

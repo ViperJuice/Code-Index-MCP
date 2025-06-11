@@ -332,31 +332,110 @@ class BaseDocumentPlugin(SpecializedPluginBase):
     
     def _index_chunks_semantically(self, file_path: str, chunks: List[DocumentChunk], 
                                   metadata: DocumentMetadata):
-        """Index document chunks for semantic search."""
-        for chunk in chunks:
+        """Index document chunks for semantic search with contextual embeddings."""
+        # Extract document structure for context
+        structure = self._structure_cache.get(file_path)
+        
+        for i, chunk in enumerate(chunks):
             # Create a unique identifier for the chunk
             chunk_id = f"{file_path}:chunk:{chunk.chunk_index}"
             
-            # Prepare embedding text
-            embedding_text = chunk.embedding_text or chunk.content
+            # Build contextual embedding text
+            contextual_parts = []
             
-            # Add metadata context
+            # 1. Document-level context
             if metadata.title:
-                embedding_text = f"Document: {metadata.title}\n{embedding_text}"
+                contextual_parts.append(f"Document: {metadata.title}")
             
+            if metadata.document_type:
+                contextual_parts.append(f"Type: {metadata.document_type}")
+            
+            if metadata.tags:
+                contextual_parts.append(f"Tags: {', '.join(metadata.tags)}")
+            
+            # 2. Section hierarchy context
+            section_context = []
             if chunk.metadata.get('section'):
-                embedding_text = f"Section: {chunk.metadata['section']}\n{embedding_text}"
+                section_context.append(chunk.metadata['section'])
+                
+                # Find parent sections if structure is available
+                if structure:
+                    for section in structure.sections:
+                        if section.get('title') == chunk.metadata['section']:
+                            # Build hierarchy path
+                            parent = section.get('parent')
+                            hierarchy = [chunk.metadata['section']]
+                            while parent:
+                                hierarchy.insert(0, parent)
+                                # Find parent's parent
+                                for s in structure.sections:
+                                    if s.get('title') == parent:
+                                        parent = s.get('parent')
+                                        break
+                                else:
+                                    parent = None
+                            section_context = hierarchy
+                            break
             
-            # Index the chunk
+            if section_context:
+                contextual_parts.append(f"Section: {' > '.join(section_context)}")
+            
+            # 3. Surrounding context from adjacent chunks
+            context_before = ""
+            context_after = ""
+            
+            # Get context from previous chunk (last 100 chars)
+            if i > 0:
+                prev_chunk = chunks[i-1]
+                context_before = prev_chunk.content[-100:].strip()
+                if context_before:
+                    contextual_parts.append(f"Previous context: ...{context_before}")
+            
+            # Get context from next chunk (first 100 chars)
+            if i < len(chunks) - 1:
+                next_chunk = chunks[i+1]
+                context_after = next_chunk.content[:100].strip()
+                if context_after:
+                    contextual_parts.append(f"Following context: {context_after}...")
+            
+            # 4. Chunk content (optimized for embedding)
+            chunk_content = chunk.embedding_text or chunk.content
+            contextual_parts.append(f"Content: {chunk_content}")
+            
+            # Combine all contextual information
+            contextual_text = "\n\n".join(contextual_parts)
+            
+            # Store contextual information in chunk metadata
+            chunk.metadata['contextual_text'] = contextual_text
+            chunk.metadata['context_before'] = context_before
+            chunk.metadata['context_after'] = context_after
+            chunk.metadata['section_hierarchy'] = section_context
+            chunk.metadata['document_title'] = metadata.title
+            chunk.metadata['document_type'] = metadata.document_type
+            chunk.metadata['document_tags'] = metadata.tags
+            
+            # Index the chunk with contextual embedding
             self.semantic_indexer.index_symbol(
                 file=file_path,
                 name=chunk_id,
                 kind="chunk",
-                signature=f"Chunk {chunk.chunk_index}",
+                signature=f"Chunk {chunk.chunk_index} of {metadata.title or Path(file_path).name}",
                 line=chunk.chunk_index,
                 span=(chunk.start_pos, chunk.end_pos),
                 doc=chunk.content[:200],  # First 200 chars as doc
-                content=embedding_text
+                content=contextual_text,  # Use contextual text for embedding
+                metadata={
+                    'contextual_text': contextual_text,
+                    'original_content': chunk.content,
+                    'section': chunk.metadata.get('section', ''),
+                    'section_hierarchy': section_context,
+                    'document_title': metadata.title,
+                    'document_type': metadata.document_type,
+                    'document_tags': metadata.tags,
+                    'context_before': context_before,
+                    'context_after': context_after,
+                    'chunk_metadata': chunk.metadata
+                }
             )
     
     def getDefinition(self, symbol: str) -> Optional[SymbolDef]:
@@ -398,7 +477,7 @@ class BaseDocumentPlugin(SpecializedPluginBase):
         return references
     
     def search(self, query: str, opts: Optional[Dict] = None) -> List[SearchResult]:
-        """Search documents for query."""
+        """Search documents for query with enhanced context."""
         results = []
         opts = opts or {}
         
@@ -416,11 +495,31 @@ class BaseDocumentPlugin(SpecializedPluginBase):
                         chunks = self._chunk_cache[file_path]
                         if chunk_index < len(chunks):
                             chunk = chunks[chunk_index]
-                            results.append({
+                            
+                            # Build enhanced result with context
+                            search_result = {
                                 "file": file_path,
                                 "line": chunk_index,
-                                "snippet": chunk.content[:200] + "..."
-                            })
+                                "snippet": chunk.content[:200] + "...",
+                                "score": result.get('score', 0.0),
+                                "metadata": {
+                                    "section": chunk.metadata.get('section', ''),
+                                    "section_hierarchy": chunk.metadata.get('section_hierarchy', []),
+                                    "document_title": chunk.metadata.get('document_title', ''),
+                                    "document_type": chunk.metadata.get('document_type', ''),
+                                    "tags": chunk.metadata.get('document_tags', []),
+                                    "chunk_index": chunk.chunk_index,
+                                    "total_chunks": len(chunks)
+                                }
+                            }
+                            
+                            # Add surrounding context if available
+                            if chunk.metadata.get('context_before'):
+                                search_result['context_before'] = chunk.metadata['context_before']
+                            if chunk.metadata.get('context_after'):
+                                search_result['context_after'] = chunk.metadata['context_after']
+                            
+                            results.append(search_result)
         else:
             # Full text search through chunks
             query_lower = query.lower()
@@ -430,7 +529,12 @@ class BaseDocumentPlugin(SpecializedPluginBase):
                         results.append({
                             "file": file_path,
                             "line": chunk.chunk_index,
-                            "snippet": self._extract_snippet(chunk.content, query)
+                            "snippet": self._extract_snippet(chunk.content, query),
+                            "metadata": {
+                                "section": chunk.metadata.get('section', ''),
+                                "chunk_index": chunk.chunk_index,
+                                "total_chunks": len(chunks)
+                            }
                         })
         
         return results[:opts.get('limit', 20)]

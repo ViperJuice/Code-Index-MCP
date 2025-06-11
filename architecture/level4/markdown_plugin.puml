@@ -33,10 +33,13 @@ package "Markdown Plugin" {
     class ChunkStrategy {
         - maxChunkSize: int
         - overlapSize: int
+        - adaptiveMode: bool
         + chunkDocument(sections): Chunk[]
         + chunkSection(section): Chunk[]
         + preserveCodeBlocks(content): string[]
         + addContextMetadata(chunk): Chunk
+        + generateContextWindows(chunks): void
+        + selectChunkSize(docSize): int
     }
     
     class FrontmatterParser {
@@ -64,16 +67,23 @@ package "Markdown Plugin" {
         + metadata: ChunkMetadata
         + startLine: int
         + endLine: int
+        + contextBefore: string
+        + contextAfter: string
+        + embedding: float[]
     }
     
     class ChunkMetadata {
         + heading: string
         + level: int
         + parentSection: string
+        + sectionPath: string[]
         + hasCode: bool
         + hasLinks: bool
         + hasTables: bool
         + wordCount: int
+        + chunkIndex: int
+        + totalChunks: int
+        + chunkStrategy: string
     }
 }
 

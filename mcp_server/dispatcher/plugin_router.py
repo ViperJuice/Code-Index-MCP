@@ -19,6 +19,7 @@ from functools import lru_cache
 
 from ..plugin_base import IPlugin
 from ..plugin_system.models import PluginInfo, PluginInstance, PluginConfig
+from ..plugins.language_registry import get_language_by_extension
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +151,8 @@ class IPluginRouter(ABC):
 class FileTypeMatcher(IFileTypeMatcher):
     """Advanced file type matcher with support for extensions, MIME types, and language detection."""
     
-    # Language mappings by file extension
+    # DEPRECATED: Use get_language_by_extension from language_registry instead
+    # Keeping for backward compatibility only
     LANGUAGE_MAP = {
         '.py': 'python',
         '.pyi': 'python',
@@ -267,7 +269,7 @@ class FileTypeMatcher(IFileTypeMatcher):
         # Determine file characteristics
         extension = path.suffix.lower()
         mime_type, _ = mimetypes.guess_type(str(path))
-        language = self.LANGUAGE_MAP.get(extension)
+        language = get_language_by_extension(extension)
         is_binary = extension in self.BINARY_EXTENSIONS
         
         # Special handling for files without extensions

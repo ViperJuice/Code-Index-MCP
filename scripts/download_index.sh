@@ -1,0 +1,20 @@
+#!/bin/bash
+# Download pre-built code index database
+
+echo "Code Index Database Downloader"
+echo "=============================="
+echo ""
+echo "The code index database is too large for Git (378MB)."
+echo "You can download it from the GitHub release artifacts."
+echo ""
+echo "Options:"
+echo "1. Download from GitHub release (when available)"
+echo "2. Build locally using: python scripts/populate_bm25_index.py"
+echo ""
+echo "To build the index locally:"
+echo "  1. Make sure you have all dependencies installed"
+echo "  2. Run: python scripts/populate_bm25_index.py"
+echo "  3. The index will be created as 'code_index.db'"
+echo ""
+echo "Note: Building the index locally will take some time but ensures"
+echo "      you have the most up-to-date index of your codebase."

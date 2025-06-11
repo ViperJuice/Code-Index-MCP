@@ -1,0 +1,211 @@
+@startuml path_management
+!include shared_interfaces.puml
+
+package "Path Management System" {
+    class PathResolver {
+        - repository_root: Path
+        --
+        + __init__(repository_root: Optional[Path])
+        + normalize_path(absolute_path: Union[str, Path]) -> str
+        + resolve_path(relative_path: str) -> Path
+        + compute_content_hash(file_path: Union[str, Path]) -> str
+        + compute_file_hash(file_path: Union[str, Path]) -> str
+        - _detect_repository_root() -> Path
+        + is_within_repository(path: Path) -> bool
+    }
+
+    class FileOperationManager {
+        - sqlite_store: SQLiteStore
+        - path_resolver: PathResolver
+        - semantic_indexer: Optional[SemanticIndexer]
+        --
+        + move_file(old_path: Path, new_path: Path, content_hash: str)
+        + remove_file(file_path: Union[Path, str])
+        + check_file_changed(file_path: Path, stored_hash: str) -> bool
+        + handle_deleted_file(relative_path: str)
+        - _update_file_references(old_path: str, new_path: str)
+    }
+
+    class MigrationManager {
+        - path_resolver: PathResolver
+        - sqlite_store: SQLiteStore
+        --
+        + migrate_to_relative_paths()
+        + compute_missing_hashes()
+        + remove_duplicate_files()
+        + update_repository_roots()
+        - _convert_path_batch(files: List[Dict])
+        - _detect_and_merge_duplicates()
+    }
+}
+
+package "Enhanced Storage Layer" {
+    class EnhancedSQLiteStore {
+        - path_resolver: PathResolver
+        {field} content_hash tracking
+        {field} soft delete support
+        {field} file move history
+        --
+        + store_file(repository_id: int, file_path: Path, content_hash: str)
+        + remove_file(relative_path: str, repository_id: int)
+        + mark_file_deleted(relative_path: str, repository_id: int)
+        + move_file(old_path: str, new_path: str, repository_id: int, content_hash: str)
+        + get_file_by_content_hash(content_hash: str, repository_id: int) -> Optional[Dict]
+        + cleanup_deleted_files(days_old: int = 30)
+        + get_file_move_history(relative_path: str) -> List[Dict]
+        - _record_file_move(old_path: str, new_path: str, content_hash: str)
+    }
+
+    database "SQLite Database" {
+        table files {
+            * id: INTEGER
+            * repository_id: INTEGER
+            * path: TEXT
+            * relative_path: TEXT
+            * content_hash: TEXT
+            * is_deleted: BOOLEAN
+            * deleted_at: TIMESTAMP
+            --
+            UNIQUE(repository_id, relative_path)
+            INDEX(content_hash)
+            INDEX(is_deleted)
+        }
+
+        table file_moves {
+            * id: INTEGER
+            * repository_id: INTEGER
+            * old_relative_path: TEXT
+            * new_relative_path: TEXT
+            * content_hash: TEXT
+            * moved_at: TIMESTAMP
+            * move_type: TEXT
+            --
+            INDEX(content_hash)
+            INDEX(moved_at)
+        }
+    }
+}
+
+package "File System Integration" {
+    class EnhancedFileWatcher {
+        - path_resolver: PathResolver
+        - file_operation_manager: FileOperationManager
+        --
+        + on_deleted(event: FileSystemEvent)
+        + on_moved(event: FileSystemEvent)
+        + on_modified(event: FileSystemEvent)
+        + on_created(event: FileSystemEvent)
+        - _should_index_file(path: Path) -> bool
+        - _compute_and_check_hash(path: Path) -> Tuple[str, bool]
+    }
+
+    class EnhancedDispatcher {
+        - path_resolver: PathResolver
+        - file_operation_manager: FileOperationManager
+        - semantic_indexer: SemanticIndexer
+        {field} content hash caching
+        --
+        + index_file(file_path: Path)
+        + remove_file(file_path: Union[Path, str])
+        + move_file(old_path: Path, new_path: Path, content_hash: str)
+        + compute_file_hash(file_path: Path) -> str
+        + check_file_changed(file_path: Path) -> bool
+        - _get_or_compute_hash(file_path: Path) -> str
+        - _invalidate_caches_for_file(relative_path: str)
+        - _coordinate_storage_operations()
+    }
+}
+
+package "Vector Storage Layer" {
+    class EnhancedSemanticIndexer {
+        - path_resolver: PathResolver
+        - qdrant: QdrantClient
+        {field} relative path based IDs
+        {field} content hash tracking
+        --
+        + _symbol_id(relative_path: str, name: str, line: int, content_hash: str) -> int
+        + remove_file(relative_path: str)
+        + move_file(old_path: str, new_path: str, content_hash: str)
+        + get_embeddings_by_content_hash(content_hash: str) -> List[Dict]
+        + index_file(path: Path) -> dict
+        - _update_payload_batch(points: List[PointStruct])
+        - _migrate_absolute_to_relative()
+    }
+
+    database "Qdrant Vector DB" {
+        collections {
+            * code-embeddings-{language}
+            * contextual-embeddings
+            * document-chunks
+        }
+        
+        payload {
+            * relative_path: keyword
+            * content_hash: keyword
+            * chunk_hash: keyword
+            * repository_id: integer
+            * is_deleted: boolean
+        }
+    }
+}
+
+' Relationships
+PathResolver <-- FileOperationManager : uses
+PathResolver <-- EnhancedSQLiteStore : uses
+PathResolver <-- EnhancedFileWatcher : uses
+PathResolver <-- EnhancedDispatcher : uses
+PathResolver <-- MigrationManager : uses
+PathResolver <-- EnhancedSemanticIndexer : uses
+
+FileOperationManager --> EnhancedSQLiteStore : delegates to
+FileOperationManager --> EnhancedSemanticIndexer : coordinates with
+FileOperationManager <-- EnhancedDispatcher : uses
+FileOperationManager <-- EnhancedFileWatcher : uses
+
+EnhancedSQLiteStore --> files : stores
+EnhancedSQLiteStore --> file_moves : tracks
+
+EnhancedSemanticIndexer --> "Qdrant Vector DB" : manages
+EnhancedDispatcher --> EnhancedSemanticIndexer : coordinates
+
+EnhancedFileWatcher --> EnhancedDispatcher : notifies
+EnhancedDispatcher --> FileOperationManager : uses
+
+' Notes
+note top of PathResolver
+  Central component for all path operations.
+  Ensures consistency across the system.
+  Handles both normalization and resolution.
+end note
+
+note right of EnhancedSQLiteStore
+  Backward compatible design:
+  - Keeps absolute path column
+  - Uses relative_path as primary
+  - Supports gradual migration
+end note
+
+note bottom of file_moves
+  Tracks all file movements for:
+  - Audit trail
+  - Duplicate detection
+  - History analysis
+end note
+
+note right of EnhancedSemanticIndexer
+  Vector operations ensure:
+  - Relative paths in all payloads
+  - Content hash deduplication
+  - Coordinated cleanup with SQLite
+  - Portable embeddings
+end note
+
+note bottom of "Qdrant Vector DB"
+  Migration updates:
+  - Convert file paths to relative
+  - Add content/chunk hashes
+  - Regenerate IDs portably
+  - Remove duplicates
+end note
+
+@enduml

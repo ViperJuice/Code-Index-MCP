@@ -301,6 +301,70 @@ class LoggingSettings(BaseModel):
             )
 
 
+class RerankingSettings(BaseModel):
+    """Reranking configuration for search result optimization."""
+    
+    # Enable/disable reranking
+    enabled: bool = Field(default=False, description="Enable search result reranking")
+    
+    # Reranker type selection
+    reranker_type: str = Field(
+        default="hybrid",
+        pattern="^(cohere|cross-encoder|tfidf|hybrid)$",
+        description="Type of reranker to use"
+    )
+    
+    # Cohere settings
+    cohere_api_key: Optional[str] = Field(default=None, description="Cohere API key")
+    cohere_model: str = Field(default="rerank-english-v2.0", description="Cohere reranking model")
+    
+    # Cross-encoder settings
+    cross_encoder_model: str = Field(
+        default="cross-encoder/ms-marco-MiniLM-L-6-v2",
+        description="Cross-encoder model for local reranking"
+    )
+    cross_encoder_device: str = Field(default="cpu", pattern="^(cpu|cuda|mps)$")
+    
+    # Hybrid reranker settings
+    hybrid_primary_type: str = Field(default="cohere", description="Primary reranker for hybrid mode")
+    hybrid_fallback_type: str = Field(default="tfidf", description="Fallback reranker for hybrid mode")
+    hybrid_primary_weight: float = Field(default=0.7, ge=0.0, le=1.0)
+    hybrid_fallback_weight: float = Field(default=0.3, ge=0.0, le=1.0)
+    
+    # General settings
+    top_k: Optional[int] = Field(default=None, ge=1, le=100, description="Number of top results to rerank")
+    cache_ttl: int = Field(default=3600, ge=0, le=86400, description="Cache TTL in seconds")
+    
+    # Performance settings
+    batch_size: int = Field(default=32, ge=1, le=128, description="Batch size for reranking")
+    timeout: float = Field(default=5.0, ge=0.1, le=30.0, description="Reranking timeout in seconds")
+    
+    @validator('hybrid_primary_weight', 'hybrid_fallback_weight')
+    def validate_weights(cls, v, values):
+        """Ensure weights sum to 1.0 for hybrid mode."""
+        if 'hybrid_primary_weight' in values and 'hybrid_fallback_weight' in values:
+            total = values['hybrid_primary_weight'] + values['hybrid_fallback_weight']
+            if abs(total - 1.0) > 0.001:  # Allow small floating point errors
+                raise ValueError(f"Hybrid weights must sum to 1.0, got {total}")
+        return v
+    
+    @classmethod
+    def from_environment(cls) -> "RerankingSettings":
+        """Create reranking settings from environment variables."""
+        return cls(
+            enabled=get_env_var("RERANKING_ENABLED", "false").lower() == "true",
+            reranker_type=get_env_var("RERANKER_TYPE", "hybrid"),
+            cohere_api_key=get_env_var("COHERE_API_KEY"),
+            cohere_model=get_env_var("COHERE_MODEL", "rerank-english-v2.0"),
+            cross_encoder_model=get_env_var("CROSS_ENCODER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"),
+            cross_encoder_device=get_env_var("CROSS_ENCODER_DEVICE", "cpu"),
+            hybrid_primary_type=get_env_var("HYBRID_PRIMARY_TYPE", "cohere"),
+            hybrid_fallback_type=get_env_var("HYBRID_FALLBACK_TYPE", "tfidf"),
+            top_k=int(get_env_var("RERANK_TOP_K", "0")) or None,
+            cache_ttl=int(get_env_var("RERANK_CACHE_TTL", "3600"))
+        )
+
+
 class Settings(BaseModel):
     """Main application settings."""
     
@@ -324,6 +388,7 @@ class Settings(BaseModel):
     cache: CacheSettings = Field(default_factory=CacheSettings.from_environment)
     metrics: MetricsSettings = Field(default_factory=MetricsSettings.from_environment)
     logging: LoggingSettings = Field(default_factory=LoggingSettings.from_environment)
+    reranking: RerankingSettings = Field(default_factory=RerankingSettings.from_environment)
     
     # Feature Flags
     dynamic_plugin_loading: bool = Field(default=True)

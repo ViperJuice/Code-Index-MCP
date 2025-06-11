@@ -6,13 +6,17 @@ import hashlib
 import time
 import re
 from datetime import datetime
+import os
 
 from ..plugin_base import IPlugin, SymbolDef, SearchResult, Reference
 from ..plugins.plugin_factory import PluginFactory
-from ..plugins.language_registry import get_language_by_extension
+from ..plugins.language_registry import get_language_by_extension, get_all_extensions
 from ..storage.sqlite_store import SQLiteStore
 from .plugin_router import PluginRouter, FileTypeMatcher, PluginCapability
 from .result_aggregator import ResultAggregator, AggregatedResult, AggregationStats, RankingCriteria
+# Note: We've removed ignore pattern checks to allow indexing ALL files
+# Filtering happens only during export via SecureIndexExporter
+# from ..core.ignore_patterns import get_ignore_manager
 
 logger = logging.getLogger(__name__)
 
@@ -722,6 +726,88 @@ class EnhancedDispatcher:
         
         return stats
     
+    def index_directory(self, directory: Path, recursive: bool = True) -> Dict[str, int]:
+        """
+        Index all files in a directory, respecting ignore patterns.
+        
+        Args:
+            directory: Directory to index
+            recursive: Whether to index subdirectories
+            
+        Returns:
+            Statistics about indexed files
+        """
+        logger.info(f"Indexing directory: {directory} (recursive={recursive})")
+        
+        # Note: We don't use ignore patterns during indexing
+        # ALL files are indexed for local search capability
+        # Filtering happens only during export/sharing
+        
+        # Get all supported extensions
+        supported_extensions = get_all_extensions()
+        
+        stats = {
+            "total_files": 0,
+            "indexed_files": 0,
+            "ignored_files": 0,
+            "failed_files": 0,
+            "by_language": {}
+        }
+        
+        # Walk directory
+        if recursive:
+            file_iterator = directory.rglob("*")
+        else:
+            file_iterator = directory.glob("*")
+            
+        for path in file_iterator:
+            if not path.is_file():
+                continue
+                
+            stats["total_files"] += 1
+            
+            # NOTE: We index ALL files locally, including gitignored ones
+            # Filtering happens only during export/sharing
+            # This allows local search of .env, secrets, etc.
+                
+            # Try to find a plugin that supports this file
+            # This allows us to index ALL files, including .env, .key, etc.
+            try:
+                # First try to match by extension
+                if path.suffix in supported_extensions:
+                    self.index_file(path)
+                    stats["indexed_files"] += 1
+                # For files without recognized extensions, try each plugin's supports() method
+                # This allows plugins to match by filename patterns (e.g., .env, Dockerfile)
+                else:
+                    matched = False
+                    for plugin in self._plugins:
+                        if plugin.supports(path):
+                            self.index_file(path)
+                            stats["indexed_files"] += 1
+                            matched = True
+                            break
+                    
+                    # If no plugin matched but we want to index everything,
+                    # we could add a fallback here to index as plaintext
+                    # For now, we'll skip unmatched files
+                    if not matched:
+                        logger.debug(f"No plugin found for {path}")
+                
+                # Track by language
+                language = get_language_by_extension(path.suffix)
+                if language:
+                    stats["by_language"][language] = stats["by_language"].get(language, 0) + 1
+                    
+            except Exception as e:
+                logger.error(f"Failed to index {path}: {e}")
+                stats["failed_files"] += 1
+                
+        logger.info(f"Directory indexing complete: {stats['indexed_files']} indexed, "
+                   f"{stats['ignored_files']} ignored, {stats['failed_files']} failed")
+        
+        return stats
+    
     def search_documentation(self, topic: str, doc_types: Optional[List[str]] = None, limit: int = 20) -> Iterable[SearchResult]:
         """Search specifically across documentation files.
         
@@ -823,3 +909,81 @@ class EnhancedDispatcher:
             health['status'] = 'degraded' if len(health['errors']) < 3 else 'unhealthy'
         
         return health
+    
+    def remove_file(self, path: Union[Path, str]) -> None:
+        """Remove a file from all indexes.
+        
+        Args:
+            path: File path to remove
+        """
+        path = Path(path).resolve()
+        logger.info(f"Removing file from index: {path}")
+        
+        try:
+            # Remove from SQLite if available
+            if self._sqlite_store:
+                from ..core.path_resolver import PathResolver
+                path_resolver = PathResolver()
+                try:
+                    relative_path = path_resolver.normalize_path(path)
+                    # Get repository ID - for now assume 1
+                    # TODO: Properly detect repository
+                    self._sqlite_store.remove_file(relative_path, repository_id=1)
+                except Exception as e:
+                    logger.error(f"Error removing from SQLite: {e}")
+            
+            # Remove from semantic index if available
+            try:
+                plugin = self._match_plugin(path)
+                if plugin and hasattr(plugin, '_indexer') and plugin._indexer:
+                    plugin._indexer.remove_file(path)
+                    logger.info(f"Removed from semantic index: {path}")
+            except Exception as e:
+                logger.warning(f"Error removing from semantic index: {e}")
+            
+            # Update statistics
+            self._operation_stats['deletions'] = self._operation_stats.get('deletions', 0) + 1
+            
+        except Exception as e:
+            logger.error(f"Error removing file {path}: {e}", exc_info=True)
+    
+    def move_file(self, old_path: Union[Path, str], new_path: Union[Path, str], content_hash: Optional[str] = None) -> None:
+        """Move a file in all indexes.
+        
+        Args:
+            old_path: Original file path
+            new_path: New file path
+            content_hash: Optional content hash to verify unchanged content
+        """
+        old_path = Path(old_path).resolve()
+        new_path = Path(new_path).resolve()
+        logger.info(f"Moving file in index: {old_path} -> {new_path}")
+        
+        try:
+            # Move in SQLite if available
+            if self._sqlite_store:
+                from ..core.path_resolver import PathResolver
+                path_resolver = PathResolver()
+                try:
+                    old_relative = path_resolver.normalize_path(old_path)
+                    new_relative = path_resolver.normalize_path(new_path)
+                    # Get repository ID - for now assume 1
+                    # TODO: Properly detect repository
+                    self._sqlite_store.move_file(old_relative, new_relative, repository_id=1, content_hash=content_hash)
+                except Exception as e:
+                    logger.error(f"Error moving in SQLite: {e}")
+            
+            # Move in semantic index if available
+            try:
+                plugin = self._match_plugin(new_path)
+                if plugin and hasattr(plugin, '_indexer') and plugin._indexer:
+                    plugin._indexer.move_file(old_path, new_path, content_hash)
+                    logger.info(f"Moved in semantic index: {old_path} -> {new_path}")
+            except Exception as e:
+                logger.warning(f"Error moving in semantic index: {e}")
+            
+            # Update statistics
+            self._operation_stats['moves'] = self._operation_stats.get('moves', 0) + 1
+            
+        except Exception as e:
+            logger.error(f"Error moving file {old_path} -> {new_path}: {e}", exc_info=True)

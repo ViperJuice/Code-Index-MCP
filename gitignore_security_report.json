@@ -1,0 +1,21 @@
+{
+  "total_indexed": 464,
+  "should_be_ignored": [
+    "/app/mcp_server/cache/__init__.py",
+    "/app/mcp_server/cache/backends.py",
+    "/app/mcp_server/cache/cache_manager.py",
+    "/app/mcp_server/cache/query_cache.py",
+    "test_repos/lodash/perf/index.html",
+    "test_repos/lodash/test/backbone.html",
+    "test_repos/lodash/test/fp.html",
+    "test_repos/lodash/test/index.html",
+    "test_repos/lodash/test/underscore.html",
+    "test_repos/normalize.css/normalize.css",
+    "test_repos/normalize.css/test.html"
+  ],
+  "sensitive_files": [],
+  "safe_files": 453,
+  "recommendations": [
+    "\u26a0\ufe0f  11 files are indexed but should be ignored per .gitignore"
+  ]
+}

@@ -1,0 +1,73 @@
+# Docker Compose for MCP Server
+version: '3.8'
+
+services:
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    container_name: code-index-mcp-server
+    restart: unless-stopped
+    volumes:
+      # Source code for indexing
+      - ./:/workspace:ro
+      # Database persistence
+      - ./code_index.db:/app/code_index.db
+      - ./.mcp-index:/app/.mcp-index
+      # Logs
+      - ./logs:/app/logs
+    environment:
+      # Core settings
+      - PYTHONPATH=/app
+      - MCP_WORKSPACE_ROOT=/workspace
+      - DATABASE_URL=sqlite:///./code_index.db
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      
+      # Semantic search (optional)
+      - VOYAGE_AI_API_KEY=${VOYAGE_AI_API_KEY:-}
+      - SEMANTIC_SEARCH_ENABLED=${SEMANTIC_SEARCH_ENABLED:-false}
+      - SEMANTIC_EMBEDDING_MODEL=${SEMANTIC_EMBEDDING_MODEL:-voyage-code-3}
+      
+      # Reranking settings
+      - RERANKING_ENABLED=${RERANKING_ENABLED:-true}
+      - RERANKER_TYPE=${RERANKER_TYPE:-hybrid}
+      
+    stdin_open: true
+    tty: true
+    networks:
+      - mcp-network
+
+  # Optional: Redis for caching
+  redis:
+    image: redis:7-alpine
+    container_name: code-index-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    networks:
+      - mcp-network
+    profiles:
+      - with-cache
+
+  # Optional: Qdrant for vector search
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: code-index-qdrant
+    restart: unless-stopped
+    volumes:
+      - qdrant-data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    networks:
+      - mcp-network
+    profiles:
+      - with-vectors
+
+networks:
+  mcp-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+  qdrant-data:

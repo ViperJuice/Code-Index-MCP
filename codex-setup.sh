@@ -210,6 +210,13 @@ install_python_deps() {
             "prometheus-client>=0.17.0"
     fi
     
+    # Install MCP-specific dependencies
+    log "Installing MCP-specific dependencies..."
+    python3 -m pip install --no-cache-dir \
+        "mcp>=1.9.0" \
+        "voyageai>=0.2.0" \
+        "qdrant-client>=1.7.0"
+    
     # Install the project in development mode
     if [[ -f "pyproject.toml" ]]; then
         log "Installing project in development mode..."

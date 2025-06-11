@@ -1,0 +1,139 @@
+@startuml Contextual Embeddings System
+!include shared_interfaces.puml
+
+package "Contextual Embedding System" {
+    class ContextualEmbeddingEngine {
+        - embedder: VoyageEmbedder
+        - contextBuilder: ContextBuilder
+        - cache: EmbeddingCache
+        + embedChunk(chunk: DocumentChunk): float[]
+        + embedWithContext(content, context): float[]
+        + batchEmbed(chunks: DocumentChunk[]): float[][]
+    }
+    
+    class ContextBuilder {
+        - summaryGenerator: TextSummarizer
+        + buildContext(chunk: DocumentChunk): ContextualText
+        + generateSummary(text: string, maxLen: int): string
+        + extractSectionPath(chunk): string[]
+        + mergeContextWindows(before, content, after): string
+    }
+    
+    class ContextualText {
+        + documentTitle: string
+        + sectionPath: string[]
+        + contextBefore: string
+        + mainContent: string
+        + contextAfter: string
+        + metadata: dict
+        + toString(): string
+    }
+    
+    class AdaptiveChunker {
+        - strategies: Map<string, ChunkStrategy>
+        + chunkDocument(doc: Document): DocumentChunk[]
+        + selectStrategy(doc): ChunkStrategy
+        + applyOverlap(chunks): DocumentChunk[]
+        + validateChunks(chunks): bool
+    }
+    
+    abstract class ChunkStrategy {
+        # targetSize: int
+        # overlapSize: int
+        + {abstract} chunk(content): Chunk[]
+        + {abstract} findBoundaries(content): int[]
+        # preserveContext(chunk): Chunk
+    }
+    
+    class SimpleChunkStrategy {
+        + chunk(content): Chunk[]
+        + findBoundaries(content): int[]
+        - splitBySize(content): string[]
+    }
+    
+    class HierarchicalChunkStrategy {
+        - sectionParser: SectionParser
+        + chunk(content): Chunk[]
+        + findBoundaries(content): int[]
+        - splitBySections(content): Section[]
+        - balanceSectionSizes(sections): Chunk[]
+    }
+    
+    class SemanticChunkStrategy {
+        - topicModeler: TopicModeler
+        - sentenceEncoder: SentenceTransformer
+        + chunk(content): Chunk[]
+        + findBoundaries(content): int[]
+        - clusterBySimilarity(sentences): Cluster[]
+        - optimizeClusterSizes(clusters): Chunk[]
+    }
+    
+    class EmbeddingCache {
+        - storage: RedisCache
+        - ttl: int
+        + get(key: string): float[]
+        + set(key: string, embedding: float[])
+        + batch_get(keys: string[]): Map<string, float[]>
+        + invalidate(pattern: string)
+    }
+}
+
+package "Hybrid Search System" {
+    class HybridSearchEngine {
+        - bm25Index: BM25Index
+        - vectorStore: QdrantClient
+        - reranker: CrossEncoderReranker
+        + search(query: string, options): SearchResult[]
+        - searchBM25(query): BM25Result[]
+        - searchVector(query): VectorResult[]
+        - mergeResults(bm25, vector): CombinedResult[]
+    }
+    
+    class BM25Index {
+        - sqliteStore: SQLiteStore
+        + index(chunks: DocumentChunk[])
+        + search(query: string, limit: int): BM25Result[]
+        + updateIndex(chunk: DocumentChunk)
+        + getTermFrequencies(query): Map<string, float>
+    }
+    
+    class CrossEncoderReranker {
+        - model: CrossEncoderModel
+        - batchSize: int
+        + rerank(query: string, candidates: Result[]): Result[]
+        + scoreCandidate(query, candidate): float
+        + batchScore(query, candidates): float[]
+    }
+    
+    class SearchResult {
+        + chunkId: string
+        + content: string
+        + contextualContent: string
+        + score: float
+        + bm25Score: float
+        + vectorScore: float
+        + rerankScore: float
+        + metadata: ResultMetadata
+    }
+}
+
+' Relationships
+ContextualEmbeddingEngine --> ContextBuilder : uses
+ContextualEmbeddingEngine --> EmbeddingCache : caches in
+ContextBuilder --> ContextualText : creates
+AdaptiveChunker --> ChunkStrategy : selects
+
+SimpleChunkStrategy --|> ChunkStrategy
+HierarchicalChunkStrategy --|> ChunkStrategy
+SemanticChunkStrategy --|> ChunkStrategy
+
+HybridSearchEngine --> BM25Index : searches
+HybridSearchEngine --> ContextualEmbeddingEngine : uses
+HybridSearchEngine --> CrossEncoderReranker : reranks with
+
+' External dependencies
+ContextualEmbeddingEngine ..> VoyageAI : embeds with
+BM25Index ..> SQLiteStore : queries
+HybridSearchEngine ..> QdrantClient : searches vectors
+
+@enduml

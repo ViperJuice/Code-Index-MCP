@@ -47,6 +47,16 @@ from .semantic_chunker import (
     create_semantic_chunker
 )
 
+from .contextual_embeddings import (
+    ContextualEmbeddingService,
+    DocumentCategory,
+    ContextGenerationMetrics,
+    ContextPromptTemplate,
+    PromptTemplateRegistry,
+    ContextCache,
+    create_contextual_embedding_service
+)
+
 __all__ = [
     'BaseDocumentPlugin',
     'DocumentMetadata',
@@ -81,5 +91,12 @@ __all__ = [
     'SemanticBoundaryDetector',
     'HierarchicalChunker',
     'MetadataPreserver',
-    'create_semantic_chunker'
+    'create_semantic_chunker',
+    'ContextualEmbeddingService',
+    'DocumentCategory',
+    'ContextGenerationMetrics',
+    'ContextPromptTemplate',
+    'PromptTemplateRegistry',
+    'ContextCache',
+    'create_contextual_embedding_service'
 ]

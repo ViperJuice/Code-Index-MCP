@@ -9,6 +9,10 @@ dependencies = [
   "tree-sitter>=0.20.0",
   "tree-sitter-languages>=1.8.0",
   "jedi>=0.19.0",
+  "mcp>=1.9.0",
+  "voyageai>=0.2.0",
+  "qdrant-client>=1.7.0",
+  "python-dotenv>=1.0.0",
 ]
 
 [build-system]

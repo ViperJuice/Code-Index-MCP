@@ -345,5 +345,112 @@ def restore(backup_dir: str):
         click.echo("❌ No backup files found to restore")
 
 
+@index.command()
+def check_semantic():
+    """Check semantic search configuration and status."""
+    click.echo("Semantic Search Configuration Check")
+    click.echo("=" * 40)
+    
+    # Check API keys
+    voyage_key = os.environ.get('VOYAGE_API_KEY') or os.environ.get('VOYAGE_AI_API_KEY')
+    semantic_enabled = os.environ.get('SEMANTIC_SEARCH_ENABLED', 'false').lower() == 'true'
+    
+    click.echo("\n📋 Environment Variables:")
+    click.echo(f"  VOYAGE_AI_API_KEY: {'✅ Set' if voyage_key else '❌ Not set'}")
+    if voyage_key:
+        click.echo(f"    Key prefix: {voyage_key[:10]}...")
+    click.echo(f"  SEMANTIC_SEARCH_ENABLED: {'✅ true' if semantic_enabled else '❌ false'}")
+    
+    # Check .env file
+    env_file = Path(".env")
+    if env_file.exists():
+        click.echo(f"\n📄 .env file: ✅ Found")
+        try:
+            with open(env_file, 'r') as f:
+                content = f.read()
+                if 'VOYAGE_AI_API_KEY' in content or 'VOYAGE_API_KEY' in content:
+                    click.echo("    Contains API key configuration")
+                if 'SEMANTIC_SEARCH_ENABLED' in content:
+                    click.echo("    Contains semantic search setting")
+        except Exception as e:
+            click.echo(f"    ⚠️ Could not read .env file: {e}")
+    else:
+        click.echo(f"\n📄 .env file: ❌ Not found")
+    
+    # Check .mcp.json configurations
+    mcp_json = Path(".mcp.json")
+    mcp_local_json = Path(".mcp.local.json")
+    
+    if mcp_local_json.exists():
+        click.echo(f"\n📄 .mcp.local.json: ✅ Found")
+        try:
+            with open(mcp_local_json, 'r') as f:
+                config = json.load(f)
+                servers = config.get('mcpServers', {})
+                if 'code-index-mcp' in servers:
+                    env_vars = servers['code-index-mcp'].get('env', {})
+                    if 'VOYAGE_AI_API_KEY' in env_vars:
+                        click.echo("    ✅ Contains API key configuration")
+                    if env_vars.get('SEMANTIC_SEARCH_ENABLED') == 'true':
+                        click.echo("    ✅ Semantic search enabled")
+        except Exception as e:
+            click.echo(f"    ⚠️ Could not read .mcp.local.json: {e}")
+    
+    # Test Voyage AI connection
+    click.echo("\n🧪 Testing Voyage AI Connection:")
+    if voyage_key:
+        try:
+            import voyageai
+            client = voyageai.Client(api_key=voyage_key)
+            # Try a simple embedding
+            result = client.embed(
+                ["test"],
+                model="voyage-code-3",
+                input_type="document"
+            )
+            click.echo("  ✅ Successfully connected to Voyage AI")
+            click.echo(f"  ✅ Model: voyage-code-3")
+            click.echo(f"  ✅ Embedding dimension: {len(result.embeddings[0])}")
+        except Exception as e:
+            click.echo(f"  ❌ Failed to connect: {e}")
+    else:
+        click.echo("  ❌ Cannot test - no API key configured")
+    
+    # Configuration recommendations
+    click.echo("\n💡 Configuration Methods:")
+    if not voyage_key:
+        click.echo("\n1. Claude Code (.mcp.json):")
+        click.echo('   Create .mcp.json with:')
+        click.echo('   {')
+        click.echo('     "mcpServers": {')
+        click.echo('       "code-index-mcp": {')
+        click.echo('         "command": "uvicorn",')
+        click.echo('         "args": ["mcp_server.gateway:app"],')
+        click.echo('         "env": {')
+        click.echo('           "VOYAGE_AI_API_KEY": "your-key-here",')
+        click.echo('           "SEMANTIC_SEARCH_ENABLED": "true"')
+        click.echo('         }')
+        click.echo('       }')
+        click.echo('     }')
+        click.echo('   }')
+        click.echo('\n2. Environment File (.env):')
+        click.echo('   VOYAGE_AI_API_KEY=your-key-here')
+        click.echo('   SEMANTIC_SEARCH_ENABLED=true')
+        click.echo('\n3. Get API Key:')
+        click.echo('   Visit https://www.voyageai.com/')
+    
+    # Overall status
+    click.echo("\n📊 Overall Status:")
+    if voyage_key and semantic_enabled:
+        click.echo("  ✅ Semantic search is fully configured and ready!")
+    elif voyage_key and not semantic_enabled:
+        click.echo("  ⚠️ API key is set but semantic search is disabled")
+        click.echo("     Set SEMANTIC_SEARCH_ENABLED=true to enable")
+    elif not voyage_key and semantic_enabled:
+        click.echo("  ❌ Semantic search is enabled but no API key is configured")
+    else:
+        click.echo("  ❌ Semantic search is not configured")
+
+
 if __name__ == '__main__':
     index()

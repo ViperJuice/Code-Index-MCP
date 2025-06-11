@@ -8,10 +8,12 @@ for efficient full-text search capabilities.
 import sqlite3
 import json
 import logging
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, Union
 from datetime import datetime
 from pathlib import Path
 from contextlib import contextmanager
+
+from ..core.path_resolver import PathResolver
 
 logger = logging.getLogger(__name__)
 
@@ -19,21 +21,27 @@ logger = logging.getLogger(__name__)
 class SQLiteStore:
     """SQLite-based storage implementation with FTS5 support."""
     
-    def __init__(self, db_path: str = "code_index.db"):
+    def __init__(self, db_path: str = "code_index.db", path_resolver: Optional[PathResolver] = None):
         """
         Initialize the SQLite store.
         
         Args:
             db_path: Path to the SQLite database file
+            path_resolver: PathResolver instance for path management
         """
         self.db_path = db_path
+        self.path_resolver = path_resolver or PathResolver()
         self._init_database()
+        self._run_migrations()
     
     def _init_database(self):
         """Initialize database and create schema if needed."""
         with self._get_connection() as conn:
             # Enable foreign keys
             conn.execute("PRAGMA foreign_keys = ON")
+            
+            # Enable FTS5 if available
+            self._check_fts5_support(conn)
             
             # Check if schema exists
             cursor = conn.execute(
@@ -44,6 +52,34 @@ class SQLiteStore:
                 logger.info(f"Initialized database schema at {self.db_path}")
             else:
                 logger.info(f"Using existing database at {self.db_path}")
+    
+    def _run_migrations(self):
+        """Run any pending database migrations."""
+        migrations_dir = Path(__file__).parent / "migrations"
+        if not migrations_dir.exists():
+            return
+        
+        with self._get_connection() as conn:
+            # Get current schema version
+            try:
+                cursor = conn.execute("SELECT MAX(version) FROM schema_version")
+                current_version = cursor.fetchone()[0] or 0
+            except sqlite3.OperationalError:
+                current_version = 0
+            
+            # Run migrations
+            for migration_file in sorted(migrations_dir.glob("*.sql")):
+                # Extract version from filename (e.g., "002_relative_paths.sql" -> 2)
+                try:
+                    version = int(migration_file.stem.split('_')[0])
+                except (ValueError, IndexError):
+                    continue
+                
+                if version > current_version:
+                    logger.info(f"Running migration {migration_file.name}")
+                    with open(migration_file, 'r') as f:
+                        conn.executescript(f.read())
+                    logger.info(f"Completed migration to version {version}")
     
     @contextmanager
     def _get_connection(self):
@@ -58,6 +94,21 @@ class SQLiteStore:
             raise
         finally:
             conn.close()
+    
+    def _check_fts5_support(self, conn: sqlite3.Connection) -> bool:
+        """Check if FTS5 is supported in this SQLite build."""
+        try:
+            cursor = conn.execute("PRAGMA compile_options;")
+            options = [row[0] for row in cursor]
+            fts5_enabled = any('ENABLE_FTS5' in option for option in options)
+            if fts5_enabled:
+                logger.info("FTS5 support confirmed")
+            else:
+                logger.warning("FTS5 may not be available in this SQLite build")
+            return fts5_enabled
+        except Exception as e:
+            logger.warning(f"Could not check FTS5 support: {e}")
+            return False
     
     def _init_schema(self, conn: sqlite3.Connection):
         """Initialize the database schema."""
@@ -294,49 +345,77 @@ class SQLiteStore:
             return dict(row) if row else None
     
     # File operations
-    def store_file(self, repository_id: int, path: str, relative_path: str,
+    def store_file(self, repository_id: int, file_path: Union[str, Path],
                    language: Optional[str] = None, size: Optional[int] = None,
-                   hash: Optional[str] = None, metadata: Optional[Dict] = None) -> int:
-        """Store file information."""
+                   metadata: Optional[Dict] = None) -> int:
+        """Store file information using relative paths and content hashes."""
+        # Convert to Path object and normalize
+        path = Path(file_path)
+        
+        # Compute relative path
+        relative_path = self.path_resolver.normalize_path(path)
+        
+        # Compute content hash
+        content_hash = self.path_resolver.compute_content_hash(path)
+        
         with self._get_connection() as conn:
+            # Check if file already exists with same content hash
+            existing = self.get_file_by_content_hash(content_hash, repository_id)
+            if existing and existing['relative_path'] != relative_path:
+                # File moved - record the move
+                self.move_file(existing['relative_path'], relative_path, repository_id, content_hash)
+                return existing['id']
+            
+            # Store using relative path as primary identifier
             cursor = conn.execute(
                 """INSERT INTO files 
-                   (repository_id, path, relative_path, language, size, hash, 
-                    last_modified, indexed_at, metadata)
-                   VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?)
-                   ON CONFLICT(repository_id, path) DO UPDATE SET
-                   relative_path=excluded.relative_path,
+                   (repository_id, path, relative_path, language, size, hash, content_hash,
+                    last_modified, indexed_at, metadata, is_deleted)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, FALSE)
+                   ON CONFLICT(repository_id, relative_path) DO UPDATE SET
+                   path=excluded.path,
                    language=excluded.language,
                    size=excluded.size,
                    hash=excluded.hash,
+                   content_hash=excluded.content_hash,
                    last_modified=CURRENT_TIMESTAMP,
                    indexed_at=CURRENT_TIMESTAMP,
-                   metadata=excluded.metadata""",
-                (repository_id, path, relative_path, language, size, hash, 
+                   metadata=excluded.metadata,
+                   is_deleted=FALSE,
+                   deleted_at=NULL""",
+                (repository_id, str(path), relative_path, language, size, 
+                 self.path_resolver.compute_file_hash(path), content_hash,
                  json.dumps(metadata or {}))
             )
             if cursor.lastrowid:
                 return cursor.lastrowid
             else:
-                # If lastrowid is None, it means we updated an existing row
                 # Get the id of the existing file
                 cursor = conn.execute(
-                    "SELECT id FROM files WHERE repository_id = ? AND path = ?", 
-                    (repository_id, path)
+                    "SELECT id FROM files WHERE repository_id = ? AND relative_path = ?", 
+                    (repository_id, relative_path)
                 )
                 return cursor.fetchone()[0]
     
-    def get_file(self, file_path: str, repository_id: Optional[int] = None) -> Optional[Dict]:
-        """Get file by path."""
+    def get_file(self, file_path: Union[str, Path], repository_id: Optional[int] = None) -> Optional[Dict]:
+        """Get file by path (relative or absolute)."""
+        # Try to normalize path if it's absolute
+        try:
+            relative_path = self.path_resolver.normalize_path(file_path)
+        except ValueError:
+            # Path might already be relative
+            relative_path = str(file_path).replace('\\', '/')
+        
         with self._get_connection() as conn:
             if repository_id:
                 cursor = conn.execute(
-                    "SELECT * FROM files WHERE path = ? AND repository_id = ?",
-                    (file_path, repository_id)
+                    "SELECT * FROM files WHERE relative_path = ? AND repository_id = ? AND is_deleted = FALSE",
+                    (relative_path, repository_id)
                 )
             else:
                 cursor = conn.execute(
-                    "SELECT * FROM files WHERE path = ?", (file_path,)
+                    "SELECT * FROM files WHERE relative_path = ? AND is_deleted = FALSE", 
+                    (relative_path,)
                 )
             row = cursor.fetchone()
             return dict(row) if row else None
@@ -592,3 +671,287 @@ class SQLiteStore:
                 cursor = conn.execute(f"SELECT COUNT(*) FROM {table}")
                 stats[table] = cursor.fetchone()[0]
         return stats
+    
+    # Enhanced FTS5 search methods for BM25
+    
+    def search_bm25(self, query: str, table: str = 'fts_code', 
+                    limit: int = 20, offset: int = 0,
+                    columns: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """
+        Perform BM25 search using FTS5.
+        
+        Args:
+            query: FTS5 query string
+            table: FTS table to search
+            limit: Maximum results
+            offset: Result offset for pagination
+            columns: Specific columns to return
+            
+        Returns:
+            List of search results with BM25 scores
+        """
+        with self._get_connection() as conn:
+            # Default columns if not specified
+            if not columns:
+                columns = ['*', f'bm25({table}) as score']
+            else:
+                columns = columns + [f'bm25({table}) as score']
+            
+            columns_str = ', '.join(columns)
+            
+            cursor = conn.execute(f"""
+                SELECT {columns_str}
+                FROM {table}
+                WHERE {table} MATCH ?
+                ORDER BY bm25({table})
+                LIMIT ? OFFSET ?
+            """, (query, limit, offset))
+            
+            results = []
+            for row in cursor:
+                results.append(dict(row))
+            
+            return results
+    
+    def search_bm25_with_snippets(self, query: str, table: str = 'fts_code',
+                                  content_column: int = 0,
+                                  limit: int = 20) -> List[Dict[str, Any]]:
+        """
+        Search with BM25 and return snippets.
+        
+        Args:
+            query: FTS5 query string
+            table: FTS table to search
+            content_column: Column index for snippet extraction
+            limit: Maximum results
+            
+        Returns:
+            List of results with snippets
+        """
+        with self._get_connection() as conn:
+            cursor = conn.execute(f"""
+                SELECT 
+                    *,
+                    snippet({table}, {content_column}, '<mark>', '</mark>', '...', 32) as snippet,
+                    bm25({table}) as score
+                FROM {table}
+                WHERE {table} MATCH ?
+                ORDER BY bm25({table})
+                LIMIT ?
+            """, (query, limit))
+            
+            results = []
+            for row in cursor:
+                results.append(dict(row))
+            
+            return results
+    
+    def search_bm25_with_highlight(self, query: str, table: str = 'fts_code',
+                                   highlight_column: int = 0,
+                                   limit: int = 20) -> List[Dict[str, Any]]:
+        """
+        Search with BM25 and return highlighted content.
+        
+        Args:
+            query: FTS5 query string
+            table: FTS table to search
+            highlight_column: Column index for highlighting
+            limit: Maximum results
+            
+        Returns:
+            List of results with highlighted content
+        """
+        with self._get_connection() as conn:
+            cursor = conn.execute(f"""
+                SELECT 
+                    *,
+                    highlight({table}, {highlight_column}, '<b>', '</b>') as highlighted,
+                    bm25({table}) as score
+                FROM {table}
+                WHERE {table} MATCH ?
+                ORDER BY bm25({table})
+                LIMIT ?
+            """, (query, limit))
+            
+            results = []
+            for row in cursor:
+                results.append(dict(row))
+            
+            return results
+    
+    def get_bm25_term_statistics(self, term: str, table: str = 'fts_code') -> Dict[str, Any]:
+        """
+        Get term statistics for BM25 tuning.
+        
+        Args:
+            term: Term to analyze
+            table: FTS table to search
+            
+        Returns:
+            Dictionary with term statistics
+        """
+        with self._get_connection() as conn:
+            # Get document frequency
+            cursor = conn.execute(f"""
+                SELECT COUNT(*) FROM {table}
+                WHERE {table} MATCH ?
+            """, (term,))
+            doc_freq = cursor.fetchone()[0]
+            
+            # Get total documents
+            cursor = conn.execute(f"SELECT COUNT(*) FROM {table}")
+            total_docs = cursor.fetchone()[0]
+            
+            # Get average document length (approximation)
+            cursor = conn.execute(f"""
+                SELECT AVG(LENGTH(content)) FROM {table}
+            """)
+            avg_doc_length = cursor.fetchone()[0] or 0
+            
+            return {
+                'term': term,
+                'document_frequency': doc_freq,
+                'total_documents': total_docs,
+                'idf': self._calculate_idf(doc_freq, total_docs),
+                'average_document_length': avg_doc_length
+            }
+    
+    def _calculate_idf(self, doc_freq: int, total_docs: int) -> float:
+        """Calculate Inverse Document Frequency."""
+        import math
+        if doc_freq == 0:
+            return 0
+        return math.log((total_docs - doc_freq + 0.5) / (doc_freq + 0.5))
+    
+    def optimize_fts_tables(self):
+        """Optimize all FTS5 tables for better performance."""
+        with self._get_connection() as conn:
+            # Get all FTS5 tables
+            cursor = conn.execute("""
+                SELECT name FROM sqlite_master 
+                WHERE type='table' AND sql LIKE '%USING fts5%'
+            """)
+            
+            fts_tables = [row[0] for row in cursor]
+            
+            for table in fts_tables:
+                try:
+                    conn.execute(f"INSERT INTO {table}({table}) VALUES('optimize')")
+                    logger.info(f"Optimized FTS5 table: {table}")
+                except Exception as e:
+                    logger.warning(f"Could not optimize {table}: {e}")
+    
+    def rebuild_fts_tables(self):
+        """Rebuild all FTS5 tables."""
+        with self._get_connection() as conn:
+            # Get all FTS5 tables
+            cursor = conn.execute("""
+                SELECT name FROM sqlite_master 
+                WHERE type='table' AND sql LIKE '%USING fts5%'
+            """)
+            
+            fts_tables = [row[0] for row in cursor]
+            
+            for table in fts_tables:
+                try:
+                    conn.execute(f"INSERT INTO {table}({table}) VALUES('rebuild')")
+                    logger.info(f"Rebuilt FTS5 table: {table}")
+                except Exception as e:
+                    logger.warning(f"Could not rebuild {table}: {e}")
+    
+    # New file operation methods for path management
+    def get_file_by_content_hash(self, content_hash: str, repository_id: int) -> Optional[Dict]:
+        """Get file by content hash."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """SELECT * FROM files 
+                   WHERE content_hash = ? AND repository_id = ? AND is_deleted = FALSE
+                   ORDER BY indexed_at DESC LIMIT 1""",
+                (content_hash, repository_id)
+            )
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    
+    def mark_file_deleted(self, relative_path: str, repository_id: int):
+        """Mark a file as deleted (soft delete)."""
+        with self._get_connection() as conn:
+            conn.execute(
+                """UPDATE files 
+                   SET is_deleted = TRUE, deleted_at = CURRENT_TIMESTAMP
+                   WHERE relative_path = ? AND repository_id = ?""",
+                (relative_path, repository_id)
+            )
+            logger.info(f"Marked file as deleted: {relative_path}")
+    
+    def remove_file(self, relative_path: str, repository_id: int):
+        """Remove file and all associated data (hard delete)."""
+        with self._get_connection() as conn:
+            # Get file ID first
+            cursor = conn.execute(
+                "SELECT id FROM files WHERE relative_path = ? AND repository_id = ?",
+                (relative_path, repository_id)
+            )
+            row = cursor.fetchone()
+            if not row:
+                logger.warning(f"File not found for removal: {relative_path}")
+                return
+            
+            file_id = row[0]
+            
+            # Delete all associated data (cascade should handle most)
+            conn.execute("DELETE FROM symbol_references WHERE file_id = ?", (file_id,))
+            conn.execute("DELETE FROM imports WHERE file_id = ?", (file_id,))
+            conn.execute("DELETE FROM embeddings WHERE file_id = ?", (file_id,))
+            conn.execute("DELETE FROM fts_code WHERE file_id = ?", (file_id,))
+            conn.execute("DELETE FROM symbols WHERE file_id = ?", (file_id,))
+            conn.execute("DELETE FROM files WHERE id = ?", (file_id,))
+            
+            logger.info(f"Removed file and all associated data: {relative_path}")
+    
+    def move_file(self, old_path: str, new_path: str, repository_id: int, content_hash: str):
+        """Record a file move operation."""
+        with self._get_connection() as conn:
+            # Update the file path
+            conn.execute(
+                """UPDATE files 
+                   SET relative_path = ?, path = ?
+                   WHERE relative_path = ? AND repository_id = ?""",
+                (new_path, new_path, old_path, repository_id)
+            )
+            
+            # Record the move
+            conn.execute(
+                """INSERT INTO file_moves 
+                   (repository_id, old_relative_path, new_relative_path, content_hash, move_type)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (repository_id, old_path, new_path, content_hash, 'rename')
+            )
+            
+            logger.info(f"Recorded file move: {old_path} -> {new_path}")
+    
+    def cleanup_deleted_files(self, days_old: int = 30):
+        """Clean up files marked as deleted for more than specified days."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """SELECT COUNT(*) FROM files 
+                   WHERE is_deleted = TRUE 
+                   AND deleted_at < datetime('now', '-' || ? || ' days')""",
+                (days_old,)
+            )
+            count = cursor.fetchone()[0]
+            
+            if count > 0:
+                # Get file IDs for cleanup
+                cursor = conn.execute(
+                    """SELECT id, relative_path FROM files 
+                       WHERE is_deleted = TRUE 
+                       AND deleted_at < datetime('now', '-' || ? || ' days')""",
+                    (days_old,)
+                )
+                
+                for row in cursor:
+                    file_id, path = row
+                    # Use remove_file for thorough cleanup
+                    self.remove_file(path, repository_id=None)
+                
+                logger.info(f"Cleaned up {count} deleted files older than {days_old} days")

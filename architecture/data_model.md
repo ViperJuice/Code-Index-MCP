@@ -22,20 +22,43 @@ CREATE TABLE repositories (
 CREATE TABLE files (
     id INTEGER PRIMARY KEY,
     repository_id INTEGER NOT NULL,
-    path TEXT NOT NULL,
-    relative_path TEXT NOT NULL,
+    path TEXT NOT NULL, -- Absolute path (for backward compatibility)
+    relative_path TEXT NOT NULL, -- Primary identifier for portability
     language TEXT,
     size INTEGER,
-    hash TEXT,
+    hash TEXT, -- File hash (for change detection)
+    content_hash TEXT, -- Content hash (for move detection)
     last_modified TIMESTAMP,
     indexed_at TIMESTAMP,
+    is_deleted BOOLEAN DEFAULT FALSE, -- Soft delete flag
+    deleted_at TIMESTAMP,
     metadata JSON,
     FOREIGN KEY (repository_id) REFERENCES repositories(id),
-    UNIQUE(repository_id, path)
+    UNIQUE(repository_id, relative_path) -- Changed from path to relative_path
 );
 
 CREATE INDEX idx_files_language ON files(language);
 CREATE INDEX idx_files_hash ON files(hash);
+CREATE INDEX idx_files_content_hash ON files(content_hash);
+CREATE INDEX idx_files_deleted ON files(is_deleted);
+CREATE INDEX idx_files_relative_path ON files(relative_path);
+```
+
+### File Move Tracking
+```sql
+CREATE TABLE file_moves (
+    id INTEGER PRIMARY KEY,
+    repository_id INTEGER NOT NULL,
+    old_relative_path TEXT NOT NULL,
+    new_relative_path TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    moved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    move_type TEXT, -- 'rename', 'relocate', 'restructure'
+    FOREIGN KEY (repository_id) REFERENCES repositories(id)
+);
+
+CREATE INDEX idx_moves_content_hash ON file_moves(content_hash);
+CREATE INDEX idx_moves_timestamp ON file_moves(moved_at);
 ```
 
 ### Symbol
@@ -44,7 +67,7 @@ CREATE TABLE symbols (
     id INTEGER PRIMARY KEY,
     file_id INTEGER NOT NULL,
     name TEXT NOT NULL,
-    kind TEXT NOT NULL, -- function, class, variable, etc.
+    kind TEXT NOT NULL, -- function, class, variable, section, paragraph, etc.
     line_start INTEGER NOT NULL,
     line_end INTEGER NOT NULL,
     column_start INTEGER,
@@ -58,6 +81,30 @@ CREATE TABLE symbols (
 CREATE INDEX idx_symbols_name ON symbols(name);
 CREATE INDEX idx_symbols_kind ON symbols(kind);
 CREATE INDEX idx_symbols_file ON symbols(file_id);
+```
+
+### Document Chunks
+```sql
+CREATE TABLE document_chunks (
+    id INTEGER PRIMARY KEY,
+    file_id INTEGER NOT NULL,
+    symbol_id INTEGER,
+    content TEXT NOT NULL,
+    context_before TEXT,  -- Summary of previous chunk
+    context_after TEXT,   -- Summary of next chunk
+    section_path TEXT,    -- JSON array of section hierarchy
+    chunk_index INTEGER NOT NULL,
+    total_chunks INTEGER NOT NULL,
+    chunk_size INTEGER NOT NULL,
+    overlap_size INTEGER,
+    metadata JSON,
+    FOREIGN KEY (file_id) REFERENCES files(id),
+    FOREIGN KEY (symbol_id) REFERENCES symbols(id)
+);
+
+CREATE INDEX idx_chunks_file ON document_chunks(file_id);
+CREATE INDEX idx_chunks_symbol ON document_chunks(symbol_id);
+CREATE INDEX idx_chunks_order ON document_chunks(file_id, chunk_index);
 ```
 
 ### Import/Include
@@ -98,20 +145,46 @@ CREATE INDEX idx_references_file ON references(file_id);
 
 ## Search Indices
 
-### Full-Text Search
+### Full-Text Search with BM25
 ```sql
+-- Symbol search with BM25 ranking
 CREATE VIRTUAL TABLE fts_symbols USING fts5(
     name,
     documentation,
     content=symbols,
-    content_rowid=id
+    content_rowid=id,
+    tokenize='porter unicode61'
 );
 
+-- Code content search
 CREATE VIRTUAL TABLE fts_code USING fts5(
     content,
     file_id UNINDEXED,
     tokenize="trigram"
 );
+
+-- Document chunk search with BM25
+CREATE VIRTUAL TABLE fts_documents USING fts5(
+    content,
+    context_before,
+    context_after,
+    section_path,
+    document_title UNINDEXED,
+    content=document_chunks,
+    content_rowid=id,
+    tokenize='porter unicode61'
+);
+
+-- BM25 search query example
+SELECT 
+    dc.*,
+    bm25(fts_documents) as rank,
+    snippet(fts_documents, 0, '<mark>', '</mark>', '...', 20) as highlight
+FROM document_chunks dc
+JOIN fts_documents ON dc.id = fts_documents.rowid
+WHERE fts_documents MATCH ?
+ORDER BY rank DESC
+LIMIT 20;
 ```
 
 ### Fuzzy Search
@@ -157,7 +230,7 @@ INSERT INTO languages (name, file_extensions, parser_type) VALUES
 
 ## Vector Storage (Qdrant)
 
-### Collection Schema
+### Collection Schema (Updated for Path Management)
 ```json
 {
     "collection_name": "code-embeddings-{language}",
@@ -166,18 +239,29 @@ INSERT INTO languages (name, file_extensions, parser_type) VALUES
         "distance": "Cosine"
     },
     "payload_schema": {
-        "file_path": "keyword",
+        "file_path": "keyword",           // Legacy: absolute path
+        "relative_path": "keyword",       // Primary: relative path
+        "content_hash": "keyword",        // File content hash
+        "chunk_hash": "keyword",          // Chunk-specific hash
+        "repository_id": "integer",       // Link to SQLite
         "symbol_name": "keyword", 
         "symbol_kind": "keyword",
         "language": "keyword",
         "line": "integer",
         "signature": "text",
-        "content": "text"
+        "content": "text",
+        "context_before": "text",
+        "context_after": "text",
+        "section_path": "keyword[]",
+        "chunk_index": "integer",
+        "document_type": "keyword",
+        "indexed_at": "date",
+        "is_deleted": "boolean"           // Soft delete flag
     }
 }
 ```
 
-### Embedding Metadata
+### Contextual Embedding Metadata
 ```json
 {
     "model": "voyage-code-3",
@@ -185,7 +269,44 @@ INSERT INTO languages (name, file_extensions, parser_type) VALUES
     "indexed_at": "2025-06-07T00:00:00Z",
     "file_hash": "sha256:...",
     "language": "python",
-    "symbol_type": "function"
+    "symbol_type": "function",
+    "embedding_type": "contextual",
+    "context_window": {
+        "before": 100,
+        "after": 100
+    },
+    "section_hierarchy": ["API Reference", "Authentication", "JWT"],
+    "chunk_metadata": {
+        "index": 3,
+        "total": 10,
+        "size": 1500,
+        "overlap": 200
+    }
+}
+```
+
+### Hybrid Search Index
+```json
+{
+    "collection_name": "hybrid-search-{document_type}",
+    "vectors": {
+        "contextual": {
+            "size": 1024,
+            "distance": "Cosine"
+        }
+    },
+    "sparse_vectors": {
+        "bm25": {
+            "modifier": "idf"
+        }
+    },
+    "payload_schema": {
+        "content": "text",
+        "bm25_score": "float",
+        "section_path": "keyword[]",
+        "document_id": "keyword",
+        "chunk_id": "keyword"
+    }
 }
 ```
 
@@ -243,6 +364,42 @@ CREATE TABLE parse_cache (
     "metrics": {
         "lines_of_code": 150,
         "cyclomatic_complexity": 10
+    },
+    "document_info": {
+        "type": "markdown",
+        "has_toc": true,
+        "has_code_blocks": true,
+        "sections_count": 12,
+        "max_heading_level": 3,
+        "estimated_reading_time": "5 min"
+    }
+}
+```
+
+### Document Chunk Metadata
+```json
+{
+    "chunk_strategy": "hierarchical",
+    "chunk_params": {
+        "size": 1500,
+        "overlap": 200,
+        "boundary": "section"
+    },
+    "context_generation": {
+        "method": "summarization",
+        "window_size": 100
+    },
+    "section_info": {
+        "title": "Installation Guide",
+        "level": 2,
+        "parent": "Getting Started",
+        "path": ["Getting Started", "Installation Guide"],
+        "has_subsections": true
+    },
+    "quality_metrics": {
+        "coherence_score": 0.92,
+        "completeness": 0.98,
+        "has_complete_sentences": true
     }
 }
 ```

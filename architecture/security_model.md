@@ -3,6 +3,33 @@
 ## Overview
 The MCP Server follows a zero-trust, defense-in-depth security model with local-first design principles.
 
+## Recent Security Enhancements (June 10, 2025)
+
+### Index Export Security
+New security measures for shared index artifacts:
+
+1. **Gitignore-Aware Filtering**
+   - Automatic exclusion of gitignored files from index exports
+   - Prevents accidental sharing of .env files, API keys, and secrets
+   - Configurable exclusion patterns via .mcp-index-ignore
+
+2. **Security Analysis Tools**
+   - `analyze_gitignore_security.py`: Identifies sensitive files in current index
+   - `secure_index_export.py`: Creates filtered exports excluding sensitive data
+   - Audit logging of all excluded files for compliance tracking
+
+3. **Default Security Patterns**
+   ```
+   *.env
+   .env*
+   *.key
+   *.pem
+   *secret*
+   *password*
+   .aws/*
+   .ssh/*
+   ```
+
 ## Security Principles
 
 1. **Local-First**: Minimize attack surface by operating locally
@@ -124,6 +151,32 @@ endpoints = {
 }
 ```
 
+## Contextual Embeddings Security
+
+### API Key Protection
+- **Environment Variables**: Store Claude, Voyage, and Cohere API keys securely
+- **Key Rotation**: Regular rotation schedule for API keys
+- **Access Control**: Restrict API key access to embedding service only
+- **Audit Trail**: Log all API key usage
+
+### Content Security
+- **Pre-Processing Validation**: Scan chunks for sensitive data before API calls
+- **Prompt Injection Prevention**: Sanitize chunk content to prevent malicious prompts
+- **Context Isolation**: Separate context generation per project/workspace
+- **Data Minimization**: Only send necessary content to APIs
+
+### Cost & Usage Protection
+- **Token Budgets**: Configurable limits per project/user
+- **Rate Limiting**: Prevent API abuse and cost overruns
+- **Usage Monitoring**: Real-time tracking with alerts
+- **Fallback Mechanisms**: Graceful degradation without APIs
+
+### Cache Security
+- **Encryption**: AES-256 for cached contexts
+- **TTL Management**: Automatic expiration of cached data
+- **Access Control**: Restrict cache access by user/project
+- **Secure Deletion**: Proper cleanup of expired cache
+
 ## Monitoring & Auditing
 
 ### Security Events
@@ -132,6 +185,9 @@ endpoints = {
 - Suspicious file access patterns
 - Rate limit violations
 - Plugin crashes or timeouts
+- API usage anomalies
+- Context generation failures
+- Token budget exceeded
 
 ### Audit Log Format
 ```json
@@ -176,6 +232,10 @@ endpoints = {
 - [ ] Secure configuration
 - [ ] Access logging enabled
 - [ ] Monitoring configured
+- [ ] API keys secured in environment
+- [ ] Context cache encryption enabled
+- [ ] Token budgets configured
+- [ ] Prompt injection detection active
 
 ### Operations
 - [ ] Regular security updates

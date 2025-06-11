@@ -35,7 +35,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Initialize the MCP server
-server = Server("code-index-mcp")
+server = Server("code-index-mcp-fast-search")
 
 # Global instances
 dispatcher: EnhancedDispatcher | None = None
@@ -131,7 +131,7 @@ async def list_tools() -> list[types.Tool]:
     return [
         types.Tool(
             name="symbol_lookup",
-            description="Look up a symbol definition in the codebase",
+            description="[MCP-FIRST] Look up symbol definitions. ALWAYS use this before grep/find for symbol searches. Returns exact file location with line number. Usage: offset=(line-1) for direct navigation.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -145,7 +145,7 @@ async def list_tools() -> list[types.Tool]:
         ),
         types.Tool(
             name="search_code",
-            description="Search for code in the codebase",
+            description="[MCP-FIRST] Search code patterns. ALWAYS use this before grep/find for content searches. Returns snippets with line numbers. Usage: offset=(line-1) for context.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -169,7 +169,7 @@ async def list_tools() -> list[types.Tool]:
         ),
         types.Tool(
             name="get_status",
-            description="Get the status of the code index server",
+            description="Get the status of the code index server. Shows index health, supported languages, and performance statistics.",
             inputSchema={
                 "type": "object",
                 "properties": {}
@@ -177,7 +177,7 @@ async def list_tools() -> list[types.Tool]:
         ),
         types.Tool(
             name="list_plugins",
-            description="List all loaded plugins",
+            description="List all loaded plugins. Shows 48 supported languages with specialized and generic plugin information.",
             inputSchema={
                 "type": "object",
                 "properties": {}
@@ -185,7 +185,7 @@ async def list_tools() -> list[types.Tool]:
         ),
         types.Tool(
             name="reindex",
-            description="Reindex files in the codebase",
+            description="Reindex files in the codebase. Updates the index for changed files or specific paths.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -213,7 +213,7 @@ async def call_tool(name: str, arguments: dict | None) -> Sequence[types.TextCon
             
             result = dispatcher.lookup(symbol)
             if result:
-                return [types.TextContent(type="text", text=json.dumps({
+                response_data = {
                     "symbol": result.get("symbol"),
                     "kind": result.get("kind"),
                     "language": result.get("language"),
@@ -222,7 +222,14 @@ async def call_tool(name: str, arguments: dict | None) -> Sequence[types.TextCon
                     "defined_in": result.get("defined_in"),
                     "line": result.get("line"),
                     "span": result.get("span")
-                }, indent=2))]
+                }
+                
+                # Add navigation hint if line number is available
+                if result.get("line") and result.get("defined_in"):
+                    offset = result.get("line", 1) - 1
+                    response_data["_usage_hint"] = f"To view definition: Read(file_path='{result.get('defined_in')}', offset={offset}, limit=20)"
+                
+                return [types.TextContent(type="text", text=json.dumps(response_data, indent=2))]
             else:
                 return [types.TextContent(type="text", text=f"Symbol '{symbol}' not found")]
         
@@ -239,11 +246,19 @@ async def call_tool(name: str, arguments: dict | None) -> Sequence[types.TextCon
             if results:
                 results_data = []
                 for r in results:
-                    results_data.append({
+                    result_item = {
                         "file": r.get("file"),
                         "line": r.get("line"),
                         "snippet": r.get("snippet")
-                    })
+                    }
+                    
+                    # Add navigation hint if line number is available
+                    if r.get("line") and r.get("file"):
+                        offset = r.get("line", 1) - 1
+                        result_item["_usage_hint"] = f"For more context: Read(file_path='{r.get('file')}', offset={offset}, limit=30)"
+                    
+                    results_data.append(result_item)
+                    
                 return [types.TextContent(type="text", text=json.dumps(results_data, indent=2))]
             else:
                 return [types.TextContent(type="text", text="No results found")]
@@ -343,39 +358,41 @@ async def call_tool(name: str, arguments: dict | None) -> Sequence[types.TextCon
                 if not target_path.exists():
                     return [types.TextContent(type="text", text=f"Error: Path not found: {path}")]
                 
-                indexed_count = 0
                 if target_path.is_file():
-                    dispatcher.index_file(target_path)
-                    indexed_count = 1
+                    # Single file - use index_file
+                    try:
+                        dispatcher.index_file(target_path)
+                        return [types.TextContent(type="text", text=f"Reindexed file: {path}")]
+                    except Exception as e:
+                        return [types.TextContent(type="text", text=f"Error reindexing {path}: {str(e)}")]
                 else:
-                    # Directory - find all supported files
-                    for file_path in target_path.rglob("*"):
-                        if file_path.is_file():
-                            try:
-                                for plugin in dispatcher._plugins:
-                                    if plugin.supports(file_path):
-                                        dispatcher.index_file(file_path)
-                                        indexed_count += 1
-                                        break
-                            except Exception as e:
-                                logger.warning(f"Failed to index {file_path}: {e}")
-                
-                return [types.TextContent(type="text", text=f"Reindexed {indexed_count} files in {path}")]
+                    # Directory - use index_directory which handles ignore patterns
+                    stats = dispatcher.index_directory(target_path, recursive=True)
+                    
+                    response_data = {
+                        "path": str(target_path),
+                        "indexed_files": stats["indexed_files"],
+                        "ignored_files": stats["ignored_files"],
+                        "failed_files": stats["failed_files"],
+                        "total_files": stats["total_files"],
+                        "by_language": stats["by_language"]
+                    }
+                    
+                    return [types.TextContent(type="text", text=json.dumps(response_data, indent=2))]
             else:
-                # Reindex all files
-                indexed_count = 0
-                for file_path in Path(".").rglob("*"):
-                    if file_path.is_file():
-                        try:
-                            for plugin in dispatcher._plugins:
-                                if plugin.supports(file_path):
-                                    dispatcher.index_file(file_path)
-                                    indexed_count += 1
-                                    break
-                        except Exception as e:
-                            logger.warning(f"Failed to index {file_path}: {e}")
+                # Reindex all files in current directory
+                stats = dispatcher.index_directory(Path("."), recursive=True)
                 
-                return [types.TextContent(type="text", text=f"Reindexed {indexed_count} files")]
+                response_data = {
+                    "path": ".",
+                    "indexed_files": stats["indexed_files"],
+                    "ignored_files": stats["ignored_files"],
+                    "failed_files": stats["failed_files"],
+                    "total_files": stats["total_files"],
+                    "by_language": stats["by_language"]
+                }
+                
+                return [types.TextContent(type="text", text=json.dumps(response_data, indent=2))]
         
         else:
             return [types.TextContent(type="text", text=f"Unknown tool: {name}")]

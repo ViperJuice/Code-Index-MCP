@@ -17,6 +17,12 @@ Modular, extensible local-first code indexer designed to enhance Claude Code and
 - **📊 Rich Code Intelligence**: Symbol resolution, type inference, dependency tracking
 - **📦 Portable Index Management**: Zero-cost index sharing via GitHub Artifacts
 - **🔄 Automatic Index Sync**: Pull indexes on clone, push on changes
+- **🎯 Smart Result Reranking**: Multi-strategy reranking for improved relevance
+- **🔒 Security-Aware Export**: Automatic filtering of sensitive files from shared indexes
+- **🔍 Hybrid Search**: BM25 + semantic search with configurable fusion
+- **🔐 Index Everything Locally**: Search .env files and secrets on your machine
+- **🚫 Smart Filtering on Share**: .gitignore and .mcp-index-ignore patterns applied only during export
+- **🌐 Multi-Language Indexing**: Index entire repositories with mixed languages
 
 ## 🏗️ Architecture
 
@@ -144,6 +150,61 @@ MCP_WORKSPACE_ROOT=.
 MCP_MAX_FILE_SIZE=10485760  # 10MB
 ```
 
+## 🆕 Advanced Features
+
+### Search Result Reranking
+
+The system includes multiple reranking strategies to improve search relevance:
+
+```python
+# Configure reranking in your searches
+from mcp_server.indexer.reranker import RerankConfig, TFIDFReranker
+
+config = RerankConfig(
+    enabled=True,
+    reranker=TFIDFReranker(),  # Or CohereReranker(), CrossEncoderReranker()
+    top_k=20
+)
+
+# Search with reranking
+results = await search_engine.search(query, rerank_config=config)
+```
+
+**Available Rerankers:**
+- **TF-IDF**: Fast, local reranking using term frequency
+- **Cohere**: Cloud-based neural reranking (requires API key)
+- **Cross-Encoder**: Local transformer-based reranking
+- **Hybrid**: Combines multiple rerankers with fallback
+
+### Security-Aware Index Sharing
+
+Prevent accidental sharing of sensitive files:
+
+```bash
+# Analyze current index for security issues
+python analyze_gitignore_security.py
+
+# Create secure index export (filters gitignored files)
+python secure_index_export.py
+
+# The secure export will:
+# - Exclude all gitignored files
+# - Remove sensitive patterns (*.env, *.key, etc.)
+# - Create audit logs of excluded files
+```
+
+### BM25 Hybrid Search
+
+Combines traditional full-text search with semantic search:
+
+```python
+# The system automatically uses hybrid search when available
+# Configure weights in settings:
+HYBRID_SEARCH_BM25_WEIGHT=0.3
+HYBRID_SEARCH_SEMANTIC_WEIGHT=0.5
+HYBRID_SEARCH_FUZZY_WEIGHT=0.2
+```
+
 ## 🗂️ Index Management
 
 ### For This Repository
@@ -213,6 +274,61 @@ mcp-index init
    ```
 
 #### Configuration
+
+##### Semantic Search Configuration
+
+To enable semantic search capabilities, you need a Voyage AI API key. Get one from [https://www.voyageai.com/](https://www.voyageai.com/).
+
+**Method 1: Claude Code Configuration (Recommended)**
+
+Create or edit `.mcp.json` in your project root:
+
+```json
+{
+  "mcpServers": {
+    "code-index-mcp": {
+      "command": "uvicorn",
+      "args": ["mcp_server.gateway:app", "--host", "0.0.0.0", "--port", "8000"],
+      "env": {
+        "VOYAGE_AI_API_KEY": "your-voyage-ai-api-key-here",
+        "SEMANTIC_SEARCH_ENABLED": "true"
+      }
+    }
+  }
+}
+```
+
+**Method 2: Claude Code CLI**
+
+```bash
+claude mcp add code-index-mcp -e VOYAGE_AI_API_KEY=your_key -e SEMANTIC_SEARCH_ENABLED=true -- uvicorn mcp_server.gateway:app
+```
+
+**Method 3: Environment Variables**
+
+```bash
+export VOYAGE_AI_API_KEY=your_key
+export SEMANTIC_SEARCH_ENABLED=true
+```
+
+**Method 4: .env File**
+
+Create a `.env` file in your project root:
+
+```
+VOYAGE_AI_API_KEY=your_key
+SEMANTIC_SEARCH_ENABLED=true
+```
+
+**Check Configuration**
+
+Verify your semantic search setup:
+
+```bash
+python mcp_cli.py index check-semantic
+```
+
+##### Index Configuration
 
 Edit `.mcp-index.json` in your repository:
 

@@ -416,6 +416,60 @@ class IIncrementalIndexer(ABC):
         pass
 
 # ========================================
+# Reranking Interfaces
+# ========================================
+
+@dataclass
+class RerankResult:
+    """Result from reranking operation"""
+    original_result: SearchResult
+    rerank_score: float
+    original_rank: int
+    new_rank: int
+    explanation: Optional[str] = None
+
+class IReranker(ABC):
+    """Interface for reranking search results"""
+    
+    @abstractmethod
+    async def rerank(
+        self, 
+        query: str, 
+        results: List[SearchResult], 
+        top_k: Optional[int] = None
+    ) -> Result[List[RerankResult]]:
+        """Rerank search results based on relevance to query"""
+        pass
+    
+    @abstractmethod
+    async def initialize(self, config: Dict[str, Any]) -> Result[None]:
+        """Initialize the reranker with configuration"""
+        pass
+    
+    @abstractmethod
+    async def shutdown(self) -> Result[None]:
+        """Shutdown the reranker and clean up resources"""
+        pass
+    
+    @abstractmethod
+    def get_capabilities(self) -> Dict[str, Any]:
+        """Get reranker capabilities and metadata"""
+        pass
+
+class IRerankerFactory(ABC):
+    """Factory for creating reranker instances"""
+    
+    @abstractmethod
+    def create_reranker(self, reranker_type: str, config: Dict[str, Any]) -> IReranker:
+        """Create a reranker instance"""
+        pass
+    
+    @abstractmethod
+    def get_available_rerankers(self) -> List[str]:
+        """Get list of available reranker types"""
+        pass
+
+# ========================================
 # Performance Monitoring Interfaces
 # ========================================
 

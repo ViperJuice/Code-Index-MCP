@@ -22,6 +22,9 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from mcp_server.config.settings import get_settings
+# Import secure export functionality
+sys.path.insert(0, str(project_root.parent))
+from secure_index_export import SecureIndexExporter
 
 
 class IndexArtifactUploader:
@@ -70,30 +73,49 @@ class IndexArtifactUploader:
         except Exception as e:
             raise RuntimeError(f"Failed to detect repository: {e}")
     
-    def compress_indexes(self, output_path: Path = Path('index-archive.tar.gz')) -> Tuple[Path, str, int]:
+    def compress_indexes(self, output_path: Path = Path('index-archive.tar.gz'), 
+                        secure: bool = True) -> Tuple[Path, str, int]:
         """
         Compress index files.
+        
+        Args:
+            output_path: Path for the output archive
+            secure: If True, use secure export to filter sensitive files
         
         Returns:
             Tuple of (archive_path, checksum, size_bytes)
         """
-        print("📦 Compressing index files...")
-        
-        with tarfile.open(output_path, 'w:gz', compresslevel=9) as tar:
-            for file_name in self.index_files:
-                file_path = Path(file_name)
-                if file_path.exists():
-                    print(f"  Adding {file_name}...")
-                    tar.add(file_path, arcname=file_name)
-                else:
-                    print(f"  ⚠️  Skipping {file_name} (not found)")
-        
-        # Calculate checksum
-        checksum = self._calculate_checksum(output_path)
-        size = output_path.stat().st_size
-        
-        print(f"✅ Compressed to {output_path} ({size / 1024 / 1024:.1f} MB)")
-        print(f"   Checksum: {checksum}")
+        if secure:
+            print("🔒 Creating secure index archive (filtering sensitive files)...")
+            exporter = SecureIndexExporter()
+            stats = exporter.create_secure_archive(str(output_path))
+            
+            # Get the created archive info
+            checksum = self._calculate_checksum(output_path)
+            size = output_path.stat().st_size
+            
+            print(f"✅ Secure archive created: {output_path} ({size / 1024 / 1024:.1f} MB)")
+            print(f"   Files included: {stats['files_included']}")
+            print(f"   Files excluded: {stats['files_excluded']}")
+            print(f"   Checksum: {checksum}")
+        else:
+            print("📦 Compressing index files (unsafe mode - includes all files)...")
+            
+            with tarfile.open(output_path, 'w:gz', compresslevel=9) as tar:
+                for file_name in self.index_files:
+                    file_path = Path(file_name)
+                    if file_path.exists():
+                        print(f"  Adding {file_name}...")
+                        tar.add(file_path, arcname=file_name)
+                    else:
+                        print(f"  ⚠️  Skipping {file_name} (not found)")
+            
+            # Calculate checksum
+            checksum = self._calculate_checksum(output_path)
+            size = output_path.stat().st_size
+            
+            print(f"✅ Compressed to {output_path} ({size / 1024 / 1024:.1f} MB)")
+            print(f"   Checksum: {checksum}")
         
         return output_path, checksum, size
     
@@ -105,7 +127,7 @@ class IndexArtifactUploader:
                 sha256.update(chunk)
         return sha256.hexdigest()
     
-    def create_metadata(self, checksum: str, size: int) -> Dict[str, Any]:
+    def create_metadata(self, checksum: str, size: int, secure: bool = True) -> Dict[str, Any]:
         """Create metadata for the artifact."""
         # Get current git info
         try:
@@ -141,6 +163,11 @@ class IndexArtifactUploader:
                 'embedding_model': get_settings().semantic_embedding_model,
                 'embedding_dimension': 1024,
                 'distance_metric': 'cosine'
+            },
+            'security': {
+                'filtered': secure,
+                'filter_type': 'gitignore + mcp-index-ignore' if secure else 'none',
+                'export_method': 'secure' if secure else 'unsafe'
             }
         }
         
@@ -323,6 +350,11 @@ def main():
         action='store_true',
         help='Validate indexes before upload'
     )
+    parser.add_argument(
+        '--no-secure',
+        action='store_true',
+        help='Disable secure export (include all files, even sensitive ones)'
+    )
     
     args = parser.parse_args()
     
@@ -336,7 +368,8 @@ def main():
             print("✅ Validation passed")
         
         # Compress indexes
-        archive_path, checksum, size = uploader.compress_indexes(Path(args.output))
+        secure = not args.no_secure
+        archive_path, checksum, size = uploader.compress_indexes(Path(args.output), secure=secure)
         
         # Check size limit (500MB for GitHub Actions Artifacts)
         if size > 500 * 1024 * 1024:
@@ -345,7 +378,7 @@ def main():
             sys.exit(1)
         
         # Create metadata
-        metadata = uploader.create_metadata(checksum, size)
+        metadata = uploader.create_metadata(checksum, size, secure=secure)
         
         # Upload based on method
         if args.method == 'workflow':

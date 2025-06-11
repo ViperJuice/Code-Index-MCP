@@ -56,18 +56,31 @@ This document defines the performance requirements and targets for Code-Index-MC
 - **Embedding Cache**: Persistent, versioned
 - **Parse Cache**: AST cache for unchanged files
 - **Result Cache**: 5-minute TTL
+- **Context Cache**: Language-specific context cached per file
+  - Type information cache: 1-hour TTL
+  - Import graph cache: Until file change
+  - Framework pattern cache: Per-project basis
 
 ### Indexing
 - **Incremental Updates**: Only changed files
 - **Parallel Processing**: Multi-threaded indexing
 - **Batch Operations**: Group small files
 - **Progressive Loading**: Stream large results
+- **Context-Aware Indexing**: 
+  - Prioritize files with rich type information
+  - Index import hubs first for better context
+  - Cache cross-file relationships
 
 ### Search Optimization
 - **Query Planning**: Cost-based optimization
 - **Index Pruning**: Remove outdated entries
 - **Fuzzy Matching**: Trigram indexes
 - **Semantic Search**: Approximate nearest neighbor
+- **Contextual Ranking**: 
+  - Boost results with matching type context
+  - Prioritize results within same import graph
+  - Framework-specific result ordering
+  - Cross-file relationship scoring
 
 ## Monitoring and Alerting
 
@@ -104,8 +117,14 @@ This document defines the performance requirements and targets for Code-Index-MC
 - Tree-sitter Parsing: 30-100ms/file (varies by language)
 - Index Update: 20ms/file
 - Embedding Generation: 200-500ms/file (Voyage AI)
+- Contextual Embedding Enhancement: +50-100ms/file (specialized plugins)
+  - Type context extraction: 20ms
+  - Import graph analysis: 30ms
+  - Framework pattern detection: 20ms
+  - Cross-file relationship mapping: 30ms
 - Vector Search: 50ms (Qdrant ANN)
 - Hybrid Search: 150ms (FTS5 + Vector)
+- Contextual Search Boost: +20ms (ranking adjustment)
 - Query Cache Lookup: < 1ms
 - Language Detection: < 5ms
 
@@ -123,11 +142,27 @@ This document defines the performance requirements and targets for Code-Index-MC
 - **Batch Processing**: Group files by language for efficiency
 - **Smart Routing**: Direct queries to relevant language indices
 
+## Contextual Embeddings Performance
+
+### Performance Targets
+- **Context Extraction**: < 50ms per file
+- **Enhanced Embedding**: < 600ms total (base + context)
+- **Context Cache Hit**: > 90% for unchanged files
+- **Memory Overhead**: < 10% increase with context
+
+### Optimization Strategies
+1. **Lazy Context Loading**: Extract context only when needed
+2. **Incremental Context Updates**: Update only changed relationships
+3. **Batch Context Processing**: Process related files together
+4. **Context Pruning**: Limit context depth to maintain performance
+
 ## Implementation Guidelines
 
 1. **Profile First**: Measure before optimizing
-2. **Cache Aggressively**: Plugin instances, queries, and results
+2. **Cache Aggressively**: Plugin instances, queries, results, and context
 3. **Parallelize**: Use all cores for multi-language processing
 4. **Stream Results**: Don't load everything in memory
 5. **Index Smartly**: Language-specific optimization strategies
 6. **Monitor Continuously**: Track per-language performance metrics
+7. **Context-Aware Design**: Balance context richness with performance
+8. **Progressive Enhancement**: Add context layers based on query needs

@@ -20,6 +20,7 @@ from fastapi.testclient import TestClient
 
 # Import our modules
 from mcp_server.gateway import app
+from mcp_server.dispatcher.dispatcher import Dispatcher
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from mcp_server.storage.sqlite_store import SQLiteStore
 from mcp_server.watcher import FileWatcher

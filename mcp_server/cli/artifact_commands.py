@@ -26,7 +26,8 @@ def artifact():
 @artifact.command()
 @click.option('--validate', is_flag=True, help='Validate indexes before upload')
 @click.option('--compress-only', is_flag=True, help='Only compress, do not upload')
-def push(validate: bool, compress_only: bool):
+@click.option('--no-secure', is_flag=True, help='Disable secure export (include all files)')
+def push(validate: bool, compress_only: bool, no_secure: bool):
     """Upload local indexes to GitHub Actions Artifacts."""
     try:
         # Check if indexes exist
@@ -42,6 +43,9 @@ def push(validate: bool, compress_only: bool):
         
         if compress_only:
             cmd.extend(['--method', 'direct'])
+            
+        if no_secure:
+            cmd.append('--no-secure')
         
         # Run upload script
         result = subprocess.run(cmd, capture_output=True, text=True)

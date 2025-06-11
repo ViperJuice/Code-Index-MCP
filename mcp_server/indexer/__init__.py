@@ -14,17 +14,8 @@ from .index_engine import (
     IndexTask
 )
 from .query_optimizer import (
-    QueryOptimizer, 
     Query,
-    QueryType,
-    QueryCost,
-    OptimizedQuery, 
-    SearchPlan,
-    IndexSuggestion,
-    PerformanceReport,
-    SearchStatistics,
-    IndexType,
-    IndexChoice
+    QueryType
 )
 
 __all__ = [
@@ -37,15 +28,6 @@ __all__ = [
     'IndexTask',
     
     # Query Optimizer
-    'QueryOptimizer',
     'Query',
-    'QueryType', 
-    'QueryCost',
-    'OptimizedQuery',
-    'SearchPlan',
-    'IndexSuggestion',
-    'PerformanceReport',
-    'SearchStatistics',
-    'IndexType',
-    'IndexChoice',
+    'QueryType'
 ]

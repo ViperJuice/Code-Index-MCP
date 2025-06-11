@@ -40,6 +40,8 @@ package "Document Processing Core" {
         + embedding: float[]
         + contextBefore: string
         + contextAfter: string
+        + bm25Terms: Map<string, float>
+        + contextualEmbedding: float[]
     }
     
     class ChunkMetadata {
@@ -116,6 +118,7 @@ package "Integration Layer" {
         + routeDocument(path): IPlugin
         + handleDocumentQuery(query): SearchResult[]
         + extractSectionQuery(query): SectionQuery
+        + selectSearchStrategy(query): SearchStrategy
     }
     
     class DocumentSearchEnhancer {
@@ -123,6 +126,15 @@ package "Integration Layer" {
         + parseNaturalLanguage(query): QueryIntent
         + findRelevantSections(query): Section[]
         + rankDocumentResults(results): Result[]
+        + applyHybridSearch(query): HybridResult[]
+    }
+    
+    class AdaptiveIndexer {
+        - chunkStrategies: Map<string, ChunkStrategy>
+        + indexDocument(doc: Document): IndexResult
+        + selectChunkStrategy(doc): ChunkStrategy
+        + generateContextualEmbeddings(chunks): float[][]
+        + updateBM25Index(chunks): void
     }
 }
 
@@ -145,10 +157,15 @@ SemanticDocumentChunker --> BaseDocumentPlugin : enhances
 
 DocumentAwareDispatcher --> BaseDocumentPlugin : routes to
 DocumentSearchEnhancer --> DocumentAwareDispatcher : enhances
+AdaptiveIndexer --> BaseDocumentPlugin : processes
+AdaptiveIndexer --> ChunkOptimizer : uses
+AdaptiveIndexer --> SemanticDocumentChunker : uses
 
 ' External Integration
 BaseDocumentPlugin ..> SQLiteStore : persists to
 BaseDocumentPlugin ..> SemanticIndexer : indexes with
 DocumentAwareDispatcher ..> EnhancedDispatcher : extends
+AdaptiveIndexer ..> ContextualEmbeddingEngine : generates embeddings
+AdaptiveIndexer ..> BM25Index : updates
 
 @enduml

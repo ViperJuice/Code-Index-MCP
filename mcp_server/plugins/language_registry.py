@@ -514,7 +514,7 @@ LANGUAGE_CONFIGS = {
     "plaintext": {
         "code": "plaintext",
         "name": "Plain Text",
-        "extensions": [".txt", ".text", ".log", ".readme"],
+        "extensions": [".txt", ".text", ".log", ".readme", ".env", ".key", ".pem", ".crt", ".cer", ".pfx", ".p12", ".pub", ".pri", ".license", ".version", ".gitignore", ".dockerignore", ".npmignore"],
         "symbols": [],  # Plain text doesn't use tree-sitter
         "query": ""
     },

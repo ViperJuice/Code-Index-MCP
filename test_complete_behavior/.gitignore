@@ -1,0 +1,13 @@
+
+# Secrets
+.env
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.pyc
+
+# Dependencies
+venv/
+node_modules/

@@ -20,6 +20,10 @@ redis>=4.5.0
 voyageai>=0.2.0
 qdrant-client>=1.7.0
 
+# Reranking dependencies (optional)
+cohere>=4.0.0  # Optional: for Cohere reranking
+sentence-transformers>=2.0.0  # Optional: for cross-encoder reranking
+
 # Security dependencies
 pyjwt>=2.8.0
 passlib[bcrypt]>=1.7.4
@@ -80,3 +84,6 @@ mcp>=0.1.0
 
 # Language-specific parsing libraries
 javalang>=0.13.0
+
+# AI/LLM dependencies
+anthropic>=0.18.0

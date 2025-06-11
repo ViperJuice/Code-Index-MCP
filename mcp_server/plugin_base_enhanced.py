@@ -1,7 +1,8 @@
 """Enhanced plugin base with semantic search support."""
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TypedDict, Iterable, Optional, List, Dict, Any
+from typing import Iterable, Optional, List, Dict, Any
+from typing_extensions import TypedDict
 from pathlib import Path
 import os
 import logging

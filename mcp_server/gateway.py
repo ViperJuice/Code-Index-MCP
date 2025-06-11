@@ -13,6 +13,9 @@ from .watcher import FileWatcher
 from .core.logging import setup_logging
 from .utils.index_discovery import IndexDiscovery
 from .plugin_system import PluginManager, PluginSystemConfig
+from .indexer.bm25_indexer import BM25Indexer
+from .indexer.hybrid_search import HybridSearch, HybridSearchConfig
+from .utils.fuzzy_indexer import FuzzyIndexer
 from .security import (
     SecurityConfig, AuthManager, SecurityMiddlewareStack,
     AuthCredentials, User, UserRole, Permission,
@@ -42,6 +45,9 @@ auth_manager: AuthManager | None = None
 security_config: SecurityConfig | None = None
 cache_manager = None
 query_cache: QueryResultCache | None = None
+bm25_indexer: BM25Indexer | None = None
+hybrid_search: HybridSearch | None = None
+fuzzy_indexer: FuzzyIndexer | None = None
 
 # Initialize metrics and health checking
 metrics_collector = get_metrics_collector()
@@ -54,7 +60,7 @@ setup_metrics_middleware(app, enable_detailed_metrics=True)
 @app.on_event("startup")
 async def startup_event():
     """Initialize the dispatcher and register plugins on startup."""
-    global dispatcher, sqlite_store, file_watcher, plugin_manager, plugin_loader, auth_manager, security_config, cache_manager, query_cache
+    global dispatcher, sqlite_store, file_watcher, plugin_manager, plugin_loader, auth_manager, security_config, cache_manager, query_cache, bm25_indexer, hybrid_search, fuzzy_indexer
     
     try:
         # Initialize security configuration
@@ -238,6 +244,46 @@ async def startup_event():
         dispatcher = Dispatcher(plugin_instances)
         logger.info(f"Dispatcher created with {len(plugin_instances)} plugins")
         
+        # Initialize BM25 indexer
+        logger.info("Initializing BM25 indexer...")
+        bm25_indexer = BM25Indexer(sqlite_store)
+        logger.info("BM25 indexer initialized successfully")
+        
+        # Initialize Fuzzy indexer
+        logger.info("Initializing Fuzzy indexer...")
+        fuzzy_indexer = FuzzyIndexer(sqlite_store)
+        logger.info("Fuzzy indexer initialized successfully")
+        
+        # Check if semantic indexer is available
+        semantic_indexer = None
+        try:
+            from .utils.semantic_indexer import SemanticIndexer
+            semantic_indexer = SemanticIndexer(sqlite_store)
+            logger.info("Semantic indexer initialized successfully")
+        except ImportError:
+            logger.warning("Semantic indexer not available (missing dependencies)")
+        
+        # Initialize Hybrid Search
+        logger.info("Initializing Hybrid Search...")
+        hybrid_config = HybridSearchConfig(
+            bm25_weight=float(os.getenv("HYBRID_BM25_WEIGHT", "0.5")),
+            semantic_weight=float(os.getenv("HYBRID_SEMANTIC_WEIGHT", "0.3")),
+            fuzzy_weight=float(os.getenv("HYBRID_FUZZY_WEIGHT", "0.2")),
+            enable_bm25=True,
+            enable_semantic=semantic_indexer is not None,
+            enable_fuzzy=True,
+            parallel_execution=True,
+            cache_results=True
+        )
+        hybrid_search = HybridSearch(
+            storage=sqlite_store,
+            bm25_indexer=bm25_indexer,
+            semantic_indexer=semantic_indexer,
+            fuzzy_indexer=fuzzy_indexer,
+            config=hybrid_config
+        )
+        logger.info(f"Hybrid Search initialized (BM25: {hybrid_config.enable_bm25}, Semantic: {hybrid_config.enable_semantic}, Fuzzy: {hybrid_config.enable_fuzzy})")
+        
         # Initialize file watcher with dispatcher and query cache
         logger.info("Starting file watcher...")
         file_watcher = FileWatcher(Path("."), dispatcher, query_cache)
@@ -256,6 +302,22 @@ async def startup_event():
         app.state.metrics_collector = metrics_collector
         app.state.health_checker = health_checker
         app.state.business_metrics = business_metrics
+        app.state.bm25_indexer = bm25_indexer
+        app.state.hybrid_search = hybrid_search
+        app.state.fuzzy_indexer = fuzzy_indexer
+        
+        # Update status to include search capabilities
+        search_capabilities = []
+        if bm25_indexer:
+            search_capabilities.append("bm25")
+        if fuzzy_indexer:
+            search_capabilities.append("fuzzy") 
+        if semantic_indexer:
+            search_capabilities.append("semantic")
+        if hybrid_search:
+            search_capabilities.append("hybrid")
+        
+        logger.info(f"Search capabilities: {', '.join(search_capabilities)}")
         
         # Register health checks for system components
         logger.info("Registering component health checks...")
@@ -671,24 +733,60 @@ async def search(
     q: str,
     semantic: bool = False,
     limit: int = 20,
+    mode: str = "auto",  # "auto", "hybrid", "bm25", "semantic", "fuzzy", "classic"
+    language: Optional[str] = None,
+    file_filter: Optional[str] = None,
     current_user: User = Depends(require_permission(Permission.READ))
 ):
-    if dispatcher is None:
+    """Search with support for multiple modes including hybrid search.
+    
+    Args:
+        q: Search query
+        semantic: Whether to use semantic search (for backward compatibility)
+        limit: Maximum number of results
+        mode: Search mode - "auto" (default), "hybrid", "bm25", "semantic", "fuzzy", or "classic"
+        language: Filter by programming language
+        file_filter: Filter by file path pattern
+        current_user: Authenticated user
+    """
+    if dispatcher is None and mode == "classic":
         logger.error("Search attempted but dispatcher not ready")
         raise HTTPException(503, "Dispatcher not ready")
     
     start_time = time.time()
     try:
-        logger.debug(f"Searching for: '{q}' (semantic={semantic}, limit={limit}) for user: {current_user.username}")
+        # Determine effective search mode
+        effective_mode = mode
+        if mode == "auto":
+            # Auto mode: use hybrid if available, otherwise fall back
+            if hybrid_search is not None:
+                effective_mode = "hybrid"
+            elif semantic and hasattr(dispatcher, 'search'):
+                effective_mode = "classic"
+            else:
+                effective_mode = "bm25" if bm25_indexer else "classic"
+        
+        logger.debug(f"Searching for: '{q}' (mode={effective_mode}, limit={limit}, language={language}) for user: {current_user.username}")
+        
+        # Build filters
+        filters = {}
+        if language:
+            filters['language'] = language
+        if file_filter:
+            filters['file_filter'] = file_filter
         
         # Try cache first if query cache is available
+        cache_key_parts = [q, effective_mode, str(limit)]
+        if filters:
+            cache_key_parts.extend([f"{k}:{v}" for k, v in sorted(filters.items())])
+        
         cached_results = None
         if query_cache and query_cache.config.enabled:
-            query_type = QueryType.SEMANTIC_SEARCH if semantic else QueryType.SEARCH
+            query_type = QueryType.SEMANTIC_SEARCH if effective_mode == "semantic" else QueryType.SEARCH
             cached_results = await query_cache.get_cached_result(
                 query_type,
                 q=q,
-                semantic=semantic,
+                semantic=(effective_mode == "semantic"),
                 limit=limit
             )
         
@@ -697,24 +795,116 @@ async def search(
             duration = time.time() - start_time
             business_metrics.record_search_performed(
                 query=q,
-                semantic=semantic,
+                semantic=(effective_mode == "semantic"),
                 results_count=len(cached_results),
                 duration=duration
             )
             return cached_results
         
-        # Record search metrics
-        with metrics_collector.time_function("search", labels={"semantic": str(semantic)}):
-            results = list(dispatcher.search(q, semantic=semantic, limit=limit))
+        # Perform search based on mode
+        results = []
+        
+        if effective_mode == "hybrid" and hybrid_search:
+            # Use hybrid search
+            with metrics_collector.time_function("search", labels={"mode": "hybrid"}):
+                hybrid_results = await hybrid_search.search(
+                    query=q,
+                    filters=filters,
+                    limit=limit
+                )
+                # Convert to SearchResult format
+                for r in hybrid_results:
+                    results.append(SearchResult(
+                        file_path=r['filepath'],
+                        snippet=r['snippet'],
+                        score=r['score']
+                    ))
+        
+        elif effective_mode == "bm25" and bm25_indexer:
+            # Direct BM25 search
+            with metrics_collector.time_function("search", labels={"mode": "bm25"}):
+                bm25_results = bm25_indexer.search(q, limit=limit, **filters)
+                for r in bm25_results:
+                    results.append(SearchResult(
+                        file_path=r['filepath'],
+                        snippet=r.get('snippet', ''),
+                        score=r['score']
+                    ))
+        
+        elif effective_mode == "fuzzy" and fuzzy_indexer:
+            # Direct fuzzy search
+            with metrics_collector.time_function("search", labels={"mode": "fuzzy"}):
+                fuzzy_results = fuzzy_indexer.search_fuzzy(q, max_results=limit)
+                for r in fuzzy_results:
+                    results.append(SearchResult(
+                        file_path=r.get('file_path', ''),
+                        snippet=r.get('context', ''),
+                        score=r.get('score', 0.0)
+                    ))
+        
+        elif effective_mode == "semantic":
+            # Use classic dispatcher with semantic=True
+            if dispatcher:
+                with metrics_collector.time_function("search", labels={"mode": "semantic"}):
+                    results = list(dispatcher.search(q, semantic=True, limit=limit))
+            else:
+                raise HTTPException(
+                    503, 
+                    detail={
+                        "error": "Semantic search not available",
+                        "reason": "Missing Voyage AI API key configuration",
+                        "setup": {
+                            "method_1_mcp_json": [
+                                "Configure in .mcp.json (recommended for Claude Code):",
+                                "{",
+                                '  "mcpServers": {',
+                                '    "code-index-mcp": {',
+                                '      "command": "uvicorn",',
+                                '      "args": ["mcp_server.gateway:app"],',
+                                '      "env": {',
+                                '        "VOYAGE_AI_API_KEY": "your-key-here",',
+                                '        "SEMANTIC_SEARCH_ENABLED": "true"',
+                                '      }',
+                                '    }',
+                                '  }',
+                                '}'
+                            ],
+                            "method_2_cli": [
+                                "Or use Claude Code CLI:",
+                                "claude mcp add code-index-mcp -e VOYAGE_AI_API_KEY=your_key -e SEMANTIC_SEARCH_ENABLED=true -- uvicorn mcp_server.gateway:app"
+                            ],
+                            "method_3_env": [
+                                "Or set environment variables:",
+                                "export VOYAGE_AI_API_KEY=your_key",
+                                "export SEMANTIC_SEARCH_ENABLED=true"
+                            ],
+                            "method_4_dotenv": [
+                                "Or add to .env file:",
+                                "VOYAGE_AI_API_KEY=your_key",
+                                "SEMANTIC_SEARCH_ENABLED=true"
+                            ],
+                            "get_api_key": "Get your API key from: https://www.voyageai.com/",
+                            "alternative": "Use mode='hybrid' or mode='bm25' for keyword-based search"
+                        }
+                    }
+                )
+        
+        else:
+            # Classic search through dispatcher
+            if dispatcher:
+                with metrics_collector.time_function("search", labels={"mode": "classic"}):
+                    results = list(dispatcher.search(q, semantic=False, limit=limit))
+            else:
+                raise HTTPException(503, "Classic search not available")
         
         # Cache the results if available
         if query_cache and query_cache.config.enabled and results:
-            query_type = QueryType.SEMANTIC_SEARCH if semantic else QueryType.SEARCH
+            query_type = QueryType.SEMANTIC_SEARCH if effective_mode == "semantic" else QueryType.SEARCH
             await query_cache.cache_result(
                 query_type,
                 results,
                 q=q,
-                semantic=semantic,
+                semantic=(effective_mode == "semantic"),
                 limit=limit
             )
         
@@ -722,12 +912,12 @@ async def search(
         duration = time.time() - start_time
         business_metrics.record_search_performed(
             query=q,
-            semantic=semantic,
+            semantic=(effective_mode == "semantic"),
             results_count=len(results),
             duration=duration
         )
         
-        logger.debug(f"Search returned {len(results)} results")
+        logger.debug(f"Search returned {len(results)} results using {effective_mode} mode")
         return results
     except Exception as e:
         duration = time.time() - start_time
@@ -739,6 +929,48 @@ async def search(
         )
         logger.error(f"Error during search for '{q}': {e}", exc_info=True)
         raise HTTPException(500, f"Internal error during search: {str(e)}")
+
+@app.get("/search/capabilities")
+async def get_search_capabilities() -> Dict[str, Any]:
+    """Get available search capabilities and configuration guidance."""
+    voyage_key = os.environ.get('VOYAGE_API_KEY') or os.environ.get('VOYAGE_AI_API_KEY')
+    semantic_enabled = os.environ.get('SEMANTIC_SEARCH_ENABLED', 'false').lower() == 'true'
+    
+    return {
+        "available_modes": {
+            "bm25": bm25_indexer is not None,
+            "fuzzy": fuzzy_indexer is not None,
+            "semantic": semantic_indexer is not None,
+            "hybrid": hybrid_search is not None,
+            "classic": dispatcher is not None
+        },
+        "semantic_config": {
+            "enabled": semantic_indexer is not None,
+            "api_key_configured": bool(voyage_key),
+            "semantic_enabled_flag": semantic_enabled,
+            "status": "ready" if semantic_indexer else "not_configured"
+        },
+        "configuration_guide": {
+            "mcp_json_example": {
+                "description": "Add to .mcp.json for Claude Code (recommended)",
+                "config": {
+                    "mcpServers": {
+                        "code-index-mcp": {
+                            "command": "uvicorn",
+                            "args": ["mcp_server.gateway:app"],
+                            "env": {
+                                "VOYAGE_AI_API_KEY": "your-key-here",
+                                "SEMANTIC_SEARCH_ENABLED": "true"
+                            }
+                        }
+                    }
+                }
+            },
+            "cli_command": "claude mcp add code-index-mcp -e VOYAGE_AI_API_KEY=key -e SEMANTIC_SEARCH_ENABLED=true -- uvicorn mcp_server.gateway:app",
+            "env_file": "Add to .env: VOYAGE_AI_API_KEY=key and SEMANTIC_SEARCH_ENABLED=true",
+            "get_api_key": "https://www.voyageai.com/"
+        }
+    }
 
 @app.get("/status")
 async def status(current_user: User = Depends(require_permission(Permission.READ))) -> Dict[str, Any]:
@@ -803,8 +1035,19 @@ async def status(current_user: User = Depends(require_permission(Permission.READ
             "indexed_files": indexed_stats,
             "database": db_stats,
             "cache": cache_stats,
+            "search_capabilities": [],
             "version": "0.1.0"
         }
+        
+        # Add search capabilities
+        if bm25_indexer:
+            status_data["search_capabilities"].append("bm25")
+        if fuzzy_indexer:
+            status_data["search_capabilities"].append("fuzzy") 
+        if hasattr(app.state, 'semantic_indexer') and app.state.semantic_indexer:
+            status_data["search_capabilities"].append("semantic")
+        if hybrid_search:
+            status_data["search_capabilities"].append("hybrid")
         
         # Cache the status
         if query_cache and query_cache.config.enabled:
@@ -1214,3 +1457,248 @@ async def cleanup_cache(
     except Exception as e:
         logger.error(f"Failed to cleanup cache: {e}")
         raise HTTPException(500, f"Failed to cleanup cache: {str(e)}")
+
+# Hybrid Search endpoints
+
+@app.get("/search/config")
+async def get_search_config(
+    current_user: User = Depends(require_permission(Permission.READ))
+) -> Dict[str, Any]:
+    """Get current hybrid search configuration."""
+    if not hybrid_search:
+        raise HTTPException(503, "Hybrid search not available")
+    
+    config = hybrid_search.config
+    return {
+        "weights": {
+            "bm25": config.bm25_weight,
+            "semantic": config.semantic_weight,
+            "fuzzy": config.fuzzy_weight
+        },
+        "enabled_methods": {
+            "bm25": config.enable_bm25,
+            "semantic": config.enable_semantic,
+            "fuzzy": config.enable_fuzzy
+        },
+        "rrf_k": config.rrf_k,
+        "parallel_execution": config.parallel_execution,
+        "cache_results": config.cache_results,
+        "limits": {
+            "individual_limit": config.individual_limit,
+            "final_limit": config.final_limit
+        }
+    }
+
+@app.put("/search/config/weights")
+async def update_search_weights(
+    bm25: Optional[float] = None,
+    semantic: Optional[float] = None,
+    fuzzy: Optional[float] = None,
+    current_user: User = Depends(require_role(UserRole.ADMIN))
+) -> Dict[str, Any]:
+    """Update hybrid search weights (admin only).
+    
+    Weights will be normalized to sum to 1.0.
+    """
+    if not hybrid_search:
+        raise HTTPException(503, "Hybrid search not available")
+    
+    try:
+        hybrid_search.set_weights(bm25=bm25, semantic=semantic, fuzzy=fuzzy)
+        
+        # Get updated config
+        config = hybrid_search.config
+        
+        logger.info(f"Search weights updated by {current_user.username}: "
+                   f"BM25={config.bm25_weight:.3f}, "
+                   f"Semantic={config.semantic_weight:.3f}, "
+                   f"Fuzzy={config.fuzzy_weight:.3f}")
+        
+        return {
+            "status": "success",
+            "weights": {
+                "bm25": config.bm25_weight,
+                "semantic": config.semantic_weight,
+                "fuzzy": config.fuzzy_weight
+            }
+        }
+    except Exception as e:
+        logger.error(f"Failed to update search weights: {e}")
+        raise HTTPException(500, f"Failed to update weights: {str(e)}")
+
+@app.put("/search/config/methods")
+async def toggle_search_methods(
+    bm25: Optional[bool] = None,
+    semantic: Optional[bool] = None,
+    fuzzy: Optional[bool] = None,
+    current_user: User = Depends(require_role(UserRole.ADMIN))
+) -> Dict[str, Any]:
+    """Enable or disable search methods (admin only)."""
+    if not hybrid_search:
+        raise HTTPException(503, "Hybrid search not available")
+    
+    try:
+        hybrid_search.enable_methods(bm25=bm25, semantic=semantic, fuzzy=fuzzy)
+        
+        # Get updated config
+        config = hybrid_search.config
+        
+        logger.info(f"Search methods updated by {current_user.username}: "
+                   f"BM25={config.enable_bm25}, "
+                   f"Semantic={config.enable_semantic}, "
+                   f"Fuzzy={config.enable_fuzzy}")
+        
+        return {
+            "status": "success",
+            "enabled_methods": {
+                "bm25": config.enable_bm25,
+                "semantic": config.enable_semantic,
+                "fuzzy": config.enable_fuzzy
+            }
+        }
+    except Exception as e:
+        logger.error(f"Failed to update search methods: {e}")
+        raise HTTPException(500, f"Failed to update methods: {str(e)}")
+
+@app.get("/search/statistics")
+async def get_search_statistics(
+    current_user: User = Depends(require_permission(Permission.READ))
+) -> Dict[str, Any]:
+    """Get search statistics and performance metrics."""
+    stats = {}
+    
+    # Hybrid search statistics
+    if hybrid_search:
+        stats["hybrid_search"] = hybrid_search.get_statistics()
+    
+    # BM25 statistics
+    if bm25_indexer:
+        stats["bm25"] = bm25_indexer.get_statistics()
+    
+    # Fuzzy search statistics
+    if fuzzy_indexer and hasattr(fuzzy_indexer, 'get_statistics'):
+        stats["fuzzy"] = fuzzy_indexer.get_statistics()
+    
+    # Add general search metrics from business metrics
+    if business_metrics:
+        search_metrics = business_metrics.get_search_metrics()
+        stats["general"] = {
+            "total_searches": search_metrics.get("total_searches", 0),
+            "average_response_time_ms": search_metrics.get("avg_response_time", 0),
+            "search_success_rate": search_metrics.get("success_rate", 0)
+        }
+    
+    return stats
+
+@app.post("/search/optimize")
+async def optimize_search_indexes(
+    current_user: User = Depends(require_role(UserRole.ADMIN))
+) -> Dict[str, Any]:
+    """Optimize search indexes for better performance (admin only)."""
+    results = {}
+    
+    try:
+        # Optimize BM25 indexes
+        if bm25_indexer:
+            bm25_indexer.optimize()
+            results["bm25"] = "optimized"
+            logger.info("BM25 indexes optimized")
+        
+        # Optimize FTS5 tables in SQLite
+        if sqlite_store:
+            sqlite_store.optimize_fts_tables()
+            results["fts5"] = "optimized"
+            logger.info("FTS5 tables optimized")
+        
+        # Clear hybrid search cache
+        if hybrid_search:
+            hybrid_search.clear_cache()
+            results["hybrid_cache"] = "cleared"
+            logger.info("Hybrid search cache cleared")
+        
+        logger.info(f"Search indexes optimized by {current_user.username}")
+        
+        return {
+            "status": "success",
+            "message": "Search indexes optimized successfully",
+            "results": results
+        }
+    except Exception as e:
+        logger.error(f"Failed to optimize search indexes: {e}")
+        raise HTTPException(500, f"Failed to optimize indexes: {str(e)}")
+
+@app.get("/search/term/{term}/stats")
+async def get_term_statistics(
+    term: str,
+    current_user: User = Depends(require_permission(Permission.READ))
+) -> Dict[str, Any]:
+    """Get statistics for a specific search term."""
+    stats = {}
+    
+    try:
+        # BM25 term statistics
+        if bm25_indexer:
+            stats["bm25"] = bm25_indexer.get_term_statistics(term)
+        
+        # SQLite FTS5 statistics
+        if sqlite_store:
+            stats["fts5"] = sqlite_store.get_bm25_term_statistics(term)
+        
+        return {
+            "term": term,
+            "statistics": stats
+        }
+    except Exception as e:
+        logger.error(f"Failed to get term statistics: {e}")
+        raise HTTPException(500, f"Failed to get term statistics: {str(e)}")
+
+@app.post("/search/rebuild")
+async def rebuild_search_indexes(
+    index_type: str = "all",  # "all", "bm25", "fuzzy", "semantic"
+    current_user: User = Depends(require_role(UserRole.ADMIN))
+) -> Dict[str, Any]:
+    """Rebuild search indexes (admin only)."""
+    if index_type not in ["all", "bm25", "fuzzy", "semantic"]:
+        raise HTTPException(400, "Invalid index_type. Must be 'all', 'bm25', 'fuzzy', or 'semantic'")
+    
+    results = {}
+    
+    try:
+        if index_type in ["all", "bm25"] and bm25_indexer:
+            bm25_indexer.rebuild()
+            results["bm25"] = "rebuilt"
+            logger.info("BM25 index rebuilt")
+        
+        if index_type in ["all", "fuzzy"] and fuzzy_indexer:
+            fuzzy_indexer.clear()
+            # Re-index all files
+            if sqlite_store:
+                files = sqlite_store.get_all_files()
+                for file_info in files:
+                    try:
+                        with open(file_info["path"], 'r', encoding='utf-8') as f:
+                            content = f.read()
+                        fuzzy_indexer.add_file(file_info["path"], content)
+                    except Exception as e:
+                        logger.warning(f"Failed to re-index {file_info['path']}: {e}")
+            results["fuzzy"] = "rebuilt"
+            logger.info("Fuzzy index rebuilt")
+        
+        if index_type in ["all", "semantic"]:
+            # Semantic index rebuild would go here if available
+            if hasattr(hybrid_search, 'semantic_indexer') and hybrid_search.semantic_indexer:
+                results["semantic"] = "rebuild_not_implemented"
+            else:
+                results["semantic"] = "not_available"
+        
+        logger.info(f"Search indexes rebuilt by {current_user.username}: {index_type}")
+        
+        return {
+            "status": "success",
+            "message": f"Search indexes rebuilt successfully",
+            "index_type": index_type,
+            "results": results
+        }
+    except Exception as e:
+        logger.error(f"Failed to rebuild search indexes: {e}")
+        raise HTTPException(500, f"Failed to rebuild indexes: {str(e)}")
