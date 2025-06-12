@@ -1,10 +1,5 @@
 {
-  "embedding_model": "voyage-code-3",
-  "model_dimension": 1024,
-  "distance_metric": "cosine",
-  "created_at": "2025-06-10T04:59:06.159971",
-  "qdrant_path": "./vector_index.qdrant",
-  "collection_name": "typescript-140327726694032",
-  "compatibility_hash": "1a8eb12939e6a631",
-  "git_commit": "cae1c820e26cffe42d4798a29226a58bc6c61758"
+  "timestamp": "2025-06-12T00:29:32.101240+00:00",
+  "version": "2.0",
+  "compatibility_test": true
 }
