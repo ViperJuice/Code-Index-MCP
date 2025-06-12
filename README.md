@@ -223,6 +223,11 @@ python mcp_cli.py artifact push
 
 # Check sync status
 python mcp_cli.py artifact sync
+
+# Optional: Install git hooks for automatic sync
+mcp-index hooks install
+# Now indexes upload automatically on git push
+# and download automatically on git pull
 ```
 
 ### For ANY Repository (MCP Index Kit)
@@ -683,3 +688,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 <p align="center">Built with ❤️ for the developer community</p>
+# Test change to trigger hook
