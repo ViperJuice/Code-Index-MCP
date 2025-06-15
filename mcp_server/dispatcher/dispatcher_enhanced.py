@@ -1069,7 +1069,7 @@ class EnhancedDispatcher:
         if "." in symbol or "::" in symbol:
             return False
         return (
-            kind in {"method", "getter", "setter", "property"}
+            kind in {"method", "getter", "setter", "property", "build_method", "lifecycle_method"}
             and "." in name
             and name.rsplit(".", 1)[1] == symbol
         ) or ("::" in name and name.rsplit("::", 1)[1] == symbol)
@@ -1115,7 +1115,8 @@ class EnhancedDispatcher:
                             JOIN files f ON s.file_id = f.id
                             WHERE s.name = ? COLLATE BINARY
                                OR (? AND (
-                                   (s.kind IN ('method', 'getter', 'setter', 'property')
+                                   (s.kind IN ('method', 'getter', 'setter', 'property',
+                                               'build_method', 'lifecycle_method')
                                     AND substr(s.name, -length(?)) = ? COLLATE BINARY)
                                    OR substr(s.name, -length(?)) = ? COLLATE BINARY
                                ))

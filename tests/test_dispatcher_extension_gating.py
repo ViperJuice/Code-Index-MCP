@@ -68,7 +68,8 @@ def _make_dispatcher_with_plugins(plugins: list) -> EnhancedDispatcher:
 
 
 @pytest.mark.parametrize("returned_name", [None, "foo", "Owner.foo", "foobar", "FOO"])
-def test_full_schema_bm25_is_only_a_fallback_hint(tmp_path, returned_name):
+@pytest.mark.parametrize("kind", ["method", "build_method", "lifecycle_method"])
+def test_full_schema_bm25_is_only_a_fallback_hint(tmp_path, returned_name, kind):
     # Initialize the real schema first: a BM25-only database bypasses the buggy branch.
     ctx = _make_ctx(str(tmp_path / "full.db"))
     with sqlite3.connect(ctx.sqlite_store.db_path) as conn:
@@ -81,7 +82,7 @@ def test_full_schema_bm25_is_only_a_fallback_hint(tmp_path, returned_name):
         )
     plugin = FakePyPlugin()
     definition = (
-        {"symbol": returned_name, "kind": "method", "defined_in": "src/real.py", "line": 19}
+        {"symbol": returned_name, "kind": kind, "defined_in": "src/real.py", "line": 19}
         if returned_name
         else None
     )
