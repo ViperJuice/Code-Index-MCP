@@ -1029,6 +1029,71 @@
       "task_summary": null,
       "type": "phase",
       "updated_at": "2026-07-10T07:17:21Z"
+    },
+    {
+      "acceptance_criteria_count": 8,
+      "created_at": "2026-10-15T00:58:30Z",
+      "cristina_review_ref": ".dev-skills/reviews/code-index-symbol-correctness/cristina-final-review-20261017.md",
+      "file": "plans/detailed-code-index-symbol-correctness-20261015-0058.md",
+      "final_plan_sha256": "fb7c3ff472da747bdc43e3e584b941226f8ea353e0ecfbe9687f4a54fbd87d50",
+      "handoff_ref": ".dev-skills/handoffs/codex-plan-detailed/20261017T060322Z-cristina-review-closeout.md",
+      "if_gates_produced": [],
+      "lanes": [],
+      "lifecycle": [
+        {
+          "at": "2026-10-15T00:58:30Z",
+          "by": "codex-plan-detailed",
+          "metadata": {
+            "git_commit_created": false,
+            "planning_only": true
+          },
+          "transition": "committed"
+        },
+        {
+          "at": "2026-10-17T06:32:05Z",
+          "by": "codex-execute-detailed",
+          "metadata": {
+            "plan": "plans/detailed-code-index-symbol-correctness-20261015-0058.md",
+            "run_id": "20261017-symbol-correctness"
+          },
+          "transition": "executing"
+        },
+        {
+          "at": "2026-10-17T21:34:39Z",
+          "by": "codex-execute-detailed",
+          "metadata": {
+            "acceptance_unmet": [
+              "AC7"
+            ],
+            "blocker": "19 pre-existing formatting failures and 49 pre-existing mypy-ratchet violations",
+            "diagnostic": "verification failed",
+            "dirty_path_classification": "9 plan-owned implementation/test/doc files plus plan and manifest; no unrelated changes",
+            "doc_delta_decision": "docs_updated",
+            "execution_plan_sha256": "80b6116fd67e840a8ec5d8dd053c3cb652aabfe0901d69136c6d0710ed5e6f19",
+            "handoff_ref": ".dev-skills/handoffs/codex-execute-detailed/20261017-symbol-correctness.md",
+            "implementation_diff_sha256": "ae0b8bd40868a9673d303a0d078cf416d3442944f749a909a906147d60ed7df2",
+            "reflection_ref": "/home/viperjuice/.codex/skills/codex-execute-detailed/reflections/c9da471c9a75/fix-symbol-correctness-20261017/20261017-symbol-correctness.md",
+            "verification_artifact_path": ".dev-skills/verification/symbol-correctness-closeout-20261017/verification.json",
+            "verification_status": "failed"
+          },
+          "transition": "failed"
+        }
+      ],
+      "live_deployment_in_scope": false,
+      "manual_review_closeout": ".dev-skills/reviews/code-index-symbol-correctness/manual-review-closeout.md",
+      "manual_review_status": "cristina_conditional_agreement_correction_applied",
+      "owner_skill": "codex-plan-detailed",
+      "phase_alias": null,
+      "pmcp_issue": "https://github.com/Consiliency/pmcp/issues/401",
+      "reflection_ref": "/home/viperjuice/.codex/skills/codex-plan-detailed/reflections/996e503e6a43/plan-dev0-symbol-lookup-fixes/20261017T060322Z-cristina-review-closeout.md",
+      "reviewed_plan_sha256": "853cb951179f417f89cad00b19b4a1eb826ba8b725a84ef8876640f2539253b1",
+      "roadmap_ref": null,
+      "slug": "detailed-code-index-symbol-correctness-20261015-0058",
+      "status": "failed",
+      "supersedes_execution_scope_of": "detailed-dev0-symbol-lookup-fixes-20261014-1523",
+      "task_summary": "One Code-Index-MCP PR for decorated Python extraction and exact/source definition selection; PMCP and live rollout excluded",
+      "type": "detailed",
+      "updated_at": "2026-10-17T21:34:39Z"
     }
   ],
   "schema_version": 1

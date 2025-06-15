@@ -33,7 +33,173 @@ from mcp_server.dispatcher.protocol import DispatcherProtocol
 from mcp_server.dispatcher.query_intent import QueryIntent, classify
 from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher
 from mcp_server.plugin_base import IPlugin, SearchResult, SymbolDef
+from mcp_server.storage.sqlite_store import SQLiteStore
 from tests.conftest import measure_time
+
+
+@pytest.fixture
+def literal_lookup(tmp_path):
+    store = SQLiteStore(str(tmp_path / "lookup.db"))
+    repo = store.create_repository(str(tmp_path), "literal")
+    ctx = RepoContext(
+        repo_id="literal",
+        sqlite_store=store,
+        workspace_root=tmp_path,
+        tracked_branch="main",
+        registry_entry=SimpleNamespace(tracked_branch="main"),
+    )
+    dispatcher = Dispatcher(
+        [],
+        enable_advanced_features=False,
+        use_plugin_factory=False,
+        semantic_search_enabled=False,
+        multi_repo_enabled=False,
+    )
+    dispatcher._plugin_set_registry._cache[ctx.repo_id] = []
+
+    def insert(
+        name, kind="class", path="src/main.py", language="python", line=10, metadata=None, end=None
+    ):
+        file_id = store.store_file(repo, path, path, language=language)
+        store.store_symbol(
+            file_id, name, kind, line, end if end is not None else line + 2, metadata=metadata
+        )
+
+    return insert, lambda symbol: dispatcher.lookup(ctx, symbol, limit=1)
+
+
+@pytest.mark.parametrize(
+    "name,near",
+    [
+        ("FrozenEval", "FrozenEvalError"),
+        ("RepositoryReadiness", "RepositoryReadinessState"),
+        ("a_b", "axb"),
+        ("a%b", "axxb"),
+        ("a'b", "axb"),
+        (r"a\b", "ab"),
+        ("CaseSensitive", "casesensitive"),
+    ],
+)
+def test_literal_symbol_names(literal_lookup, name, near):
+    insert, lookup = literal_lookup
+    insert(near)
+    assert lookup(name) is None
+    insert(name, line=23)
+    assert lookup(name)["symbol"] == name
+    assert lookup(name)["line"] == 23
+
+
+@pytest.mark.parametrize(
+    "stored,kind,query,match",
+    [
+        ("Owner.draw", "method", "draw", True),
+        ("Owner.value", "getter", "value", True),
+        ("Owner.value", "setter", "value", True),
+        ("Owner.value", "property", "value", True),
+        ("Owner.draw", "function", "draw", False),
+        ("NS::Widget", "class", "Widget", True),
+        ("Widget::draw", "function", "draw", True),
+        ("Widget::Widget", "constructor", "Widget", True),
+        ("Widget::~Widget", "destructor", "~Widget", True),
+        ("NS::Widget::draw", "function", "Widget::draw", False),
+        ("Prefix.Owner.draw", "method", "Owner.draw", False),
+        ("Owner.draw", "method", "Owner.draw", True),
+        ("NS::Widget", "class", "NS::Widget", True),
+        ("Owner.Draw", "method", "draw", False),
+        ("Owner.axb", "method", "a_b", False),
+        ("Owner.a%b", "method", "a%b", True),
+        ("Owner.a'b", "method", "a'b", True),
+        (r"Owner.a\b", "method", r"a\b", True),
+        ("UserManager.addUser", "method", "User", False),
+        ("NS::Widget", "class", "Wid", False),
+        ("Widget::draw", "method", "draw", True),
+        ("NS::run", "function", "run", True),
+        ("NS::a_b", "function", "a_b", True),
+        ("NS::axb", "function", "a_b", False),
+        ("NS::Draw", "function", "draw", False),
+        ("Owner.value", "getter", "Owner.value", True),
+        ("Owner.value", "setter", "Owner.value", True),
+        ("Owner.value", "property", "Owner.value", True),
+    ],
+)
+def test_literal_symbol_aliases(literal_lookup, stored, kind, query, match):
+    insert, lookup = literal_lookup
+    insert(stored, kind)
+    result = lookup(query)
+    assert (result is not None) is match
+    if match:
+        assert result["symbol"] == stored
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+@pytest.mark.parametrize("name", ["FrozenEval", "RepositoryReadiness", "PluginManager", "Widget"])
+def test_symbol_source_priority_and_stable_order(literal_lookup, reverse, name):
+    insert, lookup = literal_lookup
+    candidates = [
+        (name, "class", "aaa.md", "markdown", 2),
+        (name, "class", "src/z.py", "python", 8),
+        (name, "class", "docs/example.py", "python", 9),
+        (name, "class", "docs/example.py", "python", 4),
+        ("Owner." + name, "method", "aaa.py", "python", 1),
+    ]
+    for candidate in reversed(candidates) if reverse else candidates:
+        insert(*candidate)
+    result = lookup(name)
+    assert result["defined_in"] == "docs/example.py"
+    assert (result["start_line"], result["end_line"]) == (4, 6)
+
+
+@pytest.mark.parametrize(
+    "language,kind,metadata",
+    [
+        ("markdown", "class", {"language": "python"}),
+        ("plaintext", "class", None),
+        ("rst", "class", None),
+        ("latex", "class", None),
+        (None, "class", {"in_code_block": True}),
+        (None, "heading", None),
+        (None, "section", None),
+        (None, "document", None),
+        (None, "chunk", None),
+    ],
+)
+def test_source_alias_beats_document_exact(literal_lookup, language, kind, metadata):
+    insert, lookup = literal_lookup
+    insert("draw", kind, "sample.data", language, metadata=metadata)
+    assert lookup("draw")["defined_in"] == "sample.data"
+    insert("Owner.draw", "method", "src/main.py")
+    assert lookup("draw")["symbol"] == "Owner.draw"
+
+
+def test_unknown_language_uses_document_path_hint(literal_lookup):
+    insert, lookup = literal_lookup
+    insert("draw", "function", "docs/sample.unknown", "unknown")
+    insert("NS::draw", "function", "src/main.cpp", "cpp")
+    assert lookup("draw")["symbol"] == "NS::draw"
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_symbol_alias_ties_use_location_kind_and_name(literal_lookup, reverse):
+    insert, lookup = literal_lookup
+    candidates = [
+        ("Z.draw", "method", 10, 14),
+        ("A.draw", "method", 10, 14),
+        ("NS::draw", "function", 10, 14),
+        ("Earlier.draw", "method", 10, 13),
+        ("Later.draw", "method", 11, 12),
+    ]
+    for name, kind, start, end in reversed(candidates) if reverse else candidates:
+        insert(name, kind, line=start, end=end)
+    assert lookup("draw")["symbol"] == "Earlier.draw"
+    # Equal location: kind precedes stored name; dot and C++ aliases share one tier.
+    insert("Z.tie", "method", line=20)
+    insert("A.tie", "method", line=20)
+    assert lookup("tie")["symbol"] == "A.tie"
+    insert("NS::tie", "function", line=20)
+    assert lookup("tie")["symbol"] == "NS::tie"
+    # An exact source name outranks either alias regardless of path ordering.
+    insert("tie", "function", "zzz.cpp", "cpp", line=30)
+    assert lookup("tie")["symbol"] == "tie"
 
 
 class TestDispatcherInitialization:

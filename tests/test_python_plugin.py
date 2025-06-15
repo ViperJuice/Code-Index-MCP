@@ -11,6 +11,8 @@ Tests cover:
 - Performance benchmarks
 """
 
+import json
+import sqlite3
 from pathlib import Path
 from textwrap import dedent
 
@@ -18,7 +20,80 @@ import pytest
 
 from mcp_server.core.path_resolver import PathResolver
 from mcp_server.plugins.python_plugin.plugin import Plugin as PythonPlugin
+from mcp_server.plugins.python_plugin.plugin_semantic import PythonPluginSemantic
 from mcp_server.storage.sqlite_store import SQLiteStore
+
+
+@pytest.mark.parametrize("plugin_class", [PythonPlugin, PythonPluginSemantic])
+@pytest.mark.parametrize("persist", [False, True])
+def test_decorated_declaration_sites(plugin_class, persist, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("MCP_SKIP_PLUGIN_PREINDEX", "true")
+    store = SQLiteStore(str(tmp_path / "index.db")) if persist else None
+    options = {"preindex": False} if plugin_class is PythonPlugin else {"enable_semantic": False}
+    plugin = plugin_class(sqlite_store=store, **options)
+    # Undefined decorators and a raising module body must never be executed.
+    code = "\n".join(
+        [
+            "raise RuntimeError('must not execute')",
+            "@missing",
+            "@missing(arg=1)",
+            "def decorated():",
+            "    pass",
+            "@missing",
+            "async def asynchronous():",
+            "    pass",
+            "@missing",
+            "class Example:",
+            "    @missing",
+            "    @missing(arg=1)",
+            "    async def async_method(self):",
+            "        pass",
+            "    def ordinary(self):",
+            "        pass",
+            "    @classmethod",
+            "    def class_method(cls):",
+            "        pass",
+            "    @staticmethod",
+            "    def static_method():",
+            "        pass",
+            "    @property",
+            "    def value(self):",
+            "        return 1",
+            "    @value.setter",
+            "    def value(self, value):",
+            "        pass",
+            "    class Nested:",
+            "        def hidden(self):",
+            "            pass",
+            "def outer():",
+            "    def hidden():",
+            "        pass",
+            "    return hidden",
+        ]
+    )
+    expected = [
+        ("decorated", "function", 4, 5),
+        ("asynchronous", "function", 7, 8),
+        ("Example", "class", 10, 31),
+        ("async_method", "method", 13, 14),
+        ("ordinary", "method", 15, 16),
+        ("class_method", "method", 18, 19),
+        ("static_method", "method", 21, 22),
+        ("value", "method", 24, 25),
+        ("value", "method", 27, 28),
+        ("outer", "function", 32, 35),
+    ]
+    shard = plugin.indexFile(tmp_path / "example.py", code)
+    assert [(s["symbol"], s["kind"], *s["span"]) for s in shard["symbols"]] == expected
+    assert all("@" not in s["signature"] for s in shard["symbols"])
+    if store:
+        with sqlite3.connect(store.db_path) as conn:
+            rows = conn.execute(
+                "SELECT name, kind, line_start, line_end, metadata FROM symbols ORDER BY line_start"
+            ).fetchall()
+        assert [r[:4] for r in rows] == expected
+        assert all(json.loads(r[4])["parent_class"] == "Example" for r in rows if r[1] == "method")
 
 
 class TestPluginInitialization:
@@ -342,8 +417,12 @@ class TestSymbolExtraction:
         classes = [s for s in symbols if s["kind"] == "class"]
         assert len(classes) == 2
 
-        # The current implementation only extracts top-level symbols
-        # Methods are not extracted separately
+        assert {s["symbol"] for s in symbols if s["kind"] == "method"} == {
+            "__init__",
+            "method",
+            "class_method",
+            "static_method",
+        }
 
         # Verify class names
         simple_class = next(s for s in classes if s["symbol"] == "SimpleClass")
@@ -419,9 +498,8 @@ class TestSymbolExtraction:
         assert "outer_function" in symbol_names
         assert "inner_function" in symbol_names
 
-    @pytest.mark.skip(reason="Plugin does not include decorators in signatures")
-    def test_decorators_in_signature(self):
-        """Test that decorators are included in signatures."""
+    def test_decorated_symbols_keep_existing_signatures(self):
+        """Decorators preserve declaration sites without changing signature formatting."""
         plugin = PythonPlugin()
         code = dedent("""
         @decorator
@@ -448,15 +526,15 @@ class TestSymbolExtraction:
 
         # Check decorated function
         func1 = next(s for s in symbols if s["symbol"] == "decorated_function")
-        assert "@decorator" in func1["signature"]
+        assert func1["signature"] == "def decorated_function(...):"
 
         func2 = next(s for s in symbols if s["symbol"] == "multi_decorated")
-        assert "@decorator1" in func2["signature"]
-        assert "@decorator2" in func2["signature"]
+        assert func2["signature"] == "def multi_decorated(...):"
 
         # Property should have decorator
         props = [s for s in symbols if s["symbol"] == "my_property"]
-        assert any("@property" in p["signature"] for p in props)
+        assert len(props) == 2
+        assert all(p["signature"] == "def my_property(...):" for p in props)
 
 
 class TestImportTracking:
