@@ -2,9 +2,9 @@
   "embedding_model": "voyage-code-3",
   "model_dimension": 1024,
   "distance_metric": "cosine",
-  "created_at": "2025-06-28T05:09:26.851833",
+  "created_at": "2025-06-28T19:22:41.654710",
   "qdrant_path": "/workspaces/Code-Index-MCP/.indexes/qdrant/main.qdrant",
   "collection_name": "code-embeddings",
   "compatibility_hash": "1a8eb12939e6a631",
-  "git_commit": "f48abb02cff2c68ec65bd8f61e866f87316f6a0b"
+  "git_commit": "1d11bf0bd5c46d40e5b682109b036bcba0b78fcc"
 }

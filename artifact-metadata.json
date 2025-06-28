@@ -1,0 +1,32 @@
+{
+  "version": "2.0",
+  "timestamp": "2025-06-28T18:48:18.513753Z",
+  "commit": "1d11bf0bd5c46d40e5b682109b036bcba0b78fcc",
+  "branch": "main",
+  "checksum": "89085a15d96451989a81c277b4f28677a0ded38fa993c383af5e5676e799c712",
+  "compressed_size": 217,
+  "index_stats": {
+    "sqlite": {
+      "size_bytes": 93036544,
+      "size_mb": 88.7,
+      "files": 888,
+      "symbols": 0
+    }
+  },
+  "compatibility": {
+    "hash": "ec4b90fb",
+    "embedding_model": "voyage-code-3",
+    "embedding_dimension": 1024,
+    "distance_metric": "cosine",
+    "schema_version": "2.0",
+    "factors": {
+      "python_version": "3.12",
+      "relative_paths": true
+    }
+  },
+  "security": {
+    "filtered": false,
+    "filter_type": "none",
+    "export_method": "unsafe"
+  }
+}

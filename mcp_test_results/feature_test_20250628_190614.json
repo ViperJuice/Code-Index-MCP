@@ -1,0 +1,197 @@
+{
+  "timestamp": "2025-06-28T19:06:14.445803",
+  "total_time_seconds": 2.86651349067688,
+  "database_path": "/workspaces/Code-Index-MCP/.indexes/844145265d7a/code_index.db",
+  "all_tests_passed": false,
+  "working_features": [
+    "mcp_sql",
+    "multi_repo"
+  ],
+  "broken_features": [
+    "mcp_semantic",
+    "mcp_hybrid",
+    "mcp_symbol"
+  ],
+  "issues_found": [
+    "Semantic search unavailable: No Voyage AI API key",
+    "Symbol lookup failed for 'EnhancedDispatcher': no such column: type",
+    "Symbol lookup failed for 'SQLiteStore': no such column: type",
+    "Symbol lookup failed for 'BM25Indexer': no such column: type",
+    "Symbol lookup failed for 'PathUtils': no such column: type",
+    "Symbol lookup failed for 'search': no such column: type",
+    "Hybrid search failed for 'async error handling': 'dict' object has no attribute 'source'",
+    "Hybrid search failed for 'class authentication': 'dict' object has no attribute 'source'",
+    "Hybrid search failed for 'database connection pool': 'dict' object has no attribute 'source'",
+    "Hybrid search failed for 'import configuration': 'dict' object has no attribute 'source'",
+    "Hybrid search failed for 'test logging': 'dict' object has no attribute 'source'"
+  ],
+  "detailed_results": {
+    "mcp_sql": {
+      "method": "mcp_sql",
+      "working": true,
+      "avg_duration_ms": 6.810776200018154,
+      "test_results": [
+        {
+          "query": "EnhancedDispatcher",
+          "duration_ms": 9.383699999943929,
+          "result_count": 5,
+          "success": true,
+          "sample": [
+            "/workspaces/Code-Index-MCP/tests/root_tests/test_document_queries.py",
+            "...import Path\nfrom mcp_server.dispatcher.dispatcher_enhanced import <<EnhancedDispatcher>>\nfrom mcp_server.storage.sqlite_store import SQLiteStore\n\n# Setup logging...",
+            -4.239613072201845
+          ]
+        },
+        {
+          "query": "async def",
+          "duration_ms": 8.89791999998124,
+          "result_count": 5,
+          "success": true,
+          "sample": [
+            "/workspaces/Code-Index-MCP/mcp_server/interfaces/storage_interfaces.py",
+            "...Dict[str, Any] = None\n\n\n# ========================================\n# Core Storage Interfaces\n# ========================================\n\n\nclass IStorageEngine(ABC):\n    \"\"\"Main storage engine interface\"\"\"\n\n    @abstractmethod\n    <<async>> <<def>> initialize(self, config...",
+            -2.7895367226452765
+          ]
+        },
+        {
+          "query": "error handling",
+          "duration_ms": 4.71079500016458,
+          "result_count": 5,
+          "success": true,
+          "sample": [
+            "/workspaces/Code-Index-MCP/tests/root_tests/test_malformed_documents_simple.py",
+            "...print(f\"\u2713 Python syntax <<error>> caught: {type(e).__name__}\")\n\n\ndef test_unicode_<<handling>>():\n    \"\"\"Test Unicode <<handling>>.\"\"\"\n    markdown_plugin = MarkdownPlugin(enable...",
+            -1.4044101229627093
+          ]
+        },
+        {
+          "query": "TODO",
+          "duration_ms": 5.084840999870721,
+          "result_count": 5,
+          "success": true,
+          "sample": [
+            "/workspaces/Code-Index-MCP/tests/comparison/test_token_breakdown.py",
+            "...len(python_content) // 4  # Rough estimate\n        }\n        \n        # Create another file with <<TODO>> comments\n        <<todo>>_content = '''\ndef process_data(data):\n    # <<TODO>>: Add...",
+            -5.383041321452484
+          ]
+        },
+        {
+          "query": "import json",
+          "duration_ms": 5.976625000130298,
+          "result_count": 5,
+          "success": true,
+          "sample": [
+            "/workspaces/Code-Index-MCP/docs/api/API-REFERENCE.md",
+            "...application/<<json>>\n```\n\n## API Endpoints\n\n### Authentication Endpoints\n\n#### POST /auth/login\n\nAuthenticate user and receive JWT tokens.\n\n**Request Body:**\n```<<json>>\n{\n  \"username\": \"admin...",
+            -0.5364380421274821
+          ]
+        }
+      ]
+    },
+    "mcp_semantic": {
+      "method": "mcp_semantic",
+      "working": false,
+      "error": "No Voyage AI API key configured",
+      "test_results": []
+    },
+    "mcp_hybrid": {
+      "method": "mcp_hybrid",
+      "working": false,
+      "avg_duration_ms": 235.28754500002833,
+      "test_results": [
+        {
+          "query": "async error handling",
+          "duration_ms": 454.00161200018374,
+          "success": false,
+          "error": "'dict' object has no attribute 'source'"
+        },
+        {
+          "query": "class authentication",
+          "duration_ms": 211.12727800004905,
+          "success": false,
+          "error": "'dict' object has no attribute 'source'"
+        },
+        {
+          "query": "database connection pool",
+          "duration_ms": 12.039508999805548,
+          "success": false,
+          "error": "'dict' object has no attribute 'source'"
+        },
+        {
+          "query": "import configuration",
+          "duration_ms": 255.2462099999957,
+          "success": false,
+          "error": "'dict' object has no attribute 'source'"
+        },
+        {
+          "query": "test logging",
+          "duration_ms": 244.02311600010762,
+          "success": false,
+          "error": "'dict' object has no attribute 'source'"
+        }
+      ]
+    },
+    "mcp_symbol": {
+      "method": "mcp_symbol",
+      "working": false,
+      "avg_duration_ms": 0.013108799930705572,
+      "test_results": [
+        {
+          "symbol": "EnhancedDispatcher",
+          "duration_ms": 0.04072699994139839,
+          "success": false,
+          "error": "no such column: type"
+        },
+        {
+          "symbol": "SQLiteStore",
+          "duration_ms": 0.007987999879333074,
+          "success": false,
+          "error": "no such column: type"
+        },
+        {
+          "symbol": "BM25Indexer",
+          "duration_ms": 0.005384999894886278,
+          "success": false,
+          "error": "no such column: type"
+        },
+        {
+          "symbol": "PathUtils",
+          "duration_ms": 0.006634000101257698,
+          "success": false,
+          "error": "no such column: type"
+        },
+        {
+          "symbol": "search",
+          "duration_ms": 0.004809999836652423,
+          "success": false,
+          "error": "no such column: type"
+        }
+      ]
+    },
+    "multi_repo": {
+      "method": "multi_repo",
+      "working": true,
+      "repositories_found": 3,
+      "test_results": [
+        {
+          "repository": "csharp/aspnetcore",
+          "duration_ms": 0.008234000006268616,
+          "success": true,
+          "path": "/workspaces/Code-Index-MCP/test_repos/other/csharp/aspnetcore"
+        },
+        {
+          "repository": "lua/kong",
+          "duration_ms": 0.0033119999898190144,
+          "success": true,
+          "path": "/workspaces/Code-Index-MCP/test_repos/other/lua/kong"
+        },
+        {
+          "repository": "swift/Alamofire",
+          "duration_ms": 0.002581999979156535,
+          "success": true,
+          "path": "/workspaces/Code-Index-MCP/test_repos/modern/swift/Alamofire"
+        }
+      ]
+    }
+  }
+}
