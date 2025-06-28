@@ -7,7 +7,7 @@ by running the full benchmark suite and validating against SLO requirements.
 
 Usage:
     python -m mcp_server.benchmarks.run_baseline [options]
-    
+
     Options:
         --output-dir DIR    Output directory for reports (default: ./benchmark_results)
         --file-count NUM    Number of test files to generate (default: 1000)
@@ -37,61 +37,67 @@ from .benchmark_suite import BenchmarkSuite, BenchmarkResult
 def setup_logging(verbose: bool = False):
     """Setup logging configuration."""
     level = logging.DEBUG if verbose else logging.INFO
-    format_str = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format_str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     logging.basicConfig(level=level, format=format_str)
 
 
 def load_available_plugins() -> List[IPlugin]:
     """Load all available plugins for benchmarking."""
     plugins = []
-    
+
     try:
         from ..plugins.python_plugin import PythonPlugin
+
         plugins.append(PythonPlugin())
         logging.info("Loaded Python plugin")
     except ImportError as e:
         logging.warning(f"Could not load Python plugin: {e}")
-    
+
     try:
         from ..plugins.js_plugin import JSPlugin
+
         plugins.append(JSPlugin())
         logging.info("Loaded JavaScript plugin")
     except ImportError as e:
         logging.warning(f"Could not load JavaScript plugin: {e}")
-    
+
     try:
         from ..plugins.c_plugin import CPlugin
+
         plugins.append(CPlugin())
         logging.info("Loaded C plugin")
     except ImportError as e:
         logging.warning(f"Could not load C plugin: {e}")
-    
+
     # Try to load additional plugins if available
     try:
         from ..plugins.cpp_plugin import CppPlugin
+
         plugins.append(CppPlugin())
         logging.info("Loaded C++ plugin")
     except ImportError:
         logging.debug("C++ plugin not available")
-    
+
     try:
         from ..plugins.html_css_plugin import HtmlCssPlugin
+
         plugins.append(HtmlCssPlugin())
         logging.info("Loaded HTML/CSS plugin")
     except ImportError:
         logging.debug("HTML/CSS plugin not available")
-    
+
     try:
         from ..plugins.dart_plugin import DartPlugin
+
         plugins.append(DartPlugin())
         logging.info("Loaded Dart plugin")
     except ImportError:
         logging.debug("Dart plugin not available")
-    
+
     if not plugins:
         logging.error("No plugins available for benchmarking!")
         sys.exit(1)
-    
+
     logging.info(f"Loaded {len(plugins)} plugins for benchmarking")
     return plugins
 
@@ -99,15 +105,17 @@ def load_available_plugins() -> List[IPlugin]:
 def generate_comprehensive_test_data(base_path: Path, file_count: int) -> List[Path]:
     """Generate comprehensive test data for benchmarking."""
     files_created = []
-    
+
     # Calculate distribution of file types
     python_count = int(file_count * 0.4)  # 40% Python
-    js_count = int(file_count * 0.3)      # 30% JavaScript
-    c_count = int(file_count * 0.2)       # 20% C
+    js_count = int(file_count * 0.3)  # 30% JavaScript
+    c_count = int(file_count * 0.2)  # 20% C
     other_count = file_count - python_count - js_count - c_count  # 10% other
-    
-    logging.info(f"Generating test data: {python_count} Python, {js_count} JS, {c_count} C, {other_count} other files")
-    
+
+    logging.info(
+        f"Generating test data: {python_count} Python, {js_count} JS, {c_count} C, {other_count} other files"
+    )
+
     # Generate Python files
     python_dir = base_path / "python"
     python_dir.mkdir(parents=True)
@@ -258,13 +266,13 @@ if __name__ == "__main__":
 '''
         file_path.write_text(content)
         files_created.append(file_path)
-    
+
     # Generate JavaScript files
     js_dir = base_path / "javascript"
     js_dir.mkdir(parents=True)
     for i in range(js_count):
         file_path = js_dir / f"component_{i}.js"
-        content = f'''
+        content = f"""
 /**
  * Component {i} for frontend performance testing.
  * @module Component{i}
@@ -572,16 +580,16 @@ if (typeof module !== 'undefined' && module.exports) {{
         CONFIG_{i}
     }};
 }}
-'''
+"""
         file_path.write_text(content)
         files_created.append(file_path)
-    
+
     # Generate C files
     c_dir = base_path / "c"
     c_dir.mkdir(parents=True)
     for i in range(c_count):
         file_path = c_dir / f"module_{i}.c"
-        content = f'''
+        content = f"""
 /**
  * Module {i} for C performance testing
  * Contains various data structures and functions for benchmarking
@@ -894,10 +902,10 @@ void cleanup_module_{i}(void) {{
 const int MODULE_VERSION_{i} = {i % 100 + 1};
 const char MODULE_NAME_{i}[] = "Module{i}";
 const double MODULE_CONSTANT_{i} = {i} * 3.14159;
-'''
+"""
         file_path.write_text(content)
         files_created.append(file_path)
-    
+
     # Generate other file types if needed
     if other_count > 0:
         other_dir = base_path / "other"
@@ -907,7 +915,7 @@ const double MODULE_CONSTANT_{i} = {i} * 3.14159;
             if i % 3 == 0:
                 # C++ file
                 file_path = other_dir / f"class_{i}.cpp"
-                content = f'''
+                content = f"""
 #include <iostream>
 #include <vector>
 #include <memory>
@@ -935,11 +943,11 @@ public:
 }};
 
 }}
-'''
+"""
             elif i % 3 == 1:
                 # HTML file
                 file_path = other_dir / f"page_{i}.html"
-                content = f'''
+                content = f"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -956,11 +964,11 @@ public:
     </div>
 </body>
 </html>
-'''
+"""
             else:
                 # CSS file
                 file_path = other_dir / f"styles_{i}.css"
-                content = f'''
+                content = f"""
 .component-{i} {{
     display: flex;
     flex-direction: column;
@@ -981,11 +989,11 @@ public:
     height: {i}px;
     border: {i % 5 + 1}px solid #ccc;
 }}
-'''
-            
+"""
+
             file_path.write_text(content)
             files_created.append(file_path)
-    
+
     logging.info(f"Generated {len(files_created)} test files")
     return files_created
 
@@ -995,77 +1003,89 @@ async def run_comprehensive_benchmarks(
     output_dir: Path,
     file_count: int = 1000,
     iterations: int = 100,
-    validate_slo: bool = True
+    validate_slo: bool = True,
 ) -> BenchmarkResult:
     """Run comprehensive performance benchmarks."""
-    
+
     logging.info("Starting comprehensive benchmark suite...")
-    
+
     # Initialize benchmark runner
     runner = BenchmarkRunner(output_dir)
-    
+
     # Generate test data
     with tempfile.TemporaryDirectory() as tmpdir:
         test_path = Path(tmpdir)
         test_files = generate_comprehensive_test_data(test_path, file_count)
         file_paths = [str(f) for f in test_files]
-        
+
         logging.info(f"Running indexing benchmark on {len(file_paths)} files...")
         indexing_result = await runner.run_indexing_benchmark(file_paths)
-        
+
         logging.info("Running search benchmark...")
         search_queries = [
-            "DataProcessor", "Component", "process", "function", "class",
-            "async", "init", "cache", "stats", "utility", "model", "data",
-            "config", "module", "test", "performance", "benchmark"
+            "DataProcessor",
+            "Component",
+            "process",
+            "function",
+            "class",
+            "async",
+            "init",
+            "cache",
+            "stats",
+            "utility",
+            "model",
+            "data",
+            "config",
+            "module",
+            "test",
+            "performance",
+            "benchmark",
         ]
         search_result = await runner.run_search_benchmark(search_queries)
-        
+
         logging.info("Running memory benchmark...")
         memory_result = await runner.run_memory_benchmark(min(file_count, 5000))
-    
+
     # Run full benchmark suite
     logging.info("Running full benchmark suite...")
     full_result = runner.run_benchmarks(
-        plugins,
-        save_results=True,
-        compare_with_previous=True
+        plugins, save_results=True, compare_with_previous=True
     )
-    
+
     # Generate comprehensive report
     logging.info("Generating comprehensive report...")
     report_result = await runner.generate_benchmark_report()
-    
+
     if report_result.success:
         logging.info("Benchmark report generated successfully")
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("PERFORMANCE BENCHMARK REPORT")
-        print("="*80)
+        print("=" * 80)
         print(report_result.value)
-        print("="*80)
+        print("=" * 80)
     else:
         logging.error(f"Failed to generate report: {report_result.error}")
-    
+
     # Validate SLOs if requested
-    if validate_slo and hasattr(full_result, 'validations'):
+    if validate_slo and hasattr(full_result, "validations"):
         logging.info("Validating SLO compliance...")
-        
+
         passed = sum(1 for v in full_result.validations.values() if v)
         total = len(full_result.validations)
-        
+
         print(f"\nSLO VALIDATION RESULTS:")
         print(f"Overall: {passed}/{total} SLOs passed")
-        
+
         for slo_name, status in full_result.validations.items():
             status_str = "PASS" if status else "FAIL"
             print(f"  {slo_name:<35} [{status_str}]")
-        
+
         if passed < total:
             logging.warning(f"SLO validation failed: {passed}/{total} SLOs passed")
             return full_result
         else:
             logging.info("All SLOs passed!")
-    
+
     return full_result
 
 
@@ -1074,99 +1094,99 @@ def main():
     parser = argparse.ArgumentParser(
         description="Generate MCP Server performance baselines",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__
+        epilog=__doc__,
     )
-    
+
     parser.add_argument(
-        '--output-dir',
+        "--output-dir",
         type=Path,
-        default=Path('./benchmark_results'),
-        help='Output directory for reports (default: ./benchmark_results)'
+        default=Path("./benchmark_results"),
+        help="Output directory for reports (default: ./benchmark_results)",
     )
     parser.add_argument(
-        '--file-count',
+        "--file-count",
         type=int,
         default=1000,
-        help='Number of test files to generate (default: 1000)'
+        help="Number of test files to generate (default: 1000)",
     )
     parser.add_argument(
-        '--iterations',
+        "--iterations",
         type=int,
         default=100,
-        help='Number of benchmark iterations (default: 100)'
+        help="Number of benchmark iterations (default: 100)",
     )
     parser.add_argument(
-        '--validate-slo',
-        action='store_true',
+        "--validate-slo",
+        action="store_true",
         default=True,
-        help='Validate against SLO requirements (default: True)'
+        help="Validate against SLO requirements (default: True)",
     )
     parser.add_argument(
-        '--no-validate-slo',
-        action='store_false',
-        dest='validate_slo',
-        help='Disable SLO validation'
+        "--no-validate-slo",
+        action="store_false",
+        dest="validate_slo",
+        help="Disable SLO validation",
     )
     parser.add_argument(
-        '--save-baseline',
-        action='store_true',
+        "--save-baseline",
+        action="store_true",
         default=True,
-        help='Save results as new baseline (default: True)'
+        help="Save results as new baseline (default: True)",
     )
     parser.add_argument(
-        '--compare-previous',
-        action='store_true',
+        "--compare-previous",
+        action="store_true",
         default=True,
-        help='Compare with previous baseline (default: True)'
+        help="Compare with previous baseline (default: True)",
     )
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
     parser.add_argument(
-        '--verbose',
-        action='store_true',
-        help='Enable verbose logging'
+        "--format",
+        choices=["text", "json", "html", "all"],
+        default="all",
+        help="Report format (default: all)",
     )
-    parser.add_argument(
-        '--format',
-        choices=['text', 'json', 'html', 'all'],
-        default='all',
-        help='Report format (default: all)'
-    )
-    
+
     args = parser.parse_args()
-    
+
     # Setup logging
     setup_logging(args.verbose)
-    
+
     try:
         # Load plugins
         plugins = load_available_plugins()
-        
+
         # Create output directory
         args.output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Run benchmarks
-        result = asyncio.run(run_comprehensive_benchmarks(
-            plugins=plugins,
-            output_dir=args.output_dir,
-            file_count=args.file_count,
-            iterations=args.iterations,
-            validate_slo=args.validate_slo
-        ))
-        
+        result = asyncio.run(
+            run_comprehensive_benchmarks(
+                plugins=plugins,
+                output_dir=args.output_dir,
+                file_count=args.file_count,
+                iterations=args.iterations,
+                validate_slo=args.validate_slo,
+            )
+        )
+
         # Report final status
-        if hasattr(result, 'validations'):
+        if hasattr(result, "validations"):
             passed = sum(1 for v in result.validations.values() if v)
             total = len(result.validations)
-            
+
             if passed == total:
                 logging.info("✅ All performance requirements met!")
                 sys.exit(0)
             else:
-                logging.error(f"❌ Performance requirements not met: {passed}/{total} SLOs passed")
+                logging.error(
+                    f"❌ Performance requirements not met: {passed}/{total} SLOs passed"
+                )
                 sys.exit(1)
         else:
             logging.info("✅ Benchmarks completed successfully")
             sys.exit(0)
-            
+
     except KeyboardInterrupt:
         logging.info("Benchmark interrupted by user")
         sys.exit(130)
@@ -1174,9 +1194,10 @@ def main():
         logging.error(f"Benchmark failed: {e}")
         if args.verbose:
             import traceback
+
             traceback.print_exc()
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

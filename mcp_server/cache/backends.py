@@ -16,9 +16,11 @@ import weakref
 
 try:
     import redis.asyncio as aioredis
+    from redis.asyncio import Redis as AsyncRedis
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
+    AsyncRedis = None
 
 logger = logging.getLogger(__name__)
 
@@ -373,7 +375,7 @@ class RedisCacheBackend(CacheBackend):
         self._misses = 0
         self._lock = asyncio.Lock()
     
-    async def _get_redis(self) -> aioredis.Redis:
+    async def _get_redis(self) -> AsyncRedis:
         """Get Redis connection, creating if necessary."""
         if self._redis is None:
             self._redis = aioredis.from_url(

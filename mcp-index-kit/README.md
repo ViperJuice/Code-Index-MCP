@@ -79,8 +79,30 @@ mcp-index push
 mcp-index pull
 ```
 
-### Automatic sync
+### Automatic sync with Git Hooks
 
+Install git hooks for automatic index management:
+
+```bash
+mcp-index hooks install
+```
+
+This installs three git hooks:
+- **pre-push**: Automatically uploads index changes before pushing
+- **post-merge**: Automatically downloads latest index after pulling  
+- **post-checkout**: Checks index compatibility when switching branches
+
+Check hook status:
+```bash
+mcp-index hooks status
+```
+
+Uninstall hooks:
+```bash
+mcp-index hooks uninstall
+```
+
+Manual sync:
 ```bash
 mcp-index sync
 ```
@@ -93,6 +115,7 @@ Edit `.mcp-index.json`:
 {
   "enabled": true,
   "auto_download": true,
+  "auto_upload": true,
   "artifact_retention_days": 30,
   "languages": "auto",
   "github_artifacts": {

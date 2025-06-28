@@ -1,0 +1,17 @@
+{
+  "query": "Where is function process_request implemented?",
+  "mode": "mcp",
+  "tools_used": ["mcp__code-index-mcp__symbol_lookup", "mcp__code-index-mcp__search_code"],
+  "tool_calls": {
+    "mcp__code-index-mcp__symbol_lookup": 1,
+    "mcp__code-index-mcp__search_code": 1
+  },
+  "results_found": 50,
+  "execution_time_ms": 1200,
+  "token_estimate": 8500,
+  "success": true,
+  "error": null,
+  "test_id": "python_django_1_mcp",
+  "timestamp": "2025-01-06T22:17:00",
+  "batch_name": "python_django"
+}

@@ -1,0 +1,14 @@
+{
+  "query": "Find the definition of struct Runtime",
+  "mode": "native",
+  "tools_used": ["grep", "read"],
+  "tool_calls": {"grep": 2, "read": 4},
+  "results_found": 1,
+  "execution_time_ms": 3500,
+  "token_estimate": 2800,
+  "success": true,
+  "error": null,
+  "test_id": "rust_tokio_0_native",
+  "timestamp": "2025-01-06T22:19:30",
+  "batch_name": "rust_tokio"
+}

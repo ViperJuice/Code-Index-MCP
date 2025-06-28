@@ -1,0 +1,14 @@
+{
+  "query": "Show all references to HTTPServer",
+  "mode": "native",
+  "tools_used": ["Grep", "Bash"],
+  "tool_calls": {"Grep": 4, "Bash": 2},
+  "results_found": 0,
+  "execution_time_ms": 2500,
+  "token_estimate": 1800,
+  "success": true,
+  "error": null,
+  "test_id": "go_gin_7_native",
+  "batch_name": "go_gin",
+  "timestamp": "2025-01-06T01:02:00"
+}

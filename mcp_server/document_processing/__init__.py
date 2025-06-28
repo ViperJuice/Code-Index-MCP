@@ -1,9 +1,6 @@
 """Document processing plugins for code-index-mcp."""
 
-from .base_document_plugin import (
-    BaseDocumentPlugin,
-    DocumentMetadata
-)
+from .base_document_plugin import BaseDocumentPlugin, DocumentMetadata
 
 from .document_interfaces import (
     DocumentChunk,
@@ -14,7 +11,7 @@ from .document_interfaces import (
     ProcessedDocument,
     IDocumentProcessor,
     IChunkStrategy,
-    IStructureExtractor
+    IStructureExtractor,
 )
 
 from .chunk_optimizer import (
@@ -30,7 +27,7 @@ from .chunk_optimizer import (
     ParagraphBasedChunkingStrategy,
     SemanticBasedChunkingStrategy,
     HybridChunkingStrategy,
-    create_chunk_optimizer
+    create_chunk_optimizer,
 )
 
 from .metadata_extractor import MetadataExtractor
@@ -44,7 +41,7 @@ from .semantic_chunker import (
     SemanticBoundaryDetector,
     HierarchicalChunker,
     MetadataPreserver,
-    create_semantic_chunker
+    create_semantic_chunker,
 )
 
 from .contextual_embeddings import (
@@ -54,49 +51,49 @@ from .contextual_embeddings import (
     ContextPromptTemplate,
     PromptTemplateRegistry,
     ContextCache,
-    create_contextual_embedding_service
+    create_contextual_embedding_service,
 )
 
 __all__ = [
-    'BaseDocumentPlugin',
-    'DocumentMetadata',
-    'DocumentChunk',
-    'DocumentStructure',
-    'Section',
-    'ChunkType',
-    'ChunkMetadata',
-    'ProcessedDocument',
-    'IDocumentProcessor',
-    'IChunkStrategy',
-    'IStructureExtractor',
-    'ChunkOptimizer',
-    'ChunkingStrategy',
-    'ChunkingConfig',
-    'TokenEstimator',
-    'SentenceSplitter',
-    'ParagraphSplitter',
-    'SemanticAnalyzer',
-    'FixedSizeChunkingStrategy',
-    'SentenceBasedChunkingStrategy',
-    'ParagraphBasedChunkingStrategy',
-    'SemanticBasedChunkingStrategy',
-    'HybridChunkingStrategy',
-    'create_chunk_optimizer',
-    'MetadataExtractor',
-    'SemanticChunker',
-    'DocumentType',
-    'DocumentTypeDetector',
-    'ContextWindow',
-    'ChunkingContext',
-    'SemanticBoundaryDetector',
-    'HierarchicalChunker',
-    'MetadataPreserver',
-    'create_semantic_chunker',
-    'ContextualEmbeddingService',
-    'DocumentCategory',
-    'ContextGenerationMetrics',
-    'ContextPromptTemplate',
-    'PromptTemplateRegistry',
-    'ContextCache',
-    'create_contextual_embedding_service'
+    "BaseDocumentPlugin",
+    "DocumentMetadata",
+    "DocumentChunk",
+    "DocumentStructure",
+    "Section",
+    "ChunkType",
+    "ChunkMetadata",
+    "ProcessedDocument",
+    "IDocumentProcessor",
+    "IChunkStrategy",
+    "IStructureExtractor",
+    "ChunkOptimizer",
+    "ChunkingStrategy",
+    "ChunkingConfig",
+    "TokenEstimator",
+    "SentenceSplitter",
+    "ParagraphSplitter",
+    "SemanticAnalyzer",
+    "FixedSizeChunkingStrategy",
+    "SentenceBasedChunkingStrategy",
+    "ParagraphBasedChunkingStrategy",
+    "SemanticBasedChunkingStrategy",
+    "HybridChunkingStrategy",
+    "create_chunk_optimizer",
+    "MetadataExtractor",
+    "SemanticChunker",
+    "DocumentType",
+    "DocumentTypeDetector",
+    "ContextWindow",
+    "ChunkingContext",
+    "SemanticBoundaryDetector",
+    "HierarchicalChunker",
+    "MetadataPreserver",
+    "create_semantic_chunker",
+    "ContextualEmbeddingService",
+    "DocumentCategory",
+    "ContextGenerationMetrics",
+    "ContextPromptTemplate",
+    "PromptTemplateRegistry",
+    "ContextCache",
+    "create_contextual_embedding_service",
 ]

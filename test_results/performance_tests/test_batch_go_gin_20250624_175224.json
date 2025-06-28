@@ -1,0 +1,163 @@
+{
+  "batch_name": "go_gin",
+  "timestamp": "20250624_175224",
+  "test_count": 12,
+  "tests": [
+    {
+      "test_id": "go_gin_0_mcp",
+      "mode": "mcp",
+      "query_info": {
+        "query": "Find the definition of class Server",
+        "category": "symbol",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "go_gin",
+        "language": "go"
+      },
+      "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: go_gin (go)\nQuery: Find the definition of class Server\nCategory: symbol\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find the definition of class Server\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    },
+    {
+      "test_id": "go_gin_0_native",
+      "mode": "native",
+      "query_info": {
+        "query": "Find the definition of class Server",
+        "category": "symbol",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "go_gin",
+        "language": "go"
+      },
+      "prompt": "You are testing native tools for performance analysis.\n\nRepository: go_gin (go)\nWorking Directory: /workspaces/Code-Index-MCP/test_indexes/go_gin\nQuery: Find the definition of class Server\nCategory: symbol\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find the definition of class Server\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    },
+    {
+      "test_id": "go_gin_1_mcp",
+      "mode": "mcp",
+      "query_info": {
+        "query": "Where is function HandleRequest implemented?",
+        "category": "symbol",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "go_gin",
+        "language": "go"
+      },
+      "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: go_gin (go)\nQuery: Where is function HandleRequest implemented?\nCategory: symbol\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Where is function HandleRequest implemented?\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    },
+    {
+      "test_id": "go_gin_1_native",
+      "mode": "native",
+      "query_info": {
+        "query": "Where is function HandleRequest implemented?",
+        "category": "symbol",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "go_gin",
+        "language": "go"
+      },
+      "prompt": "You are testing native tools for performance analysis.\n\nRepository: go_gin (go)\nWorking Directory: /workspaces/Code-Index-MCP/test_indexes/go_gin\nQuery: Where is function HandleRequest implemented?\nCategory: symbol\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Where is function HandleRequest implemented?\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    },
+    {
+      "test_id": "go_gin_2_mcp",
+      "mode": "mcp",
+      "query_info": {
+        "query": "Search for TODO comments",
+        "category": "content",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "go_gin",
+        "language": "go"
+      },
+      "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: go_gin (go)\nQuery: Search for TODO comments\nCategory: content\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Search for TODO comments\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    },
+    {
+      "test_id": "go_gin_2_native",
+      "mode": "native",
+      "query_info": {
+        "query": "Search for TODO comments",
+        "category": "content",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "go_gin",
+        "language": "go"
+      },
+      "prompt": "You are testing native tools for performance analysis.\n\nRepository: go_gin (go)\nWorking Directory: /workspaces/Code-Index-MCP/test_indexes/go_gin\nQuery: Search for TODO comments\nCategory: content\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Search for TODO comments\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    },
+    {
+      "test_id": "go_gin_3_mcp",
+      "mode": "mcp",
+      "query_info": {
+        "query": "Find all FIXME or BUG comments",
+        "category": "content",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "go_gin",
+        "language": "go"
+      },
+      "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: go_gin (go)\nQuery: Find all FIXME or BUG comments\nCategory: content\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all FIXME or BUG comments\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    },
+    {
+      "test_id": "go_gin_3_native",
+      "mode": "native",
+      "query_info": {
+        "query": "Find all FIXME or BUG comments",
+        "category": "content",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "go_gin",
+        "language": "go"
+      },
+      "prompt": "You are testing native tools for performance analysis.\n\nRepository: go_gin (go)\nWorking Directory: /workspaces/Code-Index-MCP/test_indexes/go_gin\nQuery: Find all FIXME or BUG comments\nCategory: content\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all FIXME or BUG comments\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    },
+    {
+      "test_id": "go_gin_4_mcp",
+      "mode": "mcp",
+      "query_info": {
+        "query": "Find all files importing server",
+        "category": "navigation",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "go_gin",
+        "language": "go"
+      },
+      "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: go_gin (go)\nQuery: Find all files importing server\nCategory: navigation\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all files importing server\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    },
+    {
+      "test_id": "go_gin_4_native",
+      "mode": "native",
+      "query_info": {
+        "query": "Find all files importing server",
+        "category": "navigation",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "go_gin",
+        "language": "go"
+      },
+      "prompt": "You are testing native tools for performance analysis.\n\nRepository: go_gin (go)\nWorking Directory: /workspaces/Code-Index-MCP/test_indexes/go_gin\nQuery: Find all files importing server\nCategory: navigation\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all files importing server\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    },
+    {
+      "test_id": "go_gin_5_mcp",
+      "mode": "mcp",
+      "query_info": {
+        "query": "Show files that depend on gin",
+        "category": "navigation",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "go_gin",
+        "language": "go"
+      },
+      "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: go_gin (go)\nQuery: Show files that depend on gin\nCategory: navigation\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show files that depend on gin\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    },
+    {
+      "test_id": "go_gin_5_native",
+      "mode": "native",
+      "query_info": {
+        "query": "Show files that depend on gin",
+        "category": "navigation",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "go_gin",
+        "language": "go"
+      },
+      "prompt": "You are testing native tools for performance analysis.\n\nRepository: go_gin (go)\nWorking Directory: /workspaces/Code-Index-MCP/test_indexes/go_gin\nQuery: Show files that depend on gin\nCategory: navigation\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show files that depend on gin\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+# Dockerfile.standard - MCP Server with Semantic Search
+# Features: All minimal features + AI-powered semantic search, GitHub artifact sync
+FROM mcp-index:minimal as base
+
+# Switch to root for installation
+USER root
+
+# Install additional Python dependencies for semantic search
+RUN pip install --no-cache-dir \
+    # Semantic search dependencies
+    voyageai>=0.2.0 \
+    qdrant-client>=1.7.0 \
+    # Reranking dependencies
+    sentence-transformers>=2.0.0 \
+    # Enhanced processing
+    numpy>=1.24.0 \
+    # Artifact management
+    requests>=2.31.0 \
+    PyGithub>=2.1.0
+
+# Final stage
+FROM base
+
+# Copy configuration templates
+COPY --chown=mcp:mcp docker/config/standard.env /app/config/
+COPY --chown=mcp:mcp docker/scripts/entrypoint-standard.sh /app/
+
+# Set environment variables for standard configuration
+ENV PYTHONPATH=/app \
+    MCP_WORKSPACE_ROOT=/workspace \
+    DATABASE_URL=sqlite:////app/data/code_index.db \
+    # Enable semantic search (requires API key)
+    SEMANTIC_SEARCH_ENABLED=true \
+    SEMANTIC_EMBEDDING_MODEL=voyage-code-3 \
+    SEMANTIC_COLLECTION_NAME=code-embeddings \
+    SEMANTIC_VECTOR_SIZE=1024 \
+    SEMANTIC_SEARCH_LIMIT=20 \
+    # Reranking configuration
+    RERANKING_ENABLED=true \
+    RERANKER_TYPE=cross-encoder \
+    # GitHub artifact sync enabled by default (configurable)
+    MCP_ARTIFACT_SYNC=true \
+    AUTO_UPLOAD=true \
+    AUTO_DOWNLOAD=true \
+    ARTIFACT_RETENTION_DAYS=30 \
+    # Performance settings
+    INDEXING_MAX_WORKERS=8 \
+    INDEXING_BATCH_SIZE=50 \
+    INDEXING_GENERATE_EMBEDDINGS=true \
+    # Cache settings
+    CACHE_BACKEND=memory \
+    QUERY_CACHE_ENABLED=true \
+    QUERY_CACHE_DEFAULT_TTL=300 \
+    # Logging
+    LOG_LEVEL=INFO \
+    MCP_LOG_FILE=/app/logs/mcp.log
+
+# Create API key configuration script
+RUN echo '#!/bin/bash\n\
+if [ -z "$VOYAGE_AI_API_KEY" ]; then\n\
+    echo "⚠️  WARNING: Semantic search requires VOYAGE_AI_API_KEY" >&2\n\
+    echo "   Get your API key at: https://www.voyageai.com/" >&2\n\
+    echo "   Set it using: -e VOYAGE_AI_API_KEY=your-key" >&2\n\
+    echo "" >&2\n\
+    echo "   Costs: ~$0.05 per 1M tokens (1 token ≈ 1 character)" >&2\n\
+    echo "   Free tier: 50M tokens/month (~50K embeddings)" >&2\n\
+    echo "" >&2\n\
+    echo "   Falling back to BM25 search only..." >&2\n\
+    export SEMANTIC_SEARCH_ENABLED=false\n\
+fi\n\
+\n\
+# Check for .env file\n\
+if [ -f "/workspace/.env" ]; then\n\
+    echo "Loading configuration from .env file..." >&2\n\
+    export $(grep -v "^#" /workspace/.env | xargs)\n\
+fi\n\
+\n\
+# Check GitHub artifact sync preferences\n\
+if [ -f "/workspace/.mcp-index.json" ]; then\n\
+    echo "Loading artifact sync preferences..." >&2\n\
+    SYNC_ENABLED=$(python -c "import json; data=json.load(open(\"/workspace/.mcp-index.json\")); print(data.get(\"github_artifacts\", {}).get(\"enabled\", True))")\n\
+    export MCP_ARTIFACT_SYNC=$SYNC_ENABLED\n\
+fi\n\
+\n\
+exec "$@"' > /app/docker-entrypoint.sh && \
+    chmod +x /app/docker-entrypoint.sh && \
+    chown mcp:mcp /app/docker-entrypoint.sh
+
+# Switch back to non-root user
+USER mcp
+
+# Set the entrypoint to handle configuration
+ENTRYPOINT ["/app/docker-entrypoint.sh", "python", "/app/mcp_server_cli.py"]
+
+# Label for version tracking
+LABEL org.opencontainers.image.title="MCP Index Server - Standard" \
+      org.opencontainers.image.description="AI-powered code search with semantic understanding" \
+      org.opencontainers.image.version="standard" \
+      org.opencontainers.image.source="https://github.com/Code-Index-MCP" \
+      org.opencontainers.image.documentation="https://github.com/Code-Index-MCP/docs/DOCKER_GUIDE.md" \
+      org.opencontainers.image.licenses="MIT" \
+      com.mcp.features="semantic-search,github-sync,reranking" \
+      com.mcp.api-keys="VOYAGE_AI_API_KEY"

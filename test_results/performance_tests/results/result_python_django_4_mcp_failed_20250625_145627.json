@@ -1,0 +1,14 @@
+{
+  "query": "Find all files importing core",
+  "mode": "mcp",
+  "tools_used": [],
+  "tool_calls": {},
+  "results_found": 0,
+  "execution_time_ms": 150,
+  "token_estimate": 100,
+  "success": false,
+  "error": "MCP tools not available in Task agent environment",
+  "test_id": "python_django_4_mcp",
+  "batch_name": "python_django",
+  "timestamp": "2025-06-25T14:56:27.765720"
+}

@@ -1,0 +1,44 @@
+{
+  "completed": {
+    "c_curl": {
+      "repo": "curl",
+      "language": "c",
+      "collection": "c_curl",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": true,
+      "time": 0.00075531005859375
+    },
+    "c_phoenix": {
+      "repo": "phoenix",
+      "language": "c",
+      "collection": "c_phoenix",
+      "files_processed": 30,
+      "embeddings": 604,
+      "success": true,
+      "time": 26.045642852783203
+    },
+    "c_redis": {
+      "repo": "redis",
+      "language": "c",
+      "collection": "c_redis",
+      "files_processed": 766,
+      "embeddings": 11920,
+      "success": true,
+      "time": 499.5672388076782
+    }
+  },
+  "in_progress": {
+    "repo_key": "cpp_grpc",
+    "collection": "cpp_grpc",
+    "processed_files": [
+      "/workspaces/Code-Index-MCP/test_repos/systems/cpp/grpc/test/http2_test/messages_pb2.py",
+      "/workspaces/Code-Index-MCP/test_repos/systems/cpp/grpc/test/cpp/interop/istio_echo_server.cc",
+      "/workspaces/Code-Index-MCP/test_repos/systems/cpp/grpc/test/cpp/interop/xds_federation_client.cc",
+      "/workspaces/Code-Index-MCP/test_repos/systems/cpp/grpc/test/cpp/microbenchmarks/bm_thread_pool.cc",
+      "/workspaces/Code-Index-MCP/test_repos/systems/cpp/grpc/test/cpp/end2end/nonblocking_test.cc",
+      "/workspaces/Code-Index-MCP/test_repos/systems/cpp/grpc/test/cpp/end2end/cfstream_test.cc"
+    ]
+  },
+  "last_updated": "2025-06-27T07:44:28.681225"
+}

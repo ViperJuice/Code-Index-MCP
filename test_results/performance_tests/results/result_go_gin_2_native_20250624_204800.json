@@ -1,0 +1,14 @@
+{
+  "query": "Search for TODO comments",
+  "mode": "native",
+  "tools_used": ["Grep", "LS", "Glob"],
+  "tool_calls": {"Grep": 2, "LS": 2, "Glob": 1},
+  "results_found": 0,
+  "execution_time_ms": 2500,
+  "token_estimate": 3200,
+  "success": false,
+  "error": "No source code files found in the directory - only index database files present",
+  "test_id": "go_gin_2_native",
+  "timestamp": "2025-01-06T20:48:00",
+  "batch_name": "go_gin"
+}

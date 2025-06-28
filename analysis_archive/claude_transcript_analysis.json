@@ -1,0 +1,2294 @@
+{
+  "summary": {
+    "total_tool_uses": 453,
+    "mcp_percentage": 2.207505518763797,
+    "direct_search_percentage": 6.622516556291391,
+    "read_percentage": 22.737306843267106,
+    "read_with_limit_percentage": 54.36893203883495,
+    "read_full_file_percentage": 45.63106796116505,
+    "edit_patterns": {
+      "partial": 67,
+      "full_rewrite": 40
+    },
+    "unique_mcp_queries": 3,
+    "unique_grep_patterns": 19,
+    "common_sequences": []
+  },
+  "raw_stats": {
+    "total_tool_uses": 453,
+    "mcp_uses": 10,
+    "direct_search_uses": 30,
+    "read_uses": 103,
+    "edit_uses": 107,
+    "tool_sequences": [
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Grep"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "exit_plan_mode"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "exit_plan_mode"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Task"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Grep"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Grep"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "exit_plan_mode"
+      ],
+      [
+        "exit_plan_mode"
+      ],
+      [
+        "exit_plan_mode"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Grep"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "exit_plan_mode"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "exit_plan_mode"
+      ],
+      [
+        "Task"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Grep"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Grep"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "exit_plan_mode"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "mcp__code-index-mcp__search_code"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "mcp__code-index-mcp__search_code"
+      ],
+      [
+        "mcp__code-index-mcp__get_status"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "mcp__code-index-mcp__get_status"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Grep"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Task"
+      ],
+      [
+        "Grep"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Grep"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "exit_plan_mode"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "mcp__code-index-mcp__get_status"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Grep"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "exit_plan_mode"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "exit_plan_mode"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Task"
+      ],
+      [
+        "LS"
+      ],
+      [
+        "TodoWrite"
+      ],
+      [
+        "exit_plan_mode"
+      ],
+      [
+        "Task"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "LS"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "LS"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "LS"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Task"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Grep"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Grep"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "exit_plan_mode"
+      ],
+      [
+        "TodoWrite"
+      ],
+      [
+        "TodoWrite"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Glob"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "TodoWrite"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "mcp__code-index-mcp__get_status"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Grep"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Task"
+      ],
+      [
+        "Grep"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Grep"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "exit_plan_mode"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "mcp__code-index-mcp__get_status"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "TodoWrite"
+      ],
+      [
+        "TodoWrite"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "TodoWrite"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "TodoWrite"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "TodoWrite"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "mcp__code-index-mcp__get_status"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "mcp__code-index-mcp__get_status"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "exit_plan_mode"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Grep"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "mcp__code-index-mcp__get_status"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Grep"
+      ],
+      [
+        "Grep"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Grep"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Bash"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Grep"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Grep"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Grep"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Edit"
+      ],
+      [
+        "Write"
+      ],
+      [
+        "Task"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Grep"
+      ],
+      [
+        "Glob"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "Read"
+      ],
+      [
+        "LS"
+      ]
+    ],
+    "read_patterns": [
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 50,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": true,
+        "offset": 200
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 50,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": true,
+        "offset": 100
+      },
+      {
+        "has_limit": true,
+        "limit": 150,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 50,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": true,
+        "offset": 200
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": true,
+        "offset": 100
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": true,
+        "offset": 200
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": true,
+        "offset": 200
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 50,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 50,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": true,
+        "offset": 300
+      },
+      {
+        "has_limit": true,
+        "limit": 50,
+        "has_offset": true,
+        "offset": 450
+      },
+      {
+        "has_limit": true,
+        "limit": 30,
+        "has_offset": true,
+        "offset": 427
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 50,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 50,
+        "has_offset": true,
+        "offset": 50
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 150,
+        "has_offset": true,
+        "offset": 200
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 50,
+        "has_offset": true,
+        "offset": 80
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 50,
+        "has_offset": true,
+        "offset": 180
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 50,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": true,
+        "offset": 200
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 50,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 50,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 150,
+        "has_offset": true,
+        "offset": 200
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 50,
+        "has_offset": true,
+        "offset": 80
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 50,
+        "has_offset": true,
+        "offset": 180
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 10,
+        "has_offset": true,
+        "offset": 180
+      },
+      {
+        "has_limit": true,
+        "limit": 70,
+        "has_offset": true,
+        "offset": 50
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 30,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": true,
+        "offset": 100
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 100,
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": true,
+        "limit": 40,
+        "has_offset": true,
+        "offset": 210
+      },
+      {
+        "has_limit": true,
+        "limit": 35,
+        "has_offset": true,
+        "offset": 185
+      },
+      {
+        "has_limit": true,
+        "limit": 40,
+        "has_offset": true,
+        "offset": 280
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      },
+      {
+        "has_limit": false,
+        "limit": "full",
+        "has_offset": false,
+        "offset": 0
+      }
+    ],
+    "edit_patterns": [
+      "partial",
+      "partial",
+      "partial",
+      "full_rewrite",
+      "full_rewrite",
+      "full_rewrite",
+      "full_rewrite",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "full_rewrite",
+      "full_rewrite",
+      "partial",
+      "partial",
+      "full_rewrite",
+      "full_rewrite",
+      "partial",
+      "full_rewrite",
+      "full_rewrite",
+      "partial",
+      "full_rewrite",
+      "full_rewrite",
+      "partial",
+      "full_rewrite",
+      "partial",
+      "full_rewrite",
+      "full_rewrite",
+      "partial",
+      "partial",
+      "full_rewrite",
+      "partial",
+      "full_rewrite",
+      "partial",
+      "full_rewrite",
+      "partial",
+      "full_rewrite",
+      "full_rewrite",
+      "full_rewrite",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "full_rewrite",
+      "partial",
+      "full_rewrite",
+      "full_rewrite",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "full_rewrite",
+      "full_rewrite",
+      "full_rewrite",
+      "full_rewrite",
+      "full_rewrite",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "full_rewrite",
+      "partial",
+      "full_rewrite",
+      "full_rewrite",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "full_rewrite",
+      "full_rewrite",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "full_rewrite",
+      "partial",
+      "full_rewrite",
+      "full_rewrite",
+      "partial",
+      "full_rewrite",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "full_rewrite",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "partial",
+      "full_rewrite"
+    ],
+    "mcp_queries": [
+      {
+        "tool": "mcp__code-index-mcp__search_code",
+        "query": "func main",
+        "semantic": false,
+        "limit": 5
+      },
+      {
+        "tool": "mcp__code-index-mcp__search_code",
+        "query": "EnhancedDispatcher",
+        "semantic": false,
+        "limit": 3
+      },
+      {
+        "tool": "mcp__code-index-mcp__get_status",
+        "query": "",
+        "semantic": false,
+        "limit": 20
+      },
+      {
+        "tool": "mcp__code-index-mcp__get_status",
+        "query": "",
+        "semantic": false,
+        "limit": 20
+      },
+      {
+        "tool": "mcp__code-index-mcp__get_status",
+        "query": "",
+        "semantic": false,
+        "limit": 20
+      },
+      {
+        "tool": "mcp__code-index-mcp__get_status",
+        "query": "",
+        "semantic": false,
+        "limit": 20
+      },
+      {
+        "tool": "mcp__code-index-mcp__get_status",
+        "query": "",
+        "semantic": false,
+        "limit": 20
+      },
+      {
+        "tool": "mcp__code-index-mcp__get_status",
+        "query": "",
+        "semantic": false,
+        "limit": 20
+      },
+      {
+        "tool": "mcp__code-index-mcp__get_status",
+        "query": "",
+        "semantic": false,
+        "limit": 20
+      },
+      {
+        "tool": "mcp__code-index-mcp__get_status",
+        "query": "",
+        "semantic": false,
+        "limit": 20
+      }
+    ],
+    "grep_patterns": [
+      {
+        "pattern": "WSL|wsl",
+        "include": "",
+        "path": "/workspaces/Code-Index-MCP/docs"
+      },
+      {
+        "pattern": "comparison|benchmark|performance|visual.*report|multi.*repo",
+        "include": "",
+        "path": "/workspaces/Code-Index-MCP/scripts"
+      },
+      {
+        "pattern": "claude.*transcript|analyze.*jsonl|token.*count.*claude",
+        "include": "",
+        "path": "/workspaces/Code-Index-MCP/scripts"
+      },
+      {
+        "pattern": "class BM25Indexer",
+        "include": "",
+        "path": "/workspaces/Code-Index-MCP/mcp_server/indexer"
+      },
+      {
+        "pattern": "def add.*file|def store.*file|def index.*file",
+        "include": "",
+        "path": "/workspaces/Code-Index-MCP/mcp_server/storage/sqlite_store.py"
+      },
+      {
+        "pattern": "def get_file",
+        "include": "",
+        "path": "/workspaces/Code-Index-MCP/mcp_server/storage/sqlite_store.py"
+      },
+      {
+        "pattern": "DATABASE_URL|db_path|code_index.db",
+        "include": "",
+        "path": "/workspaces/Code-Index-MCP/scripts/cli/mcp_server_cli.py"
+      },
+      {
+        "pattern": ".mcp-index|index_path|index_dir",
+        "include": "*.py",
+        "path": "/workspaces/Code-Index-MCP"
+      },
+      {
+        "pattern": "MCP_INDEX_DIR|INDEX_STORAGE_PATH|index_storage_path",
+        "include": "*.py",
+        "path": "/workspaces/Code-Index-MCP"
+      },
+      {
+        "pattern": "WSL|wsl",
+        "include": "",
+        "path": "/workspaces/Code-Index-MCP/docs"
+      },
+      {
+        "pattern": "test_repos",
+        "include": "*.py",
+        "path": ""
+      },
+      {
+        "pattern": "visualization|analysis.*codebase",
+        "include": "",
+        "path": "/workspaces/Code-Index-MCP"
+      },
+      {
+        "pattern": "DATABASE_URL|db_path|code_index.db",
+        "include": "",
+        "path": "/workspaces/Code-Index-MCP/scripts/cli/mcp_server_cli.py"
+      },
+      {
+        "pattern": ".mcp-index|index_path|index_dir",
+        "include": "*.py",
+        "path": "/workspaces/Code-Index-MCP"
+      },
+      {
+        "pattern": "MCP_INDEX_DIR|INDEX_STORAGE_PATH|index_storage_path",
+        "include": "*.py",
+        "path": "/workspaces/Code-Index-MCP"
+      },
+      {
+        "pattern": "\\.mcp-index",
+        "include": "",
+        "path": "/workspaces/Code-Index-MCP/.gitignore"
+      },
+      {
+        "pattern": "localStorage|Local Storage|.mcp-index",
+        "include": "",
+        "path": "/workspaces/Code-Index-MCP/architecture/workspace.dsl"
+      },
+      {
+        "pattern": "Storage|storage|SQLite",
+        "include": "",
+        "path": "/workspaces/Code-Index-MCP/architecture/workspace.dsl"
+      },
+      {
+        "pattern": ".mcp-index|local storage|LocalStorage",
+        "include": "*.puml",
+        "path": "/workspaces/Code-Index-MCP/architecture/level4"
+      },
+      {
+        "pattern": "Storage relationships|indexManager ->",
+        "include": "",
+        "path": "/workspaces/Code-Index-MCP/architecture/workspace.dsl"
+      },
+      {
+        "pattern": "pythonPlugin -> indexManager",
+        "include": "",
+        "path": "/workspaces/Code-Index-MCP/architecture/workspace.dsl"
+      },
+      {
+        "pattern": "deployment|Deployment",
+        "include": "",
+        "path": "/workspaces/Code-Index-MCP/architecture/workspace.dsl"
+      },
+      {
+        "pattern": "centralized.*index|~/.mcp/indexes",
+        "include": "",
+        "path": "/workspaces/Code-Index-MCP/docs"
+      }
+    ]
+  },
+  "timestamp": "2025-06-15T06:22:32.162453"
+}

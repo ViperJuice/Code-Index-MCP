@@ -9,6 +9,7 @@ import uuid
 
 class UserRole(str, Enum):
     """User roles for role-based access control."""
+
     ADMIN = "admin"
     USER = "user"
     READONLY = "readonly"
@@ -17,6 +18,7 @@ class UserRole(str, Enum):
 
 class Permission(str, Enum):
     """Available permissions in the system."""
+
     READ = "read"
     WRITE = "write"
     DELETE = "delete"
@@ -26,6 +28,7 @@ class Permission(str, Enum):
 
 class AccessLevel(str, Enum):
     """Access levels for path-based authorization."""
+
     PUBLIC = "public"
     PROTECTED = "protected"
     PRIVATE = "private"
@@ -34,6 +37,7 @@ class AccessLevel(str, Enum):
 
 class User(BaseModel):
     """User model for authentication."""
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     username: str
     email: Optional[str] = None
@@ -45,23 +49,26 @@ class User(BaseModel):
     last_login: Optional[datetime] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
-    @validator('username')
+    @validator("username")
     def username_must_be_valid(cls, v):
         if not v or len(v) < 3:
-            raise ValueError('Username must be at least 3 characters long')
-        if not v.isalnum() and '_' not in v and '-' not in v:
-            raise ValueError('Username can only contain alphanumeric characters, underscores, and hyphens')
+            raise ValueError("Username must be at least 3 characters long")
+        if not v.isalnum() and "_" not in v and "-" not in v:
+            raise ValueError(
+                "Username can only contain alphanumeric characters, underscores, and hyphens"
+            )
         return v
 
-    @validator('email')
+    @validator("email")
     def email_must_be_valid(cls, v):
-        if v and '@' not in v:
-            raise ValueError('Invalid email format')
+        if v and "@" not in v:
+            raise ValueError("Invalid email format")
         return v
 
 
 class TokenData(BaseModel):
     """JWT token data structure."""
+
     user_id: str
     username: str
     role: UserRole
@@ -71,33 +78,35 @@ class TokenData(BaseModel):
     token_type: str = "access"
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
-    @validator('expires_at')
+    @validator("expires_at")
     def expires_at_must_be_future(cls, v, values):
-        if 'issued_at' in values and v <= values['issued_at']:
-            raise ValueError('Expiration time must be in the future')
+        if "issued_at" in values and v <= values["issued_at"]:
+            raise ValueError("Expiration time must be in the future")
         return v
 
 
 class AuthCredentials(BaseModel):
     """Authentication credentials."""
+
     username: str
     password: str
 
-    @validator('username')
+    @validator("username")
     def username_required(cls, v):
         if not v or not v.strip():
-            raise ValueError('Username is required')
+            raise ValueError("Username is required")
         return v.strip()
 
-    @validator('password')
+    @validator("password")
     def password_required(cls, v):
         if not v:
-            raise ValueError('Password is required')
+            raise ValueError("Password is required")
         return v
 
 
 class RefreshTokenData(BaseModel):
     """Refresh token data structure."""
+
     user_id: str
     token_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     issued_at: datetime = Field(default_factory=datetime.utcnow)
@@ -107,6 +116,7 @@ class RefreshTokenData(BaseModel):
 
 class AccessRequest(BaseModel):
     """Access request for path-based authorization."""
+
     user_id: str
     path: str
     operation: Permission
@@ -116,6 +126,7 @@ class AccessRequest(BaseModel):
 
 class AccessRule(BaseModel):
     """Access rule for path-based authorization."""
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     path_pattern: str
     access_level: AccessLevel
@@ -124,15 +135,16 @@ class AccessRule(BaseModel):
     allowed_operations: List[Permission] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
-    @validator('path_pattern')
+    @validator("path_pattern")
     def path_pattern_required(cls, v):
         if not v or not v.strip():
-            raise ValueError('Path pattern is required')
+            raise ValueError("Path pattern is required")
         return v.strip()
 
 
 class SecurityConfig(BaseModel):
     """Security configuration model."""
+
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
@@ -143,36 +155,41 @@ class SecurityConfig(BaseModel):
     rate_limit_requests: int = 100
     rate_limit_window_minutes: int = 1
     cors_origins: List[str] = Field(default_factory=lambda: ["*"])
-    cors_methods: List[str] = Field(default_factory=lambda: ["GET", "POST", "PUT", "DELETE"])
+    cors_methods: List[str] = Field(
+        default_factory=lambda: ["GET", "POST", "PUT", "DELETE"]
+    )
     cors_headers: List[str] = Field(default_factory=lambda: ["*"])
-    security_headers: Dict[str, str] = Field(default_factory=lambda: {
-        "X-Content-Type-Options": "nosniff",
-        "X-Frame-Options": "DENY",
-        "X-XSS-Protection": "1; mode=block",
-        "Strict-Transport-Security": "max-age=31536000; includeSubDomains"
-    })
+    security_headers: Dict[str, str] = Field(
+        default_factory=lambda: {
+            "X-Content-Type-Options": "nosniff",
+            "X-Frame-Options": "DENY",
+            "X-XSS-Protection": "1; mode=block",
+            "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+        }
+    )
 
-    @validator('jwt_secret_key')
+    @validator("jwt_secret_key")
     def jwt_secret_key_required(cls, v):
         if not v or len(v) < 32:
-            raise ValueError('JWT secret key must be at least 32 characters long')
+            raise ValueError("JWT secret key must be at least 32 characters long")
         return v
 
-    @validator('access_token_expire_minutes')
+    @validator("access_token_expire_minutes")
     def access_token_expire_minutes_positive(cls, v):
         if v <= 0:
-            raise ValueError('Access token expire minutes must be positive')
+            raise ValueError("Access token expire minutes must be positive")
         return v
 
-    @validator('refresh_token_expire_days')
+    @validator("refresh_token_expire_days")
     def refresh_token_expire_days_positive(cls, v):
         if v <= 0:
-            raise ValueError('Refresh token expire days must be positive')
+            raise ValueError("Refresh token expire days must be positive")
         return v
 
 
 class SecurityEvent(BaseModel):
     """Security event for audit logging."""
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     event_type: str
     user_id: Optional[str] = None
@@ -186,6 +203,7 @@ class SecurityEvent(BaseModel):
 
 class RateLimitInfo(BaseModel):
     """Rate limiting information."""
+
     identifier: str  # IP address or user ID
     requests_count: int = 0
     window_start: datetime = Field(default_factory=datetime.utcnow)
@@ -195,6 +213,7 @@ class RateLimitInfo(BaseModel):
 
 class SessionInfo(BaseModel):
     """User session information."""
+
     session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     user_id: str
     ip_address: Optional[str] = None
@@ -206,10 +225,16 @@ class SessionInfo(BaseModel):
 
 # Default role permissions mapping
 DEFAULT_ROLE_PERMISSIONS = {
-    UserRole.ADMIN: [Permission.READ, Permission.WRITE, Permission.DELETE, Permission.EXECUTE, Permission.ADMIN],
+    UserRole.ADMIN: [
+        Permission.READ,
+        Permission.WRITE,
+        Permission.DELETE,
+        Permission.EXECUTE,
+        Permission.ADMIN,
+    ],
     UserRole.USER: [Permission.READ, Permission.WRITE, Permission.EXECUTE],
     UserRole.READONLY: [Permission.READ],
-    UserRole.GUEST: []
+    UserRole.GUEST: [],
 }
 
 # Default access rules
@@ -217,24 +242,29 @@ DEFAULT_ACCESS_RULES = [
     AccessRule(
         path_pattern="/api/v1/public/*",
         access_level=AccessLevel.PUBLIC,
-        allowed_operations=[Permission.READ]
+        allowed_operations=[Permission.READ],
     ),
     AccessRule(
         path_pattern="/api/v1/auth/*",
         access_level=AccessLevel.PUBLIC,
-        allowed_operations=[Permission.READ, Permission.WRITE]
+        allowed_operations=[Permission.READ, Permission.WRITE],
     ),
     AccessRule(
         path_pattern="/api/v1/admin/*",
         access_level=AccessLevel.RESTRICTED,
         required_role=UserRole.ADMIN,
         required_permissions=[Permission.ADMIN],
-        allowed_operations=[Permission.READ, Permission.WRITE, Permission.DELETE, Permission.EXECUTE]
+        allowed_operations=[
+            Permission.READ,
+            Permission.WRITE,
+            Permission.DELETE,
+            Permission.EXECUTE,
+        ],
     ),
     AccessRule(
         path_pattern="/api/v1/*",
         access_level=AccessLevel.PROTECTED,
         required_permissions=[Permission.READ],
-        allowed_operations=[Permission.READ, Permission.WRITE, Permission.EXECUTE]
-    )
+        allowed_operations=[Permission.READ, Permission.WRITE, Permission.EXECUTE],
+    ),
 ]

@@ -43,7 +43,7 @@ env/
 
 # Index artifacts (tracked selectively)
 # code_index.db is too large for Git - use scripts/download_index.sh
-!vector_index.qdrant/
+!data/indexes/vector_index.qdrant/
 !.index_metadata.json
 
 # Environment variables
@@ -139,7 +139,8 @@ cache_*.db
 
 # Local test data and results (DO IGNORE)
 test_workspace/
-test_results/
+tests/results/
+tests/coverage/
 rapid_test_report.json
 
 # Local data directories (DO IGNORE)
@@ -148,8 +149,15 @@ backup/
 cache/
 
 # Test repositories (git submodules)
-test_repos/
+tests/fixtures/repos/
 
 # MCP Index (tracked for fast setup)
 .mcp-index/code_index.db
 .mcp-index/.index_metadata.json
+
+# Local index storage (3.1GB of data - DO NOT COMMIT)
+.indexes/
+
+test_repos/
+temp_cookbook/
+testing-env/

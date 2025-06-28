@@ -1,0 +1,14 @@
+{
+  "query": "What are the authentication backends",
+  "mode": "native",
+  "tools_used": ["Bash", "Read"],
+  "tool_calls": {"Bash": 3, "Read": 1},
+  "results_found": 10,
+  "execution_time_ms": 1100,
+  "token_estimate": 4000,
+  "success": true,
+  "error": null,
+  "test_id": "python_django_9_native",
+  "batch_name": "python_django",
+  "timestamp": "2025-01-06T01:24:00"
+}

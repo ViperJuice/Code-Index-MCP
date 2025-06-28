@@ -13,9 +13,9 @@ def load_test_data(filename: str) -> Any:
     """Load test data from JSON file."""
     test_data_dir = Path(__file__).parent / "test_data"
     file_path = test_data_dir / filename
-    
+
     if file_path.exists():
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             return json.load(f)
     return {}
 
@@ -30,7 +30,7 @@ This is a paragraph.
 ## Section
 
 Another paragraph."""
-    
+
     elif complexity == "medium":
         return """---
 title: Test Document
@@ -59,7 +59,7 @@ def test():
 ## Conclusion
 
 Final thoughts."""
-    
+
     elif complexity == "complex":
         return """---
 title: Complex Document
@@ -140,7 +140,7 @@ const processDocument = async (doc) => {
 ## Conclusion
 
 This demonstrates various markdown features."""
-    
+
     return ""
 
 
@@ -157,7 +157,7 @@ maintainability and knowledge sharing among team members.
 
 Finally, we conclude that both testing and documentation are critical 
 components of professional software development."""
-    
+
     elif topic == "technical":
         return """Technical Specification Document
 
@@ -183,7 +183,7 @@ with refresh token rotation.
 
 The system must handle 1000 concurrent users with response times under 
 200ms for read operations and under 500ms for write operations."""
-    
+
     elif topic == "narrative":
         return """The Journey of Software Development
 
@@ -205,7 +205,7 @@ software slowly took shape.
 
 In the end, the developers learned that perfection was not a destination 
 but a journey of continuous improvement."""
-    
+
     return ""
 
 
@@ -224,9 +224,9 @@ def memory_monitor():
     """Context manager for monitoring memory usage."""
     process = psutil.Process(os.getpid())
     initial_memory = process.memory_info().rss / 1024 / 1024  # MB
-    
+
     yield
-    
+
     final_memory = process.memory_info().rss / 1024 / 1024  # MB
     memory_used = final_memory - initial_memory
     print(f"Memory used: {memory_used:.2f} MB")
@@ -236,38 +236,42 @@ def generate_large_content(size_mb: int) -> str:
     """Generate large content for performance testing."""
     # Approximate 1MB of text
     base_text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. " * 1000
-    base_size = len(base_text.encode('utf-8')) / 1024 / 1024
-    
+    base_size = len(base_text.encode("utf-8")) / 1024 / 1024
+
     repetitions = int(size_mb / base_size)
     return (base_text + "\n\n") * repetitions
 
 
 def assert_performance(duration: float, max_duration: float, operation: str):
     """Assert that an operation completed within time limit."""
-    assert duration <= max_duration, \
-        f"{operation} took {duration:.3f}s, exceeding limit of {max_duration}s"
+    assert (
+        duration <= max_duration
+    ), f"{operation} took {duration:.3f}s, exceeding limit of {max_duration}s"
 
 
 def assert_memory_usage(memory_mb: float, max_memory_mb: float, operation: str):
     """Assert that an operation used acceptable memory."""
-    assert memory_mb <= max_memory_mb, \
-        f"{operation} used {memory_mb:.2f}MB, exceeding limit of {max_memory_mb}MB"
+    assert (
+        memory_mb <= max_memory_mb
+    ), f"{operation} used {memory_mb:.2f}MB, exceeding limit of {max_memory_mb}MB"
 
 
 def create_mock_search_results(query: str, count: int = 5) -> List[Dict[str, Any]]:
     """Create mock search results for testing."""
     results = []
     for i in range(count):
-        results.append({
-            'id': f'result-{i}',
-            'score': 0.9 - (i * 0.1),
-            'content': f'Result {i} for query: {query}',
-            'metadata': {
-                'source': f'document-{i}.md',
-                'section': f'Section {i}',
-                'line': i * 10
+        results.append(
+            {
+                "id": f"result-{i}",
+                "score": 0.9 - (i * 0.1),
+                "content": f"Result {i} for query: {query}",
+                "metadata": {
+                    "source": f"document-{i}.md",
+                    "section": f"Section {i}",
+                    "line": i * 10,
+                },
             }
-        })
+        )
     return results
 
 
@@ -283,7 +287,7 @@ nested:
 ---
 
 # Content"""
-    
+
     elif error_type == "incomplete_code":
         return """# Document
 
@@ -291,10 +295,10 @@ nested:
 def incomplete():
     # This code block is never closed
     return None"""
-    
+
     elif error_type == "binary_content":
         return "# Document\n\n" + "\x00\x01\x02\x03\x04" + "\n\nBinary content"
-    
+
     elif error_type == "circular_reference":
         return """# Document
 
@@ -307,5 +311,5 @@ See [Section B](#section-b)
 ## Section B  
 
 See [Section A](#section-a)"""
-    
+
     return ""

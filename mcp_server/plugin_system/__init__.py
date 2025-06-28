@@ -10,19 +10,20 @@ from .models import (
     PluginState,
     PluginType,
     PluginSystemConfig,
+    PluginInstance,
     PluginError,
     PluginNotFoundError,
     PluginLoadError,
     PluginInitError,
     PluginValidationError,
-    PluginConfigError
+    PluginConfigError,
 )
 from .interfaces import (
     IPluginDiscovery,
     IPluginLoader,
     IPluginRegistry,
     ILifecycleManager,
-    IPluginManager
+    IPluginManager,
 )
 from .discovery import PluginDiscovery, get_plugin_discovery
 from .loader import PluginLoader, get_plugin_loader
@@ -30,35 +31,32 @@ from .config import PluginConfigManager, get_config_manager
 
 __all__ = [
     # Main class
-    'PluginManager',
-    
+    "PluginManager",
     # Models
-    'PluginInfo',
-    'PluginConfig',
-    'PluginState',
-    'PluginType',
-    'PluginSystemConfig',
-    
+    "PluginInfo",
+    "PluginConfig",
+    "PluginState",
+    "PluginType",
+    "PluginSystemConfig",
+    "PluginInstance",
     # Exceptions
-    'PluginError',
-    'PluginNotFoundError',
-    'PluginLoadError',
-    'PluginInitError',
-    'PluginValidationError',
-    'PluginConfigError',
-    
+    "PluginError",
+    "PluginNotFoundError",
+    "PluginLoadError",
+    "PluginInitError",
+    "PluginValidationError",
+    "PluginConfigError",
     # Interfaces
-    'IPluginDiscovery',
-    'IPluginLoader',
-    'IPluginRegistry',
-    'ILifecycleManager',
-    'IPluginManager',
-    
+    "IPluginDiscovery",
+    "IPluginLoader",
+    "IPluginRegistry",
+    "ILifecycleManager",
+    "IPluginManager",
     # Dynamic plugin system
-    'PluginDiscovery',
-    'get_plugin_discovery',
-    'PluginLoader',
-    'get_plugin_loader',
-    'PluginConfigManager',
-    'get_config_manager'
+    "PluginDiscovery",
+    "get_plugin_discovery",
+    "PluginLoader",
+    "get_plugin_loader",
+    "PluginConfigManager",
+    "get_config_manager",
 ]

@@ -34,13 +34,15 @@ def benchmark_results():
     """Fixture to collect benchmark results across all tests."""
     results = {}
     yield results
-    
+
     # Print summary at the end
     if results:
         print("\n\n=== Performance Benchmark Summary ===")
         for test_name, timings in results.items():
             avg_time = sum(timings) / len(timings)
-            print(f"{test_name}: avg={avg_time:.3f}s, min={min(timings):.3f}s, max={max(timings):.3f}s")
+            print(
+                f"{test_name}: avg={avg_time:.3f}s, min={min(timings):.3f}s, max={max(timings):.3f}s"
+            )
 
 
 # Database fixtures
@@ -63,36 +65,53 @@ def populated_sqlite_store(sqlite_store: SQLiteStore) -> SQLiteStore:
     """Create a SQLiteStore with sample data."""
     # Create a repository
     repo_id = sqlite_store.create_repository("/test/repo", "test-repo", {"type": "git"})
-    
+
     # Create some files
     file1_id = sqlite_store.store_file(
-        repo_id, "/test/repo/main.py", "main.py",
-        language="python", size=1024, hash="abc123"
+        repo_id,
+        "/test/repo/main.py",
+        "main.py",
+        language="python",
+        size=1024,
+        hash="abc123",
     )
     file2_id = sqlite_store.store_file(
-        repo_id, "/test/repo/utils.py", "utils.py",
-        language="python", size=512, hash="def456"
+        repo_id,
+        "/test/repo/utils.py",
+        "utils.py",
+        language="python",
+        size=512,
+        hash="def456",
     )
-    
+
     # Create some symbols
     sqlite_store.store_symbol(
-        file1_id, "main", "function",
-        line_start=1, line_end=10,
+        file1_id,
+        "main",
+        "function",
+        line_start=1,
+        line_end=10,
         signature="def main() -> None",
-        documentation="Main entry point"
+        documentation="Main entry point",
     )
     sqlite_store.store_symbol(
-        file1_id, "MyClass", "class",
-        line_start=15, line_end=50,
+        file1_id,
+        "MyClass",
+        "class",
+        line_start=15,
+        line_end=50,
         signature="class MyClass",
-        documentation="A sample class"
+        documentation="A sample class",
     )
     sqlite_store.store_symbol(
-        file2_id, "helper_function", "function",
-        line_start=5, line_end=15,
-        signature="def helper_function(x: int) -> str"
+        file2_id,
+        "helper_function",
+        "function",
+        line_start=5,
+        line_end=15,
+        signature="def helper_function(x: int) -> str",
     )
-    
+
     return sqlite_store
 
 
@@ -102,9 +121,10 @@ def temp_code_directory(tmp_path: Path) -> Path:
     """Create a temporary directory with sample code files."""
     code_dir = tmp_path / "test_code"
     code_dir.mkdir()
-    
+
     # Create Python files
-    (code_dir / "sample.py").write_text("""
+    (code_dir / "sample.py").write_text(
+        """
 def hello_world():
     '''Say hello to the world.'''
     print("Hello, World!")
@@ -120,10 +140,12 @@ class Calculator:
 
 if __name__ == "__main__":
     hello_world()
-""")
-    
+"""
+    )
+
     # Create JavaScript file
-    (code_dir / "app.js").write_text("""
+    (code_dir / "app.js").write_text(
+        """
 function greet(name) {
     return `Hello, ${name}!`;
 }
@@ -139,11 +161,13 @@ class UserManager {
 }
 
 module.exports = { greet, UserManager };
-""")
-    
+"""
+    )
+
     # Create nested directory structure
     (code_dir / "src").mkdir()
-    (code_dir / "src" / "utils.py").write_text("""
+    (code_dir / "src" / "utils.py").write_text(
+        """
 import os
 from typing import List
 
@@ -155,8 +179,9 @@ def process_files(paths: List[str]) -> None:
 class FileHandler:
     def __init__(self, base_path: str):
         self.base_path = base_path
-""")
-    
+"""
+    )
+
     return code_dir
 
 
@@ -164,23 +189,23 @@ class FileHandler:
 def mock_file_system(monkeypatch):
     """Mock file system operations for isolated testing."""
     mock_fs = {}
-    
+
     def mock_exists(path):
         return str(path) in mock_fs
-    
+
     def mock_read_text(path):
         if str(path) not in mock_fs:
             raise FileNotFoundError(f"File not found: {path}")
         return mock_fs[str(path)]
-    
+
     def mock_write_text(path, content):
         mock_fs[str(path)] = content
-    
+
     # Patch Path methods
     monkeypatch.setattr(Path, "exists", mock_exists)
     monkeypatch.setattr(Path, "read_text", mock_read_text)
     monkeypatch.setattr(Path, "write_text", mock_write_text)
-    
+
     return mock_fs
 
 
@@ -197,7 +222,7 @@ def mock_plugin() -> Mock:
                 "name": "test_function",
                 "kind": "function",
                 "line": 1,
-                "signature": "def test_function()"
+                "signature": "def test_function()",
             }
         ]
     }
@@ -206,14 +231,11 @@ def mock_plugin() -> Mock:
         kind="function",
         path="/test/file.py",
         line=1,
-        signature="def test_function()"
+        signature="def test_function()",
     )
     plugin.search.return_value = [
         SearchResult(
-            name="test_function",
-            kind="function",
-            path="/test/file.py",
-            score=1.0
+            name="test_function", kind="function", path="/test/file.py", score=1.0
         )
     ]
     return plugin
@@ -239,7 +261,9 @@ def dispatcher_with_mock(mock_plugin: Mock) -> Dispatcher:
 
 # File watcher fixtures
 @pytest.fixture
-def file_watcher(temp_code_directory: Path, dispatcher_with_plugins: Dispatcher) -> FileWatcher:
+def file_watcher(
+    temp_code_directory: Path, dispatcher_with_plugins: Dispatcher
+) -> FileWatcher:
     """Create a file watcher instance."""
     watcher = FileWatcher(temp_code_directory, dispatcher_with_plugins)
     yield watcher
@@ -262,18 +286,19 @@ def test_client_with_dispatcher(
     test_client: TestClient,
     dispatcher_with_plugins: Dispatcher,
     sqlite_store: SQLiteStore,
-    monkeypatch
+    monkeypatch,
 ) -> TestClient:
     """Create a test client with initialized dispatcher."""
     # Patch the global variables in gateway module
     import mcp_server.gateway as gateway
+
     monkeypatch.setattr(gateway, "dispatcher", dispatcher_with_plugins)
     monkeypatch.setattr(gateway, "sqlite_store", sqlite_store)
-    
+
     # Also set in app.state
     test_client.app.state.dispatcher = dispatcher_with_plugins
     test_client.app.state.sqlite_store = sqlite_store
-    
+
     return test_client
 
 
@@ -296,7 +321,7 @@ def sample_symbol_def() -> SymbolDef:
         path="/test/sample.py",
         line=10,
         signature="def sample_function(x: int) -> str",
-        documentation="A sample function for testing"
+        documentation="A sample function for testing",
     )
 
 
@@ -305,23 +330,12 @@ def sample_search_results() -> List[SearchResult]:
     """Sample search results for testing."""
     return [
         SearchResult(
-            name="function_one",
-            kind="function",
-            path="/test/file1.py",
-            score=0.95
+            name="function_one", kind="function", path="/test/file1.py", score=0.95
         ),
         SearchResult(
-            name="function_two",
-            kind="function",
-            path="/test/file2.py",
-            score=0.85
+            name="function_two", kind="function", path="/test/file2.py", score=0.85
         ),
-        SearchResult(
-            name="ClassOne",
-            kind="class",
-            path="/test/file3.py",
-            score=0.75
-        )
+        SearchResult(name="ClassOne", kind="class", path="/test/file3.py", score=0.75),
     ]
 
 
@@ -347,7 +361,7 @@ def cleanup_logs(tmp_path):
 # Helper utilities
 class TestDataBuilder:
     """Helper class to build test data."""
-    
+
     @staticmethod
     def create_python_file(path: Path, content: str = None) -> Path:
         """Create a Python file with optional content."""
@@ -365,12 +379,12 @@ class TestClass:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content)
         return path
-    
+
     @staticmethod
     def create_project_structure(base_path: Path) -> Dict[str, Path]:
         """Create a sample project structure."""
         files = {}
-        
+
         # Create main module
         files["main"] = TestDataBuilder.create_python_file(
             base_path / "main.py",
@@ -385,13 +399,13 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-'''
+''',
         )
-        
+
         # Create src directory
         src_dir = base_path / "src"
         src_dir.mkdir()
-        
+
         files["utils"] = TestDataBuilder.create_python_file(
             src_dir / "utils.py",
             '''
@@ -403,13 +417,13 @@ class Config:
     """Configuration class."""
     def __init__(self):
         self.debug = True
-'''
+''',
         )
-        
+
         # Create tests
         test_dir = base_path / "tests"
         test_dir.mkdir()
-        
+
         files["test_main"] = TestDataBuilder.create_python_file(
             test_dir / "test_main.py",
             '''
@@ -419,9 +433,9 @@ from main import main
 def test_main():
     """Test main function."""
     assert main() == 0
-'''
+''',
         )
-        
+
         return files
 
 
@@ -435,13 +449,14 @@ def test_data_builder():
 import time
 from contextlib import contextmanager
 
+
 @contextmanager
 def measure_time(test_name: str, benchmark_results: dict):
     """Context manager to measure test execution time."""
     start = time.time()
     yield
     elapsed = time.time() - start
-    
+
     if test_name not in benchmark_results:
         benchmark_results[test_name] = []
     benchmark_results[test_name].append(elapsed)

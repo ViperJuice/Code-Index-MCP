@@ -1,0 +1,14 @@
+{
+  "query": "Find all files importing server",
+  "mode": "native",
+  "tools_used": ["Grep", "Bash"],
+  "tool_calls": {"Grep": 3, "Bash": 4},
+  "results_found": 8,
+  "execution_time_ms": 450,
+  "token_estimate": 1200,
+  "success": true,
+  "error": null,
+  "test_id": "go_gin_4_native",
+  "batch_name": "go_gin",
+  "timestamp": "2025-01-06T01:00:00"
+}

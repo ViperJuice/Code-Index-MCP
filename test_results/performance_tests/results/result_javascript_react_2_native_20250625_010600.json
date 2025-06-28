@@ -1,0 +1,14 @@
+{
+  "query": "Find the definition of useState",
+  "mode": "native",
+  "tools_used": ["Grep", "Read"],
+  "tool_calls": {"Grep": 1, "Read": 1},
+  "results_found": 1,
+  "execution_time_ms": 250,
+  "token_estimate": 2000,
+  "success": true,
+  "error": null,
+  "test_id": "javascript_react_2_native",
+  "batch_name": "javascript_react",
+  "timestamp": "2025-01-06T01:06:00"
+}

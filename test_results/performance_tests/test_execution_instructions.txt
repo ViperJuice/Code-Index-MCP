@@ -1,0 +1,19 @@
+MCP vs Native Performance Test Instructions
+==========================================
+
+Test batch: test_batch_go_gin_20250624_175224.json
+Execute each test prompt using the Task tool
+Save results to: test_results_go_gin_20250624_175224.json
+
+Test batch: test_batch_python_django_20250624_175224.json
+Execute each test prompt using the Task tool
+Save results to: test_results_python_django_20250624_175224.json
+
+Test batch: test_batch_javascript_react_20250624_175224.json
+Execute each test prompt using the Task tool
+Save results to: test_results_javascript_react_20250624_175224.json
+
+Test batch: test_batch_rust_tokio_20250624_175224.json
+Execute each test prompt using the Task tool
+Save results to: test_results_rust_tokio_20250624_175224.json
+

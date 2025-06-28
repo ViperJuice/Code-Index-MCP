@@ -1,0 +1,17 @@
+{
+  "query": "Find the definition of class Component",
+  "mode": "mcp",
+  "tools_used": ["mcp__code-index-mcp__symbol_lookup", "mcp__code-index-mcp__search_code"],
+  "tool_calls": {
+    "mcp__code-index-mcp__symbol_lookup": 1,
+    "mcp__code-index-mcp__search_code": 7
+  },
+  "results_found": 1,
+  "execution_time_ms": 8500,
+  "token_estimate": 7200,
+  "success": true,
+  "error": null,
+  "test_id": "javascript_react_0_mcp",
+  "timestamp": "2025-01-06T22:18:00",
+  "batch_name": "javascript_react"
+}

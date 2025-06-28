@@ -1,0 +1,14 @@
+{
+  "query": "Search for TODO comments",
+  "mode": "mcp",
+  "tools_used": [],
+  "tool_calls": {},
+  "results_found": 0,
+  "execution_time_ms": 150,
+  "token_estimate": 100,
+  "success": false,
+  "error": "MCP tools not available in Task agent environment",
+  "test_id": "rust_tokio_2_mcp",
+  "batch_name": "rust_tokio",
+  "timestamp": "2025-06-25T14:56:27.766084"
+}

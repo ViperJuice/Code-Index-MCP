@@ -1,0 +1,182 @@
+{
+  "total_repos": 29,
+  "completed": 29,
+  "failed": 0,
+  "results": [
+    {
+      "name": "phoenix",
+      "success": true,
+      "time": 14.930869817733765,
+      "output": ""
+    },
+    {
+      "name": "yesod",
+      "success": true,
+      "time": 8.262634992599487,
+      "output": ""
+    },
+    {
+      "name": "ring",
+      "success": true,
+      "time": 8.22158169746399,
+      "output": ""
+    },
+    {
+      "name": "kafka",
+      "success": true,
+      "time": 8.14219331741333,
+      "output": ""
+    },
+    {
+      "name": "spring-boot",
+      "success": true,
+      "time": 8.407374620437622,
+      "output": ""
+    },
+    {
+      "name": "ktor",
+      "success": true,
+      "time": 8.187662839889526,
+      "output": ""
+    },
+    {
+      "name": "akka",
+      "success": true,
+      "time": 8.020362854003906,
+      "output": ""
+    },
+    {
+      "name": "sdk",
+      "success": true,
+      "time": 8.423757791519165,
+      "output": ""
+    },
+    {
+      "name": "gin",
+      "success": true,
+      "time": 8.19631028175354,
+      "output": ""
+    },
+    {
+      "name": "terraform",
+      "success": true,
+      "time": 8.296094179153442,
+      "output": ""
+    },
+    {
+      "name": "Alamofire",
+      "success": true,
+      "time": 8.304886102676392,
+      "output": ""
+    },
+    {
+      "name": "aspnetcore",
+      "success": true,
+      "time": 8.328059673309326,
+      "output": ""
+    },
+    {
+      "name": "kong",
+      "success": true,
+      "time": 8.18222975730896,
+      "output": ""
+    },
+    {
+      "name": "curl",
+      "success": true,
+      "time": 8.331007242202759,
+      "output": ""
+    },
+    {
+      "name": "redis",
+      "success": true,
+      "time": 8.21444058418274,
+      "output": ""
+    },
+    {
+      "name": "grpc",
+      "success": true,
+      "time": 8.243091821670532,
+      "output": ""
+    },
+    {
+      "name": "json",
+      "success": true,
+      "time": 8.518272876739502,
+      "output": ""
+    },
+    {
+      "name": "rustlings",
+      "success": true,
+      "time": 8.057258605957031,
+      "output": ""
+    },
+    {
+      "name": "tokio",
+      "success": true,
+      "time": 8.278805017471313,
+      "output": ""
+    },
+    {
+      "name": "zig",
+      "success": true,
+      "time": 8.122303247451782,
+      "output": ""
+    },
+    {
+      "name": "express",
+      "success": true,
+      "time": 8.275507688522339,
+      "output": ""
+    },
+    {
+      "name": "react",
+      "success": true,
+      "time": 8.130774736404419,
+      "output": ""
+    },
+    {
+      "name": "mojo",
+      "success": true,
+      "time": 8.453139305114746,
+      "output": ""
+    },
+    {
+      "name": "framework",
+      "success": true,
+      "time": 8.111485004425049,
+      "output": ""
+    },
+    {
+      "name": "django",
+      "success": true,
+      "time": 8.192156076431274,
+      "output": ""
+    },
+    {
+      "name": "flask",
+      "success": true,
+      "time": 8.367377042770386,
+      "output": ""
+    },
+    {
+      "name": "requests",
+      "success": true,
+      "time": 8.055872678756714,
+      "output": ""
+    },
+    {
+      "name": "rails",
+      "success": true,
+      "time": 8.389035940170288,
+      "output": ""
+    },
+    {
+      "name": "TypeScript",
+      "success": true,
+      "time": 8.216975212097168,
+      "output": ""
+    }
+  ],
+  "timestamp": "2025-06-27 17:10:53"
+}

@@ -1,0 +1,73 @@
+#!/bin/bash
+# MCP Index Pre-Push Hook
+# Automatically uploads index artifacts before pushing to remote
+
+set -e
+
+# Colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+# Check if index management is enabled
+if [ -f ".mcp-index.json" ]; then
+    ENABLED=$(jq -r '.enabled // true' .mcp-index.json 2>/dev/null || echo "true")
+    AUTO_UPLOAD=$(jq -r '.artifact_sync.auto_upload // true' .mcp-index.json 2>/dev/null || echo "true")
+    
+    if [ "$ENABLED" != "true" ] || [ "$AUTO_UPLOAD" != "true" ]; then
+        exit 0
+    fi
+else
+    # No config file, skip hook
+    exit 0
+fi
+
+echo -e "${YELLOW}🔍 MCP Index: Checking index status...${NC}"
+
+# Get current commit
+COMMIT=$(git rev-parse HEAD)
+REPO_ID=$(mcp-index repo-id "$PWD" 2>/dev/null || echo "")
+
+# Check if index is up to date with current commit
+NEEDS_UPDATE=false
+if command -v mcp-index &> /dev/null; then
+    if mcp-index needs-update --repo-id "$REPO_ID" 2>/dev/null; then
+        NEEDS_UPDATE=true
+    fi
+fi
+
+if [ "$NEEDS_UPDATE" = "true" ]; then
+    echo -e "${YELLOW}📦 MCP Index: Updating index before push...${NC}"
+    
+    # Update index incrementally
+    if command -v mcp-index &> /dev/null; then
+        mcp-index update --repo-id "$REPO_ID" --incremental 2>&1 | while read line; do
+            echo -e "${GREEN}   $line${NC}"
+        done
+    fi
+fi
+
+# Upload artifact for current commit
+echo -e "${GREEN}📤 MCP Index: Uploading artifact for commit ${COMMIT:0:7}...${NC}"
+
+if command -v mcp-index &> /dev/null; then
+    mcp-index artifact push --repo-id "$REPO_ID" --commit "$COMMIT" 2>&1 | while read line; do
+        echo -e "${GREEN}   $line${NC}"
+    done || {
+        echo -e "${YELLOW}⚠️  MCP Index: Upload failed, but continuing with push${NC}"
+        echo -e "${YELLOW}   You can manually upload later with: mcp-index artifact push${NC}"
+    }
+elif [ -f "mcp_cli.py" ]; then
+    python mcp_cli.py artifact push --commit "$COMMIT" 2>/dev/null || {
+        echo -e "${YELLOW}⚠️  MCP Index: Upload failed, but continuing with push${NC}"
+        echo -e "${YELLOW}   You can manually upload later with: python mcp_cli.py artifact push${NC}"
+    }
+else
+    echo -e "${YELLOW}⚠️  MCP Index: CLI not found, skipping upload${NC}"
+fi
+
+echo -e "${GREEN}✓ MCP Index: Ready to push${NC}"
+
+# Always allow the push to continue
+exit 0

@@ -18,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 @pytest.mark.advanced_indexing
 class TestAdvancedIndexing:
     """Test advanced indexing options with real codebases."""
-    
+
     @pytest.fixture
     def setup_advanced_indexer(self):
         """Setup advanced indexer with test configuration."""
@@ -28,21 +28,21 @@ class TestAdvancedIndexing:
             from mcp_server.storage.sqlite_store import SQLiteStore
         except ImportError:
             pytest.skip("Advanced indexing components not available")
-        
+
         # Create temporary database
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as db_file:
             store = SQLiteStore(db_file.name)
             plugin_manager = PluginManager(sqlite_store=store)
-            
+
             # Load plugins
             load_result = plugin_manager.load_plugins_safe()
             if not load_result.success:
                 pytest.skip(f"Failed to load plugins: {load_result.error.message}")
-            
+
             engine = IndexEngine(plugin_manager, store)
-            
+
             yield {"engine": engine, "store": store, "plugin_manager": plugin_manager}
-            
+
             # Cleanup
             try:
                 Path(db_file.name).unlink()
@@ -53,7 +53,7 @@ class TestAdvancedIndexing:
         """Test parallel indexing with different worker counts."""
         indexer_components = setup_advanced_indexer
         engine = indexer_components["engine"]
-        
+
         # Create test files with substantial content
         test_files = []
         test_code_samples = [
@@ -203,9 +203,9 @@ class UserManager:
             return user
         
         return None
-'''
+''',
         ]
-        
+
         # Create temporary files
         for i, code in enumerate(test_code_samples):
             with tempfile.NamedTemporaryFile(
@@ -214,73 +214,85 @@ class UserManager:
                 f.write(code)
                 f.flush()
                 test_files.append(Path(f.name))
-        
+
         try:
+
             def test_indexing_workers(max_workers):
                 """Test indexing with specific worker count."""
                 options = IndexOptions(
                     max_workers=max_workers,
                     batch_size=5,
                     force_reindex=True,
-                    generate_embeddings=False  # Disabled for speed
+                    generate_embeddings=False,  # Disabled for speed
                 )
-                
+
                 start_time = time.time()
-                
+
                 # Index files using asyncio
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                
+
                 try:
+
                     async def index_files():
                         tasks = []
                         for file_path in test_files:
                             tasks.append(engine.index_file(str(file_path), options))
-                        
+
                         return await asyncio.gather(*tasks, return_exceptions=True)
-                    
+
                     results = loop.run_until_complete(index_files())
                     duration = time.time() - start_time
-                    
-                    successful = sum(1 for r in results 
-                                   if not isinstance(r, Exception) and getattr(r, 'success', False))
+
+                    successful = sum(
+                        1
+                        for r in results
+                        if not isinstance(r, Exception) and getattr(r, "success", False)
+                    )
                     return successful, duration
-                    
+
                 finally:
                     loop.close()
-            
+
             # Test different worker configurations
             worker_configs = [1, 2, 4]
             performance_results = {}
-            
+
             for workers in worker_configs:
                 successful, duration = test_indexing_workers(workers)
                 throughput = successful / duration if duration > 0 else 0
-                
+
                 performance_results[workers] = {
                     "successful": successful,
                     "duration": duration,
-                    "throughput": throughput
+                    "throughput": throughput,
                 }
-                
-                print(f"{workers} workers: {successful} files in {duration:.2f}s ({throughput:.1f} files/s)")
-            
+
+                print(
+                    f"{workers} workers: {successful} files in {duration:.2f}s ({throughput:.1f} files/s)"
+                )
+
             # Validate scaling benefits
             single_thread_throughput = performance_results[1]["throughput"]
             multi_thread_throughput = max(
                 performance_results[w]["throughput"] for w in worker_configs if w > 1
             )
-            
+
             if single_thread_throughput > 0:
                 speedup = multi_thread_throughput / single_thread_throughput
-                assert speedup >= 1.2, f"Multi-threading should provide speedup: {speedup:.2f}x"
+                assert (
+                    speedup >= 1.2
+                ), f"Multi-threading should provide speedup: {speedup:.2f}x"
                 print(f"Best speedup: {speedup:.2f}x with parallel processing")
-            
+
             # Verify all files were processed successfully
-            best_result = max(performance_results.values(), key=lambda x: x["successful"])
-            assert best_result["successful"] >= len(test_files) - 1, \
-                "Should successfully index most files"
-                
+            best_result = max(
+                performance_results.values(), key=lambda x: x["successful"]
+            )
+            assert (
+                best_result["successful"] >= len(test_files) - 1
+            ), "Should successfully index most files"
+
         finally:
             # Cleanup test files
             for file_path in test_files:
@@ -293,21 +305,20 @@ class UserManager:
         """Test embedding generation during indexing."""
         if not os.getenv("SEMANTIC_SEARCH_ENABLED", "false").lower() == "true":
             pytest.skip("Semantic search not enabled")
-        
+
         try:
             from mcp_server.utils.semantic_indexer import SemanticIndexer
         except ImportError:
             pytest.skip("Semantic indexer not available")
-        
+
         indexer_components = setup_advanced_indexer
         engine = indexer_components["engine"]
-        
+
         # Setup semantic indexer
         semantic_indexer = SemanticIndexer(
-            collection="test-embedding",
-            qdrant_path=":memory:"
+            collection="test-embedding", qdrant_path=":memory:"
         )
-        
+
         # Test code with rich semantic content
         test_code = '''
 def authenticate_user_with_password(username: str, password: str) -> bool:
@@ -380,42 +391,55 @@ class SessionManager:
         
         return session['user_id']
 '''
-        
+
         with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False) as f:
             f.write(test_code)
             f.flush()
             temp_path = Path(f.name)
-            
+
             try:
                 # Index with embedding generation enabled
                 options = IndexOptions(
-                    generate_embeddings=True,
-                    semantic_indexer=semantic_indexer
+                    generate_embeddings=True, semantic_indexer=semantic_indexer
                 )
-                
+
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                
+
                 try:
-                    result = loop.run_until_complete(engine.index_file(str(temp_path), options))
-                    
-                    assert result.success, f"Indexing with embeddings should succeed: {result.error}"
-                    assert result.symbols_count >= 3, f"Should extract symbols: {result.symbols_count}"
-                    
+                    result = loop.run_until_complete(
+                        engine.index_file(str(temp_path), options)
+                    )
+
+                    assert (
+                        result.success
+                    ), f"Indexing with embeddings should succeed: {result.error}"
+                    assert (
+                        result.symbols_count >= 3
+                    ), f"Should extract symbols: {result.symbols_count}"
+
                     # Test semantic search on indexed content
-                    semantic_results = list(semantic_indexer.query("user authentication function", limit=3))
+                    semantic_results = list(
+                        semantic_indexer.query("user authentication function", limit=3)
+                    )
                     assert len(semantic_results) > 0, "Should find semantic matches"
-                    
+
                     # Test specific semantic queries
-                    session_results = list(semantic_indexer.query("session token management", limit=3))
-                    assert len(session_results) > 0, "Should find session-related matches"
-                    
+                    session_results = list(
+                        semantic_indexer.query("session token management", limit=3)
+                    )
+                    assert (
+                        len(session_results) > 0
+                    ), "Should find session-related matches"
+
                     print(f"Embedded indexing: {result.symbols_count} symbols")
-                    print(f"Semantic matches: {len(semantic_results)} auth, {len(session_results)} session")
-                    
+                    print(
+                        f"Semantic matches: {len(semantic_results)} auth, {len(session_results)} session"
+                    )
+
                 finally:
                     loop.close()
-                    
+
             finally:
                 temp_path.unlink()
 
@@ -423,7 +447,7 @@ class SessionManager:
         """Test batch processing performance with different batch sizes."""
         indexer_components = setup_advanced_indexer
         engine = indexer_components["engine"]
-        
+
         # Create multiple small files for batch testing
         test_files = []
         for i in range(20):
@@ -445,71 +469,86 @@ CONSTANT_{i} = {i}
                 f.write(code)
                 f.flush()
                 test_files.append(Path(f.name))
-        
+
         try:
+
             def test_batch_size(batch_size):
                 """Test indexing with specific batch size."""
                 options = IndexOptions(
                     batch_size=batch_size,
                     max_workers=2,
                     force_reindex=True,
-                    generate_embeddings=False
+                    generate_embeddings=False,
                 )
-                
+
                 start_time = time.time()
-                
+
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                
+
                 try:
+
                     async def batch_index():
                         results = []
                         for i in range(0, len(test_files), batch_size):
-                            batch = test_files[i:i + batch_size]
-                            batch_tasks = [engine.index_file(str(f), options) for f in batch]
-                            batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+                            batch = test_files[i : i + batch_size]
+                            batch_tasks = [
+                                engine.index_file(str(f), options) for f in batch
+                            ]
+                            batch_results = await asyncio.gather(
+                                *batch_tasks, return_exceptions=True
+                            )
                             results.extend(batch_results)
                         return results
-                    
+
                     results = loop.run_until_complete(batch_index())
                     duration = time.time() - start_time
-                    
-                    successful = sum(1 for r in results 
-                                   if not isinstance(r, Exception) and getattr(r, 'success', False))
+
+                    successful = sum(
+                        1
+                        for r in results
+                        if not isinstance(r, Exception) and getattr(r, "success", False)
+                    )
                     return successful, duration
-                    
+
                 finally:
                     loop.close()
-            
+
             # Test different batch sizes
             batch_sizes = [1, 5, 10, 20]
             batch_results = {}
-            
+
             for batch_size in batch_sizes:
                 successful, duration = test_batch_size(batch_size)
                 throughput = successful / duration if duration > 0 else 0
-                
+
                 batch_results[batch_size] = {
                     "successful": successful,
                     "duration": duration,
-                    "throughput": throughput
+                    "throughput": throughput,
                 }
-                
-                print(f"Batch size {batch_size}: {successful} files in {duration:.2f}s ({throughput:.1f} files/s)")
-            
+
+                print(
+                    f"Batch size {batch_size}: {successful} files in {duration:.2f}s ({throughput:.1f} files/s)"
+                )
+
             # Find optimal batch size (highest throughput)
             optimal_batch = max(batch_results.items(), key=lambda x: x[1]["throughput"])
             optimal_size, optimal_stats = optimal_batch
-            
-            print(f"Optimal batch size: {optimal_size} ({optimal_stats['throughput']:.1f} files/s)")
-            
+
+            print(
+                f"Optimal batch size: {optimal_size} ({optimal_stats['throughput']:.1f} files/s)"
+            )
+
             # Verify batch processing improves over single-file processing
             single_throughput = batch_results[1]["throughput"]
             if single_throughput > 0:
                 best_throughput = optimal_stats["throughput"]
                 improvement = best_throughput / single_throughput
-                assert improvement >= 1.1, f"Batch processing should improve performance: {improvement:.2f}x"
-                
+                assert (
+                    improvement >= 1.1
+                ), f"Batch processing should improve performance: {improvement:.2f}x"
+
         finally:
             # Cleanup
             for file_path in test_files:
@@ -522,7 +561,7 @@ CONSTANT_{i} = {i}
         """Test various indexing option configurations."""
         indexer_components = setup_advanced_indexer
         engine = indexer_components["engine"]
-        
+
         # Test code with various symbol types
         test_code = '''
 """Module docstring for testing."""
@@ -573,12 +612,12 @@ def decorator_function(func):
         return func(*args, **kwargs)
     return wrapper
 '''
-        
+
         with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False) as f:
             f.write(test_code)
             f.flush()
             temp_path = Path(f.name)
-            
+
             try:
                 # Test different indexing configurations
                 test_configurations = [
@@ -587,8 +626,8 @@ def decorator_function(func):
                         "options": IndexOptions(
                             force_reindex=True,
                             extract_imports=True,
-                            extract_docstrings=True
-                        )
+                            extract_docstrings=True,
+                        ),
                     },
                     {
                         "name": "comprehensive",
@@ -597,54 +636,61 @@ def decorator_function(func):
                             extract_imports=True,
                             extract_docstrings=True,
                             extract_decorators=True,
-                            extract_type_hints=True
-                        )
+                            extract_type_hints=True,
+                        ),
                     },
                     {
                         "name": "minimal",
                         "options": IndexOptions(
                             force_reindex=True,
                             extract_imports=False,
-                            extract_docstrings=False
-                        )
-                    }
+                            extract_docstrings=False,
+                        ),
+                    },
                 ]
-                
+
                 results = {}
-                
+
                 for config in test_configurations:
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
-                    
+
                     try:
                         result = loop.run_until_complete(
                             engine.index_file(str(temp_path), config["options"])
                         )
-                        
+
                         results[config["name"]] = {
                             "success": result.success,
                             "symbols_count": result.symbols_count,
-                            "error": result.error if not result.success else None
+                            "error": result.error if not result.success else None,
                         }
-                        
+
                     finally:
                         loop.close()
-                
+
                 # Verify all configurations work
                 for config_name, result in results.items():
-                    assert result["success"], f"Configuration '{config_name}' should succeed"
-                    assert result["symbols_count"] > 0, f"Configuration '{config_name}' should extract symbols"
-                
+                    assert result[
+                        "success"
+                    ], f"Configuration '{config_name}' should succeed"
+                    assert (
+                        result["symbols_count"] > 0
+                    ), f"Configuration '{config_name}' should extract symbols"
+
                 # Comprehensive should extract more information than minimal
                 comprehensive_count = results["comprehensive"]["symbols_count"]
                 minimal_count = results["minimal"]["symbols_count"]
-                
-                print(f"Symbol extraction: minimal={minimal_count}, comprehensive={comprehensive_count}")
-                
+
+                print(
+                    f"Symbol extraction: minimal={minimal_count}, comprehensive={comprehensive_count}"
+                )
+
                 # Both should find core symbols, comprehensive may find more
-                assert comprehensive_count >= minimal_count, \
-                    "Comprehensive indexing should extract at least as many symbols as minimal"
-                
+                assert (
+                    comprehensive_count >= minimal_count
+                ), "Comprehensive indexing should extract at least as many symbols as minimal"
+
             finally:
                 temp_path.unlink()
 
@@ -652,91 +698,105 @@ def decorator_function(func):
         """Test error handling during indexing operations."""
         indexer_components = setup_advanced_indexer
         engine = indexer_components["engine"]
-        
+
         # Test files with various issues
         test_scenarios = [
             {
                 "name": "valid_file",
                 "code": "def valid_function(): return True",
-                "should_succeed": True
+                "should_succeed": True,
             },
             {
                 "name": "syntax_error",
                 "code": "def invalid_function( invalid syntax here",
-                "should_succeed": False
+                "should_succeed": False,
             },
             {
                 "name": "empty_file",
                 "code": "",
-                "should_succeed": True  # Empty files should be handled gracefully
+                "should_succeed": True,  # Empty files should be handled gracefully
             },
             {
                 "name": "only_comments",
                 "code": "# This file only contains comments\n# No actual code here",
-                "should_succeed": True
+                "should_succeed": True,
             },
             {
                 "name": "encoding_issues",
                 "code": "# -*- coding: utf-8 -*-\ndef unicode_test():\n    return 'test with unicode: ñ'",
-                "should_succeed": True
-            }
+                "should_succeed": True,
+            },
         ]
-        
+
         results = {}
         temp_files = []
-        
+
         try:
             for scenario in test_scenarios:
                 with tempfile.NamedTemporaryFile(
-                    suffix=f"_{scenario['name']}.py", mode="w", delete=False, encoding="utf-8"
+                    suffix=f"_{scenario['name']}.py",
+                    mode="w",
+                    delete=False,
+                    encoding="utf-8",
                 ) as f:
                     f.write(scenario["code"])
                     f.flush()
                     temp_path = Path(f.name)
                     temp_files.append(temp_path)
-                    
+
                     # Index the file
                     options = IndexOptions(force_reindex=True)
-                    
+
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
-                    
+
                     try:
-                        result = loop.run_until_complete(engine.index_file(str(temp_path), options))
-                        
+                        result = loop.run_until_complete(
+                            engine.index_file(str(temp_path), options)
+                        )
+
                         results[scenario["name"]] = {
                             "success": result.success,
                             "symbols_count": result.symbols_count,
                             "error": result.error,
-                            "expected_success": scenario["should_succeed"]
+                            "expected_success": scenario["should_succeed"],
                         }
-                        
+
                     finally:
                         loop.close()
-            
+
             # Validate error handling
             for scenario_name, result in results.items():
                 expected_success = result["expected_success"]
                 actual_success = result["success"]
-                
+
                 if expected_success:
-                    assert actual_success, f"Scenario '{scenario_name}' should succeed but failed: {result['error']}"
+                    assert (
+                        actual_success
+                    ), f"Scenario '{scenario_name}' should succeed but failed: {result['error']}"
                 else:
                     # For scenarios that should fail, we expect graceful handling
                     # (either success with 0 symbols or controlled failure)
                     if not actual_success:
-                        assert result["error"] is not None, f"Failed scenario '{scenario_name}' should have error message"
-                        print(f"Expected failure for '{scenario_name}': {result['error']}")
-                
-                print(f"Scenario '{scenario_name}': success={actual_success}, symbols={result['symbols_count']}")
-            
+                        assert (
+                            result["error"] is not None
+                        ), f"Failed scenario '{scenario_name}' should have error message"
+                        print(
+                            f"Expected failure for '{scenario_name}': {result['error']}"
+                        )
+
+                print(
+                    f"Scenario '{scenario_name}': success={actual_success}, symbols={result['symbols_count']}"
+                )
+
             # Verify at least the valid scenarios worked
             valid_results = [r for r in results.values() if r["expected_success"]]
             successful_valid = [r for r in valid_results if r["success"]]
-            
-            assert len(successful_valid) >= len(valid_results) - 1, \
-                "Most valid scenarios should succeed"
-                
+
+            assert (
+                len(successful_valid) >= len(valid_results) - 1
+            ), "Most valid scenarios should succeed"
+
         finally:
             # Cleanup
             for temp_path in temp_files:
@@ -749,13 +809,14 @@ def decorator_function(func):
         """Test memory usage patterns during indexing operations."""
         indexer_components = setup_advanced_indexer
         engine = indexer_components["engine"]
-        
+
         try:
             import psutil
+
             process = psutil.Process()
         except ImportError:
             pytest.skip("psutil not available for memory testing")
-        
+
         # Create larger files to test memory usage
         large_code_template = '''
 """Large file for memory testing - File {file_num}."""
@@ -780,7 +841,7 @@ GLOBAL_REGISTRY = {{}}
 for i in range(100):
     GLOBAL_REGISTRY[f"item_{{i}}"] = f"data_{{i}}"
 '''
-        
+
         class_template = '''
 class DataProcessor{class_num}:
     """Data processor class {class_num}."""
@@ -815,7 +876,7 @@ class DataProcessor{class_num}:
         """Get processing statistics."""
         return self.statistics.copy()
 '''
-        
+
         function_template = '''
 def utility_function_{func_num}(param1: str, param2: int = 0) -> Optional[str]:
     """Utility function {func_num}."""
@@ -837,31 +898,31 @@ def async_operation_{func_num}(data: Dict[str, Any]) -> Dict[str, Any]:
     
     return asyncio.run(process())
 '''
-        
+
         test_files = []
         memory_samples = []
-        
+
         try:
             # Record initial memory
             initial_memory = process.memory_info().rss / 1024 / 1024  # MB
             memory_samples.append(("initial", initial_memory))
-            
+
             # Create and index multiple large files
             for file_num in range(5):
                 # Generate classes and functions
                 classes = "\n".join(
-                    class_template.format(class_num=i) for i in range(file_num * 3, (file_num + 1) * 3)
+                    class_template.format(class_num=i)
+                    for i in range(file_num * 3, (file_num + 1) * 3)
                 )
                 functions = "\n".join(
-                    function_template.format(func_num=i) for i in range(file_num * 5, (file_num + 1) * 5)
+                    function_template.format(func_num=i)
+                    for i in range(file_num * 5, (file_num + 1) * 5)
                 )
-                
+
                 large_code = large_code_template.format(
-                    file_num=file_num,
-                    classes=classes,
-                    functions=functions
+                    file_num=file_num, classes=classes, functions=functions
                 )
-                
+
                 with tempfile.NamedTemporaryFile(
                     suffix=f"_large_{file_num}.py", mode="w", delete=False
                 ) as f:
@@ -869,42 +930,54 @@ def async_operation_{func_num}(data: Dict[str, Any]) -> Dict[str, Any]:
                     f.flush()
                     temp_path = Path(f.name)
                     test_files.append(temp_path)
-                    
+
                     # Index the file
                     options = IndexOptions(force_reindex=True)
-                    
+
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
-                    
+
                     try:
-                        result = loop.run_until_complete(engine.index_file(str(temp_path), options))
+                        result = loop.run_until_complete(
+                            engine.index_file(str(temp_path), options)
+                        )
                         assert result.success, f"Should index large file {file_num}"
-                        
+
                         # Record memory after indexing
                         current_memory = process.memory_info().rss / 1024 / 1024
-                        memory_samples.append((f"after_file_{file_num}", current_memory))
-                        
+                        memory_samples.append(
+                            (f"after_file_{file_num}", current_memory)
+                        )
+
                     finally:
                         loop.close()
-            
+
             # Analyze memory usage
             final_memory = memory_samples[-1][1]
             memory_increase = final_memory - initial_memory
-            
-            print(f"Memory usage: {initial_memory:.1f} MB -> {final_memory:.1f} MB (increase: {memory_increase:.1f} MB)")
-            
+
+            print(
+                f"Memory usage: {initial_memory:.1f} MB -> {final_memory:.1f} MB (increase: {memory_increase:.1f} MB)"
+            )
+
             # Memory usage should be reasonable for the amount of code processed
-            assert memory_increase < 200, f"Memory increase {memory_increase:.1f} MB should be < 200 MB"
-            
+            assert (
+                memory_increase < 200
+            ), f"Memory increase {memory_increase:.1f} MB should be < 200 MB"
+
             # Check for memory leaks (memory should not grow linearly with each file)
             if len(memory_samples) >= 4:
                 first_file_memory = memory_samples[1][1]
                 last_file_memory = memory_samples[-1][1]
-                per_file_growth = (last_file_memory - first_file_memory) / (len(memory_samples) - 2)
-                
-                assert per_file_growth < 50, f"Per-file memory growth {per_file_growth:.1f} MB should be < 50 MB"
+                per_file_growth = (last_file_memory - first_file_memory) / (
+                    len(memory_samples) - 2
+                )
+
+                assert (
+                    per_file_growth < 50
+                ), f"Per-file memory growth {per_file_growth:.1f} MB should be < 50 MB"
                 print(f"Average memory growth per file: {per_file_growth:.1f} MB")
-            
+
         finally:
             # Cleanup
             for temp_path in test_files:
@@ -918,39 +991,41 @@ def async_operation_{func_num}(data: Dict[str, Any]) -> Dict[str, Any]:
 @pytest.mark.slow
 class TestAdvancedIndexingIntegration:
     """Test advanced indexing integration with real repositories."""
-    
+
     def test_real_repository_advanced_indexing(self):
         """Test advanced indexing on real repository if available."""
         # Try to use requests repository if available
         repo_path = Path("test_workspace/real_repos/requests")
         if not repo_path.exists():
-            pytest.skip("Requests repository not available for advanced indexing testing")
-        
+            pytest.skip(
+                "Requests repository not available for advanced indexing testing"
+            )
+
         try:
             from mcp_server.indexer.index_engine import IndexEngine, IndexOptions
             from mcp_server.plugin_system import PluginManager
             from mcp_server.storage.sqlite_store import SQLiteStore
         except ImportError:
             pytest.skip("Advanced indexing components not available")
-        
+
         # Setup indexing system
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as db_file:
             store = SQLiteStore(db_file.name)
             plugin_manager = PluginManager(sqlite_store=store)
-            
+
             load_result = plugin_manager.load_plugins_safe()
             if not load_result.success:
                 pytest.skip(f"Failed to load plugins: {load_result.error.message}")
-            
+
             engine = IndexEngine(plugin_manager, store)
-            
+
             try:
                 # Get Python files from requests repository
                 python_files = list(repo_path.rglob("*.py"))[:20]  # Limit for testing
-                
+
                 if len(python_files) < 5:
                     pytest.skip("Not enough Python files found in repository")
-                
+
                 # Index with advanced options
                 options = IndexOptions(
                     max_workers=4,
@@ -958,25 +1033,25 @@ class TestAdvancedIndexingIntegration:
                     force_reindex=True,
                     extract_imports=True,
                     extract_docstrings=True,
-                    generate_embeddings=False  # Disabled unless semantic search is enabled
+                    generate_embeddings=False,  # Disabled unless semantic search is enabled
                 )
-                
+
                 start_time = time.time()
                 indexed_count = 0
                 total_symbols = 0
                 errors = []
-                
+
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                
+
                 try:
                     # Index files in batches
                     for i in range(0, len(python_files), options.batch_size):
-                        batch = python_files[i:i + options.batch_size]
-                        
+                        batch = python_files[i : i + options.batch_size]
+
                         tasks = [engine.index_file(str(f), options) for f in batch]
                         results = await asyncio.gather(*tasks, return_exceptions=True)
-                        
+
                         for j, result in enumerate(results):
                             if isinstance(result, Exception):
                                 errors.append(f"{batch[j]}: {result}")
@@ -985,30 +1060,37 @@ class TestAdvancedIndexingIntegration:
                                 total_symbols += result.symbols_count
                             else:
                                 errors.append(f"{batch[j]}: {result.error}")
-                
+
                 finally:
                     loop.close()
-                
+
                 duration = time.time() - start_time
-                
+
                 # Validate results
-                assert indexed_count >= len(python_files) * 0.8, \
-                    f"Should index most files: {indexed_count}/{len(python_files)}"
-                
-                assert total_symbols >= indexed_count * 2, \
-                    f"Should extract multiple symbols per file: {total_symbols} symbols from {indexed_count} files"
-                
-                assert len(errors) < len(python_files) * 0.2, \
-                    f"Error rate should be low: {len(errors)} errors out of {len(python_files)} files"
-                
-                print(f"Real repository indexing: {indexed_count} files, {total_symbols} symbols in {duration:.2f}s")
-                print(f"Performance: {indexed_count/duration:.1f} files/s, {total_symbols/duration:.1f} symbols/s")
-                
+                assert (
+                    indexed_count >= len(python_files) * 0.8
+                ), f"Should index most files: {indexed_count}/{len(python_files)}"
+
+                assert (
+                    total_symbols >= indexed_count * 2
+                ), f"Should extract multiple symbols per file: {total_symbols} symbols from {indexed_count} files"
+
+                assert (
+                    len(errors) < len(python_files) * 0.2
+                ), f"Error rate should be low: {len(errors)} errors out of {len(python_files)} files"
+
+                print(
+                    f"Real repository indexing: {indexed_count} files, {total_symbols} symbols in {duration:.2f}s"
+                )
+                print(
+                    f"Performance: {indexed_count/duration:.1f} files/s, {total_symbols/duration:.1f} symbols/s"
+                )
+
                 if errors:
                     print(f"Errors encountered ({len(errors)}):")
                     for error in errors[:5]:  # Show first 5 errors
                         print(f"  {error}")
-                
+
             finally:
                 # Cleanup
                 try:

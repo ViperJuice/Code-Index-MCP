@@ -1,0 +1,14 @@
+{
+  "query": "Find all async functions",
+  "mode": "native",
+  "tools_used": ["Grep", "Bash"],
+  "tool_calls": {"Grep": 1, "Bash": 2},
+  "results_found": 2121,
+  "execution_time_ms": 350,
+  "token_estimate": 1500,
+  "success": true,
+  "error": null,
+  "test_id": "rust_tokio_2_native",
+  "batch_name": "rust_tokio",
+  "timestamp": "2025-01-06T01:16:00"
+}

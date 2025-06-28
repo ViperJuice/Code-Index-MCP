@@ -1,0 +1,611 @@
+{
+  "mcp": {
+    "queries": 25,
+    "successes": 25,
+    "failures": 0,
+    "total_time": 0.0002434253692626953,
+    "total_tokens": 1972,
+    "times": [
+      4.0531158447265625e-06,
+      1.049041748046875e-05,
+      8.106231689453125e-06,
+      9.059906005859375e-06,
+      1.4066696166992188e-05,
+      1.0013580322265625e-05,
+      1.239776611328125e-05,
+      7.3909759521484375e-06,
+      8.821487426757812e-06,
+      8.106231689453125e-06,
+      7.3909759521484375e-06,
+      7.3909759521484375e-06,
+      9.5367431640625e-06,
+      9.298324584960938e-06,
+      1.0251998901367188e-05,
+      8.106231689453125e-06,
+      1.430511474609375e-05,
+      7.62939453125e-06,
+      1.9550323486328125e-05,
+      9.059906005859375e-06,
+      8.344650268554688e-06,
+      1.1444091796875e-05,
+      1.1444091796875e-05,
+      9.775161743164062e-06,
+      7.3909759521484375e-06
+    ],
+    "tokens": [
+      42,
+      42,
+      47,
+      43,
+      44,
+      84,
+      84,
+      83,
+      82,
+      85,
+      83,
+      88,
+      85,
+      87,
+      91,
+      93,
+      97,
+      87,
+      94,
+      86,
+      94,
+      87,
+      92,
+      84,
+      88
+    ],
+    "avg_time": 9.737014770507813e-06,
+    "median_time": 9.059906005859375e-06,
+    "avg_tokens": 78.88,
+    "median_tokens": 85,
+    "success_rate": 100.0
+  },
+  "native": {
+    "queries": 25,
+    "successes": 25,
+    "failures": 0,
+    "total_time": 18.52905821800232,
+    "total_tokens": 669560,
+    "times": [
+      6.502642631530762,
+      0.621187686920166,
+      0.47861695289611816,
+      0.5280778408050537,
+      0.5073156356811523,
+      0.465167760848999,
+      0.5017096996307373,
+      0.46500539779663086,
+      0.528430700302124,
+      0.5192005634307861,
+      0.4823954105377197,
+      0.506331205368042,
+      0.5863897800445557,
+      0.4376792907714844,
+      0.49730849266052246,
+      0.4581105709075928,
+      0.46961522102355957,
+      0.4659557342529297,
+      0.47870421409606934,
+      0.5061283111572266,
+      0.5194780826568604,
+      0.5381412506103516,
+      0.5118966102600098,
+      0.4315035343170166,
+      0.5220656394958496
+    ],
+    "tokens": [
+      25436,
+      22118,
+      30884,
+      28437,
+      42684,
+      14504,
+      25196,
+      22894,
+      4173,
+      20158,
+      19066,
+      64950,
+      8647,
+      19670,
+      14820,
+      3925,
+      3925,
+      40412,
+      35664,
+      41966,
+      11493,
+      33437,
+      47721,
+      43867,
+      43513
+    ],
+    "avg_time": 0.7411623287200928,
+    "median_time": 0.5061283111572266,
+    "avg_tokens": 26782.4,
+    "median_tokens": 25196,
+    "success_rate": 100.0
+  },
+  "query_results": [
+    {
+      "query": "BM25Indexer",
+      "description": "Find the BM25Indexer class",
+      "category": "symbol_lookup",
+      "mcp": {
+        "success": true,
+        "time": 4.0531158447265625e-06,
+        "tokens": 42
+      },
+      "native": {
+        "success": true,
+        "time": 6.502642631530762,
+        "tokens": 25436
+      },
+      "improvements": {
+        "time_factor": 1604356.4705882352,
+        "token_reduction_percent": 99.83487969806573
+      }
+    },
+    {
+      "query": "SQLiteStore",
+      "description": "Find SQLiteStore class definition",
+      "category": "symbol_lookup",
+      "mcp": {
+        "success": true,
+        "time": 1.049041748046875e-05,
+        "tokens": 42
+      },
+      "native": {
+        "success": true,
+        "time": 0.621187686920166,
+        "tokens": 22118
+      },
+      "improvements": {
+        "time_factor": 59214.77272727273,
+        "token_reduction_percent": 99.81010941314766
+      }
+    },
+    {
+      "query": "EnhancedDispatcher",
+      "description": "Locate EnhancedDispatcher",
+      "category": "symbol_lookup",
+      "mcp": {
+        "success": true,
+        "time": 8.106231689453125e-06,
+        "tokens": 47
+      },
+      "native": {
+        "success": true,
+        "time": 0.47861695289611816,
+        "tokens": 30884
+      },
+      "improvements": {
+        "time_factor": 59043.08823529412,
+        "token_reduction_percent": 99.84781764020204
+      }
+    },
+    {
+      "query": "PathResolver",
+      "description": "Find PathResolver implementation",
+      "category": "symbol_lookup",
+      "mcp": {
+        "success": true,
+        "time": 9.059906005859375e-06,
+        "tokens": 43
+      },
+      "native": {
+        "success": true,
+        "time": 0.5280778408050537,
+        "tokens": 28437
+      },
+      "improvements": {
+        "time_factor": 58287.34210526316,
+        "token_reduction_percent": 99.84878855012835
+      }
+    },
+    {
+      "query": "PluginManager",
+      "description": "Where is PluginManager defined",
+      "category": "symbol_lookup",
+      "mcp": {
+        "success": true,
+        "time": 1.4066696166992188e-05,
+        "tokens": 44
+      },
+      "native": {
+        "success": true,
+        "time": 0.5073156356811523,
+        "tokens": 42684
+      },
+      "improvements": {
+        "time_factor": 36065.016949152545,
+        "token_reduction_percent": 99.8969168775185
+      }
+    },
+    {
+      "query": "def search",
+      "description": "Find all search methods",
+      "category": "method_search",
+      "mcp": {
+        "success": true,
+        "time": 1.0013580322265625e-05,
+        "tokens": 84
+      },
+      "native": {
+        "success": true,
+        "time": 0.465167760848999,
+        "tokens": 14504
+      },
+      "improvements": {
+        "time_factor": 46453.69047619047,
+        "token_reduction_percent": 99.42084942084942
+      }
+    },
+    {
+      "query": "def lookup",
+      "description": "Find lookup implementations",
+      "category": "method_search",
+      "mcp": {
+        "success": true,
+        "time": 1.239776611328125e-05,
+        "tokens": 84
+      },
+      "native": {
+        "success": true,
+        "time": 0.5017096996307373,
+        "tokens": 25196
+      },
+      "improvements": {
+        "time_factor": 40467.75,
+        "token_reduction_percent": 99.666613748214
+      }
+    },
+    {
+      "query": "def index",
+      "description": "Find indexing methods",
+      "category": "method_search",
+      "mcp": {
+        "success": true,
+        "time": 7.3909759521484375e-06,
+        "tokens": 83
+      },
+      "native": {
+        "success": true,
+        "time": 0.46500539779663086,
+        "tokens": 22894
+      },
+      "improvements": {
+        "time_factor": 62915.290322580644,
+        "token_reduction_percent": 99.6374595964008
+      }
+    },
+    {
+      "query": "def get_",
+      "description": "Find getter methods",
+      "category": "method_search",
+      "mcp": {
+        "success": true,
+        "time": 8.821487426757812e-06,
+        "tokens": 82
+      },
+      "native": {
+        "success": true,
+        "time": 0.528430700302124,
+        "tokens": 4173
+      },
+      "improvements": {
+        "time_factor": 59902.67567567567,
+        "token_reduction_percent": 98.03498682003355
+      }
+    },
+    {
+      "query": "def __init__",
+      "description": "Find constructors",
+      "category": "method_search",
+      "mcp": {
+        "success": true,
+        "time": 8.106231689453125e-06,
+        "tokens": 85
+      },
+      "native": {
+        "success": true,
+        "time": 0.5192005634307861,
+        "tokens": 20158
+      },
+      "improvements": {
+        "time_factor": 64049.55882352941,
+        "token_reduction_percent": 99.57833118364917
+      }
+    },
+    {
+      "query": "reranking",
+      "description": "Find reranking implementation",
+      "category": "pattern_search",
+      "mcp": {
+        "success": true,
+        "time": 7.3909759521484375e-06,
+        "tokens": 83
+      },
+      "native": {
+        "success": true,
+        "time": 0.4823954105377197,
+        "tokens": 19066
+      },
+      "improvements": {
+        "time_factor": 65268.16129032258,
+        "token_reduction_percent": 99.56467009335991
+      }
+    },
+    {
+      "query": "semantic.*search",
+      "description": "Find semantic search code",
+      "category": "pattern_search",
+      "mcp": {
+        "success": true,
+        "time": 7.3909759521484375e-06,
+        "tokens": 88
+      },
+      "native": {
+        "success": true,
+        "time": 0.506331205368042,
+        "tokens": 64950
+      },
+      "improvements": {
+        "time_factor": 68506.67741935483,
+        "token_reduction_percent": 99.86451116243265
+      }
+    },
+    {
+      "query": "cache.*query",
+      "description": "Find query caching",
+      "category": "pattern_search",
+      "mcp": {
+        "success": true,
+        "time": 9.5367431640625e-06,
+        "tokens": 85
+      },
+      "native": {
+        "success": true,
+        "time": 0.5863897800445557,
+        "tokens": 8647
+      },
+      "improvements": {
+        "time_factor": 61487.425,
+        "token_reduction_percent": 99.01700011564705
+      }
+    },
+    {
+      "query": "BM25.*fallback",
+      "description": "Find BM25 fallback code",
+      "category": "pattern_search",
+      "mcp": {
+        "success": true,
+        "time": 9.298324584960938e-06,
+        "tokens": 87
+      },
+      "native": {
+        "success": true,
+        "time": 0.4376792907714844,
+        "tokens": 19670
+      },
+      "improvements": {
+        "time_factor": 47070.769230769234,
+        "token_reduction_percent": 99.55770208439247
+      }
+    },
+    {
+      "query": "centralized.*storage",
+      "description": "Find centralized storage",
+      "category": "pattern_search",
+      "mcp": {
+        "success": true,
+        "time": 1.0251998901367188e-05,
+        "tokens": 91
+      },
+      "native": {
+        "success": true,
+        "time": 0.49730849266052246,
+        "tokens": 14820
+      },
+      "improvements": {
+        "time_factor": 48508.441860465115,
+        "token_reduction_percent": 99.3859649122807
+      }
+    },
+    {
+      "query": "how does indexing work",
+      "description": "Understand indexing process",
+      "category": "natural_language",
+      "mcp": {
+        "success": true,
+        "time": 8.106231689453125e-06,
+        "tokens": 93
+      },
+      "native": {
+        "success": true,
+        "time": 0.4581105709075928,
+        "tokens": 3925
+      },
+      "improvements": {
+        "time_factor": 56513.382352941175,
+        "token_reduction_percent": 97.63057324840764
+      }
+    },
+    {
+      "query": "file watching implementation",
+      "description": "Find file watcher",
+      "category": "natural_language",
+      "mcp": {
+        "success": true,
+        "time": 1.430511474609375e-05,
+        "tokens": 97
+      },
+      "native": {
+        "success": true,
+        "time": 0.46961522102355957,
+        "tokens": 3925
+      },
+      "improvements": {
+        "time_factor": 32828.48333333333,
+        "token_reduction_percent": 97.52866242038216
+      }
+    },
+    {
+      "query": "error handling",
+      "description": "Find error handling patterns",
+      "category": "natural_language",
+      "mcp": {
+        "success": true,
+        "time": 7.62939453125e-06,
+        "tokens": 87
+      },
+      "native": {
+        "success": true,
+        "time": 0.4659557342529297,
+        "tokens": 40412
+      },
+      "improvements": {
+        "time_factor": 61073.75,
+        "token_reduction_percent": 99.7847174106701
+      }
+    },
+    {
+      "query": "configuration management",
+      "description": "Find config code",
+      "category": "natural_language",
+      "mcp": {
+        "success": true,
+        "time": 1.9550323486328125e-05,
+        "tokens": 94
+      },
+      "native": {
+        "success": true,
+        "time": 0.47870421409606934,
+        "tokens": 35664
+      },
+      "improvements": {
+        "time_factor": 24485.743902439026,
+        "token_reduction_percent": 99.73642889187977
+      }
+    },
+    {
+      "query": "plugin system",
+      "description": "Understand plugin architecture",
+      "category": "natural_language",
+      "mcp": {
+        "success": true,
+        "time": 9.059906005859375e-06,
+        "tokens": 86
+      },
+      "native": {
+        "success": true,
+        "time": 0.5061283111572266,
+        "tokens": 41966
+      },
+      "improvements": {
+        "time_factor": 55864.63157894737,
+        "token_reduction_percent": 99.79507220130583
+      }
+    },
+    {
+      "query": "import.*from.*dispatcher",
+      "description": "Find dispatcher imports",
+      "category": "cross_file",
+      "mcp": {
+        "success": true,
+        "time": 8.344650268554688e-06,
+        "tokens": 94
+      },
+      "native": {
+        "success": true,
+        "time": 0.5194780826568604,
+        "tokens": 11493
+      },
+      "improvements": {
+        "time_factor": 62252.828571428574,
+        "token_reduction_percent": 99.18211085008267
+      }
+    },
+    {
+      "query": "extends.*Plugin",
+      "description": "Find plugin extensions",
+      "category": "cross_file",
+      "mcp": {
+        "success": true,
+        "time": 1.1444091796875e-05,
+        "tokens": 87
+      },
+      "native": {
+        "success": true,
+        "time": 0.5381412506103516,
+        "tokens": 33437
+      },
+      "improvements": {
+        "time_factor": 47023.5,
+        "token_reduction_percent": 99.7398091934085
+      }
+    },
+    {
+      "query": "implements.*Interface",
+      "description": "Find interface implementations",
+      "category": "cross_file",
+      "mcp": {
+        "success": true,
+        "time": 1.1444091796875e-05,
+        "tokens": 92
+      },
+      "native": {
+        "success": true,
+        "time": 0.5118966102600098,
+        "tokens": 47721
+      },
+      "improvements": {
+        "time_factor": 44730.208333333336,
+        "token_reduction_percent": 99.80721275748621
+      }
+    },
+    {
+      "query": "TODO|FIXME",
+      "description": "Find todos and fixmes",
+      "category": "cross_file",
+      "mcp": {
+        "success": true,
+        "time": 9.775161743164062e-06,
+        "tokens": 84
+      },
+      "native": {
+        "success": true,
+        "time": 0.4315035343170166,
+        "tokens": 43867
+      },
+      "improvements": {
+        "time_factor": 44142.85365853659,
+        "token_reduction_percent": 99.80851209337315
+      }
+    },
+    {
+      "query": "raise.*Exception",
+      "description": "Find exception handling",
+      "category": "cross_file",
+      "mcp": {
+        "success": true,
+        "time": 7.3909759521484375e-06,
+        "tokens": 88
+      },
+      "native": {
+        "success": true,
+        "time": 0.5220656394958496,
+        "tokens": 43513
+      },
+      "improvements": {
+        "time_factor": 70635.54838709677,
+        "token_reduction_percent": 99.7977615884908
+      }
+    }
+  ]
+}

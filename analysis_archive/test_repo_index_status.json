@@ -1,0 +1,302 @@
+{
+  "total_repos": 29,
+  "indexed": 0,
+  "need_semantic": 0,
+  "need_indexing": 29,
+  "repositories": {
+    "indexed": [],
+    "need_semantic": [],
+    "need_indexing": [
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/functional/elixir/phoenix",
+        "name": "phoenix",
+        "hash": "e12e8e8365d2",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/functional/haskell/yesod",
+        "name": "yesod",
+        "hash": "080cafc4ddd9",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/jvm/clojure/ring",
+        "name": "ring",
+        "hash": "4a79ea8298fb",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/jvm/java/kafka",
+        "name": "kafka",
+        "hash": "34d604cbbedf",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/jvm/java/spring-boot",
+        "name": "spring-boot",
+        "hash": "1a9fbcd034f2",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/jvm/kotlin/ktor",
+        "name": "ktor",
+        "hash": "6f0779e7fd7c",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/jvm/scala/akka",
+        "name": "akka",
+        "hash": "d17b557e0b1a",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/modern/dart/sdk",
+        "name": "sdk",
+        "hash": "48f70bd595a6",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/modern/go/gin",
+        "name": "gin",
+        "hash": "2c3a11a10667",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/modern/go/terraform",
+        "name": "terraform",
+        "hash": "2849ba16ec30",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/modern/swift/Alamofire",
+        "name": "Alamofire",
+        "hash": "e8f130fe30ac",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/other/csharp/aspnetcore",
+        "name": "aspnetcore",
+        "hash": "b947d106eccf",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/other/lua/kong",
+        "name": "kong",
+        "hash": "f0a3199cb312",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/systems/c/curl",
+        "name": "curl",
+        "hash": "83245e6cb9f2",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/systems/c/redis",
+        "name": "redis",
+        "hash": "7db5331e3905",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/systems/cpp/grpc",
+        "name": "grpc",
+        "hash": "6ebf7d3a3ce3",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/systems/cpp/json",
+        "name": "json",
+        "hash": "257683c93d94",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/systems/rust/rustlings",
+        "name": "rustlings",
+        "hash": "2adae7acfd69",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/systems/rust/tokio",
+        "name": "tokio",
+        "hash": "e23a01c4032c",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/systems/zig/zig",
+        "name": "zig",
+        "hash": "bca4a9ce73d5",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/web/javascript/express",
+        "name": "express",
+        "hash": "bb4442cd5cc6",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/web/javascript/react",
+        "name": "react",
+        "hash": "d72d7e1e17d2",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/web/perl/mojo",
+        "name": "mojo",
+        "hash": "1ccf33ab5afa",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/web/php/framework",
+        "name": "framework",
+        "hash": "40fdeba5e98b",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/web/python/django",
+        "name": "django",
+        "hash": "d8df70cdcd6e",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/web/python/flask",
+        "name": "flask",
+        "hash": "a91ba02537ca",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/web/python/requests",
+        "name": "requests",
+        "hash": "2652ff29a355",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/web/ruby/rails",
+        "name": "rails",
+        "hash": "7d20371e6e74",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      },
+      {
+        "path": "/workspaces/Code-Index-MCP/test_repos/web/typescript/TypeScript",
+        "name": "TypeScript",
+        "hash": "e3acd2328eea",
+        "has_index": false,
+        "index_path": null,
+        "document_count": 0,
+        "has_bm25": false,
+        "has_semantic": false
+      }
+    ]
+  }
+}

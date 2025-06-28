@@ -1,0 +1,44 @@
+{
+  "test_suite": {
+    "name": "MCP vs Native Quick Test",
+    "version": "1.0",
+    "description": "Quick validation test suite for MCP vs Native comparison"
+  },
+  "query_categories": {
+    "symbol_queries": {
+      "description": "Find class/function definitions",
+      "queries": [
+        {
+          "id": "symbol_001",
+          "text": "Find the BM25Indexer class definition",
+          "expected_approach": "symbol_lookup",
+          "complexity": "simple"
+        },
+        {
+          "id": "symbol_002", 
+          "text": "Find the EnhancedDispatcher class and show its main methods",
+          "expected_approach": "symbol_lookup + code_search",
+          "complexity": "medium"
+        }
+      ]
+    },
+    "content_queries": {
+      "description": "Search for specific code patterns",
+      "queries": [
+        {
+          "id": "content_001",
+          "text": "Find all functions that use asyncio",
+          "expected_approach": "code_search",
+          "complexity": "simple"
+        }
+      ]
+    }
+  },
+  "execution_settings": {
+    "timeout_seconds": 60,
+    "max_retries": 1,
+    "capture_full_transcripts": true,
+    "detailed_token_analysis": true,
+    "performance_profiling": true
+  }
+}

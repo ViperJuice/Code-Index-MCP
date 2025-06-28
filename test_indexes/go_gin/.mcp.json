@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "code-index-mcp": {
+      "command": "python",
+      "args": ["/workspaces/Code-Index-MCP/scripts/cli/mcp_server_cli.py"],
+      "cwd": "/workspaces/Code-Index-MCP/test_indexes/go_gin",
+      "env": {
+        "PYTHONPATH": "/workspaces/Code-Index-MCP",
+        "DATABASE_URL": "sqlite:///./code_index.db",
+        "MCP_WORKSPACE_ROOT": "/workspaces/Code-Index-MCP/test_indexes/go_gin",
+        "MCP_LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}

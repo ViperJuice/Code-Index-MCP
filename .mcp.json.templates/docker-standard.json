@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "code-index-standard": {
+      "command": "docker",
+      "args": [
+        "run", 
+        "-i", 
+        "--rm",
+        "-v", "${workspace}:/workspace",
+        "-v", "${HOME}/.mcp-index:/app/.mcp-index",
+        "-e", "VOYAGE_AI_API_KEY=${VOYAGE_AI_API_KEY:-}",
+        "-e", "MCP_ARTIFACT_SYNC=${MCP_ARTIFACT_SYNC:-true}",
+        "-e", "AUTO_UPLOAD=${AUTO_UPLOAD:-true}",
+        "-e", "AUTO_DOWNLOAD=${AUTO_DOWNLOAD:-true}",
+        "${MCP_DOCKER_IMAGE:-ghcr.io/code-index-mcp/mcp-index:standard}"
+      ],
+      "env": {
+        "MCP_LOG_LEVEL": "${MCP_LOG_LEVEL:-INFO}"
+      }
+    }
+  }
+}

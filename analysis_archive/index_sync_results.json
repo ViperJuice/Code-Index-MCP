@@ -1,0 +1,161 @@
+{
+  "synced": [
+    {
+      "status": "synced",
+      "index_id": "d8df70cdcd6e",
+      "repo_path": "/workspaces/Code-Index-MCP/test_repos/web/python/django",
+      "git_info": {
+        "commit": "8e2249bc79a74d96f9ad20c89f82a89c78d4b648",
+        "branch": "main",
+        "has_changes": false,
+        "synced_at": "2025-06-24T05:07:20.417031"
+      }
+    },
+    {
+      "status": "synced",
+      "index_id": "a91ba02537ca",
+      "repo_path": "/workspaces/Code-Index-MCP/test_repos/web/python/flask",
+      "git_info": {
+        "commit": "85c5d93cbd049c4bd0679c36fd1ddcae8c37b642",
+        "branch": "main",
+        "has_changes": false,
+        "synced_at": "2025-06-24T05:07:20.425429"
+      }
+    },
+    {
+      "status": "synced",
+      "index_id": "bb4442cd5cc6",
+      "repo_path": "/workspaces/Code-Index-MCP/test_repos/web/javascript/express",
+      "git_info": {
+        "commit": "52872b84caf8426492108f59c1c229ac991396da",
+        "branch": "master",
+        "has_changes": false,
+        "synced_at": "2025-06-24T05:07:20.433542"
+      }
+    },
+    {
+      "status": "synced",
+      "index_id": "48f70bd595a6",
+      "repo_path": "/workspaces/Code-Index-MCP/test_repos/modern/dart/sdk",
+      "git_info": {
+        "commit": "6575655850e8fb6dfde8eb36d3e397e8561af8e5",
+        "branch": "main",
+        "has_changes": false,
+        "synced_at": "2025-06-24T05:07:20.484049"
+      }
+    },
+    {
+      "status": "synced",
+      "index_id": "e8f130fe30ac",
+      "repo_path": "/workspaces/Code-Index-MCP/test_repos/modern/swift/Alamofire",
+      "git_info": {
+        "commit": "46249e016881b96846025ed8c2e5045a822af3fe",
+        "branch": "master",
+        "has_changes": false,
+        "synced_at": "2025-06-24T05:07:20.494116"
+      }
+    },
+    {
+      "status": "synced",
+      "index_id": "7d20371e6e74",
+      "repo_path": "/workspaces/Code-Index-MCP/test_repos/web/ruby/rails",
+      "git_info": {
+        "commit": "0f591639b864de6bf3fd760a6921f5eda17b2905",
+        "branch": "main",
+        "has_changes": false,
+        "synced_at": "2025-06-24T05:07:20.507777"
+      }
+    },
+    {
+      "status": "synced",
+      "index_id": "2c3a11a10667",
+      "repo_path": "/workspaces/Code-Index-MCP/test_repos/modern/go/gin",
+      "git_info": {
+        "commit": "77d70e5858278193abfab732164b0c1415d8d4ba",
+        "branch": "master",
+        "has_changes": false,
+        "synced_at": "2025-06-24T05:07:20.515182"
+      }
+    },
+    {
+      "status": "synced",
+      "index_id": "1ccf33ab5afa",
+      "repo_path": "/workspaces/Code-Index-MCP/test_repos/web/perl/mojo",
+      "git_info": {
+        "commit": "8f5bca94ef660bca2b67215f6ed2051912e75ba0",
+        "branch": "main",
+        "has_changes": false,
+        "synced_at": "2025-06-24T05:07:20.522929"
+      }
+    },
+    {
+      "status": "synced",
+      "index_id": "2849ba16ec30",
+      "repo_path": "/workspaces/Code-Index-MCP/test_repos/modern/go/terraform",
+      "git_info": {
+        "commit": "540512e27b881144c12bb165e6ecc76b430f009f",
+        "branch": "main",
+        "has_changes": false,
+        "synced_at": "2025-06-24T05:07:20.541100"
+      }
+    },
+    {
+      "status": "synced",
+      "index_id": "e3acd2328eea",
+      "repo_path": "/workspaces/Code-Index-MCP/test_repos/web/typescript/TypeScript",
+      "git_info": {
+        "commit": "dd1e258ba56f1b511879372c857fb625de3dec4a",
+        "branch": "main",
+        "has_changes": false,
+        "synced_at": "2025-06-24T05:07:20.604411"
+      }
+    },
+    {
+      "status": "synced",
+      "index_id": "40fdeba5e98b",
+      "repo_path": "/workspaces/Code-Index-MCP/test_repos/web/php/framework",
+      "git_info": {
+        "commit": "6d3fbc5d008849995b048bb98d55dd05a39119f5",
+        "branch": "12.x",
+        "has_changes": false,
+        "synced_at": "2025-06-24T05:07:20.615599"
+      }
+    },
+    {
+      "status": "synced",
+      "index_id": "2652ff29a355",
+      "repo_path": "/workspaces/Code-Index-MCP/test_repos/web/python/requests",
+      "git_info": {
+        "commit": "90fee0876aea97c639b3bf698d83a12876d2f160",
+        "branch": "main",
+        "has_changes": false,
+        "synced_at": "2025-06-24T05:07:20.622559"
+      }
+    },
+    {
+      "status": "synced",
+      "index_id": "d72d7e1e17d2",
+      "repo_path": "/workspaces/Code-Index-MCP/test_repos/web/javascript/react",
+      "git_info": {
+        "commit": "6b7e207cabe4c1bc9390d862dd9228e94e9edf4b",
+        "branch": "main",
+        "has_changes": false,
+        "synced_at": "2025-06-24T05:07:20.635558"
+      }
+    }
+  ],
+  "missing_repo": [
+    {
+      "status": "missing_repo",
+      "index_id": "d6be0c062f54e636635b23a0a0a5b1b96a459704f8d7a871345be35ff16830b4",
+      "error": "Could not find repository path"
+    },
+    {
+      "status": "missing_repo",
+      "index_id": "f7b49f5d0ae0",
+      "error": "Could not find repository path"
+    }
+  ],
+  "errors": [],
+  "stats": {}
+}

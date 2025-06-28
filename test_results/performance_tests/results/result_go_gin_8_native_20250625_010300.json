@@ -1,0 +1,14 @@
+{
+  "query": "Explain how routing works",
+  "mode": "native",
+  "tools_used": ["Grep", "Read", "Glob"],
+  "tool_calls": {"Grep": 5, "Read": 6, "Glob": 2},
+  "results_found": 15,
+  "execution_time_ms": 3200,
+  "token_estimate": 15000,
+  "success": true,
+  "error": null,
+  "test_id": "go_gin_8_native",
+  "batch_name": "go_gin",
+  "timestamp": "2025-01-06T01:03:00"
+}

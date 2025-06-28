@@ -1,0 +1,190 @@
+@startuml index_management
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define NOT_IMPLEMENTED <<Not Implemented>>
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Centralized Index Management - Code Level
+
+package "Index Management System" <<Component>> {
+    
+    ' ========================================
+    ' Core Components
+    ' ========================================
+    
+    class IndexDiscovery #LightGreen {
+        -workspace_root: Path
+        -storage_strategy: str
+        -index_manager: IndexManager
+        --
+        +__init__(workspace_root: Path, storage_strategy: str = None)
+        +is_index_enabled() -> bool
+        +get_local_index_path() -> Optional[Path]
+        +get_index_config() -> Optional[Dict]
+        +get_index_metadata() -> Optional[Dict]
+        +should_download_index() -> bool
+        +download_latest_index() -> bool
+    }
+    
+    class PathResolver #LightGreen {
+        -repository_root: Path
+        -index_storage_path: Path
+        -storage_strategy: str
+        --
+        +__init__(repository_root: Path = None, index_storage_path: Path = None, storage_strategy: str = "centralized")
+        +normalize_path(absolute_path: Path) -> str
+        +resolve_path(relative_path: str) -> Path
+        +get_index_storage_path() -> Path
+        +compute_content_hash(file_path: Path) -> str
+        -_detect_repository_root() -> Path
+        -_get_default_index_path() -> Path
+    }
+    
+    ' ========================================
+    ' Storage Layout
+    ' ========================================
+    
+    note top of IndexDiscovery #LightGreen
+        Centralized Storage Layout:
+        ~/.mcp/indexes/
+        ├── {repo_hash}/
+        │   ├── main_f48abb0.db
+        │   ├── main_f48abb0.metadata.json
+        │   ├── feature_abc123.db
+        │   ├── feature_abc123.metadata.json
+        │   └── current.db -> main_f48abb0.db
+        ├── {another_repo_hash}/
+        │   └── ...
+        
+        Repository Hash Generation:
+        - Based on git remote URL
+        - SHA256 hash, truncated to 12 chars
+        - Fallback to path hash if no remote
+    end note
+    
+    ' ========================================
+    ' MCP Server Integration
+    ' ========================================
+    
+    class MCPServerCLI #LightGreen {
+        -dispatcher: EnhancedDispatcher
+        -plugin_manager: PluginManager
+        -sqlite_store: SQLiteStore
+        --
+        +initialize_services() -> None
+        -_get_repo_id() -> str
+        -_find_centralized_index() -> Optional[Path]
+    }
+    
+    note right of MCPServerCLI #LightGreen
+        Index Discovery Flow:
+        1. Get MCP_INDEX_STORAGE_PATH (default: ~/.mcp/indexes)
+        2. Generate repository ID from git remote
+        3. Check for current.db symlink
+        4. If found, use centralized index
+        5. If not found, show error with instructions
+        
+        No fallback to local storage!
+        Single source of truth.
+    end note
+    
+    ' ========================================
+    ' Migration Tools
+    ' ========================================
+    
+    class IndexMigrator #LightGreen {
+        +move_index_to_central(repo_path: Path) -> bool
+        +get_repo_identifier(repo_path: Path) -> str
+        +get_git_info(repo_path: Path) -> Dict
+        -_create_metadata(repo_path: Path) -> Dict
+        -_create_symlink(repo_dir: Path, target: str) -> None
+    }
+    
+    note bottom of IndexMigrator #LightGreen
+        Migration Process:
+        1. Check for .mcp-index/code_index.db
+        2. Generate repository hash
+        3. Copy to central location
+        4. Create metadata file
+        5. Create current.db symlink
+        6. Optionally remove .mcp-index/
+    end note
+    
+    ' ========================================
+    ' Git Integration
+    ' ========================================
+    
+    class GitAwareIndexManager #LightGreen {
+        -storage_dir: Path
+        -repo_registry: RepositoryRegistry
+        --
+        +__init__(storage_dir: Path = None)
+        +sync_all_repositories() -> Dict
+        +sync_repository(repo_path: Path) -> Dict
+        +get_repository_status(repo_id: str) -> Dict
+        -_get_git_info(repo_path: Path) -> Dict
+        -_update_index_metadata(index_path: Path, git_info: Dict) -> None
+    }
+    
+    class RepositoryRegistry #LightGreen {
+        -registry_file: Path
+        -repositories: Dict[str, Dict]
+        --
+        +__init__(registry_file: Path = None)
+        +register_repository(repo_path: Path, repo_id: str) -> None
+        +get_repository(repo_id: str) -> Optional[Dict]
+        +list_repositories() -> List[Dict]
+        +update_repository_status(repo_id: str, status: Dict) -> None
+        -_load_registry() -> None
+        -_save_registry() -> None
+    }
+    
+    note right of GitAwareIndexManager #LightGreen
+        Git Synchronization:
+        - Tracks commit hashes
+        - Detects branch changes
+        - Monitors uncommitted changes
+        - Updates index metadata
+        - Maintains sync status
+        
+        Successfully synced 13/15 repos
+    end note
+    
+    ' ========================================
+    ' Relationships
+    ' ========================================
+    
+    IndexDiscovery --> PathResolver : uses
+    MCPServerCLI --> IndexDiscovery : finds indexes
+    IndexMigrator --> PathResolver : uses for paths
+    GitAwareIndexManager --> RepositoryRegistry : manages repos
+    GitAwareIndexManager --> IndexMigrator : uses for sync
+    MCPServerCLI --> GitAwareIndexManager : sync on startup
+    
+    ' ========================================
+    ' Benefits
+    ' ========================================
+    
+    note bottom #LightBlue
+        Benefits of Centralized Storage:
+        ✓ Indexes never committed to git
+        ✓ Reusable across clones
+        ✓ Clear separation of concerns
+        ✓ Version management per branch
+        ✓ Simplified configuration
+        ✓ Consistent location
+        ✓ Easy backup/restore
+        ✓ No .gitignore needed
+    end note
+}
+
+' ========================================
+' Implementation Status Legend
+' ========================================
+
+legend right
+    |<#90EE90>| Implemented |
+    |<#FFD700>| Partially Implemented |
+    |<#FF6B6B>| Not Implemented |
+endlegend
+
+@enduml

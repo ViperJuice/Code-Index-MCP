@@ -4,14 +4,33 @@
 This directory contains the comprehensive architecture documentation for Code-Index-MCP using the C4 model. The system now supports **48 programming languages** through a combination of enhanced specific plugins and a generic tree-sitter based plugin system.
 
 ## Current Architecture Status
-- **Implementation**: 100% Complete - PRODUCTION READY
-- **Languages Supported**: 48+ (15 specialized plugins + 35+ via generic plugin)
-- **Semantic Search**: Voyage AI embeddings with graceful Qdrant fallback
+- **Implementation**: 95% Complete - PRODUCTION READY
+- **Languages Supported**: 48 (13 specialized plugins + 35 via generic plugin)
+- **Semantic Search**: Voyage AI embeddings with Qdrant server/file mode
 - **Storage**: SQLite with FTS5 + optional Qdrant for vectors
 - **Real-time Updates**: File system monitoring with Watchdog
-- **Performance**: Query caching, lazy loading, optimized routing
-- **Index Management**: Portable index kit with GitHub Artifacts storage
-- **Zero-Cost Sharing**: All indexing on developer machines, free artifact storage
+- **Performance**: Sub-100ms queries with timeout protection & BM25 bypass
+- **Index Management**: Centralized storage at `~/.mcp/indexes/`
+- **Git Integration**: Repository tracking and synchronization
+
+## Recent Architectural Updates (January 2025)
+
+### Local Index Storage
+The system now uses local index storage architecture:
+
+- **Default Location**: Indexes stored at `.indexes/{repo_hash}/{branch}_{commit}.db` relative to MCP server
+- **Repository Isolation**: Each repository gets a unique hash-based directory
+- **Version Management**: Multiple versions per branch supported
+- **Automatic Discovery**: MCP server automatically finds indexes based on git remote
+- **Migration Tool**: Simple script to move existing indexes to local storage
+- **Configurable**: Can override location with MCP_INDEX_STORAGE_PATH environment variable
+
+Benefits:
+- Indexes never accidentally committed to git (added to .gitignore)
+- Self-contained MCP server with all data in one place
+- Easy to backup or move entire MCP installation
+- No dependency on home directory or user-specific paths
+- Simplified deployment and distribution
 
 ## Recent Architectural Updates (June 10, 2025)
 
@@ -167,10 +186,48 @@ View the Level 4 diagrams in the `level4/` directory using:
 4. **Language Agnostic Core**: Same interfaces for all languages
 5. **Semantic Understanding**: AI-powered code comprehension
 
+## Project Organization Updates (January 2025)
+
+### Directory Structure Refactoring
+The project underwent a major directory reorganization for improved maintainability:
+
+- **Root Directory Consolidation**: Reduced from 44+ files to ~30 essential files
+- **Organized Scripts**: Scripts moved to logical subdirectories:
+  - `scripts/cli/` - Command-line interfaces (mcp_cli.py, mcp_server_cli.py)
+  - `scripts/utilities/` - Utility scripts for indexing, analysis, and management
+  - `scripts/development/` - Development tools (scaffolding, setup)
+  - `scripts/testing/` - Test runners and validation scripts
+- **Docker Organization**: All Docker files moved to `docker/` with subdirectories:
+  - `docker/compose/` - Docker Compose configurations by environment
+  - `docker/dockerfiles/` - All Dockerfile variants
+- **Test Organization**: Test fixtures and data moved to `tests/fixtures/`
+- **Documentation**: Comprehensive docs in `docs/` with categorized subdirectories
+
+See [docs/PROJECT_STRUCTURE.md](../docs/PROJECT_STRUCTURE.md) for the complete structure.
+
+### Test Suite Maintenance
+Following the directory refactoring, the test suite was updated to maintain full compatibility:
+- Fixed import paths for moved modules
+- Added missing `language` property to IPlugin interface
+- Created DocumentProcessingError exception class  
+- Corrected method signatures for store_file calls
+- Updated test expectations to match plugin behavior
+
 ## Recent Updates (June 2025)
 
-### Major Enhancements
-- **48+ Language Support**: 15 specialized plugins + 35+ via GenericTreeSitterPlugin
+### Dispatcher Performance Fixes (June 24)
+- **Timeout Protection**: Added 5-second timeout to prevent plugin loading hangs
+- **BM25 Bypass**: Direct SQLite search when plugins unavailable (< 100ms)
+- **Simple Dispatcher**: New lightweight alternative for BM25-only deployments
+- **Qdrant Server Mode**: Automatic server/file mode switching
+- **Git Synchronization**: Index metadata tracks commits and branches
+- **Environment Configuration**: 
+  - `MCP_USE_SIMPLE_DISPATCHER=true` for lightweight mode
+  - `MCP_PLUGIN_TIMEOUT=5` to configure timeout
+  - `QDRANT_USE_SERVER=true` for server mode
+
+### Major Enhancements (June 10)
+- **48 Language Support**: 13 specialized plugins + 35 via GenericTreeSitterPlugin
 - **Enhanced Dispatcher**: Dynamic plugin loading with lazy initialization
 - **Plugin Factory Pattern**: Automatic language detection and plugin creation
 - **Query Caching**: Significant performance improvements for tree-sitter queries

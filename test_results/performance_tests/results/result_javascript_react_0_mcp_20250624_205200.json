@@ -1,0 +1,14 @@
+{
+  "query": "Find the definition of class Component",
+  "mode": "mcp",
+  "tools_used": ["mcp__code-index-mcp__symbol_lookup", "mcp__code-index-mcp__search_code"],
+  "tool_calls": {"mcp__code-index-mcp__symbol_lookup": 1, "mcp__code-index-mcp__search_code": 2},
+  "results_found": 1,
+  "execution_time_ms": 3500,
+  "token_estimate": 8500,
+  "success": false,
+  "error": "Could not find React Component class definition in javascript_react repository. Results returned were from other repositories (C#, PHP) instead of the targeted JavaScript/React repository.",
+  "test_id": "javascript_react_0_mcp",
+  "timestamp": "2025-01-06T20:52:00",
+  "batch_name": "javascript_react"
+}

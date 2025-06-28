@@ -1,0 +1,13 @@
+!define PRIMARY_COLOR #2E86AB
+!define SECONDARY_COLOR #A23B72
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam roundcorner 5
+
+skinparam sequence {
+    ArrowColor PRIMARY_COLOR
+    ActorBorderColor PRIMARY_COLOR
+    ParticipantBorderColor PRIMARY_COLOR
+    ParticipantBackgroundColor white
+}

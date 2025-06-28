@@ -1,0 +1,75 @@
+{
+  "test_indexes_found": 10,
+  "repositories": [
+    {
+      "repo_name": "c_redis",
+      "db_file": "code_index.db",
+      "db_path": "/workspaces/Code-Index-MCP/test_indexes/c_redis/code_index.db",
+      "row_count": 1629,
+      "samples": []
+    },
+    {
+      "repo_name": "csharp_aspnetcore",
+      "db_file": "code_index.db",
+      "db_path": "/workspaces/Code-Index-MCP/test_indexes/csharp_aspnetcore/code_index.db",
+      "row_count": 15544,
+      "samples": []
+    },
+    {
+      "repo_name": "dart_sdk",
+      "db_file": "code_index.db",
+      "db_path": "/workspaces/Code-Index-MCP/test_indexes/dart_sdk/code_index.db",
+      "row_count": 51377,
+      "samples": []
+    },
+    {
+      "repo_name": "go_gin",
+      "db_file": "code_index.db",
+      "db_path": "/workspaces/Code-Index-MCP/test_indexes/go_gin/code_index.db",
+      "row_count": 112,
+      "samples": []
+    },
+    {
+      "repo_name": "javascript_react",
+      "db_file": "code_index.db",
+      "db_path": "/workspaces/Code-Index-MCP/test_indexes/javascript_react/code_index.db",
+      "row_count": 6261,
+      "samples": []
+    },
+    {
+      "repo_name": "lua_kong",
+      "db_file": "code_index.db",
+      "db_path": "/workspaces/Code-Index-MCP/test_indexes/lua_kong/code_index.db",
+      "row_count": 2405,
+      "samples": []
+    },
+    {
+      "repo_name": "python_django",
+      "db_file": "code_index.db",
+      "db_path": "/workspaces/Code-Index-MCP/test_indexes/python_django/code_index.db",
+      "row_count": 5497,
+      "samples": []
+    },
+    {
+      "repo_name": "rust_tokio",
+      "db_file": "code_index.db",
+      "db_path": "/workspaces/Code-Index-MCP/test_indexes/rust_tokio/code_index.db",
+      "row_count": 759,
+      "samples": []
+    },
+    {
+      "repo_name": "swift_Alamofire",
+      "db_file": "code_index.db",
+      "db_path": "/workspaces/Code-Index-MCP/test_indexes/swift_Alamofire/code_index.db",
+      "row_count": 513,
+      "samples": []
+    },
+    {
+      "repo_name": "typescript_TypeScript",
+      "db_file": "code_index.db",
+      "db_path": "/workspaces/Code-Index-MCP/test_indexes/typescript_TypeScript/code_index.db",
+      "row_count": 74128,
+      "samples": []
+    }
+  ]
+}

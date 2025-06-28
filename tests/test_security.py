@@ -9,14 +9,29 @@ from fastapi import FastAPI
 import jwt
 
 from mcp_server.security import (
-    SecurityConfig, AuthManager, User, UserRole, Permission,
-    AuthCredentials, TokenData, AccessRequest, AccessRule, AccessLevel,
-    AuthenticationError, AuthorizationError, SecurityError,
-    PasswordManager, RateLimiter, SecurityMiddlewareStack
+    SecurityConfig,
+    AuthManager,
+    User,
+    UserRole,
+    Permission,
+    AuthCredentials,
+    TokenData,
+    AccessRequest,
+    AccessRule,
+    AccessLevel,
+    AuthenticationError,
+    AuthorizationError,
+    SecurityError,
+    PasswordManager,
+    RateLimiter,
+    SecurityMiddlewareStack,
 )
 from mcp_server.security.security_middleware import (
-    RateLimitMiddleware, SecurityHeadersMiddleware, AuthenticationMiddleware,
-    AuthorizationMiddleware, RequestValidationMiddleware
+    RateLimitMiddleware,
+    SecurityHeadersMiddleware,
+    AuthenticationMiddleware,
+    AuthorizationMiddleware,
+    RequestValidationMiddleware,
 )
 
 
@@ -32,7 +47,7 @@ def security_config():
         max_login_attempts=3,
         lockout_duration_minutes=5,
         rate_limit_requests=10,
-        rate_limit_window_minutes=1
+        rate_limit_window_minutes=1,
     )
 
 
@@ -49,7 +64,7 @@ async def test_user(auth_manager):
         username="testuser",
         password="testpass123!",
         email="test@example.com",
-        role=UserRole.USER
+        role=UserRole.USER,
     )
 
 
@@ -60,7 +75,7 @@ async def admin_user(auth_manager):
         username="admin",
         password="adminpass123!",
         email="admin@example.com",
-        role=UserRole.ADMIN
+        role=UserRole.ADMIN,
     )
 
 
@@ -78,15 +93,19 @@ class TestSecurityConfig:
 
     def test_invalid_secret_key(self):
         """Test invalid JWT secret key."""
-        with pytest.raises(ValueError, match="JWT secret key must be at least 32 characters long"):
+        with pytest.raises(
+            ValueError, match="JWT secret key must be at least 32 characters long"
+        ):
             SecurityConfig(jwt_secret_key="short")
 
     def test_invalid_token_expire_time(self):
         """Test invalid token expiration time."""
-        with pytest.raises(ValueError, match="Access token expire minutes must be positive"):
+        with pytest.raises(
+            ValueError, match="Access token expire minutes must be positive"
+        ):
             SecurityConfig(
                 jwt_secret_key="test-secret-key-at-least-32-characters-long",
-                access_token_expire_minutes=0
+                access_token_expire_minutes=0,
             )
 
 
@@ -97,7 +116,7 @@ class TestPasswordManager:
         """Test password hashing and verification."""
         pwd_manager = PasswordManager()
         password = "testpassword123!"
-        
+
         hashed = pwd_manager.hash_password(password)
         assert hashed != password
         assert pwd_manager.verify_password(password, hashed)
@@ -106,10 +125,10 @@ class TestPasswordManager:
     def test_password_strength_validation(self):
         """Test password strength validation."""
         pwd_manager = PasswordManager()
-        
+
         # Strong password
         assert pwd_manager.is_strong_password("StrongPass123!")
-        
+
         # Weak passwords
         assert not pwd_manager.is_strong_password("short")
         assert not pwd_manager.is_strong_password("alllowercase")
@@ -123,27 +142,27 @@ class TestRateLimiter:
     def test_rate_limiting(self):
         """Test basic rate limiting."""
         rate_limiter = RateLimiter(max_requests=3, window_minutes=1)
-        
+
         # First 3 requests should pass
         for i in range(3):
             assert not rate_limiter.is_rate_limited("test_client")
-        
+
         # 4th request should be blocked
         assert rate_limiter.is_rate_limited("test_client")
 
     def test_rate_limit_window_reset(self):
         """Test rate limit window reset."""
         rate_limiter = RateLimiter(max_requests=2, window_minutes=1)
-        
+
         # Use up the rate limit
         assert not rate_limiter.is_rate_limited("test_client")
         assert not rate_limiter.is_rate_limited("test_client")
         assert rate_limiter.is_rate_limited("test_client")
-        
+
         # Manually reset the window by updating the start time
         rate_limit_info = rate_limiter.rate_limits["test_client"]
         rate_limit_info.window_start = datetime.utcnow() - timedelta(minutes=2)
-        
+
         # Should work again
         assert not rate_limiter.is_rate_limited("test_client")
 
@@ -155,11 +174,9 @@ class TestAuthManager:
     async def test_create_user(self, auth_manager):
         """Test user creation."""
         user = await auth_manager.create_user(
-            username="newuser",
-            password="newpass123!",
-            email="new@example.com"
+            username="newuser", password="newpass123!", email="new@example.com"
         )
-        
+
         assert user.username == "newuser"
         assert user.email == "new@example.com"
         assert user.role == UserRole.USER
@@ -170,14 +187,16 @@ class TestAuthManager:
     async def test_create_user_duplicate_username(self, auth_manager):
         """Test duplicate username error."""
         await auth_manager.create_user("duplicate", "pass123!", "test1@example.com")
-        
+
         with pytest.raises(SecurityError, match="Username already exists"):
             await auth_manager.create_user("duplicate", "pass123!", "test2@example.com")
 
     @pytest.mark.asyncio
     async def test_create_user_weak_password(self, auth_manager):
         """Test weak password rejection."""
-        with pytest.raises(SecurityError, match="Password does not meet strength requirements"):
+        with pytest.raises(
+            SecurityError, match="Password does not meet strength requirements"
+        ):
             await auth_manager.create_user("user", "weak", "test@example.com")
 
     @pytest.mark.asyncio
@@ -185,7 +204,7 @@ class TestAuthManager:
         """Test successful user authentication."""
         credentials = AuthCredentials(username="testuser", password="testpass123!")
         authenticated_user = await auth_manager.authenticate_user(credentials)
-        
+
         assert authenticated_user is not None
         assert authenticated_user.username == "testuser"
 
@@ -193,7 +212,7 @@ class TestAuthManager:
     async def test_authenticate_user_invalid_credentials(self, auth_manager, test_user):
         """Test authentication with invalid credentials."""
         credentials = AuthCredentials(username="testuser", password="wrongpassword")
-        
+
         with pytest.raises(AuthenticationError, match="Invalid credentials"):
             await auth_manager.authenticate_user(credentials)
 
@@ -201,7 +220,7 @@ class TestAuthManager:
     async def test_authenticate_user_nonexistent(self, auth_manager):
         """Test authentication with nonexistent user."""
         credentials = AuthCredentials(username="nonexistent", password="password")
-        
+
         with pytest.raises(AuthenticationError, match="Invalid credentials"):
             await auth_manager.authenticate_user(credentials)
 
@@ -209,12 +228,12 @@ class TestAuthManager:
     async def test_failed_login_lockout(self, auth_manager, test_user):
         """Test account lockout after failed attempts."""
         credentials = AuthCredentials(username="testuser", password="wrongpassword")
-        
+
         # Exceed max login attempts
         for _ in range(auth_manager.config.max_login_attempts):
             with pytest.raises(AuthenticationError):
                 await auth_manager.authenticate_user(credentials)
-        
+
         # Next attempt should be locked out
         with pytest.raises(AuthenticationError, match="Account is locked"):
             await auth_manager.authenticate_user(credentials)
@@ -223,15 +242,15 @@ class TestAuthManager:
     async def test_create_access_token(self, auth_manager, test_user):
         """Test access token creation."""
         token = await auth_manager.create_access_token(test_user)
-        
+
         assert isinstance(token, str)
         assert len(token) > 0
-        
+
         # Verify token content
         payload = jwt.decode(
             token,
             auth_manager.config.jwt_secret_key,
-            algorithms=[auth_manager.config.jwt_algorithm]
+            algorithms=[auth_manager.config.jwt_algorithm],
         )
         assert payload["user_id"] == test_user.id
         assert payload["username"] == test_user.username
@@ -242,7 +261,7 @@ class TestAuthManager:
         """Test token verification."""
         token = await auth_manager.create_access_token(test_user)
         token_data = await auth_manager.verify_token(token)
-        
+
         assert token_data is not None
         assert token_data.user_id == test_user.id
         assert token_data.username == test_user.username
@@ -259,10 +278,10 @@ class TestAuthManager:
         """Test refresh token creation and usage."""
         refresh_token = await auth_manager.create_refresh_token(test_user)
         new_access_token = await auth_manager.refresh_access_token(refresh_token)
-        
+
         assert new_access_token is not None
         assert isinstance(new_access_token, str)
-        
+
         # Verify new token works
         token_data = await auth_manager.verify_token(new_access_token)
         assert token_data.user_id == test_user.id
@@ -271,11 +290,11 @@ class TestAuthManager:
     async def test_revoke_refresh_token(self, auth_manager, test_user):
         """Test refresh token revocation."""
         refresh_token = await auth_manager.create_refresh_token(test_user)
-        
+
         # Revoke the token
         success = await auth_manager.revoke_refresh_token(refresh_token)
         assert success
-        
+
         # Should not be able to use revoked token
         new_access_token = await auth_manager.refresh_access_token(refresh_token)
         assert new_access_token is None
@@ -285,10 +304,10 @@ class TestAuthManager:
         """Test permission checking."""
         # Regular user should have read permission
         assert await auth_manager.check_permission(test_user, Permission.READ)
-        
+
         # Regular user should not have admin permission
         assert not await auth_manager.check_permission(test_user, Permission.ADMIN)
-        
+
         # Admin user should have admin permission
         assert await auth_manager.check_permission(admin_user, Permission.ADMIN)
 
@@ -299,10 +318,10 @@ class TestAuthManager:
         assert await auth_manager.check_role(test_user, UserRole.USER)
         assert await auth_manager.check_role(test_user, UserRole.READONLY)
         assert await auth_manager.check_role(test_user, UserRole.GUEST)
-        
+
         # User should not have admin role
         assert not await auth_manager.check_role(test_user, UserRole.ADMIN)
-        
+
         # Admin should have all roles
         assert await auth_manager.check_role(admin_user, UserRole.ADMIN)
         assert await auth_manager.check_role(admin_user, UserRole.USER)
@@ -315,18 +334,18 @@ class TestAuthManager:
             path_pattern="/api/v1/test/*",
             access_level=AccessLevel.PROTECTED,
             required_permissions=[Permission.READ],
-            allowed_operations=[Permission.READ]
+            allowed_operations=[Permission.READ],
         )
         await auth_manager.add_access_rule(rule)
-        
+
         # Test authorized request
         request = AccessRequest(
             user_id=test_user.id,
             path="/api/v1/test/resource",
-            operation=Permission.READ
+            operation=Permission.READ,
         )
         assert await auth_manager.authorize_request(request)
-        
+
         # Test unauthorized operation
         request.operation = Permission.DELETE
         assert not await auth_manager.authorize_request(request)
@@ -339,14 +358,14 @@ class TestSecurityMiddleware:
         """Test security headers middleware."""
         app = FastAPI()
         app.add_middleware(SecurityHeadersMiddleware)
-        
+
         @app.get("/test")
         def test_endpoint():
             return {"message": "test"}
-        
+
         client = TestClient(app)
         response = client.get("/test")
-        
+
         # Check security headers
         assert "X-Content-Type-Options" in response.headers
         assert "X-Frame-Options" in response.headers
@@ -357,26 +376,22 @@ class TestSecurityMiddleware:
         """Test request validation middleware."""
         app = FastAPI()
         app.add_middleware(RequestValidationMiddleware)
-        
+
         @app.post("/test")
         def test_endpoint():
             return {"message": "test"}
-        
+
         client = TestClient(app)
-        
+
         # Test valid request
         response = client.post(
-            "/test",
-            json={"data": "test"},
-            headers={"content-type": "application/json"}
+            "/test", json={"data": "test"}, headers={"content-type": "application/json"}
         )
         assert response.status_code != 415
-        
+
         # Test invalid content type
         response = client.post(
-            "/test",
-            data="test data",
-            headers={"content-type": "invalid/type"}
+            "/test", data="test data", headers={"content-type": "invalid/type"}
         )
         assert response.status_code == 415
 
@@ -384,20 +399,20 @@ class TestSecurityMiddleware:
         """Test request validation for suspicious patterns."""
         app = FastAPI()
         app.add_middleware(RequestValidationMiddleware)
-        
+
         @app.get("/test")
         def test_endpoint():
             return {"message": "test"}
-        
+
         client = TestClient(app)
-        
+
         # Test suspicious path patterns
         suspicious_paths = [
             "/test/../../../etc/passwd",
             "/test?param=<script>alert('xss')</script>",
-            "/test?param=javascript:alert(1)"
+            "/test?param=javascript:alert(1)",
         ]
-        
+
         for path in suspicious_paths:
             response = client.get(path)
             assert response.status_code == 400
@@ -411,34 +426,33 @@ class TestIntegration:
         """Test complete authentication flow."""
         # Create auth manager
         auth_manager = AuthManager(security_config)
-        
+
         # Create user
         user = await auth_manager.create_user(
             username="integration_user",
             password="integration_pass123!",
-            email="integration@example.com"
+            email="integration@example.com",
         )
-        
+
         # Authenticate
         credentials = AuthCredentials(
-            username="integration_user",
-            password="integration_pass123!"
+            username="integration_user", password="integration_pass123!"
         )
         authenticated_user = await auth_manager.authenticate_user(credentials)
         assert authenticated_user.id == user.id
-        
+
         # Create tokens
         access_token = await auth_manager.create_access_token(authenticated_user)
         refresh_token = await auth_manager.create_refresh_token(authenticated_user)
-        
+
         # Verify access token
         token_data = await auth_manager.verify_token(access_token)
         assert token_data.user_id == user.id
-        
+
         # Refresh token
         new_access_token = await auth_manager.refresh_access_token(refresh_token)
         assert new_access_token is not None
-        
+
         # Verify new token
         new_token_data = await auth_manager.verify_token(new_access_token)
         assert new_token_data.user_id == user.id
@@ -450,46 +464,40 @@ class TestIntegration:
         public_rule = AccessRule(
             path_pattern="/public/*",
             access_level=AccessLevel.PUBLIC,
-            allowed_operations=[Permission.READ]
+            allowed_operations=[Permission.READ],
         )
         protected_rule = AccessRule(
             path_pattern="/protected/*",
             access_level=AccessLevel.PROTECTED,
             required_permissions=[Permission.READ],
-            allowed_operations=[Permission.READ, Permission.WRITE]
+            allowed_operations=[Permission.READ, Permission.WRITE],
         )
         admin_rule = AccessRule(
             path_pattern="/admin/*",
             access_level=AccessLevel.RESTRICTED,
             required_role=UserRole.ADMIN,
-            allowed_operations=[Permission.READ, Permission.WRITE, Permission.DELETE]
+            allowed_operations=[Permission.READ, Permission.WRITE, Permission.DELETE],
         )
-        
+
         await auth_manager.add_access_rule(public_rule)
         await auth_manager.add_access_rule(protected_rule)
         await auth_manager.add_access_rule(admin_rule)
-        
+
         # Test public access
         public_request = AccessRequest(
-            user_id=test_user.id,
-            path="/public/resource",
-            operation=Permission.READ
+            user_id=test_user.id, path="/public/resource", operation=Permission.READ
         )
         assert await auth_manager.authorize_request(public_request)
-        
+
         # Test protected access (should work for authenticated user)
         protected_request = AccessRequest(
-            user_id=test_user.id,
-            path="/protected/resource",
-            operation=Permission.READ
+            user_id=test_user.id, path="/protected/resource", operation=Permission.READ
         )
         assert await auth_manager.authorize_request(protected_request)
-        
+
         # Test admin access (should fail for regular user)
         admin_request = AccessRequest(
-            user_id=test_user.id,
-            path="/admin/resource",
-            operation=Permission.READ
+            user_id=test_user.id, path="/admin/resource", operation=Permission.READ
         )
         assert not await auth_manager.authorize_request(admin_request)
 
@@ -498,19 +506,21 @@ class TestIntegration:
         # Events should be empty initially
         events = asyncio.run(auth_manager.get_security_events())
         initial_count = len(events)
-        
+
         # Log a security event
-        asyncio.run(auth_manager._log_security_event(
-            "test_event",
-            user_id="test_user_id",
-            username="test_user",
-            details={"test": "data"}
-        ))
-        
+        asyncio.run(
+            auth_manager._log_security_event(
+                "test_event",
+                user_id="test_user_id",
+                username="test_user",
+                details={"test": "data"},
+            )
+        )
+
         # Check that event was logged
         events = asyncio.run(auth_manager.get_security_events())
         assert len(events) == initial_count + 1
-        
+
         latest_event = events[-1]
         assert latest_event.event_type == "test_event"
         assert latest_event.user_id == "test_user_id"

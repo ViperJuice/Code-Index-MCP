@@ -6,17 +6,17 @@ meet the performance requirements specified in architecture/performance_requirem
 
 Key Performance Requirements:
 - Symbol lookup < 100ms (p95)
-- Search performance < 500ms (p95) 
+- Search performance < 500ms (p95)
 - Indexing speed: 10K files/minute target
 - Memory usage: < 2GB for 100K files
 
 Usage:
     # Run from command line
     python -m mcp_server.benchmarks.run_benchmarks
-    
+
     # Use in tests
     pytest tests/test_benchmarks.py --benchmark-only
-    
+
     # Programmatic usage
     from mcp_server.benchmarks import BenchmarkRunner
     runner = BenchmarkRunner()
@@ -29,10 +29,18 @@ from .benchmark_suite import (
     PerformanceMetrics,
 )
 from .benchmark_runner import BenchmarkRunner
+from .mcp_comparison_benchmark import (
+    MCPComparisonBenchmark,
+    ComparisonMetrics,
+    run_comparison_benchmarks,
+)
 
 __all__ = [
     "BenchmarkSuite",
     "BenchmarkResult",
     "PerformanceMetrics",
     "BenchmarkRunner",
+    "MCPComparisonBenchmark",
+    "ComparisonMetrics",
+    "run_comparison_benchmarks",
 ]

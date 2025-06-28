@@ -7,6 +7,4 @@ __version__ = "0.1.0"
 # Use: from mcp_server.dispatcher import Dispatcher
 # instead of: from mcp_server import Dispatcher
 
-__all__ = [
-    '__version__'
-]
+__all__ = ["__version__"]

@@ -1,0 +1,55 @@
+# MCP Index Ignore Patterns
+# One pattern per line, supports gitignore syntax
+
+# Version control
+.git/
+.svn/
+
+# Dependencies
+node_modules/
+vendor/
+venv/
+.env/
+__pycache__/
+*.pyc
+
+# Build outputs
+dist/
+build/
+target/
+*.min.js
+*.min.css
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files (optional - remove if you want to index tests)
+test/
+tests/
+spec/
+__tests__/
+
+# Documentation (optional - remove if you want to index docs)
+# docs/
+# *.md
+
+# Large files
+*.zip
+*.tar.gz
+*.iso
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Temporary files
+*.tmp
+*.temp
+*.log

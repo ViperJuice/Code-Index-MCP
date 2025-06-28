@@ -14,8 +14,10 @@ package "mcp_server.dispatcher" <<Component>> {
         +ASYNC dispatch_search_request(request: SearchRequest): SearchResponse
         +ASYNC dispatch_index_request(request: IndexRequest): IndexResponse
         +ASYNC dispatch_context_request(request: ContextRequest): ContextResponse
+        +ASYNC dispatch_multi_repo_request(request: MultiRepoRequest): MultiRepoResponse
         +register_plugin(language: str, plugin: IPlugin): void
         +get_supported_languages(): List<str>
+        +set_repository_context(repo_id: Optional<str>): void
     }
     
     interface IRequestRouter COMPONENT_INTERFACE #LightGreen {

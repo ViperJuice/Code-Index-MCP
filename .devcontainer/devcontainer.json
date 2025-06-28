@@ -20,6 +20,9 @@
 	  "ghcr.io/devcontainers/features/node:1": {
 		"version": "18"
 	  }
-	}
-  }
+	},
+	"mounts": [
+		"source=${localEnv:HOME},target=/host-home,type=bind,consistency=cached,readonly"
+	]
+}
   

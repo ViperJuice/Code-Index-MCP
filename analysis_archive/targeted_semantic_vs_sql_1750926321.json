@@ -1,0 +1,187 @@
+{
+  "test_info": {
+    "timestamp": 1750926321.1589677,
+    "total_queries": 8,
+    "successful_comparisons": 0,
+    "sql_success_rate": 1.0,
+    "semantic_success_rate": 0.0
+  },
+  "performance_summary": {
+    "sql_avg_time_ms": 0,
+    "semantic_avg_time_ms": 0,
+    "sql_avg_results": 0,
+    "semantic_avg_results": 0,
+    "overall_faster_method": "N/A",
+    "overall_speed_advantage": 0
+  },
+  "detailed_results": [
+    {
+      "query": "map",
+      "query_type": "exact_symbol",
+      "sql_time_ms": 20.555496215820312,
+      "sql_success": true,
+      "sql_results_count": 10,
+      "sql_first_result": {
+        "file": "packages/react-devtools-shared/src/hooks/__tests__/parseHookNames-test.js",
+        "content": "/**\n * Copyright (c) Meta Platforms, Inc. and affiliates.\n *\n * This source code is licensed under the MIT license found in the\n * LICENSE file in the...",
+        "method": "sql_bm25"
+      },
+      "sql_error": "",
+      "semantic_time_ms": 5.231380462646484,
+      "semantic_success": false,
+      "semantic_results_count": 0,
+      "semantic_first_result": {},
+      "semantic_error": "No API key provided. You can set your API key in code using 'voyageai.api_key = <API-KEY>', or set the environment variable VOYAGE_API_KEY=<API-KEY>). If your API key is stored in a file, you can point the voyageai module at it with 'voyageai.api_key_path = <PATH>', or set the environment variable VOYAGE_API_KEY_PATH=<PATH>. API keys can be generated in Voyage AI's dashboard (https://dash.voyageai.com).",
+      "speed_advantage_method": "",
+      "speed_advantage_percent": 0,
+      "accuracy_comparison": ""
+    },
+    {
+      "query": "class",
+      "query_type": "language_keyword",
+      "sql_time_ms": 3.0374526977539062,
+      "sql_success": true,
+      "sql_results_count": 10,
+      "sql_first_result": {
+        "file": "fixtures/packaging/index.html",
+        "content": "<html>\n  <head>\n    <style>\n      .frame {\n        display: block;\n        float: left;\n        width: 350px;\n        overflow: hidden;\n      }\n    </...",
+        "method": "sql_bm25"
+      },
+      "sql_error": "",
+      "semantic_time_ms": 4.797697067260742,
+      "semantic_success": false,
+      "semantic_results_count": 0,
+      "semantic_first_result": {},
+      "semantic_error": "No API key provided. You can set your API key in code using 'voyageai.api_key = <API-KEY>', or set the environment variable VOYAGE_API_KEY=<API-KEY>). If your API key is stored in a file, you can point the voyageai module at it with 'voyageai.api_key_path = <PATH>', or set the environment variable VOYAGE_API_KEY_PATH=<PATH>. API keys can be generated in Voyage AI's dashboard (https://dash.voyageai.com).",
+      "speed_advantage_method": "",
+      "speed_advantage_percent": 0,
+      "accuracy_comparison": ""
+    },
+    {
+      "query": "Visitor",
+      "query_type": "class_pattern",
+      "sql_time_ms": 9.720802307128906,
+      "sql_success": true,
+      "sql_results_count": 10,
+      "sql_first_result": {
+        "file": "compiler/packages/babel-plugin-react-compiler/src/ReactiveScopes/CollectReactiveIdentifiers.ts",
+        "content": "/**\n * Copyright (c) Meta Platforms, Inc. and affiliates.\n *\n * This source code is licensed under the MIT license found in the\n * LICENSE file in the...",
+        "method": "sql_bm25"
+      },
+      "sql_error": "",
+      "semantic_time_ms": 4.444599151611328,
+      "semantic_success": false,
+      "semantic_results_count": 0,
+      "semantic_first_result": {},
+      "semantic_error": "No API key provided. You can set your API key in code using 'voyageai.api_key = <API-KEY>', or set the environment variable VOYAGE_API_KEY=<API-KEY>). If your API key is stored in a file, you can point the voyageai module at it with 'voyageai.api_key_path = <PATH>', or set the environment variable VOYAGE_API_KEY_PATH=<PATH>. API keys can be generated in Voyage AI's dashboard (https://dash.voyageai.com).",
+      "speed_advantage_method": "",
+      "speed_advantage_percent": 0,
+      "accuracy_comparison": ""
+    },
+    {
+      "query": "React",
+      "query_type": "framework_name",
+      "sql_time_ms": 12.569665908813477,
+      "sql_success": true,
+      "sql_results_count": 10,
+      "sql_first_result": {
+        "file": "scripts/shared/inlinedHostConfigs.js",
+        "content": "/**\n * Copyright (c) Meta Platforms, Inc. and affiliates.\n *\n * This source code is licensed under the MIT license found in the\n * LICENSE file in the...",
+        "method": "sql_bm25"
+      },
+      "sql_error": "",
+      "semantic_time_ms": 4.182577133178711,
+      "semantic_success": false,
+      "semantic_results_count": 0,
+      "semantic_first_result": {},
+      "semantic_error": "No API key provided. You can set your API key in code using 'voyageai.api_key = <API-KEY>', or set the environment variable VOYAGE_API_KEY=<API-KEY>). If your API key is stored in a file, you can point the voyageai module at it with 'voyageai.api_key_path = <PATH>', or set the environment variable VOYAGE_API_KEY_PATH=<PATH>. API keys can be generated in Voyage AI's dashboard (https://dash.voyageai.com).",
+      "speed_advantage_method": "",
+      "speed_advantage_percent": 0,
+      "accuracy_comparison": ""
+    },
+    {
+      "query": "SSA",
+      "query_type": "algorithm_name",
+      "sql_time_ms": 6.688833236694336,
+      "sql_success": true,
+      "sql_results_count": 10,
+      "sql_first_result": {
+        "file": "compiler/packages/snap/src/SproutTodoFilter.ts",
+        "content": "/**\n * Copyright (c) Meta Platforms, Inc. and affiliates.\n *\n * This source code is licensed under the MIT license found in the\n * LICENSE file in the...",
+        "method": "sql_bm25"
+      },
+      "sql_error": "",
+      "semantic_time_ms": 30.272722244262695,
+      "semantic_success": false,
+      "semantic_results_count": 0,
+      "semantic_first_result": {},
+      "semantic_error": "No API key provided. You can set your API key in code using 'voyageai.api_key = <API-KEY>', or set the environment variable VOYAGE_API_KEY=<API-KEY>). If your API key is stored in a file, you can point the voyageai module at it with 'voyageai.api_key_path = <PATH>', or set the environment variable VOYAGE_API_KEY_PATH=<PATH>. API keys can be generated in Voyage AI's dashboard (https://dash.voyageai.com).",
+      "speed_advantage_method": "",
+      "speed_advantage_percent": 0,
+      "accuracy_comparison": ""
+    },
+    {
+      "query": "transform",
+      "query_type": "method_pattern",
+      "sql_time_ms": 6.720304489135742,
+      "sql_success": true,
+      "sql_results_count": 10,
+      "sql_first_result": {
+        "file": "babel.config.js",
+        "content": "'use strict';\n\nmodule.exports = {\n  plugins: [\n    '@babel/plugin-syntax-jsx',\n    '@babel/plugin-transform-flow-strip-types',\n    ['@babel/plugin-pro...",
+        "method": "sql_bm25"
+      },
+      "sql_error": "",
+      "semantic_time_ms": 4.176139831542969,
+      "semantic_success": false,
+      "semantic_results_count": 0,
+      "semantic_first_result": {},
+      "semantic_error": "No API key provided. You can set your API key in code using 'voyageai.api_key = <API-KEY>', or set the environment variable VOYAGE_API_KEY=<API-KEY>). If your API key is stored in a file, you can point the voyageai module at it with 'voyageai.api_key_path = <PATH>', or set the environment variable VOYAGE_API_KEY_PATH=<PATH>. API keys can be generated in Voyage AI's dashboard (https://dash.voyageai.com).",
+      "speed_advantage_method": "",
+      "speed_advantage_percent": 0,
+      "accuracy_comparison": ""
+    },
+    {
+      "query": "component",
+      "query_type": "react_concept",
+      "sql_time_ms": 11.817693710327148,
+      "sql_success": true,
+      "sql_results_count": 10,
+      "sql_first_result": {
+        "file": "compiler/packages/babel-plugin-react-compiler/src/__tests__/fixtures/compiler/context-variable-as-jsx-element-tag.expect.md",
+        "content": "\n## Input\n\n```javascript\nimport {useMemo} from 'react';\nimport {Stringify} from 'shared-runtime';\n\nfunction Component(props) {\n  let Component = Strin...",
+        "method": "sql_bm25"
+      },
+      "sql_error": "",
+      "semantic_time_ms": 4.370927810668945,
+      "semantic_success": false,
+      "semantic_results_count": 0,
+      "semantic_first_result": {},
+      "semantic_error": "No API key provided. You can set your API key in code using 'voyageai.api_key = <API-KEY>', or set the environment variable VOYAGE_API_KEY=<API-KEY>). If your API key is stored in a file, you can point the voyageai module at it with 'voyageai.api_key_path = <PATH>', or set the environment variable VOYAGE_API_KEY_PATH=<PATH>. API keys can be generated in Voyage AI's dashboard (https://dash.voyageai.com).",
+      "speed_advantage_method": "",
+      "speed_advantage_percent": 0,
+      "accuracy_comparison": ""
+    },
+    {
+      "query": "function",
+      "query_type": "common_keyword",
+      "sql_time_ms": 7.962226867675781,
+      "sql_success": true,
+      "sql_results_count": 10,
+      "sql_first_result": {
+        "file": "compiler/packages/babel-plugin-react-compiler/src/__tests__/fixtures/compiler/module-scoped-bindings.expect.md",
+        "content": "\n## Input\n\n```javascript\nimport React from 'react';\nimport {useState} from 'react';\n\nconst CONST = true;\n\nlet NON_REASSIGNED_LET = true;\n\nlet REASSIGN...",
+        "method": "sql_bm25"
+      },
+      "sql_error": "",
+      "semantic_time_ms": 4.488945007324219,
+      "semantic_success": false,
+      "semantic_results_count": 0,
+      "semantic_first_result": {},
+      "semantic_error": "No API key provided. You can set your API key in code using 'voyageai.api_key = <API-KEY>', or set the environment variable VOYAGE_API_KEY=<API-KEY>). If your API key is stored in a file, you can point the voyageai module at it with 'voyageai.api_key_path = <PATH>', or set the environment variable VOYAGE_API_KEY_PATH=<PATH>. API keys can be generated in Voyage AI's dashboard (https://dash.voyageai.com).",
+      "speed_advantage_method": "",
+      "speed_advantage_percent": 0,
+      "accuracy_comparison": ""
+    }
+  ]
+}

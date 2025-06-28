@@ -1,0 +1,14 @@
+{
+  "query": "Find all FIXME or BUG comments",
+  "mode": "native",
+  "tools_used": ["grep", "bash"],
+  "tool_calls": {"grep": 2, "bash": 9},
+  "results_found": 6,
+  "execution_time_ms": 21,
+  "token_estimate": 2500,
+  "success": true,
+  "error": null,
+  "test_id": "go_gin_3_native",
+  "timestamp": "2025-01-06T22:15:00",
+  "batch_name": "go_gin"
+}

@@ -1,0 +1,92 @@
+{
+  "timestamp": "2025-06-23 18:23:57",
+  "tests": {
+    "repository_aware_loading": {
+      "passed": false,
+      "details": {
+        "repo_id": "056d6d37b1aa",
+        "detected_languages": [],
+        "required_plugins": [],
+        "language_count": 0,
+        "plugin_count": 0,
+        "total_plugins": 47,
+        "savings_percent": 100.0
+      }
+    },
+    "memory_aware_management": {
+      "passed": true,
+      "details": {
+        "initial_memory_mb": 120.27,
+        "final_memory_mb": 120.27,
+        "loaded_plugins": [
+          "python",
+          "javascript",
+          "java",
+          "go",
+          "rust"
+        ],
+        "plugin_count": 0,
+        "memory_limit_mb": 256
+      }
+    },
+    "multi_repository_manager": {
+      "passed": true,
+      "details": {
+        "primary_repo_id": "f7b49f5d0ae0",
+        "available_repos": 46,
+        "sample_repos": [
+          "056d6d37b1aa",
+          "844145265d7a",
+          "d6be0c062f54e636635b23a0a0a5b1b96a459704f8d7a871345be35ff16830b4",
+          "e893b6cceaf1",
+          "d8df70cdcd6e"
+        ],
+        "authorized_test": true,
+        "unauthorized_test": true,
+        "index_loaded": true
+      }
+    },
+    "enhanced_dispatcher": {
+      "passed": false,
+      "details": {
+        "loaded_plugins": 0,
+        "lazy_loading": true,
+        "multi_repo_enabled": true,
+        "search_results": 0,
+        "search_time_ms": 11.13
+      }
+    },
+    "performance_comparison": {
+      "passed": true,
+      "scenarios": {
+        "all_plugins": {
+          "init_time_ms": 2139.52,
+          "memory_mb": 337.91,
+          "plugin_count": 0,
+          "search_time_ms": 1.39,
+          "results_count": 0
+        },
+        "auto_plugins": {
+          "init_time_ms": 2370.98,
+          "memory_mb": 339.19,
+          "plugin_count": 0,
+          "search_time_ms": 1.43,
+          "results_count": 0
+        },
+        "minimal_plugins": {
+          "init_time_ms": 2373.91,
+          "memory_mb": 343.96,
+          "plugin_count": 0,
+          "search_time_ms": 1.6,
+          "results_count": 0
+        }
+      }
+    }
+  },
+  "summary": {
+    "total_tests": 5,
+    "passed_tests": 3,
+    "failed_tests": 2,
+    "success_rate": "60.0%"
+  }
+}

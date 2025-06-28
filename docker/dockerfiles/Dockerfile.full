@@ -1,0 +1,178 @@
+# Dockerfile.full - Complete MCP Production Stack
+# Features: All standard features + Redis caching, Qdrant DB, monitoring
+FROM mcp-index:standard as base
+
+# Switch to root for installation
+USER root
+
+# Install additional system dependencies
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
+    redis-tools \
+    curl \
+    netcat-openbsd \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install production dependencies
+RUN pip install --no-cache-dir \
+    # Redis caching
+    redis>=4.5.0 \
+    hiredis>=2.2.0 \
+    # Production servers
+    gunicorn>=21.2.0 \
+    # Monitoring
+    prometheus-client>=0.19.0 \
+    # Database connection pooling
+    psycopg2-binary>=2.9.0 \
+    # Advanced logging
+    python-json-logger>=2.0.0 \
+    # Health checks
+    httpx>=0.25.0
+
+# Final stage
+FROM base
+
+# Copy production configuration
+COPY --chown=mcp:mcp docker/config/production.env /app/config/
+COPY --chown=mcp:mcp docker/scripts/entrypoint-production.sh /app/
+COPY --chown=mcp:mcp docker/scripts/health-check.py /app/
+
+# Create production directories
+RUN mkdir -p /app/metrics /app/backups && \
+    chown -R mcp:mcp /app
+
+# Set environment variables for production
+ENV PYTHONPATH=/app \
+    MCP_WORKSPACE_ROOT=/workspace \
+    # Production database (can override with PostgreSQL)
+    DATABASE_URL=sqlite:////app/data/code_index.db \
+    # Redis cache configuration
+    REDIS_URL=redis://redis:6379 \
+    CACHE_BACKEND=redis \
+    CACHE_DEFAULT_TTL=3600 \
+    CACHE_MAX_ENTRIES=10000 \
+    CACHE_MAX_MEMORY_MB=500 \
+    # Query cache settings
+    QUERY_CACHE_ENABLED=true \
+    QUERY_CACHE_DEFAULT_TTL=300 \
+    QUERY_CACHE_SYMBOL_TTL=1800 \
+    QUERY_CACHE_SEARCH_TTL=600 \
+    QUERY_CACHE_SEMANTIC_TTL=3600 \
+    # Qdrant vector database
+    QDRANT_URL=http://qdrant:6333 \
+    QDRANT_COLLECTION_NAME=code-index-prod \
+    # Enhanced performance
+    INDEXING_MAX_WORKERS=16 \
+    INDEXING_BATCH_SIZE=100 \
+    # Monitoring
+    METRICS_ENABLED=true \
+    METRICS_PORT=9090 \
+    HEALTH_CHECK_ENABLED=true \
+    BUSINESS_METRICS_ENABLED=true \
+    # Production logging
+    LOG_LEVEL=WARNING \
+    LOG_FORMAT=json \
+    LOG_FILE=/app/logs/mcp-production.log \
+    # Security
+    SECURE_MODE=true \
+    CORS_ORIGINS="[]"
+
+# Create startup script with dependency checks
+RUN echo '#!/bin/bash\n\
+set -e\n\
+\n\
+echo "Starting MCP Production Server..." >&2\n\
+\n\
+# Source the standard entrypoint for API key handling\n\
+source /app/docker-entrypoint.sh\n\
+\n\
+# Wait for Redis\n\
+if [ ! -z "$REDIS_URL" ]; then\n\
+    echo "Waiting for Redis..." >&2\n\
+    REDIS_HOST=$(echo $REDIS_URL | sed -E "s|redis://([^:]+):.*|\\1|")\n\
+    until nc -z $REDIS_HOST 6379; do\n\
+        echo "Redis is unavailable - sleeping" >&2\n\
+        sleep 1\n\
+    done\n\
+    echo "Redis is up" >&2\n\
+fi\n\
+\n\
+# Wait for Qdrant\n\
+if [ ! -z "$QDRANT_URL" ] && [ "$SEMANTIC_SEARCH_ENABLED" = "true" ]; then\n\
+    echo "Waiting for Qdrant..." >&2\n\
+    QDRANT_HOST=$(echo $QDRANT_URL | sed -E "s|http://([^:]+):.*|\\1|")\n\
+    until nc -z $QDRANT_HOST 6333; do\n\
+        echo "Qdrant is unavailable - sleeping" >&2\n\
+        sleep 1\n\
+    done\n\
+    echo "Qdrant is up" >&2\n\
+fi\n\
+\n\
+# Run database migrations\n\
+echo "Running database migrations..." >&2\n\
+python -m mcp_server.storage.migrations\n\
+\n\
+# Start metrics exporter in background\n\
+if [ "$METRICS_ENABLED" = "true" ]; then\n\
+    echo "Starting metrics exporter..." >&2\n\
+    python -m mcp_server.metrics.prometheus_exporter &\n\
+fi\n\
+\n\
+# Start the MCP server\n\
+exec "$@"' > /app/entrypoint-production.sh && \
+    chmod +x /app/entrypoint-production.sh && \
+    chown mcp:mcp /app/entrypoint-production.sh
+
+# Enhanced health check for production
+RUN echo '#!/usr/bin/env python3\n\
+import sys\n\
+import os\n\
+sys.path.insert(0, "/app")\n\
+\n\
+try:\n\
+    # Check MCP server\n\
+    from mcp_server.core.logging import setup_logging\n\
+    setup_logging()\n\
+    \n\
+    # Check database\n\
+    from mcp_server.storage.sqlite_store import SQLiteStore\n\
+    store = SQLiteStore(os.environ.get("DATABASE_URL", "sqlite:////app/data/code_index.db"))\n\
+    store.get_stats()\n\
+    \n\
+    # Check Redis if enabled\n\
+    if os.environ.get("REDIS_URL"):\n\
+        import redis\n\
+        r = redis.from_url(os.environ["REDIS_URL"])\n\
+        r.ping()\n\
+    \n\
+    print("HEALTHY")\n\
+    sys.exit(0)\n\
+except Exception as e:\n\
+    print(f"UNHEALTHY: {e}", file=sys.stderr)\n\
+    sys.exit(1)' > /app/health-check.py && \
+    chmod +x /app/health-check.py && \
+    chown mcp:mcp /app/health-check.py
+
+# Switch back to non-root user
+USER mcp
+
+# Production health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
+    CMD python /app/health-check.py || exit 1
+
+# Expose metrics port
+EXPOSE 9090
+
+# Production entrypoint
+ENTRYPOINT ["/app/entrypoint-production.sh", "python", "/app/mcp_server_cli.py"]
+
+# Label for version tracking
+LABEL org.opencontainers.image.title="MCP Index Server - Full Production" \
+      org.opencontainers.image.description="Complete production stack with caching, monitoring, and high availability" \
+      org.opencontainers.image.version="full" \
+      org.opencontainers.image.source="https://github.com/Code-Index-MCP" \
+      org.opencontainers.image.documentation="https://github.com/Code-Index-MCP/docs/DOCKER_GUIDE.md" \
+      org.opencontainers.image.licenses="MIT" \
+      com.mcp.features="semantic-search,github-sync,reranking,redis-cache,qdrant-db,monitoring" \
+      com.mcp.api-keys="VOYAGE_AI_API_KEY" \
+      com.mcp.services="redis,qdrant,prometheus"

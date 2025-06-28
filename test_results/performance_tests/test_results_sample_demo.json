@@ -1,0 +1,35 @@
+{
+  "test_run": "sample_demo",
+  "timestamp": "20250624_175500",
+  "results": [
+    {
+      "query": "Find the definition of class Server",
+      "mode": "mcp",
+      "tools_used": ["mcp__code-index-mcp__symbol_lookup", "mcp__code-index-mcp__search_code"],
+      "tool_calls": {
+        "mcp__code-index-mcp__symbol_lookup": 3,
+        "mcp__code-index-mcp__search_code": 7
+      },
+      "results_found": 0,
+      "execution_time_ms": 3500,
+      "token_estimate": 12000,
+      "success": false,
+      "error": "No Server class/struct found in go_gin repository. Gin framework uses Engine struct as its main type, not Server.",
+      "repository": "go_gin",
+      "category": "symbol"
+    },
+    {
+      "query": "Find the definition of class Server",
+      "mode": "native",
+      "tools_used": ["grep", "ls", "glob"],
+      "tool_calls": {"grep": 9, "ls": 3, "glob": 3},
+      "results_found": 0,
+      "execution_time_ms": 4500,
+      "token_estimate": 8500,
+      "success": false,
+      "error": "No Server class/type definition found in the Go Gin repository",
+      "repository": "go_gin",
+      "category": "symbol"
+    }
+  ]
+}

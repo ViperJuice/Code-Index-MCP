@@ -8,7 +8,7 @@ while maintaining clean architecture and preventing conflicts.
 Interface Organization:
 - shared_interfaces.py: Cross-cutting interfaces used by multiple modules
 - api_gateway_interfaces.py: All API gateway related interfaces
-- dispatcher_interfaces.py: All dispatcher and routing interfaces  
+- dispatcher_interfaces.py: All dispatcher and routing interfaces
 - plugin_interfaces.py: All plugin system interfaces
 - indexing_interfaces.py: All indexing engine interfaces
 - storage_interfaces.py: All storage and persistence interfaces
@@ -23,27 +23,62 @@ Usage:
 
 # Re-export key interfaces for convenience
 from .shared_interfaces import (
-    ILogger, IMetrics, IConfig, ICache, IEventBus,
-    Result, Error, Event, LogLevel, IndexStatus, PluginStatus,
-    ISecurityContext, IValidator, IAsyncSupport,
-    IRepository, IAsyncRepository, IFactory,
-    IObserver, IObservable
+    ILogger,
+    IMetrics,
+    IConfig,
+    ICache,
+    IEventBus,
+    Result,
+    Error,
+    Event,
+    LogLevel,
+    IndexStatus,
+    PluginStatus,
+    ISecurityContext,
+    IValidator,
+    IAsyncSupport,
+    IRepository,
+    IAsyncRepository,
+    IFactory,
+    IObserver,
+    IObservable,
 )
 
 from .plugin_interfaces import (
-    IPlugin, ILanguageAnalyzer, IPluginRegistry, 
-    IPluginManager, IPluginLoader, IPluginDiscovery
+    IPlugin,
+    ILanguageAnalyzer,
+    IPluginRegistry,
+    IPluginManager,
+    IPluginLoader,
+    IPluginDiscovery,
 )
 
 __all__ = [
     # Shared interfaces
-    'ILogger', 'IMetrics', 'IConfig', 'ICache', 'IEventBus',
-    'Result', 'Error', 'Event', 'LogLevel', 'IndexStatus', 'PluginStatus',
-    'ISecurityContext', 'IValidator', 'IAsyncSupport',
-    'IRepository', 'IAsyncRepository', 'IFactory',
-    'IObserver', 'IObservable',
-    
+    "ILogger",
+    "IMetrics",
+    "IConfig",
+    "ICache",
+    "IEventBus",
+    "Result",
+    "Error",
+    "Event",
+    "LogLevel",
+    "IndexStatus",
+    "PluginStatus",
+    "ISecurityContext",
+    "IValidator",
+    "IAsyncSupport",
+    "IRepository",
+    "IAsyncRepository",
+    "IFactory",
+    "IObserver",
+    "IObservable",
     # Plugin interfaces
-    'IPlugin', 'ILanguageAnalyzer', 'IPluginRegistry',
-    'IPluginManager', 'IPluginLoader', 'IPluginDiscovery'
+    "IPlugin",
+    "ILanguageAnalyzer",
+    "IPluginRegistry",
+    "IPluginManager",
+    "IPluginLoader",
+    "IPluginDiscovery",
 ]

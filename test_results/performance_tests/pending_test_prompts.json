@@ -1,0 +1,433 @@
+{
+  "total_pending": 60,
+  "by_repository": {
+    "go_gin": [
+      {
+        "test_id": "go_gin_4_mcp",
+        "mode": "mcp",
+        "query": "Find all files importing server",
+        "category": "navigation",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: go_gin (go)\nQuery: Find all files importing server\nCategory: navigation\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all files importing server\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "go_gin_4_native",
+        "mode": "native",
+        "query": "Find all files importing server",
+        "category": "navigation",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: go_gin (go)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/modern/go/gin\nQuery: Find all files importing server\nCategory: navigation\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all files importing server\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "go_gin_5_mcp",
+        "mode": "mcp",
+        "query": "Show files that depend on gin",
+        "category": "navigation",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: go_gin (go)\nQuery: Show files that depend on gin\nCategory: navigation\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show files that depend on gin\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "go_gin_5_native",
+        "mode": "native",
+        "query": "Show files that depend on gin",
+        "category": "navigation",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: go_gin (go)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/modern/go/gin\nQuery: Show files that depend on gin\nCategory: navigation\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show files that depend on gin\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "go_gin_7_mcp",
+        "mode": "mcp",
+        "query": "Show all references to HTTPServer",
+        "category": "refactoring",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: go_gin (go)\nQuery: Show all references to HTTPServer\nCategory: refactoring\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show all references to HTTPServer\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "go_gin_7_native",
+        "mode": "native",
+        "query": "Show all references to HTTPServer",
+        "category": "refactoring",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: go_gin (go)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/modern/go/gin\nQuery: Show all references to HTTPServer\nCategory: refactoring\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show all references to HTTPServer\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "go_gin_8_mcp",
+        "mode": "mcp",
+        "query": "Explain how routing works",
+        "category": "understanding",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: go_gin (go)\nQuery: Explain how routing works\nCategory: understanding\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Explain how routing works\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "go_gin_8_native",
+        "mode": "native",
+        "query": "Explain how routing works",
+        "category": "understanding",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: go_gin (go)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/modern/go/gin\nQuery: Explain how routing works\nCategory: understanding\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Explain how routing works\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "go_gin_9_mcp",
+        "mode": "mcp",
+        "query": "Show the flow of request_handling",
+        "category": "understanding",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: go_gin (go)\nQuery: Show the flow of request_handling\nCategory: understanding\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show the flow of request_handling\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "go_gin_9_native",
+        "mode": "native",
+        "query": "Show the flow of request_handling",
+        "category": "understanding",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: go_gin (go)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/modern/go/gin\nQuery: Show the flow of request_handling\nCategory: understanding\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show the flow of request_handling\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      }
+    ],
+    "javascript_react": [
+      {
+        "test_id": "javascript_react_1_mcp",
+        "mode": "mcp",
+        "query": "Where is function render implemented?",
+        "category": "symbol",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: javascript_react (javascript)\nQuery: Where is function render implemented?\nCategory: symbol\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Where is function render implemented?\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "javascript_react_1_native",
+        "mode": "native",
+        "query": "Where is function render implemented?",
+        "category": "symbol",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: javascript_react (javascript)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/javascript/react\nQuery: Where is function render implemented?\nCategory: symbol\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Where is function render implemented?\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "javascript_react_2_mcp",
+        "mode": "mcp",
+        "query": "Search for TODO comments",
+        "category": "content",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: javascript_react (javascript)\nQuery: Search for TODO comments\nCategory: content\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Search for TODO comments\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "javascript_react_2_native",
+        "mode": "native",
+        "query": "Search for TODO comments",
+        "category": "content",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: javascript_react (javascript)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/javascript/react\nQuery: Search for TODO comments\nCategory: content\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Search for TODO comments\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "javascript_react_3_mcp",
+        "mode": "mcp",
+        "query": "Find all FIXME or BUG comments",
+        "category": "content",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: javascript_react (javascript)\nQuery: Find all FIXME or BUG comments\nCategory: content\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all FIXME or BUG comments\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "javascript_react_3_native",
+        "mode": "native",
+        "query": "Find all FIXME or BUG comments",
+        "category": "content",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: javascript_react (javascript)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/javascript/react\nQuery: Find all FIXME or BUG comments\nCategory: content\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all FIXME or BUG comments\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "javascript_react_4_mcp",
+        "mode": "mcp",
+        "query": "Find all files importing app",
+        "category": "navigation",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: javascript_react (javascript)\nQuery: Find all files importing app\nCategory: navigation\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all files importing app\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "javascript_react_4_native",
+        "mode": "native",
+        "query": "Find all files importing app",
+        "category": "navigation",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: javascript_react (javascript)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/javascript/react\nQuery: Find all files importing app\nCategory: navigation\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all files importing app\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "javascript_react_5_mcp",
+        "mode": "mcp",
+        "query": "Show files that depend on react",
+        "category": "navigation",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: javascript_react (javascript)\nQuery: Show files that depend on react\nCategory: navigation\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show files that depend on react\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "javascript_react_5_native",
+        "mode": "native",
+        "query": "Show files that depend on react",
+        "category": "navigation",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: javascript_react (javascript)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/javascript/react\nQuery: Show files that depend on react\nCategory: navigation\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show files that depend on react\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "javascript_react_6_mcp",
+        "mode": "mcp",
+        "query": "Find all usages of App",
+        "category": "refactoring",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: javascript_react (javascript)\nQuery: Find all usages of App\nCategory: refactoring\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all usages of App\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "javascript_react_6_native",
+        "mode": "native",
+        "query": "Find all usages of App",
+        "category": "refactoring",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: javascript_react (javascript)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/javascript/react\nQuery: Find all usages of App\nCategory: refactoring\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all usages of App\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "javascript_react_7_mcp",
+        "mode": "mcp",
+        "query": "Show all references to AppComponent",
+        "category": "refactoring",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: javascript_react (javascript)\nQuery: Show all references to AppComponent\nCategory: refactoring\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show all references to AppComponent\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "javascript_react_7_native",
+        "mode": "native",
+        "query": "Show all references to AppComponent",
+        "category": "refactoring",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: javascript_react (javascript)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/javascript/react\nQuery: Show all references to AppComponent\nCategory: refactoring\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show all references to AppComponent\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "javascript_react_8_mcp",
+        "mode": "mcp",
+        "query": "Explain how state_management works",
+        "category": "understanding",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: javascript_react (javascript)\nQuery: Explain how state_management works\nCategory: understanding\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Explain how state_management works\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "javascript_react_8_native",
+        "mode": "native",
+        "query": "Explain how state_management works",
+        "category": "understanding",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: javascript_react (javascript)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/javascript/react\nQuery: Explain how state_management works\nCategory: understanding\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Explain how state_management works\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "javascript_react_9_mcp",
+        "mode": "mcp",
+        "query": "Show the flow of rendering",
+        "category": "understanding",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: javascript_react (javascript)\nQuery: Show the flow of rendering\nCategory: understanding\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show the flow of rendering\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "javascript_react_9_native",
+        "mode": "native",
+        "query": "Show the flow of rendering",
+        "category": "understanding",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: javascript_react (javascript)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/javascript/react\nQuery: Show the flow of rendering\nCategory: understanding\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show the flow of rendering\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      }
+    ],
+    "python_django": [
+      {
+        "test_id": "python_django_3_mcp",
+        "mode": "mcp",
+        "query": "Find all FIXME or BUG comments",
+        "category": "content",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: python_django (python)\nQuery: Find all FIXME or BUG comments\nCategory: content\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all FIXME or BUG comments\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "python_django_3_native",
+        "mode": "native",
+        "query": "Find all FIXME or BUG comments",
+        "category": "content",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: python_django (python)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/python/django\nQuery: Find all FIXME or BUG comments\nCategory: content\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all FIXME or BUG comments\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "python_django_4_mcp",
+        "mode": "mcp",
+        "query": "Find all files importing core",
+        "category": "navigation",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: python_django (python)\nQuery: Find all files importing core\nCategory: navigation\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all files importing core\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "python_django_4_native",
+        "mode": "native",
+        "query": "Find all files importing core",
+        "category": "navigation",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: python_django (python)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/python/django\nQuery: Find all files importing core\nCategory: navigation\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all files importing core\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "python_django_5_mcp",
+        "mode": "mcp",
+        "query": "Show files that depend on requests",
+        "category": "navigation",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: python_django (python)\nQuery: Show files that depend on requests\nCategory: navigation\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show files that depend on requests\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "python_django_5_native",
+        "mode": "native",
+        "query": "Show files that depend on requests",
+        "category": "navigation",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: python_django (python)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/python/django\nQuery: Show files that depend on requests\nCategory: navigation\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show files that depend on requests\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "python_django_6_mcp",
+        "mode": "mcp",
+        "query": "Find all usages of Handler",
+        "category": "refactoring",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: python_django (python)\nQuery: Find all usages of Handler\nCategory: refactoring\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all usages of Handler\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "python_django_6_native",
+        "mode": "native",
+        "query": "Find all usages of Handler",
+        "category": "refactoring",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: python_django (python)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/python/django\nQuery: Find all usages of Handler\nCategory: refactoring\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all usages of Handler\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "python_django_7_mcp",
+        "mode": "mcp",
+        "query": "Show all references to RequestHandler",
+        "category": "refactoring",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: python_django (python)\nQuery: Show all references to RequestHandler\nCategory: refactoring\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show all references to RequestHandler\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "python_django_7_native",
+        "mode": "native",
+        "query": "Show all references to RequestHandler",
+        "category": "refactoring",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: python_django (python)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/python/django\nQuery: Show all references to RequestHandler\nCategory: refactoring\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show all references to RequestHandler\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "python_django_8_mcp",
+        "mode": "mcp",
+        "query": "Explain how authentication works",
+        "category": "understanding",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: python_django (python)\nQuery: Explain how authentication works\nCategory: understanding\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Explain how authentication works\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "python_django_8_native",
+        "mode": "native",
+        "query": "Explain how authentication works",
+        "category": "understanding",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: python_django (python)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/python/django\nQuery: Explain how authentication works\nCategory: understanding\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Explain how authentication works\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "python_django_9_mcp",
+        "mode": "mcp",
+        "query": "Show the flow of request_handling",
+        "category": "understanding",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: python_django (python)\nQuery: Show the flow of request_handling\nCategory: understanding\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show the flow of request_handling\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "python_django_9_native",
+        "mode": "native",
+        "query": "Show the flow of request_handling",
+        "category": "understanding",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: python_django (python)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/python/django\nQuery: Show the flow of request_handling\nCategory: understanding\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show the flow of request_handling\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      }
+    ],
+    "rust_tokio": [
+      {
+        "test_id": "rust_tokio_1_mcp",
+        "mode": "mcp",
+        "query": "Where is function run implemented?",
+        "category": "symbol",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: rust_tokio (rust)\nQuery: Where is function run implemented?\nCategory: symbol\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Where is function run implemented?\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "rust_tokio_1_native",
+        "mode": "native",
+        "query": "Where is function run implemented?",
+        "category": "symbol",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: rust_tokio (rust)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/systems/rust/tokio\nQuery: Where is function run implemented?\nCategory: symbol\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Where is function run implemented?\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "rust_tokio_2_mcp",
+        "mode": "mcp",
+        "query": "Search for TODO comments",
+        "category": "content",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: rust_tokio (rust)\nQuery: Search for TODO comments\nCategory: content\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Search for TODO comments\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "rust_tokio_2_native",
+        "mode": "native",
+        "query": "Search for TODO comments",
+        "category": "content",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: rust_tokio (rust)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/systems/rust/tokio\nQuery: Search for TODO comments\nCategory: content\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Search for TODO comments\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "rust_tokio_3_mcp",
+        "mode": "mcp",
+        "query": "Find all FIXME or BUG comments",
+        "category": "content",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: rust_tokio (rust)\nQuery: Find all FIXME or BUG comments\nCategory: content\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all FIXME or BUG comments\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "rust_tokio_3_native",
+        "mode": "native",
+        "query": "Find all FIXME or BUG comments",
+        "category": "content",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: rust_tokio (rust)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/systems/rust/tokio\nQuery: Find all FIXME or BUG comments\nCategory: content\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all FIXME or BUG comments\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "rust_tokio_4_mcp",
+        "mode": "mcp",
+        "query": "Find all files importing server",
+        "category": "navigation",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: rust_tokio (rust)\nQuery: Find all files importing server\nCategory: navigation\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all files importing server\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "rust_tokio_4_native",
+        "mode": "native",
+        "query": "Find all files importing server",
+        "category": "navigation",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: rust_tokio (rust)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/systems/rust/tokio\nQuery: Find all files importing server\nCategory: navigation\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all files importing server\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "rust_tokio_5_mcp",
+        "mode": "mcp",
+        "query": "Show files that depend on tokio",
+        "category": "navigation",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: rust_tokio (rust)\nQuery: Show files that depend on tokio\nCategory: navigation\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show files that depend on tokio\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "rust_tokio_5_native",
+        "mode": "native",
+        "query": "Show files that depend on tokio",
+        "category": "navigation",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: rust_tokio (rust)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/systems/rust/tokio\nQuery: Show files that depend on tokio\nCategory: navigation\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show files that depend on tokio\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "rust_tokio_6_mcp",
+        "mode": "mcp",
+        "query": "Find all usages of App",
+        "category": "refactoring",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: rust_tokio (rust)\nQuery: Find all usages of App\nCategory: refactoring\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all usages of App\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "rust_tokio_6_native",
+        "mode": "native",
+        "query": "Find all usages of App",
+        "category": "refactoring",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: rust_tokio (rust)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/systems/rust/tokio\nQuery: Find all usages of App\nCategory: refactoring\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all usages of App\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "rust_tokio_7_mcp",
+        "mode": "mcp",
+        "query": "Show all references to Application",
+        "category": "refactoring",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: rust_tokio (rust)\nQuery: Show all references to Application\nCategory: refactoring\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show all references to Application\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "rust_tokio_7_native",
+        "mode": "native",
+        "query": "Show all references to Application",
+        "category": "refactoring",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: rust_tokio (rust)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/systems/rust/tokio\nQuery: Show all references to Application\nCategory: refactoring\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show all references to Application\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "rust_tokio_8_mcp",
+        "mode": "mcp",
+        "query": "Explain how async_runtime works",
+        "category": "understanding",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: rust_tokio (rust)\nQuery: Explain how async_runtime works\nCategory: understanding\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Explain how async_runtime works\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "rust_tokio_8_native",
+        "mode": "native",
+        "query": "Explain how async_runtime works",
+        "category": "understanding",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: rust_tokio (rust)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/systems/rust/tokio\nQuery: Explain how async_runtime works\nCategory: understanding\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Explain how async_runtime works\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "rust_tokio_9_mcp",
+        "mode": "mcp",
+        "query": "Show the flow of message_handling",
+        "category": "understanding",
+        "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: rust_tokio (rust)\nQuery: Show the flow of message_handling\nCategory: understanding\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show the flow of message_handling\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      },
+      {
+        "test_id": "rust_tokio_9_native",
+        "mode": "native",
+        "query": "Show the flow of message_handling",
+        "category": "understanding",
+        "prompt": "You are testing native tools for performance analysis.\n\nRepository: rust_tokio (rust)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/systems/rust/tokio\nQuery: Show the flow of message_handling\nCategory: understanding\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show the flow of message_handling\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+      }
+    ]
+  }
+}

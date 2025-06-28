@@ -1,0 +1,27 @@
+@startuml Simple Dispatcher Component
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Simple Dispatcher - Component Diagram
+
+Container_Boundary(dispatcher, "Simple Dispatcher") {
+    Component(search, "BM25 Search", "Python", "Direct SQLite full-text search")
+    Component(scorer, "Result Scorer", "Python", "Ranks results by relevance")
+    Component(formatter, "Result Formatter", "Python", "Formats results for MCP protocol")
+    
+    Rel(search, scorer, "Sends raw results")
+    Rel(scorer, formatter, "Sends ranked results")
+}
+
+Component_Ext(storage, "SQLite Store", "SQLite", "FTS5 full-text search index")
+
+Rel(search, storage, "Queries directly")
+
+note right of dispatcher
+  Lightweight alternative to Enhanced Dispatcher
+  - No plugin system overhead
+  - Direct BM25 search only
+  - Sub-100ms query performance
+  - Ideal for simple text search needs
+end note
+
+@enduml

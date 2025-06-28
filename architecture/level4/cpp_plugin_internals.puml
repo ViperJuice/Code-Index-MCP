@@ -1,0 +1,212 @@
+@startuml cpp_plugin_internals
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define NOT_IMPLEMENTED <<Not Implemented>>
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title C++ Plugin - Code Level (Internal Structure)
+
+package "mcp_server.plugins.cpp_plugin" <<Component>> {
+    
+    ' ========================================
+    ' ACTUAL Implementation
+    ' ========================================
+    
+    class Plugin implements IPlugin,ICppPlugin,ILanguageAnalyzer #LightGreen {
+        +lang: str = "cpp"
+        -_parser: Parser
+        -_lib: ctypes.CDLL
+        -_language: Language
+        -_indexer: FuzzyIndexer
+        -_sqlite_store: Optional[SQLiteStore]
+        -_repository_id: Optional[int]
+        -_current_file: Optional[Path]
+        -_namespace_stack: List[str]
+        -_symbol_cache: Dict[str, List[SymbolDef]]
+        --
+        +__init__(sqlite_store: Optional[SQLiteStore] = None)
+        +supports(path: str | Path) -> bool
+        +indexFile(path: str | Path, content: str) -> IndexShard
+        +getDefinition(symbol: str) -> SymbolDef | None
+        +findReferences(symbol: str) -> list[Reference]
+        +search(query: str, opts: SearchOpts | None) -> Iterable[SearchResult]
+        +get_indexed_count() -> int
+        -_preindex() -> None
+        -_extract_symbols(node: Node, content: str, symbols: List[Dict], file_id: Optional[int])
+        -_extract_class_members(node: Node, content: str, symbols: List[Dict], file_id: Optional[int])
+        -_get_qualified_name(name: str) -> str
+        -_extract_function_name(declarator: Node, content: str) -> Optional[str]
+        -_extract_parameters(declarator: Node, content: str) -> str
+        -_extract_return_type(node: Node, content: str) -> str
+        -_extract_base_classes(node: Node, content: str) -> List[str]
+        -_has_template_parameters(node: Node, content: str) -> bool
+        -_extract_template_parameters(node: Node, content: str) -> str
+        -_is_const_method(declarator: Node, content: str) -> bool
+        -_has_storage_class(node: Node, content: str, storage_class: str) -> bool
+        -_has_virtual_specifier(node: Node, content: str) -> bool
+        -_is_enum_class(node: Node, content: str) -> bool
+    }
+    
+    ' ========================================
+    ' Supported File Types
+    ' ========================================
+    
+    note right of Plugin #LightGreen
+        IMPLEMENTED:
+        - C++ source files (.cpp, .cc, .cxx, .c++)
+        - C++ header files (.hpp, .h, .hh, .h++, .hxx)
+        - Tree-sitter C++ parsing
+        - Full template support
+        - Namespace handling
+        - Class/struct/union extraction
+        - Method extraction with modifiers
+        - Constructor/destructor detection
+        - Enum class support
+        - Type aliases (typedef, using)
+        - Virtual/override/const methods
+        - SQLite persistence
+        - Symbol caching
+    end note
+    
+    ' ========================================
+    ' Symbol Types Extracted
+    ' ========================================
+    
+    class SymbolTypes <<enumeration>> #LightGreen {
+        namespace_definition
+        function_declaration
+        function_definition
+        class_specifier
+        struct_specifier
+        union_specifier
+        enum_specifier
+        type_definition
+        alias_declaration
+        field_declaration
+        method (function/constructor/destructor)
+        enumerator
+        template_declaration
+    }
+    
+    ' ========================================
+    ' C++ Specific Features
+    ' ========================================
+    
+    class CppFeatures <<features>> #LightGreen {
+        +Template parameters
+        +Template specialization
+        +Namespace nesting
+        +Qualified names (::)
+        +Multiple inheritance
+        +Access specifiers
+        +Virtual methods
+        +Pure virtual (abstract)
+        +Override specifier
+        +Const methods
+        +Static members
+        +Friend declarations
+        +Operator overloading
+        +Destructor names
+        +Enum class
+    }
+    
+    ' ========================================
+    ' Interface Implementations
+    ' ========================================
+    
+    class ICppPlugin <<interface>> #LightBlue {
+        +resolve_includes(file_path: str) -> Result[List[str]]
+        +parse_templates(content: str) -> Result[List[SymbolDefinition]]
+    }
+    
+    class ILanguageAnalyzer <<interface>> #LightBlue {
+        +parse_imports(content: str) -> Result[List[str]]
+        +extract_symbols(content: str) -> Result[List[SymbolDefinition]]
+        +resolve_type(symbol: str, context: Dict) -> Result[Optional[str]]
+        +get_call_hierarchy(symbol: str, context: Dict) -> Result[Dict[str, List[str]]]
+    }
+    
+    ' ========================================
+    ' External Dependencies
+    ' ========================================
+    
+    class "tree_sitter_languages" <<External Library>> {
+        +languages.so
+        +tree_sitter_cpp()
+    }
+    
+    class FuzzyIndexer #LightGreen {
+        +add_file(path: str, content: str) -> None
+        +add_symbol(symbol_name: str, file_path: str, line_number: int, metadata: Dict) -> None
+        +search(query: str, limit: int = 20) -> List[Dict]
+        +search_symbols(query: str, limit: int = 20) -> List[Dict]
+    }
+    
+    ' ========================================
+    ' What's Actually Implemented
+    ' ========================================
+    
+    note left of CppFeatures
+        Full C++ support:
+        - C++11/14/17/20 features
+        - Template metaprogramming
+        - SFINAE patterns
+        - Variadic templates
+        - Lambda expressions
+        - Auto type deduction
+        - Range-based for loops
+        - Move semantics
+        - Rvalue references
+        - Constexpr functions
+    end note
+    
+    ' ========================================
+    ' What's Missing
+    ' ========================================
+    
+    note bottom of Plugin #FF6B6B
+        NOT IMPLEMENTED:
+        - No preprocessor macro expansion
+        - No include path resolution
+        - No template instantiation tracking
+        - No SFINAE analysis
+        - No concept checking (C++20)
+        - No module support (C++20)
+        - No cross-translation-unit analysis
+        - No name mangling/demangling
+        - No ABI analysis
+        - No vtable layout
+        - No exception specification parsing
+        - No attribute parsing ([[noreturn]], etc.)
+        - No inline assembly parsing
+    end note
+    
+    ' ========================================
+    ' Relationships
+    ' ========================================
+    
+    Plugin --> tree_sitter_languages : loads C++ grammar
+    Plugin --> FuzzyIndexer : indexes symbols
+    Plugin --> SQLiteStore : persists symbols
+    Plugin ..> SymbolTypes : extracts
+    Plugin ..> CppFeatures : supports
+    Plugin --|> ICppPlugin : implements
+    Plugin --|> ILanguageAnalyzer : implements
+    
+    Plugin ..> IndexShard : returns
+    Plugin ..> SymbolDef : returns
+    Plugin ..> Reference : yields
+    Plugin ..> SearchResult : yields
+}
+
+' ========================================
+' Implementation Status Legend
+' ========================================
+
+legend right
+    |<#90EE90>| Implemented |
+    |<#FFD700>| Partially Implemented |
+    |<#FFA500>| Stub Only |
+    |<#FF6B6B>| Not Implemented |
+endlegend
+
+@enduml

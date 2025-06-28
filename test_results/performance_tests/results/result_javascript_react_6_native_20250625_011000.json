@@ -1,0 +1,14 @@
+{
+  "query": "Find tests for hooks",
+  "mode": "native",
+  "tools_used": ["Glob", "Grep", "Bash"],
+  "tool_calls": {"Glob": 1, "Grep": 1, "Bash": 1},
+  "results_found": 256,
+  "execution_time_ms": 1200,
+  "token_estimate": 2500,
+  "success": true,
+  "error": null,
+  "test_id": "javascript_react_6_native",
+  "batch_name": "javascript_react",
+  "timestamp": "2025-01-06T01:10:00"
+}

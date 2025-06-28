@@ -1,16 +1,35 @@
-# Docker Setup for Code-Index-MCP
+# Docker Support for MCP Index Server
 
-This directory contains Docker configuration files for running Code-Index-MCP with all dependencies, including dormant features.
+This directory contains Docker configurations for the MCP Index Server, providing containerized deployment options for different use cases.
+
+## Directory Structure
+
+```
+docker/
+├── dockerfiles/           # Dockerfile variants
+│   ├── Dockerfile.minimal # Zero-configuration version
+│   ├── Dockerfile.standard # Semantic search enabled
+│   └── Dockerfile.full    # Complete production stack
+├── compose/              # Docker Compose files
+│   ├── development/      # Dev environment configs
+│   └── production/       # Production configs
+└── config/               # Configuration templates
+```
 
 ## Quick Start
 
-### Basic Setup (Core Features Only)
-```bash
-# Start with basic features (no semantic search)
-docker-compose up -d
+### Using Pre-built Images
 
-# Access the server
-curl http://localhost:8000/health
+```bash
+# Basic search (no API keys required) - 2 minute setup
+docker run -it -v $(pwd):/workspace ghcr.io/code-index-mcp/mcp-index:minimal
+
+# AI-powered search (requires Voyage AI key)
+docker run -it -v $(pwd):/workspace -e VOYAGE_AI_API_KEY=your-key ghcr.io/code-index-mcp/mcp-index:standard
+
+# Install helper script (recommended)
+curl -sSL https://raw.githubusercontent.com/Code-Index-MCP/main/scripts/install-mcp-docker.sh | bash
+mcp-index  # Now available as a command
 ```
 
 ### Development Setup (All Features)

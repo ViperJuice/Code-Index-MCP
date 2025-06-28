@@ -1,0 +1,215 @@
+{
+  "working_repos": [],
+  "broken_repos": [],
+  "missing_repos": [
+    {
+      "name": "aspnetcore",
+      "path": "/workspaces/Code-Index-MCP/test_repos/other/csharp/aspnetcore",
+      "category": "other",
+      "language": "csharp",
+      "hash": "b947d106eccf"
+    },
+    {
+      "name": "kong",
+      "path": "/workspaces/Code-Index-MCP/test_repos/other/lua/kong",
+      "category": "other",
+      "language": "lua",
+      "hash": "f0a3199cb312"
+    },
+    {
+      "name": "Alamofire",
+      "path": "/workspaces/Code-Index-MCP/test_repos/modern/swift/Alamofire",
+      "category": "modern",
+      "language": "swift",
+      "hash": "e8f130fe30ac"
+    },
+    {
+      "name": "sdk",
+      "path": "/workspaces/Code-Index-MCP/test_repos/modern/dart/sdk",
+      "category": "modern",
+      "language": "dart",
+      "hash": "48f70bd595a6"
+    },
+    {
+      "name": "gin",
+      "path": "/workspaces/Code-Index-MCP/test_repos/modern/go/gin",
+      "category": "modern",
+      "language": "go",
+      "hash": "2c3a11a10667"
+    },
+    {
+      "name": "terraform",
+      "path": "/workspaces/Code-Index-MCP/test_repos/modern/go/terraform",
+      "category": "modern",
+      "language": "go",
+      "hash": "2849ba16ec30"
+    },
+    {
+      "name": "akka",
+      "path": "/workspaces/Code-Index-MCP/test_repos/jvm/scala/akka",
+      "category": "jvm",
+      "language": "scala",
+      "hash": "d17b557e0b1a"
+    },
+    {
+      "name": "ktor",
+      "path": "/workspaces/Code-Index-MCP/test_repos/jvm/kotlin/ktor",
+      "category": "jvm",
+      "language": "kotlin",
+      "hash": "6f0779e7fd7c"
+    },
+    {
+      "name": "ring",
+      "path": "/workspaces/Code-Index-MCP/test_repos/jvm/clojure/ring",
+      "category": "jvm",
+      "language": "clojure",
+      "hash": "4a79ea8298fb"
+    },
+    {
+      "name": "spring-boot",
+      "path": "/workspaces/Code-Index-MCP/test_repos/jvm/java/spring-boot",
+      "category": "jvm",
+      "language": "java",
+      "hash": "1a9fbcd034f2"
+    },
+    {
+      "name": "kafka",
+      "path": "/workspaces/Code-Index-MCP/test_repos/jvm/java/kafka",
+      "category": "jvm",
+      "language": "java",
+      "hash": "34d604cbbedf"
+    },
+    {
+      "name": "framework",
+      "path": "/workspaces/Code-Index-MCP/test_repos/web/php/framework",
+      "category": "web",
+      "language": "php",
+      "hash": "40fdeba5e98b"
+    },
+    {
+      "name": "express",
+      "path": "/workspaces/Code-Index-MCP/test_repos/web/javascript/express",
+      "category": "web",
+      "language": "javascript",
+      "hash": "bb4442cd5cc6"
+    },
+    {
+      "name": "react",
+      "path": "/workspaces/Code-Index-MCP/test_repos/web/javascript/react",
+      "category": "web",
+      "language": "javascript",
+      "hash": "d72d7e1e17d2"
+    },
+    {
+      "name": "mojo",
+      "path": "/workspaces/Code-Index-MCP/test_repos/web/perl/mojo",
+      "category": "web",
+      "language": "perl",
+      "hash": "1ccf33ab5afa"
+    },
+    {
+      "name": "rails",
+      "path": "/workspaces/Code-Index-MCP/test_repos/web/ruby/rails",
+      "category": "web",
+      "language": "ruby",
+      "hash": "7d20371e6e74"
+    },
+    {
+      "name": "requests",
+      "path": "/workspaces/Code-Index-MCP/test_repos/web/python/requests",
+      "category": "web",
+      "language": "python",
+      "hash": "2652ff29a355"
+    },
+    {
+      "name": "flask",
+      "path": "/workspaces/Code-Index-MCP/test_repos/web/python/flask",
+      "category": "web",
+      "language": "python",
+      "hash": "a91ba02537ca"
+    },
+    {
+      "name": "django",
+      "path": "/workspaces/Code-Index-MCP/test_repos/web/python/django",
+      "category": "web",
+      "language": "python",
+      "hash": "d8df70cdcd6e"
+    },
+    {
+      "name": "TypeScript",
+      "path": "/workspaces/Code-Index-MCP/test_repos/web/typescript/TypeScript",
+      "category": "web",
+      "language": "typescript",
+      "hash": "e3acd2328eea"
+    },
+    {
+      "name": "phoenix",
+      "path": "/workspaces/Code-Index-MCP/test_repos/functional/elixir/phoenix",
+      "category": "functional",
+      "language": "elixir",
+      "hash": "e12e8e8365d2"
+    },
+    {
+      "name": "yesod",
+      "path": "/workspaces/Code-Index-MCP/test_repos/functional/haskell/yesod",
+      "category": "functional",
+      "language": "haskell",
+      "hash": "080cafc4ddd9"
+    },
+    {
+      "name": "redis",
+      "path": "/workspaces/Code-Index-MCP/test_repos/systems/c/redis",
+      "category": "systems",
+      "language": "c",
+      "hash": "7db5331e3905"
+    },
+    {
+      "name": "curl",
+      "path": "/workspaces/Code-Index-MCP/test_repos/systems/c/curl",
+      "category": "systems",
+      "language": "c",
+      "hash": "83245e6cb9f2"
+    },
+    {
+      "name": "grpc",
+      "path": "/workspaces/Code-Index-MCP/test_repos/systems/cpp/grpc",
+      "category": "systems",
+      "language": "cpp",
+      "hash": "6ebf7d3a3ce3"
+    },
+    {
+      "name": "json",
+      "path": "/workspaces/Code-Index-MCP/test_repos/systems/cpp/json",
+      "category": "systems",
+      "language": "cpp",
+      "hash": "257683c93d94"
+    },
+    {
+      "name": "rustlings",
+      "path": "/workspaces/Code-Index-MCP/test_repos/systems/rust/rustlings",
+      "category": "systems",
+      "language": "rust",
+      "hash": "2adae7acfd69"
+    },
+    {
+      "name": "tokio",
+      "path": "/workspaces/Code-Index-MCP/test_repos/systems/rust/tokio",
+      "category": "systems",
+      "language": "rust",
+      "hash": "e23a01c4032c"
+    },
+    {
+      "name": "zig",
+      "path": "/workspaces/Code-Index-MCP/test_repos/systems/zig/zig",
+      "category": "systems",
+      "language": "zig",
+      "hash": "bca4a9ce73d5"
+    }
+  ],
+  "summary": {
+    "total": 29,
+    "working": 0,
+    "broken": 0,
+    "missing": 29
+  }
+}

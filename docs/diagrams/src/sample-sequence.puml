@@ -1,0 +1,15 @@
+@startuml sample-sequence
+!include ../includes/style.puml
+
+title Sample Sequence Diagram
+
+participant "User" as U
+participant "System" as S
+participant "Database" as DB
+
+U -> S: Request
+S -> DB: Query
+DB --> S: Result
+S --> U: Response
+
+@enduml

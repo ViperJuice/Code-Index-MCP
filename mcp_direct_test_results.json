@@ -1,0 +1,17 @@
+{
+  "total_files": 888,
+  "total_bm25": 888,
+  "total_symbols": 0,
+  "languages": {
+    "python": 571,
+    "markdown": 183,
+    "json": 62,
+    "text": 40,
+    "yaml": 24,
+    "javascript": 4,
+    "c": 2,
+    "swift": 1,
+    "kotlin": 1
+  },
+  "status": "functional"
+}

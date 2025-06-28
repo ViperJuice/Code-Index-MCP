@@ -1,1 +1,0 @@
-Testing compatibility-aware index upload/download

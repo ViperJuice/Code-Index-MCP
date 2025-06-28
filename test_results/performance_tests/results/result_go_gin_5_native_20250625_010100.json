@@ -1,0 +1,14 @@
+{
+  "query": "Show files that depend on gin",
+  "mode": "native",
+  "tools_used": ["grep", "glob"],
+  "tool_calls": {"grep": 3, "glob": 2},
+  "results_found": 88,
+  "execution_time_ms": 450,
+  "token_estimate": 8500,
+  "success": true,
+  "error": null,
+  "test_id": "go_gin_5_native",
+  "batch_name": "go_gin",
+  "timestamp": "2025-01-06T01:01:00"
+}

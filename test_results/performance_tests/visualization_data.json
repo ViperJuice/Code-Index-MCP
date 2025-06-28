@@ -1,0 +1,109 @@
+{
+  "summary": {
+    "total_tests": 23,
+    "test_date": "2025-01-06",
+    "repositories": ["go_gin", "python_django", "javascript_react", "rust_tokio"]
+  },
+  "overall_metrics": {
+    "mcp": {
+      "avg_time_ms": 3067,
+      "avg_tokens": 9500,
+      "success_rate": 0.58,
+      "total_tests": 12
+    },
+    "native": {
+      "avg_time_ms": 2125,
+      "avg_tokens": 2141,
+      "success_rate": 0.64,
+      "total_tests": 11
+    }
+  },
+  "by_repository": {
+    "go_gin": {
+      "mcp": {
+        "avg_time_ms": 1970,
+        "avg_tokens": 10100,
+        "success_rate": 0.60,
+        "tests": 5
+      },
+      "native": {
+        "avg_time_ms": 3434,
+        "avg_tokens": 2850,
+        "success_rate": 0.40,
+        "tests": 5
+      },
+      "winner": "mcp",
+      "speedup": 1.7
+    },
+    "python_django": {
+      "mcp": {
+        "avg_time_ms": 4400,
+        "avg_tokens": 8767,
+        "success_rate": 1.0,
+        "tests": 3
+      },
+      "native": {
+        "avg_time_ms": 462,
+        "avg_tokens": 1325,
+        "success_rate": 0.75,
+        "tests": 4
+      },
+      "winner": "native",
+      "speedup": 9.5
+    },
+    "javascript_react": {
+      "mcp": {
+        "avg_time_ms": 6000,
+        "avg_tokens": 7850,
+        "success_rate": 0.50,
+        "tests": 2
+      },
+      "native": {
+        "avg_time_ms": 850,
+        "avg_tokens": 1200,
+        "success_rate": 1.0,
+        "tests": 1
+      },
+      "winner": "native",
+      "speedup": 7.1
+    },
+    "rust_tokio": {
+      "mcp": {
+        "avg_time_ms": 875,
+        "avg_tokens": 10750,
+        "success_rate": 0.0,
+        "tests": 2
+      },
+      "native": {
+        "avg_time_ms": 3500,
+        "avg_tokens": 2800,
+        "success_rate": 1.0,
+        "tests": 1
+      },
+      "winner": "native",
+      "speedup": 4.0
+    }
+  },
+  "cost_analysis": {
+    "token_price_per_1k": 0.003,
+    "daily_queries": 1000,
+    "mcp_daily_cost": 28.50,
+    "native_daily_cost": 6.42,
+    "daily_savings": 22.08,
+    "monthly_savings": 662.40
+  },
+  "recommendations": {
+    "use_mcp_for": [
+      "Cross-repository searches",
+      "Complex symbol resolution",
+      "Go codebases",
+      "Semantic understanding required"
+    ],
+    "use_native_for": [
+      "Simple pattern matching",
+      "Python/JavaScript code",
+      "Comment searches (TODO/FIXME)",
+      "Token budget constraints"
+    ]
+  }
+}

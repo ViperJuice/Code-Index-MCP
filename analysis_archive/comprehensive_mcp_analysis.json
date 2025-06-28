@@ -1,0 +1,1413 @@
+{
+  "summary": {
+    "total_queries": 100,
+    "total_mcp_time": 0.28180480003356934,
+    "total_direct_time": 113.00683355331421,
+    "speed_improvement": 401.0110315362,
+    "total_mcp_tokens": 60738,
+    "total_direct_tokens": 100766484,
+    "token_reduction_percent": 99.93972400585099
+  },
+  "results": [
+    {
+      "query": "BM25Indexer",
+      "type": "symbol",
+      "mcp": {
+        "count": 8,
+        "time": 0.005237579345703125,
+        "tokens": 936
+      },
+      "direct": {
+        "count": 0,
+        "time": 10.0,
+        "tokens": 0
+      }
+    },
+    {
+      "query": "SQLiteStore",
+      "type": "symbol",
+      "mcp": {
+        "count": 76,
+        "time": 0.010147571563720703,
+        "tokens": 1126
+      },
+      "direct": {
+        "count": 415,
+        "time": 7.128049373626709,
+        "tokens": 15230
+      }
+    },
+    {
+      "query": "PluginManager",
+      "type": "symbol",
+      "mcp": {
+        "count": 8,
+        "time": 0.005029439926147461,
+        "tokens": 944
+      },
+      "direct": {
+        "count": 192,
+        "time": 1.752366065979004,
+        "tokens": 1227562
+      }
+    },
+    {
+      "query": "EnhancedDispatcher",
+      "type": "symbol",
+      "mcp": {
+        "count": 2,
+        "time": 0.002183675765991211,
+        "tokens": 244
+      },
+      "direct": {
+        "count": 80,
+        "time": 1.9485011100769043,
+        "tokens": 5159
+      }
+    },
+    {
+      "query": "PathResolver",
+      "type": "symbol",
+      "mcp": {
+        "count": 10,
+        "time": 0.007584095001220703,
+        "tokens": 1240
+      },
+      "direct": {
+        "count": 78,
+        "time": 2.438600778579712,
+        "tokens": 5505
+      }
+    },
+    {
+      "query": "TokenCounter",
+      "type": "symbol",
+      "mcp": {
+        "count": 6,
+        "time": 0.002210855484008789,
+        "tokens": 780
+      },
+      "direct": {
+        "count": 52,
+        "time": 2.152327537536621,
+        "tokens": 3969
+      }
+    },
+    {
+      "query": "SemanticIndexer",
+      "type": "symbol",
+      "mcp": {
+        "count": 18,
+        "time": 0.008996009826660156,
+        "tokens": 1334
+      },
+      "direct": {
+        "count": 78,
+        "time": 2.0627002716064453,
+        "tokens": 5023
+      }
+    },
+    {
+      "query": "IndexDiscovery",
+      "type": "symbol",
+      "mcp": {
+        "count": 6,
+        "time": 0.003972530364990234,
+        "tokens": 732
+      },
+      "direct": {
+        "count": 16,
+        "time": 1.4222772121429443,
+        "tokens": 2949
+      }
+    },
+    {
+      "query": "DocumentPlugin",
+      "type": "symbol",
+      "mcp": {
+        "count": 0,
+        "time": 0.0006954669952392578,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 15,
+        "time": 1.5395715236663818,
+        "tokens": 2997
+      }
+    },
+    {
+      "query": "BasePlugin",
+      "type": "symbol",
+      "mcp": {
+        "count": 0,
+        "time": 0.0009357929229736328,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 10,
+        "time": 1.407405138015747,
+        "tokens": 2830
+      }
+    },
+    {
+      "query": "RerankerFactory",
+      "type": "symbol",
+      "mcp": {
+        "count": 4,
+        "time": 0.0026221275329589844,
+        "tokens": 564
+      },
+      "direct": {
+        "count": 27,
+        "time": 1.2700011730194092,
+        "tokens": 3255
+      }
+    },
+    {
+      "query": "HybridSearch",
+      "type": "symbol",
+      "mcp": {
+        "count": 6,
+        "time": 0.005157947540283203,
+        "tokens": 652
+      },
+      "direct": {
+        "count": 57,
+        "time": 1.3780169486999512,
+        "tokens": 4310
+      }
+    },
+    {
+      "query": "MetricsCollector",
+      "type": "symbol",
+      "mcp": {
+        "count": 0,
+        "time": 0.0009746551513671875,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 42,
+        "time": 1.7123174667358398,
+        "tokens": 3834
+      }
+    },
+    {
+      "query": "PluginLoader",
+      "type": "symbol",
+      "mcp": {
+        "count": 10,
+        "time": 0.003144502639770508,
+        "tokens": 1224
+      },
+      "direct": {
+        "count": 28,
+        "time": 1.9173450469970703,
+        "tokens": 3224
+      }
+    },
+    {
+      "query": "PluginRegistry",
+      "type": "symbol",
+      "mcp": {
+        "count": 4,
+        "time": 0.0018498897552490234,
+        "tokens": 572
+      },
+      "direct": {
+        "count": 110,
+        "time": 1.2820453643798828,
+        "tokens": 1706192
+      }
+    },
+    {
+      "query": "ConfigValidator",
+      "type": "symbol",
+      "mcp": {
+        "count": 0,
+        "time": 0.0007188320159912109,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 1,
+        "time": 1.2921700477600098,
+        "tokens": 538
+      }
+    },
+    {
+      "query": "CacheManager",
+      "type": "symbol",
+      "mcp": {
+        "count": 6,
+        "time": 0.0022864341735839844,
+        "tokens": 752
+      },
+      "direct": {
+        "count": 64,
+        "time": 1.3271048069000244,
+        "tokens": 4346
+      }
+    },
+    {
+      "query": "ErrorHandler",
+      "type": "symbol",
+      "mcp": {
+        "count": 0,
+        "time": 0.00072479248046875,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 153,
+        "time": 1.4835071563720703,
+        "tokens": 723947
+      }
+    },
+    {
+      "query": "LogManager",
+      "type": "symbol",
+      "mcp": {
+        "count": 0,
+        "time": 0.0006291866302490234,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 4,
+        "time": 1.623624563217163,
+        "tokens": 943899
+      }
+    },
+    {
+      "query": "SecurityMiddleware",
+      "type": "symbol",
+      "mcp": {
+        "count": 0,
+        "time": 0.0007741451263427734,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 44,
+        "time": 1.5673375129699707,
+        "tokens": 4169
+      }
+    },
+    {
+      "query": "initialize_services",
+      "type": "symbol",
+      "mcp": {
+        "count": 0,
+        "time": 0.0006480216979980469,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 18,
+        "time": 1.2512102127075195,
+        "tokens": 3038
+      }
+    },
+    {
+      "query": "index_repository",
+      "type": "symbol",
+      "mcp": {
+        "count": 2,
+        "time": 0.0019307136535644531,
+        "tokens": 236
+      },
+      "direct": {
+        "count": 12,
+        "time": 1.1987407207489014,
+        "tokens": 2852
+      }
+    },
+    {
+      "query": "search_code",
+      "type": "symbol",
+      "mcp": {
+        "count": 8,
+        "time": 0.0029387474060058594,
+        "tokens": 828
+      },
+      "direct": {
+        "count": 74,
+        "time": 1.380873680114746,
+        "tokens": 4919
+      }
+    },
+    {
+      "query": "lookup_symbol",
+      "type": "symbol",
+      "mcp": {
+        "count": 10,
+        "time": 0.0064697265625,
+        "tokens": 1228
+      },
+      "direct": {
+        "count": 22,
+        "time": 1.3101623058319092,
+        "tokens": 3242
+      }
+    },
+    {
+      "query": "get_statistics",
+      "type": "symbol",
+      "mcp": {
+        "count": 36,
+        "time": 0.0050504207611083984,
+        "tokens": 1208
+      },
+      "direct": {
+        "count": 72,
+        "time": 1.3133747577667236,
+        "tokens": 4599
+      }
+    },
+    {
+      "query": "health_check",
+      "type": "symbol",
+      "mcp": {
+        "count": 20,
+        "time": 0.004785776138305664,
+        "tokens": 1204
+      },
+      "direct": {
+        "count": 412,
+        "time": 1.1479249000549316,
+        "tokens": 38648
+      }
+    },
+    {
+      "query": "load_plugins",
+      "type": "symbol",
+      "mcp": {
+        "count": 28,
+        "time": 0.00431060791015625,
+        "tokens": 1230
+      },
+      "direct": {
+        "count": 48,
+        "time": 1.3222072124481201,
+        "tokens": 4176
+      }
+    },
+    {
+      "query": "create_dispatcher",
+      "type": "symbol",
+      "mcp": {
+        "count": 2,
+        "time": 0.0026514530181884766,
+        "tokens": 220
+      },
+      "direct": {
+        "count": 3,
+        "time": 1.3670966625213623,
+        "tokens": 1597
+      }
+    },
+    {
+      "query": "validate_config",
+      "type": "symbol",
+      "mcp": {
+        "count": 4,
+        "time": 0.0011775493621826172,
+        "tokens": 456
+      },
+      "direct": {
+        "count": 12,
+        "time": 1.1811904907226562,
+        "tokens": 2973
+      }
+    },
+    {
+      "query": "run_benchmarks",
+      "type": "symbol",
+      "mcp": {
+        "count": 10,
+        "time": 0.0021517276763916016,
+        "tokens": 1056
+      },
+      "direct": {
+        "count": 11,
+        "time": 0.9263231754302979,
+        "tokens": 2804
+      }
+    },
+    {
+      "query": "dispatcher",
+      "type": "symbol",
+      "mcp": {
+        "count": 40,
+        "time": 0.0031690597534179688,
+        "tokens": 1144
+      },
+      "direct": {
+        "count": 2862,
+        "time": 0.8190627098083496,
+        "tokens": 897344
+      }
+    },
+    {
+      "query": "plugin_manager",
+      "type": "symbol",
+      "mcp": {
+        "count": 18,
+        "time": 0.002836942672729492,
+        "tokens": 1198
+      },
+      "direct": {
+        "count": 251,
+        "time": 0.8053288459777832,
+        "tokens": 11222
+      }
+    },
+    {
+      "query": "sqlite_store",
+      "type": "symbol",
+      "mcp": {
+        "count": 80,
+        "time": 0.0025975704193115234,
+        "tokens": 1094
+      },
+      "direct": {
+        "count": 898,
+        "time": 0.8987488746643066,
+        "tokens": 30882
+      }
+    },
+    {
+      "query": "logger",
+      "type": "symbol",
+      "mcp": {
+        "count": 176,
+        "time": 0.0025877952575683594,
+        "tokens": 1192
+      },
+      "direct": {
+        "count": 12666,
+        "time": 1.2519025802612305,
+        "tokens": 2695703
+      }
+    },
+    {
+      "query": "DEBUG",
+      "type": "symbol",
+      "mcp": {
+        "count": 72,
+        "time": 0.0021877288818359375,
+        "tokens": 1062
+      },
+      "direct": {
+        "count": 1820,
+        "time": 0.6427388191223145,
+        "tokens": 824240
+      }
+    },
+    {
+      "query": "INFO",
+      "type": "symbol",
+      "mcp": {
+        "count": 166,
+        "time": 0.003928184509277344,
+        "tokens": 1156
+      },
+      "direct": {
+        "count": 1850,
+        "time": 0.7024011611938477,
+        "tokens": 1821636
+      }
+    },
+    {
+      "query": "ERROR",
+      "type": "symbol",
+      "mcp": {
+        "count": 162,
+        "time": 0.0020751953125,
+        "tokens": 1082
+      },
+      "direct": {
+        "count": 3168,
+        "time": 0.6705615520477295,
+        "tokens": 1200633
+      }
+    },
+    {
+      "query": "server",
+      "type": "symbol",
+      "mcp": {
+        "count": 322,
+        "time": 0.0014874935150146484,
+        "tokens": 590
+      },
+      "direct": {
+        "count": 27953,
+        "time": 1.0095570087432861,
+        "tokens": 4602685
+      }
+    },
+    {
+      "query": "app",
+      "type": "symbol",
+      "mcp": {
+        "count": 16,
+        "time": 0.004465579986572266,
+        "tokens": 1092
+      },
+      "direct": {
+        "count": 166521,
+        "time": 1.7652347087860107,
+        "tokens": 16628840
+      }
+    },
+    {
+      "query": "config",
+      "type": "symbol",
+      "mcp": {
+        "count": 116,
+        "time": 0.004465579986572266,
+        "tokens": 1362
+      },
+      "direct": {
+        "count": 265163,
+        "time": 1.6124293804168701,
+        "tokens": 23617002
+      }
+    },
+    {
+      "query": "centralized storage",
+      "type": "content",
+      "mcp": {
+        "count": 0,
+        "time": 0.0005660057067871094,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 24,
+        "time": 0.9056534767150879,
+        "tokens": 3271
+      }
+    },
+    {
+      "query": "semantic search",
+      "type": "content",
+      "mcp": {
+        "count": 120,
+        "time": 0.003027677536010742,
+        "tokens": 1238
+      },
+      "direct": {
+        "count": 215,
+        "time": 0.7872138023376465,
+        "tokens": 9757
+      }
+    },
+    {
+      "query": "reranking algorithm",
+      "type": "content",
+      "mcp": {
+        "count": 4,
+        "time": 0.0018243789672851562,
+        "tokens": 480
+      },
+      "direct": {
+        "count": 2,
+        "time": 0.7580649852752686,
+        "tokens": 1068
+      }
+    },
+    {
+      "query": "path resolution",
+      "type": "content",
+      "mcp": {
+        "count": 22,
+        "time": 0.002990245819091797,
+        "tokens": 1112
+      },
+      "direct": {
+        "count": 15,
+        "time": 0.8502287864685059,
+        "tokens": 3103
+      }
+    },
+    {
+      "query": "index migration",
+      "type": "content",
+      "mcp": {
+        "count": 8,
+        "time": 0.002576589584350586,
+        "tokens": 920
+      },
+      "direct": {
+        "count": 3,
+        "time": 0.9498851299285889,
+        "tokens": 1612
+      }
+    },
+    {
+      "query": "BM25 scoring",
+      "type": "content",
+      "mcp": {
+        "count": 10,
+        "time": 0.004645824432373047,
+        "tokens": 1256
+      },
+      "direct": {
+        "count": 2,
+        "time": 0.8183696269989014,
+        "tokens": 1074
+      }
+    },
+    {
+      "query": "vector embeddings",
+      "type": "content",
+      "mcp": {
+        "count": 10,
+        "time": 0.00403904914855957,
+        "tokens": 1340
+      },
+      "direct": {
+        "count": 14,
+        "time": 0.8778772354125977,
+        "tokens": 3001
+      }
+    },
+    {
+      "query": "cache implementation",
+      "type": "content",
+      "mcp": {
+        "count": 66,
+        "time": 0.0030794143676757812,
+        "tokens": 1102
+      },
+      "direct": {
+        "count": 19,
+        "time": 0.7562105655670166,
+        "tokens": 3403
+      }
+    },
+    {
+      "query": "error handling",
+      "type": "content",
+      "mcp": {
+        "count": 84,
+        "time": 0.0016906261444091797,
+        "tokens": 1234
+      },
+      "direct": {
+        "count": 242,
+        "time": 0.7782037258148193,
+        "tokens": 12032
+      }
+    },
+    {
+      "query": "logging setup",
+      "type": "content",
+      "mcp": {
+        "count": 24,
+        "time": 0.0022275447845458984,
+        "tokens": 1126
+      },
+      "direct": {
+        "count": 2,
+        "time": 0.7526767253875732,
+        "tokens": 1073
+      }
+    },
+    {
+      "query": "plugin discovery",
+      "type": "content",
+      "mcp": {
+        "count": 16,
+        "time": 0.0035734176635742188,
+        "tokens": 1142
+      },
+      "direct": {
+        "count": 7,
+        "time": 0.7161777019500732,
+        "tokens": 2711
+      }
+    },
+    {
+      "query": "dynamic loading",
+      "type": "content",
+      "mcp": {
+        "count": 20,
+        "time": 0.002225160598754883,
+        "tokens": 1172
+      },
+      "direct": {
+        "count": 4,
+        "time": 0.7316124439239502,
+        "tokens": 2145
+      }
+    },
+    {
+      "query": "lazy initialization",
+      "type": "content",
+      "mcp": {
+        "count": 8,
+        "time": 0.002506256103515625,
+        "tokens": 1144
+      },
+      "direct": {
+        "count": 38,
+        "time": 0.7326819896697998,
+        "tokens": 4295
+      }
+    },
+    {
+      "query": "connection pooling",
+      "type": "content",
+      "mcp": {
+        "count": 6,
+        "time": 0.0013611316680908203,
+        "tokens": 632
+      },
+      "direct": {
+        "count": 16,
+        "time": 0.7219088077545166,
+        "tokens": 3071
+      }
+    },
+    {
+      "query": "rate limiting",
+      "type": "content",
+      "mcp": {
+        "count": 24,
+        "time": 0.002583742141723633,
+        "tokens": 1118
+      },
+      "direct": {
+        "count": 21,
+        "time": 0.72316575050354,
+        "tokens": 3328
+      }
+    },
+    {
+      "query": "authentication",
+      "type": "content",
+      "mcp": {
+        "count": 22,
+        "time": 0.002206087112426758,
+        "tokens": 1148
+      },
+      "direct": {
+        "count": 1146,
+        "time": 0.7716715335845947,
+        "tokens": 62342
+      }
+    },
+    {
+      "query": "authorization",
+      "type": "content",
+      "mcp": {
+        "count": 42,
+        "time": 0.0021686553955078125,
+        "tokens": 1238
+      },
+      "direct": {
+        "count": 858,
+        "time": 0.7937541007995605,
+        "tokens": 129758
+      }
+    },
+    {
+      "query": "data validation",
+      "type": "content",
+      "mcp": {
+        "count": 46,
+        "time": 0.002027750015258789,
+        "tokens": 1278
+      },
+      "direct": {
+        "count": 23,
+        "time": 0.8743009567260742,
+        "tokens": 3346
+      }
+    },
+    {
+      "query": "schema migration",
+      "type": "content",
+      "mcp": {
+        "count": 4,
+        "time": 0.001390695571899414,
+        "tokens": 504
+      },
+      "direct": {
+        "count": 4,
+        "time": 0.7751803398132324,
+        "tokens": 2135
+      }
+    },
+    {
+      "query": "performance optimization",
+      "type": "content",
+      "mcp": {
+        "count": 30,
+        "time": 0.0029249191284179688,
+        "tokens": 1172
+      },
+      "direct": {
+        "count": 54,
+        "time": 0.7377867698669434,
+        "tokens": 4841
+      }
+    },
+    {
+      "query": "try except",
+      "type": "content",
+      "mcp": {
+        "count": 188,
+        "time": 0.0030655860900878906,
+        "tokens": 1174
+      },
+      "direct": {
+        "count": 9,
+        "time": 0.8187673091888428,
+        "tokens": 40420
+      }
+    },
+    {
+      "query": "async def",
+      "type": "content",
+      "mcp": {
+        "count": 84,
+        "time": 0.002521038055419922,
+        "tokens": 1180
+      },
+      "direct": {
+        "count": 5563,
+        "time": 0.8471555709838867,
+        "tokens": 1418949
+      }
+    },
+    {
+      "query": "with open",
+      "type": "content",
+      "mcp": {
+        "count": 48,
+        "time": 0.002593517303466797,
+        "tokens": 1082
+      },
+      "direct": {
+        "count": 2807,
+        "time": 0.8664295673370361,
+        "tokens": 106668
+      }
+    },
+    {
+      "query": "import from",
+      "type": "content",
+      "mcp": {
+        "count": 316,
+        "time": 0.0017435550689697266,
+        "tokens": 990
+      },
+      "direct": {
+        "count": 233,
+        "time": 0.7586498260498047,
+        "tokens": 13311
+      }
+    },
+    {
+      "query": "class.*init",
+      "type": "content",
+      "mcp": {
+        "count": 0,
+        "time": 0.00036835670471191406,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 1808,
+        "time": 1.1817073822021484,
+        "tokens": 7870861
+      }
+    },
+    {
+      "query": "def.*self",
+      "type": "content",
+      "mcp": {
+        "count": 0,
+        "time": 0.00061798095703125,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 187023,
+        "time": 1.86439847946167,
+        "tokens": 12094794
+      }
+    },
+    {
+      "query": "return None",
+      "type": "content",
+      "mcp": {
+        "count": 230,
+        "time": 0.0033614635467529297,
+        "tokens": 1130
+      },
+      "direct": {
+        "count": 7389,
+        "time": 1.2609591484069824,
+        "tokens": 226673
+      }
+    },
+    {
+      "query": "raise Exception",
+      "type": "content",
+      "mcp": {
+        "count": 46,
+        "time": 0.003575563430786133,
+        "tokens": 1286
+      },
+      "direct": {
+        "count": 862,
+        "time": 0.9452095031738281,
+        "tokens": 36209
+      }
+    },
+    {
+      "query": "if __name__",
+      "type": "content",
+      "mcp": {
+        "count": 228,
+        "time": 0.0028581619262695312,
+        "tokens": 1056
+      },
+      "direct": {
+        "count": 1227,
+        "time": 0.9564230442047119,
+        "tokens": 40122
+      }
+    },
+    {
+      "query": "for.*in.*range",
+      "type": "content",
+      "mcp": {
+        "count": 0,
+        "time": 0.0004119873046875,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 16082,
+        "time": 1.1857571601867676,
+        "tokens": 6703178
+      }
+    },
+    {
+      "query": "DATABASE_URL",
+      "type": "content",
+      "mcp": {
+        "count": 4,
+        "time": 0.0016548633575439453,
+        "tokens": 488
+      },
+      "direct": {
+        "count": 33,
+        "time": 0.8287594318389893,
+        "tokens": 3552
+      }
+    },
+    {
+      "query": "PYTHONPATH",
+      "type": "content",
+      "mcp": {
+        "count": 0,
+        "time": 0.0004923343658447266,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 132,
+        "time": 0.7529304027557373,
+        "tokens": 7941
+      }
+    },
+    {
+      "query": "MCP_.*",
+      "type": "content",
+      "mcp": {
+        "count": 0,
+        "time": 0.0003898143768310547,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 67,
+        "time": 0.8843283653259277,
+        "tokens": 4733
+      }
+    },
+    {
+      "query": "VOYAGE_AI_API_KEY",
+      "type": "content",
+      "mcp": {
+        "count": 8,
+        "time": 0.0042705535888671875,
+        "tokens": 896
+      },
+      "direct": {
+        "count": 45,
+        "time": 0.9260818958282471,
+        "tokens": 3989
+      }
+    },
+    {
+      "query": "SEMANTIC_SEARCH_ENABLED",
+      "type": "content",
+      "mcp": {
+        "count": 24,
+        "time": 0.004030942916870117,
+        "tokens": 1134
+      },
+      "direct": {
+        "count": 55,
+        "time": 0.7888479232788086,
+        "tokens": 4343
+      }
+    },
+    {
+      "query": "log.*level",
+      "type": "content",
+      "mcp": {
+        "count": 0,
+        "time": 0.00029659271240234375,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 1123,
+        "time": 1.3566982746124268,
+        "tokens": 5093737
+      }
+    },
+    {
+      "query": "debug.*true",
+      "type": "content",
+      "mcp": {
+        "count": 0,
+        "time": 0.0003879070281982422,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 220,
+        "time": 0.9606897830963135,
+        "tokens": 4447190
+      }
+    },
+    {
+      "query": "config.*yaml",
+      "type": "content",
+      "mcp": {
+        "count": 0,
+        "time": 0.0003249645233154297,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 72,
+        "time": 1.0311052799224854,
+        "tokens": 1461946
+      }
+    },
+    {
+      "query": "env.*variable",
+      "type": "content",
+      "mcp": {
+        "count": 0,
+        "time": 0.0003058910369873047,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 1120,
+        "time": 1.0352835655212402,
+        "tokens": 1974412
+      }
+    },
+    {
+      "query": "settings.*json",
+      "type": "content",
+      "mcp": {
+        "count": 0,
+        "time": 0.0003769397735595703,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 95,
+        "time": 0.9335823059082031,
+        "tokens": 1350271
+      }
+    },
+    {
+      "query": "test_*.py",
+      "type": "navigation",
+      "mcp": {
+        "count": 0,
+        "time": 0.004284858703613281,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 2951,
+        "time": 0.36214184761047363,
+        "tokens": 73257
+      }
+    },
+    {
+      "query": "*_test.py",
+      "type": "navigation",
+      "mcp": {
+        "count": 0,
+        "time": 0.0025453567504882812,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 264,
+        "time": 0.3508467674255371,
+        "tokens": 7198
+      }
+    },
+    {
+      "query": "*.json",
+      "type": "navigation",
+      "mcp": {
+        "count": 0,
+        "time": 0.0032815933227539062,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 4692,
+        "time": 0.4393126964569092,
+        "tokens": 162970
+      }
+    },
+    {
+      "query": "*.yaml",
+      "type": "navigation",
+      "mcp": {
+        "count": 0,
+        "time": 0.003218412399291992,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 968,
+        "time": 0.39859580993652344,
+        "tokens": 28337
+      }
+    },
+    {
+      "query": "*.md",
+      "type": "navigation",
+      "mcp": {
+        "count": 0,
+        "time": 0.0028259754180908203,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 4033,
+        "time": 0.43346261978149414,
+        "tokens": 134020
+      }
+    },
+    {
+      "query": "plugin_*.py",
+      "type": "navigation",
+      "mcp": {
+        "count": 0,
+        "time": 0.0054743289947509766,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 18,
+        "time": 0.46170926094055176,
+        "tokens": 339
+      }
+    },
+    {
+      "query": "*_plugin.py",
+      "type": "navigation",
+      "mcp": {
+        "count": 36,
+        "time": 0.0039408206939697266,
+        "tokens": 228
+      },
+      "direct": {
+        "count": 31,
+        "time": 0.4759945869445801,
+        "tokens": 605
+      }
+    },
+    {
+      "query": "dispatcher*.py",
+      "type": "navigation",
+      "mcp": {
+        "count": 0,
+        "time": 0.0037047863006591797,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 7,
+        "time": 0.4200763702392578,
+        "tokens": 152
+      }
+    },
+    {
+      "query": "index*.py",
+      "type": "navigation",
+      "mcp": {
+        "count": 0,
+        "time": 0.004494667053222656,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 39,
+        "time": 0.4268190860748291,
+        "tokens": 800
+      }
+    },
+    {
+      "query": "storage*.py",
+      "type": "navigation",
+      "mcp": {
+        "count": 0,
+        "time": 0.002850770950317383,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 6,
+        "time": 0.32236146926879883,
+        "tokens": 130
+      }
+    },
+    {
+      "query": "config/*.py",
+      "type": "navigation",
+      "mcp": {
+        "count": 0,
+        "time": 0.002983570098876953,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 0,
+        "time": 0.39656925201416016,
+        "tokens": 0
+      }
+    },
+    {
+      "query": "tests/*.py",
+      "type": "navigation",
+      "mcp": {
+        "count": 0,
+        "time": 0.004232168197631836,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 0,
+        "time": 0.42904210090637207,
+        "tokens": 0
+      }
+    },
+    {
+      "query": "scripts/*.py",
+      "type": "navigation",
+      "mcp": {
+        "count": 0,
+        "time": 0.00422358512878418,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 0,
+        "time": 0.3392353057861328,
+        "tokens": 0
+      }
+    },
+    {
+      "query": "examples/*.py",
+      "type": "navigation",
+      "mcp": {
+        "count": 0,
+        "time": 0.0042572021484375,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 0,
+        "time": 0.33052611351013184,
+        "tokens": 0
+      }
+    },
+    {
+      "query": "docs/*.md",
+      "type": "navigation",
+      "mcp": {
+        "count": 0,
+        "time": 0.002985239028930664,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 0,
+        "time": 0.3238399028778076,
+        "tokens": 0
+      }
+    },
+    {
+      "query": "__init__.py",
+      "type": "navigation",
+      "mcp": {
+        "count": 0,
+        "time": 0.0030221939086914062,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 4489,
+        "time": 0.3316657543182373,
+        "tokens": 119246
+      }
+    },
+    {
+      "query": "setup.py",
+      "type": "navigation",
+      "mcp": {
+        "count": 0,
+        "time": 0.002632617950439453,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 32,
+        "time": 0.39240145683288574,
+        "tokens": 768
+      }
+    },
+    {
+      "query": "requirements.txt",
+      "type": "navigation",
+      "mcp": {
+        "count": 0,
+        "time": 0.0029892921447753906,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 24,
+        "time": 0.32014966011047363,
+        "tokens": 533
+      }
+    },
+    {
+      "query": "Dockerfile",
+      "type": "navigation",
+      "mcp": {
+        "count": 0,
+        "time": 0.002650022506713867,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 127,
+        "time": 0.3565969467163086,
+        "tokens": 3515
+      }
+    },
+    {
+      "query": ".gitignore",
+      "type": "navigation",
+      "mcp": {
+        "count": 0,
+        "time": 0.004132747650146484,
+        "tokens": 0
+      },
+      "direct": {
+        "count": 272,
+        "time": 0.41675901412963867,
+        "tokens": 5976
+      }
+    }
+  ]
+}

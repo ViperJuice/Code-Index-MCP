@@ -1,0 +1,60 @@
+{
+  "timestamp": "20250622_073919",
+  "metrics": {
+    "mcp": {
+      "scenarios": [
+        {
+          "name": "symbol_search",
+          "tokens": 141,
+          "time": 0.002124309539794922,
+          "tool_calls": 2
+        },
+        {
+          "name": "natural_language",
+          "tokens": 200,
+          "time": 3.337860107421875e-06,
+          "tool_calls": 1
+        },
+        {
+          "name": "code_modification",
+          "tokens": 500,
+          "time": 0.1,
+          "tool_calls": 3
+        }
+      ],
+      "total_tokens": 841,
+      "total_time": 0.10212764739990235,
+      "tool_calls": 6
+    },
+    "native": {
+      "scenarios": [
+        {
+          "name": "symbol_search",
+          "tokens": 3537,
+          "time": 9.173310279846191,
+          "tool_calls": 2
+        },
+        {
+          "name": "natural_language",
+          "tokens": 13558,
+          "time": 0.0028531551361083984,
+          "tool_calls": 6
+        },
+        {
+          "name": "code_modification",
+          "tokens": 2000,
+          "time": 0.3,
+          "tool_calls": 3
+        }
+      ],
+      "total_tokens": 19095,
+      "total_time": 9.4761634349823,
+      "tool_calls": 11
+    }
+  },
+  "summary": {
+    "token_savings": 1500,
+    "token_savings_percent": 95.59570568211574,
+    "mcp_efficiency_ratio": 22.705112960761
+  }
+}

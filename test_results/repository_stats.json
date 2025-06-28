@@ -1,0 +1,749 @@
+{
+  "summary": {
+    "total_repositories": 29,
+    "total_languages": 21,
+    "fetch_date": "2025-06-14T06:55:33.110927",
+    "failed_repositories": []
+  },
+  "repositories": [
+    {
+      "repository": "redis/redis",
+      "language": "c",
+      "description": "In-memory data structure store",
+      "size_category": "medium",
+      "path": "test_repos/systems/c/redis",
+      "fetched_at": "2025-06-14T06:49:25.622382",
+      "metrics": {
+        "total_files": 1552,
+        "files_by_extension": {
+          ".c": 436,
+          ".json": 405,
+          ".h": 287,
+          ".tcl": 214,
+          ".sh": 69,
+          "no_extension": 46,
+          ".py": 33,
+          ".in": 22,
+          ".md": 20,
+          ".lua": 20
+        },
+        "total_size_mb": 16.49,
+        "approximate_loc": 267253,
+        "primary_language_files": 436
+      }
+    },
+    {
+      "repository": "curl/curl",
+      "language": "c",
+      "description": "Command line tool for transferring data",
+      "size_category": "medium",
+      "path": "test_repos/systems/c/curl",
+      "fetched_at": "2025-06-14T06:49:25.713258",
+      "metrics": {
+        "total_files": 0,
+        "files_by_extension": {},
+        "total_size_mb": 0.0,
+        "approximate_loc": 0,
+        "primary_language_files": 0
+      }
+    },
+    {
+      "repository": "nlohmann/json",
+      "language": "cpp",
+      "description": "JSON for Modern C++",
+      "size_category": "small",
+      "path": "test_repos/systems/cpp/json",
+      "fetched_at": "2025-06-14T06:51:38.219129",
+      "metrics": {
+        "total_files": 1084,
+        "files_by_extension": {
+          ".cpp": 404,
+          ".md": 250,
+          ".output": 219,
+          ".hpp": 54,
+          ".txt": 47,
+          ".test": 46,
+          ".png": 26,
+          ".h": 17,
+          ".svg": 12,
+          "no_extension": 9
+        },
+        "total_size_mb": 15.23,
+        "approximate_loc": 61668,
+        "primary_language_files": 404
+      }
+    },
+    {
+      "repository": "grpc/grpc",
+      "language": "cpp",
+      "description": "High performance RPC framework",
+      "size_category": "large",
+      "path": "test_repos/systems/cpp/grpc",
+      "fetched_at": "2025-06-14T06:51:51.515141",
+      "metrics": {
+        "total_files": 5984,
+        "files_by_extension": {
+          ".h": 1963,
+          ".cc": 1705,
+          ".py": 610,
+          ".c": 430,
+          "no_extension": 364,
+          ".php": 215,
+          ".md": 209,
+          ".sh": 181,
+          ".rb": 154,
+          ".proto": 153
+        },
+        "total_size_mb": 62.29,
+        "approximate_loc": 237,
+        "primary_language_files": 0
+      }
+    },
+    {
+      "repository": "rust-lang/rustlings",
+      "language": "rust",
+      "description": "Small exercises to learn Rust",
+      "size_category": "small",
+      "path": "test_repos/systems/rust/rustlings",
+      "fetched_at": "2025-06-14T06:51:55.124732",
+      "metrics": {
+        "total_files": 276,
+        "files_by_extension": {
+          ".rs": 216,
+          ".md": 34,
+          ".toml": 11,
+          ".html": 6,
+          ".svg": 3,
+          "no_extension": 2,
+          ".sh": 1,
+          ".lock": 1,
+          ".json": 1,
+          ".css": 1
+        },
+        "total_size_mb": 0.51,
+        "approximate_loc": 11660,
+        "primary_language_files": 216
+      }
+    },
+    {
+      "repository": "tokio-rs/tokio",
+      "language": "rust",
+      "description": "Async runtime for Rust",
+      "size_category": "medium",
+      "path": "test_repos/systems/rust/tokio",
+      "fetched_at": "2025-06-14T06:51:56.502420",
+      "metrics": {
+        "total_files": 736,
+        "files_by_extension": {
+          ".rs": 695,
+          ".md": 17,
+          ".toml": 16,
+          "no_extension": 6,
+          ".dic": 1,
+          ".yml": 1
+        },
+        "total_size_mb": 4.92,
+        "approximate_loc": 155081,
+        "primary_language_files": 695
+      }
+    },
+    {
+      "repository": "ziglang/zig",
+      "language": "zig",
+      "description": "General-purpose programming language",
+      "size_category": "large",
+      "path": "test_repos/systems/zig/zig",
+      "fetched_at": "2025-06-14T06:52:21.423709",
+      "metrics": {
+        "total_files": 20228,
+        "files_by_extension": {
+          ".h": 11432,
+          ".zig": 2867,
+          ".def": 2652,
+          ".c": 2366,
+          ".s": 364,
+          ".cpp": 211,
+          "no_extension": 180,
+          ".zon": 71,
+          ".input": 50,
+          ".tar": 35
+        },
+        "total_size_mb": 208.6,
+        "approximate_loc": 1268651,
+        "primary_language_files": 2867
+      }
+    },
+    {
+      "repository": "django/django",
+      "language": "python",
+      "description": "High-level Python web framework",
+      "size_category": "large",
+      "path": "test_repos/web/python/django",
+      "fetched_at": "2025-06-14T06:52:31.490801",
+      "metrics": {
+        "total_files": 6696,
+        "files_by_extension": {
+          ".py": 2833,
+          ".po": 1272,
+          ".mo": 1261,
+          ".txt": 678,
+          ".html": 367,
+          ".js": 111,
+          ".json": 53,
+          ".css": 48,
+          ".png": 44,
+          ".svg": 29
+        },
+        "total_size_mb": 43.01,
+        "approximate_loc": 489995,
+        "primary_language_files": 2833
+      }
+    },
+    {
+      "repository": "psf/requests",
+      "language": "python",
+      "description": "Simple HTTP library",
+      "size_category": "small",
+      "path": "test_repos/web/python/requests",
+      "fetched_at": "2025-06-14T06:52:40.290244",
+      "metrics": {
+        "total_files": 97,
+        "files_by_extension": {
+          ".py": 36,
+          ".rst": 16,
+          "no_extension": 14,
+          ".png": 9,
+          ".md": 5,
+          ".cnf": 4,
+          ".key": 4,
+          ".csr": 3,
+          ".pem": 3,
+          ".html": 3
+        },
+        "total_size_mb": 4.93,
+        "approximate_loc": 11248,
+        "primary_language_files": 36
+      }
+    },
+    {
+      "repository": "pallets/flask",
+      "language": "python",
+      "description": "Lightweight WSGI web framework",
+      "size_category": "medium",
+      "path": "test_repos/web/python/flask",
+      "fetched_at": "2025-06-14T06:52:41.097842",
+      "metrics": {
+        "total_files": 213,
+        "files_by_extension": {
+          ".py": 83,
+          ".rst": 78,
+          ".html": 20,
+          ".txt": 10,
+          ".toml": 5,
+          ".png": 5,
+          "no_extension": 4,
+          ".md": 3,
+          ".svg": 3,
+          ".yaml": 2
+        },
+        "total_size_mb": 1.61,
+        "approximate_loc": 17819,
+        "primary_language_files": 83
+      }
+    },
+    {
+      "repository": "facebook/react",
+      "language": "javascript",
+      "description": "JavaScript library for building UIs",
+      "size_category": "large",
+      "path": "test_repos/web/javascript/react",
+      "fetched_at": "2025-06-14T06:52:47.671583",
+      "metrics": {
+        "total_files": 6164,
+        "files_by_extension": {
+          ".js": 3528,
+          ".md": 1684,
+          ".ts": 393,
+          ".json": 135,
+          ".tsx": 105,
+          ".css": 99,
+          ".html": 77,
+          ".map": 68,
+          ".lock": 42,
+          ".png": 33
+        },
+        "total_size_mb": 31.24,
+        "approximate_loc": 584184,
+        "primary_language_files": 3528
+      }
+    },
+    {
+      "repository": "expressjs/express",
+      "language": "javascript",
+      "description": "Fast, unopinionated web framework",
+      "size_category": "small",
+      "path": "test_repos/web/javascript/express",
+      "fetched_at": "2025-06-14T06:52:54.065290",
+      "metrics": {
+        "total_files": 209,
+        "files_by_extension": {
+          ".js": 142,
+          ".ejs": 20,
+          ".txt": 11,
+          ".html": 8,
+          "no_extension": 7,
+          ".tmpl": 7,
+          ".md": 6,
+          ".css": 4,
+          ".hbs": 3,
+          ".yml": 1
+        },
+        "total_size_mb": 0.66,
+        "approximate_loc": 21203,
+        "primary_language_files": 142
+      }
+    },
+    {
+      "repository": "microsoft/TypeScript",
+      "language": "typescript",
+      "description": "TypeScript language",
+      "size_category": "large",
+      "path": "test_repos/web/typescript/TypeScript",
+      "fetched_at": "2025-06-14T06:53:21.901435",
+      "metrics": {
+        "total_files": 71174,
+        "files_by_extension": {
+          ".ts": 20570,
+          ".js": 15482,
+          ".types": 12305,
+          ".symbols": 12305,
+          ".txt": 6461,
+          ".json": 1457,
+          ".jsonc": 955,
+          ".map": 853,
+          ".baseline": 455,
+          ".tsx": 331
+        },
+        "total_size_mb": 335.55,
+        "approximate_loc": 1560227,
+        "primary_language_files": 20570
+      }
+    },
+    {
+      "repository": "rails/rails",
+      "language": "ruby",
+      "description": "Web application framework",
+      "size_category": "large",
+      "path": "test_repos/web/ruby/rails",
+      "fetched_at": "2025-06-14T06:53:31.622574",
+      "metrics": {
+        "total_files": 4543,
+        "files_by_extension": {
+          ".rb": 3259,
+          ".erb": 508,
+          ".yml": 190,
+          ".tt": 161,
+          "no_extension": 141,
+          ".md": 121,
+          ".js": 68,
+          ".html": 45,
+          ".png": 30,
+          ".svg": 20
+        },
+        "total_size_mb": 29.52,
+        "approximate_loc": 509598,
+        "primary_language_files": 3259
+      }
+    },
+    {
+      "repository": "laravel/framework",
+      "language": "php",
+      "description": "Web application framework",
+      "size_category": "large",
+      "path": "test_repos/web/php/framework",
+      "fetched_at": "2025-06-14T06:53:37.039770",
+      "metrics": {
+        "total_files": 2762,
+        "files_by_extension": {
+          ".php": 2566,
+          ".stub": 85,
+          ".json": 46,
+          ".md": 40,
+          ".png": 7,
+          ".js": 5,
+          ".sh": 4,
+          ".css": 4,
+          "no_extension": 3,
+          ".yml": 2
+        },
+        "total_size_mb": 21.01,
+        "approximate_loc": 457531,
+        "primary_language_files": 2566
+      }
+    },
+    {
+      "repository": "mojolicious/mojo",
+      "language": "perl",
+      "description": "Real-time web framework",
+      "size_category": "medium",
+      "path": "test_repos/web/perl/mojo",
+      "fetched_at": "2025-06-14T06:53:38.357972",
+      "metrics": {
+        "total_files": 348,
+        "files_by_extension": {
+          ".pm": 150,
+          ".t": 108,
+          ".ep": 16,
+          ".txt": 15,
+          ".pl": 14,
+          ".pod": 10,
+          "no_extension": 9,
+          ".epl": 9,
+          ".js": 9,
+          ".png": 8
+        },
+        "total_size_mb": 3.89,
+        "approximate_loc": 388,
+        "primary_language_files": 14
+      }
+    },
+    {
+      "repository": "spring-projects/spring-boot",
+      "language": "java",
+      "description": "Spring Boot framework",
+      "size_category": "large",
+      "path": "test_repos/jvm/java/spring-boot",
+      "fetched_at": "2025-06-14T06:53:46.631200",
+      "metrics": {
+        "total_files": 8831,
+        "files_by_extension": {
+          ".java": 7387,
+          ".kt": 369,
+          ".gradle": 227,
+          ".xml": 220,
+          ".adoc": 211,
+          ".properties": 129,
+          ".key": 119,
+          ".json": 59,
+          ".txt": 57,
+          ".html": 53
+        },
+        "total_size_mb": 30.87,
+        "approximate_loc": 759235,
+        "primary_language_files": 7387
+      }
+    },
+    {
+      "repository": "apache/kafka",
+      "language": "java",
+      "description": "Distributed streaming platform",
+      "size_category": "large",
+      "path": "test_repos/jvm/java/kafka",
+      "fetched_at": "2025-06-14T06:54:00.912262",
+      "metrics": {
+        "total_files": 6603,
+        "files_by_extension": {
+          ".java": 5486,
+          ".scala": 351,
+          ".json": 298,
+          ".py": 169,
+          ".html": 64,
+          ".sh": 57,
+          "no_extension": 55,
+          ".png": 47,
+          ".properties": 41,
+          ".bat": 35
+        },
+        "total_size_mb": 70.19,
+        "approximate_loc": 1285974,
+        "primary_language_files": 5486
+      }
+    },
+    {
+      "repository": "ktorio/ktor",
+      "language": "kotlin",
+      "description": "Asynchronous framework for web apps",
+      "size_category": "medium",
+      "path": "test_repos/jvm/kotlin/ktor",
+      "fetched_at": "2025-06-14T06:54:13.852886",
+      "metrics": {
+        "total_files": 2267,
+        "files_by_extension": {
+          ".kt": 1948,
+          ".api": 218,
+          ".properties": 18,
+          ".yaml": 14,
+          ".txt": 14,
+          ".h": 12,
+          ".a": 12,
+          ".conf": 11,
+          ".xml": 10,
+          ".def": 10
+        },
+        "total_size_mb": 51.54,
+        "approximate_loc": 209218,
+        "primary_language_files": 1948
+      }
+    },
+    {
+      "repository": "akka/akka",
+      "language": "scala",
+      "description": "Actor-based concurrent framework",
+      "size_category": "large",
+      "path": "test_repos/jvm/scala/akka",
+      "fetched_at": "2025-06-14T06:54:23.887128",
+      "metrics": {
+        "total_files": 4263,
+        "files_by_extension": {
+          ".scala": 2561,
+          ".java": 544,
+          ".md": 428,
+          ".excludes": 370,
+          ".png": 110,
+          "no_extension": 78,
+          ".conf": 65,
+          ".svg": 40,
+          ".xml": 39,
+          ".json": 28
+        },
+        "total_size_mb": 37.37,
+        "approximate_loc": 468731,
+        "primary_language_files": 2561
+      }
+    },
+    {
+      "repository": "ring-clojure/ring",
+      "language": "clojure",
+      "description": "HTTP server abstraction",
+      "size_category": "small",
+      "path": "test_repos/jvm/clojure/ring",
+      "fetched_at": "2025-06-14T06:54:28.859652",
+      "metrics": {
+        "total_files": 98,
+        "files_by_extension": {
+          ".clj": 79,
+          ".md": 4,
+          ".txt": 4,
+          ".html": 3,
+          ".css": 2,
+          ".jar": 2,
+          "no_extension": 1,
+          ".edn": 1,
+          ".crt": 1,
+          ".jceks": 1
+        },
+        "total_size_mb": 0.33,
+        "approximate_loc": 7644,
+        "primary_language_files": 79
+      }
+    },
+    {
+      "repository": "gin-gonic/gin",
+      "language": "go",
+      "description": "HTTP web framework",
+      "size_category": "medium",
+      "path": "test_repos/modern/go/gin",
+      "fetched_at": "2025-06-14T06:54:29.275100",
+      "metrics": {
+        "total_files": 114,
+        "files_by_extension": {
+          ".go": 93,
+          ".md": 9,
+          ".yml": 2,
+          "no_extension": 2,
+          ".tmpl": 2,
+          ".pem": 2,
+          ".mod": 1,
+          ".yaml": 1,
+          ".sum": 1,
+          ".proto": 1
+        },
+        "total_size_mb": 0.77,
+        "approximate_loc": 20734,
+        "primary_language_files": 93
+      }
+    },
+    {
+      "repository": "hashicorp/terraform",
+      "language": "go",
+      "description": "Infrastructure as Code",
+      "size_category": "large",
+      "path": "test_repos/modern/go/terraform",
+      "fetched_at": "2025-06-14T06:54:35.669331",
+      "metrics": {
+        "total_files": 4732,
+        "files_by_extension": {
+          ".go": 1750,
+          ".tf": 1376,
+          ".json": 402,
+          ".hcl": 389,
+          ".mdx": 322,
+          "no_extension": 177,
+          ".tfstate": 167,
+          ".log": 87,
+          ".md": 35,
+          ".png": 27
+        },
+        "total_size_mb": 26.41,
+        "approximate_loc": 564394,
+        "primary_language_files": 1750
+      }
+    },
+    {
+      "repository": "Alamofire/Alamofire",
+      "language": "swift",
+      "description": "HTTP networking library",
+      "size_category": "medium",
+      "path": "test_repos/modern/swift/Alamofire",
+      "fetched_at": "2025-06-14T06:54:37.624036",
+      "metrics": {
+        "total_files": 520,
+        "files_by_extension": {
+          ".html": 328,
+          ".swift": 92,
+          ".json": 23,
+          ".cer": 18,
+          ".png": 11,
+          ".xctestplan": 11,
+          ".xcscheme": 10,
+          ".js": 10,
+          ".md": 9,
+          ".plist": 8
+        },
+        "total_size_mb": 21.14,
+        "approximate_loc": 40513,
+        "primary_language_files": 92
+      }
+    },
+    {
+      "repository": "dart-lang/sdk",
+      "language": "dart",
+      "description": "Dart SDK core libraries",
+      "size_category": "large",
+      "path": "test_repos/modern/dart/sdk",
+      "fetched_at": "2025-06-14T06:55:10.921748",
+      "metrics": {
+        "total_files": 49946,
+        "files_by_extension": {
+          ".expect": 23850,
+          ".dart": 23182,
+          ".yaml": 745,
+          ".cc": 649,
+          ".h": 444,
+          ".md": 325,
+          "no_extension": 237,
+          ".options": 202,
+          ".json": 168,
+          ".java": 144
+        },
+        "total_size_mb": 254.45,
+        "approximate_loc": 4634338,
+        "primary_language_files": 23182
+      }
+    },
+    {
+      "repository": "phoenixframework/phoenix",
+      "language": "elixir",
+      "description": "Productive web framework",
+      "size_category": "large",
+      "path": "test_repos/functional/elixir/phoenix",
+      "fetched_at": "2025-06-14T06:55:14.593642",
+      "metrics": {
+        "total_files": 431,
+        "files_by_extension": {
+          ".ex": 150,
+          ".exs": 141,
+          ".md": 55,
+          ".js": 30,
+          ".eex": 16,
+          ".heex": 11,
+          ".png": 9,
+          ".json": 8,
+          ".css": 7,
+          "no_extension": 4
+        },
+        "total_size_mb": 3.9,
+        "approximate_loc": 29436,
+        "primary_language_files": 150
+      }
+    },
+    {
+      "repository": "yesodweb/yesod",
+      "language": "haskell",
+      "description": "Web framework",
+      "size_category": "large",
+      "path": "test_repos/functional/haskell/yesod",
+      "fetched_at": "2025-06-14T06:55:15.242975",
+      "metrics": {
+        "total_files": 298,
+        "files_by_extension": {
+          ".hs": 196,
+          ".md": 32,
+          "no_extension": 26,
+          ".cabal": 16,
+          ".lhs": 14,
+          ".yaml": 4,
+          ".png": 3,
+          ".txt": 3,
+          ".sh": 2,
+          ".html": 2
+        },
+        "total_size_mb": 1.22,
+        "approximate_loc": 30156,
+        "primary_language_files": 196
+      }
+    },
+    {
+      "repository": "dotnet/aspnetcore",
+      "language": "csharp",
+      "description": "Cross-platform .NET framework",
+      "size_category": "large",
+      "path": "test_repos/other/csharp/aspnetcore",
+      "fetched_at": "2025-06-14T06:55:29.338354",
+      "metrics": {
+        "total_files": 13993,
+        "files_by_extension": {
+          ".cs": 10028,
+          ".json": 865,
+          ".cshtml": 757,
+          ".razor": 632,
+          ".csproj": 601,
+          ".txt": 469,
+          ".md": 222,
+          ".ts": 157,
+          ".js": 133,
+          ".h": 129
+        },
+        "total_size_mb": 87.02,
+        "approximate_loc": 1520331,
+        "primary_language_files": 10028
+      }
+    },
+    {
+      "repository": "kong/kong",
+      "language": "lua",
+      "description": "Cloud-native API gateway",
+      "size_category": "large",
+      "path": "test_repos/other/lua/kong",
+      "fetched_at": "2025-06-14T06:55:32.960677",
+      "metrics": {
+        "total_files": 2189,
+        "files_by_extension": {
+          ".lua": 1298,
+          ".yml": 466,
+          ".json": 144,
+          ".t": 123,
+          ".proto": 37,
+          "no_extension": 28,
+          ".txt": 28,
+          ".md": 26,
+          ".tf": 21,
+          ".crt": 18
+        },
+        "total_size_mb": 13.79,
+        "approximate_loc": 332648,
+        "primary_language_files": 1298
+      }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "query": "Where is function HandleRequest implemented?",
+  "mode": "mcp",
+  "tools_used": ["mcp__code-index-mcp__symbol_lookup", "mcp__code-index-mcp__search_code", "mcp__code-index-mcp__get_status"],
+  "tool_calls": {"mcp__code-index-mcp__symbol_lookup": 1, "mcp__code-index-mcp__search_code": 3, "mcp__code-index-mcp__get_status": 1},
+  "results_found": 0,
+  "execution_time_ms": 1500,
+  "token_estimate": 15000,
+  "success": false,
+  "error": "Function HandleRequest not found in go_gin repository. Search results returned matches from other repositories but none specifically from go_gin.",
+  "test_id": "go_gin_1_mcp",
+  "timestamp": "2025-01-06T20:45:00",
+  "batch_name": "go_gin"
+}

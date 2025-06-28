@@ -1,0 +1,114 @@
+# Dockerfile.minimal - Zero Configuration MCP Server
+# Features: Full code indexing, BM25 search, no external dependencies
+FROM python:3.11-slim as builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
+    curl \
+    libcurl4-openssl-dev \
+    libffi-dev \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /build
+
+# Copy dependency files
+COPY requirements.txt pyproject.toml setup.py ./
+COPY mcp_server/__init__.py ./mcp_server/
+
+# Install core dependencies only (no semantic search)
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir \
+    # Core MCP dependencies
+    mcp>=1.0.0 \
+    # Web framework
+    fastapi>=0.100.0 \
+    uvicorn>=0.23.0 \
+    # Database
+    sqlalchemy>=2.0.0 \
+    alembic>=1.11.0 \
+    # Parsing
+    tree-sitter>=0.20.0 \
+    tree-sitter-languages>=1.7.0 \
+    # Utils
+    pydantic>=2.0.0 \
+    pydantic-settings>=2.0.0 \
+    python-dotenv>=1.0.0 \
+    watchdog>=3.0.0 \
+    # CLI
+    typer>=0.9.0 \
+    rich>=13.0.0
+
+# Pre-compile tree-sitter grammars for all supported languages
+RUN python -c "import tree_sitter_languages; tree_sitter_languages.get_parser('python')"
+
+# Final stage - minimal runtime
+FROM python:3.11-slim
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y \
+    git \
+    sqlite3 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd -m -s /bin/bash -u 1000 mcp
+
+# Set working directory
+WORKDIR /app
+
+# Copy from builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy application code
+COPY --chown=mcp:mcp mcp_server/ ./mcp_server/
+COPY --chown=mcp:mcp scripts/cli/mcp_server_cli.py ./
+COPY --chown=mcp:mcp scripts/cli/mcp_cli.py ./scripts/cli/
+COPY --chown=mcp:mcp mcp-index-kit/ ./mcp-index-kit/
+
+# Create necessary directories
+RUN mkdir -p /app/data /app/logs /app/.mcp-index /workspace && \
+    chown -R mcp:mcp /app /workspace
+
+# Set environment variables for minimal configuration
+ENV PYTHONPATH=/app \
+    MCP_WORKSPACE_ROOT=/workspace \
+    DATABASE_URL=sqlite:////app/data/code_index.db \
+    # Disable features that require external services
+    SEMANTIC_SEARCH_ENABLED=false \
+    REDIS_URL="" \
+    CACHE_BACKEND=memory \
+    # Disable GitHub artifact sync by default (privacy-first)
+    MCP_ARTIFACT_SYNC=false \
+    AUTO_UPLOAD=false \
+    AUTO_DOWNLOAD=false \
+    # Performance settings
+    INDEXING_MAX_WORKERS=4 \
+    INDEXING_BATCH_SIZE=20 \
+    # Logging
+    LOG_LEVEL=INFO \
+    MCP_LOG_FILE=/app/logs/mcp.log
+
+# Create volume mount points
+VOLUME ["/workspace", "/app/data", "/app/.mcp-index"]
+
+# Switch to non-root user
+USER mcp
+
+# Health check for MCP server
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import sys; sys.path.append('/app'); from mcp_server.core.logging import setup_logging; setup_logging(); print('OK')" || exit 1
+
+# Default entrypoint for MCP stdio protocol
+ENTRYPOINT ["python", "/app/mcp_server_cli.py"]
+
+# Label for version tracking
+LABEL org.opencontainers.image.title="MCP Index Server - Minimal" \
+      org.opencontainers.image.description="Zero-configuration code indexing with BM25 search" \
+      org.opencontainers.image.version="minimal" \
+      org.opencontainers.image.source="https://github.com/Code-Index-MCP" \
+      org.opencontainers.image.documentation="https://github.com/Code-Index-MCP/docs/DOCKER_GUIDE.md"

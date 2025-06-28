@@ -1,0 +1,107 @@
+{
+  "to_process": [
+    {
+      "language": "c",
+      "repo": "curl",
+      "collection": "c_curl"
+    },
+    {
+      "language": "cpp",
+      "repo": "json",
+      "collection": "cpp_json"
+    },
+    {
+      "language": "dart",
+      "repo": "flutter_examples",
+      "collection": "dart_flutter_examples"
+    },
+    {
+      "language": "go",
+      "repo": "terraform",
+      "collection": "go_terraform"
+    },
+    {
+      "language": "java",
+      "repo": "kafka",
+      "collection": "java_kafka"
+    },
+    {
+      "language": "javascript",
+      "repo": "express",
+      "collection": "javascript_express"
+    },
+    {
+      "language": "kotlin",
+      "repo": "kotlin",
+      "collection": "kotlin_kotlin"
+    },
+    {
+      "language": "python",
+      "repo": "flask",
+      "collection": "python_flask"
+    },
+    {
+      "language": "python",
+      "repo": "requests",
+      "collection": "python_requests"
+    },
+    {
+      "language": "rust",
+      "repo": "rust",
+      "collection": "rust_rust"
+    },
+    {
+      "language": "rust",
+      "repo": "tokio",
+      "collection": "rust_tokio"
+    },
+    {
+      "language": "scala",
+      "repo": "akka",
+      "collection": "scala_akka"
+    },
+    {
+      "language": "swift",
+      "repo": "alamofire",
+      "collection": "swift_alamofire"
+    }
+  ],
+  "skipped": [
+    {
+      "language": "csharp",
+      "repo": "aspnetcore",
+      "estimated_files": 5000
+    },
+    {
+      "language": "java",
+      "repo": "spring-boot",
+      "estimated_files": 3000
+    },
+    {
+      "language": "javascript",
+      "repo": "react",
+      "estimated_files": 6000
+    },
+    {
+      "language": "php",
+      "repo": "laravel",
+      "estimated_files": 4000
+    },
+    {
+      "language": "python",
+      "repo": "django",
+      "estimated_files": 5000
+    },
+    {
+      "language": "ruby",
+      "repo": "rails",
+      "estimated_files": 5000
+    },
+    {
+      "language": "typescript",
+      "repo": "TypeScript",
+      "estimated_files": 50000
+    }
+  ],
+  "timestamp": "2025-06-27T07:22:14.472495"
+}

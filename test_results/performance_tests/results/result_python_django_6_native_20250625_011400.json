@@ -1,0 +1,14 @@
+{
+  "query": "Show all middleware classes",
+  "mode": "native",
+  "tools_used": ["Grep"],
+  "tool_calls": {"Grep": 1},
+  "results_found": 114,
+  "execution_time_ms": 350,
+  "token_estimate": 1600,
+  "success": true,
+  "error": null,
+  "test_id": "python_django_6_native",
+  "batch_name": "python_django",
+  "timestamp": "2025-01-06T01:14:00"
+}

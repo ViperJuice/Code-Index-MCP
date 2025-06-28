@@ -1,0 +1,14 @@
+{
+  "query": "How does React handle state updates",
+  "mode": "native",
+  "tools_used": ["Grep", "Bash"],
+  "tool_calls": {"Grep": 1, "Bash": 1},
+  "results_found": 1958,
+  "execution_time_ms": 253,
+  "token_estimate": 1500,
+  "success": true,
+  "error": null,
+  "test_id": "javascript_react_3_native",
+  "batch_name": "javascript_react",
+  "timestamp": "2025-01-06T01:07:00"
+}

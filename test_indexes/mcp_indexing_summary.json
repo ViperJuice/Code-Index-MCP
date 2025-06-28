@@ -1,0 +1,88 @@
+{
+  "timestamp": "2025-06-15T00:30:12.758911",
+  "total_repos": 10,
+  "successful": 10,
+  "total_files_indexed": 158225,
+  "repositories": [
+    {
+      "repository": "aspnetcore",
+      "path": "/workspaces/Code-Index-MCP/test_repos/other/csharp/aspnetcore",
+      "indexed_files": 15544,
+      "errors": 112,
+      "status": "success",
+      "created_at": "2025-06-15T00:28:42.977859"
+    },
+    {
+      "repository": "kong",
+      "path": "/workspaces/Code-Index-MCP/test_repos/other/lua/kong",
+      "indexed_files": 2405,
+      "errors": 3,
+      "status": "success",
+      "created_at": "2025-06-15T00:28:44.491054"
+    },
+    {
+      "repository": "Alamofire",
+      "path": "/workspaces/Code-Index-MCP/test_repos/modern/swift/Alamofire",
+      "indexed_files": 513,
+      "errors": 38,
+      "status": "success",
+      "created_at": "2025-06-15T00:28:45.229726"
+    },
+    {
+      "repository": "sdk",
+      "path": "/workspaces/Code-Index-MCP/test_repos/modern/dart/sdk",
+      "indexed_files": 51377,
+      "errors": 44,
+      "status": "success",
+      "created_at": "2025-06-15T00:29:18.771873"
+    },
+    {
+      "repository": "gin",
+      "path": "/workspaces/Code-Index-MCP/test_repos/modern/go/gin",
+      "indexed_files": 112,
+      "errors": 0,
+      "status": "success",
+      "created_at": "2025-06-15T00:29:18.878335"
+    },
+    {
+      "repository": "redis",
+      "path": "/workspaces/Code-Index-MCP/test_repos/systems/c/redis",
+      "indexed_files": 1629,
+      "errors": 13,
+      "status": "success",
+      "created_at": "2025-06-15T00:29:20.128644"
+    },
+    {
+      "repository": "django",
+      "path": "/workspaces/Code-Index-MCP/test_repos/web/python/django",
+      "indexed_files": 5497,
+      "errors": 1379,
+      "status": "success",
+      "created_at": "2025-06-15T00:29:24.639069"
+    },
+    {
+      "repository": "react",
+      "path": "/workspaces/Code-Index-MCP/test_repos/web/javascript/react",
+      "indexed_files": 6261,
+      "errors": 46,
+      "status": "success",
+      "created_at": "2025-06-15T00:29:29.052973"
+    },
+    {
+      "repository": "tokio",
+      "path": "/workspaces/Code-Index-MCP/test_repos/systems/rust/tokio",
+      "indexed_files": 759,
+      "errors": 0,
+      "status": "success",
+      "created_at": "2025-06-15T00:29:29.657484"
+    },
+    {
+      "repository": "TypeScript",
+      "path": "/workspaces/Code-Index-MCP/test_repos/web/typescript/TypeScript",
+      "indexed_files": 74128,
+      "errors": 9,
+      "status": "success",
+      "created_at": "2025-06-15T00:30:12.758311"
+    }
+  ]
+}

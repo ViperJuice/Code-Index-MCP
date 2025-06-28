@@ -1,0 +1,22 @@
+@startuml
+title MCP System Architecture
+
+skinparam componentStyle uml2
+skinparam monochrome true
+
+package "MCP Server" {
+    [Code Index Service] as CIS
+    [Query Dispatcher] as QD
+    [Repository Manager] as RM
+}
+
+database "Code Index DB" as DB
+
+cloud "Git Repositories" as Git
+
+CIS --> DB : stores/retrieves
+QD --> CIS : queries
+RM --> Git : fetches/syncs
+RM --> CIS : updates index
+
+@enduml

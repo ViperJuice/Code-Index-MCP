@@ -1,5 +1,10 @@
 {
-  "timestamp": "2025-06-12T00:29:32.101240+00:00",
-  "version": "2.0",
-  "compatibility_test": true
+  "embedding_model": "voyage-code-3",
+  "model_dimension": 1024,
+  "distance_metric": "cosine",
+  "created_at": "2025-06-28T05:09:26.851833",
+  "qdrant_path": "/workspaces/Code-Index-MCP/.indexes/qdrant/main.qdrant",
+  "collection_name": "code-embeddings",
+  "compatibility_hash": "1a8eb12939e6a631",
+  "git_commit": "f48abb02cff2c68ec65bd8f61e866f87316f6a0b"
 }

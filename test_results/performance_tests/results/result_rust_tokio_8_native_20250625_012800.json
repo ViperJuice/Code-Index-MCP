@@ -1,0 +1,14 @@
+{
+  "query": "Explain task scheduling",
+  "mode": "native",
+  "tools_used": ["Grep", "Glob"],
+  "tool_calls": {"Grep": 1, "Glob": 1},
+  "results_found": 136,
+  "execution_time_ms": 600,
+  "token_estimate": 1500,
+  "success": true,
+  "error": null,
+  "test_id": "rust_tokio_8_native",
+  "batch_name": "rust_tokio",
+  "timestamp": "2025-01-06T01:28:00"
+}

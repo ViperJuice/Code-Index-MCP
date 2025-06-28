@@ -9,4 +9,4 @@ if os.getenv("SEMANTIC_SEARCH_ENABLED", "false").lower() == "true":
 else:
     from .plugin import Plugin
 
-__all__ = ['Plugin']
+__all__ = ["Plugin"]

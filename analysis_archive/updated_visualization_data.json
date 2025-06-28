@@ -1,0 +1,129 @@
+{
+  "summary": {
+    "total_tests": 42,
+    "mcp_tests": 12,
+    "native_tests": 30,
+    "completion_rate": "52.5%"
+  },
+  "overall_performance": {
+    "mcp": {
+      "avg_time_ms": 3067,
+      "avg_tokens": 9500,
+      "success_rate": 58
+    },
+    "native": {
+      "avg_time_ms": 1245,
+      "avg_tokens": 2738,
+      "success_rate": 87
+    },
+    "comparison": {
+      "speed_ratio": 2.5,
+      "token_savings": 71,
+      "winner": "native"
+    }
+  },
+  "by_repository": {
+    "go_gin": {
+      "tests_completed": 15,
+      "mcp": {
+        "avg_time_ms": 1970,
+        "avg_tokens": 10100,
+        "success_rate": 60,
+        "test_count": 5
+      },
+      "native": {
+        "avg_time_ms": 2497,
+        "avg_tokens": 4875,
+        "success_rate": 70,
+        "test_count": 10
+      },
+      "speed_ratio": 1.3,
+      "winner": "mcp"
+    },
+    "python_django": {
+      "tests_completed": 11,
+      "mcp": {
+        "avg_time_ms": 4400,
+        "avg_tokens": 8767,
+        "success_rate": 100,
+        "test_count": 3
+      },
+      "native": {
+        "avg_time_ms": 425,
+        "avg_tokens": 1525,
+        "success_rate": 88,
+        "test_count": 8
+      },
+      "speed_ratio": 10.4,
+      "winner": "native"
+    },
+    "javascript_react": {
+      "tests_completed": 9,
+      "mcp": {
+        "avg_time_ms": 6000,
+        "avg_tokens": 7850,
+        "success_rate": 50,
+        "test_count": 2
+      },
+      "native": {
+        "avg_time_ms": 596,
+        "avg_tokens": 1843,
+        "success_rate": 100,
+        "test_count": 7
+      },
+      "speed_ratio": 10.1,
+      "winner": "native"
+    },
+    "rust_tokio": {
+      "tests_completed": 7,
+      "mcp": {
+        "avg_time_ms": 875,
+        "avg_tokens": 10750,
+        "success_rate": 0,
+        "test_count": 2
+      },
+      "native": {
+        "avg_time_ms": 960,
+        "avg_tokens": 1660,
+        "success_rate": 100,
+        "test_count": 5
+      },
+      "speed_ratio": 1.1,
+      "winner": "mcp (but 0% success)"
+    }
+  },
+  "charts": {
+    "performance_by_language": {
+      "type": "bar",
+      "data": {
+        "labels": ["Go", "Python", "JavaScript", "Rust"],
+        "mcp_times": [1970, 4400, 6000, 875],
+        "native_times": [2497, 425, 596, 960]
+      }
+    },
+    "token_usage": {
+      "type": "bar",
+      "data": {
+        "labels": ["Go", "Python", "JavaScript", "Rust"],
+        "mcp_tokens": [10100, 8767, 7850, 10750],
+        "native_tokens": [4875, 1525, 1843, 1660]
+      }
+    },
+    "success_rates": {
+      "type": "grouped_bar",
+      "data": {
+        "labels": ["Go", "Python", "JavaScript", "Rust"],
+        "mcp_success": [60, 100, 50, 0],
+        "native_success": [70, 88, 100, 100]
+      }
+    },
+    "overall_comparison": {
+      "type": "radar",
+      "data": {
+        "labels": ["Speed", "Token Efficiency", "Success Rate"],
+        "mcp_values": [33, 29, 58],
+        "native_values": [80, 100, 87]
+      }
+    }
+  }
+}

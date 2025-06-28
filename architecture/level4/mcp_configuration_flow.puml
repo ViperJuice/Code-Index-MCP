@@ -1,0 +1,66 @@
+@startuml MCP Configuration Flow
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title MCP Configuration Flow - Current Issues and Proposed Fixes
+
+Container_Boundary(configuration, "MCP Configuration System") {
+    Component(mcp_json, ".mcp.json", "JSON File", "Server configuration")
+    Component(env_loader, "Environment Loader", "Python", "Loads environment variables")
+    Component(config_parser, "Config Parser", "Python", "Parses MCP configuration")
+    Component(tool_loader, "Tool Loader", "Python", "Loads MCP tool functions")
+    Component(validator, "Config Validator", "Python", "Validates configuration")
+}
+
+Container_Boundary(runtime, "Runtime Environment") {
+    Component(main_env, "Main Agent Environment", "Process", "Parent process with full config")
+    Component(sub_env, "Sub-Agent Environment", "Process", "Child process (config missing)")
+    Component(mcp_tools, "MCP Tool Functions", "Python", "mcp__* function bindings")
+}
+
+Container_Boundary(issues, "Current Issues") {
+    Component(no_inherit, "No Config Inheritance", "Bug", "Sub-agents don't get config")
+    Component(env_loss, "Environment Variable Loss", "Bug", "MCP_* vars not passed")
+    Component(tool_missing, "Tool Functions Missing", "Bug", "mcp__* functions unavailable")
+}
+
+' Configuration Loading Flow
+mcp_json -> config_parser : "Read config"
+env_loader -> config_parser : "Merge env vars"
+config_parser -> validator : "Validate settings"
+validator -> tool_loader : "Load tools if valid"
+tool_loader -> mcp_tools : "Create function bindings"
+
+' Main Agent Success Path
+config_parser -[#green]-> main_env : "Apply configuration"
+mcp_tools -[#green]-> main_env : "Tools available"
+
+' Sub-Agent Failure Path
+main_env -> sub_env : "Spawn sub-agent"
+sub_env -[#red,dashed]-> no_inherit : "Config not passed"
+sub_env -[#red,dashed]-> env_loss : "Env vars missing"
+sub_env -[#red,dashed]-> tool_missing : "No tool access"
+
+note right of issues #FF6666
+  **Impact:**
+  - 83% of MCP operations fail
+  - Task agents can't use MCP
+  - No semantic search
+  - Fallback to native tools
+end note
+
+note bottom of configuration #66FF66
+  **Proposed Configuration Fix:**
+  ```json
+  {
+    "mcpServers": {
+      "code-index-mcp": {
+        "inherit_env": true,
+        "sub_agent_access": true,
+        "propagate_tools": true
+      }
+    }
+  }
+  ```
+end note
+
+@enduml

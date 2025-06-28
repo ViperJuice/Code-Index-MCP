@@ -1,0 +1,14 @@
+{
+  "query": "Find all files importing react-dom",
+  "mode": "native",
+  "tools_used": ["Grep"],
+  "tool_calls": {"Grep": 1},
+  "results_found": 227,
+  "execution_time_ms": 500,
+  "token_estimate": 1200,
+  "success": true,
+  "error": null,
+  "test_id": "javascript_react_4_native",
+  "batch_name": "javascript_react",
+  "timestamp": "2025-01-06T01:08:00"
+}

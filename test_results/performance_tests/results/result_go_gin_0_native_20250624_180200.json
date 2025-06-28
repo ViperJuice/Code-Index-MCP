@@ -1,0 +1,20 @@
+{
+  "query": "Find the definition of class Server",
+  "mode": "native",
+  "tools_used": ["Glob", "LS", "Bash", "Grep", "Read"],
+  "tool_calls": {
+    "Glob": 1,
+    "LS": 3,
+    "Bash": 4,
+    "Grep": 2,
+    "Read": 1
+  },
+  "results_found": 0,
+  "execution_time_ms": 12000,
+  "token_estimate": 3500,
+  "success": false,
+  "error": "No 'Server' type/class found in Gin framework. The main type is 'Engine' defined in gin.go",
+  "test_id": "go_gin_0_native",
+  "timestamp": "2025-01-06T18:02:00",
+  "batch_name": "go_gin"
+}

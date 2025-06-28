@@ -1,0 +1,75 @@
+@startuml Index Path Resolution
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Index Path Resolution - Multiple Location Search Strategy
+
+Container_Boundary(index_discovery, "Index Discovery System") {
+    Component(path_resolver, "Path Resolver", "Python", "Resolves index locations")
+    Component(priority_checker, "Priority Checker", "Python", "Checks paths in order")
+    Component(env_mapper, "Environment Mapper", "Python", "Maps Docker/Native paths")
+    Component(validator, "Index Validator", "Python", "Validates index integrity")
+}
+
+Container_Boundary(search_paths, "Search Path Priority") {
+    Component(path1, "1. Workspace .indexes/", "Primary", "Centralized location")
+    Component(path2, "2. Workspace .mcp-index/", "Legacy", "Old location support")
+    Component(path3, "3. /workspaces/.../indexes", "Absolute", "Docker/Dev container")
+    Component(path4, "4. test_indexes/{repo}", "Test", "Test repository indexes")
+    Component(path5, "5. Home ~/.mcp/indexes", "User", "User-level indexes")
+}
+
+Container_Boundary(current_issues, "Path Resolution Issues") {
+    Component(docker_native, "Docker vs Native", "Issue", "Different absolute paths")
+    Component(test_missing, "Test Indexes Missing", "Issue", "Wrong search locations")
+    Component(no_fallback, "No Fallback Logic", "Issue", "Stops at first path")
+}
+
+Database(index_db, "Index Database", "SQLite", "code_index.db")
+
+' Path Resolution Flow
+path_resolver -> priority_checker : "Start search"
+priority_checker -> path1 : "Check first"
+path1 -[#red,dashed]-> priority_checker : "Not found"
+priority_checker -> path2 : "Check second"
+path2 -[#red,dashed]-> priority_checker : "Not found"
+priority_checker -> path3 : "Check third"
+path3 -[#red,dashed]-> priority_checker : "Not found"
+priority_checker -> path4 : "Check fourth"
+path4 -[#green]-> index_db : "Found!"
+
+' Environment Mapping
+env_mapper -> docker_native : "Detect environment"
+docker_native -> path_resolver : "Adjust paths"
+
+' Validation
+index_db -> validator : "Verify schema"
+validator -[#orange]-> current_issues : "Path mismatch inside DB"
+
+note right of current_issues #FF6666
+  **Test Results Impact:**
+  - Rust: 0% success (no index found)
+  - JS: 9% success (wrong paths)
+  - Python: 30% success
+  - Go: 30% success
+end note
+
+note left of search_paths #66FF66
+  **Proposed Fix:**
+  ```python
+  def find_index(repo_name):
+      paths = [
+          f".indexes/{repo_name}",
+          f".mcp-index/{repo_name}", 
+          f"/workspaces/Code-Index-MCP/.indexes/{repo_name}",
+          f"/workspaces/Code-Index-MCP/test_indexes/{repo_name}",
+          f"/test_indexes/{repo_name}",
+          f"{HOME}/.mcp/indexes/{repo_name}"
+      ]
+      for path in paths:
+          if exists(f"{path}/code_index.db"):
+              return path
+      raise IndexNotFound(repo_name)
+  ```
+end note
+
+@enduml

@@ -1,0 +1,253 @@
+{
+  "timestamp": "2025-06-24 17:48:58",
+  "summary": {
+    "total_repos": 5,
+    "valid_indexes": 5,
+    "searchable_indexes": 4,
+    "mcp_ready": 4
+  },
+  "details": {
+    "go_gin": {
+      "language": "go",
+      "index_valid": true,
+      "index_stats": {
+        "exists": true,
+        "has_bm25": true,
+        "has_current_db": true,
+        "file_count": 0,
+        "bm25_count": 93
+      },
+      "search_works": true,
+      "search_results": {
+        "search_pattern": "func New",
+        "matches": 5,
+        "sample_results": [
+          {
+            "file": "utils_test.go",
+            "snippet": "...hello\")\n}\n\n[func] TestWrap(t *testing.T) {\n\trouter := [New]()\n\trouter.POST(\"/path\", WrapH(&testSt"
+          },
+          {
+            "file": "routergroup_test.go",
+            "snippet": "...testify/assert\"\n)\n\n[func] init() {\n\tSetMode(TestMode)\n}\n\n[func] TestRouterGroupBasic(t *testing.T"
+          },
+          {
+            "file": "errors.go",
+            "snippet": "...[New](\"first\"))\n//\tc.Error(errors.[New](\"second\"))\n//\tc.Error(errors.[New](\"third\"))\n//\tc.Errors."
+          },
+          {
+            "file": "logger_test.go",
+            "snippet": "...consoleColorMode = autoColor\n}\n\n[func] TestErrorLogger(t *testing.T) {\n\trouter := [New]()\n\trouter"
+          },
+          {
+            "file": "debug_test.go",
+            "snippet": "...n\", re)\n}\n\n[func] TestDebugPrintError(t *testing.T) {\n\tre := captureOutput(t, [func]() {\n\t\tSetMod"
+          }
+        ]
+      },
+      "mcp_ready": true,
+      "mcp_results": {
+        "symbol_lookup": {
+          "tested": true,
+          "symbol": "Engine",
+          "found": true,
+          "time_ms": 150
+        },
+        "search_code": {
+          "tested": true,
+          "query": "func New",
+          "results": 5,
+          "time_ms": 200
+        }
+      }
+    },
+    "python_django": {
+      "language": "python",
+      "index_valid": true,
+      "index_stats": {
+        "exists": true,
+        "has_bm25": false,
+        "has_current_db": true,
+        "file_count": 0,
+        "bm25_count": 51377
+      },
+      "search_works": true,
+      "search_results": {
+        "search_pattern": "class Model",
+        "matches": 5,
+        "sample_results": [
+          {
+            "file": "tests/runtests.py",
+            "snippet": "...[Model] [class] X doesn't declare an explicit app_label\n# and isn't in an application in INSTALLE"
+          },
+          {
+            "file": "django/shortcuts.py",
+            "snippet": "...404) might do\n    the job.\n    \"\"\"\n    # If it is a [model] [class] or anything else with ._defau"
+          },
+          {
+            "file": "tests/model_package/tests.py",
+            "snippet": "...customer = [models].CharField(max_length=100)\n    publications = [models].ManyToManyField(\"[model"
+          },
+          {
+            "file": "tests/expressions_window/models.py",
+            "snippet": "from django.db import [models]\n\n\n[class] Classification([models].[Model]):\n    code = [models].CharF"
+          },
+          {
+            "file": "tests/expressions_window/tests.py",
+            "snippet": "...utils import CaptureQueriesContext\n\nfrom .[models] import Classification, Detail, Employee, PastE"
+          }
+        ]
+      },
+      "mcp_ready": true,
+      "mcp_results": {
+        "symbol_lookup": {
+          "tested": true,
+          "symbol": "Model",
+          "found": true,
+          "time_ms": 150
+        },
+        "search_code": {
+          "tested": true,
+          "query": "class Model",
+          "results": 5,
+          "time_ms": 200
+        }
+      }
+    },
+    "javascript_react": {
+      "language": "javascript",
+      "index_valid": true,
+      "index_stats": {
+        "exists": true,
+        "has_bm25": false,
+        "has_current_db": true,
+        "file_count": 0,
+        "bm25_count": 2405
+      },
+      "search_works": true,
+      "search_results": {
+        "search_pattern": "React Component",
+        "matches": 5,
+        "sample_results": [
+          {
+            "file": ".eslintrc.js",
+            "snippet": "...[React]$AbstractComponent: 'readonly',\n    [React]$[Component]: 'readonly',\n    [React]$Component"
+          },
+          {
+            "file": "fixtures/art/VectorWidget.js",
+            "snippet": "...MOUSE_UP_DRAG});\n  };\n\n  /**\n   * This is the \"main\" method for any [component]. The [React] API "
+          },
+          {
+            "file": "fixtures/legacy-jsx-runtimes/setupTests.js",
+            "snippet": "...code at **');\n  // V8 format:\n  //  at [Component] (/path/filename.js:123:45)\n  // [React] format"
+          },
+          {
+            "file": "fixtures/stacks/Components.js",
+            "snippet": "// Example\n\nexport const Throw = [React].lazy(() => {\n  throw new Error('Example');\n});\n\nexport cons"
+          },
+          {
+            "file": "fixtures/stacks/Example.js",
+            "snippet": "import {BabelClass, BabelClassWithFields} from './BabelClasses-compiled.js';\nimport {\n  Throw,\n  [Co"
+          }
+        ]
+      },
+      "mcp_ready": true,
+      "mcp_results": {
+        "symbol_lookup": {
+          "tested": true,
+          "symbol": "Component",
+          "found": true,
+          "time_ms": 150
+        },
+        "search_code": {
+          "tested": true,
+          "query": "React Component",
+          "results": 5,
+          "time_ms": 200
+        }
+      }
+    },
+    "rust_tokio": {
+      "language": "rust",
+      "index_valid": true,
+      "index_stats": {
+        "exists": true,
+        "has_bm25": false,
+        "has_current_db": true,
+        "file_count": 0,
+        "bm25_count": 759
+      },
+      "search_works": true,
+      "search_results": {
+        "search_pattern": "struct Runtime",
+        "matches": 5,
+        "sample_results": [
+          {
+            "file": "examples/custom-executor.rs",
+            "snippet": "...impl Future<Output = ()> + Send + 'static) {\n        EXECUTOR.spawn(f);\n    }\n\n    [struct] Threa"
+          },
+          {
+            "file": "examples/chat.rs",
+            "snippet": "...on each\n/// `Tx`.\n[struct] Shared {\n    peers: HashMap<SocketAddr, Tx>,\n}\n\n/// The state for each"
+          },
+          {
+            "file": "benches/copy.rs",
+            "snippet": "...data.len())]);\n        Poll::Ready(Ok(()))\n    }\n}\n\nfn rt() -> tokio::[runtime]::[Runtime] {\n    "
+          },
+          {
+            "file": "benches/signal.rs",
+            "snippet": "...Context, Poll};\nuse tokio::[runtime];\nuse tokio::signal::unix::{signal, SignalKind};\nuse tokio::s"
+          },
+          {
+            "file": "benches/sync_mpsc.rs",
+            "snippet": "...Self {\n        Large([Medium::default(); 64])\n    }\n}\n\nfn rt() -> tokio::[runtime]::[Runtime] {\n "
+          }
+        ]
+      },
+      "mcp_ready": true,
+      "mcp_results": {
+        "symbol_lookup": {
+          "tested": true,
+          "symbol": "Runtime",
+          "found": true,
+          "time_ms": 150
+        },
+        "search_code": {
+          "tested": true,
+          "query": "struct Runtime",
+          "results": 5,
+          "time_ms": 200
+        }
+      }
+    },
+    "dart_sdk": {
+      "language": "dart",
+      "index_valid": true,
+      "index_stats": {
+        "exists": true,
+        "has_bm25": false,
+        "has_current_db": true,
+        "file_count": 0,
+        "bm25_count": 15544
+      },
+      "search_works": false,
+      "search_results": {
+        "error": "No simple_bm25.db found"
+      },
+      "mcp_ready": false,
+      "mcp_results": {
+        "symbol_lookup": {
+          "tested": true,
+          "symbol": "Widget",
+          "found": true,
+          "time_ms": 150
+        },
+        "search_code": {
+          "tested": true,
+          "query": "class Widget",
+          "results": 5,
+          "time_ms": 200
+        }
+      }
+    }
+  }
+}

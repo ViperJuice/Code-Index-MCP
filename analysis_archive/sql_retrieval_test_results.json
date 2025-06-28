@@ -1,0 +1,99 @@
+{
+  "timestamp": "/workspaces/Code-Index-MCP",
+  "results": [
+    {
+      "repo_id": "e3acd2328eea",
+      "query": "def",
+      "count": 842,
+      "has_results": true
+    },
+    {
+      "repo_id": "e3acd2328eea",
+      "query": "class",
+      "count": 26763,
+      "has_results": true
+    },
+    {
+      "repo_id": "e3acd2328eea",
+      "query": "function",
+      "count": 32923,
+      "has_results": true
+    },
+    {
+      "repo_id": "e3acd2328eea",
+      "query": "import",
+      "count": 13773,
+      "has_results": true
+    },
+    {
+      "repo_id": "e3acd2328eea",
+      "query": "return",
+      "count": 21424,
+      "has_results": true
+    },
+    {
+      "repo_id": "48f70bd595a6",
+      "query": "def",
+      "count": 341,
+      "has_results": true
+    },
+    {
+      "repo_id": "48f70bd595a6",
+      "query": "class",
+      "count": 29068,
+      "has_results": true
+    },
+    {
+      "repo_id": "48f70bd595a6",
+      "query": "function",
+      "count": 8908,
+      "has_results": true
+    },
+    {
+      "repo_id": "48f70bd595a6",
+      "query": "import",
+      "count": 31079,
+      "has_results": true
+    },
+    {
+      "repo_id": "48f70bd595a6",
+      "query": "return",
+      "count": 17396,
+      "has_results": true
+    },
+    {
+      "repo_id": "d72d7e1e17d2",
+      "query": "def",
+      "count": 30,
+      "has_results": true
+    },
+    {
+      "repo_id": "d72d7e1e17d2",
+      "query": "class",
+      "count": 563,
+      "has_results": true
+    },
+    {
+      "repo_id": "d72d7e1e17d2",
+      "query": "function",
+      "count": 4940,
+      "has_results": true
+    },
+    {
+      "repo_id": "d72d7e1e17d2",
+      "query": "import",
+      "count": 3225,
+      "has_results": true
+    },
+    {
+      "repo_id": "d72d7e1e17d2",
+      "query": "return",
+      "count": 4681,
+      "has_results": true
+    }
+  ],
+  "summary": {
+    "total_tests": 15,
+    "successful": 15
+  }
+}

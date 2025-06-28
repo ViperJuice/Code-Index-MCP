@@ -1,0 +1,14 @@
+{
+  "query": "Find the definition of spawn",
+  "mode": "native",
+  "tools_used": ["Grep"],
+  "tool_calls": {"Grep": 1},
+  "results_found": 15,
+  "execution_time_ms": 200,
+  "token_estimate": 800,
+  "success": true,
+  "error": null,
+  "test_id": "rust_tokio_1_native",
+  "batch_name": "rust_tokio",
+  "timestamp": "2025-01-06T01:15:00"
+}

@@ -1,0 +1,14 @@
+{
+  "query": "Find the definition of class BaseHandler",
+  "mode": "mcp",
+  "tools_used": ["mcp__code-index-mcp__symbol_lookup", "mcp__code-index-mcp__search_code"],
+  "tool_calls": {"mcp__code-index-mcp__symbol_lookup": 2, "mcp__code-index-mcp__search_code": 2},
+  "results_found": 6,
+  "execution_time_ms": 3500,
+  "token_estimate": 2800,
+  "success": true,
+  "error": null,
+  "test_id": "python_django_0_mcp",
+  "timestamp": "2025-01-06T20:50:00",
+  "batch_name": "python_django"
+}

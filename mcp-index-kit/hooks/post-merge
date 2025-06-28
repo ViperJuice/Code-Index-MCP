@@ -1,0 +1,87 @@
+#!/bin/bash
+# MCP Index Post-Merge Hook
+# Automatically downloads index artifacts after pulling from remote
+
+set -e
+
+# Colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+# Check if index management is enabled
+if [ -f ".mcp-index.json" ]; then
+    ENABLED=$(jq -r '.enabled // true' .mcp-index.json 2>/dev/null || echo "true")
+    AUTO_DOWNLOAD=$(jq -r '.auto_download // true' .mcp-index.json 2>/dev/null || echo "true")
+    
+    if [ "$ENABLED" != "true" ] || [ "$AUTO_DOWNLOAD" != "true" ]; then
+        exit 0
+    fi
+else
+    # No config file, skip hook
+    exit 0
+fi
+
+echo -e "${YELLOW}🔍 MCP Index: Checking for index updates...${NC}"
+
+# Check if gh CLI is available
+if ! command -v gh &> /dev/null; then
+    echo -e "${YELLOW}⚠️  MCP Index: GitHub CLI not found, skipping download${NC}"
+    echo -e "${YELLOW}   Install from: https://cli.github.com/${NC}"
+    exit 0
+fi
+
+# Check if we need to download
+SHOULD_DOWNLOAD=false
+
+# If no local index exists, download
+if [ ! -f ".mcp-index/code_index.db" ]; then
+    SHOULD_DOWNLOAD=true
+    echo -e "${YELLOW}📥 MCP Index: No local index found${NC}"
+fi
+
+# If config changed, might need new index
+if git diff HEAD~ HEAD --name-only | grep -q ".mcp-index.json"; then
+    SHOULD_DOWNLOAD=true
+    echo -e "${YELLOW}📥 MCP Index: Configuration changed${NC}"
+fi
+
+# Check if remote has newer index (simplified check)
+if [ -f ".mcp-index/.index_metadata.json" ]; then
+    LOCAL_COMMIT=$(jq -r '.commit // ""' .mcp-index/.index_metadata.json 2>/dev/null || echo "")
+    CURRENT_COMMIT=$(git rev-parse HEAD)
+    
+    if [ "$LOCAL_COMMIT" != "$CURRENT_COMMIT" ]; then
+        SHOULD_DOWNLOAD=true
+        echo -e "${YELLOW}📥 MCP Index: Local index is outdated${NC}"
+    fi
+fi
+
+if [ "$SHOULD_DOWNLOAD" = "true" ]; then
+    echo -e "${GREEN}📦 MCP Index: Downloading latest index...${NC}"
+    
+    # Try to download using available tools
+    if [ -f "mcp_cli.py" ]; then
+        python mcp_cli.py artifact pull --latest --no-backup 2>/dev/null || {
+            echo -e "${YELLOW}⚠️  MCP Index: Download failed${NC}"
+            echo -e "${YELLOW}   You can manually download with: python mcp_cli.py artifact pull --latest${NC}"
+        }
+    elif [ -f "mcp-index-kit/scripts/cli.py" ]; then
+        python mcp-index-kit/scripts/cli.py pull --latest 2>/dev/null || {
+            echo -e "${YELLOW}⚠️  MCP Index: Download failed${NC}"
+            echo -e "${YELLOW}   You can manually download with: mcp-index pull --latest${NC}"
+        }
+    elif [ -f "mcp-index-kit/templates/download-index.sh" ]; then
+        bash mcp-index-kit/templates/download-index.sh 2>/dev/null || {
+            echo -e "${YELLOW}⚠️  MCP Index: Download failed${NC}"
+        }
+    else
+        echo -e "${YELLOW}⚠️  MCP Index: No download tool found${NC}"
+    fi
+else
+    echo -e "${GREEN}✓ MCP Index: Local index is up to date${NC}"
+fi
+
+# Always allow the merge to complete
+exit 0

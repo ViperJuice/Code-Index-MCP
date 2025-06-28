@@ -26,15 +26,13 @@ class Plugin(IPlugin):
         self._indexer = FuzzyIndexer(sqlite_store=sqlite_store)
         self._sqlite_store = sqlite_store
         self._repository_id = None
-        
+
         # Create or get repository if SQLite is enabled
         if self._sqlite_store:
             self._repository_id = self._sqlite_store.create_repository(
-                str(Path.cwd()), 
-                Path.cwd().name,
-                {"language": "python"}
+                str(Path.cwd()), Path.cwd().name, {"language": "python"}
             )
-        
+
         self._preindex()
 
     # ------------------------------------------------------------------
@@ -63,14 +61,15 @@ class Plugin(IPlugin):
         file_id = None
         if self._sqlite_store and self._repository_id:
             import hashlib
-            file_hash = hashlib.sha256(content.encode('utf-8')).hexdigest()
+
+            file_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
             file_id = self._sqlite_store.store_file(
                 self._repository_id,
                 str(path),
                 str(path.relative_to(Path.cwd())),
                 language="python",
                 size=len(content),
-                hash=file_hash
+                hash=file_hash,
             )
 
         symbols: list[dict] = []
@@ -96,19 +95,14 @@ class Plugin(IPlugin):
             # Store symbol in SQLite if available
             if self._sqlite_store and file_id:
                 symbol_id = self._sqlite_store.store_symbol(
-                    file_id,
-                    name,
-                    kind,
-                    start_line,
-                    end_line,
-                    signature=signature
+                    file_id, name, kind, start_line, end_line, signature=signature
                 )
                 # Add to fuzzy indexer with metadata
                 self._indexer.add_symbol(
-                    name, 
-                    str(path), 
+                    name,
+                    str(path),
                     start_line,
-                    {"symbol_id": symbol_id, "file_id": file_id}
+                    {"symbol_id": symbol_id, "file_id": file_id},
                 )
 
             symbols.append(
@@ -129,7 +123,9 @@ class Plugin(IPlugin):
             try:
                 source = path.read_text()
                 script = jedi.Script(code=source, path=str(path))
-                names = script.get_names(all_scopes=True, definitions=True, references=False)
+                names = script.get_names(
+                    all_scopes=True, definitions=True, references=False
+                )
                 for name in names:
                     if name.name == symbol and name.type in ("function", "class"):
                         defs = name.goto()
@@ -168,18 +164,20 @@ class Plugin(IPlugin):
         return refs
 
     # ------------------------------------------------------------------
-    def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:
+    def search(
+        self, query: str, opts: SearchOpts | None = None
+    ) -> Iterable[SearchResult]:
         limit = 20
         if opts and "limit" in opts:
             limit = opts["limit"]
         if opts and opts.get("semantic"):
             return []
         return self._indexer.search(query, limit=limit)
-    
+
     # ------------------------------------------------------------------
     def get_indexed_count(self) -> int:
         """Return the number of indexed files."""
         # The fuzzy indexer tracks files internally
-        if hasattr(self._indexer, 'index'):
+        if hasattr(self._indexer, "index"):
             return len(self._indexer.index)
         return 0

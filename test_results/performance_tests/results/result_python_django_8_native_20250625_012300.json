@@ -1,0 +1,14 @@
+{
+  "query": "How does Django handle migrations",
+  "mode": "native",
+  "tools_used": ["Bash", "Glob"],
+  "tool_calls": {"Bash": 2, "Glob": 1},
+  "results_found": 314,
+  "execution_time_ms": 900,
+  "token_estimate": 3500,
+  "success": true,
+  "error": null,
+  "test_id": "python_django_8_native",
+  "batch_name": "python_django",
+  "timestamp": "2025-01-06T01:23:00"
+}

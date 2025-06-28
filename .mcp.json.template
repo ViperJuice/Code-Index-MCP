@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "code-index-mcp": {
+      "command": "${MCP_PYTHON_PATH:-python}",
+      "args": [
+        "${MCP_WORKSPACE_ROOT:-.}/scripts/cli/mcp_server_cli.py"
+      ],
+      "cwd": "${MCP_WORKSPACE_ROOT:-.}",
+      "env": {
+        "PYTHONPATH": "${MCP_WORKSPACE_ROOT:-.}",
+        "MCP_WORKSPACE_ROOT": "${MCP_WORKSPACE_ROOT:-.}",
+        "MCP_INDEX_STORAGE_PATH": "${MCP_INDEX_STORAGE_PATH:-.indexes}",
+        "MCP_REPO_REGISTRY": "${MCP_REPO_REGISTRY:-.indexes/repository_registry.json}",
+        "MCP_ENABLE_MULTI_REPO": "${MCP_ENABLE_MULTI_REPO:-true}",
+        "MCP_ENABLE_MULTI_PATH": "${MCP_ENABLE_MULTI_PATH:-true}",
+        "SEMANTIC_SEARCH_ENABLED": "${SEMANTIC_SEARCH_ENABLED:-true}",
+        "VOYAGE_AI_API_KEY": "${VOYAGE_AI_API_KEY:-}",
+        "MCP_LOG_PATH": "${MCP_LOG_PATH:-~/.mcp/logs}",
+        "MCP_TEMP_PATH": "${MCP_TEMP_PATH:-}",
+        "MCP_DATA_PATH": "${MCP_DATA_PATH:-./data}"
+      }
+    }
+  }
+}

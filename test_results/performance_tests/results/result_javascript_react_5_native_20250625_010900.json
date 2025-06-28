@@ -1,0 +1,14 @@
+{
+  "query": "Show files that reference ReactDOM",
+  "mode": "native",
+  "tools_used": ["Grep"],
+  "tool_calls": {"Grep": 1},
+  "results_found": 372,
+  "execution_time_ms": 600,
+  "token_estimate": 1000,
+  "success": true,
+  "error": null,
+  "test_id": "javascript_react_5_native",
+  "batch_name": "javascript_react",
+  "timestamp": "2025-01-06T01:09:00"
+}

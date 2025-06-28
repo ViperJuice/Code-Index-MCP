@@ -14,6 +14,7 @@ package "mcp_server.storage" <<Component>> {
     class SQLiteStore #LightGreen {
         -db_path: str
         -_conn: Optional[sqlite3.Connection]
+        -path_resolver: PathResolver
         --
         +__init__(db_path: str = "code_index.db")
         +close() -> None
@@ -63,6 +64,13 @@ package "mcp_server.storage" <<Component>> {
         - fuzzy_indexes
         - embeddings
         - query_cache
+        
+        Local Storage:
+        - Indexes stored at .indexes/ (relative to MCP)
+        - Repository isolation by hash
+        - Version management per branch
+        - No .mcp-index directories in repos
+        - 34 repositories indexed (~3.1GB total)
         
         Indexes:
         - idx_files_repo_path

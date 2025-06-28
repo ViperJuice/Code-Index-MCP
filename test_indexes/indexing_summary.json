@@ -1,0 +1,43 @@
+{
+  "timestamp": "2025-06-14T23:41:49.032026",
+  "total_repos": 5,
+  "successful": 5,
+  "total_files_indexed": 1020,
+  "repositories": [
+    {
+      "name": "csharp_aspnetcore",
+      "path": "/workspaces/Code-Index-MCP/test_repos/other/csharp/aspnetcore",
+      "language": "other",
+      "indexed_files": 473,
+      "status": "success"
+    },
+    {
+      "name": "lua_kong",
+      "path": "/workspaces/Code-Index-MCP/test_repos/other/lua/kong",
+      "language": "other",
+      "indexed_files": 28,
+      "status": "success"
+    },
+    {
+      "name": "swift_Alamofire",
+      "path": "/workspaces/Code-Index-MCP/test_repos/modern/swift/Alamofire",
+      "language": "modern",
+      "indexed_files": 102,
+      "status": "success"
+    },
+    {
+      "name": "dart_sdk",
+      "path": "/workspaces/Code-Index-MCP/test_repos/modern/dart/sdk",
+      "language": "modern",
+      "indexed_files": 324,
+      "status": "success"
+    },
+    {
+      "name": "go_gin",
+      "path": "/workspaces/Code-Index-MCP/test_repos/modern/go/gin",
+      "language": "modern",
+      "indexed_files": 93,
+      "status": "success"
+    }
+  ]
+}

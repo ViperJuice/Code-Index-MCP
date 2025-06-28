@@ -1,0 +1,17 @@
+{
+  "version": "1.0",
+  "enabled": true,
+  "auto_download": true,
+  "auto_upload": true,
+  "index_location": ".mcp-index/",
+  "artifact_retention_days": 30,
+  "ignore_file": ".mcp-index-ignore",
+  "languages": "auto",
+  "exclude_defaults": true,
+  "custom_excludes": [],
+  "github_artifacts": {
+    "enabled": true,
+    "compression": true,
+    "max_size_mb": 100
+  }
+}

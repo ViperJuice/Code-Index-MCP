@@ -1,0 +1,14 @@
+{
+  "query": "What is Engine",
+  "mode": "native",
+  "tools_used": ["Grep", "Read"],
+  "tool_calls": {"Grep": 3, "Read": 3},
+  "results_found": 1,
+  "execution_time_ms": 1200,
+  "token_estimate": 8000,
+  "success": true,
+  "error": null,
+  "test_id": "go_gin_9_native",
+  "batch_name": "go_gin",
+  "timestamp": "2025-01-06T01:04:00"
+}

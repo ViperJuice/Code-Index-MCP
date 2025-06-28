@@ -1,0 +1,14 @@
+{
+  "query": "Show all references to AppComponent",
+  "mode": "native",
+  "tools_used": ["grep", "bash"],
+  "tool_calls": {"grep": 1, "bash": 2},
+  "results_found": 2,
+  "execution_time_ms": 27,
+  "token_estimate": 450,
+  "success": true,
+  "error": null,
+  "test_id": "javascript_react_7_native",
+  "batch_name": "javascript_react",
+  "timestamp": "2025-01-06T01:19:00"
+}

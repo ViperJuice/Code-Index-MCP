@@ -1,0 +1,480 @@
+{
+  "sql_indexes": {
+    "01a11448c6e6": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/01a11448c6e6/current.db",
+      "documents": 0,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": []
+    },
+    "056d6d37b1aa": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/056d6d37b1aa/current.db",
+      "documents": 0,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": []
+    },
+    "08b3c2edf691": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/08b3c2edf691/main_f48abb0.db",
+      "documents": 322,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": [
+        "mcp_server/watcher.py",
+        "mcp_server/plugin_base_enhanced.py",
+        "mcp_server/sync.py"
+      ]
+    },
+    "10eb7fa8d76e": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/10eb7fa8d76e/current.db",
+      "documents": 0,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": []
+    },
+    "1100a4090b09": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/1100a4090b09/bm25_index.db",
+      "documents": 464,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": [
+        "/app/test_final_integration.py",
+        "/app/test_document_storage.py",
+        "/app/test_swift_plugin.py"
+      ]
+    },
+    "1472d55c5d37": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/1472d55c5d37/current.db",
+      "documents": 0,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": []
+    },
+    "1ccf33ab5afa": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/1ccf33ab5afa/current.db",
+      "documents": 409,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": [
+        "/workspaces/Code-Index-MCP/test_repos/web/perl/mojo/.perltidyrc",
+        "/workspaces/Code-Index-MCP/test_repos/web/perl/mojo/MANIFEST.SKIP",
+        "/workspaces/Code-Index-MCP/test_repos/web/perl/mojo/Makefile.PL"
+      ]
+    },
+    "2652ff29a355": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/2652ff29a355/current.db",
+      "documents": 136,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": [
+        "/workspaces/Code-Index-MCP/test_repos/web/python/requests/setup.cfg",
+        "/workspaces/Code-Index-MCP/test_repos/web/python/requests/.git-blame-ignore-revs",
+        "/workspaces/Code-Index-MCP/test_repos/web/python/requests/setup.py"
+      ]
+    },
+    "2849ba16ec30": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/2849ba16ec30/current.db",
+      "documents": 4930,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": [
+        "/workspaces/Code-Index-MCP/test_repos/modern/go/terraform/experiments.go",
+        "/workspaces/Code-Index-MCP/test_repos/modern/go/terraform/build.Dockerfile",
+        "/workspaces/Code-Index-MCP/test_repos/modern/go/terraform/signal_unix.go"
+      ]
+    },
+    "2891edb32de6": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/2891edb32de6/current.db",
+      "documents": 0,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": []
+    },
+    "2c3a11a10667": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/2c3a11a10667/current.db",
+      "documents": 144,
+      "repo_name": "gin",
+      "language": "go",
+      "sample_paths": [
+        "/workspaces/Code-Index-MCP/test_repos/modern/go/gin/utils_test.go",
+        "/workspaces/Code-Index-MCP/test_repos/modern/go/gin/context_appengine.go",
+        "/workspaces/Code-Index-MCP/test_repos/modern/go/gin/CONTRIBUTING.md"
+      ]
+    },
+    "369861870b55": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/369861870b55/current.db",
+      "documents": 0,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": []
+    },
+    "40fdeba5e98b": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/40fdeba5e98b/current.db",
+      "documents": 2850,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": [
+        "/workspaces/Code-Index-MCP/test_repos/web/php/framework/phpstan.types.neon.dist",
+        "/workspaces/Code-Index-MCP/test_repos/web/php/framework/.styleci.yml",
+        "/workspaces/Code-Index-MCP/test_repos/web/php/framework/.editorconfig"
+      ]
+    },
+    "48f70bd595a6": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/48f70bd595a6/current.db",
+      "documents": 51531,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": [
+        "/workspaces/Code-Index-MCP/test_repos/modern/dart/sdk/sdk_args.gni",
+        "/workspaces/Code-Index-MCP/test_repos/modern/dart/sdk/WATCHLISTS",
+        "/workspaces/Code-Index-MCP/test_repos/modern/dart/sdk/.mailmap"
+      ]
+    },
+    "4b74d90cbf2f": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/4b74d90cbf2f/current.db",
+      "documents": 0,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": []
+    },
+    "6432430f2d70": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/6432430f2d70/current.db",
+      "documents": 0,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": []
+    },
+    "70eef8290481": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/70eef8290481/current.db",
+      "documents": 0,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": []
+    },
+    "7d20371e6e74": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/7d20371e6e74/current.db",
+      "documents": 4722,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": [
+        "/workspaces/Code-Index-MCP/test_repos/web/ruby/rails/MIT-LICENSE",
+        "/workspaces/Code-Index-MCP/test_repos/web/ruby/rails/.git-blame-ignore-revs",
+        "/workspaces/Code-Index-MCP/test_repos/web/ruby/rails/Gemfile.lock"
+      ]
+    },
+    "82a17fe7580c": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/82a17fe7580c/current.db",
+      "documents": 0,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": []
+    },
+    "844145265d7a": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/844145265d7a/current.db",
+      "documents": 0,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": []
+    },
+    "91b3392fcf46": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/91b3392fcf46/current.db",
+      "documents": 0,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": []
+    },
+    "923f597756ef": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/923f597756ef/current.db",
+      "documents": 0,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": []
+    },
+    "953c59d30915": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/953c59d30915/current.db",
+      "documents": 0,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": []
+    },
+    "a5ba025580fa": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/a5ba025580fa/current.db",
+      "documents": 0,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": []
+    },
+    "a91ba02537ca": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/a91ba02537ca/current.db",
+      "documents": 253,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": [
+        "/workspaces/Code-Index-MCP/test_repos/web/python/flask/LICENSE.txt",
+        "/workspaces/Code-Index-MCP/test_repos/web/python/flask/.editorconfig",
+        "/workspaces/Code-Index-MCP/test_repos/web/python/flask/uv.lock"
+      ]
+    },
+    "a91d738376a3": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/a91d738376a3/current.db",
+      "documents": 0,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": []
+    },
+    "ad57499b3702": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/ad57499b3702/current.db",
+      "documents": 0,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": []
+    },
+    "b3fc8cfc27a6": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/b3fc8cfc27a6/current.db",
+      "documents": 0,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": []
+    },
+    "bb4442cd5cc6": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/bb4442cd5cc6/current.db",
+      "documents": 242,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": [
+        "/workspaces/Code-Index-MCP/test_repos/web/javascript/express/.eslintrc.yml",
+        "/workspaces/Code-Index-MCP/test_repos/web/javascript/express/SECURITY.md",
+        "/workspaces/Code-Index-MCP/test_repos/web/javascript/express/index.js"
+      ]
+    },
+    "c50456acc196": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/c50456acc196/current.db",
+      "documents": 0,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": []
+    },
+    "d17b557e0b1a": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/d17b557e0b1a/code_index.db",
+      "documents": 2500,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": [
+        "/workspaces/Code-Index-MCP/test_repos/jvm/scala/akka/.git-blame-ignore-revs",
+        "/workspaces/Code-Index-MCP/test_repos/jvm/scala/akka/CONTRIBUTING.md",
+        "/workspaces/Code-Index-MCP/test_repos/jvm/scala/akka/build.sbt"
+      ]
+    },
+    "d72d7e1e17d2": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/d72d7e1e17d2/current.db",
+      "documents": 6369,
+      "repo_name": "react",
+      "language": "javascript",
+      "sample_paths": [
+        "/workspaces/Code-Index-MCP/test_repos/web/javascript/react/.eslintrc.js",
+        "/workspaces/Code-Index-MCP/test_repos/web/javascript/react/.mailmap",
+        "/workspaces/Code-Index-MCP/test_repos/web/javascript/react/.git-blame-ignore-revs"
+      ]
+    },
+    "d8df70cdcd6e": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/d8df70cdcd6e/current.db",
+      "documents": 5528,
+      "repo_name": "django",
+      "language": "python",
+      "sample_paths": [
+        "/workspaces/Code-Index-MCP/test_repos/web/python/django/.git-blame-ignore-revs",
+        "/workspaces/Code-Index-MCP/test_repos/web/python/django/LICENSE.python",
+        "/workspaces/Code-Index-MCP/test_repos/web/python/django/eslint.config.mjs"
+      ]
+    },
+    "dc5322986285": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/dc5322986285/current.db",
+      "documents": 0,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": []
+    },
+    "e32dcdb0072b": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/e32dcdb0072b/current.db",
+      "documents": 0,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": []
+    },
+    "e3acd2328eea": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/e3acd2328eea/current.db",
+      "documents": 74193,
+      "repo_name": "typescript",
+      "language": "typescript",
+      "sample_paths": [
+        "/workspaces/Code-Index-MCP/test_repos/web/typescript/TypeScript/package-lock.json",
+        "/workspaces/Code-Index-MCP/test_repos/web/typescript/TypeScript/.git-blame-ignore-revs",
+        "/workspaces/Code-Index-MCP/test_repos/web/typescript/TypeScript/ThirdPartyNoticeText.txt"
+      ]
+    },
+    "e8f130fe30ac": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/e8f130fe30ac/current.db",
+      "documents": 555,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": [
+        "/workspaces/Code-Index-MCP/test_repos/modern/swift/Alamofire/Gemfile.lock",
+        "/workspaces/Code-Index-MCP/test_repos/modern/swift/Alamofire/CONTRIBUTING.md",
+        "/workspaces/Code-Index-MCP/test_repos/modern/swift/Alamofire/Package.swift"
+      ]
+    },
+    "f7b49f5d0ae0": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/f7b49f5d0ae0/current.db",
+      "documents": 64716,
+      "repo_name": "unknown",
+      "language": "unknown",
+      "sample_paths": [
+        "htmlcov/z_672113073f95d2d5___init___py.html",
+        "htmlcov/z_5f7340beec1b0b92_benchmark_runner_py.html",
+        "htmlcov/z_7611279d6dffbd11_api_gateway_interfaces_py.html"
+      ]
+    }
+  },
+  "qdrant_collections": {
+    "typescript-139683137821808": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/qdrant/main.qdrant",
+      "points": 10903,
+      "repo_hint": "unknown",
+      "sample_files": [
+        "tests/fixtures/repos/test_repos/lodash/lodash.js",
+        "tests/fixtures/repos/test_repos/lodash/vendor/firebug-lite/src/firebug-lite-debug.js",
+        "tests/fixtures/repos/test_repos/lodash/test/test.js"
+      ]
+    },
+    "typescript-140048533062240": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/qdrant/main.qdrant",
+      "points": 4216,
+      "repo_hint": "react",
+      "sample_files": [
+        "test_repos/web/javascript/react/compiler/packages/babel-plugin-react-compiler/src/Transform/TransformFire.ts",
+        "test_repos/web/javascript/react/compiler/packages/babel-plugin-react-compiler/src/Entrypoint/Options.ts",
+        "test_repos/web/javascript/react/compiler/packages/babel-plugin-react-compiler/src/Entrypoint/Suppression.ts"
+      ]
+    },
+    "typescript-139842917360864": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/qdrant/main.qdrant",
+      "points": 3327,
+      "repo_hint": "typescript",
+      "sample_files": [
+        "test_repos/web/typescript/TypeScript/tests/baselines/reference/implicitAnyGenerics.js",
+        "test_repos/web/typescript/TypeScript/tests/cases/compiler/indexedAccessKeyofNestedSimplifiedSubstituteUnwrapped.ts",
+        "test_repos/web/typescript/TypeScript/tests/baselines/reference/instantiatedBaseTypeConstraints.js"
+      ]
+    },
+    "typescript-139629772345744": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/qdrant/main.qdrant",
+      "points": 156,
+      "repo_hint": "typescript",
+      "sample_files": [
+        "test_repos/web/typescript/TypeScript/tests/cases/compiler/indexedAccessKeyofNestedSimplifiedSubstituteUnwrapped.ts",
+        "test_repos/web/typescript/TypeScript/tests/cases/compiler/duplicateErrorClassExpression.ts",
+        "test_repos/web/typescript/TypeScript/tests/cases/compiler/genericFunctionsWithOptionalParameters3.ts"
+      ]
+    },
+    "code-embeddings": {
+      "path": "/workspaces/Code-Index-MCP/.indexes/qdrant/main.qdrant",
+      "points": 495,
+      "repo_hint": "django",
+      "sample_files": [
+        "/workspaces/Code-Index-MCP/test_repos/web/python/django/tests/admin_views/models.py",
+        "/workspaces/Code-Index-MCP/test_repos/web/python/django/tests/m2m_signals/tests.py",
+        "/workspaces/Code-Index-MCP/test_repos/web/python/django/tests/timezones/tests.py"
+      ]
+    },
+    "typescript-139900648006880": {
+      "path": "/workspaces/Code-Index-MCP/vector_index.qdrant",
+      "points": 7,
+      "repo_hint": "react",
+      "sample_files": [
+        "test_repos/web/javascript/react/compiler/packages/babel-plugin-react-compiler/src/ReactiveScopes/PruneInitializationDependencies.ts",
+        "test_repos/web/javascript/react/compiler/packages/babel-plugin-react-compiler/src/SSA/EnterSSA.ts",
+        "test_repos/other/csharp/aspnetcore/src/Components/Web.JS/src/Rendering/JSRootComponents.ts"
+      ]
+    },
+    "typescript-140181717030416": {
+      "path": "/workspaces/Code-Index-MCP/vector_index.qdrant",
+      "points": 601,
+      "repo_hint": "typescript",
+      "sample_files": [
+        "test_repos/web/typescript/TypeScript/tests/cases/compiler/indexedAccessKeyofNestedSimplifiedSubstituteUnwrapped.ts",
+        "test_repos/web/typescript/TypeScript/tests/cases/compiler/recursiveTypeRelations.ts",
+        "test_repos/web/typescript/TypeScript/tests/cases/compiler/infinitelyExpandingTypesNonGenericBase.ts"
+      ]
+    }
+  },
+  "repository_mapping": {
+    "python_django": {
+      "language": "python",
+      "sql_index": "d8df70cdcd6e",
+      "sql_path": "/workspaces/Code-Index-MCP/.indexes/d8df70cdcd6e/current.db",
+      "qdrant_collection": "code-embeddings",
+      "qdrant_path": "/workspaces/Code-Index-MCP/.indexes/qdrant/main.qdrant"
+    },
+    "javascript_react": {
+      "language": "javascript",
+      "sql_index": "d72d7e1e17d2",
+      "sql_path": "/workspaces/Code-Index-MCP/.indexes/d72d7e1e17d2/current.db",
+      "qdrant_collection": "typescript-140048533062240",
+      "qdrant_path": "/workspaces/Code-Index-MCP/.indexes/qdrant/main.qdrant"
+    },
+    "typescript_typescript": {
+      "language": "typescript",
+      "sql_index": "e3acd2328eea",
+      "sql_path": "/workspaces/Code-Index-MCP/.indexes/e3acd2328eea/current.db",
+      "qdrant_collection": "typescript-139683137821808",
+      "qdrant_path": "/workspaces/Code-Index-MCP/.indexes/qdrant/main.qdrant"
+    },
+    "go_gin": {
+      "language": "go",
+      "sql_index": "2c3a11a10667",
+      "sql_path": "/workspaces/Code-Index-MCP/.indexes/2c3a11a10667/current.db",
+      "qdrant_collection": null,
+      "qdrant_path": null
+    },
+    "rust_tokio": {
+      "language": "rust",
+      "sql_index": null,
+      "sql_path": null,
+      "qdrant_collection": null,
+      "qdrant_path": null
+    },
+    "java_kafka": {
+      "language": "java",
+      "sql_index": null,
+      "sql_path": null,
+      "qdrant_collection": null,
+      "qdrant_path": null
+    },
+    "csharp_aspnetcore": {
+      "language": "csharp",
+      "sql_index": null,
+      "sql_path": null,
+      "qdrant_collection": null,
+      "qdrant_path": null
+    },
+    "cpp_grpc": {
+      "language": "cpp",
+      "sql_index": null,
+      "sql_path": null,
+      "qdrant_collection": null,
+      "qdrant_path": null
+    },
+    "c_redis": {
+      "language": "c",
+      "sql_index": null,
+      "sql_path": null,
+      "qdrant_collection": null,
+      "qdrant_path": null
+    }
+  },
+  "summary": {
+    "total_sql_indexes": 38,
+    "total_qdrant_collections": 7,
+    "mapped_repositories": 4
+  }
+}

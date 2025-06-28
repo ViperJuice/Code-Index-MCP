@@ -1,0 +1,14 @@
+{
+  "query": "Find all test modules",
+  "mode": "native",
+  "tools_used": ["Grep", "Bash"],
+  "tool_calls": {"Grep": 1, "Bash": 2},
+  "results_found": 67,
+  "execution_time_ms": 300,
+  "token_estimate": 1200,
+  "success": true,
+  "error": null,
+  "test_id": "rust_tokio_4_native",
+  "batch_name": "rust_tokio",
+  "timestamp": "2025-01-06T01:18:00"
+}

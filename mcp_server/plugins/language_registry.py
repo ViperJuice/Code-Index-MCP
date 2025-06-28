@@ -14,31 +14,61 @@ LANGUAGE_CONFIGS = {
         "code": "c",
         "name": "C",
         "extensions": [".c", ".h"],
-        "symbols": ["function_definition", "struct_specifier", "enum_specifier", "type_definition"],
+        "symbols": [
+            "function_definition",
+            "struct_specifier",
+            "enum_specifier",
+            "type_definition",
+        ],
         "query": """
             (function_definition declarator: (function_declarator declarator: (identifier) @function))
             (struct_specifier name: (type_identifier) @struct)
             (enum_specifier name: (type_identifier) @enum)
             (type_definition declarator: (type_identifier) @typedef)
-        """
+        """,
     },
     "cpp": {
         "code": "cpp",
         "name": "C++",
-        "extensions": [".cpp", ".cc", ".cxx", ".c++", ".hpp", ".h", ".hh", ".h++", ".hxx"],
-        "symbols": ["function_definition", "class_specifier", "struct_specifier", "namespace_definition"],
+        "extensions": [
+            ".cpp",
+            ".cc",
+            ".cxx",
+            ".c++",
+            ".hpp",
+            ".h",
+            ".hh",
+            ".h++",
+            ".hxx",
+        ],
+        "symbols": [
+            "function_definition",
+            "class_specifier",
+            "struct_specifier",
+            "namespace_definition",
+        ],
         "query": """
             (function_definition declarator: (function_declarator declarator: (identifier) @function))
             (class_specifier name: (type_identifier) @class)
             (struct_specifier name: (type_identifier) @struct)
             (namespace_definition name: (identifier) @namespace)
-        """
+        """,
     },
     "rust": {
         "code": "rust",
         "name": "Rust",
         "extensions": [".rs"],
-        "symbols": ["function_item", "struct_item", "enum_item", "trait_item", "impl_item", "mod_item", "const_item", "static_item", "type_item"],
+        "symbols": [
+            "function_item",
+            "struct_item",
+            "enum_item",
+            "trait_item",
+            "impl_item",
+            "mod_item",
+            "const_item",
+            "static_item",
+            "type_item",
+        ],
         "query": """
             (function_item name: (identifier) @function)
             (struct_item name: (type_identifier) @struct)
@@ -51,13 +81,19 @@ LANGUAGE_CONFIGS = {
             (static_item name: (identifier) @static)
             (type_item name: (type_identifier) @type_alias)
             (macro_definition name: (identifier) @macro)
-        """
+        """,
     },
     "go": {
         "code": "go",
         "name": "Go",
         "extensions": [".go"],
-        "symbols": ["function_declaration", "method_declaration", "type_declaration", "const_declaration", "var_declaration"],
+        "symbols": [
+            "function_declaration",
+            "method_declaration",
+            "type_declaration",
+            "const_declaration",
+            "var_declaration",
+        ],
         "query": """
             (function_declaration name: (identifier) @function)
             (method_declaration name: (field_identifier) @method)
@@ -65,15 +101,20 @@ LANGUAGE_CONFIGS = {
             (const_declaration (const_spec name: (identifier) @constant))
             (var_declaration (var_spec name: (identifier) @variable))
             (interface_type (method_spec name: (field_identifier) @interface_method))
-        """
+        """,
     },
-    
     # Scripting Languages
     "python": {
         "code": "python",
         "name": "Python",
         "extensions": [".py", ".pyw"],
-        "symbols": ["function_definition", "class_definition", "import_statement", "import_from_statement", "global_statement"],
+        "symbols": [
+            "function_definition",
+            "class_definition",
+            "import_statement",
+            "import_from_statement",
+            "global_statement",
+        ],
         "query": """
             (function_definition name: (identifier) @function)
             (class_definition name: (identifier) @class)
@@ -83,13 +124,19 @@ LANGUAGE_CONFIGS = {
             (import_from_statement module_name: (dotted_name) @import_from)
             (global_statement (identifier) @global_var)
             (assignment left: (identifier) @variable)
-        """
+        """,
     },
     "javascript": {
         "code": "javascript",
         "name": "JavaScript",
         "extensions": [".js", ".mjs", ".cjs"],
-        "symbols": ["function_declaration", "class_declaration", "method_definition", "variable_declarator", "arrow_function"],
+        "symbols": [
+            "function_declaration",
+            "class_declaration",
+            "method_definition",
+            "variable_declarator",
+            "arrow_function",
+        ],
         "query": """
             (function_declaration name: (identifier) @function)
             (class_declaration name: (identifier) @class)
@@ -99,19 +146,24 @@ LANGUAGE_CONFIGS = {
             (export_statement (function_declaration name: (identifier) @exported_function))
             (export_statement (class_declaration name: (identifier) @exported_class))
             (import_statement (import_clause (identifier) @import))
-        """
+        """,
     },
     "typescript": {
         "code": "typescript",
         "name": "TypeScript",
         "extensions": [".ts", ".tsx"],
-        "symbols": ["function_declaration", "class_declaration", "interface_declaration", "type_alias_declaration"],
+        "symbols": [
+            "function_declaration",
+            "class_declaration",
+            "interface_declaration",
+            "type_alias_declaration",
+        ],
         "query": """
             (function_declaration name: (identifier) @function)
             (class_declaration name: (identifier) @class)
             (interface_declaration name: (identifier) @interface)
             (type_alias_declaration name: (identifier) @type)
-        """
+        """,
     },
     "ruby": {
         "code": "ruby",
@@ -123,7 +175,7 @@ LANGUAGE_CONFIGS = {
             (class name: (constant) @class)
             (module name: (constant) @module)
             (singleton_method name: (identifier) @singleton_method)
-        """
+        """,
     },
     "php": {
         "code": "php",
@@ -134,7 +186,7 @@ LANGUAGE_CONFIGS = {
             (function_definition name: (name) @function)
             (class_declaration name: (name) @class)
             (method_declaration name: (name) @method)
-        """
+        """,
     },
     "perl": {
         "code": "perl",
@@ -143,7 +195,7 @@ LANGUAGE_CONFIGS = {
         "symbols": ["subroutine_declaration"],
         "query": """
             (subroutine_declaration name: (identifier) @function)
-        """
+        """,
     },
     "lua": {
         "code": "lua",
@@ -153,7 +205,7 @@ LANGUAGE_CONFIGS = {
         "query": """
             (function_declaration name: (identifier) @function)
             (function_definition name: (identifier) @function)
-        """
+        """,
     },
     "bash": {
         "code": "bash",
@@ -163,28 +215,41 @@ LANGUAGE_CONFIGS = {
         "query": """
             (function_definition name: (word) @function)
             (variable_assignment name: (variable_name) @variable)
-        """
+        """,
     },
-    
     # JVM Languages
     "java": {
         "code": "java",
         "name": "Java",
         "extensions": [".java"],
-        "symbols": ["class_declaration", "interface_declaration", "method_declaration", "constructor_declaration", "enum_declaration"],
+        "symbols": [
+            "class_declaration",
+            "interface_declaration",
+            "method_declaration",
+            "constructor_declaration",
+            "enum_declaration",
+        ],
         "query": """
             (class_declaration name: (identifier) @class)
             (interface_declaration name: (identifier) @interface)
             (method_declaration name: (identifier) @method)
             (constructor_declaration name: (identifier) @constructor)
             (enum_declaration name: (identifier) @enum)
-        """
+        """,
     },
     "kotlin": {
         "code": "kotlin",
         "name": "Kotlin",
         "extensions": [".kt", ".kts"],
-        "symbols": ["class_declaration", "function_declaration", "object_declaration", "suspend_function", "data_class", "sealed_class", "extension_function"],
+        "symbols": [
+            "class_declaration",
+            "function_declaration",
+            "object_declaration",
+            "suspend_function",
+            "data_class",
+            "sealed_class",
+            "extension_function",
+        ],
         "query": """
             (class_declaration name: (type_identifier) @class)
             (function_declaration name: (simple_identifier) @function)
@@ -205,35 +270,43 @@ LANGUAGE_CONFIGS = {
                 receiver: (function_value_parameters)
                 name: (simple_identifier) @extension_function
             )
-        """
+        """,
     },
     "scala": {
         "code": "scala",
         "name": "Scala",
         "extensions": [".scala", ".sc"],
-        "symbols": ["class_definition", "object_definition", "trait_definition", "function_definition"],
+        "symbols": [
+            "class_definition",
+            "object_definition",
+            "trait_definition",
+            "function_definition",
+        ],
         "query": """
             (class_definition name: (identifier) @class)
             (object_definition name: (identifier) @object)
             (trait_definition name: (identifier) @trait)
             (function_definition name: (identifier) @function)
-        """
+        """,
     },
-    
     # .NET Languages
     "c_sharp": {
         "code": "c_sharp",
         "name": "C#",
         "extensions": [".cs"],
-        "symbols": ["class_declaration", "interface_declaration", "method_declaration", "property_declaration"],
+        "symbols": [
+            "class_declaration",
+            "interface_declaration",
+            "method_declaration",
+            "property_declaration",
+        ],
         "query": """
             (class_declaration name: (identifier) @class)
             (interface_declaration name: (identifier) @interface)
             (method_declaration name: (identifier) @method)
             (property_declaration name: (identifier) @property)
-        """
+        """,
     },
-    
     # Functional Languages
     "haskell": {
         "code": "haskell",
@@ -244,7 +317,7 @@ LANGUAGE_CONFIGS = {
             (function name: (variable) @function)
             (type_synonym name: (type) @type)
             (data name: (type) @data)
-        """
+        """,
     },
     "ocaml": {
         "code": "ocaml",
@@ -255,7 +328,7 @@ LANGUAGE_CONFIGS = {
             (value_definition (value_name) @function)
             (type_definition (type_constructor) @type)
             (module_definition (module_name) @module)
-        """
+        """,
     },
     "elixir": {
         "code": "elixir",
@@ -265,7 +338,7 @@ LANGUAGE_CONFIGS = {
         "query": """
             (def name: (identifier) @function)
             (defmodule name: (alias) @module)
-        """
+        """,
     },
     "erlang": {
         "code": "erlang",
@@ -275,20 +348,23 @@ LANGUAGE_CONFIGS = {
         "query": """
             (function name: (atom) @function)
             (module_attribute name: (atom) @attribute)
-        """
+        """,
     },
     "elm": {
         "code": "elm",
         "name": "Elm",
         "extensions": [".elm"],
-        "symbols": ["function_declaration", "type_declaration", "type_alias_declaration"],
+        "symbols": [
+            "function_declaration",
+            "type_declaration",
+            "type_alias_declaration",
+        ],
         "query": """
             (function_declaration_left (lower_case_identifier) @function)
             (type_declaration (upper_case_identifier) @type)
             (type_alias_declaration name: (upper_case_identifier) @alias)
-        """
+        """,
     },
-    
     # Web Technologies
     "html": {
         "code": "html",
@@ -299,7 +375,7 @@ LANGUAGE_CONFIGS = {
             (element (start_tag (tag_name) @tag))
             (script_element) @script
             (style_element) @style
-        """
+        """,
     },
     "css": {
         "code": "css",
@@ -310,7 +386,7 @@ LANGUAGE_CONFIGS = {
             (rule_set (selectors) @selector)
             (media_statement) @media
             (keyframes_statement (keyframes_name) @keyframes)
-        """
+        """,
     },
     "scss": {
         "code": "scss",
@@ -321,9 +397,8 @@ LANGUAGE_CONFIGS = {
             (rule_set (selectors) @selector)
             (mixin_statement name: (identifier) @mixin)
             (function_statement name: (identifier) @function)
-        """
+        """,
     },
-    
     # Data Formats
     "json": {
         "code": "json",
@@ -332,7 +407,7 @@ LANGUAGE_CONFIGS = {
         "symbols": ["pair"],
         "query": """
             (pair key: (string) @key)
-        """
+        """,
     },
     "yaml": {
         "code": "yaml",
@@ -342,7 +417,7 @@ LANGUAGE_CONFIGS = {
         "query": """
             (block_mapping_pair key: (flow_node) @key)
             (flow_pair key: (flow_node) @key)
-        """
+        """,
     },
     "toml": {
         "code": "toml",
@@ -352,7 +427,7 @@ LANGUAGE_CONFIGS = {
         "query": """
             (table (bare_key) @section)
             (pair (bare_key) @key)
-        """
+        """,
     },
     "xml": {
         "code": "xml",
@@ -362,9 +437,8 @@ LANGUAGE_CONFIGS = {
         "query": """
             (element (start_tag (tag_name) @tag))
             (attribute (attribute_name) @attribute)
-        """
+        """,
     },
-    
     # Config Languages
     "dockerfile": {
         "code": "dockerfile",
@@ -375,7 +449,7 @@ LANGUAGE_CONFIGS = {
             (from_instruction) @from
             (run_instruction) @run
             (cmd_instruction) @cmd
-        """
+        """,
     },
     "make": {
         "code": "make",
@@ -384,7 +458,7 @@ LANGUAGE_CONFIGS = {
         "symbols": ["rule"],
         "query": """
             (rule (targets) @target)
-        """
+        """,
     },
     "cmake": {
         "code": "cmake",
@@ -394,9 +468,8 @@ LANGUAGE_CONFIGS = {
         "query": """
             (function_def name: (argument) @function)
             (macro_def name: (argument) @macro)
-        """
+        """,
     },
-    
     # Query Languages
     "sql": {
         "code": "sql",
@@ -407,31 +480,38 @@ LANGUAGE_CONFIGS = {
             (create_table (table_reference name: (identifier) @table))
             (create_function (identifier) @function)
             (create_view (identifier) @view)
-        """
+        """,
     },
     "graphql": {
         "code": "graphql",
         "name": "GraphQL",
         "extensions": [".graphql", ".gql"],
-        "symbols": ["object_type_definition", "interface_type_definition", "field_definition"],
+        "symbols": [
+            "object_type_definition",
+            "interface_type_definition",
+            "field_definition",
+        ],
         "query": """
             (object_type_definition name: (name) @type)
             (interface_type_definition name: (name) @interface)
             (field_definition name: (name) @field)
-        """
+        """,
     },
-    
     # Mobile Development
     "swift": {
         "code": "swift",
         "name": "Swift",
         "extensions": [".swift"],
-        "symbols": ["function_declaration", "class_declaration", "protocol_declaration"],
+        "symbols": [
+            "function_declaration",
+            "class_declaration",
+            "protocol_declaration",
+        ],
         "query": """
             (function_declaration name: (simple_identifier) @function)
             (class_declaration name: (type_identifier) @class)
             (protocol_declaration name: (type_identifier) @protocol)
-        """
+        """,
     },
     "objc": {
         "code": "objc",
@@ -442,7 +522,7 @@ LANGUAGE_CONFIGS = {
             (class_interface name: (identifier) @class)
             (category_interface name: (identifier) @category)
             (method_declaration) @method
-        """
+        """,
     },
     "dart": {
         "code": "dart",
@@ -453,9 +533,8 @@ LANGUAGE_CONFIGS = {
             (class_definition name: (identifier) @class)
             (function_signature name: (identifier) @function)
             (method_signature name: (identifier) @method)
-        """
+        """,
     },
-    
     # Scientific Computing
     "r": {
         "code": "r",
@@ -465,7 +544,7 @@ LANGUAGE_CONFIGS = {
         "query": """
             (function_definition name: (identifier) @function)
             (assignment left: (identifier) @variable)
-        """
+        """,
     },
     "julia": {
         "code": "julia",
@@ -476,7 +555,7 @@ LANGUAGE_CONFIGS = {
             (function_definition name: (identifier) @function)
             (struct_definition name: (identifier) @struct)
             (module_definition name: (identifier) @module)
-        """
+        """,
     },
     "matlab": {
         "code": "matlab",
@@ -486,7 +565,7 @@ LANGUAGE_CONFIGS = {
         "query": """
             (function_definition name: (identifier) @function)
             (class_definition name: (identifier) @class)
-        """
+        """,
     },
     "fortran": {
         "code": "fortran",
@@ -497,9 +576,8 @@ LANGUAGE_CONFIGS = {
             (function name: (identifier) @function)
             (subroutine name: (identifier) @subroutine)
             (module name: (identifier) @module)
-        """
+        """,
     },
-    
     # Documentation
     "markdown": {
         "code": "markdown",
@@ -509,14 +587,33 @@ LANGUAGE_CONFIGS = {
         "query": """
             (atx_heading (heading_content) @heading)
             (setext_heading (heading_content) @heading)
-        """
+        """,
     },
     "plaintext": {
         "code": "plaintext",
         "name": "Plain Text",
-        "extensions": [".txt", ".text", ".log", ".readme", ".env", ".key", ".pem", ".crt", ".cer", ".pfx", ".p12", ".pub", ".pri", ".license", ".version", ".gitignore", ".dockerignore", ".npmignore"],
+        "extensions": [
+            ".txt",
+            ".text",
+            ".log",
+            ".readme",
+            ".env",
+            ".key",
+            ".pem",
+            ".crt",
+            ".cer",
+            ".pfx",
+            ".p12",
+            ".pub",
+            ".pri",
+            ".license",
+            ".version",
+            ".gitignore",
+            ".dockerignore",
+            ".npmignore",
+        ],
         "symbols": [],  # Plain text doesn't use tree-sitter
-        "query": ""
+        "query": "",
     },
     "rst": {
         "code": "rst",
@@ -526,7 +623,7 @@ LANGUAGE_CONFIGS = {
         "query": """
             (section (title) @section)
             (directive name: (type) @directive)
-        """
+        """,
     },
     "latex": {
         "code": "latex",
@@ -537,9 +634,8 @@ LANGUAGE_CONFIGS = {
             (section (curly_group) @section)
             (environment (begin name: (curly_group_text) @env))
             (new_command_definition name: (curly_group) @command)
-        """
+        """,
     },
-    
     # Other Languages
     "vim": {
         "code": "vim",
@@ -549,7 +645,7 @@ LANGUAGE_CONFIGS = {
         "query": """
             (function_definition name: (identifier) @function)
             (command_definition name: (command_name) @command)
-        """
+        """,
     },
     "regex": {
         "code": "regex",
@@ -558,29 +654,31 @@ LANGUAGE_CONFIGS = {
         "symbols": ["pattern"],
         "query": """
             (pattern) @pattern
-        """
+        """,
     },
     "csv": {
         "code": "csv",
         "name": "CSV",
         "extensions": [".csv", ".tsv"],
         "symbols": [],  # CSV doesn't have traditional symbols
-        "query": ""
+        "query": "",
     },
 }
+
 
 # Helper function to get all supported extensions
 def get_all_extensions() -> set[str]:
     """Get all supported file extensions."""
     extensions = set()
     for config in LANGUAGE_CONFIGS.values():
-        extensions.update(config['extensions'])
+        extensions.update(config["extensions"])
     return extensions
+
 
 # Helper function to get language by extension
 def get_language_by_extension(extension: str) -> str | None:
     """Get language code by file extension."""
     for lang_code, config in LANGUAGE_CONFIGS.items():
-        if extension in config['extensions']:
+        if extension in config["extensions"]:
             return lang_code
     return None

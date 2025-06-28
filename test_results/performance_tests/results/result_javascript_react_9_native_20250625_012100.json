@@ -1,0 +1,14 @@
+{
+  "query": "Show component hierarchy",
+  "mode": "native",
+  "tools_used": ["Grep", "LS", "Read", "Bash"],
+  "tool_calls": {"Grep": 2, "LS": 1, "Read": 1, "Bash": 2},
+  "results_found": 1074,
+  "execution_time_ms": 82,
+  "token_estimate": 4500,
+  "success": true,
+  "error": null,
+  "test_id": "javascript_react_9_native",
+  "batch_name": "javascript_react",
+  "timestamp": "2025-01-06T01:21:00"
+}

@@ -1,0 +1,14 @@
+{
+  "query": "Show all usages of @property decorator",
+  "mode": "native",
+  "tools_used": ["Bash"],
+  "tool_calls": {"Bash": 3},
+  "results_found": 512,
+  "execution_time_ms": 800,
+  "token_estimate": 1200,
+  "success": true,
+  "error": null,
+  "test_id": "python_django_7_native",
+  "batch_name": "python_django",
+  "timestamp": "2025-01-06T01:22:00"
+}

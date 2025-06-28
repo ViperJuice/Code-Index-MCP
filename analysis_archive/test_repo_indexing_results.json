@@ -1,0 +1,23 @@
+{
+  "total": 29,
+  "successful": 1,
+  "failed": 0,
+  "results": [
+    {
+      "repo": {
+        "name": "framework",
+        "path": "/workspaces/Code-Index-MCP/test_repos/web/php/framework",
+        "category": "web",
+        "language": "php",
+        "url": "https://github.com/laravel/framework.git",
+        "hash": "40fdeba5e98b"
+      },
+      "success": true,
+      "stats": {
+        "file_count": 0,
+        "symbol_count": 0,
+        "bm25_count": 6
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "code-index-auto": {
+      "command": "sh",
+      "args": [
+        "-c", 
+        "if [ -f /.dockerenv ]; then python scripts/cli/mcp_server_cli.py; elif command -v docker >/dev/null 2>&1; then docker run -i --rm -v \"${workspace}:/workspace\" -e VOYAGE_AI_API_KEY=\"${VOYAGE_AI_API_KEY:-}\" ${MCP_DOCKER_IMAGE:-ghcr.io/code-index-mcp/mcp-index:minimal}; else python scripts/cli/mcp_server_cli.py; fi"
+      ],
+      "env": {
+        "PYTHONPATH": "${workspace}",
+        "MCP_LOG_LEVEL": "${MCP_LOG_LEVEL:-INFO}"
+      }
+    }
+  }
+}

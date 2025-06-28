@@ -1,0 +1,44 @@
+
+MCP vs Grep Pipeline Performance Report
+Generated: 2025-06-14 06:23
+=====================================
+
+KEY FINDINGS:
+
+1. TOKEN USAGE REDUCTION:
+   • Symbol Search: 97.5% reduction (12,330 → 305 tokens)
+   • Semantic Search: 99.7% reduction (668,071 → 2,000 tokens)
+   • Refactoring: 98.5% reduction (100,020 → 1,500 tokens)
+   • Pattern Search: -43% (grep wins for simple patterns)
+
+2. THE GREP PIPELINE PROBLEM:
+   Traditional grep workflow requires:
+   1. Search for pattern → Find files
+   2. Read ENTIRE files containing matches
+   3. Send all file contents to LLM
+   
+   This results in massive token usage because entire files must be processed,
+   not just the relevant portions.
+
+3. COST IMPLICATIONS (Per Search):
+   Example - Finding a class definition:
+   • Claude 4 Opus: $0.92 (grep) vs $0.02 (MCP) = 98% savings
+   • GPT-4.1: $0.10 (grep) vs $0.002 (MCP) = 98% savings
+   • DeepSeek-V3: $0.01 (grep) vs $0.0003 (MCP) = 97% savings
+
+4. MONTHLY SAVINGS (1000 searches/day):
+   • Claude 4 Opus: Save $27,000/month
+   • GPT-4.1: Save $2,940/month
+   • GPT-4.1 nano: Save $294/month
+   • DeepSeek-V3: Save $297/month
+
+RECOMMENDATIONS:
+• Use MCP for any code understanding task
+• Use MCP for finding symbols, methods, classes
+• Use MCP for semantic/conceptual searches
+• Use MCP for refactoring and cross-file analysis
+• Only use grep for simple pattern matching when you just need line numbers
+
+CONCLUSION:
+MCP's pre-built indexes eliminate the need to read entire files, resulting in
+97-99% token reduction for most real-world development tasks.

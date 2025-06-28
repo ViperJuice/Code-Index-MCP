@@ -1,0 +1,303 @@
+{
+  "summary": {
+    "total_repos": 29,
+    "processed": 29,
+    "successful": 0,
+    "total_files": 0,
+    "total_embeddings": 0,
+    "total_time_minutes": 4.039208094278971e-05
+  },
+  "results": [
+    {
+      "repo": "curl",
+      "language": "c",
+      "collection": "c_curl",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "phoenix",
+      "language": "c",
+      "collection": "c_phoenix",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "redis",
+      "language": "c",
+      "collection": "c_redis",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "grpc",
+      "language": "cpp",
+      "collection": "cpp_grpc",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "json",
+      "language": "cpp",
+      "collection": "cpp_json",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "aspnetcore",
+      "language": "csharp",
+      "collection": "csharp_aspnetcore",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "sdk",
+      "language": "dart",
+      "collection": "dart_sdk",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "gin",
+      "language": "go",
+      "collection": "go_gin",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "terraform",
+      "language": "go",
+      "collection": "go_terraform",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "kafka",
+      "language": "java",
+      "collection": "java_kafka",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "spring-boot",
+      "language": "java",
+      "collection": "java_spring-boot",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "express",
+      "language": "javascript",
+      "collection": "javascript_express",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "react",
+      "language": "javascript",
+      "collection": "javascript_react",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "ktor",
+      "language": "kotlin",
+      "collection": "kotlin_ktor",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "framework",
+      "language": "php",
+      "collection": "php_framework",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "django",
+      "language": "python",
+      "collection": "python_django",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "flask",
+      "language": "python",
+      "collection": "python_flask",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "requests",
+      "language": "python",
+      "collection": "python_requests",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "rails",
+      "language": "ruby",
+      "collection": "ruby_rails",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "rustlings",
+      "language": "rust",
+      "collection": "rust_rustlings",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "tokio",
+      "language": "rust",
+      "collection": "rust_tokio",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "akka",
+      "language": "scala",
+      "collection": "scala_akka",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "Alamofire",
+      "language": "swift",
+      "collection": "swift_Alamofire",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "TypeScript",
+      "language": "typescript",
+      "collection": "typescript_TypeScript",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "kong",
+      "language": "unknown",
+      "collection": "unknown_kong",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "mojo",
+      "language": "unknown",
+      "collection": "unknown_mojo",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "ring",
+      "language": "unknown",
+      "collection": "unknown_ring",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "yesod",
+      "language": "unknown",
+      "collection": "unknown_yesod",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    },
+    {
+      "repo": "zig",
+      "language": "unknown",
+      "collection": "unknown_zig",
+      "files_processed": 0,
+      "embeddings": 0,
+      "success": false,
+      "error": "'NoneType' object has no attribute 'get'",
+      "time": 0
+    }
+  ],
+  "timestamp": "2025-06-27T07:33:21.443938"
+}

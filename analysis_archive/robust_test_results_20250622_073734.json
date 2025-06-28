@@ -1,0 +1,40 @@
+{
+  "timestamp": "20250622_073734",
+  "results": {
+    "mcp": [
+      {
+        "scenario": "symbol_lookup",
+        "results": 10,
+        "time": 0.02083730697631836,
+        "tokens_estimate": 830
+      },
+      {
+        "scenario": "natural_language",
+        "results": 10,
+        "time": 0.019335031509399414,
+        "tokens_estimate": 835
+      }
+    ],
+    "native": [
+      {
+        "scenario": "symbol_lookup",
+        "results": 0,
+        "time": 5,
+        "tokens_estimate": 0
+      },
+      {
+        "scenario": "natural_language",
+        "results": 0,
+        "time": 0.0025539398193359375,
+        "tokens_estimate": 0
+      }
+    ],
+    "errors": []
+  },
+  "summary": {
+    "mcp_total_time": 0.04017233848571777,
+    "native_total_time": 5.002553939819336,
+    "mcp_total_tokens": 1665,
+    "native_total_tokens": 0
+  }
+}

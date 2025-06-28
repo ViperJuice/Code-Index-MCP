@@ -1,0 +1,60 @@
+#!/bin/bash
+# MCP Index Post-Commit Hook
+# Automatically updates index after commits
+
+set -e
+
+# Colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+# Check if index management is enabled
+if [ -f ".mcp-index.json" ]; then
+    ENABLED=$(jq -r '.enabled // true' .mcp-index.json 2>/dev/null || echo "true")
+    AUTO_INDEX=$(jq -r '.repository_tracking.auto_sync_on_commit // true' .mcp-index.json 2>/dev/null || echo "true")
+    
+    if [ "$ENABLED" != "true" ] || [ "$AUTO_INDEX" != "true" ]; then
+        exit 0
+    fi
+else
+    # No config file, skip hook
+    exit 0
+fi
+
+# Get commit information
+COMMIT=$(git rev-parse HEAD)
+REPO_PATH=$(git rev-parse --show-toplevel)
+REPO_NAME=$(basename "$REPO_PATH")
+
+echo -e "${YELLOW}🔍 MCP Index: Processing commit $COMMIT...${NC}"
+
+# Check if mcp-index CLI is available
+if command -v mcp-index &> /dev/null; then
+    # Use mcp-index CLI
+    mcp-index update --repo "$REPO_PATH" --commit "$COMMIT" --incremental 2>&1 | while read line; do
+        echo -e "${GREEN}   $line${NC}"
+    done
+elif [ -f "mcp_cli.py" ]; then
+    # Use local mcp_cli.py
+    python mcp_cli.py index update --incremental 2>&1 | while read line; do
+        echo -e "${GREEN}   $line${NC}"
+    done
+else
+    echo -e "${YELLOW}⚠️  MCP Index: CLI not found${NC}"
+    echo -e "${YELLOW}   Install with: pip install mcp-index-kit${NC}"
+    exit 0
+fi
+
+# Check if artifact sync is enabled
+if [ -f ".mcp-index.json" ]; then
+    ARTIFACT_ENABLED=$(jq -r '.artifact_sync.enabled // true' .mcp-index.json 2>/dev/null || echo "true")
+    
+    if [ "$ARTIFACT_ENABLED" = "true" ]; then
+        echo -e "${GREEN}✓ MCP Index: Index updated for commit ${COMMIT:0:7}${NC}"
+        echo -e "${YELLOW}   Remember to push artifacts with: git push${NC}"
+    fi
+fi
+
+exit 0

@@ -1,0 +1,6227 @@
+{
+  "benchmark_date": "2025-06-15T00:09:36.450672",
+  "summary": {
+    "total_repositories": 29,
+    "total_queries": 131,
+    "total_grep_tokens": 21332560,
+    "total_mcp_tokens": 0,
+    "average_token_reduction": 100.0,
+    "total_costs": {
+      "Claude 4 Opus": {
+        "grep": 1599.8196449999998,
+        "mcp": 0.0
+      },
+      "GPT-4.1": {
+        "grep": 170.64825200000004,
+        "mcp": 0.0
+      },
+      "DeepSeek-V3": {
+        "grep": 23.464124359999996,
+        "mcp": 0.0
+      }
+    },
+    "by_language": {
+      "c": {
+        "repo_count": 2,
+        "query_count": 10,
+        "avg_reduction": 100.0,
+        "total_grep_tokens": 506864,
+        "total_mcp_tokens": 0
+      },
+      "cpp": {
+        "repo_count": 2,
+        "query_count": 10,
+        "avg_reduction": 100.0,
+        "total_grep_tokens": 3327597,
+        "total_mcp_tokens": 0
+      },
+      "rust": {
+        "repo_count": 2,
+        "query_count": 10,
+        "avg_reduction": 100.0,
+        "total_grep_tokens": 361538,
+        "total_mcp_tokens": 0
+      },
+      "zig": {
+        "repo_count": 1,
+        "query_count": 4,
+        "avg_reduction": 100.0,
+        "total_grep_tokens": 782519,
+        "total_mcp_tokens": 0
+      },
+      "python": {
+        "repo_count": 3,
+        "query_count": 15,
+        "avg_reduction": 100.0,
+        "total_grep_tokens": 1359210,
+        "total_mcp_tokens": 0
+      },
+      "javascript": {
+        "repo_count": 2,
+        "query_count": 10,
+        "avg_reduction": 100.0,
+        "total_grep_tokens": 2680912,
+        "total_mcp_tokens": 0
+      },
+      "typescript": {
+        "repo_count": 1,
+        "query_count": 4,
+        "avg_reduction": 100.0,
+        "total_grep_tokens": 674756,
+        "total_mcp_tokens": 0
+      },
+      "ruby": {
+        "repo_count": 1,
+        "query_count": 4,
+        "avg_reduction": 100.0,
+        "total_grep_tokens": 781045,
+        "total_mcp_tokens": 0
+      },
+      "php": {
+        "repo_count": 1,
+        "query_count": 4,
+        "avg_reduction": 100.0,
+        "total_grep_tokens": 5327189,
+        "total_mcp_tokens": 0
+      },
+      "perl": {
+        "repo_count": 1,
+        "query_count": 4,
+        "avg_reduction": 100.0,
+        "total_grep_tokens": 437894,
+        "total_mcp_tokens": 0
+      },
+      "java": {
+        "repo_count": 2,
+        "query_count": 10,
+        "avg_reduction": 100.0,
+        "total_grep_tokens": 616022,
+        "total_mcp_tokens": 0
+      },
+      "kotlin": {
+        "repo_count": 1,
+        "query_count": 4,
+        "avg_reduction": 100.0,
+        "total_grep_tokens": 158056,
+        "total_mcp_tokens": 0
+      },
+      "scala": {
+        "repo_count": 1,
+        "query_count": 4,
+        "avg_reduction": 100.0,
+        "total_grep_tokens": 231903,
+        "total_mcp_tokens": 0
+      },
+      "clojure": {
+        "repo_count": 1,
+        "query_count": 4,
+        "avg_reduction": 100.0,
+        "total_grep_tokens": 111239,
+        "total_mcp_tokens": 0
+      },
+      "go": {
+        "repo_count": 2,
+        "query_count": 10,
+        "avg_reduction": 100.0,
+        "total_grep_tokens": 271202,
+        "total_mcp_tokens": 0
+      },
+      "swift": {
+        "repo_count": 1,
+        "query_count": 4,
+        "avg_reduction": 100.0,
+        "total_grep_tokens": 403058,
+        "total_mcp_tokens": 0
+      },
+      "dart": {
+        "repo_count": 1,
+        "query_count": 4,
+        "avg_reduction": 100.0,
+        "total_grep_tokens": 1528333,
+        "total_mcp_tokens": 0
+      },
+      "elixir": {
+        "repo_count": 1,
+        "query_count": 4,
+        "avg_reduction": 100.0,
+        "total_grep_tokens": 603027,
+        "total_mcp_tokens": 0
+      },
+      "haskell": {
+        "repo_count": 1,
+        "query_count": 4,
+        "avg_reduction": 100.0,
+        "total_grep_tokens": 220684,
+        "total_mcp_tokens": 0
+      },
+      "csharp": {
+        "repo_count": 1,
+        "query_count": 4,
+        "avg_reduction": 100.0,
+        "total_grep_tokens": 741047,
+        "total_mcp_tokens": 0
+      },
+      "lua": {
+        "repo_count": 1,
+        "query_count": 4,
+        "avg_reduction": 100.0,
+        "total_grep_tokens": 208465,
+        "total_mcp_tokens": 0
+      }
+    }
+  },
+  "repositories": [
+    {
+      "repository": "redis/redis",
+      "language": "c",
+      "repo_metrics": {
+        "total_files": 1552,
+        "files_by_extension": {
+          ".c": 436,
+          ".json": 405,
+          ".h": 287,
+          ".tcl": 214,
+          ".sh": 69,
+          "no_extension": 46,
+          ".py": 33,
+          ".in": 22,
+          ".md": 20,
+          ".lua": 20
+        },
+        "total_size_mb": 16.49,
+        "approximate_loc": 267253,
+        "primary_language_files": 436
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 1073,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 84822,
+            "total_tokens": 84839,
+            "time_seconds": 0.9446046352386475
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 6.361905,
+              "mcp_cost": 0.0,
+              "savings": 6.361905,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.6786099999999999,
+              "mcp_cost": 0.0,
+              "savings": 0.6786099999999999,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.09330879,
+              "mcp_cost": 0.0,
+              "savings": 0.09330879,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 638,
+            "files_read": 20,
+            "input_tokens": 11,
+            "output_tokens": 46035,
+            "total_tokens": 46046,
+            "time_seconds": 0.025208234786987305
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 3.45279,
+              "mcp_cost": 0.0,
+              "savings": 3.45279,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.368302,
+              "mcp_cost": 0.0,
+              "savings": 0.368302,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.05064147,
+              "mcp_cost": 0.0,
+              "savings": 0.05064147,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 464,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 99352,
+            "total_tokens": 99368,
+            "time_seconds": 0.04738497734069824
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 7.451639999999999,
+              "mcp_cost": 0.0,
+              "savings": 7.451639999999999,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.794848,
+              "mcp_cost": 0.0,
+              "savings": 0.794848,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.10929152,
+              "mcp_cost": 0.0,
+              "savings": 0.10929152,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 136,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 134520,
+            "total_tokens": 134536,
+            "time_seconds": 0.036711931228637695
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 10.08924,
+              "mcp_cost": 0.0,
+              "savings": 10.08924,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.076192,
+              "mcp_cost": 0.0,
+              "savings": 1.076192,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.14797632000000002,
+              "mcp_cost": 0.0,
+              "savings": 0.14797632000000002,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_malloc",
+          "query_text": "malloc free memory",
+          "grep": {
+            "files_found": 694,
+            "files_read": 20,
+            "input_tokens": 15,
+            "output_tokens": 132016,
+            "total_tokens": 132031,
+            "time_seconds": 0.02849102020263672
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 9.901425,
+              "mcp_cost": 0.0,
+              "savings": 9.901425,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.056158,
+              "mcp_cost": 0.0,
+              "savings": 1.056158,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.14522165,
+              "mcp_cost": 0.0,
+              "savings": 0.14522165,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "curl/curl",
+      "language": "c",
+      "repo_metrics": {
+        "total_files": 0,
+        "files_by_extension": {},
+        "total_size_mb": 0.0,
+        "approximate_loc": 0,
+        "primary_language_files": 0
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 3,
+            "files_read": 3,
+            "input_tokens": 16,
+            "output_tokens": 2758,
+            "total_tokens": 2774,
+            "time_seconds": 0.013502836227416992
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 0.20709,
+              "mcp_cost": 0.0,
+              "savings": 0.20709,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.022096,
+              "mcp_cost": 0.0,
+              "savings": 0.022096,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.00303812,
+              "mcp_cost": 0.0,
+              "savings": 0.00303812,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 10,
+            "files_read": 10,
+            "input_tokens": 11,
+            "output_tokens": 4086,
+            "total_tokens": 4097,
+            "time_seconds": 0.0032052993774414062
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 0.306615,
+              "mcp_cost": 0.0,
+              "savings": 0.306615,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.03271,
+              "mcp_cost": 0.0,
+              "savings": 0.03271,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.00449757,
+              "mcp_cost": 0.0,
+              "savings": 0.00449757,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 3,
+            "files_read": 3,
+            "input_tokens": 16,
+            "output_tokens": 2376,
+            "total_tokens": 2392,
+            "time_seconds": 0.0039730072021484375
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 0.17844,
+              "mcp_cost": 0.0,
+              "savings": 0.17844,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.01904,
+              "mcp_cost": 0.0,
+              "savings": 0.01904,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.00261792,
+              "mcp_cost": 0.0,
+              "savings": 0.00261792,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 1,
+            "files_read": 1,
+            "input_tokens": 16,
+            "output_tokens": 765,
+            "total_tokens": 781,
+            "time_seconds": 0.0033919811248779297
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 0.05761499999999999,
+              "mcp_cost": 0.0,
+              "savings": 0.05761499999999999,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.0061519999999999995,
+              "mcp_cost": 0.0,
+              "savings": 0.0061519999999999995,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.0008458200000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.0008458200000000001,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_malloc",
+          "query_text": "malloc free memory",
+          "grep": {
+            "files_found": 0,
+            "input_tokens": 15,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0.004584550857543945,
+            "error": "No matches found"
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 0.000225,
+              "mcp_cost": 0.0,
+              "savings": 0.000225,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 3e-05,
+              "mcp_cost": 0.0,
+              "savings": 3e-05,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 4.05e-06,
+              "mcp_cost": 0.0,
+              "savings": 4.05e-06,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "nlohmann/json",
+      "language": "cpp",
+      "repo_metrics": {
+        "total_files": 1084,
+        "files_by_extension": {
+          ".cpp": 404,
+          ".md": 250,
+          ".output": 219,
+          ".hpp": 54,
+          ".txt": 47,
+          ".test": 46,
+          ".png": 26,
+          ".h": 17,
+          ".svg": 12,
+          "no_extension": 9
+        },
+        "total_size_mb": 15.23,
+        "approximate_loc": 61668,
+        "primary_language_files": 404
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 604,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 508059,
+            "total_tokens": 508076,
+            "time_seconds": 0.3115105628967285
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 38.10468000000001,
+              "mcp_cost": 0.0,
+              "savings": 38.10468000000001,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 4.064506000000001,
+              "mcp_cost": 0.0,
+              "savings": 4.064506000000001,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.5588694900000001,
+              "mcp_cost": 0.0,
+              "savings": 0.5588694900000001,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 227,
+            "files_read": 20,
+            "input_tokens": 12,
+            "output_tokens": 505150,
+            "total_tokens": 505162,
+            "time_seconds": 0.025734424591064453
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 37.88643,
+              "mcp_cost": 0.0,
+              "savings": 37.88643,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 4.041224,
+              "mcp_cost": 0.0,
+              "savings": 4.041224,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.55566824,
+              "mcp_cost": 0.0,
+              "savings": 0.55566824,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 345,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 601406,
+            "total_tokens": 601423,
+            "time_seconds": 0.0536806583404541
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 45.105705,
+              "mcp_cost": 0.0,
+              "savings": 45.105705,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 4.811282,
+              "mcp_cost": 0.0,
+              "savings": 4.811282,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.6615511900000001,
+              "mcp_cost": 0.0,
+              "savings": 0.6615511900000001,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 30,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 661454,
+            "total_tokens": 661470,
+            "time_seconds": 0.23017311096191406
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 49.609289999999994,
+              "mcp_cost": 0.0,
+              "savings": 49.609289999999994,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 5.291664,
+              "mcp_cost": 0.0,
+              "savings": 5.291664,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.72760372,
+              "mcp_cost": 0.0,
+              "savings": 0.72760372,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_templates",
+          "query_text": "template<typename T>",
+          "grep": {
+            "files_found": 137,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 782444,
+            "total_tokens": 782460,
+            "time_seconds": 0.03571653366088867
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 58.68354,
+              "mcp_cost": 0.0,
+              "savings": 58.68354,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 6.259584,
+              "mcp_cost": 0.0,
+              "savings": 6.259584,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.8606927200000001,
+              "mcp_cost": 0.0,
+              "savings": 0.8606927200000001,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "grpc/grpc",
+      "language": "cpp",
+      "repo_metrics": {
+        "total_files": 5984,
+        "files_by_extension": {
+          ".h": 1963,
+          ".cc": 1705,
+          ".py": 610,
+          ".c": 430,
+          "no_extension": 364,
+          ".php": 215,
+          ".md": 209,
+          ".sh": 181,
+          ".rb": 154,
+          ".proto": 153
+        },
+        "total_size_mb": 62.29,
+        "approximate_loc": 237,
+        "primary_language_files": 0
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 3810,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 13740,
+            "total_tokens": 13757,
+            "time_seconds": 2.1937220096588135
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 1.0307549999999999,
+              "mcp_cost": 0.0,
+              "savings": 1.0307549999999999,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.10995400000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.10995400000000001,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.015118590000000003,
+              "mcp_cost": 0.0,
+              "savings": 0.015118590000000003,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 3231,
+            "files_read": 20,
+            "input_tokens": 12,
+            "output_tokens": 16250,
+            "total_tokens": 16262,
+            "time_seconds": 0.126295804977417
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 1.21893,
+              "mcp_cost": 0.0,
+              "savings": 1.21893,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.130024,
+              "mcp_cost": 0.0,
+              "savings": 0.130024,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.017878240000000004,
+              "mcp_cost": 0.0,
+              "savings": 0.017878240000000004,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 1831,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 27404,
+            "total_tokens": 27421,
+            "time_seconds": 0.17917108535766602
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 2.055555,
+              "mcp_cost": 0.0,
+              "savings": 2.055555,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.21926600000000002,
+              "mcp_cost": 0.0,
+              "savings": 0.21926600000000002,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.030148990000000004,
+              "mcp_cost": 0.0,
+              "savings": 0.030148990000000004,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 736,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 86498,
+            "total_tokens": 86514,
+            "time_seconds": 0.14558768272399902
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 6.48759,
+              "mcp_cost": 0.0,
+              "savings": 6.48759,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.6920160000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.6920160000000001,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.09515212000000002,
+              "mcp_cost": 0.0,
+              "savings": 0.09515212000000002,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_templates",
+          "query_text": "template<typename T>",
+          "grep": {
+            "files_found": 233,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 125036,
+            "total_tokens": 125052,
+            "time_seconds": 0.14474844932556152
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 9.37794,
+              "mcp_cost": 0.0,
+              "savings": 9.37794,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.00032,
+              "mcp_cost": 0.0,
+              "savings": 1.00032,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.13754392000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.13754392000000001,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "rust-lang/rustlings",
+      "language": "rust",
+      "repo_metrics": {
+        "total_files": 276,
+        "files_by_extension": {
+          ".rs": 216,
+          ".md": 34,
+          ".toml": 11,
+          ".html": 6,
+          ".svg": 3,
+          "no_extension": 2,
+          ".sh": 1,
+          ".lock": 1,
+          ".json": 1,
+          ".css": 1
+        },
+        "total_size_mb": 0.51,
+        "approximate_loc": 11660,
+        "primary_language_files": 216
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 231,
+            "files_read": 20,
+            "input_tokens": 18,
+            "output_tokens": 26326,
+            "total_tokens": 26344,
+            "time_seconds": 0.08029794692993164
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 1.9747199999999998,
+              "mcp_cost": 0.0,
+              "savings": 1.9747199999999998,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.210644,
+              "mcp_cost": 0.0,
+              "savings": 0.210644,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.02896346,
+              "mcp_cost": 0.0,
+              "savings": 0.02896346,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 145,
+            "files_read": 20,
+            "input_tokens": 13,
+            "output_tokens": 21626,
+            "total_tokens": 21639,
+            "time_seconds": 0.0063741207122802734
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 1.622145,
+              "mcp_cost": 0.0,
+              "savings": 1.622145,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.173034,
+              "mcp_cost": 0.0,
+              "savings": 0.173034,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.02379211,
+              "mcp_cost": 0.0,
+              "savings": 0.02379211,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 69,
+            "files_read": 20,
+            "input_tokens": 18,
+            "output_tokens": 38888,
+            "total_tokens": 38906,
+            "time_seconds": 0.005917787551879883
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 2.91687,
+              "mcp_cost": 0.0,
+              "savings": 2.91687,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.31113999999999997,
+              "mcp_cost": 0.0,
+              "savings": 0.31113999999999997,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.042781660000000006,
+              "mcp_cost": 0.0,
+              "savings": 0.042781660000000006,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 1,
+            "files_read": 1,
+            "input_tokens": 18,
+            "output_tokens": 767,
+            "total_tokens": 785,
+            "time_seconds": 0.00755620002746582
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 0.057795,
+              "mcp_cost": 0.0,
+              "savings": 0.057795,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.0061719999999999995,
+              "mcp_cost": 0.0,
+              "savings": 0.0061719999999999995,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.00084856,
+              "mcp_cost": 0.0,
+              "savings": 0.00084856,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_traits",
+          "query_text": "trait impl for",
+          "grep": {
+            "files_found": 191,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 23836,
+            "total_tokens": 23852,
+            "time_seconds": 0.006430149078369141
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 1.78794,
+              "mcp_cost": 0.0,
+              "savings": 1.78794,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.19072,
+              "mcp_cost": 0.0,
+              "savings": 0.19072,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.02622392,
+              "mcp_cost": 0.0,
+              "savings": 0.02622392,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "tokio-rs/tokio",
+      "language": "rust",
+      "repo_metrics": {
+        "total_files": 736,
+        "files_by_extension": {
+          ".rs": 695,
+          ".md": 17,
+          ".toml": 16,
+          "no_extension": 6,
+          ".dic": 1,
+          ".yml": 1
+        },
+        "total_size_mb": 4.92,
+        "approximate_loc": 155081,
+        "primary_language_files": 695
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 355,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 28400,
+            "total_tokens": 28417,
+            "time_seconds": 0.2003166675567627
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 2.1302550000000005,
+              "mcp_cost": 0.0,
+              "savings": 2.1302550000000005,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.22723400000000002,
+              "mcp_cost": 0.0,
+              "savings": 0.22723400000000002,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.031244590000000003,
+              "mcp_cost": 0.0,
+              "savings": 0.031244590000000003,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 407,
+            "files_read": 20,
+            "input_tokens": 12,
+            "output_tokens": 32037,
+            "total_tokens": 32049,
+            "time_seconds": 0.011684417724609375
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 2.402955,
+              "mcp_cost": 0.0,
+              "savings": 2.402955,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.25632000000000005,
+              "mcp_cost": 0.0,
+              "savings": 0.25632000000000005,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.03524394000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.03524394000000001,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 240,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 32352,
+            "total_tokens": 32369,
+            "time_seconds": 0.012543678283691406
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 2.4266550000000002,
+              "mcp_cost": 0.0,
+              "savings": 2.4266550000000002,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.25884999999999997,
+              "mcp_cost": 0.0,
+              "savings": 0.25884999999999997,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.03559179,
+              "mcp_cost": 0.0,
+              "savings": 0.03559179,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 32,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 129827,
+            "total_tokens": 129844,
+            "time_seconds": 0.014240741729736328
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 9.737279999999998,
+              "mcp_cost": 0.0,
+              "savings": 9.737279999999998,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.03865,
+              "mcp_cost": 0.0,
+              "savings": 1.03865,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.14281429,
+              "mcp_cost": 0.0,
+              "savings": 0.14281429,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_traits",
+          "query_text": "trait impl for",
+          "grep": {
+            "files_found": 627,
+            "files_read": 20,
+            "input_tokens": 15,
+            "output_tokens": 27318,
+            "total_tokens": 27333,
+            "time_seconds": 0.009681940078735352
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 2.0490749999999998,
+              "mcp_cost": 0.0,
+              "savings": 2.0490749999999998,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.218574,
+              "mcp_cost": 0.0,
+              "savings": 0.218574,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.03005385,
+              "mcp_cost": 0.0,
+              "savings": 0.03005385,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "ziglang/zig",
+      "language": "zig",
+      "repo_metrics": {
+        "total_files": 20228,
+        "files_by_extension": {
+          ".h": 11432,
+          ".zig": 2867,
+          ".def": 2652,
+          ".c": 2366,
+          ".s": 364,
+          ".cpp": 211,
+          "no_extension": 180,
+          ".zon": 71,
+          ".input": 50,
+          ".tar": 35
+        },
+        "total_size_mb": 208.6,
+        "approximate_loc": 1268651,
+        "primary_language_files": 2867
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 7751,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 86144,
+            "total_tokens": 86161,
+            "time_seconds": 4.952829837799072
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 6.461055,
+              "mcp_cost": 0.0,
+              "savings": 6.461055,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.689186,
+              "mcp_cost": 0.0,
+              "savings": 0.689186,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.09476299,
+              "mcp_cost": 0.0,
+              "savings": 0.09476299,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 2008,
+            "files_read": 20,
+            "input_tokens": 11,
+            "output_tokens": 67254,
+            "total_tokens": 67265,
+            "time_seconds": 0.30733513832092285
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 5.0442149999999994,
+              "mcp_cost": 0.0,
+              "savings": 5.0442149999999994,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.5380539999999999,
+              "mcp_cost": 0.0,
+              "savings": 0.5380539999999999,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.07398237,
+              "mcp_cost": 0.0,
+              "savings": 0.07398237,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 6321,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 87148,
+            "total_tokens": 87164,
+            "time_seconds": 0.19722604751586914
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 6.53634,
+              "mcp_cost": 0.0,
+              "savings": 6.53634,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.6972160000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.6972160000000001,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.09586712000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.09586712000000001,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 436,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 541913,
+            "total_tokens": 541929,
+            "time_seconds": 0.3731818199157715
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 40.64371499999999,
+              "mcp_cost": 0.0,
+              "savings": 40.64371499999999,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 4.335336,
+              "mcp_cost": 0.0,
+              "savings": 4.335336,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.59610862,
+              "mcp_cost": 0.0,
+              "savings": 0.59610862,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "django/django",
+      "language": "python",
+      "repo_metrics": {
+        "total_files": 6696,
+        "files_by_extension": {
+          ".py": 2833,
+          ".po": 1272,
+          ".mo": 1261,
+          ".txt": 678,
+          ".html": 367,
+          ".js": 111,
+          ".json": 53,
+          ".css": 48,
+          ".png": 44,
+          ".svg": 29
+        },
+        "total_size_mb": 43.01,
+        "approximate_loc": 489995,
+        "primary_language_files": 2833
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 2309,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 148111,
+            "total_tokens": 148128,
+            "time_seconds": 1.9020774364471436
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 11.108579999999998,
+              "mcp_cost": 0.0,
+              "savings": 11.108579999999998,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.184922,
+              "mcp_cost": 0.0,
+              "savings": 1.184922,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.16292669,
+              "mcp_cost": 0.0,
+              "savings": 0.16292669,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 1586,
+            "files_read": 20,
+            "input_tokens": 12,
+            "output_tokens": 104106,
+            "total_tokens": 104118,
+            "time_seconds": 0.061081886291503906
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 7.80813,
+              "mcp_cost": 0.0,
+              "savings": 7.80813,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.8328720000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.8328720000000001,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.11451984000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.11451984000000001,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 1709,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 148177,
+            "total_tokens": 148194,
+            "time_seconds": 0.08245182037353516
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 11.113529999999999,
+              "mcp_cost": 0.0,
+              "savings": 11.113529999999999,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.1854500000000001,
+              "mcp_cost": 0.0,
+              "savings": 1.1854500000000001,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.16299929000000002,
+              "mcp_cost": 0.0,
+              "savings": 0.16299929000000002,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 855,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 115013,
+            "total_tokens": 115029,
+            "time_seconds": 0.08280014991760254
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 8.626215,
+              "mcp_cost": 0.0,
+              "savings": 8.626215,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.9201360000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.9201360000000001,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.12651862000000003,
+              "mcp_cost": 0.0,
+              "savings": 0.12651862000000003,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_class_init",
+          "query_text": "__init__ method",
+          "grep": {
+            "files_found": 1246,
+            "files_read": 20,
+            "input_tokens": 15,
+            "output_tokens": 142705,
+            "total_tokens": 142720,
+            "time_seconds": 0.08256649971008301
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 10.703100000000001,
+              "mcp_cost": 0.0,
+              "savings": 10.703100000000001,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.14167,
+              "mcp_cost": 0.0,
+              "savings": 1.14167,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.15697955000000002,
+              "mcp_cost": 0.0,
+              "savings": 0.15697955000000002,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "psf/requests",
+      "language": "python",
+      "repo_metrics": {
+        "total_files": 97,
+        "files_by_extension": {
+          ".py": 36,
+          ".rst": 16,
+          "no_extension": 14,
+          ".png": 9,
+          ".md": 5,
+          ".cnf": 4,
+          ".key": 4,
+          ".csr": 3,
+          ".pem": 3,
+          ".html": 3
+        },
+        "total_size_mb": 4.93,
+        "approximate_loc": 11248,
+        "primary_language_files": 36
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 43,
+            "files_read": 20,
+            "input_tokens": 18,
+            "output_tokens": 93118,
+            "total_tokens": 93136,
+            "time_seconds": 0.07906723022460938
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 6.984120000000001,
+              "mcp_cost": 0.0,
+              "savings": 6.984120000000001,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.7449800000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.7449800000000001,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.10243466000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.10243466000000001,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 57,
+            "files_read": 20,
+            "input_tokens": 12,
+            "output_tokens": 57836,
+            "total_tokens": 57848,
+            "time_seconds": 0.011355161666870117
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 4.33788,
+              "mcp_cost": 0.0,
+              "savings": 4.33788,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.462712,
+              "mcp_cost": 0.0,
+              "savings": 0.462712,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.06362284,
+              "mcp_cost": 0.0,
+              "savings": 0.06362284,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 29,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 112910,
+            "total_tokens": 112927,
+            "time_seconds": 0.018109798431396484
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 8.468504999999999,
+              "mcp_cost": 0.0,
+              "savings": 8.468504999999999,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.903314,
+              "mcp_cost": 0.0,
+              "savings": 0.903314,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.12420559,
+              "mcp_cost": 0.0,
+              "savings": 0.12420559,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 11,
+            "files_read": 11,
+            "input_tokens": 17,
+            "output_tokens": 97800,
+            "total_tokens": 97817,
+            "time_seconds": 0.012425661087036133
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 7.335255,
+              "mcp_cost": 0.0,
+              "savings": 7.335255,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.782434,
+              "mcp_cost": 0.0,
+              "savings": 0.782434,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.10758459000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.10758459000000001,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_class_init",
+          "query_text": "__init__ method",
+          "grep": {
+            "files_found": 28,
+            "files_read": 20,
+            "input_tokens": 15,
+            "output_tokens": 93075,
+            "total_tokens": 93090,
+            "time_seconds": 0.010193347930908203
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 6.980850000000001,
+              "mcp_cost": 0.0,
+              "savings": 6.980850000000001,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.74463,
+              "mcp_cost": 0.0,
+              "savings": 0.74463,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.10238655000000002,
+              "mcp_cost": 0.0,
+              "savings": 0.10238655000000002,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "pallets/flask",
+      "language": "python",
+      "repo_metrics": {
+        "total_files": 213,
+        "files_by_extension": {
+          ".py": 83,
+          ".rst": 78,
+          ".html": 20,
+          ".txt": 10,
+          ".toml": 5,
+          ".png": 5,
+          "no_extension": 4,
+          ".md": 3,
+          ".svg": 3,
+          ".yaml": 2
+        },
+        "total_size_mb": 1.61,
+        "approximate_loc": 17819,
+        "primary_language_files": 83
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 108,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 63378,
+            "total_tokens": 63395,
+            "time_seconds": 0.05155682563781738
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 4.753605,
+              "mcp_cost": 0.0,
+              "savings": 4.753605,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.507058,
+              "mcp_cost": 0.0,
+              "savings": 0.507058,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.06972039000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.06972039000000001,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 96,
+            "files_read": 20,
+            "input_tokens": 12,
+            "output_tokens": 14425,
+            "total_tokens": 14437,
+            "time_seconds": 0.00421142578125
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 1.082055,
+              "mcp_cost": 0.0,
+              "savings": 1.082055,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.115424,
+              "mcp_cost": 0.0,
+              "savings": 0.115424,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.015870740000000005,
+              "mcp_cost": 0.0,
+              "savings": 0.015870740000000005,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 80,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 44837,
+            "total_tokens": 44854,
+            "time_seconds": 0.00630950927734375
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 3.36303,
+              "mcp_cost": 0.0,
+              "savings": 3.36303,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.35873,
+              "mcp_cost": 0.0,
+              "savings": 0.35873,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.04932529000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.04932529000000001,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 40,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 100370,
+            "total_tokens": 100386,
+            "time_seconds": 0.005655050277709961
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 7.52799,
+              "mcp_cost": 0.0,
+              "savings": 7.52799,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.802992,
+              "mcp_cost": 0.0,
+              "savings": 0.802992,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.11041132000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.11041132000000001,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_class_init",
+          "query_text": "__init__ method",
+          "grep": {
+            "files_found": 82,
+            "files_read": 20,
+            "input_tokens": 14,
+            "output_tokens": 23117,
+            "total_tokens": 23131,
+            "time_seconds": 0.003665924072265625
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 1.7339849999999999,
+              "mcp_cost": 0.0,
+              "savings": 1.7339849999999999,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.184964,
+              "mcp_cost": 0.0,
+              "savings": 0.184964,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.02543248,
+              "mcp_cost": 0.0,
+              "savings": 0.02543248,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "facebook/react",
+      "language": "javascript",
+      "repo_metrics": {
+        "total_files": 6164,
+        "files_by_extension": {
+          ".js": 3528,
+          ".md": 1684,
+          ".ts": 393,
+          ".json": 135,
+          ".tsx": 105,
+          ".css": 99,
+          ".html": 77,
+          ".map": 68,
+          ".lock": 42,
+          ".png": 33
+        },
+        "total_size_mb": 31.24,
+        "approximate_loc": 584184,
+        "primary_language_files": 3528
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 5119,
+            "files_read": 20,
+            "input_tokens": 18,
+            "output_tokens": 88344,
+            "total_tokens": 88362,
+            "time_seconds": 0.0352778434753418
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 6.626070000000001,
+              "mcp_cost": 0.0,
+              "savings": 6.626070000000001,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.7067880000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.7067880000000001,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.09718326000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.09718326000000001,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 954,
+            "files_read": 20,
+            "input_tokens": 13,
+            "output_tokens": 251134,
+            "total_tokens": 251147,
+            "time_seconds": 0.04230928421020508
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 18.835245000000004,
+              "mcp_cost": 0.0,
+              "savings": 18.835245000000004,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 2.0090980000000003,
+              "mcp_cost": 0.0,
+              "savings": 2.0090980000000003,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.27625091,
+              "mcp_cost": 0.0,
+              "savings": 0.27625091,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 1048,
+            "files_read": 20,
+            "input_tokens": 18,
+            "output_tokens": 306891,
+            "total_tokens": 306909,
+            "time_seconds": 0.0426175594329834
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 23.017095,
+              "mcp_cost": 0.0,
+              "savings": 23.017095,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 2.4551640000000003,
+              "mcp_cost": 0.0,
+              "savings": 2.4551640000000003,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.33758496000000004,
+              "mcp_cost": 0.0,
+              "savings": 0.33758496000000004,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 107,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 433729,
+            "total_tokens": 433746,
+            "time_seconds": 0.05828428268432617
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 32.52993,
+              "mcp_cost": 0.0,
+              "savings": 32.52993,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 3.4698659999999997,
+              "mcp_cost": 0.0,
+              "savings": 3.4698659999999997,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.47710649000000005,
+              "mcp_cost": 0.0,
+              "savings": 0.47710649000000005,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_async",
+          "query_text": "async function await",
+          "grep": {
+            "files_found": 5030,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 109051,
+            "total_tokens": 109068,
+            "time_seconds": 0.03511524200439453
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 8.179079999999999,
+              "mcp_cost": 0.0,
+              "savings": 8.179079999999999,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.8724419999999999,
+              "mcp_cost": 0.0,
+              "savings": 0.8724419999999999,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.11996069000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.11996069000000001,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "expressjs/express",
+      "language": "javascript",
+      "repo_metrics": {
+        "total_files": 209,
+        "files_by_extension": {
+          ".js": 142,
+          ".ejs": 20,
+          ".txt": 11,
+          ".html": 8,
+          "no_extension": 7,
+          ".tmpl": 7,
+          ".md": 6,
+          ".css": 4,
+          ".hbs": 3,
+          ".yml": 1
+        },
+        "total_size_mb": 0.66,
+        "approximate_loc": 21203,
+        "primary_language_files": 142
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 147,
+            "files_read": 20,
+            "input_tokens": 18,
+            "output_tokens": 23377,
+            "total_tokens": 23395,
+            "time_seconds": 0.08502531051635742
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 1.753545,
+              "mcp_cost": 0.0,
+              "savings": 1.753545,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.187052,
+              "mcp_cost": 0.0,
+              "savings": 0.187052,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.02571956,
+              "mcp_cost": 0.0,
+              "savings": 0.02571956,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 109,
+            "files_read": 20,
+            "input_tokens": 13,
+            "output_tokens": 27043,
+            "total_tokens": 27056,
+            "time_seconds": 0.006247043609619141
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 2.02842,
+              "mcp_cost": 0.0,
+              "savings": 2.02842,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.21637,
+              "mcp_cost": 0.0,
+              "savings": 0.21637,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.029750810000000006,
+              "mcp_cost": 0.0,
+              "savings": 0.029750810000000006,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 56,
+            "files_read": 20,
+            "input_tokens": 18,
+            "output_tokens": 39781,
+            "total_tokens": 39799,
+            "time_seconds": 0.009757280349731445
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 2.9838449999999996,
+              "mcp_cost": 0.0,
+              "savings": 2.9838449999999996,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.31828399999999996,
+              "mcp_cost": 0.0,
+              "savings": 0.31828399999999996,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.043763960000000005,
+              "mcp_cost": 0.0,
+              "savings": 0.043763960000000005,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 8,
+            "files_read": 8,
+            "input_tokens": 18,
+            "output_tokens": 1378018,
+            "total_tokens": 1378036,
+            "time_seconds": 0.14693856239318848
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 103.35162,
+              "mcp_cost": 0.0,
+              "savings": 103.35162,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 11.02418,
+              "mcp_cost": 0.0,
+              "savings": 11.02418,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 1.51582466,
+              "mcp_cost": 0.0,
+              "savings": 1.51582466,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_async",
+          "query_text": "async function await",
+          "grep": {
+            "files_found": 142,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 23377,
+            "total_tokens": 23394,
+            "time_seconds": 0.009071111679077148
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 1.7535299999999998,
+              "mcp_cost": 0.0,
+              "savings": 1.7535299999999998,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.18705,
+              "mcp_cost": 0.0,
+              "savings": 0.18705,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.02571929,
+              "mcp_cost": 0.0,
+              "savings": 0.02571929,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "microsoft/TypeScript",
+      "language": "typescript",
+      "repo_metrics": {
+        "total_files": 71174,
+        "files_by_extension": {
+          ".ts": 20570,
+          ".js": 15482,
+          ".types": 12305,
+          ".symbols": 12305,
+          ".txt": 6461,
+          ".json": 1457,
+          ".jsonc": 955,
+          ".map": 853,
+          ".baseline": 455,
+          ".tsx": 331
+        },
+        "total_size_mb": 335.55,
+        "approximate_loc": 1560227,
+        "primary_language_files": 20570
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 33008,
+            "files_read": 20,
+            "input_tokens": 19,
+            "output_tokens": 143281,
+            "total_tokens": 143300,
+            "time_seconds": 10.43938398361206
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 10.74636,
+              "mcp_cost": 0.0,
+              "savings": 10.74636,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.146286,
+              "mcp_cost": 0.0,
+              "savings": 1.146286,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.15761423,
+              "mcp_cost": 0.0,
+              "savings": 0.15761423,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 44758,
+            "files_read": 20,
+            "input_tokens": 14,
+            "output_tokens": 194581,
+            "total_tokens": 194595,
+            "time_seconds": 0.4468088150024414
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 14.593784999999999,
+              "mcp_cost": 0.0,
+              "savings": 14.593784999999999,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.556676,
+              "mcp_cost": 0.0,
+              "savings": 1.556676,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.21404288000000002,
+              "mcp_cost": 0.0,
+              "savings": 0.21404288000000002,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 15487,
+            "files_read": 20,
+            "input_tokens": 19,
+            "output_tokens": 141217,
+            "total_tokens": 141236,
+            "time_seconds": 0.5057806968688965
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 10.591560000000001,
+              "mcp_cost": 0.0,
+              "savings": 10.591560000000001,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.129774,
+              "mcp_cost": 0.0,
+              "savings": 1.129774,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.15534383000000002,
+              "mcp_cost": 0.0,
+              "savings": 0.15534383000000002,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 269,
+            "files_read": 20,
+            "input_tokens": 18,
+            "output_tokens": 195607,
+            "total_tokens": 195625,
+            "time_seconds": 0.5427930355072021
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 14.670795,
+              "mcp_cost": 0.0,
+              "savings": 14.670795,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.564892,
+              "mcp_cost": 0.0,
+              "savings": 1.564892,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.21517256,
+              "mcp_cost": 0.0,
+              "savings": 0.21517256,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "rails/rails",
+      "language": "ruby",
+      "repo_metrics": {
+        "total_files": 4543,
+        "files_by_extension": {
+          ".rb": 3259,
+          ".erb": 508,
+          ".yml": 190,
+          ".tt": 161,
+          "no_extension": 141,
+          ".md": 121,
+          ".js": 68,
+          ".html": 45,
+          ".png": 30,
+          ".svg": 20
+        },
+        "total_size_mb": 29.52,
+        "approximate_loc": 509598,
+        "primary_language_files": 3259
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 662,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 163745,
+            "total_tokens": 163761,
+            "time_seconds": 0.9606261253356934
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 12.281115,
+              "mcp_cost": 0.0,
+              "savings": 12.281115,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.309992,
+              "mcp_cost": 0.0,
+              "savings": 1.309992,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.18012382000000002,
+              "mcp_cost": 0.0,
+              "savings": 0.18012382000000002,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 1807,
+            "files_read": 20,
+            "input_tokens": 11,
+            "output_tokens": 162124,
+            "total_tokens": 162135,
+            "time_seconds": 0.044455766677856445
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 12.159465,
+              "mcp_cost": 0.0,
+              "savings": 12.159465,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.297014,
+              "mcp_cost": 0.0,
+              "savings": 1.297014,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.17833937,
+              "mcp_cost": 0.0,
+              "savings": 0.17833937,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 977,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 228021,
+            "total_tokens": 228037,
+            "time_seconds": 0.06085801124572754
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 17.101815000000002,
+              "mcp_cost": 0.0,
+              "savings": 17.101815000000002,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.8242,
+              "mcp_cost": 0.0,
+              "savings": 1.8242,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.25082742,
+              "mcp_cost": 0.0,
+              "savings": 0.25082742,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 362,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 227096,
+            "total_tokens": 227112,
+            "time_seconds": 0.05855369567871094
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 17.03244,
+              "mcp_cost": 0.0,
+              "savings": 17.03244,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.8168,
+              "mcp_cost": 0.0,
+              "savings": 1.8168,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.24980992000000002,
+              "mcp_cost": 0.0,
+              "savings": 0.24980992000000002,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "laravel/framework",
+      "language": "php",
+      "repo_metrics": {
+        "total_files": 2762,
+        "files_by_extension": {
+          ".php": 2566,
+          ".stub": 85,
+          ".json": 46,
+          ".md": 40,
+          ".png": 7,
+          ".js": 5,
+          ".sh": 4,
+          ".css": 4,
+          "no_extension": 3,
+          ".yml": 2
+        },
+        "total_size_mb": 21.01,
+        "approximate_loc": 457531,
+        "primary_language_files": 2566
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 2367,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 1284182,
+            "total_tokens": 1284199,
+            "time_seconds": 0.5905396938323975
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 96.31390499999999,
+              "mcp_cost": 0.0,
+              "savings": 96.31390499999999,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 10.273489999999999,
+              "mcp_cost": 0.0,
+              "savings": 10.273489999999999,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 1.41260479,
+              "mcp_cost": 0.0,
+              "savings": 1.41260479,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 973,
+            "files_read": 20,
+            "input_tokens": 12,
+            "output_tokens": 1302677,
+            "total_tokens": 1302689,
+            "time_seconds": 0.07980012893676758
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 97.70095500000001,
+              "mcp_cost": 0.0,
+              "savings": 97.70095500000001,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 10.42144,
+              "mcp_cost": 0.0,
+              "savings": 10.42144,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 1.4329479400000003,
+              "mcp_cost": 0.0,
+              "savings": 1.4329479400000003,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 383,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 1309372,
+            "total_tokens": 1309389,
+            "time_seconds": 0.11136221885681152
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 98.203155,
+              "mcp_cost": 0.0,
+              "savings": 98.203155,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 10.47501,
+              "mcp_cost": 0.0,
+              "savings": 10.47501,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 1.4403137900000003,
+              "mcp_cost": 0.0,
+              "savings": 1.4403137900000003,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 113,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 1430896,
+            "total_tokens": 1430912,
+            "time_seconds": 0.10146546363830566
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 107.31744,
+              "mcp_cost": 0.0,
+              "savings": 107.31744,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 11.447199999999999,
+              "mcp_cost": 0.0,
+              "savings": 11.447199999999999,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 1.57398992,
+              "mcp_cost": 0.0,
+              "savings": 1.57398992,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "mojolicious/mojo",
+      "language": "perl",
+      "repo_metrics": {
+        "total_files": 348,
+        "files_by_extension": {
+          ".pm": 150,
+          ".t": 108,
+          ".ep": 16,
+          ".txt": 15,
+          ".pl": 14,
+          ".pod": 10,
+          "no_extension": 9,
+          ".epl": 9,
+          ".js": 9,
+          ".png": 8
+        },
+        "total_size_mb": 3.89,
+        "approximate_loc": 388,
+        "primary_language_files": 14
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 130,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 91671,
+            "total_tokens": 91687,
+            "time_seconds": 0.09536004066467285
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 6.875565,
+              "mcp_cost": 0.0,
+              "savings": 6.875565,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.7334,
+              "mcp_cost": 0.0,
+              "savings": 0.7334,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.10084242000000002,
+              "mcp_cost": 0.0,
+              "savings": 0.10084242000000002,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 200,
+            "files_read": 20,
+            "input_tokens": 11,
+            "output_tokens": 87777,
+            "total_tokens": 87788,
+            "time_seconds": 0.008491277694702148
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 6.5834399999999995,
+              "mcp_cost": 0.0,
+              "savings": 6.5834399999999995,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.7022379999999999,
+              "mcp_cost": 0.0,
+              "savings": 0.7022379999999999,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.09655767000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.09655767000000001,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 121,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 98710,
+            "total_tokens": 98726,
+            "time_seconds": 0.007189512252807617
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 7.403490000000001,
+              "mcp_cost": 0.0,
+              "savings": 7.403490000000001,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.7897120000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.7897120000000001,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.10858532000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.10858532000000001,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 20,
+            "files_read": 20,
+            "input_tokens": 15,
+            "output_tokens": 159678,
+            "total_tokens": 159693,
+            "time_seconds": 0.009387016296386719
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 11.976075,
+              "mcp_cost": 0.0,
+              "savings": 11.976075,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.2774539999999999,
+              "mcp_cost": 0.0,
+              "savings": 1.2774539999999999,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.17564985,
+              "mcp_cost": 0.0,
+              "savings": 0.17564985,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "spring-projects/spring-boot",
+      "language": "java",
+      "repo_metrics": {
+        "total_files": 8831,
+        "files_by_extension": {
+          ".java": 7387,
+          ".kt": 369,
+          ".gradle": 227,
+          ".xml": 220,
+          ".adoc": 211,
+          ".properties": 129,
+          ".key": 119,
+          ".json": 59,
+          ".txt": 57,
+          ".html": 53
+        },
+        "total_size_mb": 30.87,
+        "approximate_loc": 759235,
+        "primary_language_files": 7387
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 2814,
+            "files_read": 20,
+            "input_tokens": 18,
+            "output_tokens": 25649,
+            "total_tokens": 25667,
+            "time_seconds": 2.2709479331970215
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 1.923945,
+              "mcp_cost": 0.0,
+              "savings": 1.923945,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.20522800000000002,
+              "mcp_cost": 0.0,
+              "savings": 0.20522800000000002,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.028218760000000002,
+              "mcp_cost": 0.0,
+              "savings": 0.028218760000000002,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 4124,
+            "files_read": 20,
+            "input_tokens": 13,
+            "output_tokens": 19268,
+            "total_tokens": 19281,
+            "time_seconds": 0.07556557655334473
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 1.445295,
+              "mcp_cost": 0.0,
+              "savings": 1.445295,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.15417,
+              "mcp_cost": 0.0,
+              "savings": 0.15417,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.021198310000000005,
+              "mcp_cost": 0.0,
+              "savings": 0.021198310000000005,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 703,
+            "files_read": 20,
+            "input_tokens": 18,
+            "output_tokens": 75758,
+            "total_tokens": 75776,
+            "time_seconds": 0.08958816528320312
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 5.682120000000001,
+              "mcp_cost": 0.0,
+              "savings": 5.682120000000001,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.6061000000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.6061000000000001,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.08333866000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.08333866000000001,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 2257,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 15601,
+            "total_tokens": 15618,
+            "time_seconds": 0.1023097038269043
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 1.1703299999999999,
+              "mcp_cost": 0.0,
+              "savings": 1.1703299999999999,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.12484200000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.12484200000000001,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.01716569,
+              "mcp_cost": 0.0,
+              "savings": 0.01716569,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_annotations",
+          "query_text": "@Override @Autowired",
+          "grep": {
+            "files_found": 2853,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 24651,
+            "total_tokens": 24668,
+            "time_seconds": 0.06928110122680664
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 1.8490799999999998,
+              "mcp_cost": 0.0,
+              "savings": 1.8490799999999998,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.197242,
+              "mcp_cost": 0.0,
+              "savings": 0.197242,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.02712069,
+              "mcp_cost": 0.0,
+              "savings": 0.02712069,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "apache/kafka",
+      "language": "java",
+      "repo_metrics": {
+        "total_files": 6603,
+        "files_by_extension": {
+          ".java": 5486,
+          ".scala": 351,
+          ".json": 298,
+          ".py": 169,
+          ".html": 64,
+          ".sh": 57,
+          "no_extension": 55,
+          ".png": 47,
+          ".properties": 41,
+          ".bat": 35
+        },
+        "total_size_mb": 70.19,
+        "approximate_loc": 1285974,
+        "primary_language_files": 5486
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 2058,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 73072,
+            "total_tokens": 73088,
+            "time_seconds": 1.4593608379364014
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 5.480639999999999,
+              "mcp_cost": 0.0,
+              "savings": 5.480639999999999,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.584608,
+              "mcp_cost": 0.0,
+              "savings": 0.584608,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.08038352,
+              "mcp_cost": 0.0,
+              "savings": 0.08038352,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 2890,
+            "files_read": 20,
+            "input_tokens": 11,
+            "output_tokens": 117428,
+            "total_tokens": 117439,
+            "time_seconds": 0.05552506446838379
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 8.807265000000001,
+              "mcp_cost": 0.0,
+              "savings": 8.807265000000001,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.939446,
+              "mcp_cost": 0.0,
+              "savings": 0.939446,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.12917377,
+              "mcp_cost": 0.0,
+              "savings": 0.12917377,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 2401,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 128587,
+            "total_tokens": 128603,
+            "time_seconds": 0.08152365684509277
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 9.644265,
+              "mcp_cost": 0.0,
+              "savings": 9.644265,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.028728,
+              "mcp_cost": 0.0,
+              "savings": 1.028728,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.14145002,
+              "mcp_cost": 0.0,
+              "savings": 0.14145002,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 656,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 27337,
+            "total_tokens": 27353,
+            "time_seconds": 0.14764094352722168
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 2.050515,
+              "mcp_cost": 0.0,
+              "savings": 2.050515,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.218728,
+              "mcp_cost": 0.0,
+              "savings": 0.218728,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.03007502,
+              "mcp_cost": 0.0,
+              "savings": 0.03007502,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_annotations",
+          "query_text": "@Override @Autowired",
+          "grep": {
+            "files_found": 2605,
+            "files_read": 20,
+            "input_tokens": 15,
+            "output_tokens": 108514,
+            "total_tokens": 108529,
+            "time_seconds": 0.05574941635131836
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 8.138775,
+              "mcp_cost": 0.0,
+              "savings": 8.138775,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.868142,
+              "mcp_cost": 0.0,
+              "savings": 0.868142,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.11936945000000002,
+              "mcp_cost": 0.0,
+              "savings": 0.11936945000000002,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "ktorio/ktor",
+      "language": "kotlin",
+      "repo_metrics": {
+        "total_files": 2267,
+        "files_by_extension": {
+          ".kt": 1948,
+          ".api": 218,
+          ".properties": 18,
+          ".yaml": 14,
+          ".txt": 14,
+          ".h": 12,
+          ".a": 12,
+          ".conf": 11,
+          ".xml": 10,
+          ".def": 10
+        },
+        "total_size_mb": 51.54,
+        "approximate_loc": 209218,
+        "primary_language_files": 1948
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 585,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 32355,
+            "total_tokens": 32372,
+            "time_seconds": 0.8048648834228516
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 2.42688,
+              "mcp_cost": 0.0,
+              "savings": 2.42688,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.258874,
+              "mcp_cost": 0.0,
+              "savings": 0.258874,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.03559509,
+              "mcp_cost": 0.0,
+              "savings": 0.03559509,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 752,
+            "files_read": 20,
+            "input_tokens": 11,
+            "output_tokens": 12613,
+            "total_tokens": 12624,
+            "time_seconds": 0.049356937408447266
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 0.9461399999999999,
+              "mcp_cost": 0.0,
+              "savings": 0.9461399999999999,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.10092599999999999,
+              "mcp_cost": 0.0,
+              "savings": 0.10092599999999999,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.01387727,
+              "mcp_cost": 0.0,
+              "savings": 0.01387727,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 451,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 24587,
+            "total_tokens": 24603,
+            "time_seconds": 0.03886604309082031
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 1.844265,
+              "mcp_cost": 0.0,
+              "savings": 1.844265,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.19672800000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.19672800000000001,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.02705002,
+              "mcp_cost": 0.0,
+              "savings": 0.02705002,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 363,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 88441,
+            "total_tokens": 88457,
+            "time_seconds": 0.0735468864440918
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 6.6333150000000005,
+              "mcp_cost": 0.0,
+              "savings": 6.6333150000000005,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.7075600000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.7075600000000001,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.09728942000000002,
+              "mcp_cost": 0.0,
+              "savings": 0.09728942000000002,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "akka/akka",
+      "language": "scala",
+      "repo_metrics": {
+        "total_files": 4263,
+        "files_by_extension": {
+          ".scala": 2561,
+          ".java": 544,
+          ".md": 428,
+          ".excludes": 370,
+          ".png": 110,
+          "no_extension": 78,
+          ".conf": 65,
+          ".svg": 40,
+          ".xml": 39,
+          ".json": 28
+        },
+        "total_size_mb": 37.37,
+        "approximate_loc": 468731,
+        "primary_language_files": 2561
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 1296,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 66189,
+            "total_tokens": 66205,
+            "time_seconds": 1.1716082096099854
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 4.964415,
+              "mcp_cost": 0.0,
+              "savings": 4.964415,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.529544,
+              "mcp_cost": 0.0,
+              "savings": 0.529544,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.07281222000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.07281222000000001,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 2134,
+            "files_read": 20,
+            "input_tokens": 11,
+            "output_tokens": 33250,
+            "total_tokens": 33261,
+            "time_seconds": 0.08835840225219727
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 2.4939150000000003,
+              "mcp_cost": 0.0,
+              "savings": 2.4939150000000003,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.26602200000000004,
+              "mcp_cost": 0.0,
+              "savings": 0.26602200000000004,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.03657797,
+              "mcp_cost": 0.0,
+              "savings": 0.03657797,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 802,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 70108,
+            "total_tokens": 70124,
+            "time_seconds": 0.08298134803771973
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 5.2583400000000005,
+              "mcp_cost": 0.0,
+              "savings": 5.2583400000000005,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.5608960000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.5608960000000001,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.07712312000000002,
+              "mcp_cost": 0.0,
+              "savings": 0.07712312000000002,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 773,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 62297,
+            "total_tokens": 62313,
+            "time_seconds": 0.08113741874694824
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 4.672515,
+              "mcp_cost": 0.0,
+              "savings": 4.672515,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.49840799999999996,
+              "mcp_cost": 0.0,
+              "savings": 0.49840799999999996,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.06853102000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.06853102000000001,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "ring-clojure/ring",
+      "language": "clojure",
+      "repo_metrics": {
+        "total_files": 98,
+        "files_by_extension": {
+          ".clj": 79,
+          ".md": 4,
+          ".txt": 4,
+          ".html": 3,
+          ".css": 2,
+          ".jar": 2,
+          "no_extension": 1,
+          ".edn": 1,
+          ".crt": 1,
+          ".jceks": 1
+        },
+        "total_size_mb": 0.33,
+        "approximate_loc": 7644,
+        "primary_language_files": 79
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 31,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 36451,
+            "total_tokens": 36468,
+            "time_seconds": 0.04636549949645996
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 2.73408,
+              "mcp_cost": 0.0,
+              "savings": 2.73408,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.29164199999999996,
+              "mcp_cost": 0.0,
+              "savings": 0.29164199999999996,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.04010069,
+              "mcp_cost": 0.0,
+              "savings": 0.04010069,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 59,
+            "files_read": 20,
+            "input_tokens": 12,
+            "output_tokens": 25312,
+            "total_tokens": 25324,
+            "time_seconds": 0.003970146179199219
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 1.8985800000000002,
+              "mcp_cost": 0.0,
+              "savings": 1.8985800000000002,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.20252,
+              "mcp_cost": 0.0,
+              "savings": 0.20252,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.027846440000000004,
+              "mcp_cost": 0.0,
+              "savings": 0.027846440000000004,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 39,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 40148,
+            "total_tokens": 40165,
+            "time_seconds": 0.009844303131103516
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 3.0113550000000004,
+              "mcp_cost": 0.0,
+              "savings": 3.0113550000000004,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.321218,
+              "mcp_cost": 0.0,
+              "savings": 0.321218,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.04416739000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.04416739000000001,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 3,
+            "files_read": 3,
+            "input_tokens": 16,
+            "output_tokens": 9266,
+            "total_tokens": 9282,
+            "time_seconds": 0.007352113723754883
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 0.69519,
+              "mcp_cost": 0.0,
+              "savings": 0.69519,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.07416,
+              "mcp_cost": 0.0,
+              "savings": 0.07416,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.010196920000000002,
+              "mcp_cost": 0.0,
+              "savings": 0.010196920000000002,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "gin-gonic/gin",
+      "language": "go",
+      "repo_metrics": {
+        "total_files": 114,
+        "files_by_extension": {
+          ".go": 93,
+          ".md": 9,
+          ".yml": 2,
+          "no_extension": 2,
+          ".tmpl": 2,
+          ".pem": 2,
+          ".mod": 1,
+          ".yaml": 1,
+          ".sum": 1,
+          ".proto": 1
+        },
+        "total_size_mb": 0.77,
+        "approximate_loc": 20734,
+        "primary_language_files": 93
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 37,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 61083,
+            "total_tokens": 61099,
+            "time_seconds": 0.006816387176513672
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 4.581465,
+              "mcp_cost": 0.0,
+              "savings": 4.581465,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.48869599999999996,
+              "mcp_cost": 0.0,
+              "savings": 0.48869599999999996,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.06719562000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.06719562000000001,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 67,
+            "files_read": 20,
+            "input_tokens": 11,
+            "output_tokens": 31795,
+            "total_tokens": 31806,
+            "time_seconds": 0.0035517215728759766
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 2.3847899999999997,
+              "mcp_cost": 0.0,
+              "savings": 2.3847899999999997,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.254382,
+              "mcp_cost": 0.0,
+              "savings": 0.254382,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.03497747,
+              "mcp_cost": 0.0,
+              "savings": 0.03497747,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 69,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 28244,
+            "total_tokens": 28260,
+            "time_seconds": 0.0038933753967285156
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 2.11854,
+              "mcp_cost": 0.0,
+              "savings": 2.11854,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.225984,
+              "mcp_cost": 0.0,
+              "savings": 0.225984,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.031072719999999998,
+              "mcp_cost": 0.0,
+              "savings": 0.031072719999999998,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 8,
+            "files_read": 8,
+            "input_tokens": 15,
+            "output_tokens": 64026,
+            "total_tokens": 64041,
+            "time_seconds": 0.0028867721557617188
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 4.802175,
+              "mcp_cost": 0.0,
+              "savings": 4.802175,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.512238,
+              "mcp_cost": 0.0,
+              "savings": 0.512238,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.07043265000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.07043265000000001,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_goroutines",
+          "query_text": "go func goroutine",
+          "grep": {
+            "files_found": 119,
+            "files_read": 20,
+            "input_tokens": 14,
+            "output_tokens": 16117,
+            "total_tokens": 16131,
+            "time_seconds": 0.003407001495361328
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 1.208985,
+              "mcp_cost": 0.0,
+              "savings": 1.208985,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.128964,
+              "mcp_cost": 0.0,
+              "savings": 0.128964,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.01773248,
+              "mcp_cost": 0.0,
+              "savings": 0.01773248,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "hashicorp/terraform",
+      "language": "go",
+      "repo_metrics": {
+        "total_files": 4732,
+        "files_by_extension": {
+          ".go": 1750,
+          ".tf": 1376,
+          ".json": 402,
+          ".hcl": 389,
+          ".mdx": 322,
+          "no_extension": 177,
+          ".tfstate": 167,
+          ".log": 87,
+          ".md": 35,
+          ".png": 27
+        },
+        "total_size_mb": 26.41,
+        "approximate_loc": 564394,
+        "primary_language_files": 1750
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 1366,
+            "files_read": 20,
+            "input_tokens": 18,
+            "output_tokens": 14431,
+            "total_tokens": 14449,
+            "time_seconds": 1.2362151145935059
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 1.082595,
+              "mcp_cost": 0.0,
+              "savings": 1.082595,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.11548399999999999,
+              "mcp_cost": 0.0,
+              "savings": 0.11548399999999999,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.01587896,
+              "mcp_cost": 0.0,
+              "savings": 0.01587896,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 2095,
+            "files_read": 20,
+            "input_tokens": 12,
+            "output_tokens": 2396,
+            "total_tokens": 2408,
+            "time_seconds": 0.038343191146850586
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 0.17988,
+              "mcp_cost": 0.0,
+              "savings": 0.17988,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.019192,
+              "mcp_cost": 0.0,
+              "savings": 0.019192,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.0026388400000000004,
+              "mcp_cost": 0.0,
+              "savings": 0.0026388400000000004,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 1510,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 21931,
+            "total_tokens": 21948,
+            "time_seconds": 0.05922961235046387
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 1.6450799999999999,
+              "mcp_cost": 0.0,
+              "savings": 1.6450799999999999,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.175482,
+              "mcp_cost": 0.0,
+              "savings": 0.175482,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.02412869,
+              "mcp_cost": 0.0,
+              "savings": 0.02412869,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 985,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 19449,
+            "total_tokens": 19466,
+            "time_seconds": 0.05196046829223633
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 1.45893,
+              "mcp_cost": 0.0,
+              "savings": 1.45893,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.15562600000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.15562600000000001,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.021398490000000003,
+              "mcp_cost": 0.0,
+              "savings": 0.021398490000000003,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_goroutines",
+          "query_text": "go func goroutine",
+          "grep": {
+            "files_found": 2082,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 11578,
+            "total_tokens": 11594,
+            "time_seconds": 0.02992725372314453
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 0.86859,
+              "mcp_cost": 0.0,
+              "savings": 0.86859,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.092656,
+              "mcp_cost": 0.0,
+              "savings": 0.092656,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.01274012,
+              "mcp_cost": 0.0,
+              "savings": 0.01274012,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "Alamofire/Alamofire",
+      "language": "swift",
+      "repo_metrics": {
+        "total_files": 520,
+        "files_by_extension": {
+          ".html": 328,
+          ".swift": 92,
+          ".json": 23,
+          ".cer": 18,
+          ".png": 11,
+          ".xctestplan": 11,
+          ".xcscheme": 10,
+          ".js": 10,
+          ".md": 9,
+          ".plist": 8
+        },
+        "total_size_mb": 21.14,
+        "approximate_loc": 40513,
+        "primary_language_files": 92
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 413,
+            "files_read": 20,
+            "input_tokens": 18,
+            "output_tokens": 119392,
+            "total_tokens": 119410,
+            "time_seconds": 0.21027088165283203
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 8.95467,
+              "mcp_cost": 0.0,
+              "savings": 8.95467,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.955172,
+              "mcp_cost": 0.0,
+              "savings": 0.955172,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.13133606,
+              "mcp_cost": 0.0,
+              "savings": 0.13133606,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 124,
+            "files_read": 20,
+            "input_tokens": 13,
+            "output_tokens": 72418,
+            "total_tokens": 72431,
+            "time_seconds": 0.03227829933166504
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 5.431545,
+              "mcp_cost": 0.0,
+              "savings": 5.431545,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.5793699999999999,
+              "mcp_cost": 0.0,
+              "savings": 0.5793699999999999,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.07966331,
+              "mcp_cost": 0.0,
+              "savings": 0.07966331,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 198,
+            "files_read": 20,
+            "input_tokens": 18,
+            "output_tokens": 140283,
+            "total_tokens": 140301,
+            "time_seconds": 0.02160024642944336
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 10.521495,
+              "mcp_cost": 0.0,
+              "savings": 10.521495,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.1222999999999999,
+              "mcp_cost": 0.0,
+              "savings": 1.1222999999999999,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.15431616,
+              "mcp_cost": 0.0,
+              "savings": 0.15431616,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 52,
+            "files_read": 20,
+            "input_tokens": 18,
+            "output_tokens": 70898,
+            "total_tokens": 70916,
+            "time_seconds": 0.029036998748779297
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 5.317620000000001,
+              "mcp_cost": 0.0,
+              "savings": 5.317620000000001,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.5672200000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.5672200000000001,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.07799266,
+              "mcp_cost": 0.0,
+              "savings": 0.07799266,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "dart-lang/sdk",
+      "language": "dart",
+      "repo_metrics": {
+        "total_files": 49946,
+        "files_by_extension": {
+          ".expect": 23850,
+          ".dart": 23182,
+          ".yaml": 745,
+          ".cc": 649,
+          ".h": 444,
+          ".md": 325,
+          "no_extension": 237,
+          ".options": 202,
+          ".json": 168,
+          ".java": 144
+        },
+        "total_size_mb": 254.45,
+        "approximate_loc": 4634338,
+        "primary_language_files": 23182
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 34761,
+            "files_read": 20,
+            "input_tokens": 17,
+            "output_tokens": 99181,
+            "total_tokens": 99198,
+            "time_seconds": 9.768428802490234
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 7.43883,
+              "mcp_cost": 0.0,
+              "savings": 7.43883,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.793482,
+              "mcp_cost": 0.0,
+              "savings": 0.793482,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.10910369000000002,
+              "mcp_cost": 0.0,
+              "savings": 0.10910369000000002,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 25854,
+            "files_read": 20,
+            "input_tokens": 11,
+            "output_tokens": 79312,
+            "total_tokens": 79323,
+            "time_seconds": 0.45125341415405273
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 5.948564999999999,
+              "mcp_cost": 0.0,
+              "savings": 5.948564999999999,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.6345179999999999,
+              "mcp_cost": 0.0,
+              "savings": 0.6345179999999999,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.08724617000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.08724617000000001,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 8246,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 681715,
+            "total_tokens": 681731,
+            "time_seconds": 0.5604865550994873
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 51.128865,
+              "mcp_cost": 0.0,
+              "savings": 51.128865,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 5.453752,
+              "mcp_cost": 0.0,
+              "savings": 5.453752,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.74989082,
+              "mcp_cost": 0.0,
+              "savings": 0.74989082,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 556,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 668065,
+            "total_tokens": 668081,
+            "time_seconds": 0.8696689605712891
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 50.105115,
+              "mcp_cost": 0.0,
+              "savings": 50.105115,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 5.344552,
+              "mcp_cost": 0.0,
+              "savings": 5.344552,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.7348758200000001,
+              "mcp_cost": 0.0,
+              "savings": 0.7348758200000001,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "phoenixframework/phoenix",
+      "language": "elixir",
+      "repo_metrics": {
+        "total_files": 431,
+        "files_by_extension": {
+          ".ex": 150,
+          ".exs": 141,
+          ".md": 55,
+          ".js": 30,
+          ".eex": 16,
+          ".heex": 11,
+          ".png": 9,
+          ".json": 8,
+          ".css": 7,
+          "no_extension": 4
+        },
+        "total_size_mb": 3.9,
+        "approximate_loc": 29436,
+        "primary_language_files": 150
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 223,
+            "files_read": 20,
+            "input_tokens": 19,
+            "output_tokens": 164132,
+            "total_tokens": 164151,
+            "time_seconds": 0.19529056549072266
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 12.310185,
+              "mcp_cost": 0.0,
+              "savings": 12.310185,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.313094,
+              "mcp_cost": 0.0,
+              "savings": 1.313094,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.18055033,
+              "mcp_cost": 0.0,
+              "savings": 0.18055033,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 214,
+            "files_read": 20,
+            "input_tokens": 14,
+            "output_tokens": 153328,
+            "total_tokens": 153342,
+            "time_seconds": 0.011247396469116211
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 11.499809999999998,
+              "mcp_cost": 0.0,
+              "savings": 11.499809999999998,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.2266519999999999,
+              "mcp_cost": 0.0,
+              "savings": 1.2266519999999999,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.16866458,
+              "mcp_cost": 0.0,
+              "savings": 0.16866458,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 195,
+            "files_read": 20,
+            "input_tokens": 19,
+            "output_tokens": 168750,
+            "total_tokens": 168769,
+            "time_seconds": 0.015807151794433594
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 12.656535,
+              "mcp_cost": 0.0,
+              "savings": 12.656535,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.350038,
+              "mcp_cost": 0.0,
+              "savings": 1.350038,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.18563013000000003,
+              "mcp_cost": 0.0,
+              "savings": 0.18563013000000003,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 88,
+            "files_read": 20,
+            "input_tokens": 18,
+            "output_tokens": 116747,
+            "total_tokens": 116765,
+            "time_seconds": 0.01368856430053711
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 8.756295000000001,
+              "mcp_cost": 0.0,
+              "savings": 8.756295000000001,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.9340120000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.9340120000000001,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.12842656000000002,
+              "mcp_cost": 0.0,
+              "savings": 0.12842656000000002,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "yesodweb/yesod",
+      "language": "haskell",
+      "repo_metrics": {
+        "total_files": 298,
+        "files_by_extension": {
+          ".hs": 196,
+          ".md": 32,
+          "no_extension": 26,
+          ".cabal": 16,
+          ".lhs": 14,
+          ".yaml": 4,
+          ".png": 3,
+          ".txt": 3,
+          ".sh": 2,
+          ".html": 2
+        },
+        "total_size_mb": 1.22,
+        "approximate_loc": 30156,
+        "primary_language_files": 196
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 158,
+            "files_read": 20,
+            "input_tokens": 19,
+            "output_tokens": 56095,
+            "total_tokens": 56114,
+            "time_seconds": 0.14547061920166016
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 4.207409999999999,
+              "mcp_cost": 0.0,
+              "savings": 4.207409999999999,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.448798,
+              "mcp_cost": 0.0,
+              "savings": 0.448798,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.06170963,
+              "mcp_cost": 0.0,
+              "savings": 0.06170963,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 87,
+            "files_read": 20,
+            "input_tokens": 14,
+            "output_tokens": 21426,
+            "total_tokens": 21440,
+            "time_seconds": 0.0070803165435791016
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 1.6071600000000001,
+              "mcp_cost": 0.0,
+              "savings": 1.6071600000000001,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.171436,
+              "mcp_cost": 0.0,
+              "savings": 0.171436,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.02357238,
+              "mcp_cost": 0.0,
+              "savings": 0.02357238,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 74,
+            "files_read": 20,
+            "input_tokens": 19,
+            "output_tokens": 75190,
+            "total_tokens": 75209,
+            "time_seconds": 0.007857561111450195
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 5.639535,
+              "mcp_cost": 0.0,
+              "savings": 5.639535,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.601558,
+              "mcp_cost": 0.0,
+              "savings": 0.601558,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.08271413000000002,
+              "mcp_cost": 0.0,
+              "savings": 0.08271413000000002,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 17,
+            "files_read": 17,
+            "input_tokens": 18,
+            "output_tokens": 67903,
+            "total_tokens": 67921,
+            "time_seconds": 0.009914875030517578
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 5.092995000000001,
+              "mcp_cost": 0.0,
+              "savings": 5.092995000000001,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.5432600000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.5432600000000001,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.07469816000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.07469816000000001,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "dotnet/aspnetcore",
+      "language": "csharp",
+      "repo_metrics": {
+        "total_files": 13993,
+        "files_by_extension": {
+          ".cs": 10028,
+          ".json": 865,
+          ".cshtml": 757,
+          ".razor": 632,
+          ".csproj": 601,
+          ".txt": 469,
+          ".md": 222,
+          ".ts": 157,
+          ".js": 133,
+          ".h": 129
+        },
+        "total_size_mb": 87.02,
+        "approximate_loc": 1520331,
+        "primary_language_files": 10028
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 3618,
+            "files_read": 20,
+            "input_tokens": 19,
+            "output_tokens": 224087,
+            "total_tokens": 224106,
+            "time_seconds": 4.596230506896973
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 16.806810000000002,
+              "mcp_cost": 0.0,
+              "savings": 16.806810000000002,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.792734,
+              "mcp_cost": 0.0,
+              "savings": 1.792734,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.24650083000000003,
+              "mcp_cost": 0.0,
+              "savings": 0.24650083000000003,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 2535,
+            "files_read": 20,
+            "input_tokens": 13,
+            "output_tokens": 223990,
+            "total_tokens": 224003,
+            "time_seconds": 0.21019530296325684
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 16.799445000000002,
+              "mcp_cost": 0.0,
+              "savings": 16.799445000000002,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.791946,
+              "mcp_cost": 0.0,
+              "savings": 1.791946,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.24639251000000004,
+              "mcp_cost": 0.0,
+              "savings": 0.24639251000000004,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 2494,
+            "files_read": 20,
+            "input_tokens": 18,
+            "output_tokens": 233762,
+            "total_tokens": 233780,
+            "time_seconds": 0.23462724685668945
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 17.532420000000002,
+              "mcp_cost": 0.0,
+              "savings": 17.532420000000002,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 1.870132,
+              "mcp_cost": 0.0,
+              "savings": 1.870132,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.25714306000000003,
+              "mcp_cost": 0.0,
+              "savings": 0.25714306000000003,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 852,
+            "files_read": 20,
+            "input_tokens": 18,
+            "output_tokens": 59140,
+            "total_tokens": 59158,
+            "time_seconds": 0.29784464836120605
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 4.435770000000001,
+              "mcp_cost": 0.0,
+              "savings": 4.435770000000001,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.47315599999999997,
+              "mcp_cost": 0.0,
+              "savings": 0.47315599999999997,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.06505886,
+              "mcp_cost": 0.0,
+              "savings": 0.06505886,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "repository": "kong/kong",
+      "language": "lua",
+      "repo_metrics": {
+        "total_files": 2189,
+        "files_by_extension": {
+          ".lua": 1298,
+          ".yml": 466,
+          ".json": 144,
+          ".t": 123,
+          ".proto": 37,
+          "no_extension": 28,
+          ".txt": 28,
+          ".md": 26,
+          ".tf": 21,
+          ".crt": 18
+        },
+        "total_size_mb": 13.79,
+        "approximate_loc": 332648,
+        "primary_language_files": 1298
+      },
+      "queries": [
+        {
+          "query_name": "find_main_function",
+          "query_text": "main function entry point",
+          "grep": {
+            "files_found": 1274,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 43579,
+            "total_tokens": 43595,
+            "time_seconds": 0.8787803649902344
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 3.268665,
+              "mcp_cost": 0.0,
+              "savings": 3.268665,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.348664,
+              "mcp_cost": 0.0,
+              "savings": 0.348664,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.04794122000000001,
+              "mcp_cost": 0.0,
+              "savings": 0.04794122000000001,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_tests",
+          "query_text": "test",
+          "grep": {
+            "files_found": 719,
+            "files_read": 20,
+            "input_tokens": 11,
+            "output_tokens": 77001,
+            "total_tokens": 77012,
+            "time_seconds": 0.03148365020751953
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 5.77524,
+              "mcp_cost": 0.0,
+              "savings": 5.77524,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.61603,
+              "mcp_cost": 0.0,
+              "savings": 0.61603,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.08470407,
+              "mcp_cost": 0.0,
+              "savings": 0.08470407,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_errors",
+          "query_text": "error handling exception",
+          "grep": {
+            "files_found": 803,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 43597,
+            "total_tokens": 43613,
+            "time_seconds": 0.03262495994567871
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 3.2700149999999994,
+              "mcp_cost": 0.0,
+              "savings": 3.2700149999999994,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.34880799999999995,
+              "mcp_cost": 0.0,
+              "savings": 0.34880799999999995,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.04796102,
+              "mcp_cost": 0.0,
+              "savings": 0.04796102,
+              "savings_percent": 100.0
+            }
+          }
+        },
+        {
+          "query_name": "find_config",
+          "query_text": "configuration settings",
+          "grep": {
+            "files_found": 320,
+            "files_read": 20,
+            "input_tokens": 16,
+            "output_tokens": 44229,
+            "total_tokens": 44245,
+            "time_seconds": 0.04349660873413086
+          },
+          "mcp": {
+            "results_found": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "time_seconds": 0,
+            "error": "No index found"
+          },
+          "token_reduction_percent": 100.0,
+          "costs": {
+            "Claude 4 Opus": {
+              "grep_cost": 3.3174149999999996,
+              "mcp_cost": 0.0,
+              "savings": 3.3174149999999996,
+              "savings_percent": 100.0
+            },
+            "GPT-4.1": {
+              "grep_cost": 0.35386399999999996,
+              "mcp_cost": 0.0,
+              "savings": 0.35386399999999996,
+              "savings_percent": 100.0
+            },
+            "DeepSeek-V3": {
+              "grep_cost": 0.04865622,
+              "mcp_cost": 0.0,
+              "savings": 0.04865622,
+              "savings_percent": 100.0
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

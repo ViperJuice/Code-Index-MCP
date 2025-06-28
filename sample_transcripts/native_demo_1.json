@@ -1,0 +1,5 @@
+{
+  "session_id": "demo_native_session_1", 
+  "timestamp": "2025-06-26T17:08:35+00:00",
+  "transcript": "Called the Grep tool with {\"pattern\": \"class.*Dispatcher\", \"include\": \"*.py\"}\n\nResult: Found 15 matches across multiple files.\n\nCalled the Read tool with {\"file_path\": \"/workspace/mcp_server/dispatcher/dispatcher_enhanced.py\"}\n\nCalled the Write tool with {\"file_path\": \"/workspace/mcp_server/dispatcher/dispatcher_enhanced.py\", \"content\": \"...full file rewrite...\"}\n\nFile rewritten completely."
+}

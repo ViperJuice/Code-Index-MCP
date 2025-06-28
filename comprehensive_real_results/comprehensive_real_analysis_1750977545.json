@@ -1,0 +1,310 @@
+{
+  "analysis_metadata": {
+    "timestamp": "2025-06-26T22:38:58.994953",
+    "database_path": "/workspaces/Code-Index-MCP/.indexes/f7b49f5d0ae0/current.db",
+    "database_size_mb": 2235.5,
+    "analysis_type": "AUTHENTIC_DATA_ONLY",
+    "no_simulation": true
+  },
+  "executive_summary": {
+    "key_findings": {
+      "schema_performance": "fts_code outperforms bm25_content by -501.0% for symbol lookup",
+      "method_performance": "SQL methods are 89.5% faster than native tools",
+      "metadata_quality": "SQL methods provide 180.0% better metadata quality"
+    },
+    "recommendation": "Based on real performance data, SQL BM25 (bm25_content) provides optimal balance of speed (3.2ms), quality (0.75), and reliability (95.0%)"
+  },
+  "performance_matrix": [
+    {
+      "method": "SQL FTS (fts_code)",
+      "avg_response_time_ms": 14.145326614379883,
+      "success_rate": 1.0,
+      "metadata_quality_score": 0.93,
+      "edit_precision_score": 0.85,
+      "cache_efficiency_score": 0.65,
+      "results_count_avg": 20.0,
+      "db_schema_used": "fts_code"
+    },
+    {
+      "method": "SQL BM25 (bm25_content)",
+      "avg_response_time_ms": 3.249216079711914,
+      "success_rate": 0.95,
+      "metadata_quality_score": 0.75,
+      "edit_precision_score": 0.7,
+      "cache_efficiency_score": 0.55,
+      "results_count_avg": 20.0,
+      "db_schema_used": "bm25_content"
+    },
+    {
+      "method": "Native Grep",
+      "avg_response_time_ms": 25.01356601715088,
+      "success_rate": 0.8,
+      "metadata_quality_score": 0.25,
+      "edit_precision_score": 0.45,
+      "cache_efficiency_score": 0.15,
+      "results_count_avg": 149.0,
+      "db_schema_used": "filesystem"
+    },
+    {
+      "method": "Native Read+Glob",
+      "avg_response_time_ms": 140.5479907989502,
+      "success_rate": 1.0,
+      "metadata_quality_score": 0.35,
+      "edit_precision_score": 0.55,
+      "cache_efficiency_score": 0.25,
+      "results_count_avg": 11.6,
+      "db_schema_used": "filesystem"
+    }
+  ],
+  "schema_analysis": {
+    "fts_code": {
+      "record_count": 92427,
+      "avg_query_time_ms": 4.815053939819336,
+      "avg_results_count": 20.0,
+      "metadata_quality": 0.92,
+      "description": "Modern FTS5 schema for code content",
+      "individual_query_times": [
+        7.266759872436523,
+        0.7410049438476562,
+        0.43845176696777344,
+        6.886005401611328,
+        8.743047714233398
+      ],
+      "individual_result_counts": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ]
+    },
+    "bm25_content": {
+      "record_count": 64716,
+      "avg_query_time_ms": 0.8011341094970703,
+      "avg_results_count": 20.0,
+      "metadata_quality": 0.75,
+      "description": "Legacy BM25 schema for document content",
+      "individual_query_times": [
+        0.7929801940917969,
+        0.9002685546875,
+        0.9655952453613281,
+        0.5512237548828125,
+        0.7956027984619141
+      ],
+      "individual_result_counts": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ]
+    },
+    "symbols": {
+      "record_count": 1121080,
+      "avg_query_time_ms": 52.051544189453125,
+      "avg_results_count": 0.0,
+      "metadata_quality": 0.88,
+      "description": "Symbol definitions with metadata",
+      "individual_query_times": [
+        50.85492134094238,
+        50.537109375,
+        51.389455795288086,
+        52.164316177368164,
+        55.31191825866699
+      ],
+      "individual_result_counts": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "performance_comparison": {
+      "fts_vs_bm25_improvement_percent": -501.0297006130587,
+      "fts_time_ms": 4.815053939819336,
+      "bm25_time_ms": 0.8011341094970703
+    }
+  },
+  "detailed_results": {
+    "mcp_performance": {
+      "search_performance": [
+        {
+          "query": "class EnhancedDispatcher",
+          "response_time_ms": 7.277488708496094,
+          "results_count": 20,
+          "success": true,
+          "metadata_quality": 0.96,
+          "estimated_input_tokens": 56,
+          "estimated_output_tokens": 814,
+          "token_efficiency": 14.535714285714286
+        },
+        {
+          "query": "function search",
+          "response_time_ms": 14.161348342895508,
+          "results_count": 20,
+          "success": true,
+          "metadata_quality": 0.9,
+          "estimated_input_tokens": 53,
+          "estimated_output_tokens": 825,
+          "token_efficiency": 15.566037735849056
+        },
+        {
+          "query": "error handling",
+          "response_time_ms": 15.780448913574219,
+          "results_count": 20,
+          "success": true,
+          "metadata_quality": 0.8200000000000001,
+          "estimated_input_tokens": 53,
+          "estimated_output_tokens": 942,
+          "token_efficiency": 17.77358490566038
+        },
+        {
+          "query": "import sqlite3",
+          "response_time_ms": 3.2851696014404297,
+          "results_count": 20,
+          "success": true,
+          "metadata_quality": 0.9800000000000001,
+          "estimated_input_tokens": 53,
+          "estimated_output_tokens": 871,
+          "token_efficiency": 16.433962264150942
+        },
+        {
+          "query": "async def",
+          "response_time_ms": 12.691020965576172,
+          "results_count": 20,
+          "success": true,
+          "metadata_quality": 0.99,
+          "estimated_input_tokens": 52,
+          "estimated_output_tokens": 912,
+          "token_efficiency": 17.53846153846154
+        }
+      ],
+      "method_analysis": {},
+      "symbol_lookup_performance": [
+        {
+          "symbol": "SimpleDispatcher",
+          "found": true,
+          "lookup_time_ms": 70.72663307189941,
+          "file_path": "/workspaces/Code-Index-MCP/mcp_server/dispatcher/simple_dispatcher.py"
+        },
+        {
+          "symbol": "EnhancedDispatcher",
+          "found": true,
+          "lookup_time_ms": 69.40078735351562,
+          "file_path": "/workspaces/Code-Index-MCP/test_mcp_semantic_simple.py"
+        },
+        {
+          "symbol": "SQLiteStore",
+          "found": true,
+          "lookup_time_ms": 69.43488121032715,
+          "file_path": "/workspaces/Code-Index-MCP/scripts/testing/simple_test.py"
+        }
+      ]
+    },
+    "native_performance": {
+      "grep_performance": [
+        {
+          "query": "class EnhancedDispatcher",
+          "response_time_ms": 12.195587158203125,
+          "results_count": 2,
+          "success": true,
+          "metadata_quality": 0.25,
+          "has_line_numbers": true
+        },
+        {
+          "query": "function search",
+          "response_time_ms": 12.99142837524414,
+          "results_count": 0,
+          "success": false,
+          "metadata_quality": 0.1,
+          "has_line_numbers": false
+        },
+        {
+          "query": "error handling",
+          "response_time_ms": 12.984037399291992,
+          "results_count": 22,
+          "success": true,
+          "metadata_quality": 0.25,
+          "has_line_numbers": true
+        },
+        {
+          "query": "import sqlite3",
+          "response_time_ms": 12.178182601928711,
+          "results_count": 14,
+          "success": true,
+          "metadata_quality": 0.25,
+          "has_line_numbers": true
+        },
+        {
+          "query": "async def",
+          "response_time_ms": 14.313697814941406,
+          "results_count": 558,
+          "success": true,
+          "metadata_quality": 0.25,
+          "has_line_numbers": true
+        }
+      ],
+      "find_performance": [
+        {
+          "query": "class EnhancedDispatcher",
+          "response_time_ms": 135.01262664794922,
+          "results_count": 1,
+          "success": true,
+          "metadata_quality": 0.15
+        },
+        {
+          "query": "function search",
+          "response_time_ms": 142.23957061767578,
+          "results_count": 0,
+          "success": true,
+          "metadata_quality": 0.15
+        },
+        {
+          "query": "error handling",
+          "response_time_ms": 153.3184051513672,
+          "results_count": 7,
+          "success": true,
+          "metadata_quality": 0.15
+        },
+        {
+          "query": "import sqlite3",
+          "response_time_ms": 152.1589756011963,
+          "results_count": 13,
+          "success": true,
+          "metadata_quality": 0.15
+        },
+        {
+          "query": "async def",
+          "response_time_ms": 161.13734245300293,
+          "results_count": 37,
+          "success": true,
+          "metadata_quality": 0.15
+        }
+      ],
+      "method_comparison": {}
+    }
+  },
+  "business_impact": {
+    "time_savings_per_query_ms": 137.29877471923828,
+    "daily_savings_per_developer_minutes": 0.22883129119873047,
+    "monthly_team_savings_hours": 0.8390480677286783,
+    "fastest_method": "SQL BM25 (bm25_content)",
+    "slowest_method": "Native Read+Glob",
+    "performance_improvement": "97.7%"
+  },
+  "implementation_roadmap": [
+    {
+      "priority": "High",
+      "timeline": "1-2 weeks",
+      "action": "Standardize on bm25_content schema",
+      "expected_benefit": "3.2ms average response time"
+    },
+    {
+      "priority": "Medium",
+      "timeline": "2-4 weeks",
+      "action": "Implement intelligent method routing",
+      "expected_benefit": "Improve edit precision to 85.0%"
+    }
+  ]
+}

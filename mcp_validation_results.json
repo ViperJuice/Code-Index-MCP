@@ -1,0 +1,168 @@
+{
+  "symbol_lookup": {
+    "PathUtils": {
+      "found": false
+    },
+    "EnhancedDispatcher": {
+      "found": true,
+      "file": "/workspaces/Code-Index-MCP/tests/root_tests/test_document_queries.py",
+      "line": 1,
+      "kind": "class"
+    },
+    "SQLiteStore": {
+      "found": true,
+      "file": "/workspaces/Code-Index-MCP/scripts/testing/simple_test.py",
+      "line": 1,
+      "kind": "class"
+    },
+    "get_workspace_root": {
+      "found": false
+    },
+    "BM25Indexer": {
+      "found": true,
+      "file": "/workspaces/Code-Index-MCP/test_mcp_dispatcher.py",
+      "line": 1,
+      "kind": "class"
+    },
+    "MultiRepositoryManager": {
+      "found": false
+    }
+  },
+  "code_search": {
+    "class PathUtils": {
+      "count": 0,
+      "results": []
+    },
+    "def get_workspace_root": {
+      "count": 0,
+      "results": []
+    },
+    "import os": {
+      "count": 5,
+      "results": [
+        {
+          "file": "/workspaces/Code-Index-MCP/mcp_server/cli/index_management.py",
+          "line": 0,
+          "score": -1.6731708801557532
+        },
+        {
+          "file": "/workspaces/Code-Index-MCP/scripts/validate_index_compatibility.py",
+          "line": 0,
+          "score": -1.6667230734805774
+        },
+        {
+          "file": "/workspaces/Code-Index-MCP/tests/root_tests/test_contextual_pipeline.py",
+          "line": 0,
+          "score": -1.6547260447667265
+        }
+      ]
+    },
+    "from pathlib import Path": {
+      "count": 5,
+      "results": [
+        {
+          "file": "/workspaces/Code-Index-MCP/scripts/development/scaffold_code.py",
+          "line": 0,
+          "score": -0.15100656751181624
+        },
+        {
+          "file": "/workspaces/Code-Index-MCP/tests/test_python_plugin.py",
+          "line": 0,
+          "score": -0.14506129537179754
+        },
+        {
+          "file": "/workspaces/Code-Index-MCP/claude_code_behavior_analysis_20250616_014128.json",
+          "line": 0,
+          "score": -0.13916448269065265
+        }
+      ]
+    },
+    "multi_repo_manager": {
+      "count": 5,
+      "results": [
+        {
+          "file": "/workspaces/Code-Index-MCP/scripts/verify_mcp_features.py",
+          "line": 0,
+          "score": -7.749237841184873
+        },
+        {
+          "file": "/workspaces/Code-Index-MCP/scripts/cli/mcp_server_cli.py",
+          "line": 0,
+          "score": -7.268072466021844
+        },
+        {
+          "file": "/workspaces/Code-Index-MCP/test_git_features_simple.py",
+          "line": 0,
+          "score": -7.222232653124741
+        }
+      ]
+    },
+    "def search": {
+      "count": 5,
+      "results": [
+        {
+          "file": "/workspaces/Code-Index-MCP/mcp_server/interfaces/indexing_interfaces.py",
+          "line": 0,
+          "score": -4.340411632646906e-06
+        },
+        {
+          "file": "/workspaces/Code-Index-MCP/tests/test_dispatcher_advanced.py",
+          "line": 0,
+          "score": -4.332610771756044e-06
+        },
+        {
+          "file": "/workspaces/Code-Index-MCP/mcp_server/benchmarks/benchmark_suite.py",
+          "line": 0,
+          "score": -4.320575447117511e-06
+        }
+      ]
+    },
+    "MCP_ENABLE_MULTI_REPO": {
+      "count": 5,
+      "results": [
+        {
+          "file": "/workspaces/Code-Index-MCP/scripts/verify_mcp_features.py",
+          "line": 0,
+          "score": -8.498484758612033
+        },
+        {
+          "file": "/workspaces/Code-Index-MCP/scripts/test_mcp_ready.py",
+          "line": 0,
+          "score": -8.10023998476296
+        },
+        {
+          "file": "/workspaces/Code-Index-MCP/examples/demo_multi_repo_smart_loading.py",
+          "line": 0,
+          "score": -7.791304721902851
+        }
+      ]
+    }
+  },
+  "file_search": {
+    "mcp_server/core/path_utils.py": {
+      "indexed": false
+    },
+    "mcp_server/dispatcher/dispatcher_enhanced.py": {
+      "indexed": true,
+      "fts_indexed": true
+    },
+    "mcp_server/storage/sqlite_store.py": {
+      "indexed": true,
+      "fts_indexed": true
+    },
+    "mcp_server/storage/multi_repo_manager.py": {
+      "indexed": true,
+      "fts_indexed": true
+    },
+    "scripts/cli/mcp_server_cli.py": {
+      "indexed": true,
+      "fts_indexed": true
+    }
+  },
+  "bm25_search": {
+    "dispatcher (bm25_content)": 3,
+    "index (bm25_content)": 3,
+    "search (bm25_content)": 3,
+    "repository (bm25_content)": 3
+  }
+}

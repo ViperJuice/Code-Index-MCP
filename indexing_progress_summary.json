@@ -1,0 +1,46 @@
+{
+  "timestamp": "2025-06-27T07:45:21.351148",
+  "completed": 3,
+  "total_files": 796,
+  "total_embeddings": 12524,
+  "remaining": 25,
+  "remaining_small": 19,
+  "remaining_large": 6,
+  "repositories": {
+    "completed": [
+      "grpc",
+      "redis",
+      "curl",
+      "phoenix"
+    ],
+    "remaining_small": [
+      "Alamofire",
+      "akka",
+      "express",
+      "flask",
+      "framework",
+      "gin",
+      "json",
+      "kafka",
+      "kong",
+      "ktor",
+      "mojo",
+      "requests",
+      "ring",
+      "rustlings",
+      "sdk",
+      "terraform",
+      "tokio",
+      "yesod",
+      "zig"
+    ],
+    "remaining_large": [
+      "TypeScript",
+      "aspnetcore",
+      "django",
+      "rails",
+      "react",
+      "spring-boot"
+    ]
+  }
+}

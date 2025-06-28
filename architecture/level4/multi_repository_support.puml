@@ -1,0 +1,117 @@
+@startuml multi_repository_support
+!include ../style.puml
+
+title Multi-Repository Search Support - Level 4
+
+package "Multi-Repository System" {
+    class MultiRepositoryManager {
+        - central_index_path: Path
+        - max_workers: int
+        - registry: RepositoryRegistry
+        - _connections: Dict[str, SQLiteStore]
+        - _search_stats: Dict[str, Any]
+        
+        + register_repository(path, name, priority): RepositoryInfo
+        + unregister_repository(repository_id)
+        + list_repositories(active_only): List[RepositoryInfo]
+        + search_symbol(query, repos, language): List[CrossRepoSearchResult]
+        + search_code(query, repos, pattern): List[CrossRepoSearchResult]
+        + health_check(): Dict[str, Any]
+        + optimize_indexes()
+        + get_statistics(): Dict[str, Any]
+        - _search_repository(repo_id, query): CrossRepoSearchResult
+        - _get_connection(repository_id): SQLiteStore
+    }
+    
+    class RepositoryRegistry {
+        - registry_path: Path
+        - _registry: Dict[str, Dict]
+        - _lock: RLock
+        
+        + register(repo_info)
+        + unregister(repository_id)
+        + get(repository_id): RepositoryInfo
+        + list_all(): List[RepositoryInfo]
+        + update_status(repo_id, active)
+        + update_priority(repo_id, priority)
+        + find_by_path(path): str
+        + cleanup(): int
+        + save()
+        - _load()
+    }
+    
+    class RepositoryInfo <<dataclass>> {
+        + repository_id: str
+        + name: str
+        + path: Path
+        + index_path: Path
+        + language_stats: Dict[str, int]
+        + total_files: int
+        + total_symbols: int
+        + indexed_at: datetime
+        + active: bool
+        + priority: int
+    }
+    
+    class CrossRepoSearchResult <<dataclass>> {
+        + repository_id: str
+        + repository_name: str
+        + results: List[Dict]
+        + search_time: float
+        + error: Optional[str]
+    }
+}
+
+package "Storage Layer" {
+    class SQLiteStore {
+        + search_symbols(where, params, limit)
+        + close()
+    }
+}
+
+package "Discovery" {
+    class IndexDiscovery {
+        + get_local_index_path(): Path
+    }
+}
+
+package "Execution" {
+    class ThreadPoolExecutor {
+        + submit(func, args)
+    }
+}
+
+' Relationships
+MultiRepositoryManager ..> RepositoryRegistry : uses
+MultiRepositoryManager ..> RepositoryInfo : creates
+MultiRepositoryManager ..> CrossRepoSearchResult : returns
+MultiRepositoryManager ..> SQLiteStore : manages connections
+MultiRepositoryManager ..> IndexDiscovery : uses for discovery
+MultiRepositoryManager ..> ThreadPoolExecutor : parallel search
+
+RepositoryRegistry ..> RepositoryInfo : stores/retrieves
+
+' Notes
+note right of MultiRepositoryManager
+  Central manager for cross-repository search
+  - Parallel search execution
+  - Connection pooling
+  - Priority-based ordering
+  - Health monitoring
+end note
+
+note left of RepositoryRegistry
+  Persistent JSON storage
+  - Thread-safe operations
+  - Atomic file writes
+  - Path-based lookup
+end note
+
+note bottom of CrossRepoSearchResult
+  Aggregated search results
+  - Per-repository results
+  - Search timing
+  - Error tracking
+end note
+
+@enduml

@@ -1,0 +1,14 @@
+{
+  "query": "What are the most complex files",
+  "mode": "native",
+  "tools_used": ["Glob", "Bash", "Grep", "Read"],
+  "tool_calls": {"Glob": 1, "Bash": 2, "Grep": 1, "Read": 1},
+  "results_found": 15,
+  "execution_time_ms": 216,
+  "token_estimate": 2800,
+  "success": true,
+  "error": null,
+  "test_id": "javascript_react_8_native",
+  "batch_name": "javascript_react",
+  "timestamp": "2025-01-06T01:20:00"
+}

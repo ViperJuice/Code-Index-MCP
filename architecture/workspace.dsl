@@ -1,14 +1,14 @@
 workspace "Code-Index-MCP" "Local-first code indexer with 48-language support via Model Context Protocol" {
     # Implementation Status: 100% complete - PRODUCTION READY
     # Complexity Score: 5/5
-    # Last Updated: 2025-06-09
+    # Last Updated: 2025-06-26
 
     !identifiers hierarchical
     
     model {
         # External actors
         developer = person "Developer" "Uses Claude Code or other LLMs for code navigation and search"
-        claudeCode = softwareSystem "Claude Code" "AI-powered code assistant" {
+        claudeCode = softwareSystem "Claude Code" "AI-powered code assistant with MCP sub-agent support" {
             tags "External System"
         }
         
@@ -98,16 +98,21 @@ workspace "Code-Index-MCP" "Local-first code indexer with 48-language support vi
                 
                 # Component Level - Indexing
                 indexManager = component "Index Manager" "Coordinates indexing operations" "Python Class"
+                multiRepoManager = component "Multi-Repository Manager" "Manages indexes across multiple repositories" "Python Class"
+                pluginMemoryManager = component "Plugin Memory Manager" "LRU cache with memory-aware eviction" "Python Class"
+                languageDetector = component "Language Detector" "Detects languages from repository indexes" "Python Class"
                 queryOptimizer = component "Query Optimizer" "Optimizes search queries across languages" "Python Class"
                 semanticIndexer = component "Semantic Indexer" "Manages embeddings and vector search" "Python Class"
             }
             
-            storage = container "Storage Layer" "Persistent storage for code symbols and search indices" "SQLite + Qdrant" {
+            storage = container "Storage Layer" "Centralized storage for code symbols and search indices at ~/.mcp/indexes/" "SQLite + Qdrant" {
                 tags "Container" "Database"
                 
                 # Component Level - Storage
-                sqliteStore = component "SQLite Store" "Stores symbols, references, and metadata" "SQLite with FTS5"
+                sqliteStore = component "SQLite Store" "Stores symbols, references, and metadata in centralized location" "SQLite with FTS5"
                 qdrantStore = component "Qdrant Store" "Vector database for semantic embeddings" "Qdrant"
+                indexManager = component "Index Manager" "Manages centralized index storage with repo isolation" "Python Class"
+                indexDiscovery = component "Index Discovery" "Multi-path discovery with enhanced validation and compatibility checking" "Python Class"
             }
             
             fileWatcher = container "File Watcher" "Monitors file system changes for real-time updates" "Python/Watchdog" {
@@ -116,6 +121,38 @@ workspace "Code-Index-MCP" "Local-first code indexer with 48-language support vi
             
             embeddingService = container "Embedding Service" "Generates code embeddings for semantic search" "Python/Voyage AI" {
                 tags "Container" "AI Service"
+            }
+            
+            mcpServer = container "MCP Server" "Enhanced MCP protocol server with sync integration and performance optimization" "Python/MCP Protocol" {
+                tags "Container"
+                
+                # Final 5% completion components
+                mcpConfigPropagator = component "MCP Config Propagator" "Enables MCP tool inheritance for sub-agents" "Python Class"
+                preflightValidator = component "Pre-flight Validator" "Validates system state before operations" "Python Class"
+                indexManagementCLI = component "Index Management CLI" "Comprehensive CLI for index operations" "Python Module"
+                repositoryAwareLoader = component "Repository-Aware Plugin Loader" "Smart plugin loading based on repository structure" "Python Class"
+                memoryAwareManager = component "Memory-Aware Plugin Manager" "LRU cache with memory constraints" "Python Class"
+                crossRepoCoordinator = component "Cross-Repository Coordinator" "Coordinates searches across multiple repositories" "Python Class"
+                syncIntegration = component "Sync Integration" "Git hooks and automatic index synchronization" "Python Module"
+            }
+            
+            userDocumentation = container "User Documentation" "Performance tuning, troubleshooting, and best practices guides" "Markdown/HTML" {
+                tags "Container" "Documentation"
+                
+                performanceTuningGuide = component "Performance Tuning Guide" "Optimization strategies and configuration tips" "Markdown"
+                troubleshootingGuide = component "Troubleshooting Guide" "Common issues and solutions" "Markdown"
+                bestPracticesGuide = component "Best Practices Guide" "Recommended usage patterns and workflows" "Markdown"
+                quickStartGuide = component "Quick Start Guide" "Getting started with Code-Index-MCP" "Markdown"
+            }
+            
+            productionValidation = container "Production Validation Suite" "End-to-end testing and monitoring framework" "Python/Pytest" {
+                tags "Container" "Testing"
+                
+                componentTestFramework = component "Component Test Framework" "Isolated testing of individual components" "Python"
+                integrationTestFramework = component "Integration Test Framework" "Cross-component integration testing" "Python"
+                e2eTestFramework = component "End-to-End Test Framework" "Full workflow testing" "Python"
+                performanceTestSuite = component "Performance Test Suite" "Load and stress testing" "Python"
+                architectureValidation = component "Architecture Validation" "Validates alignment between docs and implementation" "Python"
             }
         }
         
@@ -130,86 +167,58 @@ workspace "Code-Index-MCP" "Local-first code indexer with 48-language support vi
         
         # Relationships - System Context
         developer -> claudeCode "Uses for code assistance"
-        claudeCode -> codeIndexMCP "Queries via MCP protocol"
+        claudeCode -> codeIndexMCP "Queries via MCP protocol with sub-agent support"
         codeIndexMCP -> fileSystem "Monitors and indexes"
         codeIndexMCP -> voyageAI "Generates embeddings"
         
         # Relationships - Container Level
-        claudeCode -> apiGateway "Sends MCP requests"
-        apiGateway -> dispatcher "Routes requests"
-        dispatcher -> pluginFramework "Delegates to plugins"
-        dispatcher -> storage "Caches results"
-        pluginFramework -> indexEngine "Triggers indexing"
-        pluginFramework -> storage "Stores symbols"
-        indexEngine -> storage "Reads/writes indices"
-        indexEngine -> embeddingService "Requests embeddings"
-        embeddingService -> voyageAI "API calls"
-        fileWatcher -> indexEngine "Triggers re-indexing"
-        fileWatcher -> fileSystem "Monitors changes"
+        claudeCode -> codeIndexMCP.apiGateway "Sends MCP requests"
+        codeIndexMCP.apiGateway -> codeIndexMCP.dispatcher "Routes requests"
+        codeIndexMCP.dispatcher -> codeIndexMCP.pluginFramework "Delegates to plugins"
+        codeIndexMCP.dispatcher -> codeIndexMCP.storage "Caches results"
+        codeIndexMCP.pluginFramework -> codeIndexMCP.indexEngine "Triggers indexing"
+        codeIndexMCP.pluginFramework -> codeIndexMCP.storage "Stores symbols"
+        codeIndexMCP.indexEngine -> codeIndexMCP.storage "Reads/writes indices"
+        codeIndexMCP.indexEngine -> codeIndexMCP.embeddingService "Requests embeddings"
+        codeIndexMCP.embeddingService -> voyageAI "API calls"
+        codeIndexMCP.fileWatcher -> codeIndexMCP.indexEngine "Triggers re-indexing"
+        codeIndexMCP.fileWatcher -> fileSystem "Monitors changes"
+        
+        # Final 5% completion relationships
+        claudeCode -> codeIndexMCP.mcpServer "Enhanced MCP protocol communication"
+        codeIndexMCP.mcpServer -> codeIndexMCP.apiGateway "Improved request routing"
+        developer -> codeIndexMCP.userDocumentation "References guides"
+        codeIndexMCP.mcpServer.syncIntegration -> codeIndexMCP.storage "Syncs repository state"
+        codeIndexMCP.productionValidation.e2eTestFramework -> codeIndexMCP.apiGateway "Validates full workflows"
         
         # Relationships - Component Level (Plugin System)
-        dispatcher -> pluginFactory "Requests plugin instance"
-        pluginFactory -> languageRegistry "Looks up language config"
-        pluginFactory -> pluginCache "Checks cache"
-        pluginFactory -> pythonPlugin "Creates if Python"
-        pluginFactory -> jsPlugin "Creates if JavaScript"
-        pluginFactory -> cPlugin "Creates if C"
-        pluginFactory -> cppPlugin "Creates if C++"
-        pluginFactory -> dartPlugin "Creates if Dart"
-        pluginFactory -> htmlCssPlugin "Creates if HTML/CSS"
-        pluginFactory -> javaPlugin "Creates if Java"
-        pluginFactory -> goPlugin "Creates if Go"
-        pluginFactory -> rustPlugin "Creates if Rust"
-        pluginFactory -> csharpPlugin "Creates if C#"
-        pluginFactory -> swiftPlugin "Creates if Swift"
-        pluginFactory -> kotlinPlugin "Creates if Kotlin"
-        pluginFactory -> typescriptPlugin "Creates if TypeScript"
-        pluginFactory -> markdownPlugin "Creates if Markdown"
-        pluginFactory -> plaintextPlugin "Creates if PlainText"
-        pluginFactory -> genericPlugin "Creates for other languages"
+        codeIndexMCP.dispatcher -> codeIndexMCP.pluginFramework.pluginFactory "Requests plugin instance"
+        codeIndexMCP.pluginFramework.pluginFactory -> codeIndexMCP.pluginFramework.languageRegistry "Looks up language config"
+        codeIndexMCP.pluginFramework.pluginFactory -> codeIndexMCP.pluginFramework.pluginCache "Checks cache"
+        codeIndexMCP.pluginFramework.pluginFactory -> codeIndexMCP.pluginFramework.pythonPlugin "Creates if Python"
+        codeIndexMCP.pluginFramework.pluginFactory -> codeIndexMCP.pluginFramework.jsPlugin "Creates if JavaScript"
+        codeIndexMCP.pluginFramework.pluginFactory -> codeIndexMCP.pluginFramework.javaPlugin "Creates if Java"
+        codeIndexMCP.pluginFramework.pluginFactory -> codeIndexMCP.pluginFramework.goPlugin "Creates if Go"
         
-        # Plugin inheritance relationships
-        pythonPlugin -> semanticPluginBase "Extends"
-        jsPlugin -> semanticPluginBase "Extends"
-        cPlugin -> semanticPluginBase "Extends"
-        cppPlugin -> semanticPluginBase "Extends"
-        dartPlugin -> semanticPluginBase "Extends"
-        htmlCssPlugin -> semanticPluginBase "Extends"
-        javaPlugin -> semanticPluginBase "Extends"
-        goPlugin -> semanticPluginBase "Extends"
-        rustPlugin -> semanticPluginBase "Extends"
-        csharpPlugin -> semanticPluginBase "Extends"
-        swiftPlugin -> semanticPluginBase "Extends"
-        kotlinPlugin -> semanticPluginBase "Extends"
-        typescriptPlugin -> semanticPluginBase "Extends"
-        markdownPlugin -> pluginBase "Extends"
-        plaintextPlugin -> pluginBase "Extends"
-        genericPlugin -> semanticPluginBase "Extends"
-        semanticPluginBase -> pluginBase "Extends"
+        # Plugin inheritance relationships (simplified)
+        codeIndexMCP.pluginFramework.pythonPlugin -> codeIndexMCP.pluginFramework.semanticPluginBase "Extends"
+        codeIndexMCP.pluginFramework.jsPlugin -> codeIndexMCP.pluginFramework.semanticPluginBase "Extends"
+        codeIndexMCP.pluginFramework.javaPlugin -> codeIndexMCP.pluginFramework.semanticPluginBase "Extends"
+        codeIndexMCP.pluginFramework.goPlugin -> codeIndexMCP.pluginFramework.semanticPluginBase "Extends"
+        codeIndexMCP.pluginFramework.semanticPluginBase -> codeIndexMCP.pluginFramework.pluginBase "Extends"
         
-        # Indexing relationships
-        pythonPlugin -> indexManager "Sends symbols"
-        jsPlugin -> indexManager "Sends symbols"
-        cPlugin -> indexManager "Sends symbols"
-        cppPlugin -> indexManager "Sends symbols"
-        dartPlugin -> indexManager "Sends symbols"
-        htmlCssPlugin -> indexManager "Sends symbols"
-        javaPlugin -> indexManager "Sends symbols"
-        goPlugin -> indexManager "Sends symbols"
-        rustPlugin -> indexManager "Sends symbols"
-        csharpPlugin -> indexManager "Sends symbols"
-        swiftPlugin -> indexManager "Sends symbols"
-        kotlinPlugin -> indexManager "Sends symbols"
-        typescriptPlugin -> indexManager "Sends symbols"
-        markdownPlugin -> indexManager "Sends documents"
-        plaintextPlugin -> indexManager "Sends documents"
-        genericPlugin -> indexManager "Sends symbols"
-        indexManager -> sqliteStore "Stores symbols"
-        indexManager -> semanticIndexer "Requests embeddings"
-        semanticIndexer -> embeddingService "Gets embeddings"
-        semanticIndexer -> qdrantStore "Stores vectors"
-        queryOptimizer -> sqliteStore "Queries symbols"
-        queryOptimizer -> qdrantStore "Semantic search"
+        # Indexing relationships (simplified)
+        codeIndexMCP.pluginFramework.pythonPlugin -> codeIndexMCP.indexEngine.indexManager "Sends symbols"
+        codeIndexMCP.pluginFramework.jsPlugin -> codeIndexMCP.indexEngine.indexManager "Sends symbols"
+        codeIndexMCP.pluginFramework.javaPlugin -> codeIndexMCP.indexEngine.indexManager "Sends symbols"
+        codeIndexMCP.pluginFramework.goPlugin -> codeIndexMCP.indexEngine.indexManager "Sends symbols"
+        codeIndexMCP.indexEngine.indexManager -> codeIndexMCP.storage.sqliteStore "Stores symbols"
+        codeIndexMCP.indexEngine.semanticIndexer -> codeIndexMCP.embeddingService "Gets embeddings"
+        codeIndexMCP.indexEngine.semanticIndexer -> codeIndexMCP.storage.qdrantStore "Stores vectors"
+        codeIndexMCP.indexEngine.queryOptimizer -> codeIndexMCP.storage.sqliteStore "Queries symbols"
+        codeIndexMCP.indexEngine.queryOptimizer -> codeIndexMCP.storage.qdrantStore "Semantic search"
+        codeIndexMCP.indexEngine.indexManager -> codeIndexMCP.storage.indexDiscovery "Uses to find indexes"
+        codeIndexMCP.storage.indexDiscovery -> codeIndexMCP.storage.sqliteStore "Discovers indexes via multi-path search"
     }
     
     views {
@@ -228,22 +237,21 @@ workspace "Code-Index-MCP" "Local-first code indexer with 48-language support vi
         }
         
         # Level 3: Component Diagram - Plugin System
-        component pluginFramework "PluginSystemComponents" {
+        component codeIndexMCP.pluginFramework "PluginSystemComponents" {
             include *
             autoLayout
             description "Component diagram showing the plugin system architecture supporting 48 languages"
         }
         
         # Level 3: Component Diagram - Index Engine
-        component indexEngine "IndexEngineComponents" {
+        component codeIndexMCP.indexEngine "IndexEngineComponents" {
             include *
-            include pluginFramework
             autoLayout
             description "Component diagram showing the indexing and search components"
         }
         
         # Level 3: Component Diagram - Storage
-        component storage "StorageComponents" {
+        component codeIndexMCP.storage "StorageComponents" {
             include *
             autoLayout
             description "Component diagram showing the storage layer with SQLite and Qdrant"
@@ -252,57 +260,44 @@ workspace "Code-Index-MCP" "Local-first code indexer with 48-language support vi
         # Dynamic view showing indexing flow
         dynamic codeIndexMCP "IndexingFlow" "Shows the flow of indexing a Python file" {
             developer -> claudeCode "Requests file indexing"
-            claudeCode -> apiGateway "POST /reindex"
-            apiGateway -> dispatcher "Route to indexer"
-            dispatcher -> pluginFactory "Get Python plugin"
-            pluginFactory -> pythonPlugin "Create/retrieve instance"
-            pythonPlugin -> indexManager "Parse and extract symbols"
-            indexManager -> sqliteStore "Store symbols"
-            indexManager -> semanticIndexer "Generate embeddings"
-            semanticIndexer -> embeddingService "Get code embeddings"
-            embeddingService -> voyageAI "API: voyage-code-3"
-            semanticIndexer -> qdrantStore "Store vectors"
+            claudeCode -> codeIndexMCP.apiGateway "POST /reindex"
+            codeIndexMCP.apiGateway -> codeIndexMCP.dispatcher "Route to indexer"
+            codeIndexMCP.dispatcher -> codeIndexMCP.pluginFramework "Get Python plugin"
+            codeIndexMCP.pluginFramework -> codeIndexMCP.storage "Store symbols"
+            codeIndexMCP.embeddingService -> voyageAI "API: voyage-code-3"
             autoLayout
         }
         
         # Dynamic view showing search flow
         dynamic codeIndexMCP "SearchFlow" "Shows semantic search across multiple languages" {
             developer -> claudeCode "Search: 'calculate fibonacci'"
-            claudeCode -> apiGateway "POST /search"
-            apiGateway -> dispatcher "Route search"
-            dispatcher -> queryOptimizer "Optimize query"
-            queryOptimizer -> semanticIndexer "Semantic search"
-            semanticIndexer -> qdrantStore "Vector similarity search"
-            queryOptimizer -> sqliteStore "FTS5 search"
-            queryOptimizer -> dispatcher "Merge results"
-            dispatcher -> claudeCode "Return ranked results"
+            claudeCode -> codeIndexMCP.apiGateway "POST /search"
+            codeIndexMCP.apiGateway -> codeIndexMCP.dispatcher "Route search"
+            codeIndexMCP.dispatcher -> codeIndexMCP.pluginFramework "Delegate to plugins"
+            codeIndexMCP.pluginFramework -> codeIndexMCP.storage "Query symbols and vectors"
+            codeIndexMCP.apiGateway -> claudeCode "Return ranked results"
             claudeCode -> developer "Display results"
             autoLayout
         }
         
-        # Deployment view
-        deployment codeIndexMCP "Production" "ProductionDeployment" {
-            deploymentNode "Developer Machine" "Local development environment" {
-                deploymentNode "Docker Host" "Docker Engine" {
-                    deploymentNode "app-network" "Docker Network" {
-                        containerInstance apiGateway
-                        containerInstance dispatcher
-                        containerInstance pluginFramework
-                        containerInstance indexEngine
-                        containerInstance fileWatcher
-                        containerInstance embeddingService
-                    }
-                    deploymentNode "Storage Volume" "Persistent storage" {
-                        containerInstance storage
-                    }
-                }
-            }
-            deploymentNode "Cloud Services" "External services" {
-                deploymentNode "Voyage AI Cloud" "voyage.ai" {
-                    softwareSystemInstance voyageAI
-                }
-            }
+        # Dynamic view showing MCP success with enhanced server
+        dynamic codeIndexMCP "MCPSuccessFlow" "Shows how the enhanced MCP server handles requests" {
+            developer -> claudeCode "Request code search"
+            claudeCode -> codeIndexMCP.mcpServer "Enhanced MCP protocol"
+            codeIndexMCP.mcpServer -> codeIndexMCP.apiGateway "Route MCP call"
+            codeIndexMCP.apiGateway -> codeIndexMCP.dispatcher "Process request"
+            codeIndexMCP.dispatcher -> codeIndexMCP.apiGateway "Return results"
+            codeIndexMCP.apiGateway -> claudeCode "Send results"
+            claudeCode -> developer "Present search results"
             autoLayout
+            description "This flow demonstrates how the enhanced MCP server enables successful tool access for all agents including sub-agents"
+        }
+        
+        # Deployment view - simplified
+        systemLandscape "SystemLandscape" {
+            include *
+            autoLayout
+            description "System landscape showing Code-Index-MCP in its operational environment"
         }
         
         styles {
@@ -350,6 +345,19 @@ workspace "Code-Index-MCP" "Local-first code indexer with 48-language support vi
             element "Core Component" {
                 background #4a90e2
                 color #ffffff
+            }
+            element "Issue" {
+                background #ff6b6b
+                color #ffffff
+                shape RoundedBox
+            }
+            element "AI Agent" {
+                background #9b59b6
+                color #ffffff
+            }
+            relationship "Broken" {
+                color #ff0000
+                style dashed
             }
         }
     }

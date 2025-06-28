@@ -1,0 +1,54 @@
+{
+  "database_performance": {
+    "Symbol lookup": {
+      "response_time_ms": 86.89355850219727,
+      "results_count": 0,
+      "success": true
+    },
+    "FTS code search": {
+      "response_time_ms": 4.0378570556640625,
+      "results_count": 10,
+      "success": true
+    },
+    "BM25 content search": {
+      "response_time_ms": 5.561113357543945,
+      "results_count": 10,
+      "success": true
+    }
+  },
+  "native_tool_performance": {
+    "ripgrep class search": {
+      "response_time_ms": 0,
+      "results_count": 0,
+      "success": false,
+      "error": "[Errno 2] No such file or directory: 'rg'"
+    },
+    "find Python files": {
+      "response_time_ms": 2.694845199584961,
+      "results_count": 183,
+      "success": true
+    }
+  },
+  "mcp_connectivity": {
+    "startup_time_ms": 5000,
+    "tools_available": false
+  },
+  "schema_analysis": {
+    "symbols": {
+      "record_count": 1121080,
+      "query_time_ms": 72.27969169616699
+    },
+    "fts_code": {
+      "record_count": 92427,
+      "query_time_ms": 10.15615463256836
+    },
+    "bm25_content": {
+      "record_count": 64716,
+      "query_time_ms": 13.429403305053711
+    }
+  },
+  "database_info": {
+    "path": "/workspaces/Code-Index-MCP/.indexes/f7b49f5d0ae0/current.db",
+    "size_mb": 2235.5
+  }
+}

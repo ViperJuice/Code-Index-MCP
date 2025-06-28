@@ -1,0 +1,107 @@
+#!/bin/bash
+# MCP Index Post-Clone Hook
+# Automatically downloads index artifacts after cloning a repository
+
+set -e
+
+# Colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+# This hook should be called with the cloned repository path as first argument
+REPO_PATH="${1:-$PWD}"
+cd "$REPO_PATH"
+
+# Check if this is a git repository
+if [ ! -d ".git" ]; then
+    exit 0
+fi
+
+# Check if index management is configured
+if [ ! -f ".mcp-index.json" ]; then
+    # No config, but we can still check for artifacts
+    echo -e "${YELLOW}🔍 MCP Index: Checking for available index artifacts...${NC}"
+else
+    ENABLED=$(jq -r '.enabled // true' .mcp-index.json 2>/dev/null || echo "true")
+    AUTO_DOWNLOAD=$(jq -r '.artifact_sync.auto_download // true' .mcp-index.json 2>/dev/null || echo "true")
+    
+    if [ "$ENABLED" != "true" ] || [ "$AUTO_DOWNLOAD" != "true" ]; then
+        exit 0
+    fi
+fi
+
+# Get repository information
+REPO_NAME=$(basename "$REPO_PATH")
+COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
+
+if [ -z "$COMMIT" ]; then
+    echo -e "${RED}✗ MCP Index: Unable to determine repository commit${NC}"
+    exit 0
+fi
+
+echo -e "${YELLOW}🔍 MCP Index: Looking for index artifacts...${NC}"
+
+# Register repository with MCP
+if command -v mcp-index &> /dev/null; then
+    REPO_ID=$(mcp-index register "$REPO_PATH" 2>/dev/null || echo "")
+    
+    if [ -n "$REPO_ID" ]; then
+        echo -e "${GREEN}✓ MCP Index: Registered repository (ID: ${REPO_ID:0:8}...)${NC}"
+        
+        # Check for remote index artifact
+        if mcp-index artifact exists --repo-id "$REPO_ID" --commit "$COMMIT" 2>/dev/null; then
+            echo -e "${GREEN}📥 MCP Index: Downloading index for commit ${COMMIT:0:7}...${NC}"
+            
+            if mcp-index artifact pull --repo-id "$REPO_ID" --commit "$COMMIT" 2>&1 | while read line; do
+                echo -e "${GREEN}   $line${NC}"
+            done; then
+                echo -e "${GREEN}✓ MCP Index: Index downloaded successfully!${NC}"
+                echo -e "${GREEN}   Repository is ready for instant code search${NC}"
+            else
+                echo -e "${YELLOW}⚠️  MCP Index: Download failed${NC}"
+                echo -e "${YELLOW}   You can build index locally with: mcp-index build${NC}"
+            fi
+        else
+            # Try to get latest artifact
+            if mcp-index artifact exists --repo-id "$REPO_ID" --latest 2>/dev/null; then
+                echo -e "${YELLOW}📥 MCP Index: No exact match, downloading latest index...${NC}"
+                
+                if mcp-index artifact pull --repo-id "$REPO_ID" --latest 2>&1 | while read line; do
+                    echo -e "${GREEN}   $line${NC}"
+                done; then
+                    echo -e "${GREEN}✓ MCP Index: Latest index downloaded${NC}"
+                    echo -e "${YELLOW}   Note: Index may not match current commit${NC}"
+                    echo -e "${YELLOW}   Run 'mcp-index update' to sync${NC}"
+                fi
+            else
+                echo -e "${YELLOW}ℹ️  MCP Index: No artifacts found${NC}"
+                echo -e "${YELLOW}   Build index with: mcp-index build${NC}"
+            fi
+        fi
+    fi
+else
+    echo -e "${YELLOW}⚠️  MCP Index: CLI not installed${NC}"
+    echo -e "${YELLOW}   Install with: pip install mcp-index-kit${NC}"
+fi
+
+# Create .mcp-index directory if it doesn't exist
+mkdir -p .mcp-index
+
+# Add .mcp-index to .gitignore if not already there
+if [ -f ".gitignore" ]; then
+    if ! grep -q "^\.mcp-index/" .gitignore 2>/dev/null; then
+        echo -e "${GREEN}✓ MCP Index: Adding .mcp-index/ to .gitignore${NC}"
+        echo "" >> .gitignore
+        echo "# MCP Index files (local only)" >> .gitignore
+        echo ".mcp-index/" >> .gitignore
+    fi
+else
+    # Create .gitignore with .mcp-index entry
+    echo -e "${GREEN}✓ MCP Index: Creating .gitignore with .mcp-index/ entry${NC}"
+    echo "# MCP Index files (local only)" > .gitignore
+    echo ".mcp-index/" >> .gitignore
+fi
+
+exit 0

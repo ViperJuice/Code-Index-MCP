@@ -1,0 +1,4 @@
+
+# MCP Index (tracked for fast setup)
+.mcp-index/code_index.db
+.mcp-index/.index_metadata.json

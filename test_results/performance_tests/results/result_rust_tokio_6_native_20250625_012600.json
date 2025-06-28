@@ -1,0 +1,14 @@
+{
+  "query": "Find docs about timers",
+  "mode": "native",
+  "tools_used": ["Bash"],
+  "tool_calls": {"Bash": 2},
+  "results_found": 51,
+  "execution_time_ms": 800,
+  "token_estimate": 1200,
+  "success": true,
+  "error": null,
+  "test_id": "rust_tokio_6_native",
+  "batch_name": "rust_tokio",
+  "timestamp": "2025-01-06T01:26:00"
+}

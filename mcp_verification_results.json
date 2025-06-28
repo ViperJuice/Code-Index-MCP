@@ -1,0 +1,126 @@
+{
+  "timestamp": "2025-06-27 17:28:14",
+  "tests": [
+    {
+      "tool": "search",
+      "args": [
+        "symbol_lookup",
+        "useState"
+      ],
+      "success": true,
+      "time": 14.134581565856934,
+      "result_count": 0,
+      "output_preview": "",
+      "error": null
+    },
+    {
+      "tool": "search",
+      "args": [
+        "search_code",
+        "async function"
+      ],
+      "success": true,
+      "time": 8.005244970321655,
+      "result_count": 0,
+      "output_preview": "",
+      "error": null
+    },
+    {
+      "tool": "search",
+      "args": [
+        "search_code",
+        "README.md"
+      ],
+      "success": true,
+      "time": 8.13057804107666,
+      "result_count": 0,
+      "output_preview": "",
+      "error": null
+    },
+    {
+      "tool": "search",
+      "args": [
+        "search_code",
+        "--semantic",
+        "false",
+        "authentication"
+      ],
+      "success": true,
+      "time": 8.037067890167236,
+      "result_count": 0,
+      "output_preview": "",
+      "error": null
+    },
+    {
+      "tool": "search",
+      "args": [
+        "search_code",
+        "--semantic",
+        "true",
+        "implement authentication"
+      ],
+      "success": true,
+      "time": 7.9161317348480225,
+      "result_count": 0,
+      "output_preview": "",
+      "error": null
+    },
+    {
+      "tool": "search",
+      "args": [
+        "search_code",
+        "--semantic",
+        "true",
+        "handle user login"
+      ],
+      "success": true,
+      "time": 8.465124607086182,
+      "result_count": 0,
+      "output_preview": "",
+      "error": null
+    },
+    {
+      "tool": "search",
+      "args": [
+        "search_code",
+        "--semantic",
+        "true",
+        "process HTTP requests"
+      ],
+      "success": true,
+      "time": 8.036531209945679,
+      "result_count": 0,
+      "output_preview": "",
+      "error": null
+    },
+    {
+      "tool": "search",
+      "args": [
+        "search_code",
+        "--hybrid",
+        "true",
+        "database connection"
+      ],
+      "success": true,
+      "time": 8.237859725952148,
+      "result_count": 0,
+      "output_preview": "",
+      "error": null
+    },
+    {
+      "tool": "search",
+      "args": [
+        "search_code",
+        "--hybrid",
+        "true",
+        "parse JSON data"
+      ],
+      "success": true,
+      "time": 8.148599624633789,
+      "result_count": 0,
+      "output_preview": "",
+      "error": null
+    }
+  ],
+  "direct_api_test": false
+}

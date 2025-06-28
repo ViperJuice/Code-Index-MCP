@@ -1,0 +1,17 @@
+{
+  "query": "Search for TODO comments",
+  "mode": "native",
+  "tools_used": ["Grep", "Bash"],
+  "tool_calls": {
+    "Grep": 1,
+    "Bash": 1
+  },
+  "results_found": 41,
+  "execution_time_ms": 1200,
+  "token_estimate": 2500,
+  "success": true,
+  "error": null,
+  "test_id": "python_django_2_native",
+  "timestamp": "2025-01-06T22:20:30",
+  "batch_name": "python_django"
+}

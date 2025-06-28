@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "code-index-mcp": {
+      "command": "/usr/local/bin/python",
+      "args": ["/workspaces/Code-Index-MCP/scripts/cli/mcp_server_cli.py"],
+      "cwd": "/workspaces/Code-Index-MCP",
+      "env": {
+        "VOYAGE_AI_API_KEY": "pa-Fdhj97wixjABvuP4oGuOgNTgjoPM3-ovbmg-4VktTnL",
+        "SEMANTIC_SEARCH_ENABLED": "true",
+        "SEMANTIC_EMBEDDING_MODEL": "voyage-code-3",
+        "SEMANTIC_COLLECTION_NAME": "code-embeddings",
+        "RERANKING_ENABLED": "true",
+        "RERANKER_TYPE": "hybrid",
+        "MCP_WORKSPACE_ROOT": "/workspaces/Code-Index-MCP",
+        "MCP_LOG_LEVEL": "INFO",
+        "DATABASE_URL": "sqlite:///./code_index.db",
+        "PYTHONPATH": "/workspaces/Code-Index-MCP"
+      }
+    }
+  }
+}

@@ -1,0 +1,173 @@
+{
+  "timestamp": "2025-06-27T22:11:50.814018",
+  "environment": {
+    "workspace_root": "/workspaces/Code-Index-MCP",
+    "index_storage_path": "/workspaces/Code-Index-MCP/.indexes",
+    "repo_registry_path": "/workspaces/Code-Index-MCP/.indexes/repository_registry.json",
+    "python_version": "3.12.10 (main, May 22 2025, 01:28:35) [GCC 10.2.1 20210110]",
+    "platform": "linux",
+    "env_vars": {
+      "MCP_WORKSPACE_ROOT": null,
+      "MCP_INDEX_STORAGE_PATH": null,
+      "MCP_ENABLE_MULTI_REPO": null,
+      "SEMANTIC_SEARCH_ENABLED": null
+    }
+  },
+  "tests": [
+    {
+      "name": "status",
+      "timestamp": "2025-06-27T22:11:52.041057",
+      "success": true,
+      "duration": 1.2267646789550781,
+      "stdout": "",
+      "stderr": "2025-06-27 22:11:51,914 - __main__ - INFO - ============================================================\n2025-06-27 22:11:51,914 - __main__ - INFO - Code Index MCP Server Starting\n2025-06-27 22:11:51,914 - __main__ - INFO - Dispatcher Mode: Enhanced (with plugins)\n2025-06-27 22:11:51,914 - __main__ - INFO - Plugin Timeout: 5 seconds\n2025-06-27 22:11:51,914 - __main__ - INFO - Debug Mode: Disabled\n2025-06-27 22:11:51,914 - __main__ - INFO - ============================================================\n2025-06-27 22:11:51,914 - __main__ - INFO - Searching for index using multi-path discovery...\n2025-06-27 22:11:51,915 - __main__ - ERROR - Failed to initialize services: invalid syntax. Perhaps you forgot a comma? (index_manager.py, line 43)\nTraceback (most recent call last):\n  File \"/workspaces/Code-Index-MCP/scripts/cli/mcp_server_cli.py\", line 91, in initialize_services\n    discovery = IndexDiscovery(current_dir, enable_multi_path=enable_multi_path)\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspaces/Code-Index-MCP/mcp_server/utils/index_discovery.py\", line 33, in __init__\n    from mcp_server.storage.index_manager import IndexManager\n  File \"/workspaces/Code-Index-MCP/mcp_server/storage/index_manager.py\", line 43\n    Path(\"PathUtils.get_temp_path() / \"mcp-indexes\"\"),\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nSyntaxError: invalid syntax. Perhaps you forgot a comma?\n",
+      "returncode": 0
+    },
+    {
+      "name": "list_plugins",
+      "timestamp": "2025-06-27T22:11:53.289639",
+      "success": true,
+      "duration": 1.2483179569244385,
+      "stdout": "",
+      "stderr": "2025-06-27 22:11:53,148 - __main__ - INFO - ============================================================\n2025-06-27 22:11:53,148 - __main__ - INFO - Code Index MCP Server Starting\n2025-06-27 22:11:53,148 - __main__ - INFO - Dispatcher Mode: Enhanced (with plugins)\n2025-06-27 22:11:53,148 - __main__ - INFO - Plugin Timeout: 5 seconds\n2025-06-27 22:11:53,148 - __main__ - INFO - Debug Mode: Disabled\n2025-06-27 22:11:53,148 - __main__ - INFO - ============================================================\n2025-06-27 22:11:53,148 - __main__ - INFO - Searching for index using multi-path discovery...\n2025-06-27 22:11:53,148 - __main__ - ERROR - Failed to initialize services: invalid syntax. Perhaps you forgot a comma? (index_manager.py, line 43)\nTraceback (most recent call last):\n  File \"/workspaces/Code-Index-MCP/scripts/cli/mcp_server_cli.py\", line 91, in initialize_services\n    discovery = IndexDiscovery(current_dir, enable_multi_path=enable_multi_path)\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspaces/Code-Index-MCP/mcp_server/utils/index_discovery.py\", line 33, in __init__\n    from mcp_server.storage.index_manager import IndexManager\n  File \"/workspaces/Code-Index-MCP/mcp_server/storage/index_manager.py\", line 43\n    Path(\"PathUtils.get_temp_path() / \"mcp-indexes\"\"),\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nSyntaxError: invalid syntax. Perhaps you forgot a comma?\n",
+      "returncode": 0
+    },
+    {
+      "name": "symbol_lookup_PathUtils",
+      "timestamp": "2025-06-27T22:11:54.513261",
+      "success": true,
+      "duration": 1.2233965396881104,
+      "stdout": "",
+      "stderr": "2025-06-27 22:11:54,371 - __main__ - INFO - ============================================================\n2025-06-27 22:11:54,371 - __main__ - INFO - Code Index MCP Server Starting\n2025-06-27 22:11:54,371 - __main__ - INFO - Dispatcher Mode: Enhanced (with plugins)\n2025-06-27 22:11:54,371 - __main__ - INFO - Plugin Timeout: 5 seconds\n2025-06-27 22:11:54,371 - __main__ - INFO - Debug Mode: Disabled\n2025-06-27 22:11:54,371 - __main__ - INFO - ============================================================\n2025-06-27 22:11:54,371 - __main__ - INFO - Searching for index using multi-path discovery...\n2025-06-27 22:11:54,372 - __main__ - ERROR - Failed to initialize services: invalid syntax. Perhaps you forgot a comma? (index_manager.py, line 43)\nTraceback (most recent call last):\n  File \"/workspaces/Code-Index-MCP/scripts/cli/mcp_server_cli.py\", line 91, in initialize_services\n    discovery = IndexDiscovery(current_dir, enable_multi_path=enable_multi_path)\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspaces/Code-Index-MCP/mcp_server/utils/index_discovery.py\", line 33, in __init__\n    from mcp_server.storage.index_manager import IndexManager\n  File \"/workspaces/Code-Index-MCP/mcp_server/storage/index_manager.py\", line 43\n    Path(\"PathUtils.get_temp_path() / \"mcp-indexes\"\"),\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nSyntaxError: invalid syntax. Perhaps you forgot a comma?\n",
+      "returncode": 0,
+      "warning": "No results found"
+    },
+    {
+      "name": "symbol_lookup_EnhancedDispatcher",
+      "timestamp": "2025-06-27T22:11:55.858049",
+      "success": true,
+      "duration": 1.3445487022399902,
+      "stdout": "",
+      "stderr": "2025-06-27 22:11:55,690 - __main__ - INFO - ============================================================\n2025-06-27 22:11:55,690 - __main__ - INFO - Code Index MCP Server Starting\n2025-06-27 22:11:55,690 - __main__ - INFO - Dispatcher Mode: Enhanced (with plugins)\n2025-06-27 22:11:55,690 - __main__ - INFO - Plugin Timeout: 5 seconds\n2025-06-27 22:11:55,690 - __main__ - INFO - Debug Mode: Disabled\n2025-06-27 22:11:55,690 - __main__ - INFO - ============================================================\n2025-06-27 22:11:55,690 - __main__ - INFO - Searching for index using multi-path discovery...\n2025-06-27 22:11:55,691 - __main__ - ERROR - Failed to initialize services: invalid syntax. Perhaps you forgot a comma? (index_manager.py, line 43)\nTraceback (most recent call last):\n  File \"/workspaces/Code-Index-MCP/scripts/cli/mcp_server_cli.py\", line 91, in initialize_services\n    discovery = IndexDiscovery(current_dir, enable_multi_path=enable_multi_path)\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspaces/Code-Index-MCP/mcp_server/utils/index_discovery.py\", line 33, in __init__\n    from mcp_server.storage.index_manager import IndexManager\n  File \"/workspaces/Code-Index-MCP/mcp_server/storage/index_manager.py\", line 43\n    Path(\"PathUtils.get_temp_path() / \"mcp-indexes\"\"),\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nSyntaxError: invalid syntax. Perhaps you forgot a comma?\n",
+      "returncode": 0,
+      "warning": "No results found"
+    },
+    {
+      "name": "symbol_lookup_SQLiteStore",
+      "timestamp": "2025-06-27T22:11:57.181667",
+      "success": true,
+      "duration": 1.3233718872070312,
+      "stdout": "",
+      "stderr": "2025-06-27 22:11:57,056 - __main__ - INFO - ============================================================\n2025-06-27 22:11:57,056 - __main__ - INFO - Code Index MCP Server Starting\n2025-06-27 22:11:57,056 - __main__ - INFO - Dispatcher Mode: Enhanced (with plugins)\n2025-06-27 22:11:57,056 - __main__ - INFO - Plugin Timeout: 5 seconds\n2025-06-27 22:11:57,056 - __main__ - INFO - Debug Mode: Disabled\n2025-06-27 22:11:57,056 - __main__ - INFO - ============================================================\n2025-06-27 22:11:57,056 - __main__ - INFO - Searching for index using multi-path discovery...\n2025-06-27 22:11:57,056 - __main__ - ERROR - Failed to initialize services: invalid syntax. Perhaps you forgot a comma? (index_manager.py, line 43)\nTraceback (most recent call last):\n  File \"/workspaces/Code-Index-MCP/scripts/cli/mcp_server_cli.py\", line 91, in initialize_services\n    discovery = IndexDiscovery(current_dir, enable_multi_path=enable_multi_path)\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspaces/Code-Index-MCP/mcp_server/utils/index_discovery.py\", line 33, in __init__\n    from mcp_server.storage.index_manager import IndexManager\n  File \"/workspaces/Code-Index-MCP/mcp_server/storage/index_manager.py\", line 43\n    Path(\"PathUtils.get_temp_path() / \"mcp-indexes\"\"),\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nSyntaxError: invalid syntax. Perhaps you forgot a comma?\n",
+      "returncode": 0,
+      "warning": "No results found"
+    },
+    {
+      "name": "symbol_lookup_PluginManager",
+      "timestamp": "2025-06-27T22:11:58.400635",
+      "success": true,
+      "duration": 1.2187421321868896,
+      "stdout": "",
+      "stderr": "2025-06-27 22:11:58,271 - __main__ - INFO - ============================================================\n2025-06-27 22:11:58,271 - __main__ - INFO - Code Index MCP Server Starting\n2025-06-27 22:11:58,271 - __main__ - INFO - Dispatcher Mode: Enhanced (with plugins)\n2025-06-27 22:11:58,271 - __main__ - INFO - Plugin Timeout: 5 seconds\n2025-06-27 22:11:58,271 - __main__ - INFO - Debug Mode: Disabled\n2025-06-27 22:11:58,271 - __main__ - INFO - ============================================================\n2025-06-27 22:11:58,271 - __main__ - INFO - Searching for index using multi-path discovery...\n2025-06-27 22:11:58,272 - __main__ - ERROR - Failed to initialize services: invalid syntax. Perhaps you forgot a comma? (index_manager.py, line 43)\nTraceback (most recent call last):\n  File \"/workspaces/Code-Index-MCP/scripts/cli/mcp_server_cli.py\", line 91, in initialize_services\n    discovery = IndexDiscovery(current_dir, enable_multi_path=enable_multi_path)\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspaces/Code-Index-MCP/mcp_server/utils/index_discovery.py\", line 33, in __init__\n    from mcp_server.storage.index_manager import IndexManager\n  File \"/workspaces/Code-Index-MCP/mcp_server/storage/index_manager.py\", line 43\n    Path(\"PathUtils.get_temp_path() / \"mcp-indexes\"\"),\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nSyntaxError: invalid syntax. Perhaps you forgot a comma?\n",
+      "returncode": 0,
+      "warning": "No results found"
+    },
+    {
+      "name": "sql_search_def test",
+      "timestamp": "2025-06-27T22:11:59.624846",
+      "success": true,
+      "duration": 1.2239773273468018,
+      "stdout": "",
+      "stderr": "2025-06-27 22:11:59,493 - __main__ - INFO - ============================================================\n2025-06-27 22:11:59,493 - __main__ - INFO - Code Index MCP Server Starting\n2025-06-27 22:11:59,493 - __main__ - INFO - Dispatcher Mode: Enhanced (with plugins)\n2025-06-27 22:11:59,493 - __main__ - INFO - Plugin Timeout: 5 seconds\n2025-06-27 22:11:59,493 - __main__ - INFO - Debug Mode: Disabled\n2025-06-27 22:11:59,493 - __main__ - INFO - ============================================================\n2025-06-27 22:11:59,494 - __main__ - INFO - Searching for index using multi-path discovery...\n2025-06-27 22:11:59,494 - __main__ - ERROR - Failed to initialize services: invalid syntax. Perhaps you forgot a comma? (index_manager.py, line 43)\nTraceback (most recent call last):\n  File \"/workspaces/Code-Index-MCP/scripts/cli/mcp_server_cli.py\", line 91, in initialize_services\n    discovery = IndexDiscovery(current_dir, enable_multi_path=enable_multi_path)\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspaces/Code-Index-MCP/mcp_server/utils/index_discovery.py\", line 33, in __init__\n    from mcp_server.storage.index_manager import IndexManager\n  File \"/workspaces/Code-Index-MCP/mcp_server/storage/index_manager.py\", line 43\n    Path(\"PathUtils.get_temp_path() / \"mcp-indexes\"\"),\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nSyntaxError: invalid syntax. Perhaps you forgot a comma?\n",
+      "returncode": 0,
+      "warning": "No results found"
+    },
+    {
+      "name": "sql_search_class Plugin",
+      "timestamp": "2025-06-27T22:12:00.858268",
+      "success": true,
+      "duration": 1.2331974506378174,
+      "stdout": "",
+      "stderr": "2025-06-27 22:12:00,729 - __main__ - INFO - ============================================================\n2025-06-27 22:12:00,729 - __main__ - INFO - Code Index MCP Server Starting\n2025-06-27 22:12:00,729 - __main__ - INFO - Dispatcher Mode: Enhanced (with plugins)\n2025-06-27 22:12:00,729 - __main__ - INFO - Plugin Timeout: 5 seconds\n2025-06-27 22:12:00,730 - __main__ - INFO - Debug Mode: Disabled\n2025-06-27 22:12:00,730 - __main__ - INFO - ============================================================\n2025-06-27 22:12:00,730 - __main__ - INFO - Searching for index using multi-path discovery...\n2025-06-27 22:12:00,730 - __main__ - ERROR - Failed to initialize services: invalid syntax. Perhaps you forgot a comma? (index_manager.py, line 43)\nTraceback (most recent call last):\n  File \"/workspaces/Code-Index-MCP/scripts/cli/mcp_server_cli.py\", line 91, in initialize_services\n    discovery = IndexDiscovery(current_dir, enable_multi_path=enable_multi_path)\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspaces/Code-Index-MCP/mcp_server/utils/index_discovery.py\", line 33, in __init__\n    from mcp_server.storage.index_manager import IndexManager\n  File \"/workspaces/Code-Index-MCP/mcp_server/storage/index_manager.py\", line 43\n    Path(\"PathUtils.get_temp_path() / \"mcp-indexes\"\"),\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nSyntaxError: invalid syntax. Perhaps you forgot a comma?\n",
+      "returncode": 0,
+      "warning": "No results found"
+    },
+    {
+      "name": "sql_search_import os",
+      "timestamp": "2025-06-27T22:12:02.099837",
+      "success": true,
+      "duration": 1.2413427829742432,
+      "stdout": "",
+      "stderr": "2025-06-27 22:12:01,967 - __main__ - INFO - ============================================================\n2025-06-27 22:12:01,967 - __main__ - INFO - Code Index MCP Server Starting\n2025-06-27 22:12:01,967 - __main__ - INFO - Dispatcher Mode: Enhanced (with plugins)\n2025-06-27 22:12:01,967 - __main__ - INFO - Plugin Timeout: 5 seconds\n2025-06-27 22:12:01,967 - __main__ - INFO - Debug Mode: Disabled\n2025-06-27 22:12:01,967 - __main__ - INFO - ============================================================\n2025-06-27 22:12:01,967 - __main__ - INFO - Searching for index using multi-path discovery...\n2025-06-27 22:12:01,967 - __main__ - ERROR - Failed to initialize services: invalid syntax. Perhaps you forgot a comma? (index_manager.py, line 43)\nTraceback (most recent call last):\n  File \"/workspaces/Code-Index-MCP/scripts/cli/mcp_server_cli.py\", line 91, in initialize_services\n    discovery = IndexDiscovery(current_dir, enable_multi_path=enable_multi_path)\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspaces/Code-Index-MCP/mcp_server/utils/index_discovery.py\", line 33, in __init__\n    from mcp_server.storage.index_manager import IndexManager\n  File \"/workspaces/Code-Index-MCP/mcp_server/storage/index_manager.py\", line 43\n    Path(\"PathUtils.get_temp_path() / \"mcp-indexes\"\"),\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nSyntaxError: invalid syntax. Perhaps you forgot a comma?\n",
+      "returncode": 0,
+      "warning": "No results found"
+    },
+    {
+      "name": "sql_search_README",
+      "timestamp": "2025-06-27T22:12:03.321174",
+      "success": true,
+      "duration": 1.221116065979004,
+      "stdout": "",
+      "stderr": "2025-06-27 22:12:03,186 - __main__ - INFO - ============================================================\n2025-06-27 22:12:03,186 - __main__ - INFO - Code Index MCP Server Starting\n2025-06-27 22:12:03,186 - __main__ - INFO - Dispatcher Mode: Enhanced (with plugins)\n2025-06-27 22:12:03,186 - __main__ - INFO - Plugin Timeout: 5 seconds\n2025-06-27 22:12:03,186 - __main__ - INFO - Debug Mode: Disabled\n2025-06-27 22:12:03,186 - __main__ - INFO - ============================================================\n2025-06-27 22:12:03,186 - __main__ - INFO - Searching for index using multi-path discovery...\n2025-06-27 22:12:03,187 - __main__ - ERROR - Failed to initialize services: invalid syntax. Perhaps you forgot a comma? (index_manager.py, line 43)\nTraceback (most recent call last):\n  File \"/workspaces/Code-Index-MCP/scripts/cli/mcp_server_cli.py\", line 91, in initialize_services\n    discovery = IndexDiscovery(current_dir, enable_multi_path=enable_multi_path)\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspaces/Code-Index-MCP/mcp_server/utils/index_discovery.py\", line 33, in __init__\n    from mcp_server.storage.index_manager import IndexManager\n  File \"/workspaces/Code-Index-MCP/mcp_server/storage/index_manager.py\", line 43\n    Path(\"PathUtils.get_temp_path() / \"mcp-indexes\"\"),\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nSyntaxError: invalid syntax. Perhaps you forgot a comma?\n",
+      "returncode": 0,
+      "warning": "No results found"
+    },
+    {
+      "name": "semantic_search_implement path resolution for ",
+      "timestamp": "2025-06-27T22:12:05.822653",
+      "success": true,
+      "duration": 1.2548365592956543,
+      "stdout": "",
+      "stderr": "2025-06-27 22:12:05,683 - __main__ - INFO - ============================================================\n2025-06-27 22:12:05,683 - __main__ - INFO - Code Index MCP Server Starting\n2025-06-27 22:12:05,683 - __main__ - INFO - Dispatcher Mode: Enhanced (with plugins)\n2025-06-27 22:12:05,683 - __main__ - INFO - Plugin Timeout: 5 seconds\n2025-06-27 22:12:05,683 - __main__ - INFO - Debug Mode: Disabled\n2025-06-27 22:12:05,683 - __main__ - INFO - ============================================================\n2025-06-27 22:12:05,683 - __main__ - INFO - Searching for index using multi-path discovery...\n2025-06-27 22:12:05,683 - __main__ - ERROR - Failed to initialize services: invalid syntax. Perhaps you forgot a comma? (index_manager.py, line 43)\nTraceback (most recent call last):\n  File \"/workspaces/Code-Index-MCP/scripts/cli/mcp_server_cli.py\", line 91, in initialize_services\n    discovery = IndexDiscovery(current_dir, enable_multi_path=enable_multi_path)\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspaces/Code-Index-MCP/mcp_server/utils/index_discovery.py\", line 33, in __init__\n    from mcp_server.storage.index_manager import IndexManager\n  File \"/workspaces/Code-Index-MCP/mcp_server/storage/index_manager.py\", line 43\n    Path(\"PathUtils.get_temp_path() / \"mcp-indexes\"\"),\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nSyntaxError: invalid syntax. Perhaps you forgot a comma?\n",
+      "returncode": 0
+    },
+    {
+      "name": "semantic_search_handle multi-repository indexi",
+      "timestamp": "2025-06-27T22:12:07.056141",
+      "success": true,
+      "duration": 1.2332501411437988,
+      "stdout": "",
+      "stderr": "2025-06-27 22:12:06,928 - __main__ - INFO - ============================================================\n2025-06-27 22:12:06,928 - __main__ - INFO - Code Index MCP Server Starting\n2025-06-27 22:12:06,928 - __main__ - INFO - Dispatcher Mode: Enhanced (with plugins)\n2025-06-27 22:12:06,928 - __main__ - INFO - Plugin Timeout: 5 seconds\n2025-06-27 22:12:06,928 - __main__ - INFO - Debug Mode: Disabled\n2025-06-27 22:12:06,928 - __main__ - INFO - ============================================================\n2025-06-27 22:12:06,928 - __main__ - INFO - Searching for index using multi-path discovery...\n2025-06-27 22:12:06,928 - __main__ - ERROR - Failed to initialize services: invalid syntax. Perhaps you forgot a comma? (index_manager.py, line 43)\nTraceback (most recent call last):\n  File \"/workspaces/Code-Index-MCP/scripts/cli/mcp_server_cli.py\", line 91, in initialize_services\n    discovery = IndexDiscovery(current_dir, enable_multi_path=enable_multi_path)\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspaces/Code-Index-MCP/mcp_server/utils/index_discovery.py\", line 33, in __init__\n    from mcp_server.storage.index_manager import IndexManager\n  File \"/workspaces/Code-Index-MCP/mcp_server/storage/index_manager.py\", line 43\n    Path(\"PathUtils.get_temp_path() / \"mcp-indexes\"\"),\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nSyntaxError: invalid syntax. Perhaps you forgot a comma?\n",
+      "returncode": 0
+    },
+    {
+      "name": "semantic_search_process Python code with tree-",
+      "timestamp": "2025-06-27T22:12:08.286558",
+      "success": true,
+      "duration": 1.2301805019378662,
+      "stdout": "",
+      "stderr": "2025-06-27 22:12:08,154 - __main__ - INFO - ============================================================\n2025-06-27 22:12:08,154 - __main__ - INFO - Code Index MCP Server Starting\n2025-06-27 22:12:08,154 - __main__ - INFO - Dispatcher Mode: Enhanced (with plugins)\n2025-06-27 22:12:08,154 - __main__ - INFO - Plugin Timeout: 5 seconds\n2025-06-27 22:12:08,154 - __main__ - INFO - Debug Mode: Disabled\n2025-06-27 22:12:08,154 - __main__ - INFO - ============================================================\n2025-06-27 22:12:08,154 - __main__ - INFO - Searching for index using multi-path discovery...\n2025-06-27 22:12:08,154 - __main__ - ERROR - Failed to initialize services: invalid syntax. Perhaps you forgot a comma? (index_manager.py, line 43)\nTraceback (most recent call last):\n  File \"/workspaces/Code-Index-MCP/scripts/cli/mcp_server_cli.py\", line 91, in initialize_services\n    discovery = IndexDiscovery(current_dir, enable_multi_path=enable_multi_path)\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspaces/Code-Index-MCP/mcp_server/utils/index_discovery.py\", line 33, in __init__\n    from mcp_server.storage.index_manager import IndexManager\n  File \"/workspaces/Code-Index-MCP/mcp_server/storage/index_manager.py\", line 43\n    Path(\"PathUtils.get_temp_path() / \"mcp-indexes\"\"),\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nSyntaxError: invalid syntax. Perhaps you forgot a comma?\n",
+      "returncode": 0
+    },
+    {
+      "name": "hybrid_search",
+      "timestamp": "2025-06-27T22:12:09.535124",
+      "success": true,
+      "duration": 1.2483141422271729,
+      "stdout": "",
+      "stderr": "2025-06-27 22:12:09,400 - __main__ - INFO - ============================================================\n2025-06-27 22:12:09,401 - __main__ - INFO - Code Index MCP Server Starting\n2025-06-27 22:12:09,401 - __main__ - INFO - Dispatcher Mode: Enhanced (with plugins)\n2025-06-27 22:12:09,401 - __main__ - INFO - Plugin Timeout: 5 seconds\n2025-06-27 22:12:09,401 - __main__ - INFO - Debug Mode: Disabled\n2025-06-27 22:12:09,401 - __main__ - INFO - ============================================================\n2025-06-27 22:12:09,401 - __main__ - INFO - Searching for index using multi-path discovery...\n2025-06-27 22:12:09,401 - __main__ - ERROR - Failed to initialize services: invalid syntax. Perhaps you forgot a comma? (index_manager.py, line 43)\nTraceback (most recent call last):\n  File \"/workspaces/Code-Index-MCP/scripts/cli/mcp_server_cli.py\", line 91, in initialize_services\n    discovery = IndexDiscovery(current_dir, enable_multi_path=enable_multi_path)\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspaces/Code-Index-MCP/mcp_server/utils/index_discovery.py\", line 33, in __init__\n    from mcp_server.storage.index_manager import IndexManager\n  File \"/workspaces/Code-Index-MCP/mcp_server/storage/index_manager.py\", line 43\n    Path(\"PathUtils.get_temp_path() / \"mcp-indexes\"\"),\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nSyntaxError: invalid syntax. Perhaps you forgot a comma?\n",
+      "returncode": 0
+    },
+    {
+      "name": "direct_db_access",
+      "timestamp": "2025-06-27T22:12:09.564627",
+      "success": true,
+      "stdout": "BM25 search: Found 0 results\n\u2717 Direct database access failed: 'SQLiteStore' object has no attribute 'search_fts'\n",
+      "stderr": "",
+      "repo_id": "d8df70cdcd6e"
+    },
+    {
+      "name": "path_resolution",
+      "timestamp": "2025-06-27T22:12:09.592423",
+      "success": true,
+      "stdout": "Workspace root: /workspaces/Code-Index-MCP\nIndex storage: /workspaces/Code-Index-MCP/.indexes\nRepo registry: /workspaces/Code-Index-MCP/.indexes/repository_registry.json\nTemp path: /tmp\nDocker /app/test.py -> Native /workspaces/Code-Index-MCP/test.py\nIs Docker: True\n\u2713 Path resolution working correctly\n",
+      "stderr": ""
+    }
+  ],
+  "summary": {
+    "total": 16,
+    "passed": 16,
+    "failed": 0,
+    "errors": 0
+  }
+}

@@ -1,0 +1,9 @@
+[
+  {
+    "test_id": "go_gin_2_native_corrected",
+    "original_file": "test_results/performance_tests/results/result_go_gin_2_native_20250624_204800.json",
+    "prompt": "You are testing native tools for performance analysis.\n\nRepository: go_gin (go)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/modern/go/gin\nQuery: Search for TODO comments\nCategory: symbol\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Search for TODO comments\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```",
+    "batch_name": "go_gin",
+    "query": "Search for TODO comments"
+  }
+]

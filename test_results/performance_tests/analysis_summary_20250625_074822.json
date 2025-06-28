@@ -1,0 +1,22 @@
+{
+  "timestamp": "2025-06-25T07:48:22.904016",
+  "total_tests": 23,
+  "mcp_tests": 12,
+  "native_tests": 11,
+  "repositories": [
+    "go_gin",
+    "python_django",
+    "javascript_react",
+    "rust_tokio"
+  ],
+  "mcp_metrics": {
+    "avg_time_ms": 3066.6666666666665,
+    "avg_tokens": 9500.0,
+    "success_rate": 58.333333333333336
+  },
+  "native_metrics": {
+    "avg_time_ms": 2124.6363636363635,
+    "avg_tokens": 2140.909090909091,
+    "success_rate": 63.63636363636363
+  }
+}

@@ -1,0 +1,182 @@
+@startuml cross_repository_search
+!include ../style.puml
+
+title Cross-Repository Search Architecture - Level 4
+
+package "Cross-Repository Search System" {
+    class CrossRepositorySearchCoordinator <<singleton>> {
+        - multi_repo_manager: MultiRepoIndexManager
+        - max_workers: int
+        - default_result_limit: int
+        - memory_manager: MemoryAwarePluginManager
+        - plugin_loader: RepositoryPluginLoader
+        - _repo_capabilities_cache: Dict[str, Set[str]]
+        
+        + search_symbol(symbol, scope): AggregatedResult
+        + search_code(query, scope, semantic, limit): AggregatedResult
+        + get_search_statistics(): Dict
+        - _get_target_repositories(scope): List[RepositoryInfo]
+        - _execute_parallel_symbol_search(): List[CrossRepoSearchResult]
+        - _execute_parallel_code_search(): List[CrossRepoSearchResult]
+        - _aggregate_symbol_results(): AggregatedResult
+        - _aggregate_code_results(): AggregatedResult
+        - _create_symbol_signature(): str
+        - _create_content_hash(): str
+    }
+    
+    class SearchScope <<dataclass>> {
+        + repositories: Optional[List[str]]
+        + languages: Optional[List[str]]
+        + file_types: Optional[List[str]]
+        + max_repositories: int
+        + priority_order: bool
+    }
+    
+    class AggregatedResult <<dataclass>> {
+        + query: str
+        + total_results: int
+        + repositories_searched: int
+        + search_time: float
+        + results: List[Dict[str, Any]]
+        + repository_stats: Dict[str, int]
+        + deduplication_stats: Dict[str, int]
+    }
+}
+
+package "Repository Management" {
+    class MultiRepoIndexManager {
+        + get_active_repositories(): List[RepositoryInfo]
+        + search_across_repositories(): List[CrossRepoSearchResult]
+    }
+    
+    class RepositoryInfo <<dataclass>> {
+        + repository_id: str
+        + name: str
+        + path: Path
+        + index_path: Path
+        + language_stats: Dict[str, int]
+        + total_files: int
+        + total_symbols: int
+        + priority: int
+    }
+    
+    class CrossRepoSearchResult <<dataclass>> {
+        + repository_id: str
+        + repository_name: str
+        + results: List[Dict[str, Any]]
+        + search_time: float
+        + error: Optional[str]
+    }
+}
+
+package "Storage Layer" {
+    class SQLiteStore {
+        + search_symbols(symbol): List[Dict]
+        + search_content(query): List[Dict]
+        + semantic_search(query): List[Dict]
+    }
+}
+
+package "Memory Management" {
+    class MemoryAwarePluginManager {
+        + get_plugin(language): Plugin
+        + get_memory_status(): Dict
+    }
+    
+    class RepositoryPluginLoader {
+        + analyze_repository(path): RepositoryProfile
+        + load_plugins_for_repository(): Dict[str, Plugin]
+    }
+}
+
+package "Parallel Processing" {
+    class ThreadPoolExecutor {
+        + submit(fn, *args): Future
+        + as_completed(futures): Iterator
+    }
+}
+
+' Relationships
+CrossRepositorySearchCoordinator ..> SearchScope : uses
+CrossRepositorySearchCoordinator ..> AggregatedResult : creates
+CrossRepositorySearchCoordinator ..> MultiRepoIndexManager : coordinates
+CrossRepositorySearchCoordinator ..> MemoryAwarePluginManager : manages memory
+CrossRepositorySearchCoordinator ..> RepositoryPluginLoader : loads plugins
+CrossRepositorySearchCoordinator ..> ThreadPoolExecutor : parallel execution
+
+MultiRepoIndexManager ..> RepositoryInfo : manages
+MultiRepoIndexManager ..> CrossRepoSearchResult : creates
+MultiRepoIndexManager ..> SQLiteStore : uses
+
+CrossRepositorySearchCoordinator --> SQLiteStore : searches
+
+' Search Flow
+note right of CrossRepositorySearchCoordinator
+  Search Process:
+  1. Parse search scope and filters
+  2. Get target repositories by priority
+  3. Execute parallel searches
+  4. Aggregate and deduplicate results
+  5. Apply ranking and limits
+  6. Return unified results
+end note
+
+note left of AggregatedResult
+  Result Structure:
+  - Combined results from all repos
+  - Repository attribution
+  - Deduplication statistics
+  - Performance metrics
+  - Error handling
+end note
+
+note bottom of SearchScope
+  Filtering Options:
+  - Specific repositories
+  - Language constraints
+  - File type filters
+  - Repository limits
+  - Priority ordering
+end note
+
+' Performance Notes
+note top of ThreadPoolExecutor
+  Parallel Execution:
+  - Configurable worker pool
+  - 30s timeout per repo (symbol)
+  - 60s timeout per repo (code)
+  - Graceful error handling
+end note
+
+note bottom of CrossRepositorySearchCoordinator
+  Deduplication Strategy:
+  - Symbol: name + relative path + line
+  - Content: content hash + relative path
+  - MD5 signatures for efficiency
+  - Preserves repository attribution
+end note
+
+' Integration Points
+package "MCP Interface" {
+    class MCPSearchTool {
+        + cross_repo_symbol_search()
+        + cross_repo_code_search()
+    }
+}
+
+MCPSearchTool ..> CrossRepositorySearchCoordinator : uses
+
+' Result Ranking
+note right of AggregatedResult
+  Ranking Strategy:
+  Symbol Search:
+  - Exact matches first
+  - Repository priority second
+  
+  Code Search:
+  - Relevance score (if available)
+  - Repository result count
+  - Repository priority
+end note
+
+@enduml

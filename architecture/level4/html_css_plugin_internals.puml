@@ -1,0 +1,245 @@
+@startuml html_css_plugin_internals
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define NOT_IMPLEMENTED <<Not Implemented>>
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title HTML/CSS Plugin - Code Level (Internal Structure)
+
+package "mcp_server.plugins.html_css_plugin" <<Component>> {
+    
+    ' ========================================
+    ' ACTUAL Implementation
+    ' ========================================
+    
+    class Plugin implements IPlugin,IHtmlCssPlugin,ILanguageAnalyzer #LightGreen {
+        +lang: str = "html_css"
+        -_html_parser: Parser
+        -_css_parser: Parser
+        -_lib: ctypes.CDLL
+        -_html_language: Language
+        -_css_language: Language
+        -_indexer: FuzzyIndexer
+        -_sqlite_store: Optional[SQLiteStore]
+        -_repository_id: Optional[int]
+        -_html_elements: Dict[str, List[Dict[str, Any]]]
+        -_css_selectors: Dict[str, List[Dict[str, Any]]]
+        -_symbol_cache: Dict[str, List[SymbolDef]]
+        -_current_file: Optional[Path]
+        --
+        +__init__(sqlite_store: Optional[SQLiteStore] = None)
+        +supports(path: str | Path) -> bool
+        +indexFile(path: str | Path, content: str) -> IndexShard
+        +getDefinition(symbol: str) -> SymbolDef | None
+        +findReferences(symbol: str) -> list[Reference]
+        +search(query: str, opts: SearchOpts | None) -> Iterable[SearchResult]
+        +get_indexed_count() -> int
+        -_preindex() -> None
+        -_index_html_file(path: Path, content: str, file_id: Optional[int]) -> List[Dict]
+        -_index_css_file(path: Path, content: str, file_id: Optional[int]) -> List[Dict]
+        -_extract_html_symbols(tree: Any, content: str, file_id: Optional[int]) -> List[Dict]
+        -_extract_css_symbols(tree: Any, content: str, file_id: Optional[int]) -> List[Dict]
+        -_extract_element_info(node: Any, content: str) -> Dict[str, Any]
+        -_extract_css_rule(node: Any, content: str) -> Dict[str, Any]
+        -_extract_selectors(selector_node: Any, content: str) -> List[str]
+        -_extract_declarations(block_node: Any, content: str) -> List[Dict[str, str]]
+        -_find_style_references() -> Dict[str, List[str]]
+    }
+    
+    ' ========================================
+    ' Supported File Types
+    ' ========================================
+    
+    note right of Plugin #LightGreen
+        IMPLEMENTED:
+        - HTML files (.html, .htm)
+        - CSS files (.css)
+        - SCSS files (.scss)
+        - SASS files (.sass)
+        - Dual tree-sitter parsers
+        - Element extraction with attributes
+        - ID and class tracking
+        - CSS selector parsing
+        - Property declarations
+        - Media queries
+        - @import tracking
+        - Cross-reference matching
+        - Inline style extraction
+        - <style> tag parsing
+        - SQLite persistence
+    end note
+    
+    ' ========================================
+    ' Symbol Types Extracted
+    ' ========================================
+    
+    class HtmlSymbolTypes <<enumeration>> #LightGreen {
+        element (tag names)
+        id_attribute
+        class_attribute
+        data_attribute
+        script_tag
+        style_tag
+        link_tag
+        meta_tag
+        form_element
+        input_element
+    }
+    
+    class CssSymbolTypes <<enumeration>> #LightGreen {
+        rule_set
+        class_selector
+        id_selector
+        element_selector
+        attribute_selector
+        pseudo_class
+        pseudo_element
+        media_query
+        keyframes
+        variable (custom properties)
+        import_rule
+        mixin (SCSS)
+        function (SCSS)
+    }
+    
+    ' ========================================
+    ' HTML/CSS Specific Features
+    ' ========================================
+    
+    class HtmlCssFeatures <<features>> #LightGreen {
+        +Element hierarchy tracking
+        +Attribute extraction
+        +Class/ID cross-referencing
+        +Selector specificity
+        +Cascade analysis
+        +Box model properties
+        +Flexbox properties
+        +Grid properties
+        +Animation properties
+        +Transform properties
+        +Media query breakpoints
+        +CSS variables (--var)
+        +SCSS nesting
+        +SCSS mixins
+        +SCSS extends
+        +Vendor prefixes
+        +Inline styles
+        +External stylesheets
+        +Framework detection
+    }
+    
+    ' ========================================
+    ' Interface Implementations
+    ' ========================================
+    
+    class IHtmlCssPlugin <<interface>> #LightBlue {
+        +analyze_styles(file_path: str) -> Result[StyleAnalysis]
+        +get_unused_styles(html_files: List[str], css_files: List[str]) -> Result[List[str]]
+        +get_element_styles(element_path: str) -> Result[Dict[str, str]]
+    }
+    
+    class ILanguageAnalyzer <<interface>> #LightBlue {
+        +parse_imports(content: str) -> Result[List[str]]
+        +extract_symbols(content: str) -> Result[List[SymbolDefinition]]
+        +resolve_type(symbol: str, context: Dict) -> Result[Optional[str]]
+        +get_call_hierarchy(symbol: str, context: Dict) -> Result[Dict[str, List[str]]]
+    }
+    
+    ' ========================================
+    ' Cross-Reference Components
+    ' ========================================
+    
+    class CrossReferenceAnalyzer #LightGreen {
+        +match_selectors_to_elements(selectors: List[str], elements: List[Dict]) -> Dict[str, List[str]]
+        +find_unused_classes(html_classes: Set[str], css_classes: Set[str]) -> Set[str]
+        +find_undefined_classes(html_classes: Set[str], css_classes: Set[str]) -> Set[str]
+        +calculate_specificity(selector: str) -> Tuple[int, int, int]
+    }
+    
+    ' ========================================
+    ' External Dependencies
+    ' ========================================
+    
+    class "tree_sitter_languages" <<External Library>> {
+        +languages.so
+        +tree_sitter_html()
+        +tree_sitter_css()
+    }
+    
+    class FuzzyIndexer #LightGreen {
+        +add_file(path: str, content: str) -> None
+        +add_symbol(symbol_name: str, file_path: str, line_number: int, metadata: Dict) -> None
+        +search(query: str, limit: int = 20) -> List[Dict]
+        +search_symbols(query: str, limit: int = 20) -> List[Dict]
+    }
+    
+    ' ========================================
+    ' What's Actually Implemented
+    ' ========================================
+    
+    note left of HtmlCssFeatures
+        Cross-file analysis:
+        - HTML elements cached per file
+        - CSS selectors cached per file
+        - ID/class matching
+        - Style application tracking
+        - Framework class detection
+        - Responsive breakpoints
+        - Animation keyframes
+        - CSS custom properties
+        - SCSS preprocessing
+    end note
+    
+    ' ========================================
+    ' What's Missing
+    ' ========================================
+    
+    note bottom of Plugin #FF6B6B
+        NOT IMPLEMENTED:
+        - No CSS-in-JS support
+        - No styled-components parsing
+        - No PostCSS plugin support
+        - No Tailwind JIT analysis
+        - No CSS module scoping
+        - No cascade calculation
+        - No inheritance tracking
+        - No browser compatibility data
+        - No performance metrics
+        - No critical CSS extraction
+        - No dead CSS elimination
+        - No responsive image analysis
+        - No accessibility validation
+        - No SEO metadata analysis
+    end note
+    
+    ' ========================================
+    ' Relationships
+    ' ========================================
+    
+    Plugin --> tree_sitter_languages : loads HTML/CSS grammars
+    Plugin --> FuzzyIndexer : indexes symbols
+    Plugin --> SQLiteStore : persists symbols
+    Plugin --> CrossReferenceAnalyzer : analyzes references
+    Plugin ..> HtmlSymbolTypes : extracts
+    Plugin ..> CssSymbolTypes : extracts
+    Plugin ..> HtmlCssFeatures : supports
+    Plugin --|> IHtmlCssPlugin : implements
+    Plugin --|> ILanguageAnalyzer : implements
+    
+    Plugin ..> IndexShard : returns
+    Plugin ..> SymbolDef : returns
+    Plugin ..> Reference : yields
+    Plugin ..> SearchResult : yields
+}
+
+' ========================================
+' Implementation Status Legend
+' ========================================
+
+legend right
+    |<#90EE90>| Implemented |
+    |<#FFD700>| Partially Implemented |
+    |<#FFA500>| Stub Only |
+    |<#FF6B6B>| Not Implemented |
+endlegend
+
+@enduml

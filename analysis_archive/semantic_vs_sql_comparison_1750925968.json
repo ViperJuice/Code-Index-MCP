@@ -1,0 +1,1044 @@
+{
+  "test_info": {
+    "timestamp": "2025-06-26T08:19:28.701380",
+    "datasets_tested": 10,
+    "queries_per_dataset": 8,
+    "total_tests": 80
+  },
+  "datasets": [
+    {
+      "name": "go_gin",
+      "sql_db": "/workspaces/Code-Index-MCP/test_indexes/go_gin/code_index.db",
+      "qdrant_collection": null
+    },
+    {
+      "name": "dart_sdk",
+      "sql_db": "/workspaces/Code-Index-MCP/test_indexes/dart_sdk/code_index.db",
+      "qdrant_collection": null
+    },
+    {
+      "name": "swift_Alamofire",
+      "sql_db": "/workspaces/Code-Index-MCP/test_indexes/swift_Alamofire/code_index.db",
+      "qdrant_collection": null
+    },
+    {
+      "name": "rust_tokio",
+      "sql_db": "/workspaces/Code-Index-MCP/test_indexes/rust_tokio/code_index.db",
+      "qdrant_collection": null
+    },
+    {
+      "name": "javascript_react",
+      "sql_db": "/workspaces/Code-Index-MCP/test_indexes/javascript_react/code_index.db",
+      "qdrant_collection": null
+    },
+    {
+      "name": "typescript_TypeScript",
+      "sql_db": "/workspaces/Code-Index-MCP/test_indexes/typescript_TypeScript/code_index.db",
+      "qdrant_collection": null
+    },
+    {
+      "name": "lua_kong",
+      "sql_db": "/workspaces/Code-Index-MCP/test_indexes/lua_kong/code_index.db",
+      "qdrant_collection": null
+    },
+    {
+      "name": "c_redis",
+      "sql_db": "/workspaces/Code-Index-MCP/test_indexes/c_redis/code_index.db",
+      "qdrant_collection": null
+    },
+    {
+      "name": "csharp_aspnetcore",
+      "sql_db": "/workspaces/Code-Index-MCP/test_indexes/csharp_aspnetcore/code_index.db",
+      "qdrant_collection": null
+    },
+    {
+      "name": "python_django",
+      "sql_db": "/workspaces/Code-Index-MCP/test_indexes/python_django/code_index.db",
+      "qdrant_collection": null
+    }
+  ],
+  "test_queries": [
+    {
+      "id": "symbol_simple_001",
+      "query": "BM25Indexer",
+      "category": "symbol_search",
+      "expected_results": [
+        "BM25Indexer"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "symbol_simple_002",
+      "query": "class EnhancedDispatcher",
+      "category": "symbol_search",
+      "expected_results": [
+        "EnhancedDispatcher"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "content_simple_001",
+      "query": "def index_file",
+      "category": "content_search",
+      "expected_results": [
+        "index_file"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "content_simple_002",
+      "query": "async function",
+      "category": "content_search",
+      "expected_results": [
+        "async"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "natural_medium_001",
+      "query": "find all HTTP handlers",
+      "category": "natural_language",
+      "expected_results": [
+        "handler",
+        "http"
+      ],
+      "complexity": "medium"
+    },
+    {
+      "id": "natural_medium_002",
+      "query": "search for database connection code",
+      "category": "natural_language",
+      "expected_results": [
+        "database",
+        "connection",
+        "connect"
+      ],
+      "complexity": "medium"
+    },
+    {
+      "id": "symbol_complex_001",
+      "query": "middleware configuration setup",
+      "category": "symbol_search",
+      "expected_results": [
+        "middleware",
+        "config"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "natural_complex_001",
+      "query": "find error handling patterns for file operations",
+      "category": "natural_language",
+      "expected_results": [
+        "error",
+        "file",
+        "exception"
+      ],
+      "complexity": "complex"
+    }
+  ],
+  "individual_results": [
+    {
+      "method": "sql",
+      "query_id": "symbol_simple_001",
+      "query_text": "BM25Indexer",
+      "success": false,
+      "response_time_ms": 0.4074573516845703,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_simple_002",
+      "query_text": "class EnhancedDispatcher",
+      "success": false,
+      "response_time_ms": 0.16832351684570312,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "content_simple_001",
+      "query_text": "def index_file",
+      "success": false,
+      "response_time_ms": 0.15401840209960938,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "content_simple_002",
+      "query_text": "async function",
+      "success": false,
+      "response_time_ms": 0.1437664031982422,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_medium_001",
+      "query_text": "find all HTTP handlers",
+      "success": false,
+      "response_time_ms": 0.1347064971923828,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_medium_002",
+      "query_text": "search for database connection code",
+      "success": false,
+      "response_time_ms": 0.1385211944580078,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_complex_001",
+      "query_text": "middleware configuration setup",
+      "success": false,
+      "response_time_ms": 0.12755393981933594,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_complex_001",
+      "query_text": "find error handling patterns for file operations",
+      "success": false,
+      "response_time_ms": 0.14257431030273438,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_simple_001",
+      "query_text": "BM25Indexer",
+      "success": false,
+      "response_time_ms": 0.9307861328125,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_simple_002",
+      "query_text": "class EnhancedDispatcher",
+      "success": false,
+      "response_time_ms": 0.194549560546875,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "content_simple_001",
+      "query_text": "def index_file",
+      "success": false,
+      "response_time_ms": 0.1671314239501953,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "content_simple_002",
+      "query_text": "async function",
+      "success": false,
+      "response_time_ms": 0.15807151794433594,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_medium_001",
+      "query_text": "find all HTTP handlers",
+      "success": false,
+      "response_time_ms": 0.13303756713867188,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_medium_002",
+      "query_text": "search for database connection code",
+      "success": false,
+      "response_time_ms": 0.1418590545654297,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_complex_001",
+      "query_text": "middleware configuration setup",
+      "success": false,
+      "response_time_ms": 0.13947486877441406,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_complex_001",
+      "query_text": "find error handling patterns for file operations",
+      "success": false,
+      "response_time_ms": 0.1342296600341797,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_simple_001",
+      "query_text": "BM25Indexer",
+      "success": false,
+      "response_time_ms": 0.9615421295166016,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_simple_002",
+      "query_text": "class EnhancedDispatcher",
+      "success": false,
+      "response_time_ms": 0.2052783966064453,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "content_simple_001",
+      "query_text": "def index_file",
+      "success": false,
+      "response_time_ms": 0.15926361083984375,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "content_simple_002",
+      "query_text": "async function",
+      "success": false,
+      "response_time_ms": 0.15926361083984375,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_medium_001",
+      "query_text": "find all HTTP handlers",
+      "success": false,
+      "response_time_ms": 0.1480579376220703,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_medium_002",
+      "query_text": "search for database connection code",
+      "success": false,
+      "response_time_ms": 0.1437664031982422,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_complex_001",
+      "query_text": "middleware configuration setup",
+      "success": false,
+      "response_time_ms": 0.13399124145507812,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_complex_001",
+      "query_text": "find error handling patterns for file operations",
+      "success": false,
+      "response_time_ms": 0.13875961303710938,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_simple_001",
+      "query_text": "BM25Indexer",
+      "success": false,
+      "response_time_ms": 74.75709915161133,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_simple_002",
+      "query_text": "class EnhancedDispatcher",
+      "success": false,
+      "response_time_ms": 0.20885467529296875,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "content_simple_001",
+      "query_text": "def index_file",
+      "success": false,
+      "response_time_ms": 0.16307830810546875,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "content_simple_002",
+      "query_text": "async function",
+      "success": false,
+      "response_time_ms": 0.1590251922607422,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_medium_001",
+      "query_text": "find all HTTP handlers",
+      "success": false,
+      "response_time_ms": 0.1385211944580078,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_medium_002",
+      "query_text": "search for database connection code",
+      "success": false,
+      "response_time_ms": 0.16045570373535156,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_complex_001",
+      "query_text": "middleware configuration setup",
+      "success": false,
+      "response_time_ms": 0.14519691467285156,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_complex_001",
+      "query_text": "find error handling patterns for file operations",
+      "success": false,
+      "response_time_ms": 0.1614093780517578,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_simple_001",
+      "query_text": "BM25Indexer",
+      "success": false,
+      "response_time_ms": 1.15203857421875,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_simple_002",
+      "query_text": "class EnhancedDispatcher",
+      "success": false,
+      "response_time_ms": 0.2155303955078125,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "content_simple_001",
+      "query_text": "def index_file",
+      "success": false,
+      "response_time_ms": 0.15282630920410156,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "content_simple_002",
+      "query_text": "async function",
+      "success": false,
+      "response_time_ms": 0.15616416931152344,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_medium_001",
+      "query_text": "find all HTTP handlers",
+      "success": false,
+      "response_time_ms": 1.0602474212646484,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_medium_002",
+      "query_text": "search for database connection code",
+      "success": false,
+      "response_time_ms": 0.11992454528808594,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_complex_001",
+      "query_text": "middleware configuration setup",
+      "success": false,
+      "response_time_ms": 0.10418891906738281,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_complex_001",
+      "query_text": "find error handling patterns for file operations",
+      "success": false,
+      "response_time_ms": 0.09179115295410156,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_simple_001",
+      "query_text": "BM25Indexer",
+      "success": false,
+      "response_time_ms": 0.9443759918212891,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_simple_002",
+      "query_text": "class EnhancedDispatcher",
+      "success": false,
+      "response_time_ms": 0.1354217529296875,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "content_simple_001",
+      "query_text": "def index_file",
+      "success": false,
+      "response_time_ms": 0.09799003601074219,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "content_simple_002",
+      "query_text": "async function",
+      "success": false,
+      "response_time_ms": 0.10323524475097656,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_medium_001",
+      "query_text": "find all HTTP handlers",
+      "success": false,
+      "response_time_ms": 0.10323524475097656,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_medium_002",
+      "query_text": "search for database connection code",
+      "success": false,
+      "response_time_ms": 0.08249282836914062,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_complex_001",
+      "query_text": "middleware configuration setup",
+      "success": false,
+      "response_time_ms": 0.08678436279296875,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_complex_001",
+      "query_text": "find error handling patterns for file operations",
+      "success": false,
+      "response_time_ms": 0.08416175842285156,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_simple_001",
+      "query_text": "BM25Indexer",
+      "success": false,
+      "response_time_ms": 0.8740425109863281,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_simple_002",
+      "query_text": "class EnhancedDispatcher",
+      "success": false,
+      "response_time_ms": 0.12993812561035156,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "content_simple_001",
+      "query_text": "def index_file",
+      "success": false,
+      "response_time_ms": 0.10204315185546875,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "content_simple_002",
+      "query_text": "async function",
+      "success": false,
+      "response_time_ms": 0.09202957153320312,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_medium_001",
+      "query_text": "find all HTTP handlers",
+      "success": false,
+      "response_time_ms": 0.08606910705566406,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_medium_002",
+      "query_text": "search for database connection code",
+      "success": false,
+      "response_time_ms": 0.08416175842285156,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_complex_001",
+      "query_text": "middleware configuration setup",
+      "success": false,
+      "response_time_ms": 0.08273124694824219,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_complex_001",
+      "query_text": "find error handling patterns for file operations",
+      "success": false,
+      "response_time_ms": 0.08487701416015625,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_simple_001",
+      "query_text": "BM25Indexer",
+      "success": false,
+      "response_time_ms": 0.9548664093017578,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_simple_002",
+      "query_text": "class EnhancedDispatcher",
+      "success": false,
+      "response_time_ms": 0.15664100646972656,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "content_simple_001",
+      "query_text": "def index_file",
+      "success": false,
+      "response_time_ms": 0.13780593872070312,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "content_simple_002",
+      "query_text": "async function",
+      "success": false,
+      "response_time_ms": 0.09393692016601562,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_medium_001",
+      "query_text": "find all HTTP handlers",
+      "success": false,
+      "response_time_ms": 0.08940696716308594,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_medium_002",
+      "query_text": "search for database connection code",
+      "success": false,
+      "response_time_ms": 0.08749961853027344,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_complex_001",
+      "query_text": "middleware configuration setup",
+      "success": false,
+      "response_time_ms": 0.08678436279296875,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_complex_001",
+      "query_text": "find error handling patterns for file operations",
+      "success": false,
+      "response_time_ms": 0.08726119995117188,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_simple_001",
+      "query_text": "BM25Indexer",
+      "success": false,
+      "response_time_ms": 0.9453296661376953,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_simple_002",
+      "query_text": "class EnhancedDispatcher",
+      "success": false,
+      "response_time_ms": 0.1347064971923828,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "content_simple_001",
+      "query_text": "def index_file",
+      "success": false,
+      "response_time_ms": 0.1049041748046875,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "content_simple_002",
+      "query_text": "async function",
+      "success": false,
+      "response_time_ms": 0.09369850158691406,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_medium_001",
+      "query_text": "find all HTTP handlers",
+      "success": false,
+      "response_time_ms": 0.08630752563476562,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_medium_002",
+      "query_text": "search for database connection code",
+      "success": false,
+      "response_time_ms": 0.08606910705566406,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_complex_001",
+      "query_text": "middleware configuration setup",
+      "success": false,
+      "response_time_ms": 0.08225440979003906,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_complex_001",
+      "query_text": "find error handling patterns for file operations",
+      "success": false,
+      "response_time_ms": 0.11348724365234375,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_simple_001",
+      "query_text": "BM25Indexer",
+      "success": false,
+      "response_time_ms": 0.232696533203125,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_simple_002",
+      "query_text": "class EnhancedDispatcher",
+      "success": false,
+      "response_time_ms": 0.16236305236816406,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "content_simple_001",
+      "query_text": "def index_file",
+      "success": false,
+      "response_time_ms": 0.1468658447265625,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "content_simple_002",
+      "query_text": "async function",
+      "success": false,
+      "response_time_ms": 0.1442432403564453,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_medium_001",
+      "query_text": "find all HTTP handlers",
+      "success": false,
+      "response_time_ms": 0.14019012451171875,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_medium_002",
+      "query_text": "search for database connection code",
+      "success": false,
+      "response_time_ms": 0.16021728515625,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "symbol_complex_001",
+      "query_text": "middleware configuration setup",
+      "success": false,
+      "response_time_ms": 0.1468658447265625,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    },
+    {
+      "method": "sql",
+      "query_id": "natural_complex_001",
+      "query_text": "find error handling patterns for file operations",
+      "success": false,
+      "response_time_ms": 0.1418590545654297,
+      "results_count": 0,
+      "results": [],
+      "error_message": "no such column: file_path",
+      "memory_usage_mb": null
+    }
+  ],
+  "comparison_metrics": [],
+  "analysis": {
+    "summary": {
+      "total_sql_tests": 80,
+      "total_semantic_tests": 0,
+      "sql_success_rate": 0.0,
+      "semantic_success_rate": 0
+    },
+    "performance": {
+      "sql_avg_response_time": 0.0,
+      "semantic_avg_response_time": 0.0,
+      "sql_avg_results": 0.0,
+      "semantic_avg_results": 0.0
+    },
+    "comparisons": {
+      "total_comparisons": 0,
+      "semantic_faster_count": 0,
+      "sql_faster_count": 0,
+      "semantic_better_accuracy": 0,
+      "sql_better_accuracy": 0
+    }
+  }
+}

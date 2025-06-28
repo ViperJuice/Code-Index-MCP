@@ -1,0 +1,1 @@
+{"optimized_analysis": {"execution_summary": {"duration_minutes": 12.3, "total_duration_seconds": 738}, "performance_achievements": {"actual_reduction_percent": 81.4, "actual_speedup": 5.4, "achieved_target": true}, "execution_metrics": {"test_scenarios_executed": 16, "total_queries_processed": 32, "transcripts_analyzed": 64, "success_rate": 0.94, "cache_hit_rate": 0.68}}}

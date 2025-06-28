@@ -1,0 +1,14 @@
+{
+  "query": "Find the definition of class Server",
+  "mode": "mcp",
+  "tools_used": ["mcp__code-index-mcp__symbol_lookup", "mcp__code-index-mcp__search_code"],
+  "tool_calls": {"mcp__code-index-mcp__symbol_lookup": 2, "mcp__code-index-mcp__search_code": 5},
+  "results_found": 1,
+  "execution_time_ms": 3500,
+  "token_estimate": 8500,
+  "success": true,
+  "error": null,
+  "test_id": "go_gin_0_mcp",
+  "timestamp": "2025-01-06T18:01:00",
+  "batch_name": "go_gin"
+}

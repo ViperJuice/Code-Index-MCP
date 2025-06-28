@@ -1,0 +1,163 @@
+{
+  "batch_name": "python_django",
+  "timestamp": "20250624_175224",
+  "test_count": 12,
+  "tests": [
+    {
+      "test_id": "python_django_0_mcp",
+      "mode": "mcp",
+      "query_info": {
+        "query": "Find the definition of class BaseHandler",
+        "category": "symbol",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "python_django",
+        "language": "python"
+      },
+      "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: python_django (python)\nQuery: Find the definition of class BaseHandler\nCategory: symbol\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find the definition of class BaseHandler\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    },
+    {
+      "test_id": "python_django_0_native",
+      "mode": "native",
+      "query_info": {
+        "query": "Find the definition of class BaseHandler",
+        "category": "symbol",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "python_django",
+        "language": "python"
+      },
+      "prompt": "You are testing native tools for performance analysis.\n\nRepository: python_django (python)\nWorking Directory: /workspaces/Code-Index-MCP/test_indexes/python_django\nQuery: Find the definition of class BaseHandler\nCategory: symbol\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find the definition of class BaseHandler\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    },
+    {
+      "test_id": "python_django_1_mcp",
+      "mode": "mcp",
+      "query_info": {
+        "query": "Where is function process_request implemented?",
+        "category": "symbol",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "python_django",
+        "language": "python"
+      },
+      "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: python_django (python)\nQuery: Where is function process_request implemented?\nCategory: symbol\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Where is function process_request implemented?\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    },
+    {
+      "test_id": "python_django_1_native",
+      "mode": "native",
+      "query_info": {
+        "query": "Where is function process_request implemented?",
+        "category": "symbol",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "python_django",
+        "language": "python"
+      },
+      "prompt": "You are testing native tools for performance analysis.\n\nRepository: python_django (python)\nWorking Directory: /workspaces/Code-Index-MCP/test_indexes/python_django\nQuery: Where is function process_request implemented?\nCategory: symbol\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Where is function process_request implemented?\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    },
+    {
+      "test_id": "python_django_2_mcp",
+      "mode": "mcp",
+      "query_info": {
+        "query": "Search for TODO comments",
+        "category": "content",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "python_django",
+        "language": "python"
+      },
+      "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: python_django (python)\nQuery: Search for TODO comments\nCategory: content\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Search for TODO comments\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    },
+    {
+      "test_id": "python_django_2_native",
+      "mode": "native",
+      "query_info": {
+        "query": "Search for TODO comments",
+        "category": "content",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "python_django",
+        "language": "python"
+      },
+      "prompt": "You are testing native tools for performance analysis.\n\nRepository: python_django (python)\nWorking Directory: /workspaces/Code-Index-MCP/test_indexes/python_django\nQuery: Search for TODO comments\nCategory: content\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Search for TODO comments\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    },
+    {
+      "test_id": "python_django_3_mcp",
+      "mode": "mcp",
+      "query_info": {
+        "query": "Find all FIXME or BUG comments",
+        "category": "content",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "python_django",
+        "language": "python"
+      },
+      "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: python_django (python)\nQuery: Find all FIXME or BUG comments\nCategory: content\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all FIXME or BUG comments\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    },
+    {
+      "test_id": "python_django_3_native",
+      "mode": "native",
+      "query_info": {
+        "query": "Find all FIXME or BUG comments",
+        "category": "content",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "python_django",
+        "language": "python"
+      },
+      "prompt": "You are testing native tools for performance analysis.\n\nRepository: python_django (python)\nWorking Directory: /workspaces/Code-Index-MCP/test_indexes/python_django\nQuery: Find all FIXME or BUG comments\nCategory: content\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all FIXME or BUG comments\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    },
+    {
+      "test_id": "python_django_4_mcp",
+      "mode": "mcp",
+      "query_info": {
+        "query": "Find all files importing core",
+        "category": "navigation",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "python_django",
+        "language": "python"
+      },
+      "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: python_django (python)\nQuery: Find all files importing core\nCategory: navigation\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all files importing core\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    },
+    {
+      "test_id": "python_django_4_native",
+      "mode": "native",
+      "query_info": {
+        "query": "Find all files importing core",
+        "category": "navigation",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "python_django",
+        "language": "python"
+      },
+      "prompt": "You are testing native tools for performance analysis.\n\nRepository: python_django (python)\nWorking Directory: /workspaces/Code-Index-MCP/test_indexes/python_django\nQuery: Find all files importing core\nCategory: navigation\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all files importing core\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    },
+    {
+      "test_id": "python_django_5_mcp",
+      "mode": "mcp",
+      "query_info": {
+        "query": "Show files that depend on requests",
+        "category": "navigation",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "python_django",
+        "language": "python"
+      },
+      "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: python_django (python)\nQuery: Show files that depend on requests\nCategory: navigation\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show files that depend on requests\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    },
+    {
+      "test_id": "python_django_5_native",
+      "mode": "native",
+      "query_info": {
+        "query": "Show files that depend on requests",
+        "category": "navigation",
+        "complexity": "medium",
+        "expected_result_type": "location",
+        "repository": "python_django",
+        "language": "python"
+      },
+      "prompt": "You are testing native tools for performance analysis.\n\nRepository: python_django (python)\nWorking Directory: /workspaces/Code-Index-MCP/test_indexes/python_django\nQuery: Show files that depend on requests\nCategory: navigation\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show files that depend on requests\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+    }
+  ]
+}

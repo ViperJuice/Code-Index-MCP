@@ -1,0 +1,14 @@
+{
+  "query": "List all Tokio macros",
+  "mode": "native",
+  "tools_used": ["Bash"],
+  "tool_calls": {"Bash": 1},
+  "results_found": 138,
+  "execution_time_ms": 500,
+  "token_estimate": 1000,
+  "success": true,
+  "error": null,
+  "test_id": "rust_tokio_5_native",
+  "batch_name": "rust_tokio",
+  "timestamp": "2025-01-06T01:25:00"
+}

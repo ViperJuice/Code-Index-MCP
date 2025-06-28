@@ -1,0 +1,14 @@
+{
+  "query": "List all ORM models",
+  "mode": "native",
+  "tools_used": ["Grep"],
+  "tool_calls": {"Grep": 1},
+  "results_found": 2220,
+  "execution_time_ms": 400,
+  "token_estimate": 1800,
+  "success": true,
+  "error": null,
+  "test_id": "python_django_4_native",
+  "batch_name": "python_django",
+  "timestamp": "2025-01-06T01:12:00"
+}

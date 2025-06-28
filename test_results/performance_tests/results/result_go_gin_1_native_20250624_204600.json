@@ -1,0 +1,14 @@
+{
+  "query": "Where is function HandleRequest implemented?",
+  "mode": "native",
+  "tools_used": ["Grep", "LS", "Glob"],
+  "tool_calls": {"Grep": 4, "LS": 1, "Glob": 2},
+  "results_found": 0,
+  "execution_time_ms": 2500,
+  "token_estimate": 4200,
+  "success": false,
+  "error": "Function HandleRequest not found in the gin repository",
+  "test_id": "go_gin_1_native",
+  "timestamp": "2025-01-06T20:46:00",
+  "batch_name": "go_gin"
+}

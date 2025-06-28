@@ -390,5 +390,85 @@ def toggle(enable: bool):
         pass
 
 
+@cli.command()
+@click.argument('action', type=click.Choice(['install', 'uninstall', 'status']))
+def hooks(action: str):
+    """Manage git hooks for automatic index sync"""
+    script_dir = Path(__file__).parent.parent
+    hooks_dir = script_dir / 'hooks'
+    installer_script = hooks_dir / 'install-hooks.sh'
+    
+    if not installer_script.exists():
+        # Try to find it in the installed location
+        possible_paths = [
+            Path('/usr/local/share/mcp-index-kit/hooks/install-hooks.sh'),
+            Path.home() / '.mcp-index-kit/hooks/install-hooks.sh'
+        ]
+        for path in possible_paths:
+            if path.exists():
+                installer_script = path
+                break
+        else:
+            click.echo(click.style('✗ Hooks installer not found', fg='red'))
+            click.echo('Make sure mcp-index-kit is properly installed.')
+            sys.exit(1)
+    
+    if action == 'install':
+        try:
+            subprocess.run(['bash', str(installer_script)], check=True)
+        except subprocess.CalledProcessError:
+            click.echo(click.style('✗ Failed to install hooks', fg='red'))
+            sys.exit(1)
+    
+    elif action == 'uninstall':
+        try:
+            subprocess.run(['bash', str(installer_script), '--uninstall'], check=True)
+        except subprocess.CalledProcessError:
+            click.echo(click.style('✗ Failed to uninstall hooks', fg='red'))
+            sys.exit(1)
+    
+    elif action == 'status':
+        git_dir = Path('.git/hooks')
+        if not git_dir.exists():
+            click.echo(click.style('✗ Not in a git repository', fg='red'))
+            sys.exit(1)
+        
+        hooks_info = []
+        for hook_name in ['pre-push', 'post-merge', 'post-checkout']:
+            hook_path = git_dir / hook_name
+            if hook_path.exists():
+                # Check if it's our hook
+                try:
+                    with open(hook_path) as f:
+                        content = f.read()
+                    if 'MCP Index' in content:
+                        hooks_info.append((hook_name, 'installed', 'green'))
+                    else:
+                        hooks_info.append((hook_name, 'other hook', 'yellow'))
+                except:
+                    hooks_info.append((hook_name, 'unreadable', 'red'))
+            else:
+                hooks_info.append((hook_name, 'not installed', 'dim'))
+        
+        click.echo('Git hooks status:')
+        for name, status, color in hooks_info:
+            click.echo(f'  {name:<15} {click.style(status, fg=color)}')
+        
+        # Check configuration
+        config_path = Path('.mcp-index.json')
+        if config_path.exists():
+            with open(config_path) as f:
+                config = json.load(f)
+            
+            click.echo('\nAuto-sync configuration:')
+            enabled = config.get('enabled', True)
+            auto_upload = config.get('auto_upload', True)
+            auto_download = config.get('auto_download', True)
+            
+            click.echo(f'  Indexing:      {click.style("enabled" if enabled else "disabled", fg="green" if enabled else "red")}')
+            click.echo(f'  Auto upload:   {click.style("enabled" if auto_upload else "disabled", fg="green" if auto_upload else "red")}')
+            click.echo(f'  Auto download: {click.style("enabled" if auto_download else "disabled", fg="green" if auto_download else "red")}')
+
+
 if __name__ == '__main__':
     cli()

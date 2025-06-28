@@ -10,4 +10,4 @@ This plugin provides comprehensive Swift language support including:
 
 from .plugin import Plugin
 
-__all__ = ['Plugin']
+__all__ = ["Plugin"]

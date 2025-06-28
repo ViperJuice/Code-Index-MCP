@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "code-index-minimal": {
+      "command": "docker",
+      "args": [
+        "run", 
+        "-i", 
+        "--rm",
+        "-v", "${workspace}:/workspace",
+        "-v", "${HOME}/.mcp-index:/app/.mcp-index",
+        "${MCP_DOCKER_IMAGE:-ghcr.io/code-index-mcp/mcp-index:minimal}"
+      ],
+      "env": {
+        "MCP_LOG_LEVEL": "${MCP_LOG_LEVEL:-INFO}",
+        "MCP_ARTIFACT_SYNC": "false"
+      }
+    }
+  }
+}

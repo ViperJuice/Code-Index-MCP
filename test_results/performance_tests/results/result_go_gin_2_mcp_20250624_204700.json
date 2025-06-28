@@ -1,0 +1,14 @@
+{
+  "query": "Search for TODO comments",
+  "mode": "mcp",
+  "tools_used": ["mcp__code-index-mcp__search_code"],
+  "tool_calls": {"mcp__code-index-mcp__search_code": 6},
+  "results_found": 0,
+  "execution_time_ms": 850,
+  "token_estimate": 12500,
+  "success": true,
+  "error": null,
+  "test_id": "go_gin_2_mcp",
+  "timestamp": "2025-01-06T20:47:00",
+  "batch_name": "go_gin"
+}

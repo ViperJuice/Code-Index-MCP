@@ -1,0 +1,93 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# Test coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# Development
+.git/
+.github/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentation (not needed in container)
+docs/
+*.md
+!README.md
+
+# Test data
+tests/
+test_*/
+pytest_cache/
+.pytest_cache/
+
+# Local data
+data/
+.mcp-index/
+*.db
+*.sqlite
+*.log
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Docker files (avoid recursive copy)
+docker/
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+.DS_Store
+
+# Archives
+*.tar.gz
+*.zip
+*.tar
+
+# CI/CD
+.travis.yml
+.gitlab-ci.yml
+.circleci/
+
+# Scripts not needed in container
+scripts/development/
+scripts/testing/
+scripts/utilities/
+
+# Node modules (if any)
+node_modules/
+
+# Monitoring data
+prometheus-data/
+grafana-data/
+
+# Artifacts
+artifacts/
+releases/

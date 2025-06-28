@@ -1,0 +1,14 @@
+{
+  "query": "Find the definition of class BaseHandler",
+  "mode": "native",
+  "tools_used": ["Grep", "LS", "Glob"],
+  "tool_calls": {"Grep": 4, "LS": 3, "Glob": 1},
+  "results_found": 0,
+  "execution_time_ms": 250,
+  "token_estimate": 150,
+  "success": false,
+  "error": "No Python source files found in the specified directory. Only database index files are present.",
+  "test_id": "python_django_0_native",
+  "timestamp": "2025-01-06T20:51:00",
+  "batch_name": "python_django"
+}

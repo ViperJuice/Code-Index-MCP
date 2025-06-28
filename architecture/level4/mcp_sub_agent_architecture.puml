@@ -1,0 +1,56 @@
+@startuml MCP Sub-Agent Architecture
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title MCP Sub-Agent Architecture - Showing Tool Inheritance Issues
+
+Person(developer, "Developer", "Uses Claude Code for code analysis")
+
+System_Boundary(claude_code, "Claude Code") {
+    Container(main_agent, "Main Agent", "Claude", "Primary agent with full tool access")
+    Container(task_agent, "Task Sub-Agent", "Claude", "Spawned for parallel tasks")
+    
+    Component(mcp_config, "MCP Configuration", "JSON", ".mcp.json configuration")
+    Component(env_vars, "Environment Variables", "System", "MCP settings and paths")
+    Component(tool_registry, "Tool Registry", "Runtime", "Available tools list")
+}
+
+System_Boundary(mcp_server, "Code-Index-MCP Server") {
+    Container(api_gateway, "API Gateway", "FastAPI", "MCP protocol endpoint")
+    Container(dispatcher, "Dispatcher", "Python", "Routes requests to plugins")
+    ContainerDb(indexes, "Index Storage", "SQLite", "Code symbols and search data")
+}
+
+' Current (Broken) Flow
+developer -> main_agent : "Search code"
+main_agent -> mcp_config : "Load config"
+main_agent -> tool_registry : "Register MCP tools"
+main_agent -> task_agent : "Spawn sub-agent"
+
+note right of task_agent #FF6666
+  **ISSUE: Tool Inheritance Broken**
+  - No MCP configuration passed
+  - Environment variables not propagated
+  - Tool registry empty
+  - Result: 83% failure rate
+end note
+
+task_agent -[#red,dashed]-> api_gateway : "Attempt MCP call (FAILS)"
+task_agent -[#red]-> main_agent : "Error: MCP tools not available"
+
+' Proposed Fix
+note left of main_agent #66FF66
+  **PROPOSED FIX:**
+  1. Pass MCP config to sub-agent
+  2. Propagate environment variables
+  3. Share tool registry reference
+  4. Validate before execution
+end note
+
+' Working Direct Flow (for comparison)
+main_agent -[#green]-> api_gateway : "Direct MCP call (WORKS)"
+api_gateway -> dispatcher : "Route request"
+dispatcher -> indexes : "Query data"
+dispatcher -> api_gateway : "Return results"
+api_gateway -> main_agent : "Success response"
+
+@enduml

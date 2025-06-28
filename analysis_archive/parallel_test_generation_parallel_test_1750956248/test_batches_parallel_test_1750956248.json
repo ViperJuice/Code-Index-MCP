@@ -1,0 +1,306 @@
+[
+  {
+    "batch_id": "mcp_batch_2",
+    "scenarios": [
+      {
+        "scenario_id": "performance_analysis",
+        "name": "Performance Analysis Query",
+        "description": "Test semantic analysis of performance patterns",
+        "queries": [
+          "Analyze performance bottlenecks in the indexing pipeline",
+          "Identify slow database queries",
+          "Suggest optimizations for cache usage"
+        ],
+        "expected_retrieval_method": "RetrievalMethod.SEMANTIC",
+        "expected_edit_type": "EditType.ANALYSIS_ONLY",
+        "complexity_level": "high",
+        "requires_context": true,
+        "expected_files_modified": 0,
+        "priority": 8,
+        "expected_response_time_ms": 1800
+      },
+      {
+        "scenario_id": "documentation_search",
+        "name": "Documentation Search and Update",
+        "description": "Test BM25 content search for documentation",
+        "queries": [
+          "Find the API documentation for search_code tool",
+          "Add usage examples with different parameter combinations",
+          "Include performance benchmarks and best practices"
+        ],
+        "expected_retrieval_method": "RetrievalMethod.SQL_BM25",
+        "expected_edit_type": "EditType.APPEND_ONLY",
+        "complexity_level": "medium",
+        "requires_context": true,
+        "expected_files_modified": 2,
+        "priority": 7,
+        "expected_response_time_ms": 300
+      },
+      {
+        "scenario_id": "test_framework_enhancement",
+        "name": "Test Framework Enhancement",
+        "description": "Test complex testing infrastructure modifications",
+        "queries": [
+          "Find the parallel test runner implementation",
+          "Add support for test result caching",
+          "Implement intelligent test ordering based on dependencies"
+        ],
+        "expected_retrieval_method": "RetrievalMethod.HYBRID",
+        "expected_edit_type": "EditType.MULTI_EDIT",
+        "complexity_level": "high",
+        "requires_context": true,
+        "expected_files_modified": 5,
+        "priority": 7,
+        "expected_response_time_ms": 1500
+      },
+      {
+        "scenario_id": "configuration_optimization",
+        "name": "Configuration File Optimization",
+        "description": "Test configuration search and modification",
+        "queries": [
+          "Find MCP server configuration files",
+          "Add environment variable support for timeouts",
+          "Update default configuration with optimized values"
+        ],
+        "expected_retrieval_method": "RetrievalMethod.NATIVE_GREP",
+        "expected_edit_type": "EditType.TARGETED_EDIT",
+        "complexity_level": "medium",
+        "requires_context": true,
+        "expected_files_modified": 4,
+        "priority": 6,
+        "expected_response_time_ms": 200
+      }
+    ],
+    "mcp_enabled": true,
+    "priority": 8,
+    "estimated_duration_seconds": 7.442
+  },
+  {
+    "batch_id": "mcp_batch_1",
+    "scenarios": [
+      {
+        "scenario_id": "symbol_lookup_precision",
+        "name": "Symbol Lookup Precision Test",
+        "description": "Test precise symbol finding with metadata quality tracking",
+        "queries": [
+          "Find the EnhancedDispatcher class definition",
+          "Show its constructor parameters",
+          "Add a new parameter 'cache_timeout' with default value 300"
+        ],
+        "expected_retrieval_method": "RetrievalMethod.SQL_FTS",
+        "expected_edit_type": "EditType.TARGETED_EDIT",
+        "complexity_level": "medium",
+        "requires_context": true,
+        "expected_files_modified": 1,
+        "priority": 10,
+        "expected_response_time_ms": 150
+      },
+      {
+        "scenario_id": "semantic_exploration",
+        "name": "Semantic Code Exploration",
+        "description": "Test semantic understanding for complex code patterns",
+        "queries": [
+          "How does error handling work in the MCP dispatcher?",
+          "Show me examples of async patterns in the indexing system",
+          "Add comprehensive error handling to the plugin loader"
+        ],
+        "expected_retrieval_method": "RetrievalMethod.SEMANTIC",
+        "expected_edit_type": "EditType.MULTI_EDIT",
+        "complexity_level": "high",
+        "requires_context": true,
+        "expected_files_modified": 3,
+        "priority": 9,
+        "expected_response_time_ms": 2000
+      },
+      {
+        "scenario_id": "api_enhancement",
+        "name": "API Enhancement Test",
+        "description": "Test API modification with precise targeting",
+        "queries": [
+          "Find the search_code MCP tool implementation",
+          "Add support for regex search patterns",
+          "Update the tool's schema and error handling"
+        ],
+        "expected_retrieval_method": "RetrievalMethod.SQL_FTS",
+        "expected_edit_type": "EditType.TARGETED_EDIT",
+        "complexity_level": "medium",
+        "requires_context": true,
+        "expected_files_modified": 2,
+        "priority": 8,
+        "expected_response_time_ms": 250
+      },
+      {
+        "scenario_id": "cross_file_refactoring",
+        "name": "Cross-File Refactoring Test",
+        "description": "Test complex refactoring across multiple files",
+        "queries": [
+          "Find all uses of 'process_document' method",
+          "Rename it to 'handle_document' everywhere",
+          "Update all import statements and method calls"
+        ],
+        "expected_retrieval_method": "RetrievalMethod.HYBRID",
+        "expected_edit_type": "EditType.MULTI_EDIT",
+        "complexity_level": "high",
+        "requires_context": false,
+        "expected_files_modified": 8,
+        "priority": 8,
+        "expected_response_time_ms": 1200
+      }
+    ],
+    "mcp_enabled": true,
+    "priority": 10,
+    "estimated_duration_seconds": 7.264000000000001
+  },
+  {
+    "batch_id": "native_batch_1",
+    "scenarios": [
+      {
+        "scenario_id": "symbol_lookup_precision",
+        "name": "Symbol Lookup Precision Test",
+        "description": "Test precise symbol finding with metadata quality tracking",
+        "queries": [
+          "Find the EnhancedDispatcher class definition",
+          "Show its constructor parameters",
+          "Add a new parameter 'cache_timeout' with default value 300"
+        ],
+        "expected_retrieval_method": "RetrievalMethod.SQL_FTS",
+        "expected_edit_type": "EditType.TARGETED_EDIT",
+        "complexity_level": "medium",
+        "requires_context": true,
+        "expected_files_modified": 1,
+        "priority": 10,
+        "expected_response_time_ms": 150
+      },
+      {
+        "scenario_id": "semantic_exploration",
+        "name": "Semantic Code Exploration",
+        "description": "Test semantic understanding for complex code patterns",
+        "queries": [
+          "How does error handling work in the MCP dispatcher?",
+          "Show me examples of async patterns in the indexing system",
+          "Add comprehensive error handling to the plugin loader"
+        ],
+        "expected_retrieval_method": "RetrievalMethod.SEMANTIC",
+        "expected_edit_type": "EditType.MULTI_EDIT",
+        "complexity_level": "high",
+        "requires_context": true,
+        "expected_files_modified": 3,
+        "priority": 9,
+        "expected_response_time_ms": 2000
+      },
+      {
+        "scenario_id": "api_enhancement",
+        "name": "API Enhancement Test",
+        "description": "Test API modification with precise targeting",
+        "queries": [
+          "Find the search_code MCP tool implementation",
+          "Add support for regex search patterns",
+          "Update the tool's schema and error handling"
+        ],
+        "expected_retrieval_method": "RetrievalMethod.SQL_FTS",
+        "expected_edit_type": "EditType.TARGETED_EDIT",
+        "complexity_level": "medium",
+        "requires_context": true,
+        "expected_files_modified": 2,
+        "priority": 8,
+        "expected_response_time_ms": 250
+      },
+      {
+        "scenario_id": "cross_file_refactoring",
+        "name": "Cross-File Refactoring Test",
+        "description": "Test complex refactoring across multiple files",
+        "queries": [
+          "Find all uses of 'process_document' method",
+          "Rename it to 'handle_document' everywhere",
+          "Update all import statements and method calls"
+        ],
+        "expected_retrieval_method": "RetrievalMethod.HYBRID",
+        "expected_edit_type": "EditType.MULTI_EDIT",
+        "complexity_level": "high",
+        "requires_context": false,
+        "expected_files_modified": 8,
+        "priority": 8,
+        "expected_response_time_ms": 1200
+      }
+    ],
+    "mcp_enabled": false,
+    "priority": 10,
+    "estimated_duration_seconds": 15.980800000000006
+  },
+  {
+    "batch_id": "native_batch_2",
+    "scenarios": [
+      {
+        "scenario_id": "performance_analysis",
+        "name": "Performance Analysis Query",
+        "description": "Test semantic analysis of performance patterns",
+        "queries": [
+          "Analyze performance bottlenecks in the indexing pipeline",
+          "Identify slow database queries",
+          "Suggest optimizations for cache usage"
+        ],
+        "expected_retrieval_method": "RetrievalMethod.SEMANTIC",
+        "expected_edit_type": "EditType.ANALYSIS_ONLY",
+        "complexity_level": "high",
+        "requires_context": true,
+        "expected_files_modified": 0,
+        "priority": 8,
+        "expected_response_time_ms": 1800
+      },
+      {
+        "scenario_id": "documentation_search",
+        "name": "Documentation Search and Update",
+        "description": "Test BM25 content search for documentation",
+        "queries": [
+          "Find the API documentation for search_code tool",
+          "Add usage examples with different parameter combinations",
+          "Include performance benchmarks and best practices"
+        ],
+        "expected_retrieval_method": "RetrievalMethod.SQL_BM25",
+        "expected_edit_type": "EditType.APPEND_ONLY",
+        "complexity_level": "medium",
+        "requires_context": true,
+        "expected_files_modified": 2,
+        "priority": 7,
+        "expected_response_time_ms": 300
+      },
+      {
+        "scenario_id": "test_framework_enhancement",
+        "name": "Test Framework Enhancement",
+        "description": "Test complex testing infrastructure modifications",
+        "queries": [
+          "Find the parallel test runner implementation",
+          "Add support for test result caching",
+          "Implement intelligent test ordering based on dependencies"
+        ],
+        "expected_retrieval_method": "RetrievalMethod.HYBRID",
+        "expected_edit_type": "EditType.MULTI_EDIT",
+        "complexity_level": "high",
+        "requires_context": true,
+        "expected_files_modified": 5,
+        "priority": 7,
+        "expected_response_time_ms": 1500
+      },
+      {
+        "scenario_id": "configuration_optimization",
+        "name": "Configuration File Optimization",
+        "description": "Test configuration search and modification",
+        "queries": [
+          "Find MCP server configuration files",
+          "Add environment variable support for timeouts",
+          "Update default configuration with optimized values"
+        ],
+        "expected_retrieval_method": "RetrievalMethod.NATIVE_GREP",
+        "expected_edit_type": "EditType.TARGETED_EDIT",
+        "complexity_level": "medium",
+        "requires_context": true,
+        "expected_files_modified": 4,
+        "priority": 6,
+        "expected_response_time_ms": 200
+      }
+    ],
+    "mcp_enabled": false,
+    "priority": 8,
+    "estimated_duration_seconds": 16.372400000000003
+  }
+]

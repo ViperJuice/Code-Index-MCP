@@ -1,0 +1,45 @@
+{
+  "session_id": "parallel_test_1750956248",
+  "generation_timestamp": "2025-06-26T16:44:08.133040",
+  "config": {
+    "max_concurrent_workers": 8,
+    "test_generation_batch_size": 4,
+    "transcript_processing_workers": 6,
+    "analysis_pipeline_workers": 4,
+    "enable_real_time_processing": true,
+    "cache_intermediate_results": true
+  },
+  "execution_metrics": {
+    "generation_start": 1750956248.1308982,
+    "generation_end": 1750956248.1320999,
+    "total_scenarios_generated": 16,
+    "parallel_efficiency": 6657.625396825397
+  },
+  "batch_summary": {
+    "total_batches": 4,
+    "mcp_batches": 2,
+    "native_batches": 2,
+    "total_scenarios": 16,
+    "avg_batch_size": 4.0
+  },
+  "performance_estimates": {
+    "total_estimated_duration_seconds": 47.05920000000001,
+    "mcp_estimated_duration": 14.706000000000001,
+    "native_estimated_duration": 32.35320000000001,
+    "parallel_speedup_factor": 6657.625396825397
+  },
+  "optimization_insights": {
+    "batch_balancing": "Scenarios distributed by priority and complexity",
+    "method_distribution": {
+      "semantic": 4,
+      "sql_bm25": 2,
+      "hybrid": 4,
+      "native_grep": 2,
+      "sql_fts": 4
+    },
+    "complexity_distribution": {
+      "high": 8,
+      "medium": 8
+    }
+  }
+}

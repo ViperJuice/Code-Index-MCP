@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "code-index-native": {
+      "command": "python",
+      "args": ["scripts/cli/mcp_server_cli.py"],
+      "cwd": "${workspace}",
+      "env": {
+        "PYTHONPATH": "${workspace}",
+        "VOYAGE_AI_API_KEY": "${VOYAGE_AI_API_KEY:-}",
+        "SEMANTIC_SEARCH_ENABLED": "${SEMANTIC_SEARCH_ENABLED:-false}",
+        "MCP_WORKSPACE_ROOT": "${workspace}",
+        "MCP_LOG_LEVEL": "${MCP_LOG_LEVEL:-INFO}",
+        "DATABASE_URL": "sqlite:///./code_index.db"
+      }
+    }
+  }
+}

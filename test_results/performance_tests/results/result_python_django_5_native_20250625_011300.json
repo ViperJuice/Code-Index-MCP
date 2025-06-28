@@ -1,0 +1,14 @@
+{
+  "query": "Find all test fixtures",
+  "mode": "native",
+  "tools_used": ["Bash"],
+  "tool_calls": {"Bash": 2},
+  "results_found": 48,
+  "execution_time_ms": 500,
+  "token_estimate": 2000,
+  "success": true,
+  "error": null,
+  "test_id": "python_django_5_native",
+  "batch_name": "python_django",
+  "timestamp": "2025-01-06T01:13:00"
+}

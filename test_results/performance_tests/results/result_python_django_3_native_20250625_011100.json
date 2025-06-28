@@ -1,0 +1,14 @@
+{
+  "query": "Find where HttpResponse is defined",
+  "mode": "native",
+  "tools_used": ["Grep"],
+  "tool_calls": {"Grep": 1},
+  "results_found": 17,
+  "execution_time_ms": 300,
+  "token_estimate": 1500,
+  "success": true,
+  "error": null,
+  "test_id": "python_django_3_native",
+  "batch_name": "python_django",
+  "timestamp": "2025-01-06T01:11:00"
+}

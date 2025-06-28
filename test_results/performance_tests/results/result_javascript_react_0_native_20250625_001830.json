@@ -1,0 +1,14 @@
+{
+  "query": "Find the definition of class Component",
+  "mode": "native",
+  "tools_used": ["grep", "read"],
+  "tool_calls": {"grep": 4, "read": 1},
+  "results_found": 1,
+  "execution_time_ms": 850,
+  "token_estimate": 1200,
+  "success": true,
+  "error": null,
+  "test_id": "javascript_react_0_native",
+  "timestamp": "2025-01-06T22:18:30",
+  "batch_name": "javascript_react"
+}

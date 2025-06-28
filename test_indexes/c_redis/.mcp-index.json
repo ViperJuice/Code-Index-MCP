@@ -1,0 +1,8 @@
+{
+  "version": "1.0",
+  "enabled": true,
+  "auto_download": false,
+  "github_artifacts": {
+    "enabled": false
+  }
+}

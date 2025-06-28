@@ -143,7 +143,7 @@ docker-dev:
 	@if [ -z "$$VOYAGE_AI_API_KEY" ]; then \
 		echo "⚠️  VOYAGE_AI_API_KEY not set - semantic search will be disabled"; \
 	fi
-	docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+	docker-compose -f docker-compose.yml -f docker/compose/development/docker-compose.dev.yml up -d
 	@echo "✅ Development environment started:"
 	@echo "   🌐 MCP Server: http://localhost:8000"
 	@echo "   📊 Prometheus: http://localhost:9090"
@@ -162,7 +162,7 @@ docker-prod:
 docker-down:
 	@echo "🐳 Stopping Docker services..."
 	docker-compose down
-	docker-compose -f docker-compose.yml -f docker-compose.dev.yml down
+	docker-compose -f docker-compose.yml -f docker/compose/development/docker-compose.dev.yml down
 
 docker-logs:
 	docker-compose logs -f
@@ -178,7 +178,7 @@ docker-health:
 
 docker-test:
 	@echo "🧪 Running tests in Docker..."
-	docker-compose -f docker-compose.yml -f docker-compose.dev.yml run --rm test-runner
+	docker-compose -f docker-compose.yml -f docker/compose/development/docker-compose.dev.yml run --rm test-runner
 
 # Dormant features testing
 test-dormant:

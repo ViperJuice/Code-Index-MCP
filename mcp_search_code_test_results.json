@@ -1,0 +1,30 @@
+[
+  {
+    "query": "EnhancedDispatcher",
+    "status": "pass",
+    "found": 5,
+    "elapsed": 1.048492431640625,
+    "hung": false
+  },
+  {
+    "query": "multi_repo_manager",
+    "status": "pass",
+    "found": 5,
+    "elapsed": 0.004316806793212891,
+    "hung": false
+  },
+  {
+    "query": "def search",
+    "status": "pass",
+    "found": 5,
+    "elapsed": 0.00486302375793457,
+    "hung": false
+  },
+  {
+    "query": "PathUtils",
+    "status": "pass",
+    "found": 0,
+    "elapsed": 0.008625507354736328,
+    "hung": false
+  }
+]

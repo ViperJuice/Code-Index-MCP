@@ -1,0 +1,14 @@
+{
+  "query": "Where is function process_request implemented?",
+  "mode": "native",
+  "tools_used": ["grep"],
+  "tool_calls": {"grep": 2},
+  "results_found": 18,
+  "execution_time_ms": 250,
+  "token_estimate": 1800,
+  "success": true,
+  "error": null,
+  "test_id": "python_django_1_native",
+  "timestamp": "2025-01-06T22:17:30",
+  "batch_name": "python_django"
+}

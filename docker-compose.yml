@@ -8,7 +8,7 @@ services:
       - "8000:8000"
     environment:
       # Database configuration
-      - DATABASE_URL=sqlite:///app/data/code_index.db
+      - DATABASE_URL=sqlite:///${MCP_DATA_PATH:-/app/data}/code_index.db
       
       # Redis cache configuration
       - REDIS_URL=redis://redis:6379
@@ -119,7 +119,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'

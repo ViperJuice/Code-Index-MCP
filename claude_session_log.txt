@@ -1,5 +1,0 @@
-Claude Code Session Log
-========================
-Timestamp: 2025-06-09T20:30:00Z
-
-User: Find where PluginManager is defined

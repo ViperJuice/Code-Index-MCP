@@ -1,0 +1,14 @@
+{
+  "query": "Find all usages of Router",
+  "mode": "mcp",
+  "tools_used": ["mcp__code-index-mcp__symbol_lookup", "mcp__code-index-mcp__search_code"],
+  "tool_calls": {"mcp__code-index-mcp__symbol_lookup": 1, "mcp__code-index-mcp__search_code": 7},
+  "results_found": 107,
+  "execution_time_ms": 2500,
+  "token_estimate": 12000,
+  "success": true,
+  "error": null,
+  "test_id": "go_gin_6_mcp",
+  "timestamp": "2025-01-06T22:16:00",
+  "batch_name": "go_gin"
+}

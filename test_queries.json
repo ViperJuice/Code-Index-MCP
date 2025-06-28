@@ -1,0 +1,209 @@
+{
+  "test_suite": {
+    "name": "MCP vs Native Comprehensive Analysis",
+    "version": "2.0",
+    "description": "Complete test suite for comparing MCP and Native Claude Code performance with granular token tracking"
+  },
+  "query_categories": {
+    "symbol_queries": {
+      "description": "Find class/function definitions",
+      "queries": [
+        {
+          "id": "symbol_001",
+          "text": "Find the BM25Indexer class definition",
+          "expected_approach": "symbol_lookup",
+          "complexity": "simple"
+        },
+        {
+          "id": "symbol_002", 
+          "text": "Find the EnhancedDispatcher class and show its main methods",
+          "expected_approach": "symbol_lookup + code_search",
+          "complexity": "medium"
+        },
+        {
+          "id": "symbol_003",
+          "text": "Locate the SQLiteStore class and explain its search method",
+          "expected_approach": "symbol_lookup + file_read",
+          "complexity": "medium"
+        },
+        {
+          "id": "symbol_004",
+          "text": "Find all Plugin classes that inherit from IPlugin",
+          "expected_approach": "code_search + pattern_matching",
+          "complexity": "complex"
+        },
+        {
+          "id": "symbol_005",
+          "text": "Show me the SymbolDef TypedDict definition and its usage",
+          "expected_approach": "symbol_lookup + reference_search",
+          "complexity": "medium"
+        }
+      ]
+    },
+    "content_queries": {
+      "description": "Search for specific code patterns",
+      "queries": [
+        {
+          "id": "content_001",
+          "text": "Find all functions that use asyncio",
+          "expected_approach": "code_search",
+          "complexity": "simple"
+        },
+        {
+          "id": "content_002",
+          "text": "Search for error handling patterns with try/except blocks",
+          "expected_approach": "code_search + pattern_analysis",
+          "complexity": "medium"
+        },
+        {
+          "id": "content_003",
+          "text": "Find all occurrences of 'mcp__' tool calls",
+          "expected_approach": "code_search",
+          "complexity": "simple"
+        },
+        {
+          "id": "content_004",
+          "text": "Show me all SQL queries in the codebase",
+          "expected_approach": "code_search + file_filtering",
+          "complexity": "medium"
+        },
+        {
+          "id": "content_005",
+          "text": "Find all logging statements with error level",
+          "expected_approach": "code_search + pattern_matching",
+          "complexity": "simple"
+        }
+      ]
+    },
+    "error_queries": {
+      "description": "Debugging and troubleshooting scenarios",
+      "queries": [
+        {
+          "id": "error_001",
+          "text": "Help me debug why MCP tools might return None",
+          "expected_approach": "code_search + analysis",
+          "complexity": "complex"
+        },
+        {
+          "id": "error_002",
+          "text": "Find where TimeoutExpired exceptions are handled",
+          "expected_approach": "code_search + exception_analysis",
+          "complexity": "medium"
+        },
+        {
+          "id": "error_003",
+          "text": "Identify potential hanging points in the dispatcher",
+          "expected_approach": "code_analysis + pattern_detection",
+          "complexity": "complex"
+        },
+        {
+          "id": "error_004",
+          "text": "Find all TODO and FIXME comments in the code",
+          "expected_approach": "code_search",
+          "complexity": "simple"
+        },
+        {
+          "id": "error_005",
+          "text": "Analyze memory usage patterns in plugin loading",
+          "expected_approach": "code_search + performance_analysis",
+          "complexity": "complex"
+        }
+      ]
+    },
+    "pattern_queries": {
+      "description": "Complex regex-style searches",
+      "queries": [
+        {
+          "id": "pattern_001",
+          "text": "Find all function definitions that start with 'get_' or 'set_'",
+          "expected_approach": "regex_search",
+          "complexity": "medium"
+        },
+        {
+          "id": "pattern_002",
+          "text": "Search for all import statements from mcp_server packages",
+          "expected_approach": "regex_search + filtering",
+          "complexity": "simple"
+        },
+        {
+          "id": "pattern_003",
+          "text": "Find all dataclass definitions with their fields",
+          "expected_approach": "regex_search + structure_analysis",
+          "complexity": "medium"
+        },
+        {
+          "id": "pattern_004",
+          "text": "Locate all pytest test functions across the codebase",
+          "expected_approach": "regex_search + file_filtering",
+          "complexity": "medium"
+        },
+        {
+          "id": "pattern_005",
+          "text": "Find all configuration file references (.json, .yaml, .toml)",
+          "expected_approach": "regex_search + file_analysis",
+          "complexity": "medium"
+        }
+      ]
+    },
+    "context_queries": {
+      "description": "Understanding code relationships and architecture",
+      "queries": [
+        {
+          "id": "context_001",
+          "text": "Explain the plugin system architecture and how plugins are loaded",
+          "expected_approach": "multi_file_analysis + documentation",
+          "complexity": "complex"
+        },
+        {
+          "id": "context_002",
+          "text": "Show me the data flow from MCP tool call to result return",
+          "expected_approach": "trace_analysis + multi_file_read",
+          "complexity": "complex"
+        },
+        {
+          "id": "context_003",
+          "text": "How does the dispatcher choose between different search methods?",
+          "expected_approach": "code_analysis + logic_tracing",
+          "complexity": "complex"
+        },
+        {
+          "id": "context_004",
+          "text": "What's the relationship between SQLiteStore and the various indexers?",
+          "expected_approach": "architecture_analysis + interface_study",
+          "complexity": "complex"
+        },
+        {
+          "id": "context_005",
+          "text": "Trace the execution path of a symbol lookup from start to finish",
+          "expected_approach": "execution_tracing + multi_component_analysis",
+          "complexity": "complex"
+        }
+      ]
+    }
+  },
+  "execution_settings": {
+    "timeout_seconds": 120,
+    "max_retries": 2,
+    "capture_full_transcripts": true,
+    "detailed_token_analysis": true,
+    "performance_profiling": true
+  },
+  "validation_criteria": {
+    "success_metrics": [
+      "query_completed",
+      "relevant_results_returned",
+      "no_errors_or_timeouts"
+    ],
+    "performance_metrics": [
+      "response_time_ms",
+      "token_efficiency",
+      "tool_call_count",
+      "context_utilization"
+    ],
+    "quality_metrics": [
+      "result_accuracy",
+      "completeness",
+      "relevance_score"
+    ]
+  }
+}

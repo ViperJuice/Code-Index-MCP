@@ -1,0 +1,14 @@
+{
+  "query": "What is the purpose of Pin",
+  "mode": "native",
+  "tools_used": ["Grep"],
+  "tool_calls": {"Grep": 3},
+  "results_found": 335,
+  "execution_time_ms": 500,
+  "token_estimate": 1200,
+  "success": true,
+  "error": null,
+  "test_id": "rust_tokio_9_native",
+  "batch_name": "rust_tokio",
+  "timestamp": "2025-01-06T01:29:00"
+}

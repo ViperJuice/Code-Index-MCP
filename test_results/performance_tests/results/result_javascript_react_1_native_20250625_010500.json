@@ -1,0 +1,14 @@
+{
+  "query": "Find all React components",
+  "mode": "native",
+  "tools_used": ["Grep", "Bash"],
+  "tool_calls": {"Grep": 2, "Bash": 1},
+  "results_found": 5408,
+  "execution_time_ms": 520,
+  "token_estimate": 3500,
+  "success": true,
+  "error": null,
+  "test_id": "javascript_react_1_native",
+  "batch_name": "javascript_react",
+  "timestamp": "2025-01-06T01:05:00"
+}

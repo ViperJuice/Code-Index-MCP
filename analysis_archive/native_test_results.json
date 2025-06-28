@@ -1,0 +1,114 @@
+{
+  "test_results": [
+    {
+      "test_id": 1,
+      "repository": "python_django",
+      "language": "python",
+      "working_directory": "/workspaces/Code-Index-MCP/test_repos/web/python/django",
+      "query": "Find where HttpResponse is defined",
+      "category": "symbol",
+      "execution_time_seconds": 0,
+      "results_found": 17,
+      "tool_calls": [
+        {
+          "tool": "grep",
+          "command": "grep -r \"class HttpResponse\" --include=\"*.py\" .",
+          "purpose": "Search for HttpResponse class definitions"
+        }
+      ],
+      "estimated_tokens": 850,
+      "key_findings": [
+        "Main definition: ./django/http/response.py:class HttpResponse(HttpResponseBase)",
+        "Base class: ./django/http/response.py:class HttpResponseBase",
+        "Multiple subclasses found (HttpResponseRedirect, HttpResponseNotFound, etc.)",
+        "Test classes in ./tests/responses/tests.py and ./tests/httpwrappers/tests.py"
+      ]
+    },
+    {
+      "test_id": 2,
+      "repository": "python_django",
+      "language": "python",
+      "working_directory": "/workspaces/Code-Index-MCP/test_repos/web/python/django",
+      "query": "List all ORM models",
+      "category": "symbol",
+      "execution_time_seconds": 0,
+      "results_found": 2220,
+      "tool_calls": [
+        {
+          "tool": "grep",
+          "command": "grep -r \"class.*models\\.Model\" --include=\"*.py\" .",
+          "purpose": "Search for Django ORM model definitions"
+        }
+      ],
+      "estimated_tokens": 1200,
+      "key_findings": [
+        "Core models: ContentType, Permission, Group, LogEntry, Site",
+        "Auth models: AbstractBaseUser, PermissionsMixin",
+        "GIS models: PostGISGeometryColumns, SpatialiteSpatialRefSys",
+        "Session models: AbstractBaseSession",
+        "Total 2220 model references found (includes test models)"
+      ]
+    },
+    {
+      "test_id": 3,
+      "repository": "python_django",
+      "language": "python",
+      "working_directory": "/workspaces/Code-Index-MCP/test_repos/web/python/django",
+      "query": "Find all test fixtures",
+      "category": "navigation",
+      "execution_time_seconds": 0,
+      "results_found": 48,
+      "tool_calls": [
+        {
+          "tool": "find",
+          "command": "find . -name \"fixtures\" -type d",
+          "purpose": "Find fixtures directories"
+        },
+        {
+          "tool": "find",
+          "command": "find . -name \"*.json\" -path \"*/fixtures/*\"",
+          "purpose": "Count JSON fixture files"
+        }
+      ],
+      "estimated_tokens": 600,
+      "key_findings": [
+        "15 fixture directories found",
+        "48 JSON fixture files total",
+        "Main fixtures in: ./tests/fixtures, ./tests/auth_tests/fixtures",
+        "GIS test fixtures in: ./tests/gis_tests/*/fixtures"
+      ]
+    },
+    {
+      "test_id": 4,
+      "repository": "python_django",
+      "language": "python",
+      "working_directory": "/workspaces/Code-Index-MCP/test_repos/web/python/django",
+      "query": "Show all middleware classes",
+      "category": "navigation",
+      "execution_time_seconds": 0,
+      "results_found": 114,
+      "tool_calls": [
+        {
+          "tool": "grep",
+          "command": "grep -r \"class.*Middleware\" --include=\"*.py\" .",
+          "purpose": "Search for middleware class definitions"
+        }
+      ],
+      "estimated_tokens": 950,
+      "key_findings": [
+        "Core middleware: CommonMiddleware, SessionMiddleware, AuthenticationMiddleware",
+        "Security middleware: CsrfViewMiddleware, XFrameOptionsMiddleware",
+        "Contrib middleware: MessageMiddleware, FlatpageFallbackMiddleware",
+        "Total 114 middleware references found"
+      ]
+    }
+  ],
+  "summary": {
+    "total_tests": 4,
+    "total_execution_time_seconds": 0,
+    "total_tool_calls": 6,
+    "total_estimated_tokens": 3600,
+    "tools_used": ["grep", "find"],
+    "all_tests_successful": true
+  }
+}

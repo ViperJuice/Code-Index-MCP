@@ -1,0 +1,128 @@
+[
+  {
+    "test_id": "javascript_react_1_mcp",
+    "mode": "mcp",
+    "query": "Where is function render implemented?",
+    "category": "symbol",
+    "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: javascript_react (javascript)\nQuery: Where is function render implemented?\nCategory: symbol\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Where is function render implemented?\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+  },
+  {
+    "test_id": "javascript_react_1_native",
+    "mode": "native",
+    "query": "Where is function render implemented?",
+    "category": "symbol",
+    "prompt": "You are testing native tools for performance analysis.\n\nRepository: javascript_react (javascript)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/javascript/react\nQuery: Where is function render implemented?\nCategory: symbol\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Where is function render implemented?\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+  },
+  {
+    "test_id": "javascript_react_2_mcp",
+    "mode": "mcp",
+    "query": "Search for TODO comments",
+    "category": "content",
+    "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: javascript_react (javascript)\nQuery: Search for TODO comments\nCategory: content\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Search for TODO comments\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+  },
+  {
+    "test_id": "javascript_react_2_native",
+    "mode": "native",
+    "query": "Search for TODO comments",
+    "category": "content",
+    "prompt": "You are testing native tools for performance analysis.\n\nRepository: javascript_react (javascript)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/javascript/react\nQuery: Search for TODO comments\nCategory: content\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Search for TODO comments\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+  },
+  {
+    "test_id": "javascript_react_3_mcp",
+    "mode": "mcp",
+    "query": "Find all FIXME or BUG comments",
+    "category": "content",
+    "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: javascript_react (javascript)\nQuery: Find all FIXME or BUG comments\nCategory: content\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all FIXME or BUG comments\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+  },
+  {
+    "test_id": "javascript_react_3_native",
+    "mode": "native",
+    "query": "Find all FIXME or BUG comments",
+    "category": "content",
+    "prompt": "You are testing native tools for performance analysis.\n\nRepository: javascript_react (javascript)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/javascript/react\nQuery: Find all FIXME or BUG comments\nCategory: content\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all FIXME or BUG comments\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+  },
+  {
+    "test_id": "javascript_react_4_mcp",
+    "mode": "mcp",
+    "query": "Find all files importing app",
+    "category": "navigation",
+    "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: javascript_react (javascript)\nQuery: Find all files importing app\nCategory: navigation\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all files importing app\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+  },
+  {
+    "test_id": "javascript_react_4_native",
+    "mode": "native",
+    "query": "Find all files importing app",
+    "category": "navigation",
+    "prompt": "You are testing native tools for performance analysis.\n\nRepository: javascript_react (javascript)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/javascript/react\nQuery: Find all files importing app\nCategory: navigation\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all files importing app\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+  },
+  {
+    "test_id": "javascript_react_5_mcp",
+    "mode": "mcp",
+    "query": "Show files that depend on react",
+    "category": "navigation",
+    "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: javascript_react (javascript)\nQuery: Show files that depend on react\nCategory: navigation\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show files that depend on react\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+  },
+  {
+    "test_id": "javascript_react_5_native",
+    "mode": "native",
+    "query": "Show files that depend on react",
+    "category": "navigation",
+    "prompt": "You are testing native tools for performance analysis.\n\nRepository: javascript_react (javascript)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/javascript/react\nQuery: Show files that depend on react\nCategory: navigation\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show files that depend on react\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+  },
+  {
+    "test_id": "javascript_react_6_mcp",
+    "mode": "mcp",
+    "query": "Find all usages of App",
+    "category": "refactoring",
+    "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: javascript_react (javascript)\nQuery: Find all usages of App\nCategory: refactoring\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all usages of App\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+  },
+  {
+    "test_id": "javascript_react_6_native",
+    "mode": "native",
+    "query": "Find all usages of App",
+    "category": "refactoring",
+    "prompt": "You are testing native tools for performance analysis.\n\nRepository: javascript_react (javascript)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/javascript/react\nQuery: Find all usages of App\nCategory: refactoring\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Find all usages of App\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+  },
+  {
+    "test_id": "javascript_react_7_mcp",
+    "mode": "mcp",
+    "query": "Show all references to AppComponent",
+    "category": "refactoring",
+    "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: javascript_react (javascript)\nQuery: Show all references to AppComponent\nCategory: refactoring\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show all references to AppComponent\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+  },
+  {
+    "test_id": "javascript_react_7_native",
+    "mode": "native",
+    "query": "Show all references to AppComponent",
+    "category": "refactoring",
+    "prompt": "You are testing native tools for performance analysis.\n\nRepository: javascript_react (javascript)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/javascript/react\nQuery: Show all references to AppComponent\nCategory: refactoring\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show all references to AppComponent\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+  },
+  {
+    "test_id": "javascript_react_8_mcp",
+    "mode": "mcp",
+    "query": "Explain how state_management works",
+    "category": "understanding",
+    "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: javascript_react (javascript)\nQuery: Explain how state_management works\nCategory: understanding\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Explain how state_management works\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+  },
+  {
+    "test_id": "javascript_react_8_native",
+    "mode": "native",
+    "query": "Explain how state_management works",
+    "category": "understanding",
+    "prompt": "You are testing native tools for performance analysis.\n\nRepository: javascript_react (javascript)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/javascript/react\nQuery: Explain how state_management works\nCategory: understanding\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Explain how state_management works\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+  },
+  {
+    "test_id": "javascript_react_9_mcp",
+    "mode": "mcp",
+    "query": "Show the flow of rendering",
+    "category": "understanding",
+    "prompt": "You are testing MCP tools for performance analysis.\n\nRepository: javascript_react (javascript)\nQuery: Show the flow of rendering\nCategory: understanding\n\nInstructions:\n1. Use ONLY MCP tools (mcp__code-index-mcp__symbol_lookup, mcp__code-index-mcp__search_code)\n2. Time your query execution\n3. Count results found\n4. Track tool calls made\n5. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show the flow of rendering\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+  },
+  {
+    "test_id": "javascript_react_9_native",
+    "mode": "native",
+    "query": "Show the flow of rendering",
+    "category": "understanding",
+    "prompt": "You are testing native tools for performance analysis.\n\nRepository: javascript_react (javascript)\nWorking Directory: /workspaces/Code-Index-MCP/test_repos/web/javascript/react\nQuery: Show the flow of rendering\nCategory: understanding\n\nInstructions:\n1. Use ONLY native tools (grep, find, glob, ls, read)\n2. NO MCP tools allowed\n3. Time your query execution\n4. Count results found\n5. Track tool calls made\n6. Estimate tokens used\n\nOutput JSON only:\n```json\n{\n  \"query\": \"Show the flow of rendering\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"list\", \"of\", \"tools\"],\n  \"tool_calls\": {\"tool_name\": count},\n  \"results_found\": number,\n  \"execution_time_ms\": milliseconds,\n  \"token_estimate\": number,\n  \"success\": true/false,\n  \"error\": null_or_string\n}\n```"
+  }
+]

@@ -1,0 +1,18 @@
+{
+  "query": "Find the definition of struct Runtime",
+  "mode": "mcp",
+  "tools_used": ["mcp__code-index-mcp__symbol_lookup", "mcp__code-index-mcp__search_code", "mcp__code-index-mcp__get_status"],
+  "tool_calls": {
+    "mcp__code-index-mcp__symbol_lookup": 1,
+    "mcp__code-index-mcp__search_code": 4,
+    "mcp__code-index-mcp__get_status": 1
+  },
+  "results_found": 0,
+  "execution_time_ms": 250,
+  "token_estimate": 3500,
+  "success": false,
+  "error": "No rust_tokio repository data found in index. The index appears to be empty or not populated with the requested repository.",
+  "test_id": "rust_tokio_0_mcp",
+  "timestamp": "2025-01-06T22:19:00",
+  "batch_name": "rust_tokio"
+}

@@ -1,0 +1,231 @@
+@startuml dart_plugin_internals
+!define COMPONENT_INTERFACE <<Component Interface>>
+!define NOT_IMPLEMENTED <<Not Implemented>>
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Dart/Flutter Plugin - Code Level (Internal Structure)
+
+package "mcp_server.plugins.dart_plugin" <<Component>> {
+    
+    ' ========================================
+    ' ACTUAL Implementation
+    ' ========================================
+    
+    class Plugin implements IPlugin,IDartPlugin,ILanguageAnalyzer #LightGreen {
+        +lang: str = "dart"
+        -_indexer: FuzzyIndexer
+        -_sqlite_store: Optional[SQLiteStore]
+        -_repository_id: Optional[int]
+        -_symbol_cache: Dict[str, List[SymbolDefinition]]
+        -_file_cache: Dict[str, IndexedFile]
+        -_current_file: Optional[Path]
+        --
+        +__init__(sqlite_store: Optional[SQLiteStore] = None)
+        +supports(path: str | Path) -> bool
+        +indexFile(path: str | Path, content: str) -> IndexShard
+        +getDefinition(symbol: str) -> SymbolDef | None
+        +findReferences(symbol: str) -> list[Reference]
+        +search(query: str, opts: SearchOpts | None) -> Iterable[SearchResult]
+        +get_indexed_count() -> int
+        -_preindex() -> None
+        -_extract_dart_symbols(content: str, file_id: Optional[int]) -> List[Dict]
+        -_extract_imports(content: str) -> List[Dict[str, str]]
+        -_extract_class(match: re.Match, content: str, file_id: Optional[int]) -> Dict
+        -_extract_class_members(class_body: str, class_name: str, start_line: int, file_id: Optional[int]) -> List[Dict]
+        -_extract_enum(match: re.Match, content: str, file_id: Optional[int]) -> Dict
+        -_extract_function(match: re.Match, content: str, file_id: Optional[int]) -> Dict
+        -_parse_function_signature(declaration: str) -> Tuple[str, str, str]
+        -_count_lines(text: str, end_pos: int) -> int
+        -_is_flutter_widget(class_name: str, extends_clause: str) -> bool
+        -_is_state_class(class_name: str, extends_clause: str) -> bool
+    }
+    
+    ' ========================================
+    ' Supported File Types
+    ' ========================================
+    
+    note right of Plugin #LightGreen
+        IMPLEMENTED:
+        - Dart source files (.dart)
+        - Regex-based parsing (fallback)
+        - Class extraction with inheritance
+        - Method extraction with signatures
+        - Function extraction (top-level)
+        - Variable/constant extraction
+        - Enum extraction with values
+        - Mixin support
+        - Extension methods
+        - Import/export tracking
+        - Flutter widget detection
+        - State class detection
+        - Async/await support
+        - SQLite persistence
+    end note
+    
+    ' ========================================
+    ' Symbol Types Extracted
+    ' ========================================
+    
+    class SymbolTypes <<enumeration>> #LightGreen {
+        class_declaration
+        method_definition
+        function_declaration
+        variable_declaration
+        constant_declaration
+        enum_declaration
+        mixin_declaration
+        extension_declaration
+        constructor
+        getter
+        setter
+        import_directive
+        export_directive
+        typedef_declaration
+    }
+    
+    ' ========================================
+    ' Dart/Flutter Specific Features
+    ' ========================================
+    
+    class DartFeatures <<features>> #LightGreen {
+        +Widget hierarchy detection
+        +StatefulWidget/StatelessWidget
+        +State<T> classes
+        +Build method recognition
+        +Async/await/Future
+        +Stream handling
+        +Late keyword
+        +Null safety (?)
+        +Required parameters
+        +Named parameters
+        +Optional parameters
+        +Factory constructors
+        +Named constructors
+        +Cascade notation (..)
+        +Extension methods
+        +Mixins (with keyword)
+        +Abstract classes
+        +Implements vs extends
+        +Part/part of
+        +Annotations (@override, @required)
+    }
+    
+    ' ========================================
+    ' Interface Implementations
+    ' ========================================
+    
+    class IDartPlugin <<interface>> #LightBlue {
+        +analyze_widgets(file_path: str) -> Result[List[WidgetInfo]]
+        +get_state_management(file_path: str) -> Result[StateManagementInfo]
+        +resolve_packages(content: str) -> Result[List[PackageInfo]]
+    }
+    
+    class ILanguageAnalyzer <<interface>> #LightBlue {
+        +parse_imports(content: str) -> Result[List[str]]
+        +extract_symbols(content: str) -> Result[List[SymbolDefinition]]
+        +resolve_type(symbol: str, context: Dict) -> Result[Optional[str]]
+        +get_call_hierarchy(symbol: str, context: Dict) -> Result[Dict[str, List[str]]]
+    }
+    
+    ' ========================================
+    ' Flutter-Specific Components
+    ' ========================================
+    
+    class FlutterAnalyzer #LightGreen {
+        +detect_widget_type(class_name: str, extends: str) -> WidgetType
+        +extract_build_method(class_body: str) -> Optional[str]
+        +analyze_widget_tree(build_method: str) -> List[WidgetNode]
+        +detect_state_management_pattern(content: str) -> StatePattern
+    }
+    
+    class WidgetTypes <<enumeration>> #LightGreen {
+        StatelessWidget
+        StatefulWidget
+        InheritedWidget
+        CustomPainter
+        RenderObjectWidget
+        PreferredSizeWidget
+    }
+    
+    ' ========================================
+    ' External Dependencies
+    ' ========================================
+    
+    class FuzzyIndexer #LightGreen {
+        +add_file(path: str, content: str) -> None
+        +add_symbol(symbol_name: str, file_path: str, line_number: int, metadata: Dict) -> None
+        +search(query: str, limit: int = 20) -> List[Dict]
+        +search_symbols(query: str, limit: int = 20) -> List[Dict]
+    }
+    
+    ' ========================================
+    ' What's Actually Implemented
+    ' ========================================
+    
+    note left of DartFeatures
+        Current implementation uses
+        regex-based parsing as fallback:
+        - Class patterns with extends/implements
+        - Method patterns with return types
+        - Function patterns (async/sync)
+        - Variable/constant patterns
+        - Enum patterns
+        - Import/export patterns
+        - Constructor patterns
+        - Getter/setter patterns
+        - Annotation detection
+    end note
+    
+    ' ========================================
+    ' What's Missing
+    ' ========================================
+    
+    note bottom of Plugin #FF6B6B
+        NOT IMPLEMENTED:
+        - No tree-sitter Dart grammar (uses regex)
+        - No pub.yaml dependency analysis
+        - No package resolution
+        - No cross-file type inference
+        - No generic type tracking
+        - No async stream analysis
+        - No isolate tracking
+        - No FFI binding analysis
+        - No code generation tracking
+        - No analyzer plugin integration
+        - No Flutter inspector data
+        - No widget tree visualization
+        - No hot reload metadata
+        - No DevTools integration
+    end note
+    
+    ' ========================================
+    ' Relationships
+    ' ========================================
+    
+    Plugin --> FuzzyIndexer : indexes symbols
+    Plugin --> SQLiteStore : persists symbols
+    Plugin --> FlutterAnalyzer : analyzes Flutter code
+    Plugin ..> SymbolTypes : extracts
+    Plugin ..> DartFeatures : supports
+    Plugin ..> WidgetTypes : detects
+    Plugin --|> IDartPlugin : implements
+    Plugin --|> ILanguageAnalyzer : implements
+    
+    Plugin ..> IndexShard : returns
+    Plugin ..> SymbolDef : returns
+    Plugin ..> Reference : yields
+    Plugin ..> SearchResult : yields
+}
+
+' ========================================
+' Implementation Status Legend
+' ========================================
+
+legend right
+    |<#90EE90>| Implemented |
+    |<#FFD700>| Partially Implemented |
+    |<#FFA500>| Stub Only |
+    |<#FF6B6B>| Not Implemented |
+endlegend
+
+@enduml

@@ -1,0 +1,123 @@
+{
+  "scenarios": {
+    "find_class_definition": {
+      "task": "Find the BM25Indexer class definition",
+      "mcp": {
+        "steps": 1,
+        "tokens": 100,
+        "time": 0.1,
+        "workflow": [
+          "symbol_lookup(symbol)"
+        ]
+      },
+      "native": {
+        "steps": 2,
+        "tokens": 5500,
+        "time": 0.7,
+        "workflow": [
+          "grep(pattern)",
+          "read_full(file)"
+        ]
+      },
+      "improvement": {
+        "token_reduction": 98.18181818181819,
+        "time_reduction": 85.71428571428572,
+        "efficiency_gain": 50.0
+      }
+    },
+    "fix_bug_in_method": {
+      "task": "Fix a bug in the search method of SQLiteStore",
+      "mcp": {
+        "steps": 4,
+        "tokens": 750,
+        "time": 0.5,
+        "workflow": [
+          "symbol_lookup(symbol)",
+          "search_code(query)",
+          "read_partial(file)",
+          "edit(old)"
+        ]
+      },
+      "native": {
+        "steps": 4,
+        "tokens": 9150,
+        "time": 2.2,
+        "workflow": [
+          "find(name)",
+          "grep(pattern)",
+          "read_full(file)",
+          "edit(old)"
+        ]
+      },
+      "improvement": {
+        "token_reduction": 91.80327868852459,
+        "time_reduction": 77.27272727272727,
+        "efficiency_gain": 0.0
+      }
+    },
+    "understand_reranking": {
+      "task": "Understand how reranking works in the system",
+      "mcp": {
+        "steps": 3,
+        "tokens": 1000,
+        "time": 0.5,
+        "workflow": [
+          "search_code(query)",
+          "search_code(query)",
+          "read_partial(file)"
+        ]
+      },
+      "native": {
+        "steps": 4,
+        "tokens": 11800,
+        "time": 1.9,
+        "workflow": [
+          "grep(pattern)",
+          "read_full(file)",
+          "read_full(file)",
+          "grep(pattern)"
+        ]
+      },
+      "improvement": {
+        "token_reduction": 91.52542372881356,
+        "time_reduction": 73.68421052631578,
+        "efficiency_gain": 25.0
+      }
+    },
+    "add_new_feature": {
+      "task": "Add caching to the search functionality",
+      "mcp": {
+        "steps": 4,
+        "tokens": 1220,
+        "time": 0.6000000000000001,
+        "workflow": [
+          "search_code(query)",
+          "symbol_lookup(symbol)",
+          "read_partial(file)",
+          "multi_edit(edits)"
+        ]
+      },
+      "native": {
+        "steps": 4,
+        "tokens": 18000,
+        "time": 2.8,
+        "workflow": [
+          "find(name)",
+          "read_full(file)",
+          "read_full(file)",
+          "write(file)"
+        ]
+      },
+      "improvement": {
+        "token_reduction": 93.22222222222221,
+        "time_reduction": 78.57142857142857,
+        "efficiency_gain": 0.0
+      }
+    }
+  },
+  "summary": {
+    "total_scenarios": 4,
+    "average_token_reduction": 93.68318570534464,
+    "average_time_reduction": 78.81066302118933
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "query": "Search for TODO comments",
+  "mode": "mcp",
+  "tools_used": ["mcp__code-index-mcp__search_code", "mcp__code-index-mcp__get_status"],
+  "tool_calls": {"mcp__code-index-mcp__search_code": 5, "mcp__code-index-mcp__get_status": 1},
+  "results_found": 50,
+  "execution_time_ms": 8500,
+  "token_estimate": 15000,
+  "success": true,
+  "error": null,
+  "test_id": "python_django_2_mcp",
+  "timestamp": "2025-01-06T22:20:00",
+  "batch_name": "python_django"
+}

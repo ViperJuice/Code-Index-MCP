@@ -1,0 +1,537 @@
+{
+  "analysis_metadata": {
+    "timestamp": "2025-06-26T22:45:13.921525",
+    "total_edit_scenarios": 8,
+    "mcp_edits_tracked": 8,
+    "native_edits_tracked": 8,
+    "analysis_type": "REAL_EDIT_BEHAVIOR_TRACKING"
+  },
+  "edit_behavior_profiles": [
+    {
+      "profile_type": "MCP Tools",
+      "total_edits": 8,
+      "successful_edits": 0,
+      "avg_context_retrieval_time": 51.73560976982117,
+      "avg_edit_precision": 0.7000000000000001,
+      "avg_revision_count": 2.75,
+      "preferred_context_sources": [
+        "ContextSource.MCP_SEARCH"
+      ],
+      "productivity_metrics": {
+        "lines_per_edit": 53.0,
+        "context_efficiency": 16.465020300432588,
+        "token_efficiency": 0.6413690476190476,
+        "success_rate": 0.0,
+        "avg_test_pass_rate": 0.51
+      }
+    },
+    {
+      "profile_type": "Native Tools",
+      "total_edits": 8,
+      "successful_edits": 2,
+      "avg_context_retrieval_time": 22.675782442092896,
+      "avg_edit_precision": 0.55000625,
+      "avg_revision_count": 1.25,
+      "preferred_context_sources": [
+        "ContextSource.NATIVE_GREP",
+        "ContextSource.NATIVE_READ"
+      ],
+      "productivity_metrics": {
+        "lines_per_edit": 33.25,
+        "context_efficiency": 24.323021596386678,
+        "token_efficiency": 0.2345074268239406,
+        "success_rate": 0.25,
+        "avg_test_pass_rate": 0.782
+      }
+    }
+  ],
+  "detailed_edit_operations": {
+    "mcp_edits": [
+      {
+        "edit_id": "mcp_edit_1750977913_3647845060791670217",
+        "timestamp": "2025-06-26 22:45:13.384536",
+        "edit_type": "EditType.BUG_FIX",
+        "target_file": "mcp_server/dispatcher/dispatcher.py",
+        "lines_added": 40,
+        "lines_removed": 12,
+        "lines_modified": 8,
+        "context_sources": [
+          "ContextSource.MCP_SEARCH"
+        ],
+        "context_files_referenced": [],
+        "context_retrieval_time_ms": 82.20577239990234,
+        "context_relevance_score": 0.0,
+        "edit_precision_score": 0.7000000000000001,
+        "compilation_success": false,
+        "test_pass_rate": 0.51,
+        "revision_count": 3,
+        "context_tokens_used": 0,
+        "edit_tokens_generated": 1000,
+        "total_session_tokens": 1500
+      },
+      {
+        "edit_id": "mcp_edit_1750977913_454297182017806775",
+        "timestamp": "2025-06-26 22:45:13.420980",
+        "edit_type": "EditType.FUNCTION_CREATION",
+        "target_file": "mcp_server/plugins/semantic_plugin.py",
+        "lines_added": 120,
+        "lines_removed": 36,
+        "lines_modified": 24,
+        "context_sources": [
+          "ContextSource.MCP_SEARCH"
+        ],
+        "context_files_referenced": [],
+        "context_retrieval_time_ms": 32.28425979614258,
+        "context_relevance_score": 0.0,
+        "edit_precision_score": 0.6000000000000001,
+        "compilation_success": false,
+        "test_pass_rate": 0.44999999999999996,
+        "revision_count": 4,
+        "context_tokens_used": 0,
+        "edit_tokens_generated": 3000,
+        "total_session_tokens": 3500
+      },
+      {
+        "edit_id": "mcp_edit_1750977913_1989190433151840466",
+        "timestamp": "2025-06-26 22:45:13.456143",
+        "edit_type": "EditType.REFACTORING",
+        "target_file": "mcp_server/storage/sqlite_store.py",
+        "lines_added": 120,
+        "lines_removed": 36,
+        "lines_modified": 24,
+        "context_sources": [
+          "ContextSource.MCP_SEARCH"
+        ],
+        "context_files_referenced": [],
+        "context_retrieval_time_ms": 32.199859619140625,
+        "context_relevance_score": 0.0,
+        "edit_precision_score": 0.6000000000000001,
+        "compilation_success": false,
+        "test_pass_rate": 0.44999999999999996,
+        "revision_count": 4,
+        "context_tokens_used": 0,
+        "edit_tokens_generated": 3000,
+        "total_session_tokens": 3500
+      },
+      {
+        "edit_id": "mcp_edit_1750977913_4435113725282213556",
+        "timestamp": "2025-06-26 22:45:13.532236",
+        "edit_type": "EditType.FUNCTION_CREATION",
+        "target_file": "mcp_server/utils/index_discovery.py",
+        "lines_added": 12,
+        "lines_removed": 3,
+        "lines_modified": 2,
+        "context_sources": [
+          "ContextSource.MCP_SEARCH"
+        ],
+        "context_files_referenced": [],
+        "context_retrieval_time_ms": 73.38333129882812,
+        "context_relevance_score": 0.0,
+        "edit_precision_score": 0.8,
+        "compilation_success": false,
+        "test_pass_rate": 0.57,
+        "revision_count": 1,
+        "context_tokens_used": 0,
+        "edit_tokens_generated": 300,
+        "total_session_tokens": 800
+      },
+      {
+        "edit_id": "mcp_edit_1750977913_3081662040924487503",
+        "timestamp": "2025-06-26 22:45:13.614519",
+        "edit_type": "EditType.BUG_FIX",
+        "target_file": "mcp_server/cache/backends.py",
+        "lines_added": 40,
+        "lines_removed": 12,
+        "lines_modified": 8,
+        "context_sources": [
+          "ContextSource.MCP_SEARCH"
+        ],
+        "context_files_referenced": [],
+        "context_retrieval_time_ms": 79.63275909423828,
+        "context_relevance_score": 0.0,
+        "edit_precision_score": 0.7000000000000001,
+        "compilation_success": false,
+        "test_pass_rate": 0.51,
+        "revision_count": 3,
+        "context_tokens_used": 0,
+        "edit_tokens_generated": 1000,
+        "total_session_tokens": 1500
+      },
+      {
+        "edit_id": "mcp_edit_1750977913_8716006528230349701",
+        "timestamp": "2025-06-26 22:45:13.674319",
+        "edit_type": "EditType.FUNCTION_CREATION",
+        "target_file": "mcp_server/config/validation.py",
+        "lines_added": 40,
+        "lines_removed": 12,
+        "lines_modified": 8,
+        "context_sources": [
+          "ContextSource.MCP_SEARCH"
+        ],
+        "context_files_referenced": [],
+        "context_retrieval_time_ms": 57.00850486755371,
+        "context_relevance_score": 0.0,
+        "edit_precision_score": 0.7000000000000001,
+        "compilation_success": false,
+        "test_pass_rate": 0.51,
+        "revision_count": 3,
+        "context_tokens_used": 0,
+        "edit_tokens_generated": 1000,
+        "total_session_tokens": 1500
+      },
+      {
+        "edit_id": "mcp_edit_1750977913_-5810061087017188957",
+        "timestamp": "2025-06-26 22:45:13.701679",
+        "edit_type": "EditType.DOCUMENTATION",
+        "target_file": "mcp_server/plugins/README.md",
+        "lines_added": 12,
+        "lines_removed": 3,
+        "lines_modified": 2,
+        "context_sources": [
+          "ContextSource.MCP_SEARCH"
+        ],
+        "context_files_referenced": [],
+        "context_retrieval_time_ms": 24.595022201538086,
+        "context_relevance_score": 0.0,
+        "edit_precision_score": 0.8,
+        "compilation_success": false,
+        "test_pass_rate": 0.57,
+        "revision_count": 1,
+        "context_tokens_used": 0,
+        "edit_tokens_generated": 300,
+        "total_session_tokens": 800
+      },
+      {
+        "edit_id": "mcp_edit_1750977913_-8333347400029585907",
+        "timestamp": "2025-06-26 22:45:13.736988",
+        "edit_type": "EditType.FUNCTION_CREATION",
+        "target_file": "mcp_server/metrics/metrics_collector.py",
+        "lines_added": 40,
+        "lines_removed": 12,
+        "lines_modified": 8,
+        "context_sources": [
+          "ContextSource.MCP_SEARCH"
+        ],
+        "context_files_referenced": [],
+        "context_retrieval_time_ms": 32.575368881225586,
+        "context_relevance_score": 0.0,
+        "edit_precision_score": 0.7000000000000001,
+        "compilation_success": false,
+        "test_pass_rate": 0.51,
+        "revision_count": 3,
+        "context_tokens_used": 0,
+        "edit_tokens_generated": 1000,
+        "total_session_tokens": 1500
+      }
+    ],
+    "native_edits": [
+      {
+        "edit_id": "native_edit_1750977913_3647845060791670217",
+        "timestamp": "2025-06-26 22:45:13.760085",
+        "edit_type": "EditType.BUG_FIX",
+        "target_file": "mcp_server/dispatcher/dispatcher.py",
+        "lines_added": 24,
+        "lines_removed": 7,
+        "lines_modified": 4,
+        "context_sources": [
+          "ContextSource.NATIVE_GREP",
+          "ContextSource.NATIVE_READ"
+        ],
+        "context_files_referenced": [
+          "/workspaces/Code-Index-MCP/mcp_server/plugin_system/interfaces.py",
+          "/workspaces/Code-Index-MCP/mcp_server/plugin_system/plugin_manager.py",
+          "/workspaces/Code-Index-MCP/mcp_server/AGENTS.md",
+          "/workspaces/Code-Index-MCP/mcp_server/cli/index_management.py",
+          "/workspaces/Code-Index-MCP/mcp_server/plugin_system/plugin_discovery.py",
+          "/workspaces/Code-Index-MCP/mcp_server/cli/artifact_commands.py",
+          "/workspaces/Code-Index-MCP/mcp_server/cli/__pycache__/artifact_commands.cpython-311.pyc",
+          "/workspaces/Code-Index-MCP/mcp_server/cli/__pycache__/index_management.cpython-311.pyc"
+        ],
+        "context_retrieval_time_ms": 22.671937942504883,
+        "context_relevance_score": 0.168,
+        "edit_precision_score": 0.5504,
+        "compilation_success": false,
+        "test_pass_rate": 0.782,
+        "revision_count": 1,
+        "context_tokens_used": 1500,
+        "edit_tokens_generated": 600,
+        "total_session_tokens": 2400
+      },
+      {
+        "edit_id": "native_edit_1750977913_454297182017806775",
+        "timestamp": "2025-06-26 22:45:13.781689",
+        "edit_type": "EditType.FUNCTION_CREATION",
+        "target_file": "mcp_server/plugins/semantic_plugin.py",
+        "lines_added": 78,
+        "lines_removed": 23,
+        "lines_modified": 15,
+        "context_sources": [
+          "ContextSource.NATIVE_GREP",
+          "ContextSource.NATIVE_READ"
+        ],
+        "context_files_referenced": [
+          "/workspaces/Code-Index-MCP/mcp_server/cli/__pycache__/index_management.cpython-311.pyc",
+          "/workspaces/Code-Index-MCP/mcp_server/cache/__pycache__/__init__.cpython-311.pyc",
+          "/workspaces/Code-Index-MCP/mcp_server/core/__pycache__/errors.cpython-312.pyc",
+          "/workspaces/Code-Index-MCP/mcp_server/watcher.py",
+          "/workspaces/Code-Index-MCP/mcp_server/cache/query_cache.py",
+          "/workspaces/Code-Index-MCP/mcp_server/cli/index_management.py",
+          "/workspaces/Code-Index-MCP/mcp_server/cli/index_commands.py",
+          "/workspaces/Code-Index-MCP/mcp_server/cli/repository_commands.py"
+        ],
+        "context_retrieval_time_ms": 21.237850189208984,
+        "context_relevance_score": 0.14466666666666672,
+        "edit_precision_score": 0.44339999999999996,
+        "compilation_success": false,
+        "test_pass_rate": 0.6900000000000001,
+        "revision_count": 2,
+        "context_tokens_used": 2250,
+        "edit_tokens_generated": 1950,
+        "total_session_tokens": 4500
+      },
+      {
+        "edit_id": "native_edit_1750977913_1989190433151840466",
+        "timestamp": "2025-06-26 22:45:13.805982",
+        "edit_type": "EditType.REFACTORING",
+        "target_file": "mcp_server/storage/sqlite_store.py",
+        "lines_added": 78,
+        "lines_removed": 23,
+        "lines_modified": 15,
+        "context_sources": [
+          "ContextSource.NATIVE_GREP",
+          "ContextSource.NATIVE_READ"
+        ],
+        "context_files_referenced": [
+          "/workspaces/Code-Index-MCP/mcp_server/cache/__pycache__/cache_manager.cpython-311.pyc",
+          "/workspaces/Code-Index-MCP/mcp_server/cache/query_cache.py",
+          "/workspaces/Code-Index-MCP/mcp_server/cli/index_management.py",
+          "/workspaces/Code-Index-MCP/mcp_server/utils/fuzzy_indexer.py",
+          "/workspaces/Code-Index-MCP/mcp_server/utils/treesitter_wrapper.py",
+          "/workspaces/Code-Index-MCP/mcp_server/cli/artifact_commands.py",
+          "/workspaces/Code-Index-MCP/mcp_server/cli/__pycache__/artifact_commands.cpython-311.pyc",
+          "/workspaces/Code-Index-MCP/mcp_server/utils/direct_searcher.py"
+        ],
+        "context_retrieval_time_ms": 23.949384689331055,
+        "context_relevance_score": 0.15400000000000008,
+        "edit_precision_score": 0.4462,
+        "compilation_success": false,
+        "test_pass_rate": 0.6900000000000001,
+        "revision_count": 2,
+        "context_tokens_used": 2250,
+        "edit_tokens_generated": 1950,
+        "total_session_tokens": 4500
+      },
+      {
+        "edit_id": "native_edit_1750977913_4435113725282213556",
+        "timestamp": "2025-06-26 22:45:13.827528",
+        "edit_type": "EditType.FUNCTION_CREATION",
+        "target_file": "mcp_server/utils/index_discovery.py",
+        "lines_added": 7,
+        "lines_removed": 2,
+        "lines_modified": 1,
+        "context_sources": [
+          "ContextSource.NATIVE_GREP",
+          "ContextSource.NATIVE_READ"
+        ],
+        "context_files_referenced": [
+          "/workspaces/Code-Index-MCP/mcp_server/security/models.py",
+          "/workspaces/Code-Index-MCP/mcp_server/cli/__pycache__/__init__.cpython-311.pyc",
+          "/workspaces/Code-Index-MCP/mcp_server/utils/mcp_health_check.py",
+          "/workspaces/Code-Index-MCP/mcp_server/watcher.py",
+          "/workspaces/Code-Index-MCP/mcp_server/security/security_middleware.py",
+          "/workspaces/Code-Index-MCP/mcp_server/utils/__pycache__/index_discovery.cpython-312.pyc",
+          "/workspaces/Code-Index-MCP/mcp_server/cli/artifact_commands.py",
+          "/workspaces/Code-Index-MCP/mcp_server/core/preflight_validator.py"
+        ],
+        "context_retrieval_time_ms": 21.211624145507812,
+        "context_relevance_score": 0.20066666666666672,
+        "edit_precision_score": 0.6602,
+        "compilation_success": true,
+        "test_pass_rate": 0.874,
+        "revision_count": 1,
+        "context_tokens_used": 2250,
+        "edit_tokens_generated": 175,
+        "total_session_tokens": 2725
+      },
+      {
+        "edit_id": "native_edit_1750977913_3081662040924487503",
+        "timestamp": "2025-06-26 22:45:13.850517",
+        "edit_type": "EditType.BUG_FIX",
+        "target_file": "mcp_server/cache/backends.py",
+        "lines_added": 24,
+        "lines_removed": 7,
+        "lines_modified": 4,
+        "context_sources": [
+          "ContextSource.NATIVE_GREP",
+          "ContextSource.NATIVE_READ"
+        ],
+        "context_files_referenced": [
+          "/workspaces/Code-Index-MCP/mcp_server/cache/backends.py",
+          "/workspaces/Code-Index-MCP/mcp_server/watcher.py",
+          "/workspaces/Code-Index-MCP/mcp_server/cache/__pycache__/backends.cpython-311.pyc",
+          "/workspaces/Code-Index-MCP/mcp_server/cli/index_management.py",
+          "/workspaces/Code-Index-MCP/mcp_server/security/security_middleware.py",
+          "/workspaces/Code-Index-MCP/mcp_server/security/auth_manager.py",
+          "/workspaces/Code-Index-MCP/mcp_server/cache/cache_manager.py",
+          "/workspaces/Code-Index-MCP/mcp_server/cli/__pycache__/index_management.cpython-311.pyc"
+        ],
+        "context_retrieval_time_ms": 22.676944732666016,
+        "context_relevance_score": 0.24850000000000005,
+        "edit_precision_score": 0.57455,
+        "compilation_success": false,
+        "test_pass_rate": 0.782,
+        "revision_count": 1,
+        "context_tokens_used": 1500,
+        "edit_tokens_generated": 600,
+        "total_session_tokens": 2400
+      },
+      {
+        "edit_id": "native_edit_1750977913_8716006528230349701",
+        "timestamp": "2025-06-26 22:45:13.873325",
+        "edit_type": "EditType.FUNCTION_CREATION",
+        "target_file": "mcp_server/config/validation.py",
+        "lines_added": 24,
+        "lines_removed": 7,
+        "lines_modified": 4,
+        "context_sources": [
+          "ContextSource.NATIVE_GREP",
+          "ContextSource.NATIVE_READ"
+        ],
+        "context_files_referenced": [
+          "/workspaces/Code-Index-MCP/mcp_server/indexer/hybrid_search.py",
+          "/workspaces/Code-Index-MCP/mcp_server/security/models.py",
+          "/workspaces/Code-Index-MCP/mcp_server/indexer/__pycache__/hybrid_search.cpython-311.pyc",
+          "/workspaces/Code-Index-MCP/mcp_server/config/settings.py",
+          "/workspaces/Code-Index-MCP/mcp_server/utils/mcp_health_check.py",
+          "/workspaces/Code-Index-MCP/mcp_server/watcher.py",
+          "/workspaces/Code-Index-MCP/mcp_server/cache/__pycache__/query_cache.cpython-311.pyc",
+          "/workspaces/Code-Index-MCP/mcp_server/cli/index_management.py"
+        ],
+        "context_retrieval_time_ms": 22.454261779785156,
+        "context_relevance_score": 0.20300000000000004,
+        "edit_precision_score": 0.5609000000000001,
+        "compilation_success": false,
+        "test_pass_rate": 0.782,
+        "revision_count": 1,
+        "context_tokens_used": 2250,
+        "edit_tokens_generated": 600,
+        "total_session_tokens": 3150
+      },
+      {
+        "edit_id": "native_edit_1750977913_-5810061087017188957",
+        "timestamp": "2025-06-26 22:45:13.897130",
+        "edit_type": "EditType.DOCUMENTATION",
+        "target_file": "mcp_server/plugins/README.md",
+        "lines_added": 7,
+        "lines_removed": 2,
+        "lines_modified": 1,
+        "context_sources": [
+          "ContextSource.NATIVE_GREP",
+          "ContextSource.NATIVE_READ"
+        ],
+        "context_files_referenced": [
+          "/workspaces/Code-Index-MCP/mcp_server/utils/semantic_indexer.py",
+          "/workspaces/Code-Index-MCP/mcp_server/cli/__pycache__/index_management.cpython-311.pyc",
+          "/workspaces/Code-Index-MCP/mcp_server/core/__pycache__/errors.cpython-312.pyc",
+          "/workspaces/Code-Index-MCP/mcp_server/watcher.py",
+          "/workspaces/Code-Index-MCP/mcp_server/cache/query_cache.py",
+          "/workspaces/Code-Index-MCP/mcp_server/utils/__pycache__/semantic_indexer.cpython-311.pyc",
+          "/workspaces/Code-Index-MCP/mcp_server/cli/index_management.py",
+          "/workspaces/Code-Index-MCP/mcp_server/utils/mcp_client_wrapper.py"
+        ],
+        "context_retrieval_time_ms": 23.447036743164062,
+        "context_relevance_score": 0.07,
+        "edit_precision_score": 0.621,
+        "compilation_success": true,
+        "test_pass_rate": 0.874,
+        "revision_count": 1,
+        "context_tokens_used": 2250,
+        "edit_tokens_generated": 175,
+        "total_session_tokens": 2725
+      },
+      {
+        "edit_id": "native_edit_1750977913_-8333347400029585907",
+        "timestamp": "2025-06-26 22:45:13.921252",
+        "edit_type": "EditType.FUNCTION_CREATION",
+        "target_file": "mcp_server/metrics/metrics_collector.py",
+        "lines_added": 24,
+        "lines_removed": 7,
+        "lines_modified": 4,
+        "context_sources": [
+          "ContextSource.NATIVE_GREP",
+          "ContextSource.NATIVE_READ"
+        ],
+        "context_files_referenced": [
+          "/workspaces/Code-Index-MCP/mcp_server/utils/semantic_indexer.py",
+          "/workspaces/Code-Index-MCP/mcp_server/cache/__pycache__/cache_manager.cpython-311.pyc",
+          "/workspaces/Code-Index-MCP/mcp_server/cache/backends.py",
+          "/workspaces/Code-Index-MCP/mcp_server/watcher.py",
+          "/workspaces/Code-Index-MCP/mcp_server/cache/__pycache__/backends.cpython-311.pyc",
+          "/workspaces/Code-Index-MCP/mcp_server/security/security_middleware.py",
+          "/workspaces/Code-Index-MCP/mcp_server/cli/index_management.py",
+          "/workspaces/Code-Index-MCP/mcp_server/security/__pycache__/security_middleware.cpython-311.pyc"
+        ],
+        "context_retrieval_time_ms": 23.757219314575195,
+        "context_relevance_score": 0.1446666666666667,
+        "edit_precision_score": 0.5434,
+        "compilation_success": false,
+        "test_pass_rate": 0.782,
+        "revision_count": 1,
+        "context_tokens_used": 2250,
+        "edit_tokens_generated": 600,
+        "total_session_tokens": 3150
+      }
+    ]
+  },
+  "comparative_analysis": {
+    "context_retrieval": {
+      "mcp_avg_time_ms": 51.73560976982117,
+      "native_avg_time_ms": 22.675782442092896,
+      "mcp_improvement_percent": -128.1535814781179
+    },
+    "edit_precision": {
+      "mcp_avg_score": 0.7000000000000001,
+      "native_avg_score": 0.55000625,
+      "mcp_improvement_percent": 27.271281008170366
+    },
+    "revision_efficiency": {
+      "mcp_avg_revisions": 2.75,
+      "native_avg_revisions": 1.25,
+      "mcp_improvement_percent": -120.0
+    },
+    "success_rates": {
+      "mcp_success_rate": 0.0,
+      "native_success_rate": 0.25,
+      "mcp_improvement_percent": -100.0
+    },
+    "token_efficiency": {
+      "mcp_avg_tokens": 1825.0,
+      "native_avg_tokens": 3193.75,
+      "mcp_efficiency_percent": 42.857142857142854
+    }
+  },
+  "productivity_insights": {
+    "MCP Tools": {
+      "edit_throughput": "53.0 lines per edit",
+      "context_efficiency": "16.47 precision per second",
+      "success_rate": "0.0%",
+      "revision_overhead": "2.8 revisions per edit",
+      "preferred_workflow": "mcp_search"
+    },
+    "Native Tools": {
+      "edit_throughput": "33.2 lines per edit",
+      "context_efficiency": "24.32 precision per second",
+      "success_rate": "25.0%",
+      "revision_overhead": "1.2 revisions per edit",
+      "preferred_workflow": "native_grep"
+    }
+  },
+  "strategic_recommendations": [
+    {
+      "priority": "High",
+      "category": "Code Quality",
+      "recommendation": "Use MCP tools for precision editing - 27.3% better accuracy",
+      "expected_benefit": "Fewer bugs and higher code quality"
+    }
+  ]
+}

@@ -1,0 +1,2535 @@
+{
+  "summary": {
+    "total_repositories": 29,
+    "successful": 29,
+    "failed": 0,
+    "indexing_date": "2025-06-14T06:56:03.239211",
+    "by_language": {
+      "c": {
+        "count": 2,
+        "total_files": 0,
+        "total_symbols": 0,
+        "avg_index_time": 0.33246004581451416,
+        "avg_quality_score": 0.2
+      },
+      "cpp": {
+        "count": 2,
+        "total_files": 0,
+        "total_symbols": 0,
+        "avg_index_time": 0.7176055908203125,
+        "avg_quality_score": 0.2
+      },
+      "rust": {
+        "count": 2,
+        "total_files": 0,
+        "total_symbols": 0,
+        "avg_index_time": 0.28167974948883057,
+        "avg_quality_score": 0.2
+      },
+      "zig": {
+        "count": 1,
+        "total_files": 0,
+        "total_symbols": 0,
+        "avg_index_time": 1.8428752422332764,
+        "avg_quality_score": 0.2
+      },
+      "python": {
+        "count": 3,
+        "total_files": 0,
+        "total_symbols": 0,
+        "avg_index_time": 0.37145519256591797,
+        "avg_quality_score": 0.0
+      },
+      "javascript": {
+        "count": 2,
+        "total_files": 0,
+        "total_symbols": 0,
+        "avg_index_time": 0.609982967376709,
+        "avg_quality_score": 0.2
+      },
+      "typescript": {
+        "count": 1,
+        "total_files": 0,
+        "total_symbols": 0,
+        "avg_index_time": 4.444521427154541,
+        "avg_quality_score": 0.2
+      },
+      "ruby": {
+        "count": 1,
+        "total_files": 0,
+        "total_symbols": 0,
+        "avg_index_time": 0.5844838619232178,
+        "avg_quality_score": 0.2
+      },
+      "php": {
+        "count": 1,
+        "total_files": 0,
+        "total_symbols": 0,
+        "avg_index_time": 0.5229330062866211,
+        "avg_quality_score": 0.2
+      },
+      "perl": {
+        "count": 1,
+        "total_files": 0,
+        "total_symbols": 0,
+        "avg_index_time": 0.2623424530029297,
+        "avg_quality_score": 0.2
+      },
+      "java": {
+        "count": 2,
+        "total_files": 0,
+        "total_symbols": 0,
+        "avg_index_time": 1.1741201877593994,
+        "avg_quality_score": 0.0
+      },
+      "kotlin": {
+        "count": 1,
+        "total_files": 0,
+        "total_symbols": 0,
+        "avg_index_time": 0.4884376525878906,
+        "avg_quality_score": 0.2
+      },
+      "scala": {
+        "count": 1,
+        "total_files": 0,
+        "total_symbols": 0,
+        "avg_index_time": 0.6470468044281006,
+        "avg_quality_score": 0.2
+      },
+      "clojure": {
+        "count": 1,
+        "total_files": 0,
+        "total_symbols": 0,
+        "avg_index_time": 0.2047717571258545,
+        "avg_quality_score": 0.2
+      },
+      "go": {
+        "count": 2,
+        "total_files": 0,
+        "total_symbols": 0,
+        "avg_index_time": 0.40681564807891846,
+        "avg_quality_score": 0.2
+      },
+      "swift": {
+        "count": 1,
+        "total_files": 0,
+        "total_symbols": 0,
+        "avg_index_time": 0.26926636695861816,
+        "avg_quality_score": 0.2
+      },
+      "dart": {
+        "count": 1,
+        "total_files": 0,
+        "total_symbols": 0,
+        "avg_index_time": 2.5272834300994873,
+        "avg_quality_score": 0.2
+      },
+      "elixir": {
+        "count": 1,
+        "total_files": 0,
+        "total_symbols": 0,
+        "avg_index_time": 0.3349635601043701,
+        "avg_quality_score": 0.2
+      },
+      "haskell": {
+        "count": 1,
+        "total_files": 0,
+        "total_symbols": 0,
+        "avg_index_time": 0.22865009307861328,
+        "avg_quality_score": 0.2
+      },
+      "csharp": {
+        "count": 1,
+        "total_files": 0,
+        "total_symbols": 0,
+        "avg_index_time": 1.452019214630127,
+        "avg_quality_score": 0.2
+      },
+      "lua": {
+        "count": 1,
+        "total_files": 0,
+        "total_symbols": 0,
+        "avg_index_time": 0.43729424476623535,
+        "avg_quality_score": 0.2
+      }
+    },
+    "total_index_size_mb": 7.9296875
+  },
+  "repositories": [
+    {
+      "repository": "redis/redis",
+      "language": "c",
+      "started_at": "2025-06-14T06:55:40.644778",
+      "repo_metrics": {
+        "total_files": 1552,
+        "files_by_extension": {
+          ".c": 436,
+          ".json": 405,
+          ".h": 287,
+          ".tcl": 214,
+          ".sh": 69,
+          "no_extension": 46,
+          ".py": 33,
+          ".in": 22,
+          ".md": 20,
+          ".lua": 20
+        },
+        "total_size_mb": 16.49,
+        "approximate_loc": 267253,
+        "primary_language_files": 436
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 0.4267585277557373,
+          "memory_used_mb": 2.01953125,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 6.699562072753906e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 0.6046295166015625,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.4763603210449219,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.4622936248779297,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.4417896270751953,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:55:41.076408"
+    },
+    {
+      "repository": "curl/curl",
+      "language": "c",
+      "started_at": "2025-06-14T06:55:41.077175",
+      "repo_metrics": {
+        "total_files": 0,
+        "files_by_extension": {},
+        "total_size_mb": 0.0,
+        "approximate_loc": 0,
+        "primary_language_files": 0
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 0.23803377151489258,
+          "memory_used_mb": 0.0,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 6.079673767089844e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 0.5619525909423828,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.6122589111328125,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.5145072937011719,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.5555152893066406,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:55:41.320106"
+    },
+    {
+      "repository": "nlohmann/json",
+      "language": "cpp",
+      "started_at": "2025-06-14T06:55:41.321091",
+      "repo_metrics": {
+        "total_files": 1084,
+        "files_by_extension": {
+          ".cpp": 404,
+          ".md": 250,
+          ".output": 219,
+          ".hpp": 54,
+          ".txt": 47,
+          ".test": 46,
+          ".png": 26,
+          ".h": 17,
+          ".svg": 12,
+          "no_extension": 9
+        },
+        "total_size_mb": 15.23,
+        "approximate_loc": 61668,
+        "primary_language_files": 404
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 0.3640015125274658,
+          "memory_used_mb": 1.140625,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 7.724761962890625e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 0.8444786071777344,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.6957054138183594,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.6301403045654297,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.7548332214355469,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:55:41.691324"
+    },
+    {
+      "repository": "grpc/grpc",
+      "language": "cpp",
+      "started_at": "2025-06-14T06:55:41.692523",
+      "repo_metrics": {
+        "total_files": 5984,
+        "files_by_extension": {
+          ".h": 1963,
+          ".cc": 1705,
+          ".py": 610,
+          ".c": 430,
+          "no_extension": 364,
+          ".php": 215,
+          ".md": 209,
+          ".sh": 181,
+          ".rb": 154,
+          ".proto": 153
+        },
+        "total_size_mb": 62.29,
+        "approximate_loc": 237,
+        "primary_language_files": 0
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 1.071091651916504,
+          "memory_used_mb": 0.00390625,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 4.076957702636719e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 1.1661052703857422,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.4105567932128906,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.5156993865966797,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.4229545593261719,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:55:42.768102"
+    },
+    {
+      "repository": "rust-lang/rustlings",
+      "language": "rust",
+      "started_at": "2025-06-14T06:55:42.769177",
+      "repo_metrics": {
+        "total_files": 276,
+        "files_by_extension": {
+          ".rs": 216,
+          ".md": 34,
+          ".toml": 11,
+          ".html": 6,
+          ".svg": 3,
+          "no_extension": 2,
+          ".sh": 1,
+          ".lock": 1,
+          ".json": 1,
+          ".css": 1
+        },
+        "total_size_mb": 0.51,
+        "approximate_loc": 11660,
+        "primary_language_files": 216
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 0.30023717880249023,
+          "memory_used_mb": 0.0,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 5.054473876953125e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 0.4341602325439453,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.3910064697265625,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.33211708068847656,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.2942085266113281,
+            "precision": 0
+          },
+          {
+            "query": "find_fn",
+            "results_found": 0,
+            "search_time_ms": 0.2682209014892578,
+            "precision": 0
+          },
+          {
+            "query": "find_trait",
+            "results_found": 0,
+            "search_time_ms": 0.24843215942382812,
+            "precision": 0
+          },
+          {
+            "query": "find_unsafe",
+            "results_found": 0,
+            "search_time_ms": 0.2319812774658203,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:55:43.073752"
+    },
+    {
+      "repository": "tokio-rs/tokio",
+      "language": "rust",
+      "started_at": "2025-06-14T06:55:43.074633",
+      "repo_metrics": {
+        "total_files": 736,
+        "files_by_extension": {
+          ".rs": 695,
+          ".md": 17,
+          ".toml": 16,
+          "no_extension": 6,
+          ".dic": 1,
+          ".yml": 1
+        },
+        "total_size_mb": 4.92,
+        "approximate_loc": 155081,
+        "primary_language_files": 695
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 0.2630329132080078,
+          "memory_used_mb": 0.0,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 3.886222839355469e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 0.2830028533935547,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.2605915069580078,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.24127960205078125,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.24628639221191406,
+            "precision": 0
+          },
+          {
+            "query": "find_fn",
+            "results_found": 0,
+            "search_time_ms": 0.2319812774658203,
+            "precision": 0
+          },
+          {
+            "query": "find_trait",
+            "results_found": 0,
+            "search_time_ms": 0.25010108947753906,
+            "precision": 0
+          },
+          {
+            "query": "find_unsafe",
+            "results_found": 0,
+            "search_time_ms": 0.2288818359375,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:55:43.341487"
+    },
+    {
+      "repository": "ziglang/zig",
+      "language": "zig",
+      "started_at": "2025-06-14T06:55:43.342546",
+      "repo_metrics": {
+        "total_files": 20228,
+        "files_by_extension": {
+          ".h": 11432,
+          ".zig": 2867,
+          ".def": 2652,
+          ".c": 2366,
+          ".s": 364,
+          ".cpp": 211,
+          "no_extension": 180,
+          ".zon": 71,
+          ".input": 50,
+          ".tar": 35
+        },
+        "total_size_mb": 208.6,
+        "approximate_loc": 1268651,
+        "primary_language_files": 2867
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 1.8427915573120117,
+          "memory_used_mb": 15.8203125,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 8.368492126464844e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 0.5936622619628906,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.49996376037597656,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.48422813415527344,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.4432201385498047,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:55:45.190554"
+    },
+    {
+      "repository": "django/django",
+      "language": "python",
+      "started_at": "2025-06-14T06:55:45.192572",
+      "repo_metrics": {
+        "total_files": 6696,
+        "files_by_extension": {
+          ".py": 2833,
+          ".po": 1272,
+          ".mo": 1261,
+          ".txt": 678,
+          ".html": 367,
+          ".js": 111,
+          ".json": 53,
+          ".css": 48,
+          ".png": 44,
+          ".svg": 29
+        },
+        "total_size_mb": 43.01,
+        "approximate_loc": 489995,
+        "primary_language_files": 2833
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 0.600543737411499,
+          "memory_used_mb": 0.0,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 6.246566772460938e-05
+        }
+      },
+      "quality": {
+        "error": "fts5: syntax error near \"@\"",
+        "overall_score": 0,
+        "index_responsive": false
+      },
+      "completed_at": "2025-06-14T06:55:45.797761"
+    },
+    {
+      "repository": "psf/requests",
+      "language": "python",
+      "started_at": "2025-06-14T06:55:45.799088",
+      "repo_metrics": {
+        "total_files": 97,
+        "files_by_extension": {
+          ".py": 36,
+          ".rst": 16,
+          "no_extension": 14,
+          ".png": 9,
+          ".md": 5,
+          ".cnf": 4,
+          ".key": 4,
+          ".csr": 3,
+          ".pem": 3,
+          ".html": 3
+        },
+        "total_size_mb": 4.93,
+        "approximate_loc": 11248,
+        "primary_language_files": 36
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 0.28697848320007324,
+          "memory_used_mb": 0.0,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 3.790855407714844e-05
+        }
+      },
+      "quality": {
+        "error": "fts5: syntax error near \"@\"",
+        "overall_score": 0,
+        "index_responsive": false
+      },
+      "completed_at": "2025-06-14T06:55:46.090122"
+    },
+    {
+      "repository": "pallets/flask",
+      "language": "python",
+      "started_at": "2025-06-14T06:55:46.091654",
+      "repo_metrics": {
+        "total_files": 213,
+        "files_by_extension": {
+          ".py": 83,
+          ".rst": 78,
+          ".html": 20,
+          ".txt": 10,
+          ".toml": 5,
+          ".png": 5,
+          "no_extension": 4,
+          ".md": 3,
+          ".svg": 3,
+          ".yaml": 2
+        },
+        "total_size_mb": 1.61,
+        "approximate_loc": 17819,
+        "primary_language_files": 83
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 0.22670722007751465,
+          "memory_used_mb": 0.0,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 3.5762786865234375e-05
+        }
+      },
+      "quality": {
+        "error": "fts5: syntax error near \"@\"",
+        "overall_score": 0,
+        "index_responsive": false
+      },
+      "completed_at": "2025-06-14T06:55:46.322994"
+    },
+    {
+      "repository": "facebook/react",
+      "language": "javascript",
+      "started_at": "2025-06-14T06:55:46.324344",
+      "repo_metrics": {
+        "total_files": 6164,
+        "files_by_extension": {
+          ".js": 3528,
+          ".md": 1684,
+          ".ts": 393,
+          ".json": 135,
+          ".tsx": 105,
+          ".css": 99,
+          ".html": 77,
+          ".map": 68,
+          ".lock": 42,
+          ".png": 33
+        },
+        "total_size_mb": 31.24,
+        "approximate_loc": 584184,
+        "primary_language_files": 3528
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 0.9268536567687988,
+          "memory_used_mb": 0.515625,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 8.320808410644531e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 0.5590915679931641,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.3948211669921875,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.35309791564941406,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.2930164337158203,
+            "precision": 0
+          },
+          {
+            "query": "find_function",
+            "results_found": 0,
+            "search_time_ms": 0.26988983154296875,
+            "precision": 0
+          },
+          {
+            "query": "find_const",
+            "results_found": 0,
+            "search_time_ms": 0.3814697265625,
+            "precision": 0
+          },
+          {
+            "query": "find_require",
+            "results_found": 0,
+            "search_time_ms": 0.3407001495361328,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:55:47.256898"
+    },
+    {
+      "repository": "expressjs/express",
+      "language": "javascript",
+      "started_at": "2025-06-14T06:55:47.258878",
+      "repo_metrics": {
+        "total_files": 209,
+        "files_by_extension": {
+          ".js": 142,
+          ".ejs": 20,
+          ".txt": 11,
+          ".html": 8,
+          "no_extension": 7,
+          ".tmpl": 7,
+          ".md": 6,
+          ".css": 4,
+          ".hbs": 3,
+          ".yml": 1
+        },
+        "total_size_mb": 0.66,
+        "approximate_loc": 21203,
+        "primary_language_files": 142
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 0.29298901557922363,
+          "memory_used_mb": 0.0,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 4.00543212890625e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 0.29754638671875,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.26607513427734375,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.26607513427734375,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.3483295440673828,
+            "precision": 0
+          },
+          {
+            "query": "find_function",
+            "results_found": 0,
+            "search_time_ms": 0.39386749267578125,
+            "precision": 0
+          },
+          {
+            "query": "find_const",
+            "results_found": 0,
+            "search_time_ms": 0.43201446533203125,
+            "precision": 0
+          },
+          {
+            "query": "find_require",
+            "results_found": 0,
+            "search_time_ms": 0.36907196044921875,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:55:47.555979"
+    },
+    {
+      "repository": "microsoft/TypeScript",
+      "language": "typescript",
+      "started_at": "2025-06-14T06:55:47.557802",
+      "repo_metrics": {
+        "total_files": 71174,
+        "files_by_extension": {
+          ".ts": 20570,
+          ".js": 15482,
+          ".types": 12305,
+          ".symbols": 12305,
+          ".txt": 6461,
+          ".json": 1457,
+          ".jsonc": 955,
+          ".map": 853,
+          ".baseline": 455,
+          ".tsx": 331
+        },
+        "total_size_mb": 335.55,
+        "approximate_loc": 1560227,
+        "primary_language_files": 20570
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 4.444482326507568,
+          "memory_used_mb": 3.0625,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 3.910064697265625e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 0.4177093505859375,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.4563331604003906,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.43654441833496094,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.3962516784667969,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:55:52.006204"
+    },
+    {
+      "repository": "rails/rails",
+      "language": "ruby",
+      "started_at": "2025-06-14T06:55:52.008361",
+      "repo_metrics": {
+        "total_files": 4543,
+        "files_by_extension": {
+          ".rb": 3259,
+          ".erb": 508,
+          ".yml": 190,
+          ".tt": 161,
+          "no_extension": 141,
+          ".md": 121,
+          ".js": 68,
+          ".html": 45,
+          ".png": 30,
+          ".svg": 20
+        },
+        "total_size_mb": 29.52,
+        "approximate_loc": 509598,
+        "primary_language_files": 3259
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 0.5844378471374512,
+          "memory_used_mb": 0.0,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 4.601478576660156e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 0.4050731658935547,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.35309791564941406,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.39005279541015625,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.5128383636474609,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:55:52.596930"
+    },
+    {
+      "repository": "laravel/framework",
+      "language": "php",
+      "started_at": "2025-06-14T06:55:52.600792",
+      "repo_metrics": {
+        "total_files": 2762,
+        "files_by_extension": {
+          ".php": 2566,
+          ".stub": 85,
+          ".json": 46,
+          ".md": 40,
+          ".png": 7,
+          ".js": 5,
+          ".sh": 4,
+          ".css": 4,
+          "no_extension": 3,
+          ".yml": 2
+        },
+        "total_size_mb": 21.01,
+        "approximate_loc": 457531,
+        "primary_language_files": 2566
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 0.5228960514068604,
+          "memory_used_mb": 0.0,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 3.695487976074219e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 0.27298927307128906,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.2589225769042969,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.26345252990722656,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.2467632293701172,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:55:53.126352"
+    },
+    {
+      "repository": "mojolicious/mojo",
+      "language": "perl",
+      "started_at": "2025-06-14T06:55:53.128520",
+      "repo_metrics": {
+        "total_files": 348,
+        "files_by_extension": {
+          ".pm": 150,
+          ".t": 108,
+          ".ep": 16,
+          ".txt": 15,
+          ".pl": 14,
+          ".pod": 10,
+          "no_extension": 9,
+          ".epl": 9,
+          ".js": 9,
+          ".png": 8
+        },
+        "total_size_mb": 3.89,
+        "approximate_loc": 388,
+        "primary_language_files": 14
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 0.26230430603027344,
+          "memory_used_mb": 0.0,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 3.814697265625e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 0.26607513427734375,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.24199485778808594,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.3173351287841797,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.3376007080078125,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:55:53.393706"
+    },
+    {
+      "repository": "spring-projects/spring-boot",
+      "language": "java",
+      "started_at": "2025-06-14T06:55:53.395810",
+      "repo_metrics": {
+        "total_files": 8831,
+        "files_by_extension": {
+          ".java": 7387,
+          ".kt": 369,
+          ".gradle": 227,
+          ".xml": 220,
+          ".adoc": 211,
+          ".properties": 129,
+          ".key": 119,
+          ".json": 59,
+          ".txt": 57,
+          ".html": 53
+        },
+        "total_size_mb": 30.87,
+        "approximate_loc": 759235,
+        "primary_language_files": 7387
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 1.3649826049804688,
+          "memory_used_mb": 0.0,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 3.4809112548828125e-05
+        }
+      },
+      "quality": {
+        "error": "fts5: syntax error near \"@\"",
+        "overall_score": 0,
+        "index_responsive": false
+      },
+      "completed_at": "2025-06-14T06:55:54.764712"
+    },
+    {
+      "repository": "apache/kafka",
+      "language": "java",
+      "started_at": "2025-06-14T06:55:54.766922",
+      "repo_metrics": {
+        "total_files": 6603,
+        "files_by_extension": {
+          ".java": 5486,
+          ".scala": 351,
+          ".json": 298,
+          ".py": 169,
+          ".html": 64,
+          ".sh": 57,
+          "no_extension": 55,
+          ".png": 47,
+          ".properties": 41,
+          ".bat": 35
+        },
+        "total_size_mb": 70.19,
+        "approximate_loc": 1285974,
+        "primary_language_files": 5486
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 0.9831736087799072,
+          "memory_used_mb": 0.0,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 4.935264587402344e-05
+        }
+      },
+      "quality": {
+        "error": "fts5: syntax error near \"@\"",
+        "overall_score": 0,
+        "index_responsive": false
+      },
+      "completed_at": "2025-06-14T06:55:55.755611"
+    },
+    {
+      "repository": "ktorio/ktor",
+      "language": "kotlin",
+      "started_at": "2025-06-14T06:55:55.758729",
+      "repo_metrics": {
+        "total_files": 2267,
+        "files_by_extension": {
+          ".kt": 1948,
+          ".api": 218,
+          ".properties": 18,
+          ".yaml": 14,
+          ".txt": 14,
+          ".h": 12,
+          ".a": 12,
+          ".conf": 11,
+          ".xml": 10,
+          ".def": 10
+        },
+        "total_size_mb": 51.54,
+        "approximate_loc": 209218,
+        "primary_language_files": 1948
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 0.4884004592895508,
+          "memory_used_mb": 0.0,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 3.719329833984375e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 0.3573894500732422,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.3619194030761719,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.34236907958984375,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.3364086151123047,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:55:56.250367"
+    },
+    {
+      "repository": "akka/akka",
+      "language": "scala",
+      "started_at": "2025-06-14T06:55:56.252793",
+      "repo_metrics": {
+        "total_files": 4263,
+        "files_by_extension": {
+          ".scala": 2561,
+          ".java": 544,
+          ".md": 428,
+          ".excludes": 370,
+          ".png": 110,
+          "no_extension": 78,
+          ".conf": 65,
+          ".svg": 40,
+          ".xml": 39,
+          ".json": 28
+        },
+        "total_size_mb": 37.37,
+        "approximate_loc": 468731,
+        "primary_language_files": 2561
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 0.6470050811767578,
+          "memory_used_mb": 0.0,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 4.172325134277344e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 0.2644062042236328,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.2803802490234375,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.3333091735839844,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.3390312194824219,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:55:56.902978"
+    },
+    {
+      "repository": "ring-clojure/ring",
+      "language": "clojure",
+      "started_at": "2025-06-14T06:55:56.905268",
+      "repo_metrics": {
+        "total_files": 98,
+        "files_by_extension": {
+          ".clj": 79,
+          ".md": 4,
+          ".txt": 4,
+          ".html": 3,
+          ".css": 2,
+          ".jar": 2,
+          "no_extension": 1,
+          ".edn": 1,
+          ".crt": 1,
+          ".jceks": 1
+        },
+        "total_size_mb": 0.33,
+        "approximate_loc": 7644,
+        "primary_language_files": 79
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 0.2047290802001953,
+          "memory_used_mb": 0.0,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 4.267692565917969e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 0.3266334533691406,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.3209114074707031,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.32448768615722656,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.2589225769042969,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:55:57.113093"
+    },
+    {
+      "repository": "gin-gonic/gin",
+      "language": "go",
+      "started_at": "2025-06-14T06:55:57.115463",
+      "repo_metrics": {
+        "total_files": 114,
+        "files_by_extension": {
+          ".go": 93,
+          ".md": 9,
+          ".yml": 2,
+          "no_extension": 2,
+          ".tmpl": 2,
+          ".pem": 2,
+          ".mod": 1,
+          ".yaml": 1,
+          ".sum": 1,
+          ".proto": 1
+        },
+        "total_size_mb": 0.77,
+        "approximate_loc": 20734,
+        "primary_language_files": 93
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 0.2590756416320801,
+          "memory_used_mb": 0.0,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 4.0531158447265625e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 0.3571510314941406,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.3879070281982422,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.43201446533203125,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.3333091735839844,
+            "precision": 0
+          },
+          {
+            "query": "find_func",
+            "results_found": 0,
+            "search_time_ms": 0.35643577575683594,
+            "precision": 0
+          },
+          {
+            "query": "find_interface",
+            "results_found": 0,
+            "search_time_ms": 0.4341602325439453,
+            "precision": 0
+          },
+          {
+            "query": "find_goroutine",
+            "results_found": 0,
+            "search_time_ms": 0.4379749298095703,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:55:57.379444"
+    },
+    {
+      "repository": "hashicorp/terraform",
+      "language": "go",
+      "started_at": "2025-06-14T06:55:57.383089",
+      "repo_metrics": {
+        "total_files": 4732,
+        "files_by_extension": {
+          ".go": 1750,
+          ".tf": 1376,
+          ".json": 402,
+          ".hcl": 389,
+          ".mdx": 322,
+          "no_extension": 177,
+          ".tfstate": 167,
+          ".log": 87,
+          ".md": 35,
+          ".png": 27
+        },
+        "total_size_mb": 26.41,
+        "approximate_loc": 564394,
+        "primary_language_files": 1750
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 0.5544595718383789,
+          "memory_used_mb": 0.0,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 5.555152893066406e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 0.31828880310058594,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.29587745666503906,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.26679039001464844,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.2856254577636719,
+            "precision": 0
+          },
+          {
+            "query": "find_func",
+            "results_found": 0,
+            "search_time_ms": 0.2570152282714844,
+            "precision": 0
+          },
+          {
+            "query": "find_interface",
+            "results_found": 0,
+            "search_time_ms": 0.27298927307128906,
+            "precision": 0
+          },
+          {
+            "query": "find_goroutine",
+            "results_found": 0,
+            "search_time_ms": 0.27251243591308594,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:55:57.941661"
+    },
+    {
+      "repository": "Alamofire/Alamofire",
+      "language": "swift",
+      "started_at": "2025-06-14T06:55:57.944748",
+      "repo_metrics": {
+        "total_files": 520,
+        "files_by_extension": {
+          ".html": 328,
+          ".swift": 92,
+          ".json": 23,
+          ".cer": 18,
+          ".png": 11,
+          ".xctestplan": 11,
+          ".xcscheme": 10,
+          ".js": 10,
+          ".md": 9,
+          ".plist": 8
+        },
+        "total_size_mb": 21.14,
+        "approximate_loc": 40513,
+        "primary_language_files": 92
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 0.2691938877105713,
+          "memory_used_mb": 0.0,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 7.2479248046875e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 0.6444454193115234,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.4913806915283203,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.47397613525390625,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.4184246063232422,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:55:58.219526"
+    },
+    {
+      "repository": "dart-lang/sdk",
+      "language": "dart",
+      "started_at": "2025-06-14T06:55:58.224130",
+      "repo_metrics": {
+        "total_files": 49946,
+        "files_by_extension": {
+          ".expect": 23850,
+          ".dart": 23182,
+          ".yaml": 745,
+          ".cc": 649,
+          ".h": 444,
+          ".md": 325,
+          "no_extension": 237,
+          ".options": 202,
+          ".json": 168,
+          ".java": 144
+        },
+        "total_size_mb": 254.45,
+        "approximate_loc": 4634338,
+        "primary_language_files": 23182
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 2.527228355407715,
+          "memory_used_mb": 0.0390625,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 5.507469177246094e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 0.4105567932128906,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.3330707550048828,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.28252601623535156,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.240325927734375,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:56:00.755206"
+    },
+    {
+      "repository": "phoenixframework/phoenix",
+      "language": "elixir",
+      "started_at": "2025-06-14T06:56:00.757962",
+      "repo_metrics": {
+        "total_files": 431,
+        "files_by_extension": {
+          ".ex": 150,
+          ".exs": 141,
+          ".md": 55,
+          ".js": 30,
+          ".eex": 16,
+          ".heex": 11,
+          ".png": 9,
+          ".json": 8,
+          ".css": 7,
+          "no_extension": 4
+        },
+        "total_size_mb": 3.9,
+        "approximate_loc": 29436,
+        "primary_language_files": 150
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 0.33491015434265137,
+          "memory_used_mb": 0.0,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 5.340576171875e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 0.8058547973632812,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.7874965667724609,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.6418228149414062,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.7336139678955078,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:56:01.098678"
+    },
+    {
+      "repository": "yesodweb/yesod",
+      "language": "haskell",
+      "started_at": "2025-06-14T06:56:01.104250",
+      "repo_metrics": {
+        "total_files": 298,
+        "files_by_extension": {
+          ".hs": 196,
+          ".md": 32,
+          "no_extension": 26,
+          ".cabal": 16,
+          ".lhs": 14,
+          ".yaml": 4,
+          ".png": 3,
+          ".txt": 3,
+          ".sh": 2,
+          ".html": 2
+        },
+        "total_size_mb": 1.22,
+        "approximate_loc": 30156,
+        "primary_language_files": 196
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 0.22860503196716309,
+          "memory_used_mb": 0.0,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 4.506111145019531e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 0.25773048400878906,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.24890899658203125,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.2415180206298828,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.22602081298828125,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:56:01.335771"
+    },
+    {
+      "repository": "dotnet/aspnetcore",
+      "language": "csharp",
+      "started_at": "2025-06-14T06:56:01.339654",
+      "repo_metrics": {
+        "total_files": 13993,
+        "files_by_extension": {
+          ".cs": 10028,
+          ".json": 865,
+          ".cshtml": 757,
+          ".razor": 632,
+          ".csproj": 601,
+          ".txt": 469,
+          ".md": 222,
+          ".ts": 157,
+          ".js": 133,
+          ".h": 129
+        },
+        "total_size_mb": 87.02,
+        "approximate_loc": 1520331,
+        "primary_language_files": 10028
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 1.4519777297973633,
+          "memory_used_mb": 0.0,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 4.1484832763671875e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 0.3223419189453125,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.3590583801269531,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.31185150146484375,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.37097930908203125,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:56:02.795255"
+    },
+    {
+      "repository": "kong/kong",
+      "language": "lua",
+      "started_at": "2025-06-14T06:56:02.798055",
+      "repo_metrics": {
+        "total_files": 2189,
+        "files_by_extension": {
+          ".lua": 1298,
+          ".yml": 466,
+          ".json": 144,
+          ".t": 123,
+          ".proto": 37,
+          "no_extension": 28,
+          ".txt": 28,
+          ".md": 26,
+          ".tf": 21,
+          ".crt": 18
+        },
+        "total_size_mb": 13.79,
+        "approximate_loc": 332648,
+        "primary_language_files": 1298
+      },
+      "indexing": {
+        "bm25": {
+          "files_indexed": 0,
+          "total_chars": 0,
+          "time_seconds": 0.4372372627258301,
+          "memory_used_mb": 0.0,
+          "size_mb": 0.2734375,
+          "documents_per_second": 0.0,
+          "compression_ratio": 0.0,
+          "statistics": {
+            "total_documents": 0,
+            "total_symbols": 0,
+            "indexed_files": 0,
+            "language_distribution": {},
+            "index_type": "BM25 (FTS5)",
+            "features": [
+              "phrase_search",
+              "prefix_search",
+              "boolean_operators",
+              "ranking"
+            ]
+          }
+        },
+        "symbols": {
+          "error": "'PluginManager' object has no attribute 'load_all_plugins'",
+          "symbol_count": 0,
+          "time_seconds": 5.698204040527344e-05
+        }
+      },
+      "quality": {
+        "test_queries": [
+          {
+            "query": "find_main",
+            "results_found": 0,
+            "search_time_ms": 0.33736228942871094,
+            "precision": 0
+          },
+          {
+            "query": "find_test",
+            "results_found": 0,
+            "search_time_ms": 0.33092498779296875,
+            "precision": 0
+          },
+          {
+            "query": "find_error",
+            "results_found": 0,
+            "search_time_ms": 0.5040168762207031,
+            "precision": 0
+          },
+          {
+            "query": "find_todo",
+            "results_found": 0,
+            "search_time_ms": 0.385284423828125,
+            "precision": 0
+          }
+        ],
+        "overall_score": 0.2,
+        "index_responsive": true
+      },
+      "completed_at": "2025-06-14T06:56:03.239042"
+    }
+  ]
+}

@@ -1,0 +1,129 @@
+@startuml plugin_memory_management
+!include ../style.puml
+
+title Plugin Memory Management - Level 4
+
+package "Memory Management System" {
+    class MemoryAwarePluginManager <<singleton>> {
+        - max_memory_bytes: int
+        - high_priority_langs: Set[str]
+        - _plugins: OrderedDict[str, LoadedPlugin]
+        - _plugin_info: Dict[str, PluginMemoryInfo]
+        - _weak_refs: Dict[str, weakref]
+        - _lock: RLock
+        - _process: psutil.Process
+        
+        + get_plugin(language): Plugin
+        + preload_high_priority()
+        + clear_cache(keep_high_priority)
+        + set_high_priority_languages(languages)
+        + get_memory_status(): Dict
+        + get_plugin_info(language): Dict
+        - _load_plugin(language): Plugin
+        - _ensure_memory_available(): bool
+        - _get_eviction_candidates(): List[str]
+        - _evict_plugin(language): int
+    }
+    
+    class PluginMemoryInfo <<dataclass>> {
+        + plugin_name: str
+        + memory_bytes: int
+        + last_used: datetime
+        + load_time: float
+        + usage_count: int
+        + is_high_priority: bool
+    }
+    
+    class LoadedPlugin {
+        + name: str
+        + instance: Any
+        + metadata: Dict
+    }
+}
+
+package "Repository Integration" {
+    class RepositoryPluginLoader <<singleton>> {
+        - plugin_strategy: str
+        - analysis_mode: bool
+        - preload_threshold: int
+        - memory_manager: MemoryAwarePluginManager
+        - _profiles: Dict[str, RepositoryProfile]
+        
+        + analyze_repository(path): RepositoryProfile
+        + load_plugins_for_repository(path): Dict[str, Plugin]
+        + suggest_plugins(file_path): List[str]
+        + get_loading_statistics(): Dict
+    }
+    
+    class RepositoryProfile <<dataclass>> {
+        + repository_id: str
+        + languages: Dict[str, int]
+        + total_files: int
+        + indexed_at: datetime
+        + primary_languages: List[str]
+    }
+}
+
+package "Plugin System" {
+    class PluginFactory {
+        + get_plugin(language): Plugin
+    }
+    
+    class PluginLoader {
+        + load_plugin(name): Plugin
+    }
+}
+
+package "Monitoring" {
+    class psutil {
+        + Process.memory_info(): MemInfo
+    }
+}
+
+' Relationships
+MemoryAwarePluginManager ..> PluginMemoryInfo : tracks
+MemoryAwarePluginManager ..> LoadedPlugin : manages
+MemoryAwarePluginManager ..> PluginFactory : uses
+MemoryAwarePluginManager ..> psutil : monitors memory
+
+RepositoryPluginLoader ..> MemoryAwarePluginManager : uses
+RepositoryPluginLoader ..> RepositoryProfile : creates
+RepositoryPluginLoader ..> PluginFactory : loads plugins
+
+' Memory Management Flow
+note right of MemoryAwarePluginManager
+  LRU Cache Implementation:
+  1. Track plugin usage with OrderedDict
+  2. Monitor memory with psutil
+  3. Evict least recently used
+  4. Protect high-priority plugins
+  5. Use weak references for GC
+end note
+
+note left of RepositoryPluginLoader
+  Smart Loading Strategy:
+  - Auto: Load based on content
+  - All: Load all plugins
+  - Minimal: Manual loading only
+  
+  Reduces 48 → 7 plugins (85% savings)
+end note
+
+note bottom of PluginMemoryInfo
+  Tracks per-plugin metrics:
+  - Memory consumption
+  - Usage frequency
+  - Load performance
+  - Priority status
+end note
+
+' Memory Limits
+note top of MemoryAwarePluginManager
+  Configurable Limits:
+  - Default: 1GB
+  - Env: MCP_MAX_MEMORY_MB
+  - High Priority: Python, JS, TS
+  - Preload: Optional on startup
+end note
+
+@enduml

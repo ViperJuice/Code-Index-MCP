@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Code-Index-MCP Setup Script
-# This script sets up everything needed for the Code-Index-MCP project in a blank container
-# Assumes no internet access after this script runs
-# Assumes Node.js and Python are already installed
+# MCP Dependencies Setup Script for Codex Development Container
+# This script sets up MCP-specific dependencies needed for Codex IDE development
+# Focuses only on MCP runtime dependencies, no IDE-specific configurations
+# Optimized for development containers with UV package manager
 
 set -euo pipefail
 
@@ -161,69 +161,74 @@ setup_directories() {
     success "Directory structure created"
 }
 
-# Install Python dependencies
-install_python_deps() {
-    log "Installing Python dependencies..."
+# Install MCP dependencies using UV (faster) or pip fallback
+install_mcp_deps() {
+    log "Installing MCP dependencies..."
     
-    # Upgrade pip first
-    log "Upgrading pip..."
-    python3 -m pip install --upgrade pip setuptools wheel
+    # Check if UV is available for faster installation
+    if command -v uv &> /dev/null; then
+        log "Using UV package manager for faster installation..."
+        INSTALLER="uv pip install"
+    else
+        log "UV not available, using pip..."
+        INSTALLER="python3 -m pip install --no-cache-dir"
+        # Upgrade pip first
+        python3 -m pip install --upgrade pip setuptools wheel
+    fi
     
-    # Install core dependencies from pyproject.toml
-    log "Installing core dependencies..."
-    python3 -m pip install --no-cache-dir \
+    # Install MCP core dependencies
+    log "Installing MCP core dependencies..."
+    $INSTALLER \
+        "mcp>=1.9.0" \
         "fastapi>=0.110" \
-        "uvicorn[standard]>=0.29" \
-        "watchdog>=4.0" \
+        "uvicorn[standard]>=0.29"
+    
+    # Install search and AI dependencies
+    log "Installing semantic search dependencies..."
+    $INSTALLER \
+        "voyageai>=0.2.0" \
+        "qdrant-client>=1.7.0"
+    
+    # Install code processing dependencies
+    log "Installing code processing dependencies..."
+    $INSTALLER \
         "tree-sitter>=0.20.0" \
         "tree-sitter-languages>=1.8.0" \
         "jedi>=0.19.0"
     
-    # Install development and testing dependencies
-    if [[ -f "requirements.txt" ]]; then
-        log "Installing requirements from requirements.txt..."
-        python3 -m pip install --no-cache-dir -r requirements.txt
-    else
-        log "Installing essential testing and development dependencies..."
-        python3 -m pip install --no-cache-dir \
-            "pytest>=7.4.0" \
-            "pytest-asyncio>=0.21.0" \
-            "pytest-cov>=4.1.0" \
-            "pytest-timeout>=2.1.0" \
-            "pytest-mock>=3.11.1" \
-            "pytest-benchmark>=4.0.0" \
-            "pytest-xdist>=3.3.1" \
-            "black>=23.7.0" \
-            "isort>=5.12.0" \
-            "flake8>=6.1.0" \
-            "mypy>=1.5.1" \
-            "coverage[toml]>=7.3.0" \
-            "hypothesis>=6.82.0" \
-            "redis>=4.5.0" \
-            "pyjwt>=2.8.0" \
-            "passlib[bcrypt]>=1.7.4" \
-            "python-multipart>=0.0.6" \
-            "cryptography>=41.0.4" \
-            "httpx>=0.24.1" \
-            "aiofiles>=23.2.1" \
-            "psutil>=5.9.0" \
-            "prometheus-client>=0.17.0"
-    fi
+    # Install database and caching
+    log "Installing database and caching dependencies..."
+    $INSTALLER \
+        "redis>=4.5.0" \
+        "aiofiles>=23.2.1"
     
-    # Install MCP-specific dependencies
-    log "Installing MCP-specific dependencies..."
-    python3 -m pip install --no-cache-dir \
-        "mcp>=1.9.0" \
-        "voyageai>=0.2.0" \
-        "qdrant-client>=1.7.0"
+    # Install security dependencies
+    log "Installing security dependencies..."
+    $INSTALLER \
+        "pyjwt>=2.8.0" \
+        "passlib[bcrypt]>=1.7.4" \
+        "cryptography>=41.0.4"
+    
+    # Install testing framework for MCP
+    log "Installing MCP testing dependencies..."
+    $INSTALLER \
+        "pytest>=7.4.0" \
+        "pytest-asyncio>=0.21.0" \
+        "httpx>=0.24.1"
+    
+    # Install requirements.txt if available
+    if [[ -f "requirements.txt" ]]; then
+        log "Installing additional requirements from requirements.txt..."
+        $INSTALLER -r requirements.txt
+    fi
     
     # Install the project in development mode
     if [[ -f "pyproject.toml" ]]; then
         log "Installing project in development mode..."
-        python3 -m pip install -e .
+        $INSTALLER -e .
     fi
     
-    success "Python dependencies installed"
+    success "MCP dependencies installed"
 }
 
 # Setup Tree-sitter grammars
@@ -262,58 +267,56 @@ EOF
     success "Tree-sitter grammars initialized"
 }
 
-# Create configuration files
-create_config_files() {
-    log "Creating configuration files..."
+# Create MCP configuration files
+create_mcp_config() {
+    log "Creating MCP configuration files..."
     
     # Create .env file if it doesn't exist
     if [[ ! -f ".env" ]]; then
-        log "Creating default .env file..."
+        log "Creating MCP .env configuration..."
         cat > .env << 'EOF'
-# Code-Index-MCP Configuration
+# MCP Server Configuration for Codex Development
 
 # Server Configuration
 HOST=0.0.0.0
 PORT=8000
-DEBUG=false
+DEBUG=true
 LOG_LEVEL=INFO
 
-# Security
-JWT_SECRET_KEY=your-secret-key-change-in-production
-JWT_ALGORITHM=HS256
-JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+# MCP-Specific Settings
+MCP_SERVER_NAME=codex-mcp-server
+MCP_VERSION=1.0.0
 
 # Database
 DATABASE_URL=sqlite:///./data/code_index.db
+
+# Semantic Search (Voyage AI)
+VOYAGE_AI_API_KEY=
+SEMANTIC_SEARCH_ENABLED=true
+
+# Vector Database (Qdrant)
+QDRANT_URL=http://localhost:6333
+QDRANT_COLLECTION_NAME=codebase
 
 # Cache Configuration
 REDIS_URL=redis://localhost:6379
 CACHE_TTL=3600
 
-# Features Toggle
-SEMANTIC_SEARCH_ENABLED=false
-METRICS_ENABLED=true
-SECURITY_ENABLED=true
+# Security
+JWT_SECRET_KEY=codex-dev-secret-change-in-production
+JWT_ALGORITHM=HS256
 
-# API Keys (optional)
-VOYAGE_AI_API_KEY=
-QDRANT_URL=http://localhost:6333
-
-# CORS
-CORS_ORIGINS=["http://localhost:3000", "http://localhost:8080"]
-
-# Monitoring
-PROMETHEUS_ENABLED=true
-PROMETHEUS_PORT=9090
+# CORS for development
+CORS_ORIGINS=["http://localhost:3000", "http://localhost:8080", "http://localhost:8000"]
 EOF
-        success "Created .env file"
+        success "Created MCP .env file"
     else
         log ".env file already exists"
     fi
     
-    # Create pytest configuration if it doesn't exist
+    # Create MCP-specific pytest configuration
     if [[ ! -f "pytest.ini" ]]; then
-        log "Creating pytest.ini..."
+        log "Creating MCP pytest.ini..."
         cat > pytest.ini << 'EOF'
 [tool:pytest]
 testpaths = tests
@@ -330,17 +333,15 @@ addopts =
 markers =
     unit: Unit tests
     integration: Integration tests
-    slow: Slow tests
-    benchmark: Benchmark tests
-    real_world: Real world tests
+    mcp: MCP-specific tests
     semantic: Semantic search tests
-    redis: Redis-dependent tests
-    dormant: Dormant features tests
+    vector: Vector database tests
+    slow: Slow tests
 filterwarnings =
     ignore::DeprecationWarning
     ignore::PendingDeprecationWarning
 EOF
-        success "Created pytest.ini"
+        success "Created MCP pytest.ini"
     else
         log "pytest.ini already exists"
     fi
@@ -359,38 +360,52 @@ setup_permissions() {
     success "Permissions set"
 }
 
-# Validate installation
-validate_installation() {
-    log "Validating installation..."
+# Validate MCP installation
+validate_mcp_installation() {
+    log "Validating MCP installation..."
     
-    # Test Python imports
-    log "Testing Python imports..."
+    # Test MCP imports
+    log "Testing MCP dependencies..."
     python3 -c "
 import sys
 print(f'Python version: {sys.version}')
 
-# Test core imports
+# Test MCP core imports
 try:
+    import mcp
     import fastapi
     import uvicorn
-    import watchdog
+    print('✅ MCP core dependencies imported successfully')
+except ImportError as e:
+    print(f'❌ MCP core import failed: {e}')
+    sys.exit(1)
+
+# Test semantic search imports
+try:
+    import voyageai
+    import qdrant_client
+    print('✅ Semantic search dependencies available')
+except ImportError as e:
+    print(f'⚠️  Semantic search import issue: {e}')
+
+# Test code processing imports
+try:
     import tree_sitter
     import tree_sitter_languages
     import jedi
-    print('✅ Core dependencies imported successfully')
+    print('✅ Code processing dependencies available')
 except ImportError as e:
-    print(f'❌ Core import failed: {e}')
-    sys.exit(1)
+    print(f'⚠️  Code processing import issue: {e}')
 
-# Test optional imports
-optional_imports = {
-    'redis': 'Redis support',
-    'pytest': 'Testing framework',
-    'black': 'Code formatting',
-    'mypy': 'Type checking',
+# Test other MCP dependencies
+mcp_deps = {
+    'redis': 'Redis cache support',
+    'pytest': 'MCP testing framework',
+    'jwt': 'Security (PyJWT)',
+    'passlib': 'Password security',
 }
 
-for module, description in optional_imports.items():
+for module, description in mcp_deps.items():
     try:
         __import__(module)
         print(f'✅ {description} available')
@@ -399,7 +414,7 @@ for module, description in optional_imports.items():
 "
     
     # Test project structure
-    log "Checking project structure..."
+    log "Checking MCP project structure..."
     required_dirs=("mcp_server" "tests")
     for dir in "${required_dirs[@]}"; do
         if [[ -d "$dir" ]]; then
@@ -409,100 +424,114 @@ for module, description in optional_imports.items():
         fi
     done
     
-    # Test if the project can be imported
-    log "Testing project import..."
+    # Test if MCP server can be imported
+    log "Testing MCP server import..."
     python3 -c "
 try:
     from mcp_server import gateway
-    print('✅ Project can be imported')
+    print('✅ MCP server can be imported')
 except ImportError as e:
-    print(f'⚠️  Project import issue: {e}')
+    print(f'⚠️  MCP server import issue: {e}')
 "
     
-    success "Installation validation completed"
+    success "MCP installation validation completed"
 }
 
-# Create startup script
-create_startup_script() {
-    log "Creating startup script..."
+# Create MCP startup script
+create_mcp_startup_script() {
+    log "Creating MCP startup script..."
     
-    cat > start-server.sh << 'EOF'
+    cat > start-mcp-server.sh << 'EOF'
 #!/bin/bash
-# Start the Code-Index-MCP server
+# Start the MCP server for Codex development
 
 set -euo pipefail
 
-# Check if virtual environment should be activated
-if [[ -d "venv" ]]; then
+# Check if UV virtual environment should be activated
+if [[ -d ".venv" ]]; then
+    echo "Activating UV virtual environment..."
+    source .venv/bin/activate
+elif [[ -d "venv" ]]; then
     echo "Activating virtual environment..."
     source venv/bin/activate
 fi
 
 # Load environment variables
 if [[ -f ".env" ]]; then
-    echo "Loading environment variables..."
+    echo "Loading MCP environment variables..."
     export $(grep -v '^#' .env | xargs)
 fi
 
 # Create data directory if it doesn't exist
 mkdir -p data
 
-# Start the server
-echo "Starting Code-Index-MCP server..."
+# Start the MCP server
+echo "Starting MCP server for Codex..."
 exec python3 -m uvicorn mcp_server.gateway:app \
     --host "${HOST:-0.0.0.0}" \
     --port "${PORT:-8000}" \
-    --reload
+    --reload \
+    --log-level "${LOG_LEVEL:-info}"
 EOF
     
-    chmod +x start-server.sh
-    success "Created start-server.sh"
+    chmod +x start-mcp-server.sh
+    success "Created start-mcp-server.sh"
 }
 
-# Create test runner script
-create_test_script() {
-    log "Creating test runner script..."
+# Create MCP test runner script
+create_mcp_test_script() {
+    log "Creating MCP test runner script..."
     
-    cat > run-tests.sh << 'EOF'
+    cat > run-mcp-tests.sh << 'EOF'
 #!/bin/bash
-# Run tests for Code-Index-MCP
+# Run MCP tests for Codex development
 
 set -euo pipefail
 
 # Activate virtual environment if it exists
-if [[ -d "venv" ]]; then
+if [[ -d ".venv" ]]; then
+    source .venv/bin/activate
+elif [[ -d "venv" ]]; then
     source venv/bin/activate
 fi
 
-# Default to unit tests if no argument provided
-TEST_TYPE=${1:-unit}
+# Default to MCP unit tests if no argument provided
+TEST_TYPE=${1:-mcp}
 
 case $TEST_TYPE in
-    "unit")
-        echo "Running unit tests..."
-        python3 -m pytest tests -v -m "not integration and not slow and not benchmark"
+    "mcp")
+        echo "Running MCP-specific tests..."
+        python3 -m pytest tests -v -m "mcp and not slow"
+        ;;
+    "semantic")
+        echo "Running semantic search tests..."
+        python3 -m pytest tests -v -m "semantic"
+        ;;
+    "vector")
+        echo "Running vector database tests..."
+        python3 -m pytest tests -v -m "vector"
         ;;
     "integration")
-        echo "Running integration tests..."
-        python3 -m pytest tests -v -m "integration"
+        echo "Running MCP integration tests..."
+        python3 -m pytest tests -v -m "integration and mcp"
         ;;
     "all")
-        echo "Running all tests with coverage..."
+        echo "Running all MCP tests with coverage..."
         python3 -m pytest tests -v --cov=mcp_server --cov-report=term-missing --cov-report=html
         ;;
     "quick")
-        echo "Running quick smoke tests..."
-        python3 -m pytest tests -v -k "test_" --maxfail=5 -x
+        echo "Running quick MCP smoke tests..."
+        python3 -m pytest tests -v -m "mcp" --maxfail=3 -x
         ;;
     *)
-        echo "Usage: $0 [unit|integration|all|quick]"
+        echo "Usage: $0 [mcp|semantic|vector|integration|all|quick]"
         exit 1
         ;;
 esac
 EOF
     
-    chmod +x run-tests.sh
-    success "Created run-tests.sh"
+    chmod +x run-mcp-tests.sh
+    success "Created run-mcp-tests.sh"
 }
 
 # Create maintenance script
@@ -591,41 +620,42 @@ EOF
     success "Created maintenance.sh"
 }
 
-# Main execution
+# Main execution for MCP setup
 main() {
-    log "Starting Code-Index-MCP setup..."
+    log "Starting MCP dependencies setup for Codex development..."
     
     check_privileges
     check_prerequisites
     install_system_deps
     setup_directories
-    install_python_deps
+    install_mcp_deps
     setup_tree_sitter
-    create_config_files
+    create_mcp_config
     setup_permissions
-    create_startup_script
-    create_test_script
+    create_mcp_startup_script
+    create_mcp_test_script
     create_maintenance_script
-    validate_installation
+    validate_mcp_installation
     
-    success "Setup completed successfully!"
+    success "MCP setup completed successfully!"
     
-    log "Next steps:"
-    echo "  1. Review and update .env file with your configuration"
-    echo "  2. Start the server: ./start-server.sh"
-    echo "  3. Run tests: ./run-tests.sh"
-    echo "  4. Check health: ./maintenance.sh health"
+    log "Next steps for Codex development:"
+    echo "  1. Review and update .env file with your MCP configuration"
+    echo "  2. Add your Voyage AI API key to .env for semantic search"
+    echo "  3. Start the MCP server: ./start-mcp-server.sh"
+    echo "  4. Run MCP tests: ./run-mcp-tests.sh"
+    echo "  5. Check health: ./maintenance.sh health"
     echo ""
-    log "Available scripts:"
-    echo "  - start-server.sh   : Start the MCP server"
-    echo "  - run-tests.sh      : Run test suite"
-    echo "  - maintenance.sh    : System maintenance"
+    log "Available MCP scripts:"
+    echo "  - start-mcp-server.sh : Start the MCP server for Codex"
+    echo "  - run-mcp-tests.sh    : Run MCP test suite"
+    echo "  - maintenance.sh      : System maintenance"
     echo ""
-    log "Make commands (if Makefile available):"
-    echo "  - make install      : Install dependencies"
-    echo "  - make test         : Run tests"
-    echo "  - make lint         : Run code quality checks"
-    echo "  - make help         : Show all available commands"
+    log "MCP development workflow:"
+    echo "  - ./run-mcp-tests.sh mcp       : Test MCP functionality"
+    echo "  - ./run-mcp-tests.sh semantic  : Test semantic search"
+    echo "  - ./run-mcp-tests.sh vector    : Test vector database"
+    echo "  - ./run-mcp-tests.sh all       : Full test suite with coverage"
 }
 
 # Execute main function

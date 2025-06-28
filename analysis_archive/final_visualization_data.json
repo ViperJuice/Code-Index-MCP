@@ -1,0 +1,149 @@
+{
+  "summary": {
+    "total_tests": 83,
+    "mcp_tests": 42,
+    "native_tests": 41,
+    "completion_rate": "100%",
+    "test_date": "2025-01-06"
+  },
+  "overall_performance": {
+    "mcp": {
+      "avg_time_ms": 983,
+      "avg_tokens": 2786,
+      "success_rate": 17,
+      "successful_tests": 7,
+      "failed_tests": 35
+    },
+    "native": {
+      "avg_time_ms": 1053,
+      "avg_tokens": 2544,
+      "success_rate": 90,
+      "successful_tests": 37,
+      "failed_tests": 4
+    },
+    "comparison": {
+      "speed_ratio": 1.1,
+      "token_savings": 9,
+      "success_rate_ratio": 5.3,
+      "winner": "native"
+    }
+  },
+  "by_repository": {
+    "go_gin": {
+      "tests_completed": 20,
+      "mcp": {
+        "avg_time_ms": 1060,
+        "avg_tokens": 5100,
+        "success_rate": 30,
+        "test_count": 10
+      },
+      "native": {
+        "avg_time_ms": 2497,
+        "avg_tokens": 4875,
+        "success_rate": 70,
+        "test_count": 10
+      },
+      "speed_ratio": 2.4,
+      "winner": "mcp (but 70% failures)"
+    },
+    "python_django": {
+      "tests_completed": 21,
+      "mcp": {
+        "avg_time_ms": 1425,
+        "avg_tokens": 2700,
+        "success_rate": 30,
+        "test_count": 10
+      },
+      "native": {
+        "avg_time_ms": 564,
+        "avg_tokens": 1900,
+        "success_rate": 91,
+        "test_count": 11
+      },
+      "speed_ratio": 2.5,
+      "winner": "native"
+    },
+    "javascript_react": {
+      "tests_completed": 21,
+      "mcp": {
+        "avg_time_ms": 1214,
+        "avg_tokens": 1509,
+        "success_rate": 9,
+        "test_count": 11
+      },
+      "native": {
+        "avg_time_ms": 450,
+        "avg_tokens": 2065,
+        "success_rate": 100,
+        "test_count": 10
+      },
+      "speed_ratio": 2.7,
+      "winner": "native"
+    },
+    "rust_tokio": {
+      "tests_completed": 21,
+      "mcp": {
+        "avg_time_ms": 282,
+        "avg_tokens": 2036,
+        "success_rate": 0,
+        "test_count": 11
+      },
+      "native": {
+        "avg_time_ms": 750,
+        "avg_tokens": 1400,
+        "success_rate": 100,
+        "test_count": 10
+      },
+      "speed_ratio": 2.7,
+      "winner": "native (mcp failed all)"
+    }
+  },
+  "charts": {
+    "success_rates": {
+      "type": "bar",
+      "data": {
+        "labels": ["Go", "Python", "JavaScript", "Rust", "Overall"],
+        "mcp_success": [30, 30, 9, 0, 17],
+        "native_success": [70, 91, 100, 100, 90]
+      }
+    },
+    "performance_by_language": {
+      "type": "grouped_bar",
+      "data": {
+        "labels": ["Go", "Python", "JavaScript", "Rust"],
+        "mcp_times": [1060, 1425, 1214, 282],
+        "native_times": [2497, 564, 450, 750]
+      }
+    },
+    "token_usage": {
+      "type": "grouped_bar",
+      "data": {
+        "labels": ["Go", "Python", "JavaScript", "Rust"],
+        "mcp_tokens": [5100, 2700, 1509, 2036],
+        "native_tokens": [4875, 1900, 2065, 1400]
+      }
+    },
+    "failure_analysis": {
+      "type": "stacked_bar",
+      "data": {
+        "labels": ["MCP", "Native"],
+        "successful": [7, 37],
+        "failed": [35, 4]
+      }
+    },
+    "speed_comparison": {
+      "type": "horizontal_bar",
+      "data": {
+        "labels": ["Go (MCP faster)", "Python (Native faster)", "JavaScript (Native faster)", "Rust (Native only)"],
+        "speed_advantage": [2.4, -2.5, -2.7, -100]
+      }
+    }
+  },
+  "key_insights": [
+    "Native tools have 5.3x better success rate (90% vs 17%)",
+    "MCP failed completely for Rust (0% success rate)",
+    "Native is 2.5-2.7x faster for Python and JavaScript",
+    "MCP is 2.4x faster for Go when it works (30% of the time)",
+    "83% of MCP tests failed due to tool availability issues"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "code-index-sidecar": {
+      "command": "docker",
+      "args": [
+        "exec", 
+        "-i", 
+        "mcp-sidecar",
+        "python", 
+        "/app/scripts/cli/mcp_server_cli.py"
+      ],
+      "env": {
+        "MCP_WORKSPACE_ROOT": "/workspace",
+        "VOYAGE_AI_API_KEY": "${VOYAGE_AI_API_KEY:-}",
+        "MCP_LOG_LEVEL": "${MCP_LOG_LEVEL:-INFO}"
+      }
+    }
+  }
+}

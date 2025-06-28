@@ -1,0 +1,939 @@
+{
+  "summary": {
+    "total_indexes": 47,
+    "populated_indexes": 25,
+    "total_files": 152776,
+    "total_symbols": 2242160,
+    "total_size_mb": 5412.4
+  },
+  "indexes": [
+    {
+      "repo_id": "e3acd2328eea",
+      "db_path": ".indexes/e3acd2328eea/current.db",
+      "size_mb": 468.38,
+      "file_count": 74193,
+      "symbol_count": 0,
+      "bm25_count": 74193,
+      "languages": {
+        "ts": 20647,
+        "js": 16949,
+        "symbols": 12783,
+        "types": 12777,
+        "txt": 6735,
+        "json": 1467,
+        "jsonc": 954,
+        "map": 863,
+        "baseline": 452,
+        "tsx": 331
+      },
+      "has_content": true
+    },
+    {
+      "repo_id": "48f70bd595a6",
+      "db_path": ".indexes/48f70bd595a6/current.db",
+      "size_mb": 401.87,
+      "file_count": 51531,
+      "symbol_count": 0,
+      "bm25_count": 51531,
+      "languages": {
+        "expect": 23918,
+        "dart": 23474,
+        "yaml": 749,
+        "cc": 655,
+        "h": 449,
+        "md": 339,
+        "text": 322,
+        "options": 202,
+        "json": 170,
+        "java": 144
+      },
+      "has_content": true
+    },
+    {
+      "repo_id": "d72d7e1e17d2",
+      "db_path": ".indexes/d72d7e1e17d2/current.db",
+      "size_mb": 53.57,
+      "file_count": 6369,
+      "symbol_count": 0,
+      "bm25_count": 6369,
+      "languages": {
+        "js": 3572,
+        "md": 1692,
+        "ts": 395,
+        "json": 138,
+        "tsx": 105,
+        "css": 99,
+        "html": 79,
+        "map": 68,
+        "text": 65,
+        "lock": 44
+      },
+      "has_content": true
+    },
+    {
+      "repo_id": "d8df70cdcd6e",
+      "db_path": ".indexes/d8df70cdcd6e/current.db",
+      "size_mb": 65.03,
+      "file_count": 5528,
+      "symbol_count": 0,
+      "bm25_count": 5528,
+      "languages": {
+        "py": 2834,
+        "po": 1272,
+        "txt": 673,
+        "html": 347,
+        "js": 111,
+        "json": 54,
+        "css": 46,
+        "text": 44,
+        "svg": 29,
+        "sample": 15
+      },
+      "has_content": true
+    },
+    {
+      "repo_id": "2849ba16ec30",
+      "db_path": ".indexes/2849ba16ec30/current.db",
+      "size_mb": 41.08,
+      "file_count": 4930,
+      "symbol_count": 0,
+      "bm25_count": 4930,
+      "languages": {
+        "go": 1771,
+        "tf": 1445,
+        "json": 402,
+        "hcl": 392,
+        "mdx": 323,
+        "text": 209,
+        "tfstate": 167,
+        "md": 39,
+        "yaml": 21,
+        "sh": 20
+      },
+      "has_content": true
+    },
+    {
+      "repo_id": "7d20371e6e74",
+      "db_path": ".indexes/7d20371e6e74/current.db",
+      "size_mb": 40.57,
+      "file_count": 4722,
+      "symbol_count": 0,
+      "bm25_count": 4722,
+      "languages": {
+        "rb": 3280,
+        "erb": 508,
+        "yml": 202,
+        "text": 167,
+        "tt": 154,
+        "md": 124,
+        "js": 68,
+        "html": 45,
+        "svg": 20,
+        "builder": 19
+      },
+      "has_content": true
+    },
+    {
+      "repo_id": "40fdeba5e98b",
+      "db_path": ".indexes/40fdeba5e98b/current.db",
+      "size_mb": 25.09,
+      "file_count": 2850,
+      "symbol_count": 0,
+      "bm25_count": 2850,
+      "languages": {
+        "php": 2564,
+        "stub": 85,
+        "yml": 47,
+        "json": 46,
+        "md": 45,
+        "text": 38,
+        "css": 7,
+        "js": 6,
+        "sh": 4,
+        "dist": 3
+      },
+      "has_content": true
+    },
+    {
+      "repo_id": "e8f130fe30ac",
+      "db_path": ".indexes/e8f130fe30ac/current.db",
+      "size_mb": 28.78,
+      "file_count": 555,
+      "symbol_count": 0,
+      "bm25_count": 555,
+      "languages": {
+        "html": 328,
+        "swift": 92,
+        "json": 23,
+        "text": 18,
+        "sample": 14,
+        "md": 12,
+        "xctestplan": 11,
+        "xcscheme": 10,
+        "js": 10,
+        "plist": 8
+      },
+      "has_content": true
+    },
+    {
+      "repo_id": "d6be0c062f54e636635b23a0a0a5b1b96a459704f8d7a871345be35ff16830b4",
+      "db_path": ".indexes/d6be0c062f54e636635b23a0a0a5b1b96a459704f8d7a871345be35ff16830b4/current.db",
+      "size_mb": 1539.14,
+      "file_count": 457,
+      "symbol_count": 1121080,
+      "bm25_count": 464,
+      "languages": {
+        "python": 306,
+        "html": 142,
+        "css": 3,
+        "c": 2,
+        "javascript": 2,
+        "kotlin": 1,
+        "swift": 1
+      },
+      "has_content": true
+    },
+    {
+      "repo_id": "f7b49f5d0ae0",
+      "db_path": ".indexes/f7b49f5d0ae0/current.db",
+      "size_mb": 1539.14,
+      "file_count": 457,
+      "symbol_count": 1121080,
+      "bm25_count": 464,
+      "languages": {
+        "python": 306,
+        "html": 142,
+        "css": 3,
+        "c": 2,
+        "javascript": 2,
+        "kotlin": 1,
+        "swift": 1
+      },
+      "has_content": true
+    },
+    {
+      "repo_id": "1ccf33ab5afa",
+      "db_path": ".indexes/1ccf33ab5afa/current.db",
+      "size_mb": 7.7,
+      "file_count": 409,
+      "symbol_count": 0,
+      "bm25_count": 409,
+      "languages": {
+        "pm": 150,
+        "t": 108,
+        "text": 22,
+        "ep": 15,
+        "sample": 14,
+        "txt": 13,
+        "pl": 13,
+        "pod": 10,
+        "yml": 9,
+        "js": 9
+      },
+      "has_content": true
+    },
+    {
+      "repo_id": "a91ba02537ca",
+      "db_path": ".indexes/a91ba02537ca/current.db",
+      "size_mb": 2.99,
+      "file_count": 253,
+      "symbol_count": 0,
+      "bm25_count": 253,
+      "languages": {
+        "py": 83,
+        "rst": 78,
+        "html": 20,
+        "text": 17,
+        "sample": 14,
+        "txt": 10,
+        "yaml": 6,
+        "md": 6,
+        "toml": 5,
+        "svg": 3
+      },
+      "has_content": true
+    },
+    {
+      "repo_id": "bb4442cd5cc6",
+      "db_path": ".indexes/bb4442cd5cc6/current.db",
+      "size_mb": 1.47,
+      "file_count": 242,
+      "symbol_count": 0,
+      "bm25_count": 242,
+      "languages": {
+        "js": 142,
+        "ejs": 20,
+        "text": 19,
+        "sample": 14,
+        "txt": 11,
+        "html": 8,
+        "tmpl": 7,
+        "yml": 6,
+        "md": 6,
+        "css": 4
+      },
+      "has_content": true
+    },
+    {
+      "repo_id": "2c3a11a10667",
+      "db_path": ".indexes/2c3a11a10667/current.db",
+      "size_mb": 1.55,
+      "file_count": 144,
+      "symbol_count": 0,
+      "bm25_count": 144,
+      "languages": {
+        "go": 93,
+        "text": 14,
+        "sample": 14,
+        "md": 11,
+        "yml": 6,
+        "tmpl": 2,
+        "yaml": 1,
+        "sum": 1,
+        "proto": 1,
+        "mod": 1
+      },
+      "has_content": true
+    },
+    {
+      "repo_id": "2652ff29a355",
+      "db_path": ".indexes/2652ff29a355/current.db",
+      "size_mb": 2.9,
+      "file_count": 136,
+      "symbol_count": 0,
+      "bm25_count": 136,
+      "languages": {
+        "py": 36,
+        "text": 27,
+        "rst": 16,
+        "sample": 14,
+        "md": 12,
+        "yml": 8,
+        "cnf": 4,
+        "html": 3,
+        "csr": 3,
+        "yaml": 2
+      },
+      "has_content": true
+    },
+    {
+      "repo_id": "056d6d37b1aa",
+      "db_path": ".indexes/056d6d37b1aa/current.db",
+      "size_mb": 0.27,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 0,
+      "languages": {},
+      "has_content": false
+    },
+    {
+      "repo_id": "844145265d7a",
+      "db_path": ".indexes/844145265d7a/current.db",
+      "size_mb": 0.27,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 0,
+      "languages": {},
+      "has_content": false
+    },
+    {
+      "repo_id": "e893b6cceaf1",
+      "db_path": ".indexes/e893b6cceaf1/current.db",
+      "size_mb": 315.26,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 51377,
+      "languages": {},
+      "has_content": true
+    },
+    {
+      "repo_id": "e32dcdb0072b",
+      "db_path": ".indexes/e32dcdb0072b/current.db",
+      "size_mb": 0.27,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 0,
+      "languages": {},
+      "has_content": false
+    },
+    {
+      "repo_id": "2891edb32de6",
+      "db_path": ".indexes/2891edb32de6/current.db",
+      "size_mb": 0.27,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 0,
+      "languages": {},
+      "has_content": false
+    },
+    {
+      "repo_id": "6432430f2d70",
+      "db_path": ".indexes/6432430f2d70/current.db",
+      "size_mb": 0.27,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 0,
+      "languages": {},
+      "has_content": false
+    },
+    {
+      "repo_id": "1c65ea69ba96",
+      "db_path": ".indexes/1c65ea69ba96/current.db",
+      "size_mb": 205.71,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 15544,
+      "languages": {},
+      "has_content": true
+    },
+    {
+      "repo_id": "1490e3750df5",
+      "db_path": ".indexes/1490e3750df5/current.db",
+      "size_mb": 41.01,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 6261,
+      "languages": {},
+      "has_content": true
+    },
+    {
+      "repo_id": "4b74d90cbf2f",
+      "db_path": ".indexes/4b74d90cbf2f/current.db",
+      "size_mb": 0.27,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 0,
+      "languages": {},
+      "has_content": false
+    },
+    {
+      "repo_id": "878181344d02",
+      "db_path": ".indexes/878181344d02/current.db",
+      "size_mb": 19.69,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 2405,
+      "languages": {},
+      "has_content": true
+    },
+    {
+      "repo_id": "96d34ef1438c",
+      "db_path": ".indexes/96d34ef1438c/current.db",
+      "size_mb": 1.16,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 112,
+      "languages": {},
+      "has_content": true
+    },
+    {
+      "repo_id": "1472d55c5d37",
+      "db_path": ".indexes/1472d55c5d37/current.db",
+      "size_mb": 0.27,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 0,
+      "languages": {},
+      "has_content": false
+    },
+    {
+      "repo_id": "1f1a1152467f",
+      "db_path": ".indexes/1f1a1152467f/current.db",
+      "size_mb": 22.55,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 1629,
+      "languages": {},
+      "has_content": true
+    },
+    {
+      "repo_id": "ad57499b3702",
+      "db_path": ".indexes/ad57499b3702/current.db",
+      "size_mb": 0.27,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 0,
+      "languages": {},
+      "has_content": false
+    },
+    {
+      "repo_id": "c50456acc196",
+      "db_path": ".indexes/c50456acc196/current.db",
+      "size_mb": 0.27,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 0,
+      "languages": {},
+      "has_content": false
+    },
+    {
+      "repo_id": "946b1bd983bf",
+      "db_path": ".indexes/946b1bd983bf/current.db",
+      "size_mb": 377.81,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 74128,
+      "languages": {},
+      "has_content": true
+    },
+    {
+      "repo_id": "369861870b55",
+      "db_path": ".indexes/369861870b55/current.db",
+      "size_mb": 0.27,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 0,
+      "languages": {},
+      "has_content": false
+    },
+    {
+      "repo_id": "923f597756ef",
+      "db_path": ".indexes/923f597756ef/current.db",
+      "size_mb": 0.27,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 0,
+      "languages": {},
+      "has_content": false
+    },
+    {
+      "repo_id": "e0fe77a49f46",
+      "db_path": ".indexes/e0fe77a49f46/current.db",
+      "size_mb": 23.85,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 513,
+      "languages": {},
+      "has_content": true
+    },
+    {
+      "repo_id": "91b3392fcf46",
+      "db_path": ".indexes/91b3392fcf46/current.db",
+      "size_mb": 0.27,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 0,
+      "languages": {},
+      "has_content": false
+    },
+    {
+      "repo_id": "953c59d30915",
+      "db_path": ".indexes/953c59d30915/current.db",
+      "size_mb": 0.27,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 0,
+      "languages": {},
+      "has_content": false
+    },
+    {
+      "repo_id": "1d472673edce",
+      "db_path": ".indexes/1d472673edce/current.db",
+      "size_mb": 122.75,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 0,
+      "languages": {},
+      "has_content": false
+    },
+    {
+      "repo_id": "10eb7fa8d76e",
+      "db_path": ".indexes/10eb7fa8d76e/current.db",
+      "size_mb": 0.27,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 0,
+      "languages": {},
+      "has_content": false
+    },
+    {
+      "repo_id": "ae65dcd8c207",
+      "db_path": ".indexes/ae65dcd8c207/current.db",
+      "size_mb": 7.49,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 759,
+      "languages": {},
+      "has_content": true
+    },
+    {
+      "repo_id": "82a17fe7580c",
+      "db_path": ".indexes/82a17fe7580c/current.db",
+      "size_mb": 0.27,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 0,
+      "languages": {},
+      "has_content": false
+    },
+    {
+      "repo_id": "a5ba025580fa",
+      "db_path": ".indexes/a5ba025580fa/current.db",
+      "size_mb": 0.27,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 0,
+      "languages": {},
+      "has_content": false
+    },
+    {
+      "repo_id": "dc5322986285",
+      "db_path": ".indexes/dc5322986285/current.db",
+      "size_mb": 0.27,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 0,
+      "languages": {},
+      "has_content": false
+    },
+    {
+      "repo_id": "70eef8290481",
+      "db_path": ".indexes/70eef8290481/current.db",
+      "size_mb": 0.27,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 0,
+      "languages": {},
+      "has_content": false
+    },
+    {
+      "repo_id": "a91d738376a3",
+      "db_path": ".indexes/a91d738376a3/current.db",
+      "size_mb": 0.27,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 0,
+      "languages": {},
+      "has_content": false
+    },
+    {
+      "repo_id": "c9891acfa824",
+      "db_path": ".indexes/c9891acfa824/current.db",
+      "size_mb": 50.23,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 5497,
+      "languages": {},
+      "has_content": true
+    },
+    {
+      "repo_id": "01a11448c6e6",
+      "db_path": ".indexes/01a11448c6e6/current.db",
+      "size_mb": 0.27,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 0,
+      "languages": {},
+      "has_content": false
+    },
+    {
+      "repo_id": "b3fc8cfc27a6",
+      "db_path": ".indexes/b3fc8cfc27a6/current.db",
+      "size_mb": 0.27,
+      "file_count": 0,
+      "symbol_count": 0,
+      "bm25_count": 0,
+      "languages": {},
+      "has_content": false
+    }
+  ],
+  "sql_tests": [
+    {
+      "repo_id": "e3acd2328eea",
+      "db_path": ".indexes/e3acd2328eea/current.db",
+      "queries": [
+        {
+          "description": "Service classes",
+          "query": "SELECT * FROM symbols WHERE name LIKE '%Service%' LIMIT 5",
+          "error": "no such table: symbols"
+        },
+        {
+          "description": "Functions",
+          "query": "SELECT * FROM symbols WHERE kind = 'function' LIMIT 5",
+          "error": "no such table: symbols"
+        },
+        {
+          "description": "BM25 'def'",
+          "query": "SELECT filepath, snippet(bm25_content, -1, '<<', '>>', '...', 10) FROM bm25_content WHERE bm25_content MATCH 'def' LIMIT 5",
+          "result_count": 5,
+          "sample": [
+            [
+              "/workspaces/Code-Index-MCP/test_repos/web/typescript/TypeScript/tests/lib/lib.d.ts",
+              "...NodeListOf<HTMLDDElement>;\n    getElementsByTagName(tagname: \"<<defs>>\"): NodeListOf<SVGDefsElement>;\n    getElementsByTagName(tagname: \"del..."
+            ],
+            [
+              "/workspaces/Code-Index-MCP/test_repos/web/typescript/TypeScript/tests/lib/react16.d.ts",
+              "...SVGFactory;\n            <<defs>>: SVGFactory;\n            desc: SVGFactory;\n            ellipse: SVGFactory;\n            feBlend: SVGFactory;\n            feColorMatrix..."
+            ]
+          ]
+        },
+        {
+          "description": "BM25 'class'",
+          "query": "SELECT filepath, snippet(bm25_content, -1, '<<', '>>', '...', 10) FROM bm25_content WHERE bm25_content MATCH 'class' LIMIT 5",
+          "result_count": 5,
+          "sample": [
+            [
+              "/workspaces/Code-Index-MCP/test_repos/web/typescript/TypeScript/CONTRIBUTING.md",
+              "...with type aliases or <<classes>>.\n * Search for the title of..."
+            ],
+            [
+              "/workspaces/Code-Index-MCP/test_repos/web/typescript/TypeScript/eslint.config.mjs",
+              "...comment\": \"off\",\n            \"@typescript-eslint/<<class>>-literal-property-style\": \"off\",\n            \"@typescript..."
+            ]
+          ]
+        },
+        {
+          "description": "Languages",
+          "query": "SELECT DISTINCT language FROM files WHERE language IS NOT NULL LIMIT 10",
+          "result_count": 10,
+          "sample": [
+            [
+              "json"
+            ],
+            [
+              "text"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "repo_id": "48f70bd595a6",
+      "db_path": ".indexes/48f70bd595a6/current.db",
+      "queries": [
+        {
+          "description": "Service classes",
+          "query": "SELECT * FROM symbols WHERE name LIKE '%Service%' LIMIT 5",
+          "error": "no such table: symbols"
+        },
+        {
+          "description": "Functions",
+          "query": "SELECT * FROM symbols WHERE kind = 'function' LIMIT 5",
+          "error": "no such table: symbols"
+        },
+        {
+          "description": "BM25 'def'",
+          "query": "SELECT filepath, snippet(bm25_content, -1, '<<', '>>', '...', 10) FROM bm25_content WHERE bm25_content MATCH 'def' LIMIT 5",
+          "result_count": 5,
+          "sample": [
+            [
+              "/workspaces/Code-Index-MCP/test_repos/modern/dart/sdk/PRESUBMIT.py",
+              "...return path.endswith('.cc') or path.endswith('.h')\n\n\n<<def>> is..."
+            ],
+            [
+              "/workspaces/Code-Index-MCP/test_repos/modern/dart/sdk/DEPS",
+              "...test_scripts/gen_build_<<defs>>.py',\n    ],\n    'condition': 'download_fuchsia_deps'\n  },\n]\n"
+            ]
+          ]
+        },
+        {
+          "description": "BM25 'class'",
+          "query": "SELECT filepath, snippet(bm25_content, -1, '<<', '>>', '...', 10) FROM bm25_content WHERE bm25_content MATCH 'class' LIMIT 5",
+          "result_count": 5,
+          "sample": [
+            [
+              "/workspaces/Code-Index-MCP/test_repos/modern/dart/sdk/CHANGELOG.md",
+              "...For example:\n\n  ```dart\n  <<class>> A {\n    int? get _field;\n  }\n  <<class>> B..."
+            ],
+            [
+              "/workspaces/Code-Index-MCP/test_repos/modern/dart/sdk/build/gn_helpers.py",
+              "...script function.\"\"\"\n\n\nimport sys\n\n\n<<class>> GNException(Exception):\n    pass\n\n\n# Computes ASCII..."
+            ]
+          ]
+        },
+        {
+          "description": "Languages",
+          "query": "SELECT DISTINCT language FROM files WHERE language IS NOT NULL LIMIT 10",
+          "result_count": 10,
+          "sample": [
+            [
+              "gni"
+            ],
+            [
+              "text"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "repo_id": "d72d7e1e17d2",
+      "db_path": ".indexes/d72d7e1e17d2/current.db",
+      "queries": [
+        {
+          "description": "Service classes",
+          "query": "SELECT * FROM symbols WHERE name LIKE '%Service%' LIMIT 5",
+          "error": "no such table: symbols"
+        },
+        {
+          "description": "Functions",
+          "query": "SELECT * FROM symbols WHERE kind = 'function' LIMIT 5",
+          "error": "no such table: symbols"
+        },
+        {
+          "description": "BM25 'def'",
+          "query": "SELECT filepath, snippet(bm25_content, -1, '<<', '>>', '...', 10) FROM bm25_content WHERE bm25_content MATCH 'def' LIMIT 5",
+          "result_count": 5,
+          "sample": [
+            [
+              "/workspaces/Code-Index-MCP/test_repos/web/javascript/react/CHANGELOG.md",
+              "...support for SVG tags `<<defs>>`, `linearGradient`, `polygon`, `radialGradient`, `stop`\n- Added..."
+            ],
+            [
+              "/workspaces/Code-Index-MCP/test_repos/web/javascript/react/compiler/CHANGELOG.md",
+              "...com/mofeiZ)\n* Generate ts <<defs>> [#31994](https://github.com/facebook..."
+            ]
+          ]
+        },
+        {
+          "description": "BM25 'class'",
+          "query": "SELECT filepath, snippet(bm25_content, -1, '<<', '>>', '...', 10) FROM bm25_content WHERE bm25_content MATCH 'class' LIMIT 5",
+          "result_count": 5,
+          "sample": [
+            [
+              "/workspaces/Code-Index-MCP/test_repos/web/javascript/react/.eslintrc.js",
+              "...WARNING,\n    'no-empty-character-<<class>>': WARNING,\n    'no-empty': OFF,\n    'no..."
+            ],
+            [
+              "/workspaces/Code-Index-MCP/test_repos/web/javascript/react/yarn.lock",
+              "...cache-base \"^1.0.1\"\n    <<class>>-utils \"^0.3.5..."
+            ]
+          ]
+        },
+        {
+          "description": "Languages",
+          "query": "SELECT DISTINCT language FROM files WHERE language IS NOT NULL LIMIT 10",
+          "result_count": 10,
+          "sample": [
+            [
+              "js"
+            ],
+            [
+              "text"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "repo_id": "d8df70cdcd6e",
+      "db_path": ".indexes/d8df70cdcd6e/current.db",
+      "queries": [
+        {
+          "description": "Service classes",
+          "query": "SELECT * FROM symbols WHERE name LIKE '%Service%' LIMIT 5",
+          "error": "no such table: symbols"
+        },
+        {
+          "description": "Functions",
+          "query": "SELECT * FROM symbols WHERE kind = 'function' LIMIT 5",
+          "error": "no such table: symbols"
+        },
+        {
+          "description": "BM25 'def'",
+          "query": "SELECT filepath, snippet(bm25_content, -1, '<<', '>>', '...', 10) FROM bm25_content WHERE bm25_content MATCH 'def' LIMIT 5",
+          "result_count": 5,
+          "sample": [
+            [
+              "/workspaces/Code-Index-MCP/test_repos/web/python/django/scripts/manage_translations.py",
+              "...name = f\"contrib-{name}\"\n    return name\n\n\n<<def>> _tx_resource_for..."
+            ],
+            [
+              "/workspaces/Code-Index-MCP/test_repos/web/python/django/tests/runtests.py",
+              "...test_module = dirname + \".\" + test_module\n                yield test_module\n\n\n<<def>> get..."
+            ]
+          ]
+        },
+        {
+          "description": "BM25 'class'",
+          "query": "SELECT filepath, snippet(bm25_content, -1, '<<', '>>', '...', 10) FROM bm25_content WHERE bm25_content MATCH 'class' LIMIT 5",
+          "result_count": 5,
+          "sample": [
+            [
+              "/workspaces/Code-Index-MCP/test_repos/web/python/django/tests/runtests.py",
+              "...Model <<class>> X doesn't declare an explicit app_label..."
+            ],
+            [
+              "/workspaces/Code-Index-MCP/test_repos/web/python/django/js_tests/tests.html",
+              "...<<class>>=\"button\" name=\"index\" value=\"0\">Go</button>\n            <span <<class>>..."
+            ]
+          ]
+        },
+        {
+          "description": "Languages",
+          "query": "SELECT DISTINCT language FROM files WHERE language IS NOT NULL LIMIT 10",
+          "result_count": 10,
+          "sample": [
+            [
+              "text"
+            ],
+            [
+              "python"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "repo_id": "2849ba16ec30",
+      "db_path": ".indexes/2849ba16ec30/current.db",
+      "queries": [
+        {
+          "description": "Service classes",
+          "query": "SELECT * FROM symbols WHERE name LIKE '%Service%' LIMIT 5",
+          "error": "no such table: symbols"
+        },
+        {
+          "description": "Functions",
+          "query": "SELECT * FROM symbols WHERE kind = 'function' LIMIT 5",
+          "error": "no such table: symbols"
+        },
+        {
+          "description": "BM25 'def'",
+          "query": "SELECT filepath, snippet(bm25_content, -1, '<<', '>>', '...', 10) FROM bm25_content WHERE bm25_content MATCH 'def' LIMIT 5",
+          "result_count": 5,
+          "sample": [
+            [
+              "/workspaces/Code-Index-MCP/test_repos/modern/go/terraform/website/docs/language/functions/matchkeys.mdx",
+              "...i if z == \"us-east\"]\n[\n  \"i-<<def>>\",\n  \"i-abc\",\n]\n```\n\nIf..."
+            ],
+            [
+              "/workspaces/Code-Index-MCP/test_repos/modern/go/terraform/internal/configs/query_file.go",
+              "...<<defs>>, defsDiags := decodeLocalsBlock(block)\n\t\t\tdiags = append(diags, defsDiags...)\n\t\t\tfile.Locals..."
+            ]
+          ]
+        },
+        {
+          "description": "BM25 'class'",
+          "query": "SELECT filepath, snippet(bm25_content, -1, '<<', '>>', '...', 10) FROM bm25_content WHERE bm25_content MATCH 'class' LIMIT 5",
+          "result_count": 5,
+          "sample": [
+            [
+              "/workspaces/Code-Index-MCP/test_repos/modern/go/terraform/docs/unicode.md",
+              "...Start\" and \"ID_Continue\" <<classes>>.\n\nSince Terraform is the primary..."
+            ],
+            [
+              "/workspaces/Code-Index-MCP/test_repos/modern/go/terraform/website/docs/language/functions/list.mdx",
+              "...introduced a new first-<<class>> syntax.\n\nTo update an expression..."
+            ]
+          ]
+        },
+        {
+          "description": "Languages",
+          "query": "SELECT DISTINCT language FROM files WHERE language IS NOT NULL LIMIT 10",
+          "result_count": 10,
+          "sample": [
+            [
+              "go"
+            ],
+            [
+              "Dockerfile"
+            ]
+          ]
+        }
+      ]
+    }
+  ],
+  "semantic_tests": [],
+  "errors": []
+}

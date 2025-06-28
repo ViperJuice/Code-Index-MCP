@@ -1,0 +1,138 @@
+{
+  "timestamp": "2025-06-27T17:11:22.787348",
+  "sql_indexes": {
+    "count": 16,
+    "total_documents": 155148,
+    "repositories": {
+      "d8df70cdcd6e": {
+        "documents": 5528,
+        "repo": "django",
+        "db_path": ".indexes/d8df70cdcd6e/code_index.db"
+      },
+      "a91ba02537ca": {
+        "documents": 253,
+        "repo": "flask",
+        "db_path": ".indexes/a91ba02537ca/code_index.db"
+      },
+      "bb4442cd5cc6": {
+        "documents": 242,
+        "repo": "unknown",
+        "db_path": ".indexes/bb4442cd5cc6/code_index.db"
+      },
+      "48f70bd595a6": {
+        "documents": 51531,
+        "repo": "unknown",
+        "db_path": ".indexes/48f70bd595a6/code_index.db"
+      },
+      "e8f130fe30ac": {
+        "documents": 555,
+        "repo": "unknown",
+        "db_path": ".indexes/e8f130fe30ac/code_index.db"
+      },
+      "7d20371e6e74": {
+        "documents": 4722,
+        "repo": "unknown",
+        "db_path": ".indexes/7d20371e6e74/code_index.db"
+      },
+      "2c3a11a10667": {
+        "documents": 144,
+        "repo": "gin",
+        "db_path": ".indexes/2c3a11a10667/code_index.db"
+      },
+      "1ccf33ab5afa": {
+        "documents": 409,
+        "repo": "unknown",
+        "db_path": ".indexes/1ccf33ab5afa/code_index.db"
+      },
+      "2849ba16ec30": {
+        "documents": 4930,
+        "repo": "unknown",
+        "db_path": ".indexes/2849ba16ec30/code_index.db"
+      },
+      "e3acd2328eea": {
+        "documents": 74193,
+        "repo": "typescript",
+        "db_path": ".indexes/e3acd2328eea/code_index.db"
+      },
+      "d17b557e0b1a": {
+        "documents": 2500,
+        "repo": "unknown",
+        "db_path": ".indexes/d17b557e0b1a/code_index.db"
+      },
+      "40fdeba5e98b": {
+        "documents": 2850,
+        "repo": "unknown",
+        "db_path": ".indexes/40fdeba5e98b/code_index.db"
+      },
+      "2652ff29a355": {
+        "documents": 136,
+        "repo": "unknown",
+        "db_path": ".indexes/2652ff29a355/code_index.db"
+      },
+      "d72d7e1e17d2": {
+        "documents": 6369,
+        "repo": "react",
+        "db_path": ".indexes/d72d7e1e17d2/code_index.db"
+      },
+      "1100a4090b09": {
+        "documents": 464,
+        "repo": "unknown",
+        "db_path": ".indexes/1100a4090b09/bm25_index.db"
+      },
+      "08b3c2edf691": {
+        "documents": 322,
+        "repo": "unknown",
+        "db_path": ".indexes/08b3c2edf691/main_f48abb0.db"
+      }
+    }
+  },
+  "semantic_indexes": {
+    "count": 9,
+    "total_embeddings": 35956,
+    "collections": {
+      "typescript-139683137821808": {
+        "points": 10903,
+        "vectors_config": 1024
+      },
+      "typescript-140048533062240": {
+        "points": 4216,
+        "vectors_config": 1024
+      },
+      "typescript-139842917360864": {
+        "points": 3327,
+        "vectors_config": 1024
+      },
+      "typescript-139629772345744": {
+        "points": 156,
+        "vectors_config": 1024
+      },
+      "code-embeddings": {
+        "points": 495,
+        "vectors_config": 1024
+      },
+      "go_gin": {
+        "points": 416,
+        "vectors_config": 1024
+      },
+      "c_phoenix": {
+        "points": 604,
+        "vectors_config": 1024
+      },
+      "c_redis": {
+        "points": 11920,
+        "vectors_config": 1024
+      },
+      "cpp_grpc": {
+        "points": 3919,
+        "vectors_config": 1024
+      }
+    }
+  },
+  "summary": {
+    "total_repos": 29,
+    "sql_indexed": 5,
+    "semantic_indexed": 4,
+    "missing_sql": 25,
+    "missing_semantic": 25
+  }
+}

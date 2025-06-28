@@ -1,0 +1,61 @@
+--- a/mcp_server/utils/semantic_indexer.py
++++ b/mcp_server/utils/semantic_indexer.py
+@@ -75,17 +75,46 @@ class SemanticIndexer:
+         self.metadata_file = ".index_metadata.json"
+         self.path_resolver = path_resolver or PathResolver()
+ 
+-        # Support both memory and HTTP URLs
+-        if qdrant_path.startswith("http"):
+-            # For HTTP URLs, parse properly
+-            self.qdrant = QdrantClient(url=qdrant_path)
+-        elif qdrant_path == ":memory:":
+-            # Memory mode
+-            self.qdrant = QdrantClient(location=":memory:")
+-        else:
+-            # Local file path - use path parameter to avoid IDNA issues
+-            self.qdrant = QdrantClient(path=qdrant_path)
++        # Initialize Qdrant client with server mode preference
++        self.qdrant = self._init_qdrant_client(qdrant_path)
+         self.wrapper = TreeSitterWrapper()
++        
++    def _init_qdrant_client(self, qdrant_path: str) -> QdrantClient:
++        """Initialize Qdrant client with server mode preference."""
++        # First, try server mode (recommended for concurrent access)
++        server_url = os.environ.get("QDRANT_URL", "http://localhost:6333")
++        
++        if os.environ.get("QDRANT_USE_SERVER", "true").lower() == "true":
++            try:
++                # Try connecting to Qdrant server
++                client = QdrantClient(url=server_url, timeout=5)
++                # Test connection
++                client.get_collections()
++                logger.info(f"Connected to Qdrant server at {server_url}")
++                return client
++            except Exception as e:
++                logger.warning(f"Qdrant server not available at {server_url}: {e}")
++        
++        # Support explicit HTTP URLs
++        if qdrant_path.startswith("http"):
++            return QdrantClient(url=qdrant_path)
++        
++        # Memory mode
++        if qdrant_path == ":memory:":
++            return QdrantClient(location=":memory:")
++        
++        # Local file path with lock cleanup
++        try:
++            # Clean up any stale locks
++            lock_file = Path(qdrant_path) / ".lock"
++            if lock_file.exists():
++                logger.warning(f"Removing stale Qdrant lock file: {lock_file}")
++                lock_file.unlink()
++            
++            client = QdrantClient(path=qdrant_path)
++            logger.info(f"Using file-based Qdrant at {qdrant_path}")
++            return client
++        except Exception as e:
++            logger.error(f"Failed to initialize Qdrant: {e}")
++            raise
+ 
+         # Initialize Voyage AI client with proper API key handling
+         api_key = os.environ.get("VOYAGE_API_KEY") or os.environ.get(

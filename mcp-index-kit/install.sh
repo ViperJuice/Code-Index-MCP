@@ -63,6 +63,7 @@ create_config() {
   "version": "1.0",
   "enabled": true,
   "auto_download": true,
+  "auto_upload": true,
   "index_location": ".mcp-index/",
   "artifact_retention_days": 30,
   "ignore_file": ".mcp-index-ignore",
@@ -371,6 +372,30 @@ main() {
         echo ".mcp-index/code_index.db" >> .gitignore
         echo ".mcp-index/.index_metadata.json" >> .gitignore
         print_info "Updated .gitignore"
+    fi
+    
+    # Offer to install git hooks
+    echo
+    read -p "Would you like to install git hooks for automatic index sync? [Y/n] " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+        # Find the hooks installer
+        HOOKS_INSTALLER=""
+        if [ -f "$(dirname "$0")/hooks/install-hooks.sh" ]; then
+            HOOKS_INSTALLER="$(dirname "$0")/hooks/install-hooks.sh"
+        elif [ -f "/usr/local/share/mcp-index-kit/hooks/install-hooks.sh" ]; then
+            HOOKS_INSTALLER="/usr/local/share/mcp-index-kit/hooks/install-hooks.sh"
+        fi
+        
+        if [ -n "$HOOKS_INSTALLER" ] && [ -f "$HOOKS_INSTALLER" ]; then
+            bash "$HOOKS_INSTALLER"
+        else
+            print_warning "Git hooks installer not found. You can install them later with:"
+            echo "  mcp-index hooks install"
+        fi
+    else
+        print_info "Skipping git hooks installation"
+        echo "You can install them later with: mcp-index hooks install"
     fi
     
     print_success "Installation complete!"

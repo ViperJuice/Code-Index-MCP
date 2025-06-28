@@ -1,0 +1,100 @@
+
+======================================================================
+PERFORMANCE TEST SUMMARY REPORT
+======================================================================
+Total tests completed: 11
+Generated at: 2025-06-24 21:57:47
+
+
+GO_GIN Repository
+--------------------------------------------------
+
+MCP Mode (4 tests):
+  Average time: 1838ms
+  Average tokens: 9625
+  Success rate: 50.0%
+
+Native Mode (3 tests):
+  Average time: 5667ms
+  Average tokens: 3633
+  Success rate: 0.0%
+
+Detailed Results:
+  [✓] go_gin_0_mcp: Find the definition of class Server
+      Time: 3500ms, Tokens: 8500
+  [✗] go_gin_0_native: Find the definition of class Server
+      Time: 12000ms, Tokens: 3500
+      Error: No 'Server' type/class found in Gin framework. The main type is 'Engine' defined in gin.go
+  [✗] go_gin_1_mcp: Where is function HandleRequest implemented?
+      Time: 1500ms, Tokens: 15000
+      Error: Function HandleRequest not found in go_gin repository. Search results returned matches from other repositories but none specifically from go_gin.
+  [✗] go_gin_1_native: Where is function HandleRequest implemented?
+      Time: 2500ms, Tokens: 4200
+      Error: Function HandleRequest not found in the gin repository
+  [✓] go_gin_2_mcp: Search for TODO comments
+      Time: 850ms, Tokens: 12500
+  [✗] go_gin_2_native: Search for TODO comments
+      Time: 2500ms, Tokens: 3200
+      Error: No source code files found in the directory - only index database files present
+  [✗] go_gin_3_mcp: Find all FIXME or BUG comments
+      Time: 1500ms, Tokens: 2500
+      Error: No results found in go_gin repository despite finding FIXME/BUG comments in other repositories
+
+
+JAVASCRIPT_REACT Repository
+--------------------------------------------------
+
+MCP Mode (1 tests):
+  Average time: 3500ms
+  Average tokens: 8500
+  Success rate: 0.0%
+
+Native Mode (0 tests):
+  Average time: 0ms
+  Average tokens: 0
+  Success rate: 0.0%
+
+Detailed Results:
+  [✗] javascript_react_0_mcp: Find the definition of class Component
+      Time: 3500ms, Tokens: 8500
+      Error: Could not find React Component class definition in javascript_react repository. Results returned were from other repositories (C#, PHP) instead of the targeted JavaScript/React repository.
+
+
+PYTHON_DJANGO Repository
+--------------------------------------------------
+
+MCP Mode (1 tests):
+  Average time: 3500ms
+  Average tokens: 2800
+  Success rate: 100.0%
+
+Native Mode (1 tests):
+  Average time: 250ms
+  Average tokens: 150
+  Success rate: 0.0%
+
+Detailed Results:
+  [✓] python_django_0_mcp: Find the definition of class BaseHandler
+      Time: 3500ms, Tokens: 2800
+  [✗] python_django_0_native: Find the definition of class BaseHandler
+      Time: 250ms, Tokens: 150
+      Error: No Python source files found in the specified directory. Only database index files are present.
+
+
+RUST_TOKIO Repository
+--------------------------------------------------
+
+MCP Mode (1 tests):
+  Average time: 1500ms
+  Average tokens: 18000
+  Success rate: 0.0%
+
+Native Mode (0 tests):
+  Average time: 0ms
+  Average tokens: 0
+  Success rate: 0.0%
+
+Detailed Results:
+  [✗] rust_tokio_0_mcp: Find the definition of class Server
+      Time: 1500ms, Tokens: 18000
+      Error: No Server struct/class definition found in rust_tokio repository. The search results showed matches from other repositories but not from rust_tokio specifically.

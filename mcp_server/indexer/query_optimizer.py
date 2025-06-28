@@ -4,8 +4,10 @@ from enum import Enum
 from dataclasses import dataclass
 from typing import List, Optional
 
+
 class QueryType(Enum):
     """Types of search queries."""
+
     EXACT = "exact"
     PHRASE = "phrase"
     FUZZY = "fuzzy"
@@ -14,9 +16,11 @@ class QueryType(Enum):
     WILDCARD = "wildcard"
     REGEX = "regex"
 
+
 @dataclass
 class Query:
     """Represents a parsed search query."""
+
     raw_query: str
     query_type: QueryType
     terms: List[str]

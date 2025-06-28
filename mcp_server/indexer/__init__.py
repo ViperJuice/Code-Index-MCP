@@ -6,28 +6,24 @@ for efficiently indexing and searching code repositories.
 """
 
 from .index_engine import (
-    IndexEngine, 
-    IndexResult, 
-    BatchIndexResult, 
-    IndexOptions, 
+    IndexEngine,
+    IndexResult,
+    BatchIndexResult,
+    IndexOptions,
     IndexProgress,
-    IndexTask
+    IndexTask,
 )
-from .query_optimizer import (
-    Query,
-    QueryType
-)
+from .query_optimizer import Query, QueryType
 
 __all__ = [
     # Index Engine
-    'IndexEngine',
-    'IndexResult', 
-    'BatchIndexResult',
-    'IndexOptions',
-    'IndexProgress',
-    'IndexTask',
-    
+    "IndexEngine",
+    "IndexResult",
+    "BatchIndexResult",
+    "IndexOptions",
+    "IndexProgress",
+    "IndexTask",
     # Query Optimizer
-    'Query',
-    'QueryType'
+    "Query",
+    "QueryType",
 ]

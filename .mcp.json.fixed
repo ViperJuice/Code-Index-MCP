@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "code-index-mcp": {
+      "command": "bash",
+      "args": ["-c", "python /workspaces/Code-Index-MCP/scripts/cli/mcp_server_cli.py 2>/tmp/mcp_debug.log || echo '{\"error\": \"MCP server failed to start\"}'"],
+      "cwd": "/workspaces/Code-Index-MCP",
+      "env": {
+        "PYTHONPATH": "/workspaces/Code-Index-MCP",
+        "MCP_WORKSPACE_ROOT": "/workspaces/Code-Index-MCP",
+        "MCP_INDEX_STORAGE_PATH": "~/.mcp/indexes",
+        "MCP_DEBUG": "1"
+      }
+    }
+  }
+}

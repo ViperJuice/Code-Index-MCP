@@ -15,7 +15,7 @@ from typing import Dict, List, Any, Set, Tuple
 @pytest.mark.cross_language
 class TestCrossLanguageResolution:
     """Test cross-language symbol resolution capabilities."""
-    
+
     @pytest.fixture
     def setup_multi_language_project(self):
         """Setup multi-language test project with various file types."""
@@ -24,26 +24,26 @@ class TestCrossLanguageResolution:
             from mcp_server.storage.sqlite_store import SQLiteStore
         except ImportError:
             pytest.skip("Plugin system components not available")
-        
+
         # Create temporary database
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as db_file:
             store = SQLiteStore(db_file.name)
             plugin_manager = PluginManager(sqlite_store=store)
-            
+
             # Load all available plugins
             load_result = plugin_manager.load_plugins_safe()
             if not load_result.success:
                 pytest.skip(f"Failed to load plugins: {load_result.error.message}")
-            
+
             # Create test files in multiple languages
             test_files = self._create_multi_language_files()
-            
+
             yield {
                 "plugin_manager": plugin_manager,
                 "store": store,
-                "test_files": test_files
+                "test_files": test_files,
             }
-            
+
             # Cleanup
             self._cleanup_test_files(test_files)
             try:
@@ -54,7 +54,7 @@ class TestCrossLanguageResolution:
     def _create_multi_language_files(self) -> Dict[str, Path]:
         """Create test files in multiple programming languages."""
         test_files = {}
-        
+
         # Python file
         python_code = '''
 """Python API client module."""
@@ -95,9 +95,9 @@ DEFAULT_CONFIG = {
     "enable_logging": True
 }
 '''
-        
+
         # JavaScript file
-        javascript_code = '''
+        javascript_code = """
 /**
  * JavaScript frontend client for API communication.
  */
@@ -175,10 +175,10 @@ function processConfigData(configData) {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { ApiClient, processConfigData };
 }
-'''
-        
+"""
+
         # C header file
-        c_header_code = '''
+        c_header_code = """
 /**
  * C API client header file.
  * Provides C interface for API communication.
@@ -241,10 +241,10 @@ const char* api_client_get_last_error(APIClient* client);
 #define DEFAULT_RETRY_ATTEMPTS 3
 
 #endif // API_CLIENT_H
-'''
-        
+"""
+
         # C implementation file
-        c_impl_code = '''
+        c_impl_code = """
 /**
  * C API client implementation.
  */
@@ -394,10 +394,10 @@ Config* config_load_from_file(const char* config_path) {
     fclose(file);
     return config;
 }
-'''
-        
+"""
+
         # JSON configuration file
-        json_config = '''
+        json_config = """
 {
     "api": {
         "base_url": "https://api.example.com",
@@ -421,10 +421,10 @@ Config* config_load_from_file(const char* config_path) {
         "enable_authentication": true
     }
 }
-'''
-        
+"""
+
         # YAML configuration file
-        yaml_config = '''
+        yaml_config = """
 api:
   base_url: "https://api.example.com"
   timeout: 30
@@ -450,8 +450,8 @@ database:
   port: 5432
   name: "api_db"
   user: "api_user"
-'''
-        
+"""
+
         # Create temporary files
         file_contents = {
             "api_client.py": python_code,
@@ -459,9 +459,9 @@ database:
             "api_client.h": c_header_code,
             "api_client.c": c_impl_code,
             "config.json": json_config,
-            "config.yaml": yaml_config
+            "config.yaml": yaml_config,
         }
-        
+
         for filename, content in file_contents.items():
             with tempfile.NamedTemporaryFile(
                 suffix=f"_{filename}", mode="w", delete=False, encoding="utf-8"
@@ -469,7 +469,7 @@ database:
                 f.write(content)
                 f.flush()
                 test_files[filename] = Path(f.name)
-        
+
         return test_files
 
     def _cleanup_test_files(self, test_files: Dict[str, Path]):
@@ -485,162 +485,183 @@ database:
         project_data = setup_multi_language_project
         plugin_manager = project_data["plugin_manager"]
         test_files = project_data["test_files"]
-        
+
         # Index files from different languages
         language_files = {
             "python": ["api_client.py"],
             "javascript": ["api_client.js"],
             "c": ["api_client.h", "api_client.c"],
             "json": ["config.json"],
-            "yaml": ["config.yaml"]
+            "yaml": ["config.yaml"],
         }
-        
+
         indexed_by_language = {}
         symbols_by_language = {}
-        
+
         for language, filenames in language_files.items():
             indexed_count = 0
             total_symbols = 0
-            
+
             for filename in filenames:
                 if filename not in test_files:
                     continue
-                    
+
                 file_path = test_files[filename]
-                
+
                 try:
                     # Find plugin that supports this file
                     supporting_plugin = None
-                    for plugin_name, plugin_instance in plugin_manager.get_active_plugins().items():
-                        if hasattr(plugin_instance, 'supports') and plugin_instance.supports(file_path):
+                    for (
+                        plugin_name,
+                        plugin_instance,
+                    ) in plugin_manager.get_active_plugins().items():
+                        if hasattr(
+                            plugin_instance, "supports"
+                        ) and plugin_instance.supports(file_path):
                             supporting_plugin = plugin_instance
                             break
-                    
+
                     if supporting_plugin:
                         # Read file content and index
-                        content = file_path.read_text(encoding='utf-8', errors='ignore')
+                        content = file_path.read_text(encoding="utf-8", errors="ignore")
                         result = supporting_plugin.indexFile(file_path, content)
-                        
-                        if result and 'symbols' in result:
+
+                        if result and "symbols" in result:
                             indexed_count += 1
-                            total_symbols += len(result['symbols'])
-                            
-                            print(f"Indexed {filename} ({language}): {len(result['symbols'])} symbols")
-                        
+                            total_symbols += len(result["symbols"])
+
+                            print(
+                                f"Indexed {filename} ({language}): {len(result['symbols'])} symbols"
+                            )
+
                 except Exception as e:
                     print(f"Failed to index {filename} ({language}): {e}")
                     continue
-            
+
             indexed_by_language[language] = indexed_count
             symbols_by_language[language] = total_symbols
-        
+
         # Validate multi-language indexing
-        successful_languages = [lang for lang, count in indexed_by_language.items() if count > 0]
-        assert len(successful_languages) >= 3, \
-            f"Should index multiple languages: {successful_languages}"
-        
+        successful_languages = [
+            lang for lang, count in indexed_by_language.items() if count > 0
+        ]
+        assert (
+            len(successful_languages) >= 3
+        ), f"Should index multiple languages: {successful_languages}"
+
         total_indexed = sum(indexed_by_language.values())
         total_symbols = sum(symbols_by_language.values())
-        
+
         assert total_indexed >= 4, f"Should index multiple files: {total_indexed}"
         assert total_symbols >= 20, f"Should extract symbols: {total_symbols}"
-        
+
         print(f"Multi-language indexing: {successful_languages}")
         print(f"Total: {total_indexed} files, {total_symbols} symbols")
 
-    def test_common_symbol_patterns_across_languages(self, setup_multi_language_project):
+    def test_common_symbol_patterns_across_languages(
+        self, setup_multi_language_project
+    ):
         """Test finding common patterns across different languages."""
         project_data = setup_multi_language_project
         plugin_manager = project_data["plugin_manager"]
         test_files = project_data["test_files"]
-        
+
         # Index all files and collect symbols
         all_symbols = {}
-        
+
         for filename, file_path in test_files.items():
             try:
                 # Find supporting plugin
                 supporting_plugin = None
-                for plugin_name, plugin_instance in plugin_manager.get_active_plugins().items():
-                    if hasattr(plugin_instance, 'supports') and plugin_instance.supports(file_path):
+                for (
+                    plugin_name,
+                    plugin_instance,
+                ) in plugin_manager.get_active_plugins().items():
+                    if hasattr(
+                        plugin_instance, "supports"
+                    ) and plugin_instance.supports(file_path):
                         supporting_plugin = plugin_instance
                         break
-                
+
                 if supporting_plugin:
-                    content = file_path.read_text(encoding='utf-8', errors='ignore')
+                    content = file_path.read_text(encoding="utf-8", errors="ignore")
                     result = supporting_plugin.indexFile(file_path, content)
-                    
-                    if result and 'symbols' in result:
+
+                    if result and "symbols" in result:
                         # Determine language from file extension
                         language = self._get_language_from_filename(filename)
                         if language not in all_symbols:
                             all_symbols[language] = []
-                        
-                        all_symbols[language].extend([
-                            symbol['symbol'] for symbol in result['symbols'] 
-                            if isinstance(symbol, dict) and 'symbol' in symbol
-                        ])
-                        
+
+                        all_symbols[language].extend(
+                            [
+                                symbol["symbol"]
+                                for symbol in result["symbols"]
+                                if isinstance(symbol, dict) and "symbol" in symbol
+                            ]
+                        )
+
             except Exception as e:
                 print(f"Error processing {filename}: {e}")
                 continue
-        
+
         # Test common patterns that appear in multiple languages
         test_patterns = [
             {
                 "pattern": "config",
                 "expected_languages": ["python", "javascript", "c"],
-                "case_sensitive": False
+                "case_sensitive": False,
             },
             {
                 "pattern": "client",
                 "expected_languages": ["python", "javascript", "c"],
-                "case_sensitive": False
+                "case_sensitive": False,
             },
             {
                 "pattern": "authenticate",
                 "expected_languages": ["python", "javascript", "c"],
-                "case_sensitive": False
+                "case_sensitive": False,
             },
             {
                 "pattern": "user",
                 "expected_languages": ["python", "javascript", "c"],
-                "case_sensitive": False
-            }
+                "case_sensitive": False,
+            },
         ]
-        
+
         pattern_results = {}
-        
+
         for test_case in test_patterns:
             pattern = test_case["pattern"]
             case_sensitive = test_case["case_sensitive"]
             found_in_languages = set()
-            
+
             for language, symbols in all_symbols.items():
                 for symbol in symbols:
                     symbol_text = symbol if case_sensitive else symbol.lower()
                     pattern_text = pattern if case_sensitive else pattern.lower()
-                    
+
                     if pattern_text in symbol_text:
                         found_in_languages.add(language)
                         break
-            
+
             pattern_results[pattern] = found_in_languages
             print(f"Pattern '{pattern}' found in: {found_in_languages}")
-        
+
         # Validate cross-language patterns
         for test_case in test_patterns:
             pattern = test_case["pattern"]
             found_languages = pattern_results[pattern]
-            
-            assert len(found_languages) >= 2, \
-                f"Pattern '{pattern}' should be found in multiple languages: {found_languages}"
+
+            assert (
+                len(found_languages) >= 2
+            ), f"Pattern '{pattern}' should be found in multiple languages: {found_languages}"
 
     def _get_language_from_filename(self, filename: str) -> str:
         """Determine programming language from filename."""
         extension_map = {
             ".py": "python",
-            ".js": "javascript", 
+            ".js": "javascript",
             ".ts": "typescript",
             ".c": "c",
             ".h": "c",
@@ -652,13 +673,13 @@ database:
             ".yml": "yaml",
             ".xml": "xml",
             ".html": "html",
-            ".css": "css"
+            ".css": "css",
         }
-        
+
         for ext, lang in extension_map.items():
             if filename.endswith(ext):
                 return lang
-        
+
         return "unknown"
 
     def test_cross_language_symbol_resolution(self, setup_multi_language_project):
@@ -666,178 +687,227 @@ database:
         project_data = setup_multi_language_project
         plugin_manager = project_data["plugin_manager"]
         test_files = project_data["test_files"]
-        
+
         # Index files and build cross-language symbol map
         symbol_definitions = {}
         symbol_references = {}
-        
+
         for filename, file_path in test_files.items():
             try:
                 # Find supporting plugin
                 supporting_plugin = None
-                for plugin_name, plugin_instance in plugin_manager.get_active_plugins().items():
-                    if hasattr(plugin_instance, 'supports') and plugin_instance.supports(file_path):
+                for (
+                    plugin_name,
+                    plugin_instance,
+                ) in plugin_manager.get_active_plugins().items():
+                    if hasattr(
+                        plugin_instance, "supports"
+                    ) and plugin_instance.supports(file_path):
                         supporting_plugin = plugin_instance
                         break
-                
+
                 if not supporting_plugin:
                     continue
-                
-                content = file_path.read_text(encoding='utf-8', errors='ignore')
+
+                content = file_path.read_text(encoding="utf-8", errors="ignore")
                 result = supporting_plugin.indexFile(file_path, content)
-                
-                if result and 'symbols' in result:
+
+                if result and "symbols" in result:
                     language = self._get_language_from_filename(filename)
-                    
-                    for symbol_info in result['symbols']:
-                        if isinstance(symbol_info, dict) and 'symbol' in symbol_info:
-                            symbol_name = symbol_info['symbol']
-                            
+
+                    for symbol_info in result["symbols"]:
+                        if isinstance(symbol_info, dict) and "symbol" in symbol_info:
+                            symbol_name = symbol_info["symbol"]
+
                             # Record symbol definition
                             if symbol_name not in symbol_definitions:
                                 symbol_definitions[symbol_name] = []
-                            
-                            symbol_definitions[symbol_name].append({
-                                'file': filename,
-                                'language': language,
-                                'kind': symbol_info.get('kind', 'unknown'),
-                                'line': symbol_info.get('line', 0)
-                            })
-                            
+
+                            symbol_definitions[symbol_name].append(
+                                {
+                                    "file": filename,
+                                    "language": language,
+                                    "kind": symbol_info.get("kind", "unknown"),
+                                    "line": symbol_info.get("line", 0),
+                                }
+                            )
+
                             # Look for potential cross-references
                             self._find_cross_references(
-                                symbol_name, content, filename, language, symbol_references
+                                symbol_name,
+                                content,
+                                filename,
+                                language,
+                                symbol_references,
                             )
-                
+
             except Exception as e:
                 print(f"Error processing {filename} for cross-language resolution: {e}")
                 continue
-        
+
         # Analyze cross-language symbol patterns
         cross_language_symbols = {}
         for symbol_name, definitions in symbol_definitions.items():
-            languages = set(defn['language'] for defn in definitions)
+            languages = set(defn["language"] for defn in definitions)
             if len(languages) > 1:
                 cross_language_symbols[symbol_name] = {
-                    'languages': languages,
-                    'definitions': definitions
+                    "languages": languages,
+                    "definitions": definitions,
                 }
-        
+
         # Test specific cross-language concepts
         expected_cross_language = [
             "APIClient",  # Class/struct in multiple languages
             "authenticate",  # Function in multiple languages
             "getUserData",  # Method in multiple languages
-            "config"  # Configuration concept
+            "config",  # Configuration concept
         ]
-        
+
         found_cross_language = []
         for concept in expected_cross_language:
             # Check exact match or case-insensitive match
             for symbol_name in symbol_definitions.keys():
-                if (concept.lower() in symbol_name.lower() and 
-                    len(set(defn['language'] for defn in symbol_definitions[symbol_name])) > 1):
+                if (
+                    concept.lower() in symbol_name.lower()
+                    and len(
+                        set(
+                            defn["language"] for defn in symbol_definitions[symbol_name]
+                        )
+                    )
+                    > 1
+                ):
                     found_cross_language.append(concept)
                     break
-        
+
         print(f"Cross-language symbols found: {list(cross_language_symbols.keys())}")
         print(f"Expected concepts found: {found_cross_language}")
-        
-        # Validate cross-language resolution
-        assert len(cross_language_symbols) >= 2, \
-            f"Should find symbols across languages: {len(cross_language_symbols)}"
-        
-        assert len(found_cross_language) >= 2, \
-            f"Should find expected cross-language concepts: {found_cross_language}"
 
-    def _find_cross_references(self, symbol_name: str, content: str, filename: str, 
-                             language: str, symbol_references: Dict):
+        # Validate cross-language resolution
+        assert (
+            len(cross_language_symbols) >= 2
+        ), f"Should find symbols across languages: {len(cross_language_symbols)}"
+
+        assert (
+            len(found_cross_language) >= 2
+        ), f"Should find expected cross-language concepts: {found_cross_language}"
+
+    def _find_cross_references(
+        self,
+        symbol_name: str,
+        content: str,
+        filename: str,
+        language: str,
+        symbol_references: Dict,
+    ):
         """Find potential cross-references to symbols in content."""
-        lines = content.split('\n')
-        
+        lines = content.split("\n")
+
         for line_num, line in enumerate(lines, 1):
             # Simple pattern matching for potential references
-            if symbol_name in line and not line.strip().startswith('//') and not line.strip().startswith('#'):
+            if (
+                symbol_name in line
+                and not line.strip().startswith("//")
+                and not line.strip().startswith("#")
+            ):
                 if symbol_name not in symbol_references:
                     symbol_references[symbol_name] = []
-                
-                symbol_references[symbol_name].append({
-                    'file': filename,
-                    'language': language,
-                    'line': line_num,
-                    'context': line.strip()
-                })
+
+                symbol_references[symbol_name].append(
+                    {
+                        "file": filename,
+                        "language": language,
+                        "line": line_num,
+                        "context": line.strip(),
+                    }
+                )
 
     def test_configuration_file_integration(self, setup_multi_language_project):
         """Test integration between code and configuration files."""
         project_data = setup_multi_language_project
         plugin_manager = project_data["plugin_manager"]
         test_files = project_data["test_files"]
-        
+
         # Index configuration files
         config_symbols = {}
         code_symbols = {}
-        
+
         for filename, file_path in test_files.items():
             try:
                 # Find supporting plugin
                 supporting_plugin = None
-                for plugin_name, plugin_instance in plugin_manager.get_active_plugins().items():
-                    if hasattr(plugin_instance, 'supports') and plugin_instance.supports(file_path):
+                for (
+                    plugin_name,
+                    plugin_instance,
+                ) in plugin_manager.get_active_plugins().items():
+                    if hasattr(
+                        plugin_instance, "supports"
+                    ) and plugin_instance.supports(file_path):
                         supporting_plugin = plugin_instance
                         break
-                
+
                 if not supporting_plugin:
                     continue
-                
-                content = file_path.read_text(encoding='utf-8', errors='ignore')
+
+                content = file_path.read_text(encoding="utf-8", errors="ignore")
                 result = supporting_plugin.indexFile(file_path, content)
-                
-                if result and 'symbols' in result:
+
+                if result and "symbols" in result:
                     language = self._get_language_from_filename(filename)
-                    
-                    if language in ['json', 'yaml']:
-                        config_symbols[filename] = result['symbols']
+
+                    if language in ["json", "yaml"]:
+                        config_symbols[filename] = result["symbols"]
                     else:
-                        code_symbols[filename] = result['symbols']
-                
+                        code_symbols[filename] = result["symbols"]
+
             except Exception as e:
                 print(f"Error processing {filename} for config integration: {e}")
                 continue
-        
+
         # Look for configuration-related patterns in code
         config_patterns = [
-            "config", "Config", "CONFIG",
-            "timeout", "retry", "api_key",
-            "base_url", "endpoint", "logging"
+            "config",
+            "Config",
+            "CONFIG",
+            "timeout",
+            "retry",
+            "api_key",
+            "base_url",
+            "endpoint",
+            "logging",
         ]
-        
+
         code_config_references = {}
-        
+
         for code_file, symbols in code_symbols.items():
             references = []
             for symbol_info in symbols:
-                if isinstance(symbol_info, dict) and 'symbol' in symbol_info:
-                    symbol_name = symbol_info['symbol']
+                if isinstance(symbol_info, dict) and "symbol" in symbol_info:
+                    symbol_name = symbol_info["symbol"]
                     for pattern in config_patterns:
                         if pattern.lower() in symbol_name.lower():
-                            references.append({
-                                'symbol': symbol_name,
-                                'pattern': pattern,
-                                'kind': symbol_info.get('kind', 'unknown')
-                            })
+                            references.append(
+                                {
+                                    "symbol": symbol_name,
+                                    "pattern": pattern,
+                                    "kind": symbol_info.get("kind", "unknown"),
+                                }
+                            )
                             break
-            
+
             if references:
                 code_config_references[code_file] = references
-        
+
         # Validate configuration integration
         assert len(config_symbols) >= 1, "Should index configuration files"
-        assert len(code_config_references) >= 1, "Should find config-related symbols in code"
-        
+        assert (
+            len(code_config_references) >= 1
+        ), "Should find config-related symbols in code"
+
         print(f"Configuration files indexed: {list(config_symbols.keys())}")
-        print(f"Code files with config references: {list(code_config_references.keys())}")
-        
+        print(
+            f"Code files with config references: {list(code_config_references.keys())}"
+        )
+
         # Check for consistent naming patterns
         for code_file, references in code_config_references.items():
             print(f"{code_file} config references:")
@@ -849,83 +919,92 @@ database:
         project_data = setup_multi_language_project
         plugin_manager = project_data["plugin_manager"]
         test_files = project_data["test_files"]
-        
+
         # Define expected API patterns
         expected_api_methods = [
             {"pattern": "get.*user.*data", "languages": ["python", "javascript", "c"]},
             {"pattern": "authenticate", "languages": ["python", "javascript", "c"]},
             {"pattern": "api.*client", "languages": ["python", "javascript", "c"]},
-            {"pattern": "config", "languages": ["python", "javascript", "c"]}
+            {"pattern": "config", "languages": ["python", "javascript", "c"]},
         ]
-        
+
         # Index and extract API-related symbols
         api_symbols_by_language = {}
-        
+
         for filename, file_path in test_files.items():
             language = self._get_language_from_filename(filename)
-            if language not in ['python', 'javascript', 'c']:
+            if language not in ["python", "javascript", "c"]:
                 continue
-            
+
             try:
                 # Find supporting plugin
                 supporting_plugin = None
-                for plugin_name, plugin_instance in plugin_manager.get_active_plugins().items():
-                    if hasattr(plugin_instance, 'supports') and plugin_instance.supports(file_path):
+                for (
+                    plugin_name,
+                    plugin_instance,
+                ) in plugin_manager.get_active_plugins().items():
+                    if hasattr(
+                        plugin_instance, "supports"
+                    ) and plugin_instance.supports(file_path):
                         supporting_plugin = plugin_instance
                         break
-                
+
                 if not supporting_plugin:
                     continue
-                
-                content = file_path.read_text(encoding='utf-8', errors='ignore')
+
+                content = file_path.read_text(encoding="utf-8", errors="ignore")
                 result = supporting_plugin.indexFile(file_path, content)
-                
-                if result and 'symbols' in result:
+
+                if result and "symbols" in result:
                     if language not in api_symbols_by_language:
                         api_symbols_by_language[language] = []
-                    
-                    for symbol_info in result['symbols']:
-                        if isinstance(symbol_info, dict) and 'symbol' in symbol_info:
-                            api_symbols_by_language[language].append({
-                                'name': symbol_info['symbol'],
-                                'kind': symbol_info.get('kind', 'unknown'),
-                                'file': filename
-                            })
-                
+
+                    for symbol_info in result["symbols"]:
+                        if isinstance(symbol_info, dict) and "symbol" in symbol_info:
+                            api_symbols_by_language[language].append(
+                                {
+                                    "name": symbol_info["symbol"],
+                                    "kind": symbol_info.get("kind", "unknown"),
+                                    "file": filename,
+                                }
+                            )
+
             except Exception as e:
                 print(f"Error processing {filename} for API consistency: {e}")
                 continue
-        
+
         # Check API consistency
         api_consistency_results = {}
-        
+
         for api_pattern in expected_api_methods:
             pattern = api_pattern["pattern"]
             expected_langs = api_pattern["languages"]
-            
+
             found_in_languages = {}
-            
+
             for language, symbols in api_symbols_by_language.items():
                 if language in expected_langs:
                     matching_symbols = []
                     for symbol in symbols:
                         import re
-                        if re.search(pattern, symbol['name'], re.IGNORECASE):
+
+                        if re.search(pattern, symbol["name"], re.IGNORECASE):
                             matching_symbols.append(symbol)
-                    
+
                     if matching_symbols:
                         found_in_languages[language] = matching_symbols
-            
+
             api_consistency_results[pattern] = found_in_languages
-        
+
         # Validate API consistency
         for pattern, found_languages in api_consistency_results.items():
-            assert len(found_languages) >= 2, \
-                f"API pattern '{pattern}' should be found in multiple languages: {list(found_languages.keys())}"
-            
+            assert (
+                len(found_languages) >= 2
+            ), f"API pattern '{pattern}' should be found in multiple languages: {list(found_languages.keys())}"
+
             print(f"API pattern '{pattern}' found in: {list(found_languages.keys())}")
             for lang, symbols in found_languages.items():
-                symbol_names = [s['name'] for s in symbols[:3]]  # Show first 3
+                symbol_names = [s["name"] for s in symbols[:3]]  # Show first 3
                 print(f"  {lang}: {symbol_names}")
 
     def test_real_world_multi_language_project(self):
@@ -933,81 +1012,96 @@ database:
         # Try to use kubernetes repository which has multiple languages
         repo_path = Path("test_workspace/real_repos/kubernetes")
         if not repo_path.exists():
-            pytest.skip("Kubernetes repository not available for multi-language testing")
-        
+            pytest.skip(
+                "Kubernetes repository not available for multi-language testing"
+            )
+
         try:
             from mcp_server.plugin_system import PluginManager
             from mcp_server.storage.sqlite_store import SQLiteStore
         except ImportError:
             pytest.skip("Plugin system components not available")
-        
+
         # Setup plugin system
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as db_file:
             store = SQLiteStore(db_file.name)
             plugin_manager = PluginManager(sqlite_store=store)
-            
+
             load_result = plugin_manager.load_plugins_safe()
             if not load_result.success:
                 pytest.skip(f"Failed to load plugins: {load_result.error.message}")
-            
+
             try:
                 # Find files from different languages
                 language_files = {
                     "go": list(repo_path.rglob("*.go"))[:10],
-                    "yaml": list(repo_path.rglob("*.yaml"))[:5] + list(repo_path.rglob("*.yml"))[:5],
+                    "yaml": list(repo_path.rglob("*.yaml"))[:5]
+                    + list(repo_path.rglob("*.yml"))[:5],
                     "shell": list(repo_path.rglob("*.sh"))[:5],
-                    "json": list(repo_path.rglob("*.json"))[:5]
+                    "json": list(repo_path.rglob("*.json"))[:5],
                 }
-                
+
                 indexed_by_language = {}
                 symbols_by_language = {}
-                
+
                 for language, files in language_files.items():
                     if not files:
                         continue
-                    
+
                     indexed_count = 0
                     total_symbols = 0
-                    
+
                     for file_path in files:
                         try:
                             # Find supporting plugin
                             supporting_plugin = None
-                            for plugin_name, plugin_instance in plugin_manager.get_active_plugins().items():
-                                if hasattr(plugin_instance, 'supports') and plugin_instance.supports(file_path):
+                            for (
+                                plugin_name,
+                                plugin_instance,
+                            ) in plugin_manager.get_active_plugins().items():
+                                if hasattr(
+                                    plugin_instance, "supports"
+                                ) and plugin_instance.supports(file_path):
                                     supporting_plugin = plugin_instance
                                     break
-                            
+
                             if supporting_plugin:
-                                content = file_path.read_text(encoding='utf-8', errors='ignore')
+                                content = file_path.read_text(
+                                    encoding="utf-8", errors="ignore"
+                                )
                                 result = supporting_plugin.indexFile(file_path, content)
-                                
-                                if result and 'symbols' in result:
+
+                                if result and "symbols" in result:
                                     indexed_count += 1
-                                    total_symbols += len(result['symbols'])
-                            
+                                    total_symbols += len(result["symbols"])
+
                         except Exception as e:
                             print(f"Error indexing {file_path}: {e}")
                             continue
-                    
+
                     indexed_by_language[language] = indexed_count
                     symbols_by_language[language] = total_symbols
-                
+
                 # Validate real-world multi-language indexing
-                successful_languages = [lang for lang, count in indexed_by_language.items() if count > 0]
+                successful_languages = [
+                    lang for lang, count in indexed_by_language.items() if count > 0
+                ]
                 total_files = sum(indexed_by_language.values())
                 total_symbols = sum(symbols_by_language.values())
-                
-                assert len(successful_languages) >= 2, \
-                    f"Should index multiple languages: {successful_languages}"
-                
+
+                assert (
+                    len(successful_languages) >= 2
+                ), f"Should index multiple languages: {successful_languages}"
+
                 assert total_files >= 5, f"Should index multiple files: {total_files}"
                 assert total_symbols >= 10, f"Should extract symbols: {total_symbols}"
-                
+
                 print(f"Real-world multi-language indexing:")
                 for lang in successful_languages:
-                    print(f"  {lang}: {indexed_by_language[lang]} files, {symbols_by_language[lang]} symbols")
-                
+                    print(
+                        f"  {lang}: {indexed_by_language[lang]} files, {symbols_by_language[lang]} symbols"
+                    )
+
             finally:
                 # Cleanup
                 try:
@@ -1020,44 +1114,46 @@ database:
 @pytest.mark.integration
 class TestCrossLanguageIntegration:
     """Test cross-language integration with system components."""
-    
+
     def test_cross_language_search_integration(self):
         """Test cross-language search capabilities."""
         # This would test search across multiple languages
         # For now, we'll create a simple test structure
-        
+
         test_symbols = {
             "python": ["UserManager", "authenticate_user", "get_user_data"],
             "javascript": ["UserManager", "authenticateUser", "getUserData"],
-            "c": ["user_manager_t", "authenticate_user", "get_user_data"]
+            "c": ["user_manager_t", "authenticate_user", "get_user_data"],
         }
-        
+
         # Test cross-language symbol matching
         common_concepts = {}
-        
+
         for lang, symbols in test_symbols.items():
             for symbol in symbols:
                 concept = self._extract_concept(symbol)
                 if concept not in common_concepts:
                     common_concepts[concept] = []
                 common_concepts[concept].append((lang, symbol))
-        
+
         # Find concepts that appear in multiple languages
         cross_language_concepts = {
-            concept: languages for concept, languages in common_concepts.items()
+            concept: languages
+            for concept, languages in common_concepts.items()
             if len(set(lang for lang, sym in languages)) > 1
         }
-        
-        assert len(cross_language_concepts) >= 2, \
-            f"Should find cross-language concepts: {list(cross_language_concepts.keys())}"
-        
+
+        assert (
+            len(cross_language_concepts) >= 2
+        ), f"Should find cross-language concepts: {list(cross_language_concepts.keys())}"
+
         print(f"Cross-language concepts: {list(cross_language_concepts.keys())}")
 
     def _extract_concept(self, symbol_name: str) -> str:
         """Extract core concept from symbol name."""
         # Simple concept extraction
         symbol_lower = symbol_name.lower()
-        
+
         if "user" in symbol_lower:
             return "user"
         elif "auth" in symbol_lower:

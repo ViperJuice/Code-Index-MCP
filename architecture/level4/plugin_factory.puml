@@ -9,6 +9,8 @@ package "mcp_server.plugins" <<Component>> {
         +create_plugin(language: str, store: SQLiteStore, semantic: bool): IPlugin
         +get_supported_languages(): List<str>
         +get_language_for_file(path: Path): Optional<str>
+        +get_languages_in_repo(repo_id: str): Set<str>
+        +set_memory_manager(manager: IMemoryAwarePluginManager): void
     }
     
     class PluginFactory implements IPluginFactory {

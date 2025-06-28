@@ -1,0 +1,14 @@
+{
+  "query": "Find all usages of Router",
+  "mode": "native",
+  "tools_used": ["Grep", "Bash"],
+  "tool_calls": {"Grep": 1, "Bash": 2},
+  "results_found": 113,
+  "execution_time_ms": 150,
+  "token_estimate": 850,
+  "success": true,
+  "error": null,
+  "test_id": "go_gin_6_native",
+  "timestamp": "2025-01-06T22:16:30",
+  "batch_name": "go_gin"
+}

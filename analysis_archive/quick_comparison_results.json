@@ -1,0 +1,139 @@
+{
+  "timestamp": "2025-06-15 00:08:15",
+  "summary": {
+    "total_queries": 8,
+    "total_mcp_tokens": 8224,
+    "total_grep_tokens": 697368,
+    "average_token_reduction": 96.8600920933373
+  },
+  "detailed_results": [
+    {
+      "repo": "javascript_react",
+      "query": "useState",
+      "mcp": {
+        "results": 20,
+        "time": 0.0010685920715332031,
+        "tokens": 1421
+      },
+      "grep": {
+        "files": 603,
+        "files_to_read": 20,
+        "time": 0.032874107360839844,
+        "estimated_tokens": 11072
+      },
+      "token_reduction": 87.16582369942196
+    },
+    {
+      "repo": "javascript_react",
+      "query": "componentDidMount",
+      "mcp": {
+        "results": 20,
+        "time": 0.001712799072265625,
+        "tokens": 1513
+      },
+      "grep": {
+        "files": 103,
+        "files_to_read": 20,
+        "time": 0.030063390731811523,
+        "estimated_tokens": 37724
+      },
+      "token_reduction": 95.9892906372601
+    },
+    {
+      "repo": "javascript_react",
+      "query": "TODO",
+      "mcp": {
+        "results": 20,
+        "time": 0.004582405090332031,
+        "tokens": 1257
+      },
+      "grep": {
+        "files": 434,
+        "files_to_read": 20,
+        "time": 0.030794620513916016,
+        "estimated_tokens": 116684
+      },
+      "token_reduction": 98.92273147989441
+    },
+    {
+      "repo": "javascript_react",
+      "query": "error handling",
+      "mcp": {
+        "results": 20,
+        "time": 0.004766702651977539,
+        "tokens": 1476
+      },
+      "grep": {
+        "files": 14,
+        "files_to_read": 14,
+        "time": 0.029484272003173828,
+        "estimated_tokens": 376597
+      },
+      "token_reduction": 99.60806910304649
+    },
+    {
+      "repo": "go_gin",
+      "query": "func main",
+      "mcp": {
+        "results": 4,
+        "time": 0.0028760433197021484,
+        "tokens": 219
+      },
+      "grep": {
+        "files": 4,
+        "files_to_read": 4,
+        "time": 0.003778696060180664,
+        "estimated_tokens": 19639
+      },
+      "token_reduction": 98.88487193848974
+    },
+    {
+      "repo": "go_gin",
+      "query": "error",
+      "mcp": {
+        "results": 20,
+        "time": 0.003215789794921875,
+        "tokens": 1154
+      },
+      "grep": {
+        "files": 69,
+        "files_to_read": 20,
+        "time": 0.0034990310668945312,
+        "estimated_tokens": 35820
+      },
+      "token_reduction": 96.7783361250698
+    },
+    {
+      "repo": "go_gin",
+      "query": "TODO",
+      "mcp": {
+        "results": 5,
+        "time": 0.0015246868133544922,
+        "tokens": 296
+      },
+      "grep": {
+        "files": 8,
+        "files_to_read": 8,
+        "time": 0.0030930042266845703,
+        "estimated_tokens": 53452
+      },
+      "token_reduction": 99.44623213350296
+    },
+    {
+      "repo": "go_gin",
+      "query": "Handler",
+      "mcp": {
+        "results": 15,
+        "time": 0.0038826465606689453,
+        "tokens": 888
+      },
+      "grep": {
+        "files": 23,
+        "files_to_read": 20,
+        "time": 0.003052949905395508,
+        "estimated_tokens": 46380
+      },
+      "token_reduction": 98.08538163001293
+    }
+  ]
+}

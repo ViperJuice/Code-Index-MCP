@@ -1,0 +1,30 @@
+[
+  {
+    "test_id": "1a_mcp",
+    "query": "Find the BM25Indexer class definition",
+    "mode": "mcp",
+    "repository": "gin",
+    "prompt": "You are testing MCP tools for code search performance analysis.\n\nIMPORTANT: You MUST use MCP tools for this test. Available MCP tools:\n- mcp__code-index-mcp__symbol_lookup\n- mcp__code-index-mcp__search_code\n- mcp__code-index-mcp__get_status\n\nRepository: gin\nWorking Directory: /workspaces/Code-Index-MCP/test_indexes/gin\nQuery: Find the BM25Indexer class definition\n\nInstructions:\n1. Use MCP tools to answer the query\n2. Record the time taken and number of results\n3. Note which MCP tools you used\n4. Count the tokens in tool responses\n5. Report your findings in a structured format\n\nOutput format:\n```json\n{\n  \"query\": \"Find the BM25Indexer class definition\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"tool1\", \"tool2\"],\n  \"results_found\": <number>,\n  \"execution_time\": <seconds>,\n  \"token_estimate\": <count>,\n  \"success\": true/false\n}\n```"
+  },
+  {
+    "test_id": "1b_native",
+    "query": "Find the BM25Indexer class definition",
+    "mode": "native",
+    "repository": "gin",
+    "prompt": "You are testing native code search tools for performance analysis.\n\nIMPORTANT: You MUST NOT use any MCP tools. Only use:\n- Grep\n- Find  \n- Read\n- Glob\n- LS\n\nRepository: gin\nWorking Directory: /workspaces/Code-Index-MCP/test_indexes/gin\nQuery: Find the BM25Indexer class definition\n\nInstructions:\n1. Use ONLY native tools (grep, find, read) to answer the query\n2. Record the time taken and number of results\n3. Note which tools you used and how many times\n4. Count approximate tokens in file contents read\n5. Report your findings in a structured format\n\nOutput format:\n```json\n{\n  \"query\": \"Find the BM25Indexer class definition\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"tool1\", \"tool2\"],\n  \"results_found\": <number>,\n  \"execution_time\": <seconds>,\n  \"token_estimate\": <count>,\n  \"success\": true/false\n}\n```"
+  },
+  {
+    "test_id": "2a_mcp",
+    "query": "Where is the SQLiteStore class implemented?",
+    "mode": "mcp",
+    "repository": "gin",
+    "prompt": "You are testing MCP tools for code search performance analysis.\n\nIMPORTANT: You MUST use MCP tools for this test. Available MCP tools:\n- mcp__code-index-mcp__symbol_lookup\n- mcp__code-index-mcp__search_code\n- mcp__code-index-mcp__get_status\n\nRepository: gin\nWorking Directory: /workspaces/Code-Index-MCP/test_indexes/gin\nQuery: Where is the SQLiteStore class implemented?\n\nInstructions:\n1. Use MCP tools to answer the query\n2. Record the time taken and number of results\n3. Note which MCP tools you used\n4. Count the tokens in tool responses\n5. Report your findings in a structured format\n\nOutput format:\n```json\n{\n  \"query\": \"Where is the SQLiteStore class implemented?\",\n  \"mode\": \"mcp\",\n  \"tools_used\": [\"tool1\", \"tool2\"],\n  \"results_found\": <number>,\n  \"execution_time\": <seconds>,\n  \"token_estimate\": <count>,\n  \"success\": true/false\n}\n```"
+  },
+  {
+    "test_id": "2b_native",
+    "query": "Where is the SQLiteStore class implemented?",
+    "mode": "native",
+    "repository": "gin",
+    "prompt": "You are testing native code search tools for performance analysis.\n\nIMPORTANT: You MUST NOT use any MCP tools. Only use:\n- Grep\n- Find  \n- Read\n- Glob\n- LS\n\nRepository: gin\nWorking Directory: /workspaces/Code-Index-MCP/test_indexes/gin\nQuery: Where is the SQLiteStore class implemented?\n\nInstructions:\n1. Use ONLY native tools (grep, find, read) to answer the query\n2. Record the time taken and number of results\n3. Note which tools you used and how many times\n4. Count approximate tokens in file contents read\n5. Report your findings in a structured format\n\nOutput format:\n```json\n{\n  \"query\": \"Where is the SQLiteStore class implemented?\",\n  \"mode\": \"native\",\n  \"tools_used\": [\"tool1\", \"tool2\"],\n  \"results_found\": <number>,\n  \"execution_time\": <seconds>,\n  \"token_estimate\": <count>,\n  \"success\": true/false\n}\n```"
+  }
+]

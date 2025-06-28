@@ -1,0 +1,69 @@
+{
+  "timestamp": "2025-06-23 21:10:47",
+  "tests": {
+    "basic_status": {
+      "passed": false,
+      "details": {}
+    },
+    "repository_aware_loading": {
+      "passed": false,
+      "details": {}
+    },
+    "memory_aware_management": {
+      "passed": true,
+      "details": {
+        "memory_samples_mb": [
+          335.04,
+          335.04,
+          335.04,
+          335.04,
+          335.04
+        ],
+        "max_memory_mb": 335.04,
+        "configured_limit_mb": 512,
+        "memory_limit_respected": true
+      }
+    },
+    "multi_repository_search": {
+      "passed": false,
+      "details": {
+        "authorized_repos": [
+          "056d6d37b1aa",
+          "844145265d7a"
+        ],
+        "search_authorized": false,
+        "search_unauthorized": false,
+        "search_current": false
+      }
+    },
+    "performance_scenarios": {
+      "passed": true,
+      "scenarios": {
+        "single_repo_auto": {
+          "startup_time_s": 2.01,
+          "memory_mb": 334.05,
+          "search_time_s": 0.002,
+          "search_success": false
+        },
+        "multi_repo_reference": {
+          "startup_time_s": 2.01,
+          "memory_mb": 332.57,
+          "search_time_s": 0.002,
+          "search_success": false
+        },
+        "analysis_mode_all": {
+          "startup_time_s": 2.01,
+          "memory_mb": 338.09,
+          "search_time_s": 0.003,
+          "search_success": false
+        }
+      }
+    }
+  },
+  "summary": {
+    "total_tests": 5,
+    "passed_tests": 2,
+    "failed_tests": 3,
+    "success_rate": "40.0%"
+  }
+}

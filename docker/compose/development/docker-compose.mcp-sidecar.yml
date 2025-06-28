@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # MCP as a sidecar service for dev containers
+  mcp-sidecar:
+    image: ${MCP_DOCKER_IMAGE:-mcp-index:minimal}
+    container_name: mcp-sidecar
+    
+    # Keep the container running
+    command: tail -f /dev/null
+    
+    volumes:
+      # Mount the workspace - adjust path as needed
+      - ${WORKSPACE:-/workspaces/Code-Index-MCP}:/workspace
+      # Persistent index storage
+      - mcp-index-data:/app/.mcp-index
+      # Share .env file if exists
+      - ${WORKSPACE:-/workspaces/Code-Index-MCP}/.env:/app/.env:ro
+    
+    environment:
+      # Core settings
+      - MCP_WORKSPACE_ROOT=/workspace
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DATABASE_URL=sqlite:////app/.mcp-index/code_index.db
+      
+      # API keys (optional)
+      - VOYAGE_AI_API_KEY=${VOYAGE_AI_API_KEY:-}
+      - SEMANTIC_SEARCH_ENABLED=${SEMANTIC_SEARCH_ENABLED:-false}
+      
+      # GitHub sync settings
+      - MCP_ARTIFACT_SYNC=${MCP_ARTIFACT_SYNC:-false}
+      - AUTO_UPLOAD=${AUTO_UPLOAD:-false}
+      - AUTO_DOWNLOAD=${AUTO_DOWNLOAD:-true}
+    
+    # Keep stdin open for MCP protocol
+    stdin_open: true
+    tty: true
+    
+    # Use the same network as the dev container
+    network_mode: ${NETWORK_MODE:-bridge}
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import mcp_server; print('healthy')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  mcp-index-data:
+    name: mcp-index-data
+    driver: local
+
+# Note: To use this sidecar:
+# 1. Start it: docker-compose -f docker/compose/development/docker-compose.mcp-sidecar.yml up -d
+# 2. Use the docker-sidecar.json template: cp .mcp.json.templates/docker-sidecar.json .mcp.json
+# 3. The sidecar will be accessible via: docker exec -i mcp-sidecar python /app/scripts/cli/mcp_server_cli.py

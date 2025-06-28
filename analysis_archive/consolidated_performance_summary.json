@@ -1,0 +1,33 @@
+{
+  "total_records": 102,
+  "date_range": {
+    "earliest": "2025-06-26T07:31:00.864352",
+    "latest": "2025-06-26T07:40:50.439Z"
+  },
+  "approaches": {
+    "mcp_count": 45,
+    "native_count": 57
+  },
+  "performance_summary": {
+    "mcp_avg_response_time": 43860.030090909095,
+    "native_avg_response_time": 46587.346909090906,
+    "mcp_success_rate": 0.9333333333333333,
+    "native_success_rate": 0.9473684210526315
+  },
+  "token_summary": {
+    "mcp_avg_input_tokens": 52.06666666666667,
+    "native_avg_input_tokens": 311.8070175438597,
+    "mcp_avg_output_tokens": 33.44444444444444,
+    "native_avg_output_tokens": 205.28070175438597
+  },
+  "categories": {
+    "transcript_query": 80,
+    "symbol_queries": 16,
+    "content_queries": 6
+  },
+  "complexity_distribution": {
+    "unknown": 80,
+    "simple": 14,
+    "medium": 8
+  }
+}

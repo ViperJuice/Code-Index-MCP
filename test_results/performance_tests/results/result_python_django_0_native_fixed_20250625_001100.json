@@ -1,0 +1,14 @@
+{
+  "query": "Find the definition of class BaseHandler",
+  "mode": "native",
+  "tools_used": ["Grep", "Read"],
+  "tool_calls": {"Grep": 2, "Read": 1},
+  "results_found": 1,
+  "execution_time_ms": 150,
+  "token_estimate": 850,
+  "success": true,
+  "error": null,
+  "test_id": "python_django_0_native_fixed",
+  "timestamp": "2025-01-06T22:11:00",
+  "batch_name": "python_django"
+}

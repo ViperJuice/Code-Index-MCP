@@ -4,12 +4,13 @@ This file defines the capabilities and constraints for AI agents working with th
 
 ## Current State
 
-**PROJECT STATUS**: 100% Complete - PRODUCTION READY 🎉 (complexity 5/5)
+**PROJECT STATUS**: 95% Complete - NEAR PRODUCTION (complexity 5/5)
 
-**Current Implementation Status**: 100% complete - All roadmap items implemented and tested
+**Current Implementation Status**: 95% complete - Core system functional but MCP sub-agent issues blocking full production
 **System Complexity**: 5/5 (High - 136k lines, 48 plugins, semantic search, document processing)
-**Next Priority**: Operational maintenance and potential future enhancements
-**Last Updated**: 2025-06-09
+**Critical Blocker**: MCP sub-agent tool inheritance (83% failure rate)
+**Next Priority**: Fix MCP issues, complete Phase 1 agents
+**Last Updated**: 2025-01-06
 
 ### What's Actually Implemented
 - ✅ FastAPI gateway with all endpoints: `/symbol`, `/search`, `/status`, `/plugins`, `/reindex`
@@ -60,9 +61,15 @@ This file defines the capabilities and constraints for AI agents working with th
 
 ## MCP SEARCH STRATEGY (CRITICAL)
 
-### ALWAYS USE MCP TOOLS FIRST
+### ⚠️ CRITICAL WARNING: MCP Sub-Agent Issues (January 2025)
+**Performance testing revealed 83% failure rate for MCP tools in Task sub-agents.**
+- MCP tools work in main agent but NOT in spawned sub-agents
+- Use native tools (grep, find) as fallback until fixed
+- See `/FINAL_COMPREHENSIVE_MCP_VS_NATIVE_REPORT.md` for details
+
+### ALWAYS USE MCP TOOLS FIRST (When Available)
 The codebase has a pre-built index with 312 files across 48 languages. 
-NEVER use Grep, Glob, or Read for searching - use MCP tools instead.
+When MCP is available, use it instead of Grep, Glob, or Read for searching.
 
 ### Tool Priority Order:
 1. **mcp__code-index-mcp__symbol_lookup** - For finding definitions
@@ -183,6 +190,21 @@ mcp__code-index-mcp__list_plugins()
 ```
 
 ## Development Priorities
+
+### 🔴 CRITICAL_PRIORITIES (Immediate, Complexity 5)
+**Phase 1 Status: 100% Complete (8/8 agents implemented) ✅**
+
+#### All Phase 1 Agents Completed:
+1. ✅ **Agent 1: MCP Sub-Agent Tool Inheritance** - Config propagator implemented
+2. ✅ **Agent 2: Multi-Path Index Discovery** - Enhanced discovery system created
+3. ✅ **Agent 3: Pre-Flight Validation System** - Comprehensive validation framework
+4. ✅ **Agent 4: Index Management CLI** - Full CLI tool with all commands
+5. ✅ **Agent 5: Repository-Aware Plugin Loading** - Dynamic plugin selection (repository_plugin_loader.py)
+6. ✅ **Agent 6: Multi-Repository Search Support** - Cross-repo search capability (multi_repo_manager.py)
+7. ✅ **Agent 7: Memory-Aware Plugin Management** - LRU cache with 1GB limit (memory_aware_manager.py)
+8. ✅ **Agent 8: Cross-Repository Search Coordinator** - Unified search interface (cross_repo_coordinator.py)
+
+**Note**: While implementation is complete, the 83% MCP failure rate in sub-agents prevents production deployment.
 
 ### IMMEDIATE_PRIORITIES (This Week, Complexity 3-4)
 1. **Document processing validation** - Complete testing and documentation (BLOCKING: production claims)

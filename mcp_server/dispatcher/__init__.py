@@ -9,29 +9,45 @@ This package provides advanced dispatcher capabilities including:
 - Load balancing across plugins
 """
 
-from .dispatcher import Dispatcher
-from .plugin_router import PluginRouter, FileTypeMatcher, IPluginRouter, IFileTypeMatcher, PluginCapability, FileTypeInfo, RouteResult
+from .dispatcher_enhanced import EnhancedDispatcher
+# Legacy import for backwards compatibility
+from .dispatcher_enhanced import EnhancedDispatcher as Dispatcher
+from .plugin_router import (
+    PluginRouter,
+    FileTypeMatcher,
+    IPluginRouter,
+    IFileTypeMatcher,
+    PluginCapability,
+    FileTypeInfo,
+    RouteResult,
+)
 from .result_aggregator import (
-    ResultAggregator, IResultAggregator, 
-    SimpleAggregationStrategy, SmartAggregationStrategy, IAggregationStrategy,
-    AggregatedResult, AggregationStats, RankingCriteria
+    ResultAggregator,
+    IResultAggregator,
+    SimpleAggregationStrategy,
+    SmartAggregationStrategy,
+    IAggregationStrategy,
+    AggregatedResult,
+    AggregationStats,
+    RankingCriteria,
 )
 
 __all__ = [
-    'Dispatcher',
-    'PluginRouter',
-    'FileTypeMatcher', 
-    'IPluginRouter',
-    'IFileTypeMatcher',
-    'PluginCapability',
-    'FileTypeInfo',
-    'RouteResult',
-    'ResultAggregator',
-    'IResultAggregator',
-    'SimpleAggregationStrategy',
-    'SmartAggregationStrategy', 
-    'IAggregationStrategy',
-    'AggregatedResult',
-    'AggregationStats',
-    'RankingCriteria',
+    "Dispatcher",  # Legacy alias
+    "EnhancedDispatcher",
+    "PluginRouter",
+    "FileTypeMatcher",
+    "IPluginRouter",
+    "IFileTypeMatcher",
+    "PluginCapability",
+    "FileTypeInfo",
+    "RouteResult",
+    "ResultAggregator",
+    "IResultAggregator",
+    "SimpleAggregationStrategy",
+    "SmartAggregationStrategy",
+    "IAggregationStrategy",
+    "AggregatedResult",
+    "AggregationStats",
+    "RankingCriteria",
 ]

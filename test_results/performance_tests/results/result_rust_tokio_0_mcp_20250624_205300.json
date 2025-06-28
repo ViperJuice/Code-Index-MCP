@@ -1,0 +1,14 @@
+{
+  "query": "Find the definition of class Server",
+  "mode": "mcp",
+  "tools_used": ["mcp__code-index-mcp__symbol_lookup", "mcp__code-index-mcp__search_code"],
+  "tool_calls": {"mcp__code-index-mcp__symbol_lookup": 1, "mcp__code-index-mcp__search_code": 3},
+  "results_found": 0,
+  "execution_time_ms": 1500,
+  "token_estimate": 18000,
+  "success": false,
+  "error": "No Server struct/class definition found in rust_tokio repository. The search results showed matches from other repositories but not from rust_tokio specifically.",
+  "test_id": "rust_tokio_0_mcp",
+  "timestamp": "2025-01-06T20:53:00",
+  "batch_name": "rust_tokio"
+}
