@@ -222,8 +222,8 @@ jobs:
           # Trigger artifact upload workflow
           echo "📤 Uploading validated indexes as artifacts..."
           
-          # Use the artifact management script v2
-          python scripts/index-artifact-upload-v2.py
+          # Use the artifact management script
+          python scripts/index-artifact-upload.py --method direct
 
       - name: Fallback - Build minimal index
         if: steps.check_artifacts.outputs.found == 'false'
