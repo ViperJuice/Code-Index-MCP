@@ -1,0 +1,493 @@
+{
+  "test_results": [
+    {
+      "query": "EnhancedDispatcher",
+      "mcp": {
+        "method": "mcp_sql_bm25",
+        "query": "EnhancedDispatcher",
+        "duration_ms": 6.397563993232325,
+        "result_count": 20,
+        "has_snippets": true,
+        "has_file_paths": true,
+        "sample_results": [
+          [
+            "/workspaces/Code-Index-MCP/tests/root_tests/test_document_queries.py",
+            "...import Path\nfrom mcp_server.dispatcher.dispatcher_enhanced import <<EnhancedDispatcher>>\nfrom mcp_server.storage.sqlite_store import SQLiteStore\n\n# Setup logging...",
+            -4.239613072201845
+          ],
+          [
+            "/workspaces/Code-Index-MCP/scripts/launch_claude_code_tests.py",
+            "...tool_msg = {\n                            \"type\": \"tool_use\", \n                            \"name\": \"mcp__code-index-mcp__symbol_lookup\",\n                            \"input\": {\"symbol\": \"<<EnhancedDispatcher>>\"},\n                            \"timestamp\": timestamp + i * 10 + 2...",
+            -4.210999830479582
+          ],
+          [
+            "/workspaces/Code-Index-MCP/fix_dispatcher_timeout.py",
+            "...str) -> str:\n         \"\"\"Determine the search strategy based on query analysis.\"\"\"\n@@ -768,6 +798,22 @@ class <<EnhancedDispatcher>>:\n         \"\"\"\n         # Implementation tracking\n         logger.debug...",
+            -4.194313880152875
+          ]
+        ]
+      },
+      "grep": {
+        "method": "native_grep",
+        "query": "EnhancedDispatcher",
+        "duration_ms": 3334.7740969911683,
+        "result_count": 459,
+        "has_snippets": true,
+        "has_file_paths": true,
+        "has_line_numbers": true,
+        "sample_results": [
+          "./archive/scripts/comprehensive_enhanced_mcp_test.py:112:                    \"Find the EnhancedDispatcher class definition and show its inheritance hierarchy\",",
+          "./archive/scripts/comprehensive_enhanced_mcp_test.py:113:                    \"Show me all methods in EnhancedDispatcher that override parent methods\",",
+          "./archive/scripts/comprehensive_enhanced_mcp_test.py:144:                    \"Find the search method in EnhancedDispatcher\","
+        ]
+      },
+      "ripgrep": {
+        "method": "ripgrep",
+        "query": "EnhancedDispatcher",
+        "duration_ms": 0.4757089918712154,
+        "error": "[Errno 2] No such file or directory: 'rg'"
+      }
+    },
+    {
+      "query": "async def",
+      "mcp": {
+        "method": "mcp_sql_bm25",
+        "query": "async def",
+        "duration_ms": 5.864511986146681,
+        "result_count": 20,
+        "has_snippets": true,
+        "has_file_paths": true,
+        "sample_results": [
+          [
+            "/workspaces/Code-Index-MCP/mcp_server/interfaces/storage_interfaces.py",
+            "...Dict[str, Any] = None\n\n\n# ========================================\n# Core Storage Interfaces\n# ========================================\n\n\nclass IStorageEngine(ABC):\n    \"\"\"Main storage engine interface\"\"\"\n\n    @abstractmethod\n    <<async>> <<def>> initialize(self, config...",
+            -2.7895367226452765
+          ],
+          [
+            "/workspaces/Code-Index-MCP/mcp_server/interfaces/indexing_interfaces.py",
+            "...Dict[str, Any] = None\n\n\n# ========================================\n# Core Indexing Interfaces\n# ========================================\n\n\nclass IIndexEngine(IObservable):\n    \"\"\"Main interface for the indexing engine\"\"\"\n\n    @abstractmethod\n    <<async>> <<def>> initialize...",
+            -2.7819409640055994
+          ],
+          [
+            "/workspaces/Code-Index-MCP/mcp_server/interfaces/cache_interfaces.py",
+            "...CacheConfig) -> Result[None]:\n        \"\"\"Initialize the cache manager\"\"\"\n        pass\n\n    @abstractmethod\n    <<async>> <<def>> shutdown(self) -> Result[None]:\n        \"\"\"Shutdown the cache manager\"\"\"\n        pass...",
+            -2.781268430216461
+          ]
+        ]
+      },
+      "grep": {
+        "method": "native_grep",
+        "query": "async def",
+        "duration_ms": 428.7424930080306,
+        "result_count": 7377,
+        "has_snippets": true,
+        "has_file_paths": true,
+        "has_line_numbers": true,
+        "sample_results": [
+          "./archive/scripts/comprehensive_enhanced_mcp_test.py:206:    async def run_scenario_with_mcp(self, scenario: TestScenario) -> TestSession:",
+          "./archive/scripts/comprehensive_enhanced_mcp_test.py:262:    async def run_scenario_with_native(self, scenario: TestScenario) -> TestSession:",
+          "./archive/scripts/comprehensive_enhanced_mcp_test.py:310:    async def _execute_claude_query_mcp(self, query: str, scenario: TestScenario) -> str:"
+        ]
+      },
+      "ripgrep": {
+        "method": "ripgrep",
+        "query": "async def",
+        "duration_ms": 0.5550420028157532,
+        "error": "[Errno 2] No such file or directory: 'rg'"
+      }
+    },
+    {
+      "query": "TODO",
+      "mcp": {
+        "method": "mcp_sql_bm25",
+        "query": "TODO",
+        "duration_ms": 12.323220988037065,
+        "result_count": 20,
+        "has_snippets": true,
+        "has_file_paths": true,
+        "sample_results": [
+          [
+            "/workspaces/Code-Index-MCP/tests/comparison/test_token_breakdown.py",
+            "...len(python_content) // 4  # Rough estimate\n        }\n        \n        # Create another file with <<TODO>> comments\n        <<todo>>_content = '''\ndef process_data(data):\n    # <<TODO>>: Add...",
+            -5.383041321452484
+          ],
+          [
+            "/workspaces/Code-Index-MCP/tests/fixtures/data/test_data/markdown/tutorial.md",
+            "...Found <<TODOs>> in staged files:\"\n    echo \"$<<todos>>\"\n    read -p \"Continue with commit? (y/n) \" -n 1 -r\n    echo\n    if [[ ! $REPLY...",
+            -5.278828457805293
+          ],
+          [
+            "/workspaces/Code-Index-MCP/scripts/mcp_performance_summary.py",
+            "...True\n        },\n        {\n            \"scenario\": \"Pattern Search (<<TODO>>/FIXME)\",\n            \"description\": \"Finding all <<TODO>> and FIXME comments\",\n            \"direct_approach\": \"grep <<TODO>> + grep FIXME\",\n            \"direct...",
+            -5.111589653245633
+          ]
+        ]
+      },
+      "grep": {
+        "method": "native_grep",
+        "query": "TODO",
+        "duration_ms": 352.60210899286903,
+        "result_count": 6998,
+        "has_snippets": true,
+        "has_file_paths": true,
+        "has_line_numbers": true,
+        "sample_results": [
+          "./archive/scripts/simple_bm25_index.py:92:            \"SELECT filepath FROM bm25_simple WHERE bm25_simple MATCH 'TODO' LIMIT 5\"",
+          "./archive/scripts/simple_bm25_index.py:95:        print(f\"  Test search found {len(results)} TODO matches\")",
+          "./archive/scripts/comprehensive_mcp_native_comparison.py:113:                \"Find all TODO comments\","
+        ]
+      },
+      "ripgrep": {
+        "method": "ripgrep",
+        "query": "TODO",
+        "duration_ms": 0.6702079990645871,
+        "error": "[Errno 2] No such file or directory: 'rg'"
+      }
+    },
+    {
+      "query": "import",
+      "mcp": {
+        "method": "mcp_sql_bm25",
+        "query": "import",
+        "duration_ms": 20.652947001508437,
+        "result_count": 20,
+        "has_snippets": true,
+        "has_file_paths": true,
+        "sample_results": [
+          [
+            "/workspaces/Code-Index-MCP/tests/fixtures/data/test_data/markdown/huge.md",
+            "...Key points:\n- Point 1: <<Important>> consideration about performance metric 1.1.1\n- Point 2: <<Important>> consideration about performance metric 1...",
+            -2.1856328347342414e-06
+          ],
+          [
+            "/workspaces/Code-Index-MCP/mcp_server/plugins/java_plugin/import_resolver.py",
+            "\"\"\"Java <<import>> resolver for resolving package <<imports>> and dependencies.\"\"\"\n\n<<import>> logging\nfrom pathlib <<import>> Path\nfrom typing <<import>> Dict, Set...",
+            -2.1836615094625253e-06
+          ],
+          [
+            "/workspaces/Code-Index-MCP/mcp_server/plugins/swift_plugin/module_analyzer.py",
+            "\"\"\"Swift module system and framework <<import>> analyzer.\"\"\"\n\n<<import>> re\n<<import>> logging\nfrom pathlib <<import>> Path\nfrom typing <<import>> List, Dict...",
+            -2.178827637421358e-06
+          ]
+        ]
+      },
+      "grep": {
+        "method": "native_grep",
+        "query": "import",
+        "duration_ms": 613.5280080052326,
+        "result_count": 210444,
+        "has_snippets": true,
+        "has_file_paths": true,
+        "has_line_numbers": true,
+        "sample_results": [
+          "./archive/scripts/analyze_claude_behavior_simple.py:6:import json",
+          "./archive/scripts/analyze_claude_behavior_simple.py:7:import os",
+          "./archive/scripts/analyze_claude_behavior_simple.py:8:from pathlib import Path"
+        ]
+      },
+      "ripgrep": {
+        "method": "ripgrep",
+        "query": "import",
+        "duration_ms": 0.7753259997116402,
+        "error": "[Errno 2] No such file or directory: 'rg'"
+      }
+    },
+    {
+      "query": "class",
+      "mcp": {
+        "method": "mcp_sql_bm25",
+        "query": "class",
+        "duration_ms": 8.427285007201135,
+        "result_count": 20,
+        "has_snippets": true,
+        "has_file_paths": true,
+        "sample_results": [
+          [
+            "/workspaces/Code-Index-MCP/mcp_server/plugins/language_registry.py",
+            "...kts\"],\n        \"symbols\": [\n            \"<<class>>_declaration\",\n            \"function_declaration\",\n            \"object_declaration\",\n            \"suspend_function\",\n            \"data_<<class>>\",\n            \"sealed_<<class>>\",\n            \"extension_function\",\n        ],\n        \"query\": \"\"\"\n            (<<class>>_declaration name...",
+            -2.173153597564355e-06
+          ],
+          [
+            "/workspaces/Code-Index-MCP/mcp_server/plugin_system/discovery.py",
+            "...plugin_<<class>>.__doc__ or \"\",\n            \"languages\": [language],\n            \"entry_point\": f\"{plugin_<<class>>.__module__}.{plugin_<<class>>.__name__}\",\n            \"path\": \"manual\",\n            \"<<class>>\": plugin_<<class>>...",
+            -2.171638362660221e-06
+          ],
+          [
+            "/workspaces/Code-Index-MCP/tests/test_python_plugin.py",
+            "...return super().__new__(mcs, name, bases, namespace)\n        \n        <<class>> MyClass(metaclass=MetaClass):\n            '''<<Class>> using metaclass.'''\n            pass\n        \n        <<class>> Descriptor:\n            '''A descriptor <<class>>...",
+            -2.1701135001547826e-06
+          ]
+        ]
+      },
+      "grep": {
+        "method": "native_grep",
+        "query": "class",
+        "duration_ms": 604.7230569965905,
+        "result_count": 151476,
+        "has_snippets": true,
+        "has_file_paths": true,
+        "has_line_numbers": true,
+        "sample_results": [
+          "./archive/scripts/analyze_claude_behavior_simple.py:14:class ClaudeTranscriptAnalyzer:",
+          "./archive/scripts/run_comprehensive_performance_test.py:33:        \"main_class\": \"Engine\",",
+          "./archive/scripts/run_comprehensive_performance_test.py:41:        \"main_class\": \"Model\","
+        ]
+      },
+      "ripgrep": {
+        "method": "ripgrep",
+        "query": "class",
+        "duration_ms": 0.553178004338406,
+        "error": "[Errno 2] No such file or directory: 'rg'"
+      }
+    },
+    {
+      "query": "error",
+      "mcp": {
+        "method": "mcp_sql_bm25",
+        "query": "error",
+        "duration_ms": 6.697421005810611,
+        "result_count": 20,
+        "has_snippets": true,
+        "has_file_paths": true,
+        "sample_results": [
+          [
+            "/workspaces/Code-Index-MCP/tests/root_tests/test_semantic_comprehensive.py",
+            "...this.handleGenericError(<<error>>);\n        }\n    }\n    \n    /**\n     * Handle validation <<errors>> with user-friendly messages\n     */\n    handleValidationError(<<error>>) {\n        const message = `Validation failed: ${<<error>>.message}`;\n        if (<<error>>...",
+            -2.1766823958041723e-06
+          ],
+          [
+            "/workspaces/Code-Index-MCP/mcp_server/plugin_system/plugin_manager.py",
+            "...<<error>> = <<Error>>(\n                code=\"PLUGIN_SHUTDOWN_<<ERROR>>\",\n                message=\"Failed to shutdown plugin manager\",\n                details={\"<<error>>_type\": type(e).__name__, \"<<error>>_message...",
+            -2.171618636497122e-06
+          ],
+          [
+            "/workspaces/Code-Index-MCP/mcp_server/core/errors.py",
+            "...Optional[Any] = None):\n        \"\"\"\n        Initialize MCP <<error>>.\n\n        Args:\n            message: <<Error>> message\n            details: Additional <<error>> details (optional)\n        \"\"\"\n        super().__init__(message)\n        self.message...",
+            -2.1690586072204615e-06
+          ]
+        ]
+      },
+      "grep": {
+        "method": "native_grep",
+        "query": "error",
+        "duration_ms": 509.91156400414184,
+        "result_count": 45422,
+        "has_snippets": true,
+        "has_file_paths": true,
+        "has_line_numbers": true,
+        "sample_results": [
+          "./archive/scripts/create_clean_index.py:138:        logger.error(f\"\u274c Source database not found: {source_db}\")",
+          "./archive/scripts/create_semantic_embeddings_simple.py:51:        logger.error(f\"Error creating embeddings: {e}\")",
+          "./archive/scripts/create_semantic_embeddings_simple.py:149:        logger.error(f\"Error processing repository: {e}\")"
+        ]
+      },
+      "ripgrep": {
+        "method": "ripgrep",
+        "query": "error",
+        "duration_ms": 0.5596080009127036,
+        "error": "[Errno 2] No such file or directory: 'rg'"
+      }
+    },
+    {
+      "query": "test_",
+      "mcp": {
+        "method": "mcp_sql_bm25",
+        "query": "test_",
+        "duration_ms": 9.256894001737237,
+        "result_count": 20,
+        "has_snippets": true,
+        "has_file_paths": true,
+        "sample_results": [
+          [
+            "/workspaces/Code-Index-MCP/tests/test_plugin_system.py",
+            "\"\"\"<<Tests>> for the plugin system.\"\"\"\n\nimport pytest\nimport tempfile\nimport json\nimport yaml\nfrom pathlib import Path\nfrom unittest.mock...",
+            -2.1911395835132268e-06
+          ],
+          [
+            "/workspaces/Code-Index-MCP/docs/development/TESTING-GUIDE.md",
+            "# Code-Index-MCP <<Testing>> Guide\n\nThis guide provides comprehensive instructions for <<testing>> the Code-Index-MCP project, covering unit <<tests>>...",
+            -2.1911035942592236e-06
+          ],
+          [
+            "/workspaces/Code-Index-MCP/tests/test_gateway.py",
+            "\"\"\"\nComprehensive <<tests>> for the MCP Server API Gateway.\n\nThis module <<tests>> all API endpoints including:\n- Symbol lookup\n- Search functionality (fuzzy...",
+            -2.1909265662029517e-06
+          ]
+        ]
+      },
+      "grep": {
+        "method": "native_grep",
+        "query": "test_",
+        "duration_ms": 487.719462995301,
+        "result_count": 100432,
+        "has_snippets": true,
+        "has_file_paths": true,
+        "has_line_numbers": true,
+        "sample_results": [
+          "./archive/scripts/index_test_repos_simple.py:45:    test_repos_dir = Path(\"/workspaces/Code-Index-MCP/test_repos\")",
+          "./archive/scripts/index_test_repos_simple.py:48:    for git_dir in sorted(test_repos_dir.rglob(\".git\")):",
+          "./archive/scripts/create_clean_index.py:32:    'test_repos/',"
+        ]
+      },
+      "ripgrep": {
+        "method": "ripgrep",
+        "query": "test_",
+        "duration_ms": 0.607134003075771,
+        "error": "[Errno 2] No such file or directory: 'rg'"
+      }
+    },
+    {
+      "query": "configuration",
+      "mcp": {
+        "method": "mcp_sql_bm25",
+        "query": "configuration",
+        "duration_ms": 12.699176004389301,
+        "result_count": 20,
+        "has_snippets": true,
+        "has_file_paths": true,
+        "sample_results": [
+          [
+            "/workspaces/Code-Index-MCP/docs/MCP_CONFIGURATION.md",
+            "# MCP <<Configuration>> Guide\n\nThis guide provides comprehensive information on <<configuring>> the Code-Index-MCP for different environments and use cases...",
+            -1.1685768768740288
+          ],
+          [
+            "/workspaces/Code-Index-MCP/mcp_server/plugin_system/config.py",
+            "\"\"\"\nPlugin <<configuration>> management.\nHandles loading, validation, and management of plugin <<configurations>>.\n\"\"\"\n\nimport os\nimport yaml\nimport json\nimport logging\nfrom...",
+            -1.1627896958849229
+          ],
+          [
+            "/workspaces/Code-Index-MCP/CLAUDE_CODE_MCP_ANALYSIS.md",
+            "# Claude Code MCP Connection Analysis\n\n## Executive Summary\n\nAfter analyzing Claude Code transcripts and <<configurations>>, I've identified the primary issue...",
+            -1.157424852607541
+          ]
+        ]
+      },
+      "grep": {
+        "method": "native_grep",
+        "query": "configuration",
+        "duration_ms": 421.509880994563,
+        "result_count": 10601,
+        "has_snippets": true,
+        "has_file_paths": true,
+        "has_line_numbers": true,
+        "sample_results": [
+          "./archive/scripts/run_comprehensive_performance_test.py:169:        # Create test configurations",
+          "./archive/scripts/run_comprehensive_performance_test.py:188:        # Save configurations",
+          "./archive/scripts/run_comprehensive_performance_test.py:198:        print(f\"Saved {len(test_configs)} test configurations to: {config_file}\")"
+        ]
+      },
+      "ripgrep": {
+        "method": "ripgrep",
+        "query": "configuration",
+        "duration_ms": 0.5311589920893312,
+        "error": "[Errno 2] No such file or directory: 'rg'"
+      }
+    },
+    {
+      "query": "authentication",
+      "mcp": {
+        "method": "mcp_sql_bm25",
+        "query": "authentication",
+        "duration_ms": 15.119953997782432,
+        "result_count": 20,
+        "has_snippets": true,
+        "has_file_paths": true,
+        "sample_results": [
+          [
+            "/workspaces/Code-Index-MCP/tests/test_security.py",
+            "...await auth_manager.<<authenticate>>_user(credentials)\n\n    @pytest.mark.asyncio\n    async def test_<<authenticate>>_user_nonexistent(self, auth_manager):\n        \"\"\"Test <<authentication>>...",
+            -3.973100576536458
+          ],
+          [
+            "/workspaces/Code-Index-MCP/tests/root_tests/test_reranking_simple.py",
+            "...str) -> User:\",\n            match_type=\"exact\",\n            score=0.85,\n            context=\"<<Authenticates>> a user with username and password\"\n        ),\n        SearchResult(\n            file_path=\"/app...",
+            -3.9641994705947505
+          ],
+          [
+            "/workspaces/Code-Index-MCP/docs/api/API-REFERENCE.md",
+            "...25,\n      \"content\": \"def <<authenticate>>_user(username: str, password: str) -> bool:\",\n      \"symbol\": {\n        \"name\": \"<<authenticate>>_user\",\n        \"kind\": \"function\",\n        \"signature\": \"def <<authenticate>>_user...",
+            -3.961100867964934
+          ]
+        ]
+      },
+      "grep": {
+        "method": "native_grep",
+        "query": "authentication",
+        "duration_ms": 422.46408300707117,
+        "result_count": 1550,
+        "has_snippets": true,
+        "has_file_paths": true,
+        "has_line_numbers": true,
+        "sample_results": [
+          "./archive/scripts/comprehensive_mcp_test.py:45:                'connection pooling', 'rate limiting', 'authentication', 'authorization',",
+          "./archive/scripts/comprehensive_mcp_native_comparison.py:118:                \"Show authentication logic\",",
+          "./archive/scripts/comprehensive_mcp_performance_test.py:82:            \"authentication middleware\","
+        ]
+      },
+      "ripgrep": {
+        "method": "ripgrep",
+        "query": "authentication",
+        "duration_ms": 0.6842069997219369,
+        "error": "[Errno 2] No such file or directory: 'rg'"
+      }
+    },
+    {
+      "query": "def search",
+      "mcp": {
+        "method": "mcp_sql_bm25",
+        "query": "def search",
+        "duration_ms": 8.333891004440375,
+        "result_count": 20,
+        "has_snippets": true,
+        "has_file_paths": true,
+        "sample_results": [
+          [
+            "/workspaces/Code-Index-MCP/mcp_server/interfaces/indexing_interfaces.py",
+            "...Dict[str, Any]\n    ) -> Result[List[SymbolDefinition]]:\n        \"\"\"<<Search>> for symbols\"\"\"\n        pass\n\n    @abstractmethod\n    async <<def>> <<search>>_references(\n        self, symbol: str, options: Dict...",
+            -4.340411632646906e-06
+          ],
+          [
+            "/workspaces/Code-Index-MCP/tests/test_dispatcher_advanced.py",
+            "...str):\n        \"\"\"Find references to symbol.\"\"\"\n        return self._references.get(symbol, [])\n\n    <<def>> <<search>>(self, query: str, opts=None):\n        \"\"\"<<Search>> for query...",
+            -4.332610771756044e-06
+          ],
+          [
+            "/workspaces/Code-Index-MCP/mcp_server/benchmarks/benchmark_suite.py",
+            "...self._<<search>>_times = self._<<search>>_times[-10000:]\n\n    async <<def>> get_performance_metrics(self) -> Result[Dict[str, Any]]:\n        \"\"\"Get performance metrics...",
+            -4.320575447117511e-06
+          ]
+        ]
+      },
+      "grep": {
+        "method": "native_grep",
+        "query": "def search",
+        "duration_ms": 396.2214130006032,
+        "result_count": 433,
+        "has_snippets": true,
+        "has_file_paths": true,
+        "has_line_numbers": true,
+        "sample_results": [
+          "./archive/dispatcher/dispatcher.py:246:    def search(self, query: str, semantic=False, limit=20) -> Iterable[SearchResult]:",
+          "./analysis_archive/scripts_archive/root_test_scripts/test_mcp_semantic_simple.py:40:        (\"BM25: 'def search'\", \"def search\", False, 5),",
+          "./analysis_archive/scripts_archive/root_test_scripts/test_mcp_semantic_direct.py:18:    (\"search_code\", {\"query\": \"def search\", \"limit\": 5}, False),"
+        ]
+      },
+      "ripgrep": {
+        "method": "ripgrep",
+        "query": "def search",
+        "duration_ms": 0.5545949970837682,
+        "error": "[Errno 2] No such file or directory: 'rg'"
+      }
+    }
+  ],
+  "summary": {
+    "total_queries": 10,
+    "mcp_avg_ms": 10.57728649902856,
+    "grep_avg_ms": 757.2196167995571,
+    "ripgrep_avg_ms": 0,
+    "mcp_vs_grep_speedup": 71.58921306226334,
+    "mcp_vs_ripgrep_speedup": 0
+  },
+  "timestamp": "2025-06-28T05:39:07.166602"
+}
