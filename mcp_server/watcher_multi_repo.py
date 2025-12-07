@@ -18,7 +18,8 @@ from watchdog.events import FileSystemEventHandler
 
 from .watcher import FileWatcher, _Handler
 from .dispatcher.dispatcher_enhanced import EnhancedDispatcher
-from .storage.repository_registry import RepositoryRegistry, RepositoryInfo
+from .storage.repository_registry import RepositoryRegistry
+from .storage.multi_repo_manager import RepositoryInfo
 from .storage.git_index_manager import GitAwareIndexManager
 from .artifacts.commit_artifacts import CommitArtifactManager
 

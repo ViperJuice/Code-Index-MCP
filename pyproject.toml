@@ -1,24 +1,82 @@
 [project]
-name = "mcp_server"
-version = "0.0.0"
-description = "Local-first MCP server"
-dependencies = [
-  "fastapi>=0.110",
-  "uvicorn[standard]>=0.29",
-  "watchdog>=4.0",
-  "tree-sitter>=0.20.0",
-  "tree-sitter-languages>=1.8.0",
-  "jedi>=0.19.0",
-  "mcp>=1.9.0",
-  "voyageai>=0.2.0",
-  "qdrant-client>=1.7.0",
-  "python-dotenv>=1.0.0",
-  "psutil>=7.1.3",
-  "passlib>=1.7.4",
-  "prometheus-client>=0.23.1",
-  "pytest-cov>=7.0.0",
-  "pytest-benchmark>=5.2.3",
+name = "code-index-mcp"
+version = "1.0.0"
+description = "Local-first code indexer for AI assistants via Model Context Protocol (MCP)"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Jenner Torrence"}
 ]
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Text Processing :: Indexing",
+]
+keywords = ["mcp", "code-indexer", "ai", "llm", "claude", "code-search", "tree-sitter"]
+
+# Core dependencies - includes voyageai/qdrant for imports (features require API keys)
+dependencies = [
+    "mcp>=1.0.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+    "tree-sitter>=0.20.0",
+    "tree-sitter-languages>=1.7.0",
+    "jedi>=0.19.0",
+    "watchdog>=3.0.0",
+    "click>=8.1.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "httpx>=0.24.1",
+    "pyyaml>=6.0.0",
+    # Required for module imports (actual features need API keys)
+    "voyageai>=0.2.0",
+    "qdrant-client>=1.7.0",
+    "numpy>=1.24.0",
+    "psutil>=5.9.0",
+]
+
+[project.optional-dependencies]
+semantic = [
+    # Additional semantic search features (reranking, transformers)
+    "sentence-transformers>=2.0.0",
+    "cohere>=4.0.0",
+    "anthropic>=0.18.0",
+]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "pytest-timeout>=2.1.0",
+    "pytest-mock>=3.11.1",
+    "pytest-benchmark>=4.0.0",
+    "pytest-xdist>=3.3.1",
+    "black>=23.7.0",
+    "isort>=5.12.0",
+    "mypy>=1.5.1",
+]
+all = [
+    "code-index-mcp[semantic,dev]",
+]
+
+[project.scripts]
+mcp-index = "mcp_server.cli:cli"
+code-index-mcp = "mcp_server.cli:cli"
+
+[project.urls]
+Homepage = "https://github.com/ViperJuice/Code-Index-MCP"
+Documentation = "https://github.com/ViperJuice/Code-Index-MCP#readme"
+Repository = "https://github.com/ViperJuice/Code-Index-MCP"
+Issues = "https://github.com/ViperJuice/Code-Index-MCP/issues"
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
@@ -29,7 +87,35 @@ where = ["."]
 include = ["mcp_server*"]
 exclude = ["tests*", "data*", "logs*", "config*", "backup*", "docker*", "ai_docs*", "test_results*", "architecture*", "nginx*", "k8s*"]
 
-[dependency-groups]
-dev = [
-    "pytest>=9.0.2",
+[tool.setuptools.package-data]
+mcp_server = ["py.typed"]
+
+[tool.black]
+line-length = 100
+target-version = ["py38", "py39", "py310", "py311", "py312"]
+exclude = '''
+/(
+    \.git
+  | \.venv
+  | build
+  | dist
+  | \.eggs
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+filterwarnings = [
+    "ignore::DeprecationWarning",
 ]

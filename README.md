@@ -3,9 +3,12 @@
 Modular, extensible local-first code indexer designed to enhance Claude Code and other LLMs with deep code understanding capabilities. Built on the Model Context Protocol (MCP) for seamless integration with AI assistants.
 
 ## Implementation Status
-**Current completion**: 100% (Production-ready with comprehensive validation completed)  
-**System complexity**: 5/5 (High - 136k lines, semantic search, distributed architecture)  
-**Production ready**: Yes - All systems validated, sub-100ms query performance, complete documentation
+**Version**: 1.0.0 (MVP Release)
+**Core Features**: Stable - Local indexing, symbol/text search, 48-language support
+**Optional Features**: Semantic search (requires Voyage AI), Index sync (beta)
+**Performance**: Sub-100ms queries, <10s indexing for cached repositories
+
+> **New to Code-Index-MCP?** Check out our [Getting Started Guide](docs/GETTING_STARTED.md) for a quick walkthrough.
 
 ## 🎯 Key Features
 
@@ -127,7 +130,7 @@ This automatically detects your environment and creates the appropriate `.mcp.js
 #### Option 1: Basic Search (No API Keys) - 2 Minutes
 ```bash
 # Install MCP Index with Docker
-curl -sSL https://raw.githubusercontent.com/Code-Index-MCP/main/scripts/install-mcp-docker.sh | bash
+curl -sSL https://raw.githubusercontent.com/ViperJuice/Code-Index-MCP/main/scripts/install-mcp-docker.sh | bash
 
 # Index your current directory
 docker run -it -v $(pwd):/workspace ghcr.io/code-index-mcp/mcp-index:minimal
@@ -239,71 +242,50 @@ The setup script creates the appropriate `.mcp.json` for your environment. Manua
 ### Prerequisites
 - Python 3.8+
 - Git
-- Docker (optional, for architecture diagrams)
 
 ### Installation
 
-#### Option 1: Quick Start with Pre-built Index
-Download a pre-built index from our releases to get started immediately:
-
+#### Option 1: Install via pip (Recommended)
 ```bash
-# Download latest release
-python scripts/download-release.py --latest
+# Install the package
+pip install code-index-mcp
 
-# Or download a specific version
-python scripts/download-release.py --tag v2024.01.15
+# Or install with dev tools for testing
+pip install code-index-mcp[dev]
 ```
 
-#### Option 2: Build from Source
+#### Option 2: Install from Source
+```bash
+# Clone the repository
+git clone https://github.com/ViperJuice/Code-Index-MCP.git
+cd Code-Index-MCP
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/Code-Index-MCP.git
-   cd Code-Index-MCP
-   ```
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-2. **Install dependencies**
-   ```bash
-   # Create virtual environment
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   
-   # Install requirements
-   pip install -r requirements.txt
-   ```
+# Install in editable mode
+pip install -e .
+```
 
-3. **Build the index** (or download pre-built)
-   ```bash
-   # Build index for current directory with full support (SQL + Semantic)
-   python scripts/index_repositories.py --mode full
-   
-   # Or use specific modes:
-   # SQL-only (fast, no API key needed):
-   python scripts/index_repositories.py --mode sql
-   
-   # Semantic-only (requires VOYAGE_AI_API_KEY):
-   python scripts/index_repositories.py --mode semantic
-   
-   # Or download from GitHub artifacts (if available)
-   python scripts/index-artifact-download-v2.py --latest
-   ```
+### Quick Start After Installation
 
-4. **Start the server**
-   ```bash
-   # Start the MCP server
-   uvicorn mcp_server.gateway:app --reload --host 0.0.0.0 --port 8000
-   ```
+```bash
+# Build index for your project (from project root)
+mcp-index index rebuild
 
-5. **Test the API**
-   ```bash
-   # Check server status
-   curl http://localhost:8000/status
-   
-   # Search for code
-   curl -X POST http://localhost:8000/search \
-     -H "Content-Type: application/json" \
-     -d '{"query": "def parse"}'
-   ```
+# Check index status
+mcp-index index status
+
+# Start the API server
+uvicorn mcp_server.gateway:app --host 0.0.0.0 --port 8000
+
+# Test the API
+curl http://localhost:8000/status
+curl -X POST http://localhost:8000/search \
+  -H "Content-Type: application/json" \
+  -d '{"query": "def parse"}'
+```
 
 ### 🔧 Configuration
 
@@ -513,7 +495,7 @@ Enable portable index management in any repository with zero GitHub compute cost
 
 ```bash
 # One-line install
-curl -sSL https://raw.githubusercontent.com/yourusername/mcp-index-kit/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/ViperJuice/Code-Index-MCP/main/scripts/install-mcp.sh | bash
 
 # Or via npm
 npm install -g mcp-index-kit
@@ -954,24 +936,19 @@ For detailed architectural documentation, see the [architecture/](architecture/)
 
 See [ROADMAP.md](ROADMAP.md) for detailed development plans and current progress.
 
-**Current Status**: 100% Complete - Production Ready
-- ✅ **Completed**: All features implemented and validated
-- ✅ **Documentation**: Complete user guides and troubleshooting resources
-- ✅ **Testing**: Comprehensive validation framework with E2E coverage
-- ✅ **Architecture**: All diagrams and documentation aligned with implementation
+**Current Status**: v1.0.0 MVP Release
+- ✅ **Core Indexing**: SQLite + FTS5 for fast local search
+- ✅ **Multi-Language**: 48 languages via tree-sitter integration
+- ✅ **MCP Protocol**: Full compatibility with Claude Code and other MCP clients
+- ✅ **Performance**: Sub-100ms queries with BM25 optimization
+- 🔄 **Index Sync**: Beta support via GitHub Artifacts
+- 🔄 **Semantic Search**: Optional feature requiring Voyage AI API
 
-**Recent Achievements (June 2025)**: 
-- **🎯 PROJECT COMPLETION**: Achieved 100% completion with comprehensive validation
-- **🚀 Parallelization Optimization**: 81% time reduction in analysis framework (66+ min → 12.5 min)
-- **📚 Complete Documentation Suite**: Performance tuning, troubleshooting, best practices, and quick start guides
-- **🔧 MCP Integration Enhancement**: Enhanced sync.py integration with dispatcher optimization
-- **✅ Production Validation Framework**: Component, integration, E2E, and architecture validation testing
-- **🏗️ Architecture Alignment**: Updated all Structurizr DSL and PlantUML files to reflect current state
-- **📊 Enhanced Performance Analysis**: Comprehensive MCP vs Native comparison with token tracking
-- **🗂️ Codebase Organization**: Cleaned up 200+ analysis files, organized into dedicated directories
-- **⚡ Dispatcher Improvements**: Fixed timeout issues (5-second protection) and BM25 bypass
-- **🔄 Git Synchronization**: Automatic index updates tracking repository changes
-- **📈 Performance Validation**: Sub-100ms query performance across 150K+ files
+**Recent Improvements**:
+- **⚡ Dispatcher Optimization**: Timeout protection and BM25 bypass for reliability
+- **🔄 Hybrid Search**: BM25 + semantic search with graceful degradation
+- **📊 Result Ranking**: Improved relevance with score normalization
+- **🔧 CLI Tools**: Full-featured `mcp-index` command for index management
 
 ### Optimization Tips
 
@@ -1005,11 +982,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📬 Contact
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/Code-Index-MCP/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/Code-Index-MCP/discussions)
-- **Email**: your.email@example.com
+- **Issues**: [GitHub Issues](https://github.com/ViperJuice/Code-Index-MCP/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/ViperJuice/Code-Index-MCP/discussions)
 
 ---
 
 <p align="center">Built with ❤️ for the developer community</p>
-# Test change to trigger hook

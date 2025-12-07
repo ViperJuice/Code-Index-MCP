@@ -6,13 +6,14 @@ including index management, diagnostics, and maintenance operations.
 """
 
 import click
+from .. import __version__
 from .index_management import index
 from .artifact_commands import artifact
 from .repository_commands import repository
 
 
 @click.group()
-@click.version_option()
+@click.version_option(version=__version__, prog_name="code-index-mcp")
 def cli():
     """MCP Server CLI utilities."""
     pass
