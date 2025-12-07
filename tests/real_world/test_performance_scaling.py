@@ -4,22 +4,23 @@ Real-world performance scaling tests for Code-Index-MCP.
 Tests how performance scales with repository size and complexity.
 """
 
-import pytest
-import time
 import asyncio
-from pathlib import Path
-from typing import Dict, List, Any, Optional
-import subprocess
-import tempfile
 import os
 import statistics
-import psutil
+import subprocess
+import tempfile
+import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from mcp_server.storage.sqlite_store import SQLiteStore
+import psutil
+import pytest
+
 from mcp_server.dispatcher.dispatcher import Dispatcher
-from mcp_server.plugin_system.plugin_manager import PluginManager
-from mcp_server.utils.fuzzy_indexer import FuzzyIndexer
 from mcp_server.interfaces.shared_interfaces import Result
+from mcp_server.plugin_system.plugin_manager import PluginManager
+from mcp_server.storage.sqlite_store import SQLiteStore
+from mcp_server.utils.fuzzy_indexer import FuzzyIndexer
 
 
 class TestPerformanceScaling:
@@ -68,9 +69,7 @@ class TestPerformanceScaling:
         """Provide fuzzy search indexer."""
         return FuzzyIndexer()
 
-    def ensure_repository_exists(
-        self, workspace_dir: Path, repo_name: str, repo_url: str
-    ) -> Path:
+    def ensure_repository_exists(self, workspace_dir: Path, repo_name: str, repo_url: str) -> Path:
         """Ensure repository exists in workspace, download if needed."""
         repo_path = workspace_dir / repo_name
 
@@ -121,9 +120,7 @@ class TestPerformanceScaling:
             result = plugin.indexFile(file_path, content)
 
             return (
-                Result.success(result)
-                if result
-                else Result.error("Plugin returned empty result")
+                Result.success(result) if result else Result.error("Plugin returned empty result")
             )
 
         except Exception as e:
@@ -162,9 +159,7 @@ class TestPerformanceScaling:
         dispatcher: Dispatcher,
     ) -> Dict[str, Any]:
         """Measure indexing performance for a set of files."""
-        repo_id = test_db.create_repository(
-            str(repo_path), repo_path.name, {"type": "perf_test"}
-        )
+        repo_id = test_db.create_repository(str(repo_path), repo_path.name, {"type": "perf_test"})
 
         start_time = time.perf_counter()
         start_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
@@ -188,9 +183,7 @@ class TestPerformanceScaling:
                 lines = len(content.splitlines())
                 chars = len(content)
 
-                result = self.index_file_with_plugin(
-                    str(file_path), content, dispatcher
-                )
+                result = self.index_file_with_plugin(str(file_path), content, dispatcher)
                 if result.success:
                     symbols = result.value.get("symbols", [])
 
@@ -249,16 +242,12 @@ class TestPerformanceScaling:
             "avg_file_time_ms": statistics.mean(file_times) if file_times else 0,
             "max_file_time_ms": max(file_times) if file_times else 0,
             "success_rate": (
-                indexed_files / (indexed_files + errors)
-                if (indexed_files + errors) > 0
-                else 0
+                indexed_files / (indexed_files + errors) if (indexed_files + errors) > 0 else 0
             ),
         }
 
     @pytest.mark.performance
-    def test_indexing_performance_scaling(
-        self, workspace_dir, test_db, dispatcher, benchmark
-    ):
+    def test_indexing_performance_scaling(self, workspace_dir, test_db, dispatcher, benchmark):
         """Test how indexing performance scales with repository size."""
         repo_path = self.ensure_repository_exists(
             workspace_dir, "django_scaling", "https://github.com/django/django.git"
@@ -332,15 +321,11 @@ class TestPerformanceScaling:
             ), f"Throughput degrades too much: {throughput_degradation:.1%}"
 
             # Memory usage should scale roughly linearly
-            memory_per_file_ratios = [
-                memory_usage[i] / sizes[i] for i in range(len(sizes))
-            ]
-            memory_variance = statistics.stdev(
+            memory_per_file_ratios = [memory_usage[i] / sizes[i] for i in range(len(sizes))]
+            memory_variance = statistics.stdev(memory_per_file_ratios) / statistics.mean(
                 memory_per_file_ratios
-            ) / statistics.mean(memory_per_file_ratios)
-            assert (
-                memory_variance < 1.0
-            ), f"Memory scaling too inconsistent: {memory_variance:.2f}"
+            )
+            assert memory_variance < 1.0, f"Memory scaling too inconsistent: {memory_variance:.2f}"
 
     @pytest.mark.performance
     def test_search_performance_scaling(
@@ -381,9 +366,7 @@ class TestPerformanceScaling:
                         if len(content.strip()) == 0:
                             continue
 
-                        result = self.index_file_with_plugin(
-                            str(file_path), content, dispatcher
-                        )
+                        result = self.index_file_with_plugin(str(file_path), content, dispatcher)
                         if result.success:
                             symbols = result.value.get("symbols", [])
 
@@ -441,12 +424,8 @@ class TestPerformanceScaling:
                 }
 
                 # Performance assertions
-                assert (
-                    avg_search_time < 50
-                ), f"Average search too slow: {avg_search_time:.2f}ms"
-                assert (
-                    max_search_time < 200
-                ), f"Slowest search too slow: {max_search_time:.2f}ms"
+                assert avg_search_time < 50, f"Average search too slow: {avg_search_time:.2f}ms"
+                assert max_search_time < 200, f"Slowest search too slow: {max_search_time:.2f}ms"
 
             finally:
                 try:
@@ -478,9 +457,7 @@ class TestPerformanceScaling:
 
     @pytest.mark.performance
     @pytest.mark.slow
-    def test_large_codebase_performance(
-        self, workspace_dir, test_db, dispatcher, benchmark
-    ):
+    def test_large_codebase_performance(self, workspace_dir, test_db, dispatcher, benchmark):
         """Test performance on a large codebase subset."""
         repo_path = self.ensure_repository_exists(
             workspace_dir, "linux_subset", "https://github.com/torvalds/linux.git"
@@ -491,9 +468,7 @@ class TestPerformanceScaling:
         print(f"Testing with {len(c_files)} C files from Linux kernel")
 
         def index_large_codebase():
-            return self.measure_indexing_performance(
-                c_files, repo_path, test_db, dispatcher
-            )
+            return self.measure_indexing_performance(c_files, repo_path, test_db, dispatcher)
 
         perf_data = benchmark(index_large_codebase)
 
@@ -588,9 +563,7 @@ class TestPerformanceScaling:
                 "total_time_s": total_time,
                 "successful_files": len(successful),
                 "total_symbols": sum(r.get("symbols", 0) for r in successful),
-                "files_per_second": (
-                    len(successful) / total_time if total_time > 0 else 0
-                ),
+                "files_per_second": (len(successful) / total_time if total_time > 0 else 0),
                 "success_rate": len(successful) / len(results) if results else 0,
             }
 
@@ -616,9 +589,7 @@ class TestPerformanceScaling:
         )
 
         speedup = best_concurrent_throughput / sequential_throughput
-        assert (
-            speedup >= 1.5
-        ), f"Concurrent indexing should provide speedup: {speedup:.1f}x"
+        assert speedup >= 1.5, f"Concurrent indexing should provide speedup: {speedup:.1f}x"
 
         print(f"\nBest speedup: {speedup:.1f}x over sequential processing")
 
@@ -670,14 +641,12 @@ class TestPerformanceScaling:
                     "avg_file_size_kb": avg_file_size / 1024,
                     "total_file_size_mb": total_file_size / (1024 * 1024),
                     "memory_per_file_kb": (
-                        (perf_data["memory_increase_mb"] * 1024)
-                        / perf_data["indexed_files"]
+                        (perf_data["memory_increase_mb"] * 1024) / perf_data["indexed_files"]
                         if perf_data["indexed_files"] > 0
                         else 0
                     ),
                     "memory_per_symbol_bytes": (
-                        (perf_data["memory_increase_mb"] * 1024 * 1024)
-                        / perf_data["total_symbols"]
+                        (perf_data["memory_increase_mb"] * 1024 * 1024) / perf_data["total_symbols"]
                         if perf_data["total_symbols"] > 0
                         else 0
                     ),

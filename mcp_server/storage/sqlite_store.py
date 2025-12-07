@@ -5,13 +5,13 @@ This module provides a local storage implementation using SQLite with FTS5
 for efficient full-text search capabilities.
 """
 
-import sqlite3
 import json
 import logging
-from typing import List, Dict, Any, Optional, Tuple, Union
+import sqlite3
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from contextlib import contextmanager
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ..core.path_resolver import PathResolver
 
@@ -35,12 +35,12 @@ class SQLiteStore:
         """
         self.db_path = db_path
         self.path_resolver = path_resolver or PathResolver()
-        
+
         # Check if database already exists
         db_exists = Path(db_path).exists()
-        
+
         self._init_database()
-        
+
         # Only run migrations on new databases
         if not db_exists:
             self._run_migrations()
@@ -78,11 +78,17 @@ class SQLiteStore:
 
                 # Check for missing columns that may need migration
                 if not self._check_column_exists(conn, "files", "content_hash"):
-                    logger.warning("Column 'content_hash' missing from 'files' table - migration may be needed")
+                    logger.warning(
+                        "Column 'content_hash' missing from 'files' table - migration may be needed"
+                    )
                 if not self._check_column_exists(conn, "files", "is_deleted"):
-                    logger.warning("Column 'is_deleted' missing from 'files' table - migration may be needed")
+                    logger.warning(
+                        "Column 'is_deleted' missing from 'files' table - migration may be needed"
+                    )
                 if not self._check_column_exists(conn, "files", "deleted_at"):
-                    logger.warning("Column 'deleted_at' missing from 'files' table - migration may be needed")
+                    logger.warning(
+                        "Column 'deleted_at' missing from 'files' table - migration may be needed"
+                    )
 
     def _run_migrations(self):
         """Run any pending database migrations."""
@@ -91,12 +97,15 @@ class SQLiteStore:
             cursor = conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='bm25_content'"
             )
-            if cursor.fetchone() and not conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'"
-            ).fetchone():
+            if (
+                cursor.fetchone()
+                and not conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'"
+                ).fetchone()
+            ):
                 logger.debug("Skipping migrations for BM25-only database")
                 return
-        
+
         migrations_dir = Path(__file__).parent / "migrations"
         if not migrations_dir.exists():
             return
@@ -388,9 +397,7 @@ class SQLiteStore:
         )
 
     # Repository operations
-    def create_repository(
-        self, path: str, name: str, metadata: Optional[Dict] = None
-    ) -> int:
+    def create_repository(self, path: str, name: str, metadata: Optional[Dict] = None) -> int:
         """Create a new repository entry."""
         with self._get_connection() as conn:
             cursor = conn.execute(
@@ -407,9 +414,7 @@ class SQLiteStore:
             else:
                 # If lastrowid is None, it means we updated an existing row
                 # Get the id of the existing repository
-                cursor = conn.execute(
-                    "SELECT id FROM repositories WHERE path = ?", (path,)
-                )
+                cursor = conn.execute("SELECT id FROM repositories WHERE path = ?", (path,))
                 return cursor.fetchone()[0]
 
     def get_repository(self, path: str) -> Optional[Dict]:
@@ -819,7 +824,7 @@ class SQLiteStore:
             "fts5": False,
             "wal": False,
             "version": 0,
-            "error": None
+            "error": None,
         }
 
         try:
@@ -840,13 +845,12 @@ class SQLiteStore:
                     "parse_cache",
                     "migrations",
                     "index_config",
-                    "file_moves"
+                    "file_moves",
                 ]
 
                 for table in required_tables:
                     cursor = conn.execute(
-                        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-                        (table,)
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
                     )
                     result["tables"][table] = cursor.fetchone() is not None
 
@@ -872,7 +876,9 @@ class SQLiteStore:
                 if missing_tables:
                     if len(missing_tables) > 5:
                         result["status"] = "unhealthy"
-                        result["error"] = f"Critical tables missing: {', '.join(missing_tables[:5])} and {len(missing_tables) - 5} more"
+                        result["error"] = (
+                            f"Critical tables missing: {', '.join(missing_tables[:5])} and {len(missing_tables) - 5} more"
+                        )
                     else:
                         result["status"] = "degraded"
                         result["error"] = f"Some tables missing: {', '.join(missing_tables)}"
@@ -916,17 +922,16 @@ class SQLiteStore:
         with self._get_connection() as conn:
             # Check if this is a simple BM25 table (like bm25_content) or structured FTS
             cursor = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-                (table,)
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
             )
             if not cursor.fetchone():
                 # Table doesn't exist
                 return []
-                
+
             # Check table structure
             cursor = conn.execute(f"PRAGMA table_info({table})")
             table_columns = {row[1] for row in cursor.fetchall()}
-            
+
             if table == "fts_code" and "file_id" in table_columns:
                 # Modern schema with file_id references - join with files table
                 cursor = conn.execute(
@@ -1069,9 +1074,7 @@ class SQLiteStore:
 
             return results
 
-    def get_bm25_term_statistics(
-        self, term: str, table: str = "fts_code"
-    ) -> Dict[str, Any]:
+    def get_bm25_term_statistics(self, term: str, table: str = "fts_code") -> Dict[str, Any]:
         """
         Get term statistics for BM25 tuning.
 
@@ -1162,9 +1165,7 @@ class SQLiteStore:
                     logger.warning(f"Could not rebuild {table}: {e}")
 
     # New file operation methods for path management
-    def get_file_by_content_hash(
-        self, content_hash: str, repository_id: int
-    ) -> Optional[Dict]:
+    def get_file_by_content_hash(self, content_hash: str, repository_id: int) -> Optional[Dict]:
         """Get file by content hash."""
         with self._get_connection() as conn:
             cursor = conn.execute(
@@ -1212,9 +1213,7 @@ class SQLiteStore:
 
             logger.info(f"Removed file and all associated data: {relative_path}")
 
-    def move_file(
-        self, old_path: str, new_path: str, repository_id: int, content_hash: str
-    ):
+    def move_file(self, old_path: str, new_path: str, repository_id: int, content_hash: str):
         """Record a file move operation."""
         with self._get_connection() as conn:
             # Update the file path
@@ -1260,6 +1259,4 @@ class SQLiteStore:
                     # Use remove_file for thorough cleanup
                     self.remove_file(path, repository_id=None)
 
-                logger.info(
-                    f"Cleaned up {count} deleted files older than {days_old} days"
-                )
+                logger.info(f"Cleaned up {count} deleted files older than {days_old} days")

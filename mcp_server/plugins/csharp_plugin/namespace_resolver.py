@@ -1,10 +1,10 @@
 """Namespace resolution utilities for C# code analysis."""
 
-from typing import Dict, List, Set, Optional, Tuple
-from pathlib import Path
+import logging
 import re
 import xml.etree.ElementTree as ET
-import logging
+from pathlib import Path
+from typing import Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -290,9 +290,7 @@ class NamespaceResolver:
                 include = package_ref.get("Include")
                 version = package_ref.get("Version")
                 if include:
-                    analysis["package_references"].append(
-                        {"name": include, "version": version}
-                    )
+                    analysis["package_references"].append({"name": include, "version": version})
 
             # Extract project references
             for proj_ref in root.findall(".//ProjectReference"):

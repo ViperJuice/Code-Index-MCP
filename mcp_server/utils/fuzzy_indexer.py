@@ -1,6 +1,6 @@
-import pickle
 import logging
-from typing import Optional, List, Dict, Tuple, Set, Any
+import pickle
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 # Import SQLiteStore only if it's available
 try:
@@ -24,7 +24,7 @@ class FuzzyIndexer:
         self.sqlite_store = sqlite_store
         self._index_type = "fuzzy_file_index"
         self._symbol_metadata: Dict[str, Dict[str, Any]] = {}  # Track symbol metadata
-        
+
         # Detect available schema type
         self._schema_type = "fts_code"  # Default expected schema
         if self.sqlite_store:
@@ -38,14 +38,14 @@ class FuzzyIndexer:
         """Detect which schema type is available in the database."""
         if not self.sqlite_store:
             return "fts_code"
-            
+
         try:
             with self.sqlite_store._get_connection() as conn:
                 cursor = conn.execute(
                     "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('fts_code', 'bm25_content')"
                 )
                 tables = [row[0] for row in cursor.fetchall()]
-                
+
                 if "fts_code" in tables:
                     logger.debug("Detected fts_code schema")
                     return "fts_code"
@@ -162,9 +162,7 @@ class FuzzyIndexer:
                     if key in seen:
                         continue
                     seen.add(key)
-                    results.append(
-                        {"file": file, "line": line_no, "snippet": text.strip()}
-                    )
+                    results.append({"file": file, "line": line_no, "snippet": text.strip()})
                     if len(results) >= limit:
                         return results
         return results

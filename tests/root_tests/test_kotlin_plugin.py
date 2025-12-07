@@ -134,7 +134,7 @@ def test_kotlin_plugin():
     """Test the Kotlin plugin functionality."""
     print("Testing Kotlin Plugin Implementation")
     print("=" * 50)
-    
+
     # Create plugin instance
     try:
         # Initialize with in-memory SQLite store
@@ -144,33 +144,35 @@ def test_kotlin_plugin():
     except Exception as e:
         print(f"✗ Failed to create Kotlin plugin: {e}")
         return False
-    
+
     # Test basic properties
     print(f"✓ Language name: {plugin.get_language_name()}")
     print(f"✓ File extensions: {plugin.get_file_extensions()}")
     print(f"✓ Supported queries: {len(plugin.get_supported_queries())} query types")
-    
+
     # Test symbol extraction
     test_content = create_test_kotlin_file()
     test_file_path = "/tmp/test_kotlin_file.kt"
-    
+
     try:
         symbols = plugin.extract_symbols(test_content, test_file_path)
         print(f"✓ Extracted {len(symbols)} symbols from test file")
-        
+
         # Display some symbols
         symbol_types = {}
         for symbol in symbols[:10]:  # Show first 10 symbols
-            symbol_type = symbol.get('type', 'unknown')
+            symbol_type = symbol.get("type", "unknown")
             symbol_types[symbol_type] = symbol_types.get(symbol_type, 0) + 1
-            print(f"  - {symbol.get('name', 'unnamed')} ({symbol_type}) at line {symbol.get('line_number', 0)}")
-        
+            print(
+                f"  - {symbol.get('name', 'unnamed')} ({symbol_type}) at line {symbol.get('line_number', 0)}"
+            )
+
         print(f"✓ Symbol type distribution: {dict(symbol_types)}")
-        
+
     except Exception as e:
         print(f"✗ Symbol extraction failed: {e}")
         return False
-    
+
     # Test null safety analysis
     try:
         null_safety_result = plugin.null_safety_analyzer.analyze(None, test_content)
@@ -178,14 +180,14 @@ def test_kotlin_plugin():
         print(f"  - Nullable usages: {len(null_safety_result.get('nullable_usages', []))}")
         print(f"  - Safe call chains: {len(null_safety_result.get('safe_call_chains', []))}")
         print(f"  - Not-null assertions: {len(null_safety_result.get('not_null_assertions', []))}")
-        
-        stats = null_safety_result.get('statistics', {})
+
+        stats = null_safety_result.get("statistics", {})
         if stats:
             print(f"  - Safety score: {stats.get('safety_score', 'N/A')}")
             print(f"  - Overall risk: {stats.get('overall_risk', 'N/A')}")
     except Exception as e:
         print(f"✗ Null safety analysis failed: {e}")
-    
+
     # Test coroutines analysis
     try:
         coroutines_result = plugin.coroutines_analyzer.analyze(None, test_content)
@@ -193,14 +195,14 @@ def test_kotlin_plugin():
         print(f"  - Suspend functions: {len(coroutines_result.get('suspend_functions', []))}")
         print(f"  - Coroutine builders: {len(coroutines_result.get('coroutine_builders', []))}")
         print(f"  - Flow operations: {len(coroutines_result.get('flow_operations', []))}")
-        
-        stats = coroutines_result.get('statistics', {})
+
+        stats = coroutines_result.get("statistics", {})
         if stats:
             print(f"  - Maturity score: {stats.get('maturity_score', 'N/A')}")
             print(f"  - Performance impact: {stats.get('performance_impact', 'N/A')}")
     except Exception as e:
         print(f"✗ Coroutines analysis failed: {e}")
-    
+
     # Test Java interop analysis
     try:
         java_interop_result = plugin.java_interop_analyzer.analyze(None, test_content)
@@ -208,14 +210,14 @@ def test_kotlin_plugin():
         print(f"  - JVM annotations: {len(java_interop_result.get('jvm_annotations', []))}")
         print(f"  - Java imports: {len(java_interop_result.get('java_imports', []))}")
         print(f"  - Collection interop: {len(java_interop_result.get('collection_interop', []))}")
-        
-        stats = java_interop_result.get('statistics', {})
+
+        stats = java_interop_result.get("statistics", {})
         if stats:
             print(f"  - Interop quality score: {stats.get('interop_quality_score', 'N/A')}")
             print(f"  - Java dependency level: {stats.get('java_dependency_level', 'N/A')}")
     except Exception as e:
         print(f"✗ Java interop analysis failed: {e}")
-    
+
     print("\n" + "=" * 50)
     print("✓ Kotlin plugin test completed successfully!")
     return True

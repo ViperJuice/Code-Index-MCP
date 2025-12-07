@@ -1,21 +1,21 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Iterable, Optional
+
 import jedi
-from typing import Optional
 
 from ...plugin_base import (
-    IPlugin,
     IndexShard,
-    SymbolDef,
+    IPlugin,
     Reference,
-    SearchResult,
     SearchOpts,
+    SearchResult,
+    SymbolDef,
 )
-
-from ...utils.treesitter_wrapper import TreeSitterWrapper
-from ...utils.fuzzy_indexer import FuzzyIndexer
 from ...storage.sqlite_store import SQLiteStore
+from ...utils.fuzzy_indexer import FuzzyIndexer
+from ...utils.treesitter_wrapper import TreeSitterWrapper
 
 
 class Plugin(IPlugin):
@@ -123,9 +123,7 @@ class Plugin(IPlugin):
             try:
                 source = path.read_text()
                 script = jedi.Script(code=source, path=str(path))
-                names = script.get_names(
-                    all_scopes=True, definitions=True, references=False
-                )
+                names = script.get_names(all_scopes=True, definitions=True, references=False)
                 for name in names:
                     if name.name == symbol and name.type in ("function", "class"):
                         defs = name.goto()
@@ -164,9 +162,7 @@ class Plugin(IPlugin):
         return refs
 
     # ------------------------------------------------------------------
-    def search(
-        self, query: str, opts: SearchOpts | None = None
-    ) -> Iterable[SearchResult]:
+    def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:
         limit = 20
         if opts and "limit" in opts:
             limit = opts["limit"]

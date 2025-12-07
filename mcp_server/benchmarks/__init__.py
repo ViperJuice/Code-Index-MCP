@@ -23,15 +23,15 @@ Usage:
     result = runner.run_benchmarks(plugins)
 """
 
+from .benchmark_runner import BenchmarkRunner
 from .benchmark_suite import (
-    BenchmarkSuite,
     BenchmarkResult,
+    BenchmarkSuite,
     PerformanceMetrics,
 )
-from .benchmark_runner import BenchmarkRunner
 from .mcp_comparison_benchmark import (
-    MCPComparisonBenchmark,
     ComparisonMetrics,
+    MCPComparisonBenchmark,
     run_comparison_benchmarks,
 )
 

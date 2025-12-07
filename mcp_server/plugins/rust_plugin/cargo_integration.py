@@ -7,10 +7,10 @@ try:
 except ImportError:
     HAS_TOML = False
 
-from pathlib import Path
-from typing import Dict, List, Optional, Set, Any
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set
 
 
 @dataclass
@@ -87,12 +87,8 @@ class CargoIntegration:
 
             # Extract dependencies
             dependencies = self._parse_dependencies(data.get("dependencies", {}))
-            dev_dependencies = self._parse_dependencies(
-                data.get("dev-dependencies", {})
-            )
-            build_dependencies = self._parse_dependencies(
-                data.get("build-dependencies", {})
-            )
+            dev_dependencies = self._parse_dependencies(data.get("dev-dependencies", {}))
+            build_dependencies = self._parse_dependencies(data.get("build-dependencies", {}))
 
             # Extract features
             features = data.get("features", {})
@@ -227,9 +223,7 @@ class CargoIntegration:
         except Exception:
             return None
 
-    def resolve_local_dependency(
-        self, from_crate: str, dep_name: str
-    ) -> Optional[Path]:
+    def resolve_local_dependency(self, from_crate: str, dep_name: str) -> Optional[Path]:
         """Resolve a local dependency path."""
         crate_info = self.find_crate_by_name(from_crate)
         if not crate_info:
@@ -376,9 +370,7 @@ class CargoIntegration:
                     # Array value
                     array_content = value[1:-1]
                     if array_content.strip():
-                        value = [
-                            item.strip().strip('"') for item in array_content.split(",")
-                        ]
+                        value = [item.strip().strip('"') for item in array_content.split(",")]
                     else:
                         value = []
                 elif value.startswith("{") and value.endswith("}"):

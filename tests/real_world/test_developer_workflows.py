@@ -4,21 +4,22 @@ Real-world developer workflow tests for Code-Index-MCP.
 Tests realistic developer search and navigation patterns.
 """
 
-import pytest
-import time
 import asyncio
-from pathlib import Path
-from typing import Dict, List, Any, Optional, Set
-import subprocess
-import tempfile
 import os
 import re
+import subprocess
+import tempfile
+import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set
 
-from mcp_server.storage.sqlite_store import SQLiteStore
+import pytest
+
 from mcp_server.dispatcher.dispatcher import Dispatcher
-from mcp_server.plugin_system.plugin_manager import PluginManager
-from mcp_server.utils.fuzzy_indexer import FuzzyIndexer
 from mcp_server.interfaces.shared_interfaces import Result
+from mcp_server.plugin_system.plugin_manager import PluginManager
+from mcp_server.storage.sqlite_store import SQLiteStore
+from mcp_server.utils.fuzzy_indexer import FuzzyIndexer
 
 
 class TestDeveloperWorkflows:
@@ -67,9 +68,7 @@ class TestDeveloperWorkflows:
         """Provide fuzzy search indexer."""
         return FuzzyIndexer()
 
-    def ensure_repository_exists(
-        self, workspace_dir: Path, repo_name: str, repo_url: str
-    ) -> Path:
+    def ensure_repository_exists(self, workspace_dir: Path, repo_name: str, repo_url: str) -> Path:
         """Ensure repository exists in workspace, download if needed."""
         repo_path = workspace_dir / repo_name
 
@@ -102,9 +101,7 @@ class TestDeveloperWorkflows:
         """Setup and index a repository for testing."""
         repo_path = self.ensure_repository_exists(workspace_dir, repo_name, repo_url)
 
-        repo_id = test_db.create_repository(
-            str(repo_path), repo_name, {"type": "workflow_test"}
-        )
+        repo_id = test_db.create_repository(str(repo_path), repo_name, {"type": "workflow_test"})
 
         # Index files and build search index
         indexed_count = 0
@@ -123,9 +120,7 @@ class TestDeveloperWorkflows:
                         continue
 
                     # Index with plugin
-                    result = self.index_file_with_plugin(
-                        str(file_path), content, dispatcher
-                    )
+                    result = self.index_file_with_plugin(str(file_path), content, dispatcher)
                     if result.success:
                         # Store in database
                         file_id = test_db.store_file(
@@ -196,17 +191,13 @@ class TestDeveloperWorkflows:
             result = plugin.indexFile(file_path, content)
 
             return (
-                Result.success(result)
-                if result
-                else Result.error("Plugin returned empty result")
+                Result.success(result) if result else Result.error("Plugin returned empty result")
             )
 
         except Exception as e:
             return Result.error(f"Error indexing {file_path}: {str(e)}")
 
-    def lookup_symbol(
-        self, symbol_name: str, fuzzy_indexer: FuzzyIndexer
-    ) -> List[Dict]:
+    def lookup_symbol(self, symbol_name: str, fuzzy_indexer: FuzzyIndexer) -> List[Dict]:
         """Look up a symbol using fuzzy search."""
         results = fuzzy_indexer.search(symbol_name, limit=20)
         return [
@@ -251,9 +242,7 @@ class TestDeveloperWorkflows:
                     results.append(
                         {
                             "file_path": file_data.get("path", ""),
-                            "content": (
-                                content[:300] + "..." if len(content) > 300 else content
-                            ),
+                            "content": (content[:300] + "..." if len(content) > 300 else content),
                             "line": line_num,
                         }
                     )
@@ -307,9 +296,7 @@ class TestDeveloperWorkflows:
 
     @pytest.mark.integration
     @pytest.mark.workflow
-    def test_find_function_usage(
-        self, workspace_dir, test_db, dispatcher, fuzzy_indexer
-    ):
+    def test_find_function_usage(self, workspace_dir, test_db, dispatcher, fuzzy_indexer):
         """Test finding where a function is used across codebase."""
         repo_id = self.setup_indexed_repository(
             workspace_dir,
@@ -333,9 +320,7 @@ class TestDeveloperWorkflows:
 
         # Validate result quality
         usage_files = set(result["file_path"] for result in usage_results)
-        assert (
-            len(usage_files) >= 3
-        ), f"Should span multiple files, got {len(usage_files)}"
+        assert len(usage_files) >= 3, f"Should span multiple files, got {len(usage_files)}"
 
         # Check for common usage patterns
         common_patterns = ["from", "import", "def", "get_object_or_404("]
@@ -349,9 +334,7 @@ class TestDeveloperWorkflows:
                     break
 
         pattern_coverage = found_patterns / len(usage_results) if usage_results else 0
-        assert (
-            pattern_coverage >= 0.5
-        ), f"Should find common usage patterns: {pattern_coverage:.1%}"
+        assert pattern_coverage >= 0.5, f"Should find common usage patterns: {pattern_coverage:.1%}"
 
         print(
             f"Function usage test: Found {len(symbol_results)} definitions, "
@@ -360,9 +343,7 @@ class TestDeveloperWorkflows:
 
     @pytest.mark.integration
     @pytest.mark.workflow
-    def test_class_hierarchy_discovery(
-        self, workspace_dir, test_db, dispatcher, fuzzy_indexer
-    ):
+    def test_class_hierarchy_discovery(self, workspace_dir, test_db, dispatcher, fuzzy_indexer):
         """Test discovering class inheritance patterns."""
         repo_id = self.setup_indexed_repository(
             workspace_dir,
@@ -375,9 +356,7 @@ class TestDeveloperWorkflows:
 
         # Search for Model class and its subclasses
         base_class = "Model"
-        model_results = self.search_code(
-            f"class.*{base_class}", test_db, repo_id, limit=30
-        )
+        model_results = self.search_code(f"class.*{base_class}", test_db, repo_id, limit=30)
 
         # Should find base Model class and many subclasses
         assert len(model_results) >= 5, f"Should find {base_class} class hierarchy"
@@ -388,9 +367,7 @@ class TestDeveloperWorkflows:
         found_patterns = 0
         for pattern in inheritance_patterns:
             pattern_results = [
-                r
-                for r in model_results
-                if re.search(pattern, r.get("content", ""), re.IGNORECASE)
+                r for r in model_results if re.search(pattern, r.get("content", ""), re.IGNORECASE)
             ]
             if pattern_results:
                 found_patterns += 1
@@ -403,9 +380,7 @@ class TestDeveloperWorkflows:
         subclass_results = self.lookup_symbol("User", fuzzy_indexer)
         if subclass_results:
             # Should find User model or similar
-            user_files = [
-                r["file"] for r in subclass_results if "model" in r["file"].lower()
-            ]
+            user_files = [r["file"] for r in subclass_results if "model" in r["file"].lower()]
             print(f"Found User-related symbols in {len(user_files)} model files")
 
         print(f"Class hierarchy test: Found {len(model_results)} Model-related classes")
@@ -430,13 +405,10 @@ class TestDeveloperWorkflows:
         for method in http_methods:
             # Look for function definitions
             symbol_results = self.lookup_symbol(method, fuzzy_indexer)
-            content_results = self.search_code(
-                f"def {method}", test_db, repo_id, limit=5
-            )
+            content_results = self.search_code(f"def {method}", test_db, repo_id, limit=5)
 
             combined_results = symbol_results + [
-                {"name": method, "file": r["file_path"], "line": r["line"]}
-                for r in content_results
+                {"name": method, "file": r["file_path"], "line": r["line"]} for r in content_results
             ]
 
             method_results[method] = combined_results
@@ -445,12 +417,8 @@ class TestDeveloperWorkflows:
                 print(f"Found {method} method in {len(combined_results)} locations")
 
         # Should find most HTTP methods
-        found_methods = [
-            method for method, results in method_results.items() if results
-        ]
-        assert (
-            len(found_methods) >= 3
-        ), f"Should find common HTTP methods: {found_methods}"
+        found_methods = [method for method, results in method_results.items() if results]
+        assert len(found_methods) >= 3, f"Should find common HTTP methods: {found_methods}"
 
         # Look for Session class (main API entry point)
         session_results = self.lookup_symbol("Session", fuzzy_indexer)

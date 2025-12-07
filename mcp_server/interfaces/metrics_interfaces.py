@@ -5,10 +5,11 @@ All interfaces related to metrics collection, monitoring, and observability.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any, Callable, ContextManager
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from .shared_interfaces import Result, IMetrics
+from typing import Any, Callable, ContextManager, Dict, List, Optional
+
+from .shared_interfaces import IMetrics, Result
 
 # ========================================
 # Metrics Data Types
@@ -100,9 +101,7 @@ class IMetricsCollector(IMetrics):
         pass
 
     @abstractmethod
-    def get_metric_value(
-        self, metric_name: str, labels: Dict[str, str] = None
-    ) -> Optional[float]:
+    def get_metric_value(self, metric_name: str, labels: Dict[str, str] = None) -> Optional[float]:
         """Get current value of a metric"""
         pass
 
@@ -159,9 +158,7 @@ class IMetricsExporter(ABC):
         pass
 
     @abstractmethod
-    async def send_to_endpoint(
-        self, endpoint: str, metrics: List[MetricSample]
-    ) -> Result[None]:
+    async def send_to_endpoint(self, endpoint: str, metrics: List[MetricSample]) -> Result[None]:
         """Send metrics to an endpoint"""
         pass
 
@@ -276,9 +273,7 @@ class IAlertManager(ABC):
         pass
 
     @abstractmethod
-    async def update_alert_rule(
-        self, rule_id: str, updates: Dict[str, Any]
-    ) -> Result[None]:
+    async def update_alert_rule(self, rule_id: str, updates: Dict[str, Any]) -> Result[None]:
         """Update an alert rule"""
         pass
 
@@ -312,9 +307,7 @@ class INotificationService(ABC):
         pass
 
     @abstractmethod
-    async def register_channel(
-        self, channel_name: str, config: Dict[str, Any]
-    ) -> Result[None]:
+    async def register_channel(self, channel_name: str, config: Dict[str, Any]) -> Result[None]:
         """Register notification channel"""
         pass
 
@@ -452,16 +445,12 @@ class IMetricsLogger(ABC):
     """Interface for logging metrics"""
 
     @abstractmethod
-    def log_metric(
-        self, metric_name: str, value: float, labels: Dict[str, str] = None
-    ) -> None:
+    def log_metric(self, metric_name: str, value: float, labels: Dict[str, str] = None) -> None:
         """Log a metric value"""
         pass
 
     @abstractmethod
-    def log_performance(
-        self, operation: str, duration: float, success: bool = True
-    ) -> None:
+    def log_performance(self, operation: str, duration: float, success: bool = True) -> None:
         """Log performance metric"""
         pass
 
@@ -512,23 +501,17 @@ class IBusinessMetrics(ABC):
     """Interface for business-specific metrics"""
 
     @abstractmethod
-    def track_api_usage(
-        self, endpoint: str, user_id: str, response_time: float
-    ) -> None:
+    def track_api_usage(self, endpoint: str, user_id: str, response_time: float) -> None:
         """Track API usage metrics"""
         pass
 
     @abstractmethod
-    def track_indexing_performance(
-        self, file_count: int, duration: float, language: str
-    ) -> None:
+    def track_indexing_performance(self, file_count: int, duration: float, language: str) -> None:
         """Track indexing performance"""
         pass
 
     @abstractmethod
-    def track_search_performance(
-        self, query_type: str, result_count: int, duration: float
-    ) -> None:
+    def track_search_performance(self, query_type: str, result_count: int, duration: float) -> None:
         """Track search performance"""
         pass
 
@@ -549,9 +532,7 @@ class ICustomMetricsCollector(ABC):
         pass
 
     @abstractmethod
-    def register_custom_metric(
-        self, name: str, collector_func: Callable[[], float]
-    ) -> None:
+    def register_custom_metric(self, name: str, collector_func: Callable[[], float]) -> None:
         """Register custom metric collector"""
         pass
 

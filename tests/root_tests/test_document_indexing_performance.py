@@ -13,4 +13,12 @@ from performance.test_document_indexing_performance import *
 
 if __name__ == "__main__":
     import pytest
-    pytest.main([str(tests_dir / "performance" / "test_document_indexing_performance.py"), "-v", "-m", "performance"])
+
+    pytest.main(
+        [
+            str(tests_dir / "performance" / "test_document_indexing_performance.py"),
+            "-v",
+            "-m",
+            "performance",
+        ]
+    )

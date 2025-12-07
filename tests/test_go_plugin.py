@@ -1,9 +1,10 @@
 """Test cases for the Go plugin."""
 
 import os
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
+
 import pytest
 
 from mcp_server.plugins.go_plugin import Plugin as GoPlugin
@@ -236,7 +237,5 @@ func IntPtr(i int) *int {
         assert external_path == "external:github.com/gorilla/mux"
 
         # Test internal import
-        internal_path = plugin.module_resolver.resolve_import(
-            "example.com/testapp/pkg/utils"
-        )
+        internal_path = plugin.module_resolver.resolve_import("example.com/testapp/pkg/utils")
         assert "pkg/utils" in internal_path

@@ -1,16 +1,17 @@
 """Test cases for document processing edge cases."""
 
-import pytest
-from pathlib import Path
-import tempfile
 import json
+import tempfile
+from pathlib import Path
 from unittest.mock import Mock, patch
+
+import pytest
 
 from mcp_server.document_processing.base_document_plugin import BaseDocumentPlugin
 from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
 from mcp_server.plugins.plaintext_plugin.plugin import PlaintextPlugin
 from mcp_server.storage.sqlite_store import SQLiteStore
-from tests.test_utils import generate_large_content, timer, memory_monitor
+from tests.test_utils import generate_large_content, memory_monitor, timer
 
 
 class TestDocumentEdgeCases:

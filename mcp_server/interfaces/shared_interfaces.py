@@ -7,20 +7,20 @@ caching, events, and other shared concerns.
 """
 
 from abc import ABC, abstractmethod
-from typing import (
-    Any,
-    Dict,
-    List,
-    Optional,
-    Callable,
-    ContextManager,
-    Awaitable,
-    TypeVar,
-    Generic,
-)
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    ContextManager,
+    Dict,
+    Generic,
+    List,
+    Optional,
+    TypeVar,
+)
 
 T = TypeVar("T")
 
@@ -113,9 +113,7 @@ class ILogger(ABC):
     """Logging interface for all components"""
 
     @abstractmethod
-    def log(
-        self, level: LogLevel, message: str, context: Dict[str, Any] = None
-    ) -> None:
+    def log(self, level: LogLevel, message: str, context: Dict[str, Any] = None) -> None:
         """Log a message with specified level and context"""
         pass
 
@@ -146,9 +144,7 @@ class IMetrics(ABC):
     """Metrics collection interface"""
 
     @abstractmethod
-    def increment(
-        self, metric: str, value: int = 1, tags: Dict[str, str] = None
-    ) -> None:
+    def increment(self, metric: str, value: int = 1, tags: Dict[str, str] = None) -> None:
         """Increment a counter metric"""
         pass
 

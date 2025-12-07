@@ -5,21 +5,21 @@ Comprehensive settings management for production deployments.
 import os
 import secrets
 from pathlib import Path
-from typing import Optional, Dict, Any, List, Union
-from pydantic import BaseModel, Field, validator, model_validator
+from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
-from .environment import Environment, get_environment, get_env_var, is_production
+from pydantic import BaseModel, Field, model_validator, validator
+
 from mcp_server.core.path_utils import PathUtils
+
+from .environment import Environment, get_env_var, get_environment, is_production
 
 
 class DatabaseSettings(BaseModel):
     """Database configuration settings."""
 
     # Connection settings
-    url: str = Field(
-        default="sqlite:///./code_index.db", description="Database connection URL"
-    )
+    url: str = Field(default="sqlite:///./code_index.db", description="Database connection URL")
     pool_size: int = Field(default=10, ge=1, le=100)
     max_overflow: int = Field(default=20, ge=0, le=100)
     pool_timeout: int = Field(default=30, ge=1, le=300)
@@ -136,21 +136,15 @@ class SecuritySettings(BaseModel):
         jwt_secret = get_env_var("JWT_SECRET_KEY")
         if not jwt_secret:
             if is_production():
-                raise ValueError(
-                    "JWT_SECRET_KEY must be explicitly set in production environment"
-                )
+                raise ValueError("JWT_SECRET_KEY must be explicitly set in production environment")
             # Generate a secure secret for non-production
             jwt_secret = secrets.token_urlsafe(32)
 
         if env == Environment.PRODUCTION:
             return cls(
                 jwt_secret_key=jwt_secret,
-                access_token_expire_minutes=int(
-                    get_env_var("JWT_ACCESS_EXPIRE_MINUTES", "15")
-                ),
-                refresh_token_expire_days=int(
-                    get_env_var("JWT_REFRESH_EXPIRE_DAYS", "7")
-                ),
+                access_token_expire_minutes=int(get_env_var("JWT_ACCESS_EXPIRE_MINUTES", "15")),
+                refresh_token_expire_days=int(get_env_var("JWT_REFRESH_EXPIRE_DAYS", "7")),
                 cors_allowed_origins=get_env_var("CORS_ALLOWED_ORIGINS", "").split(","),
                 rate_limit_requests=int(get_env_var("RATE_LIMIT_REQUESTS", "60")),
                 rate_limit_window=int(get_env_var("RATE_LIMIT_WINDOW", "3600")),
@@ -161,9 +155,7 @@ class SecuritySettings(BaseModel):
         elif env == Environment.STAGING:
             return cls(
                 jwt_secret_key=jwt_secret,
-                access_token_expire_minutes=int(
-                    get_env_var("JWT_ACCESS_EXPIRE_MINUTES", "30")
-                ),
+                access_token_expire_minutes=int(get_env_var("JWT_ACCESS_EXPIRE_MINUTES", "30")),
                 cors_allowed_origins=get_env_var(
                     "CORS_ALLOWED_ORIGINS", "http://localhost:3000"
                 ).split(","),
@@ -181,9 +173,7 @@ class SecuritySettings(BaseModel):
         else:  # Development
             return cls(
                 jwt_secret_key=jwt_secret,
-                access_token_expire_minutes=int(
-                    get_env_var("JWT_ACCESS_EXPIRE_MINUTES", "60")
-                ),
+                access_token_expire_minutes=int(get_env_var("JWT_ACCESS_EXPIRE_MINUTES", "60")),
                 rate_limit_requests=int(get_env_var("RATE_LIMIT_REQUESTS", "1000")),
                 cors_allowed_origins=["*"],
             )
@@ -257,11 +247,9 @@ class MetricsSettings(BaseModel):
     def from_environment(cls) -> "MetricsSettings":
         """Create metrics settings from environment variables."""
         return cls(
-            prometheus_enabled=get_env_var("PROMETHEUS_ENABLED", "true").lower()
-            == "true",
+            prometheus_enabled=get_env_var("PROMETHEUS_ENABLED", "true").lower() == "true",
             prometheus_port=int(get_env_var("PROMETHEUS_PORT", "8001")),
-            health_check_enabled=get_env_var("HEALTH_CHECK_ENABLED", "true").lower()
-            == "true",
+            health_check_enabled=get_env_var("HEALTH_CHECK_ENABLED", "true").lower() == "true",
             performance_monitoring_enabled=get_env_var(
                 "PERFORMANCE_MONITORING_ENABLED", "true"
             ).lower()
@@ -318,8 +306,7 @@ class LoggingSettings(BaseModel):
                 level=get_env_var("LOG_LEVEL", "DEBUG"),
                 json_format=get_env_var("LOG_JSON_FORMAT", "false").lower() == "true",
                 log_file=get_env_var("LOG_FILE"),
-                log_request_body=get_env_var("LOG_REQUEST_BODY", "false").lower()
-                == "true",
+                log_request_body=get_env_var("LOG_REQUEST_BODY", "false").lower() == "true",
             )
 
 
@@ -338,9 +325,7 @@ class RerankingSettings(BaseModel):
 
     # Cohere settings
     cohere_api_key: Optional[str] = Field(default=None, description="Cohere API key")
-    cohere_model: str = Field(
-        default="rerank-english-v2.0", description="Cohere reranking model"
-    )
+    cohere_model: str = Field(default="rerank-english-v2.0", description="Cohere reranking model")
 
     # Cross-encoder settings
     cross_encoder_model: str = Field(
@@ -363,17 +348,11 @@ class RerankingSettings(BaseModel):
     top_k: Optional[int] = Field(
         default=None, ge=1, le=100, description="Number of top results to rerank"
     )
-    cache_ttl: int = Field(
-        default=3600, ge=0, le=86400, description="Cache TTL in seconds"
-    )
+    cache_ttl: int = Field(default=3600, ge=0, le=86400, description="Cache TTL in seconds")
 
     # Performance settings
-    batch_size: int = Field(
-        default=32, ge=1, le=128, description="Batch size for reranking"
-    )
-    timeout: float = Field(
-        default=5.0, ge=0.1, le=30.0, description="Reranking timeout in seconds"
-    )
+    batch_size: int = Field(default=32, ge=1, le=128, description="Batch size for reranking")
+    timeout: float = Field(default=5.0, ge=0.1, le=30.0, description="Reranking timeout in seconds")
 
     @validator("hybrid_primary_weight", "hybrid_fallback_weight")
     def validate_weights(cls, v, values):
@@ -421,18 +400,12 @@ class Settings(BaseModel):
     debug: bool = Field(default=False)
 
     # Component Settings
-    database: DatabaseSettings = Field(
-        default_factory=DatabaseSettings.from_environment
-    )
-    security: SecuritySettings = Field(
-        default_factory=SecuritySettings.from_environment
-    )
+    database: DatabaseSettings = Field(default_factory=DatabaseSettings.from_environment)
+    security: SecuritySettings = Field(default_factory=SecuritySettings.from_environment)
     cache: CacheSettings = Field(default_factory=CacheSettings.from_environment)
     metrics: MetricsSettings = Field(default_factory=MetricsSettings.from_environment)
     logging: LoggingSettings = Field(default_factory=LoggingSettings.from_environment)
-    reranking: RerankingSettings = Field(
-        default_factory=RerankingSettings.from_environment
-    )
+    reranking: RerankingSettings = Field(default_factory=RerankingSettings.from_environment)
 
     # Feature Flags
     dynamic_plugin_loading: bool = Field(default=True)
@@ -459,20 +432,14 @@ class Settings(BaseModel):
             port=int(get_env_var("PORT", "8000")),
             environment=env,
             debug=get_env_var("DEBUG", "false").lower() == "true",
-            semantic_search_enabled=get_env_var(
-                "SEMANTIC_SEARCH_ENABLED", "true"
-            ).lower()
+            semantic_search_enabled=get_env_var("SEMANTIC_SEARCH_ENABLED", "true").lower()
             == "true",
             voyage_api_key=get_env_var("VOYAGE_AI_API_KEY"),
             qdrant_host=get_env_var("QDRANT_HOST", "localhost"),
             qdrant_port=int(get_env_var("QDRANT_PORT", "6333")),
             qdrant_grpc_port=int(get_env_var("QDRANT_GRPC_PORT", "6334")),
-            semantic_embedding_model=get_env_var(
-                "SEMANTIC_EMBEDDING_MODEL", "voyage-code-3"
-            ),
-            semantic_collection_name=get_env_var(
-                "SEMANTIC_COLLECTION_NAME", "code-embeddings"
-            ),
+            semantic_embedding_model=get_env_var("SEMANTIC_EMBEDDING_MODEL", "voyage-code-3"),
+            semantic_collection_name=get_env_var("SEMANTIC_COLLECTION_NAME", "code-embeddings"),
         )
 
         # Environment-specific overrides
@@ -494,9 +461,7 @@ class Settings(BaseModel):
                 raise ValueError("Debug mode must be disabled in production")
 
             if self.security and len(self.security.jwt_secret_key) < 32:
-                raise ValueError(
-                    "JWT secret key must be at least 32 characters in production"
-                )
+                raise ValueError("JWT secret key must be at least 32 characters in production")
 
         return self
 

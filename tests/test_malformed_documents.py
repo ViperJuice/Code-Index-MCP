@@ -1,9 +1,10 @@
 """Test cases for handling malformed and corrupted documents."""
 
-import pytest
-from pathlib import Path
 import tempfile
+from pathlib import Path
 from unittest.mock import Mock, patch
+
+import pytest
 
 from mcp_server.document_processing.base_document_plugin import BaseDocumentPlugin
 from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin

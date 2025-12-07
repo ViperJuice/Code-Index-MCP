@@ -4,13 +4,18 @@ This module defines all the interfaces for the plugin system components,
 following the architecture defined in level3_mcp_components.dsl.
 """
 
-from abc import ABC, abstractmethod
-from pathlib import Path
-from typing import Dict, List, Optional, Any, Type, Callable
-from dataclasses import dataclass
+from __future__ import annotations
 
-from ..plugin_base import IPlugin
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Type
+
 from ..interfaces.shared_interfaces import Result
+from ..plugin_base import IPlugin
+
+if TYPE_CHECKING:
+    from .models import PluginInfo
 
 
 class IPluginDiscovery(ABC):
@@ -40,9 +45,7 @@ class IPluginDiscovery(ABC):
         """
         pass
 
-    def discover_plugins_safe(
-        self, plugin_dirs: List[Path]
-    ) -> Result[List["PluginInfo"]]:
+    def discover_plugins_safe(self, plugin_dirs: List[Path]) -> Result[List["PluginInfo"]]:
         """Discover plugins using Result pattern for error handling."""
         pass
 
@@ -91,9 +94,7 @@ class IPluginRegistry(ABC):
     """Interface for managing plugin registration and metadata."""
 
     @abstractmethod
-    def register_plugin(
-        self, plugin_info: "PluginInfo", plugin_class: Type[IPlugin]
-    ) -> None:
+    def register_plugin(self, plugin_info: "PluginInfo", plugin_class: Type[IPlugin]) -> None:
         """Register a plugin with its metadata.
 
         Args:

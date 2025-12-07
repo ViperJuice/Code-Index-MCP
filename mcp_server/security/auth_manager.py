@@ -1,32 +1,33 @@
 """Authentication and authorization manager."""
 
+import fnmatch
 import hashlib
 import hmac
+import re
 import secrets
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Set, Any
-import re
-import fnmatch
+from typing import Any, Dict, List, Optional, Set
+
 import jwt
 from passlib.context import CryptContext
 from passlib.hash import bcrypt
 
 from .models import (
-    User,
-    UserRole,
-    Permission,
-    TokenData,
-    AuthCredentials,
-    RefreshTokenData,
+    DEFAULT_ACCESS_RULES,
+    DEFAULT_ROLE_PERMISSIONS,
+    AccessLevel,
     AccessRequest,
     AccessRule,
+    AuthCredentials,
+    Permission,
+    RateLimitInfo,
+    RefreshTokenData,
     SecurityConfig,
     SecurityEvent,
-    RateLimitInfo,
     SessionInfo,
-    DEFAULT_ROLE_PERMISSIONS,
-    DEFAULT_ACCESS_RULES,
-    AccessLevel,
+    TokenData,
+    User,
+    UserRole,
 )
 
 
@@ -190,9 +191,7 @@ class AuthManager(IAuthenticator, IAuthorizer):
         role: UserRole = UserRole.USER,
     ) -> User:
         """Create a new user."""
-        if not self.password_manager.is_strong_password(
-            password, self.config.password_min_length
-        ):
+        if not self.password_manager.is_strong_password(password, self.config.password_min_length):
             raise SecurityError("Password does not meet strength requirements")
 
         if any(u.username == username for u in self.users.values()):
@@ -210,9 +209,7 @@ class AuthManager(IAuthenticator, IAuthorizer):
         )
 
         self.users[user.id] = user
-        await self._log_security_event(
-            "user_created", user_id=user.id, username=username
-        )
+        await self._log_security_event("user_created", user_id=user.id, username=username)
         return user
 
     async def get_user_by_username(self, username: str) -> Optional[User]:
@@ -231,17 +228,13 @@ class AuthManager(IAuthenticator, IAuthorizer):
 
         # Check rate limiting
         if self.rate_limiter.is_rate_limited(username):
-            await self._log_security_event(
-                "authentication_rate_limited", username=username
-            )
+            await self._log_security_event("authentication_rate_limited", username=username)
             raise AuthenticationError("Rate limit exceeded")
 
         # Check account lockout
         if username in self.lockouts:
             if datetime.utcnow() < self.lockouts[username]:
-                await self._log_security_event(
-                    "authentication_locked_out", username=username
-                )
+                await self._log_security_event("authentication_locked_out", username=username)
                 raise AuthenticationError("Account is locked")
             else:
                 del self.lockouts[username]
@@ -265,9 +258,7 @@ class AuthManager(IAuthenticator, IAuthorizer):
             )
             raise AuthenticationError("Account is inactive")
 
-        if not self.password_manager.verify_password(
-            credentials.password, user.hashed_password
-        ):
+        if not self.password_manager.verify_password(credentials.password, user.hashed_password):
             await self._increment_failed_attempts(username)
             await self._log_security_event(
                 "authentication_failed",
@@ -279,9 +270,7 @@ class AuthManager(IAuthenticator, IAuthorizer):
         # Reset failed attempts on successful login
         self.failed_attempts.pop(username, None)
         user.last_login = datetime.utcnow()
-        await self._log_security_event(
-            "authentication_success", user_id=user.id, username=username
-        )
+        await self._log_security_event("authentication_success", user_id=user.id, username=username)
 
         return user
 
@@ -324,9 +313,7 @@ class AuthManager(IAuthenticator, IAuthorizer):
             "type": "access",
         }
 
-        token = jwt.encode(
-            payload, self.config.jwt_secret_key, algorithm=self.config.jwt_algorithm
-        )
+        token = jwt.encode(payload, self.config.jwt_secret_key, algorithm=self.config.jwt_algorithm)
         await self._log_security_event(
             "access_token_created", user_id=user.id, username=user.username
         )
@@ -337,9 +324,7 @@ class AuthManager(IAuthenticator, IAuthorizer):
         now = datetime.utcnow()
         expires_at = now + timedelta(days=self.config.refresh_token_expire_days)
 
-        refresh_data = RefreshTokenData(
-            user_id=user.id, issued_at=now, expires_at=expires_at
-        )
+        refresh_data = RefreshTokenData(user_id=user.id, issued_at=now, expires_at=expires_at)
 
         self.refresh_tokens[refresh_data.token_id] = refresh_data
 
@@ -351,9 +336,7 @@ class AuthManager(IAuthenticator, IAuthorizer):
             "type": "refresh",
         }
 
-        token = jwt.encode(
-            payload, self.config.jwt_secret_key, algorithm=self.config.jwt_algorithm
-        )
+        token = jwt.encode(payload, self.config.jwt_secret_key, algorithm=self.config.jwt_algorithm)
         await self._log_security_event(
             "refresh_token_created", user_id=user.id, username=user.username
         )
@@ -389,14 +372,10 @@ class AuthManager(IAuthenticator, IAuthorizer):
             )
 
         except jwt.ExpiredSignatureError:
-            await self._log_security_event(
-                "token_expired", details={"token_type": "access"}
-            )
+            await self._log_security_event("token_expired", details={"token_type": "access"})
             return None
         except jwt.InvalidTokenError:
-            await self._log_security_event(
-                "token_invalid", details={"token_type": "access"}
-            )
+            await self._log_security_event("token_invalid", details={"token_type": "access"})
             return None
 
     async def refresh_access_token(self, refresh_token: str) -> Optional[str]:
@@ -430,14 +409,10 @@ class AuthManager(IAuthenticator, IAuthorizer):
             return new_access_token
 
         except jwt.ExpiredSignatureError:
-            await self._log_security_event(
-                "token_expired", details={"token_type": "refresh"}
-            )
+            await self._log_security_event("token_expired", details={"token_type": "refresh"})
             return None
         except jwt.InvalidTokenError:
-            await self._log_security_event(
-                "token_invalid", details={"token_type": "refresh"}
-            )
+            await self._log_security_event("token_invalid", details={"token_type": "refresh"})
             return None
 
     async def revoke_refresh_token(self, refresh_token: str) -> bool:

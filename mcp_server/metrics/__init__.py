@@ -4,11 +4,11 @@ This package provides Prometheus-compatible metrics collection, health checks,
 and performance monitoring for all system components.
 """
 
+import time
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from enum import Enum
-import time
+from typing import Any, Dict, List, Optional
 
 
 class HealthStatus(Enum):
@@ -76,9 +76,7 @@ class IMetricsCollector(ABC):
         pass
 
     @abstractmethod
-    def set_gauge(
-        self, name: str, value: float, labels: Optional[Dict[str, str]] = None
-    ) -> None:
+    def set_gauge(self, name: str, value: float, labels: Optional[Dict[str, str]] = None) -> None:
         """Set a gauge metric value.
 
         Args:
@@ -186,9 +184,10 @@ class IHealthCheck(ABC):
         pass
 
 
+from .health_check import ComponentHealthChecker
+
 # Import implementations
 from .metrics_collector import PrometheusMetricsCollector
-from .health_check import ComponentHealthChecker
 
 
 # Factory functions

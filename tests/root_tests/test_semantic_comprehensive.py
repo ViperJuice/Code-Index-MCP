@@ -2,9 +2,9 @@
 """Comprehensive test of semantic search and all retrieval varieties."""
 
 import asyncio
+import os
 import sys
 import tempfile
-import os
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -15,7 +15,7 @@ import mcp_server_cli
 async def test_comprehensive_retrieval():
     """Test all varieties of retrieval: exact search, fuzzy search, semantic search."""
     print("=== Comprehensive Retrieval Testing ===\n")
-    
+
     # Create diverse test files to properly test all retrieval methods
     test_files = {
         "user_management.py": '''"""User management module for handling user operations."""
@@ -102,8 +102,7 @@ def generate_temporary_password() -> str:
     alphabet = string.ascii_letters + string.digits
     return ''.join(secrets.choice(alphabet) for _ in range(12))
 ''',
-        
-        "authentication.go": '''package main
+        "authentication.go": """package main
 
 import (
     "crypto/sha256"
@@ -228,9 +227,8 @@ func (auth *AuthenticationService) RegisterUser(username, email string) error {
     auth.users[username] = user
     return nil
 }
-''',
-        
-        "data_processing.rs": '''use std::collections::HashMap;
+""",
+        "data_processing.rs": """use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use tokio::time::{sleep, Duration};
 
@@ -395,9 +393,8 @@ pub fn create_sample_data(count: usize) -> Vec<DataRecord> {
         })
         .collect()
 }
-''',
-        
-        "error_handling.js": '''/**
+""",
+        "error_handling.js": """/**
  * Comprehensive error handling utilities for web applications
  */
 
@@ -657,33 +654,33 @@ if (typeof module !== 'undefined' && module.exports) {
         makeApiRequest
     };
 }
-'''
+""",
     }
-    
+
     # Create temporary directory
     temp_dir = tempfile.mkdtemp(prefix="semantic_test_")
     original_cwd = os.getcwd()
     os.chdir(temp_dir)
-    
+
     try:
         print(f"Working directory: {temp_dir}")
-        
+
         # Create test files
         for filename, content in test_files.items():
             Path(filename).write_text(content)
-        
+
         print(f"✓ Created {len(test_files)} test files")
-        
+
         # Initialize MCP services
         await mcp_server_cli.initialize_services()
         dispatcher = mcp_server_cli.dispatcher
-        
+
         # Index all files
         print(f"\nIndexing files...")
         for filename in test_files.keys():
             dispatcher.index_file(Path(filename))
             print(f"  ✓ Indexed {filename}")
-        
+
         # Test 1: Exact Symbol Search
         print(f"\n1. Testing Exact Symbol Search...")
         exact_searches = {
@@ -691,21 +688,21 @@ if (typeof module !== 'undefined' && module.exports) {
             "create_user": "Should find exact function name",
             "AuthenticationService": "Should find service class",
             "validate_email_format": "Should find validation function",
-            "ProcessingConfig": "Should find configuration struct"
+            "ProcessingConfig": "Should find configuration struct",
         }
-        
+
         exact_results = {}
         for symbol, description in exact_searches.items():
             results = list(dispatcher.search(symbol, limit=10))
             exact_results[symbol] = len(results)
             print(f"   '{symbol}': {len(results)} results")
-            
+
             # Show first result for verification
             if results:
                 first_result = results[0]
-                file_name = Path(first_result.get('file', '')).name
+                file_name = Path(first_result.get("file", "")).name
                 print(f"     → Found in {file_name}:{first_result.get('line', 'N/A')}")
-        
+
         # Test 2: Fuzzy/Partial Search
         print(f"\n2. Testing Fuzzy/Partial Search...")
         fuzzy_searches = {
@@ -713,25 +710,25 @@ if (typeof module !== 'undefined' && module.exports) {
             "process": "Should find processing-related functions",
             "validate": "Should find validation functions",
             "error": "Should find error handling code",
-            "hash": "Should find hashing/password functions"
+            "hash": "Should find hashing/password functions",
         }
-        
+
         fuzzy_results = {}
         for term, description in fuzzy_searches.items():
             results = list(dispatcher.search(term, limit=15))
             fuzzy_results[term] = len(results)
             print(f"   '{term}': {len(results)} results")
-            
+
             # Show language distribution
             if results:
                 languages = set()
                 for result in results[:5]:
-                    file_name = result.get('file', '')
+                    file_name = result.get("file", "")
                     if file_name:
                         ext = Path(file_name).suffix
                         languages.add(ext)
                 print(f"     → Found in: {', '.join(sorted(languages))}")
-        
+
         # Test 3: Semantic Search (AI-powered)
         print(f"\n3. Testing Semantic Search...")
         semantic_queries = {
@@ -742,136 +739,148 @@ if (typeof module !== 'undefined' && module.exports) {
             "email format validation": "Should find email validation",
             "error handling and logging": "Should find error management",
             "JWT token generation": "Should find token-related code",
-            "database operations": "Should find data persistence code"
+            "database operations": "Should find data persistence code",
         }
-        
+
         semantic_results = {}
         for query, description in semantic_queries.items():
             try:
                 results = list(dispatcher.search(query, semantic=True, limit=8))
                 semantic_results[query] = len(results)
                 print(f"   '{query}': {len(results)} results")
-                
+
                 # Show semantic matches
                 if results:
                     for i, result in enumerate(results[:2]):
-                        file_name = Path(result.get('file', '')).name
-                        snippet = result.get('snippet', '')[:50] + "..."
+                        file_name = Path(result.get("file", "")).name
+                        snippet = result.get("snippet", "")[:50] + "..."
                         print(f"     {i+1}. {file_name}: {snippet}")
                 else:
                     print(f"     → No semantic matches found")
             except Exception as e:
                 print(f"   '{query}': Error - {e}")
                 semantic_results[query] = 0
-        
+
         # Test 4: Symbol Definition Lookup
         print(f"\n4. Testing Symbol Definition Lookup...")
         definition_tests = [
-            "User", "AuthenticationService", "DataProcessor", 
-            "ErrorHandlingService", "ProcessingConfig"
+            "User",
+            "AuthenticationService",
+            "DataProcessor",
+            "ErrorHandlingService",
+            "ProcessingConfig",
         ]
-        
+
         definition_results = {}
         for symbol in definition_tests:
             definition = dispatcher.lookup(symbol)
             if definition:
-                file_name = Path(definition.get('defined_in', '')).name
-                kind = definition.get('kind', 'unknown')
-                line = definition.get('line', 'N/A')
+                file_name = Path(definition.get("defined_in", "")).name
+                kind = definition.get("kind", "unknown")
+                line = definition.get("line", "N/A")
                 definition_results[symbol] = True
                 print(f"   ✓ {symbol}: {kind} in {file_name}:{line}")
             else:
                 definition_results[symbol] = False
                 print(f"   ✗ {symbol}: not found")
-        
+
         # Test 5: Cross-Language Concept Search
         print(f"\n5. Testing Cross-Language Concept Search...")
         concept_searches = {
             "email validation": "Email validation across all languages",
             "user management": "User-related operations",
             "async processing": "Asynchronous operations",
-            "error handling": "Error management patterns"
+            "error handling": "Error management patterns",
         }
-        
+
         concept_results = {}
         for concept, description in concept_searches.items():
             # Test both regular and semantic search
             regular_results = list(dispatcher.search(concept, limit=10))
-            
+
             try:
-                semantic_results_for_concept = list(dispatcher.search(concept, semantic=True, limit=5))
+                semantic_results_for_concept = list(
+                    dispatcher.search(concept, semantic=True, limit=5)
+                )
             except:
                 semantic_results_for_concept = []
-            
+
             # Count languages found
             all_results = regular_results + semantic_results_for_concept
             languages_found = set()
             for result in all_results:
-                file_name = result.get('file', '')
+                file_name = result.get("file", "")
                 if file_name:
                     ext = Path(file_name).suffix
                     languages_found.add(ext)
-            
+
             concept_results[concept] = {
-                'regular': len(regular_results),
-                'semantic': len(semantic_results_for_concept),
-                'languages': len(languages_found)
+                "regular": len(regular_results),
+                "semantic": len(semantic_results_for_concept),
+                "languages": len(languages_found),
             }
-            
-            print(f"   '{concept}': {len(regular_results)} regular + {len(semantic_results_for_concept)} semantic across {len(languages_found)} languages")
-        
+
+            print(
+                f"   '{concept}': {len(regular_results)} regular + {len(semantic_results_for_concept)} semantic across {len(languages_found)} languages"
+            )
+
         # Summary and Analysis
         print(f"\n=== Comprehensive Retrieval Analysis ===")
-        
+
         total_exact = sum(exact_results.values())
         total_fuzzy = sum(fuzzy_results.values())
         total_semantic = sum(semantic_results.values())
         total_definitions = sum(1 for found in definition_results.values() if found)
-        
+
         print(f"\nRetrieval Method Performance:")
         print(f"  ✓ Exact symbol search: {total_exact} results across {len(exact_results)} queries")
-        print(f"  ✓ Fuzzy/partial search: {total_fuzzy} results across {len(fuzzy_results)} queries")
-        print(f"  ✓ Semantic search: {total_semantic} results across {len(semantic_results)} queries")
+        print(
+            f"  ✓ Fuzzy/partial search: {total_fuzzy} results across {len(fuzzy_results)} queries"
+        )
+        print(
+            f"  ✓ Semantic search: {total_semantic} results across {len(semantic_results)} queries"
+        )
         print(f"  ✓ Symbol definitions: {total_definitions}/{len(definition_results)} found")
-        
+
         print(f"\nCross-Language Capabilities:")
-        concept_langs = sum(r['languages'] for r in concept_results.values())
+        concept_langs = sum(r["languages"] for r in concept_results.values())
         print(f"  ✓ Cross-language concepts: {concept_langs} language combinations")
-        
+
         # Check semantic search functionality
         semantic_working = total_semantic > 0
         if semantic_working:
             print(f"  ✓ Semantic search: OPERATIONAL")
         else:
             print(f"  ⚠ Semantic search: Limited results (may need configuration)")
-        
+
         print(f"\nDetailed Results:")
         print(f"  Best exact matches: {max(exact_results.items(), key=lambda x: x[1])}")
         print(f"  Best fuzzy matches: {max(fuzzy_results.items(), key=lambda x: x[1])}")
         if semantic_working:
             print(f"  Best semantic matches: {max(semantic_results.items(), key=lambda x: x[1])}")
-        
+
         # Success criteria
         success = (
-            total_exact > 10 and        # Good exact search
-            total_fuzzy > 20 and        # Good fuzzy search  
-            total_definitions >= 3 and  # Symbol lookup working
-            concept_langs > 8           # Cross-language working
+            total_exact > 10  # Good exact search
+            and total_fuzzy > 20  # Good fuzzy search
+            and total_definitions >= 3  # Symbol lookup working
+            and concept_langs > 8  # Cross-language working
         )
-        
+
         return success, {
-            'exact_search': exact_results,
-            'fuzzy_search': fuzzy_results,
-            'semantic_search': semantic_results,
-            'definition_lookup': definition_results,
-            'cross_language': concept_results,
-            'semantic_working': semantic_working
+            "exact_search": exact_results,
+            "fuzzy_search": fuzzy_results,
+            "semantic_search": semantic_results,
+            "definition_lookup": definition_results,
+            "cross_language": concept_results,
+            "semantic_working": semantic_working,
         }
-        
+
     finally:
         # Cleanup
         os.chdir(original_cwd)
         import shutil
+
         shutil.rmtree(temp_dir)
         print(f"\n✓ Cleaned up test directory")
 
@@ -880,23 +889,24 @@ async def main():
     """Run comprehensive retrieval test."""
     try:
         success, results = await test_comprehensive_retrieval()
-        
+
         if success:
             print(f"\n🎉 Comprehensive Retrieval: EXCELLENT!")
             print(f"All retrieval methods are working effectively!")
-            
-            if results['semantic_working']:
+
+            if results["semantic_working"]:
                 print(f"🧠 Semantic search is operational and finding relevant results!")
             else:
                 print(f"⚠️ Semantic search needs configuration (Voyage AI / Qdrant setup)")
         else:
             print(f"\n⚠️ Some retrieval methods need optimization")
-        
+
         return success
-        
+
     except Exception as e:
         print(f"\n❌ Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 

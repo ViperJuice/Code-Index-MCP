@@ -2,20 +2,20 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Optional, Iterable, Dict, List, Any
 import logging
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional
 
 from ...plugin_base import (
     IndexShard,
-    SymbolDef,
     Reference,
-    SearchResult,
     SearchOpts,
+    SearchResult,
+    SymbolDef,
 )
 from ...plugin_base_enhanced import PluginWithSemanticSearch
-from ...utils.fuzzy_indexer import FuzzyIndexer
 from ...storage.sqlite_store import SQLiteStore
+from ...utils.fuzzy_indexer import FuzzyIndexer
 
 logger = logging.getLogger(__name__)
 
@@ -97,21 +97,14 @@ class DartPluginSemantic(PluginWithSemanticSearch):
 
         return IndexShard(file=str(path), symbols=symbols, language="dart")
 
-    def _extract_symbols(
-        self, content: str, file_id: Optional[int] = None
-    ) -> List[Dict]:
+    def _extract_symbols(self, content: str, file_id: Optional[int] = None) -> List[Dict]:
         """Extract symbols from Dart code."""
         symbols = []
         lines = content.split("\n")
 
         # Basic symbol extraction - override in actual implementation
         for i, line in enumerate(lines):
-            if (
-                "class" in line
-                or "void" in line
-                or "Future" in line
-                or "Stream" in line
-            ):
+            if "class" in line or "void" in line or "Future" in line or "Stream" in line:
                 stripped = line.strip()
                 if stripped and not stripped.startswith("//"):
                     # Extract Dart symbols

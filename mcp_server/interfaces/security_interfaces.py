@@ -5,10 +5,11 @@ All interfaces related to authentication, authorization, and security management
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any, Set
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from .shared_interfaces import Result, ISecurityContext
+from typing import Any, Dict, List, Optional, Set
+
+from .shared_interfaces import ISecurityContext, Result
 
 # ========================================
 # Security Data Types
@@ -195,9 +196,7 @@ class IAuthorizer(ABC):
         pass
 
     @abstractmethod
-    def filter_resources(
-        self, user: User, resources: List[str], action: str
-    ) -> List[str]:
+    def filter_resources(self, user: User, resources: List[str], action: str) -> List[str]:
         """Filter resources user can access"""
         pass
 
@@ -206,9 +205,7 @@ class IAccessController(ABC):
     """Interface for access control"""
 
     @abstractmethod
-    async def check_access(
-        self, context: ISecurityContext, resource: str, action: str
-    ) -> bool:
+    async def check_access(self, context: ISecurityContext, resource: str, action: str) -> bool:
         """Check if security context has access"""
         pass
 
@@ -304,9 +301,7 @@ class IPolicyEngine(ABC):
     """Interface for policy-based access control"""
 
     @abstractmethod
-    async def evaluate_policy(
-        self, policy_id: str, context: Dict[str, Any]
-    ) -> Result[bool]:
+    async def evaluate_policy(self, policy_id: str, context: Dict[str, Any]) -> Result[bool]:
         """Evaluate a policy against context"""
         pass
 
@@ -316,9 +311,7 @@ class IPolicyEngine(ABC):
         pass
 
     @abstractmethod
-    async def update_policy(
-        self, policy_id: str, updates: Dict[str, Any]
-    ) -> Result[None]:
+    async def update_policy(self, policy_id: str, updates: Dict[str, Any]) -> Result[None]:
         """Update a policy"""
         pass
 
@@ -344,9 +337,7 @@ class IRuleEvaluator(ABC):
         pass
 
     @abstractmethod
-    def evaluate_rules(
-        self, rules: List[Dict[str, Any]], context: Dict[str, Any]
-    ) -> bool:
+    def evaluate_rules(self, rules: List[Dict[str, Any]], context: Dict[str, Any]) -> bool:
         """Evaluate multiple rules"""
         pass
 
@@ -379,16 +370,12 @@ class ISecurityAuditor(ABC):
         pass
 
     @abstractmethod
-    async def log_security_event(
-        self, event_type: str, details: Dict[str, Any]
-    ) -> None:
+    async def log_security_event(self, event_type: str, details: Dict[str, Any]) -> None:
         """Log security event"""
         pass
 
     @abstractmethod
-    async def get_security_events(
-        self, filters: Dict[str, Any]
-    ) -> Result[List[Dict[str, Any]]]:
+    async def get_security_events(self, filters: Dict[str, Any]) -> Result[List[Dict[str, Any]]]:
         """Get security events"""
         pass
 
@@ -402,16 +389,12 @@ class IThreatDetector(ABC):
         pass
 
     @abstractmethod
-    async def detect_suspicious_activity(
-        self, user_id: str, activity: Dict[str, Any]
-    ) -> bool:
+    async def detect_suspicious_activity(self, user_id: str, activity: Dict[str, Any]) -> bool:
         """Detect suspicious user activity"""
         pass
 
     @abstractmethod
-    async def analyze_request_pattern(
-        self, requests: List[Dict[str, Any]]
-    ) -> List[str]:
+    async def analyze_request_pattern(self, requests: List[Dict[str, Any]]) -> List[str]:
         """Analyze request patterns for threats"""
         pass
 

@@ -4,16 +4,16 @@ Automatically detects and uses indexes created by mcp-index-kit
 Enhanced with multi-path discovery to fix test environment issues
 """
 
+import hashlib
 import json
+import logging
 import os
+import sqlite3
 import subprocess
+import tarfile
 import tempfile
 from pathlib import Path
-from typing import Optional, Dict, Any, Tuple, List
-import logging
-import sqlite3
-import tarfile
-import hashlib
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -21,26 +21,30 @@ logger = logging.getLogger(__name__)
 class IndexDiscovery:
     """Discovers and manages portable MCP indexes in repositories"""
 
-    def __init__(self, workspace_root: Path, storage_strategy: Optional[str] = None, 
-                 enable_multi_path: bool = True):
+    def __init__(
+        self,
+        workspace_root: Path,
+        storage_strategy: Optional[str] = None,
+        enable_multi_path: bool = True,
+    ):
         self.workspace_root = Path(workspace_root)
         self.index_dir = self.workspace_root / ".mcp-index"
         self.config_file = self.workspace_root / ".mcp-index.json"
         self.metadata_file = self.index_dir / ".index_metadata.json"
         self.enable_multi_path = enable_multi_path
-        
+
         # Import modules for multi-path support
-        from mcp_server.storage.index_manager import IndexManager
         from mcp_server.config.index_paths import IndexPathConfig
-        
+        from mcp_server.storage.index_manager import IndexManager
+
         # Initialize multi-path configuration
         self.path_config = IndexPathConfig() if enable_multi_path else None
-        
+
         # Determine storage strategy
         if storage_strategy is None:
             config = self.get_index_config()
             storage_strategy = config.get("storage_strategy", "inline") if config else "inline"
-            
+
         self.storage_strategy = storage_strategy
         self.index_manager = IndexManager(storage_strategy=storage_strategy)
 
@@ -109,9 +113,9 @@ class IndexDiscovery:
             # Try to determine repository identifier
             repo_id = self._get_repository_identifier()
             search_paths = self.path_config.get_search_paths(repo_id)
-            
+
             logger.info(f"Searching for index in {len(search_paths)} locations")
-            
+
             for search_path in search_paths:
                 # Look for code_index.db in each path
                 db_candidates = [
@@ -119,13 +123,13 @@ class IndexDiscovery:
                     search_path / "current.db",
                     search_path / f"{repo_id}.db" if repo_id else None,
                 ]
-                
+
                 for db_path in db_candidates:
                     if db_path and db_path.exists():
                         if self._validate_sqlite_index(db_path):
                             logger.info(f"Found valid index at: {db_path}")
                             return db_path
-                        
+
         # Fall back to legacy local storage
         db_path = self.index_dir / "code_index.db"
         if db_path.exists():
@@ -139,23 +143,25 @@ class IndexDiscovery:
             existing_paths = [str(p) for p, exists in validation.items() if exists]
             if existing_paths:
                 logger.info(f"Existing search paths: {existing_paths}")
-                
+
         return None
-    
+
     def _validate_sqlite_index(self, db_path: Path) -> bool:
         """Validate that a file is a valid SQLite database with expected schema."""
         try:
             conn = sqlite3.connect(str(db_path))
             # Check for expected tables
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT name FROM sqlite_master 
                 WHERE type='table' AND name IN ('files', 'symbols', 'repositories')
-            """)
+            """
+            )
             tables = {row[0] for row in cursor.fetchall()}
             conn.close()
-            
+
             # Must have at least files table
-            if 'files' in tables:
+            if "files" in tables:
                 return True
             else:
                 logger.debug(f"Index at {db_path} missing required tables")
@@ -163,7 +169,7 @@ class IndexDiscovery:
         except Exception as e:
             logger.debug(f"Invalid SQLite index at {db_path}: {e}")
             return False
-            
+
     def _get_repository_identifier(self) -> Optional[str]:
         """Get repository identifier for the current workspace."""
         # Try to get from git remote
@@ -173,13 +179,13 @@ class IndexDiscovery:
                 capture_output=True,
                 text=True,
                 cwd=str(self.workspace_root),
-                check=False
+                check=False,
             )
             if result.returncode == 0 and result.stdout.strip():
                 return result.stdout.strip()
         except:
             pass
-            
+
         # Fall back to directory name
         return self.workspace_root.name
 
@@ -253,9 +259,7 @@ class IndexDiscovery:
     def _is_gh_cli_available(self) -> bool:
         """Check if GitHub CLI is available"""
         try:
-            result = subprocess.run(
-                ["gh", "--version"], capture_output=True, check=False
-            )
+            result = subprocess.run(["gh", "--version"], capture_output=True, check=False)
             return result.returncode == 0
         except FileNotFoundError:
             return False
@@ -412,57 +416,63 @@ class IndexDiscovery:
                 info["github_artifacts"] = (
                     info["config"].get("github_artifacts", {}).get("enabled", True)
                 )
-                
+
             # Include search paths if multi-path is enabled
             if self.enable_multi_path and self.path_config:
                 repo_id = self._get_repository_identifier()
                 info["search_paths"] = [str(p) for p in self.path_config.get_search_paths(repo_id)]
 
         return info
-    
+
     def find_all_indexes(self) -> List[Dict[str, Any]]:
         """Find all available indexes across all search paths."""
         if not self.enable_multi_path or not self.path_config:
             # Just check the default location
             index_path = self.get_local_index_path()
             if index_path:
-                return [{
-                    "path": str(index_path),
-                    "type": "sqlite",
-                    "valid": True,
-                    "location_type": "default"
-                }]
+                return [
+                    {
+                        "path": str(index_path),
+                        "type": "sqlite",
+                        "valid": True,
+                        "location_type": "default",
+                    }
+                ]
             return []
-            
+
         found_indexes = []
         repo_id = self._get_repository_identifier()
         search_paths = self.path_config.get_search_paths(repo_id)
-        
+
         for search_path in search_paths:
             # Look for SQLite indexes
             for pattern in ["code_index.db", "current.db", "*.db"]:
                 for db_path in search_path.glob(pattern):
                     if self._validate_sqlite_index(db_path):
-                        found_indexes.append({
-                            "path": str(db_path),
-                            "type": "sqlite",
-                            "valid": True,
-                            "location_type": self._classify_location(search_path),
-                            "size_mb": db_path.stat().st_size / (1024 * 1024)
-                        })
-                        
+                        found_indexes.append(
+                            {
+                                "path": str(db_path),
+                                "type": "sqlite",
+                                "valid": True,
+                                "location_type": self._classify_location(search_path),
+                                "size_mb": db_path.stat().st_size / (1024 * 1024),
+                            }
+                        )
+
             # Look for vector indexes
             vector_path = search_path / "vector_index"
             if vector_path.exists() and vector_path.is_dir():
-                found_indexes.append({
-                    "path": str(vector_path),
-                    "type": "vector",
-                    "valid": True,
-                    "location_type": self._classify_location(search_path)
-                })
-                
+                found_indexes.append(
+                    {
+                        "path": str(vector_path),
+                        "type": "vector",
+                        "valid": True,
+                        "location_type": self._classify_location(search_path),
+                    }
+                )
+
         return found_indexes
-        
+
     def _classify_location(self, path: Path) -> str:
         """Classify the type of location for an index."""
         path_str = str(path)

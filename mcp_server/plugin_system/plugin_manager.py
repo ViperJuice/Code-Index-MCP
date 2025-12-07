@@ -1,28 +1,29 @@
 """Plugin manager implementation."""
 
 import logging
-import yaml
-from pathlib import Path
-from typing import Dict, List, Optional, Any, Type
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Type
 
+import yaml
+
+from ..interfaces.shared_interfaces import Error, Result
 from ..plugin_base import IPlugin
 from ..storage.sqlite_store import SQLiteStore
-from .interfaces import IPluginManager, ILifecycleManager
+from .interfaces import ILifecycleManager, IPluginManager
+from .models import (
+    PluginConfig,
+    PluginInfo,
+    PluginInitError,
+    PluginInstance,
+    PluginLoadResult,
+    PluginNotFoundError,
+    PluginState,
+    PluginSystemConfig,
+)
 from .plugin_discovery import PluginDiscovery
 from .plugin_loader import PluginLoader
 from .plugin_registry import PluginRegistry
-from .models import (
-    PluginInfo,
-    PluginConfig,
-    PluginInstance,
-    PluginState,
-    PluginSystemConfig,
-    PluginNotFoundError,
-    PluginInitError,
-    PluginLoadResult,
-)
-from ..interfaces.shared_interfaces import Result, Error
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +54,7 @@ class PluginManager(IPluginManager, ILifecycleManager):
     def _get_default_config(self) -> PluginSystemConfig:
         """Get default plugin system configuration."""
         return PluginSystemConfig(
-            plugin_dirs=[
-                Path(__file__).parent.parent / "plugins"  # Default plugins directory
-            ],
+            plugin_dirs=[Path(__file__).parent.parent / "plugins"],  # Default plugins directory
             auto_discover=True,
             auto_load=True,
             validate_interfaces=True,
@@ -104,9 +103,7 @@ class PluginManager(IPluginManager, ILifecycleManager):
                     self._registry.register_plugin(plugin_info, plugin_class)
 
                     # Get plugin config
-                    plugin_config = self.config.plugin_configs.get(
-                        plugin_info.name, PluginConfig()
-                    )
+                    plugin_config = self.config.plugin_configs.get(plugin_info.name, PluginConfig())
 
                     # Create instance record with timing
                     import time
@@ -170,9 +167,7 @@ class PluginManager(IPluginManager, ILifecycleManager):
                         self._instances[plugin_info.name] = instance
 
                         if self.config.auto_load and plugin_config.enabled:
-                            self.initialize_plugin(
-                                plugin_info.name, plugin_config.settings
-                            )
+                            self.initialize_plugin(plugin_info.name, plugin_config.settings)
 
                         results.append(
                             PluginLoadResult(
@@ -245,9 +240,7 @@ class PluginManager(IPluginManager, ILifecycleManager):
 
             # Re-initialize if it was active
             if self._instances[plugin_name].config.enabled:
-                self.initialize_plugin(
-                    plugin_name, self._instances[plugin_name].config.settings
-                )
+                self.initialize_plugin(plugin_name, self._instances[plugin_name].config.settings)
 
             logger.info(f"Successfully reloaded plugin: {plugin_name}")
 
@@ -409,9 +402,7 @@ class PluginManager(IPluginManager, ILifecycleManager):
         """Shutdown all plugins using Result pattern for error handling."""
         try:
             self.shutdown()
-            return Result.success_result(
-                None, metadata={"shutdown_at": datetime.now().isoformat()}
-            )
+            return Result.success_result(None, metadata={"shutdown_at": datetime.now().isoformat()})
         except Exception as e:
             error = Error(
                 code="PLUGIN_SHUTDOWN_ERROR",
@@ -430,9 +421,7 @@ class PluginManager(IPluginManager, ILifecycleManager):
 
         instance_info = self._instances[plugin_name]
         if instance_info.state == PluginState.ERROR:
-            raise PluginInitError(
-                f"Plugin {plugin_name} is in error state: {instance_info.error}"
-            )
+            raise PluginInitError(f"Plugin {plugin_name} is in error state: {instance_info.error}")
 
         try:
             # Get plugin class
@@ -467,9 +456,7 @@ class PluginManager(IPluginManager, ILifecycleManager):
             instance_info.state = PluginState.ERROR
             instance_info.error = str(e)
             logger.error(f"Failed to initialize plugin {plugin_name}: {e}")
-            raise PluginInitError(
-                f"Failed to initialize plugin {plugin_name}: {str(e)}"
-            ) from e
+            raise PluginInitError(f"Failed to initialize plugin {plugin_name}: {str(e)}") from e
 
     def start_plugin(self, plugin_name: str) -> None:
         """Start a plugin (called after initialization)."""
@@ -478,9 +465,7 @@ class PluginManager(IPluginManager, ILifecycleManager):
 
         instance_info = self._instances[plugin_name]
         if instance_info.state != PluginState.INITIALIZED:
-            raise PluginInitError(
-                f"Plugin {plugin_name} must be initialized before starting"
-            )
+            raise PluginInitError(f"Plugin {plugin_name} must be initialized before starting")
 
         try:
             # Call start method if it exists
@@ -607,19 +592,11 @@ class PluginManager(IPluginManager, ILifecycleManager):
 
     def get_plugins_by_status(self, state: PluginState) -> List[str]:
         """Get list of plugin names by their state."""
-        return [
-            name
-            for name, instance in self._instances.items()
-            if instance.state == state
-        ]
+        return [name for name, instance in self._instances.items() if instance.state == state]
 
     def get_enabled_plugins(self) -> List[str]:
         """Get list of enabled plugin names."""
-        return [
-            name
-            for name, instance in self._instances.items()
-            if instance.config.enabled
-        ]
+        return [name for name, instance in self._instances.items() if instance.config.enabled]
 
     def get_plugins_by_language(self, language: str) -> List[str]:
         """Get plugin names that support a specific language."""

@@ -5,29 +5,30 @@ This test suite ensures that all metadata (file paths, line numbers, columns, sn
 match types, and context) is preserved correctly during reranking operations.
 """
 
-import pytest
 import asyncio
 import os
-from typing import List, Dict, Any
-from unittest.mock import Mock, patch, AsyncMock
-import numpy as np
 
 # Import the reranker module and its classes
 import sys
+from typing import Any, Dict, List
+from unittest.mock import AsyncMock, Mock, patch
+
+import numpy as np
+import pytest
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from mcp_server.indexer.reranker import (
-    SearchResult,
-    RerankItem,
-    RerankResult,
     BaseReranker,
     CohereReranker,
-    LocalCrossEncoderReranker,
-    TFIDFReranker,
     HybridReranker,
+    LocalCrossEncoderReranker,
     RerankerFactory,
+    RerankItem,
+    RerankResult,
     Result,
+    SearchResult,
+    TFIDFReranker,
 )
 
 
@@ -130,9 +131,7 @@ class TestRerankItemDataclass:
     def test_rerank_item_preserves_original(self):
         """Test that RerankItem preserves complete original SearchResult"""
         original = TestDataFactory.create_search_results(1)[0]
-        item = RerankItem(
-            original_result=original, rerank_score=0.99, original_rank=0, new_rank=0
-        )
+        item = RerankItem(original_result=original, rerank_score=0.99, original_rank=0, new_rank=0)
 
         # Verify all original fields are preserved
         assert item.original_result.file_path == original.file_path
@@ -255,9 +254,7 @@ class TestCohereReranker:
     @pytest.fixture
     def cohere_reranker(self):
         """Create Cohere reranker instance"""
-        return CohereReranker(
-            {"cohere_api_key": "test-key", "model": "rerank-english-v2.0"}
-        )
+        return CohereReranker({"cohere_api_key": "test-key", "model": "rerank-english-v2.0"})
 
     @pytest.mark.asyncio
     async def test_cohere_preserves_metadata(self, cohere_reranker):
@@ -338,32 +335,15 @@ class TestCohereReranker:
             cached_item = result2.data.results[0]
             original_item = result1.data.results[0]
 
+            assert cached_item.original_result.file_path == original_item.original_result.file_path
+            assert cached_item.original_result.line == original_item.original_result.line
+            assert cached_item.original_result.column == original_item.original_result.column
+            assert cached_item.original_result.snippet == original_item.original_result.snippet
             assert (
-                cached_item.original_result.file_path
-                == original_item.original_result.file_path
+                cached_item.original_result.match_type == original_item.original_result.match_type
             )
-            assert (
-                cached_item.original_result.line == original_item.original_result.line
-            )
-            assert (
-                cached_item.original_result.column
-                == original_item.original_result.column
-            )
-            assert (
-                cached_item.original_result.snippet
-                == original_item.original_result.snippet
-            )
-            assert (
-                cached_item.original_result.match_type
-                == original_item.original_result.match_type
-            )
-            assert (
-                cached_item.original_result.score == original_item.original_result.score
-            )
-            assert (
-                cached_item.original_result.context
-                == original_item.original_result.context
-            )
+            assert cached_item.original_result.score == original_item.original_result.score
+            assert cached_item.original_result.context == original_item.original_result.context
             assert cached_item.rerank_score == original_item.rerank_score
 
 
@@ -395,9 +375,7 @@ class TestCrossEncoderReranker:
             original_results = TestDataFactory.create_search_results(5)
 
             # Perform reranking
-            result = await cross_encoder_reranker.rerank(
-                query, original_results, top_k=3
-            )
+            result = await cross_encoder_reranker.rerank(query, original_results, top_k=3)
             assert result.is_success
 
             rerank_result = result.data
@@ -754,9 +732,7 @@ class TestMetadataConsistency:
                     assert item.original_result.score == original.score
                     assert item.original_result.context == original.context
                     break
-            assert (
-                original_found
-            ), f"Original result not found for {item.original_result.file_path}"
+            assert original_found, f"Original result not found for {item.original_result.file_path}"
 
     @pytest.mark.asyncio
     async def test_reranker_result_immutability(self):

@@ -9,27 +9,27 @@ This package provides advanced dispatcher capabilities including:
 - Load balancing across plugins
 """
 
-from .dispatcher_enhanced import EnhancedDispatcher
 # Legacy import for backwards compatibility
+from .dispatcher_enhanced import EnhancedDispatcher
 from .dispatcher_enhanced import EnhancedDispatcher as Dispatcher
 from .plugin_router import (
-    PluginRouter,
-    FileTypeMatcher,
-    IPluginRouter,
-    IFileTypeMatcher,
-    PluginCapability,
     FileTypeInfo,
+    FileTypeMatcher,
+    IFileTypeMatcher,
+    IPluginRouter,
+    PluginCapability,
+    PluginRouter,
     RouteResult,
 )
 from .result_aggregator import (
-    ResultAggregator,
-    IResultAggregator,
-    SimpleAggregationStrategy,
-    SmartAggregationStrategy,
-    IAggregationStrategy,
     AggregatedResult,
     AggregationStats,
+    IAggregationStrategy,
+    IResultAggregator,
     RankingCriteria,
+    ResultAggregator,
+    SimpleAggregationStrategy,
+    SmartAggregationStrategy,
 )
 
 __all__ = [

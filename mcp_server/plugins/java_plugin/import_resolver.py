@@ -1,9 +1,9 @@
 """Java import resolver for resolving package imports and dependencies."""
 
 import logging
-from pathlib import Path
-from typing import Dict, Set, Optional, List, Tuple
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Dict, List, Optional, Set, Tuple
 
 from mcp_server.plugins.specialized_plugin_base import IImportResolver, ImportInfo
 
@@ -106,9 +106,7 @@ class JavaImportResolver(IImportResolver):
 
         return classes
 
-    def resolve_import(
-        self, import_info: ImportInfo, current_file: Path
-    ) -> Optional[Path]:
+    def resolve_import(self, import_info: ImportInfo, current_file: Path) -> Optional[Path]:
         """Resolve a Java import to its file path."""
         if isinstance(import_info, JavaImportInfo):
             return self._resolve_java_import(import_info)
@@ -151,9 +149,7 @@ class JavaImportResolver(IImportResolver):
             src_path = self.project_root / src_dir
             if src_path.exists():
                 # Try as a class file
-                class_file = (
-                    src_path / Path(*path_parts[:-1]) / f"{path_parts[-1]}.java"
-                )
+                class_file = src_path / Path(*path_parts[:-1]) / f"{path_parts[-1]}.java"
                 if class_file.exists():
                     return class_file
 

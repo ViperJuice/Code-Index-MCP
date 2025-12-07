@@ -1,15 +1,15 @@
 """Build system integration for Maven and Gradle."""
 
+import json
 import logging
+import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import List, Dict, Any, Optional
-import json
-import re
+from typing import Any, Dict, List, Optional
 
 from mcp_server.plugins.specialized_plugin_base import (
-    IBuildSystemIntegration,
     BuildDependency,
+    IBuildSystemIntegration,
 )
 
 logger = logging.getLogger(__name__)
@@ -312,9 +312,7 @@ class JavaBuildSystemIntegration(IBuildSystemIntegration):
 
         return structure
 
-    def _find_text(
-        self, element, path: str, namespaces: Dict[str, str]
-    ) -> Optional[str]:
+    def _find_text(self, element, path: str, namespaces: Dict[str, str]) -> Optional[str]:
         """Safely find text in XML element."""
         elem = element.find(path, namespaces)
         return elem.text if elem is not None and elem.text else None

@@ -14,21 +14,19 @@ Options:
 """
 
 import argparse
+import logging
 import sys
 from pathlib import Path
-import logging
 
-from .benchmark_runner import BenchmarkRunner
-from ..plugins.python_plugin.plugin import PythonPlugin
-from ..plugins.js_plugin.plugin import JavaScriptPlugin
 from ..plugins.c_plugin.plugin import CPlugin
+from ..plugins.js_plugin.plugin import JavaScriptPlugin
+from ..plugins.python_plugin.plugin import PythonPlugin
+from .benchmark_runner import BenchmarkRunner
 
 
 def main():
     """Run MCP Server benchmarks."""
-    parser = argparse.ArgumentParser(
-        description="Run MCP Server performance benchmarks"
-    )
+    parser = argparse.ArgumentParser(description="Run MCP Server performance benchmarks")
     parser.add_argument(
         "--output-dir",
         type=Path,
@@ -40,17 +38,13 @@ def main():
         default="python,javascript,c",
         help="Comma-separated list of plugins to test",
     )
-    parser.add_argument(
-        "--quick", action="store_true", help="Run quick benchmarks only"
-    )
+    parser.add_argument("--quick", action="store_true", help="Run quick benchmarks only")
     parser.add_argument(
         "--full",
         action="store_true",
         help="Run full benchmark suite including large tests",
     )
-    parser.add_argument(
-        "--compare", action="store_true", help="Compare with previous results"
-    )
+    parser.add_argument("--compare", action="store_true", help="Compare with previous results")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
 
     args = parser.parse_args()
@@ -103,9 +97,7 @@ def main():
         print("-" * 70)
 
         for name, metric in result.metrics.items():
-            print(
-                f"{name:<30} {metric.p95:<15.2f} {metric.p99:<15.2f} {metric.count:<10}"
-            )
+            print(f"{name:<30} {metric.p95:<15.2f} {metric.p99:<15.2f} {metric.count:<10}")
 
         # SLO validation
         if hasattr(result, "validations"):

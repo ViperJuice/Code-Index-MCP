@@ -2,23 +2,23 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Optional, Iterable, Dict, List, Set, Tuple, Any
 import logging
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
-from tree_sitter import Language, Parser, Node
 import tree_sitter_languages
+from tree_sitter import Language, Node, Parser
 
 from ...plugin_base import (
     IndexShard,
-    SymbolDef,
     Reference,
-    SearchResult,
     SearchOpts,
+    SearchResult,
+    SymbolDef,
 )
 from ...plugin_base_enhanced import PluginWithSemanticSearch
-from ...utils.fuzzy_indexer import FuzzyIndexer
 from ...storage.sqlite_store import SQLiteStore
+from ...utils.fuzzy_indexer import FuzzyIndexer
 
 logger = logging.getLogger(__name__)
 
@@ -102,9 +102,7 @@ class JsPluginSemantic(PluginWithSemanticSearch):
 
         return IndexShard(file=str(path), symbols=symbols, language="javascript")
 
-    def _extract_symbols_simple(
-        self, content: str, file_id: Optional[int] = None
-    ) -> List[Dict]:
+    def _extract_symbols_simple(self, content: str, file_id: Optional[int] = None) -> List[Dict]:
         """Simple symbol extraction without tree-sitter."""
         symbols = []
         lines = content.split("\n")
@@ -263,9 +261,7 @@ class JsPluginSemantic(PluginWithSemanticSearch):
 
         # Arrow functions and variables
         elif node.type == "variable_declaration":
-            declarators = [
-                child for child in node.children if child.type == "variable_declarator"
-            ]
+            declarators = [child for child in node.children if child.type == "variable_declarator"]
             for declarator in declarators:
                 name_node = declarator.child_by_field_name("name")
                 value_node = declarator.child_by_field_name("value")
@@ -302,9 +298,7 @@ class JsPluginSemantic(PluginWithSemanticSearch):
         if node.type == "import_statement":
             source_node = node.child_by_field_name("source")
             if source_node:
-                module = content[source_node.start_byte : source_node.end_byte].strip(
-                    "\"'"
-                )
+                module = content[source_node.start_byte : source_node.end_byte].strip("\"'")
                 imports.append({"module": module})
 
         for child in node.children:
@@ -317,9 +311,7 @@ class JsPluginSemantic(PluginWithSemanticSearch):
         exports = []
         if node.type in ["export_statement", "export_default_declaration"]:
             # Simplified export extraction
-            exports.append(
-                {"name": "export", "kind": "export", "line": node.start_point[0] + 1}
-            )
+            exports.append({"name": "export", "kind": "export", "line": node.start_point[0] + 1})
 
         for child in node.children:
             exports.extend(self._extract_exports(child, content))
@@ -368,9 +360,7 @@ class JsPluginSemantic(PluginWithSemanticSearch):
                 # Clean up JSDoc
                 doc = "\n".join(doc_lines)
                 doc = doc.replace("/**", "").replace("*/", "")
-                doc = "\n".join(
-                    line.strip().lstrip("*").strip() for line in doc.split("\n")
-                )
+                doc = "\n".join(line.strip().lstrip("*").strip() for line in doc.split("\n"))
                 return doc.strip()
 
         return None

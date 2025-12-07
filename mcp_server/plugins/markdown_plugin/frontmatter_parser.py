@@ -3,6 +3,7 @@ Frontmatter parser for YAML and TOML metadata extraction.
 """
 
 import re
+
 import yaml
 
 try:
@@ -12,9 +13,10 @@ except ImportError:
         import tomlkit as tomllib
     except ImportError:
         import toml as tomllib
-from typing import Dict, Any, Tuple, Optional, List
+
 import logging
-from datetime import datetime, date
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -289,18 +291,14 @@ class FrontmatterParser:
 
         return len(errors) == 0, errors
 
-    def serialize_frontmatter(
-        self, metadata: Dict[str, Any], format: str = "yaml"
-    ) -> str:
+    def serialize_frontmatter(self, metadata: Dict[str, Any], format: str = "yaml") -> str:
         """Serialize metadata back to frontmatter format."""
         if not metadata:
             return ""
 
         if format == "yaml":
             try:
-                yaml_content = yaml.dump(
-                    metadata, default_flow_style=False, allow_unicode=True
-                )
+                yaml_content = yaml.dump(metadata, default_flow_style=False, allow_unicode=True)
                 return f"{self.yaml_delimiter}\n{yaml_content}{self.yaml_delimiter}\n"
             except Exception as e:
                 logger.error(f"Failed to serialize YAML frontmatter: {e}")

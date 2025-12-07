@@ -4,13 +4,14 @@ Comprehensive validation test suite for document processing plugins.
 Tests both Markdown and PlainText plugins for production readiness.
 """
 
-import pytest
 import os
 import tempfile
 import time
-import psutil
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
+import psutil
+import pytest
 
 from mcp_server.plugins.plugin_factory import PluginFactory
 from mcp_server.storage.sqlite_store import SQLiteStore
@@ -18,30 +19,30 @@ from mcp_server.storage.sqlite_store import SQLiteStore
 
 class TestDocumentProcessingValidation:
     """Comprehensive validation tests for document processing."""
-    
+
     @pytest.fixture
     def sqlite_store(self):
         """Create a temporary SQLite store for testing."""
-        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
             db_path = tmp.name
-        
+
         store = SQLiteStore(db_path)
         yield store
-        
+
         # Cleanup
         store.close()
         os.unlink(db_path)
-    
+
     @pytest.fixture
     def markdown_plugin(self, sqlite_store):
         """Create Markdown plugin instance."""
-        return PluginFactory.create_plugin('markdown', sqlite_store)
-    
+        return PluginFactory.create_plugin("markdown", sqlite_store)
+
     @pytest.fixture
     def plaintext_plugin(self, sqlite_store):
         """Create PlainText plugin instance."""
-        return PluginFactory.create_plugin('plaintext', sqlite_store)
-    
+        return PluginFactory.create_plugin("plaintext", sqlite_store)
+
     def test_markdown_hierarchical_extraction(self, markdown_plugin):
         """Test that Markdown plugin correctly extracts hierarchical structure."""
         content = """
@@ -62,18 +63,22 @@ More details.
 #### Subsubsection 2.1.1
 Deep nesting.
 """
-        
+
         result = markdown_plugin.extract_symbols(content, "test.md")
-        
+
         # Verify hierarchical structure
         assert any(s.name == "Main Title" and s.symbol_type == "heading_1" for s in result.symbols)
         assert any(s.name == "Section 1" and s.symbol_type == "heading_2" for s in result.symbols)
-        assert any(s.name == "Subsection 1.1" and s.symbol_type == "heading_3" for s in result.symbols)
-        assert any(s.name == "Subsubsection 2.1.1" and s.symbol_type == "heading_4" for s in result.symbols)
-    
+        assert any(
+            s.name == "Subsection 1.1" and s.symbol_type == "heading_3" for s in result.symbols
+        )
+        assert any(
+            s.name == "Subsubsection 2.1.1" and s.symbol_type == "heading_4" for s in result.symbols
+        )
+
     def test_markdown_code_block_preservation(self, markdown_plugin):
         """Test that code blocks are preserved with language tags."""
-        content = '''
+        content = """
 # Code Examples
 
 ```python
@@ -86,18 +91,18 @@ function helloWorld() {
     console.log("Hello, World!");
 }
 ```
-'''
-        
+"""
+
         result = markdown_plugin.extract_symbols(content, "test.md")
-        
+
         # Check for code blocks
         code_blocks = [s for s in result.symbols if s.symbol_type == "code_block"]
         assert len(code_blocks) >= 2
-        
+
         # Verify language tags
         assert any("python" in str(s.metadata) for s in code_blocks)
         assert any("javascript" in str(s.metadata) for s in code_blocks)
-    
+
     def test_markdown_frontmatter_parsing(self, markdown_plugin):
         """Test YAML frontmatter parsing."""
         content = """---
@@ -110,14 +115,14 @@ date: 2025-06-09
 # Document Content
 This is the actual content.
 """
-        
+
         result = markdown_plugin.extract_symbols(content, "test.md")
-        
+
         # Check metadata extraction
-        assert result.metadata.get('title') == 'Test Document'
-        assert result.metadata.get('author') == 'Test Author'
-        assert 'testing' in result.metadata.get('tags', [])
-    
+        assert result.metadata.get("title") == "Test Document"
+        assert result.metadata.get("author") == "Test Author"
+        assert "testing" in result.metadata.get("tags", [])
+
     def test_plaintext_nlp_features(self, plaintext_plugin):
         """Test NLP features of PlainText plugin."""
         content = """
@@ -130,26 +135,28 @@ We're testing the semantic coherence-based chunking feature.
 Technical terms like API, REST, and JSON should be recognized.
 The plugin should handle various formatting patterns.
 """
-        
+
         result = plaintext_plugin.extract_symbols(content, "test.txt")
-        
+
         # Check paragraph detection
         paragraphs = [s for s in result.symbols if s.symbol_type == "paragraph"]
         assert len(paragraphs) >= 2
-        
+
         # Check sentence boundary detection
         assert any("multiple sentences" in s.name for s in result.symbols)
-    
+
     def test_performance_document_indexing(self, markdown_plugin, sqlite_store):
         """Test indexing performance meets < 100ms per file requirement."""
         content = """
 # Large Document
 
-""" + "\n".join([f"## Section {i}\nContent for section {i}." for i in range(100)])
-        
+""" + "\n".join(
+            [f"## Section {i}\nContent for section {i}." for i in range(100)]
+        )
+
         start_time = time.time()
         result = markdown_plugin.extract_symbols(content, "large.md")
-        
+
         # Store symbols
         for symbol in result.symbols:
             sqlite_store.add_symbol(
@@ -157,18 +164,18 @@ The plugin should handle various formatting patterns.
                 symbol_name=symbol.name,
                 symbol_type=symbol.symbol_type,
                 line_number=symbol.line,
-                metadata=symbol.metadata
+                metadata=symbol.metadata,
             )
-        
+
         elapsed_time = (time.time() - start_time) * 1000  # Convert to ms
-        
+
         assert elapsed_time < 100, f"Indexing took {elapsed_time}ms, exceeding 100ms requirement"
-    
+
     def test_memory_usage_thousand_documents(self, markdown_plugin, sqlite_store):
         """Test memory usage stays under 100MB for 1000 documents."""
         process = psutil.Process()
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
-        
+
         # Generate and index 1000 small documents
         for i in range(1000):
             content = f"""
@@ -181,21 +188,23 @@ This is document number {i}.
 Some content here.
 """
             result = markdown_plugin.extract_symbols(content, f"doc_{i}.md")
-            
+
             for symbol in result.symbols:
                 sqlite_store.add_symbol(
                     file_path=f"doc_{i}.md",
                     symbol_name=symbol.name,
                     symbol_type=symbol.symbol_type,
                     line_number=symbol.line,
-                    metadata=symbol.metadata
+                    metadata=symbol.metadata,
                 )
-        
+
         final_memory = process.memory_info().rss / 1024 / 1024  # MB
         memory_increase = final_memory - initial_memory
-        
-        assert memory_increase < 100, f"Memory usage increased by {memory_increase}MB, exceeding 100MB limit"
-    
+
+        assert (
+            memory_increase < 100
+        ), f"Memory usage increased by {memory_increase}MB, exceeding 100MB limit"
+
     def test_natural_language_query_support(self, markdown_plugin, sqlite_store):
         """Test support for natural language queries."""
         content = """
@@ -216,23 +225,23 @@ Edit the config file.
 ## Troubleshooting
 If you encounter errors, check the logs.
 """
-        
+
         result = markdown_plugin.extract_symbols(content, "install.md")
-        
+
         for symbol in result.symbols:
             sqlite_store.add_symbol(
                 file_path="install.md",
                 symbol_name=symbol.name,
                 symbol_type=symbol.symbol_type,
                 line_number=symbol.line,
-                metadata=symbol.metadata
+                metadata=symbol.metadata,
             )
-        
+
         # Test natural language query
         results = sqlite_store.search_symbols("how to install", limit=5)
         assert len(results) > 0
         assert any("install" in r[1].lower() for r in results)
-    
+
     def test_cross_document_linking(self, markdown_plugin, sqlite_store):
         """Test cross-document link extraction and tracking."""
         doc1 = """
@@ -241,31 +250,31 @@ If you encounter errors, check the logs.
 See [Installation Guide](install.md) for setup instructions.
 Also check [API Reference](api.md#endpoints).
 """
-        
+
         doc2 = """
 # Installation Guide
 
 Return to [Main Document](index.md).
 """
-        
+
         # Process both documents
         for filename, content in [("index.md", doc1), ("install.md", doc2)]:
             result = markdown_plugin.extract_symbols(content, filename)
-            
+
             # Extract links
             links = []
-            if hasattr(result, 'links'):
+            if hasattr(result, "links"):
                 links = result.links
-            
+
             for symbol in result.symbols:
                 sqlite_store.add_symbol(
                     file_path=filename,
                     symbol_name=symbol.name,
                     symbol_type=symbol.symbol_type,
                     line_number=symbol.line,
-                    metadata={'links': links} if links else symbol.metadata
+                    metadata={"links": links} if links else symbol.metadata,
                 )
-    
+
     def test_real_world_readme_parsing(self, markdown_plugin):
         """Test with a real-world README structure."""
         content = """
@@ -335,20 +344,20 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 This project is licensed under the MIT License - see [LICENSE](LICENSE) file.
 """
-        
+
         result = markdown_plugin.extract_symbols(content, "README.md")
-        
+
         # Verify key sections are extracted
         section_names = [s.name for s in result.symbols if s.symbol_type.startswith("heading")]
         assert "Features" in section_names
         assert "Installation" in section_names
         assert "Usage" in section_names
         assert "API" in section_names
-        
+
         # Check code block extraction
         code_blocks = [s for s in result.symbols if s.symbol_type == "code_block"]
         assert len(code_blocks) >= 2
-    
+
     def test_api_documentation_parsing(self, markdown_plugin):
         """Test parsing of API documentation format."""
         content = """
@@ -404,17 +413,19 @@ Trigger reindexing of files.
 }
 ```
 """
-        
+
         result = markdown_plugin.extract_symbols(content, "api.md")
-        
+
         # Check API endpoint extraction
         endpoints = [s for s in result.symbols if "GET" in s.name or "POST" in s.name]
         assert len(endpoints) >= 2
-        
+
         # Verify parameter documentation
-        assert any("Parameters:" in s.name or "parameters" in str(s.metadata).lower() 
-                  for s in result.symbols)
-    
+        assert any(
+            "Parameters:" in s.name or "parameters" in str(s.metadata).lower()
+            for s in result.symbols
+        )
+
     def test_technical_documentation_structure(self, plaintext_plugin):
         """Test parsing of technical documentation."""
         content = """
@@ -447,13 +458,13 @@ TECHNICAL SPECIFICATION
    - Latency: < 50ms p95
    - Availability: 99.9%
 """
-        
+
         result = plaintext_plugin.extract_symbols(content, "tech_spec.txt")
-        
+
         # Check section extraction
         sections = [s for s in result.symbols if s.symbol_type in ["section", "paragraph"]]
         assert len(sections) >= 4
-        
+
         # Verify technical terms are recognized
         assert any("API Gateway" in s.name for s in result.symbols)
         assert any("RabbitMQ" in s.name for s in result.symbols)

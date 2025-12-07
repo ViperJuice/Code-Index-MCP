@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from typing import Optional, List, Dict, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 
 class RustModuleResolver:
@@ -43,9 +43,7 @@ class RustModuleResolver:
             self._module_cache[cache_key] = resolved
         return resolved
 
-    def _resolve_module_path_impl(
-        self, from_file: Path, module_path: str
-    ) -> Optional[Path]:
+    def _resolve_module_path_impl(self, from_file: Path, module_path: str) -> Optional[Path]:
         """Internal implementation of module path resolution."""
         parts = module_path.split("::")
 

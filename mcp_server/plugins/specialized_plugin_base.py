@@ -1,10 +1,10 @@
 """Base classes and interfaces for specialized language plugins."""
 
-from abc import ABC, abstractmethod
-from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple, Any, Iterable
 import logging
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from mcp_server.plugins.generic_treesitter_plugin import GenericTreeSitterPlugin
 from mcp_server.storage.sqlite_store import SQLiteStore
@@ -62,9 +62,7 @@ class IImportResolver(ABC):
     """Interface for resolving imports and dependencies."""
 
     @abstractmethod
-    def resolve_import(
-        self, import_info: ImportInfo, current_file: Path
-    ) -> Optional[Path]:
+    def resolve_import(self, import_info: ImportInfo, current_file: Path) -> Optional[Path]:
         """Resolve an import to its actual file path."""
         pass
 
@@ -121,9 +119,7 @@ class ICrossFileAnalyzer(ABC):
     """Interface for cross-file analysis."""
 
     @abstractmethod
-    def find_all_references(
-        self, symbol: str, definition_file: str
-    ) -> List[CrossFileReference]:
+    def find_all_references(self, symbol: str, definition_file: str) -> List[CrossFileReference]:
         """Find all references to a symbol across files."""
         pass
 
@@ -226,9 +222,7 @@ class SpecializedPluginBase(GenericTreeSitterPlugin):
 
         if definition:
             # Enhance with type information
-            type_info = self.type_analyzer.get_type_info(
-                symbol, definition.get("defined_in", "")
-            )
+            type_info = self.type_analyzer.get_type_info(symbol, definition.get("defined_in", ""))
             if type_info:
                 definition["type_info"] = {
                     "type": type_info.type_name,
@@ -260,9 +254,7 @@ class SpecializedPluginBase(GenericTreeSitterPlugin):
         definition_file = definition.get("defined_in", "")
 
         # Find cross-file references
-        cross_refs = self.cross_file_analyzer.find_all_references(
-            symbol, definition_file
-        )
+        cross_refs = self.cross_file_analyzer.find_all_references(symbol, definition_file)
 
         for ref in cross_refs:
             references.append(

@@ -6,14 +6,14 @@ import tempfile
 from pathlib import Path
 
 # Add the project root to Python path
-sys.path.insert(0, '/app')
+sys.path.insert(0, "/app")
 
 from mcp_server.plugins.markdown_plugin import MarkdownPlugin
 
 
 def test_markdown_plugin():
     """Test the Markdown plugin functionality."""
-    
+
     # Create a test Markdown file
     test_content = """---
 title: Test Document
@@ -57,25 +57,25 @@ More content here with **bold** and *italic* text.
 
 ![Image alt text](image.png)
 """
-    
+
     # Create a temporary file
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
         f.write(test_content)
         test_file = Path(f.name)
-    
+
     try:
         # Initialize the plugin
         plugin = MarkdownPlugin(enable_semantic=False)  # Disable semantic for simple test
-        
+
         print("Testing Markdown Plugin")
         print("=" * 50)
-        
+
         # Test 1: Check if plugin can handle the file
         print("\n1. Can handle test:")
         can_handle = plugin.supports(str(test_file))
         print(f"   Can handle .md file: {can_handle}")
         assert can_handle, "Plugin should handle .md files"
-        
+
         # Test 2: Extract metadata
         print("\n2. Extract metadata test:")
         metadata = plugin.extract_metadata(test_content, test_file)
@@ -83,37 +83,38 @@ More content here with **bold** and *italic* text.
         print(f"   Author: {metadata.author}")
         print(f"   Tags: {metadata.tags}")
         print(f"   Date: {metadata.created_date}")
-        
+
         # Test 3: Extract structure
         print("\n3. Extract structure test:")
         structure = plugin.extract_structure(test_content, test_file)
         print(f"   Sections found: {len(structure.sections)}")
         print(f"   Title: {structure.title}")
-        
+
         for i, section in enumerate(structure.sections[:3]):
             print(f"   Section {i+1}: {section.heading} (level {section.level})")
-        
+
         # Test 4: Parse to plain text
         print("\n4. Parse to plain text test:")
         plain_text = plugin.parse_content(test_content, test_file)
         print(f"   Plain text length: {len(plain_text)} characters")
         print(f"   First 100 chars: {plain_text[:100]}...")
-        
+
         # Test 5: Index file
         print("\n5. Index file test:")
         result = plugin.indexFile(str(test_file), test_content)
         print(f"   File: {result['file']}")
         print(f"   Language: {result['language']}")
         print(f"   Symbols found: {len(result['symbols'])}")
-        
-        for symbol in result['symbols'][:5]:
+
+        for symbol in result["symbols"][:5]:
             print(f"   - {symbol['kind']}: {symbol['symbol']}")
-        
+
         print("\n✅ All tests passed!")
-        
+
     except Exception as e:
         print(f"\n❌ Test failed with error: {e}")
         import traceback
+
         traceback.print_exc()
     finally:
         # Clean up

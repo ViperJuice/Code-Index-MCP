@@ -3,24 +3,25 @@ Comprehensive tests for the cache system.
 """
 
 import asyncio
-import pytest
 import time
-from unittest.mock import Mock, AsyncMock, patch
 from typing import Any, Dict, Set
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 
 from mcp_server.cache import (
+    CacheBackendType,
+    CacheConfig,
+    CacheEntry,
     CacheManager,
     CacheManagerFactory,
-    CacheConfig,
-    CacheBackendType,
-    MemoryCacheBackend,
-    QueryResultCache,
-    QueryCacheConfig,
-    QueryType,
     InvalidationStrategy,
-    CacheEntry,
+    MemoryCacheBackend,
+    QueryCacheConfig,
+    QueryResultCache,
+    QueryType,
 )
-from mcp_server.plugin_base import SymbolDef, SearchResult
+from mcp_server.plugin_base import SearchResult, SymbolDef
 
 
 class TestCacheEntry:
@@ -402,9 +403,7 @@ class TestQueryResultCache:
             line_number=10,
         )
 
-        await query_cache.cache_result(
-            QueryType.SYMBOL_LOOKUP, symbol_def, symbol="file_function"
-        )
+        await query_cache.cache_result(QueryType.SYMBOL_LOOKUP, symbol_def, symbol="file_function")
 
         # Verify it's cached
         cached_result = await query_cache.get_cached_result(
@@ -439,9 +438,7 @@ class TestQueryResultCache:
         assert count >= 1
 
         # Search should be gone, symbol lookup should remain
-        search_result = await query_cache.get_cached_result(
-            QueryType.SEARCH, q="query1"
-        )
+        search_result = await query_cache.get_cached_result(QueryType.SEARCH, q="query1")
         assert search_result is None
 
         symbol_result = await query_cache.get_cached_result(
@@ -497,9 +494,7 @@ class TestCacheManagerFactory:
     @pytest.mark.asyncio
     async def test_create_memory_cache(self):
         """Test creating memory cache."""
-        cache_manager = CacheManagerFactory.create_memory_cache(
-            max_entries=50, max_memory_mb=10
-        )
+        cache_manager = CacheManagerFactory.create_memory_cache(max_entries=50, max_memory_mb=10)
 
         await cache_manager.initialize()
 
@@ -521,9 +516,7 @@ class TestCacheManagerFactory:
 
     def test_create_hybrid_cache(self):
         """Test creating hybrid cache configuration."""
-        cache_manager = CacheManagerFactory.create_hybrid_cache(
-            max_entries=200, max_memory_mb=20
-        )
+        cache_manager = CacheManagerFactory.create_hybrid_cache(max_entries=200, max_memory_mb=20)
 
         assert cache_manager.config.backend_type == CacheBackendType.HYBRID
         assert cache_manager.config.max_entries == 200
@@ -556,9 +549,7 @@ class TestCacheDecorators:
         async def lookup_symbol(symbol: str):
             nonlocal call_count
             call_count += 1
-            return SymbolDef(
-                name=symbol, type="function", file_path=f"/test/{symbol}.py"
-            )
+            return SymbolDef(name=symbol, type="function", file_path=f"/test/{symbol}.py")
 
         # First call should execute function
         result1 = await lookup_symbol(symbol="test_func")

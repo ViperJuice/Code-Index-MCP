@@ -13,4 +13,12 @@ from performance.test_document_memory_usage import *
 
 if __name__ == "__main__":
     import pytest
-    pytest.main([str(tests_dir / "performance" / "test_document_memory_usage.py"), "-v", "-m", "performance"])
+
+    pytest.main(
+        [
+            str(tests_dir / "performance" / "test_document_memory_usage.py"),
+            "-v",
+            "-m",
+            "performance",
+        ]
+    )

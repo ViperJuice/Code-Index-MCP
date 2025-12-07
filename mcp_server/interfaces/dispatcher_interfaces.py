@@ -6,10 +6,11 @@ The dispatcher coordinates between the API gateway and the plugin system.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any, Callable, Union
 from dataclasses import dataclass
-from .shared_interfaces import Result, ICache, IMetrics
+from typing import Any, Callable, Dict, List, Optional, Union
+
 from .plugin_interfaces import IPlugin, SearchResult, SymbolDefinition, SymbolReference
+from .shared_interfaces import ICache, IMetrics, Result
 
 # ========================================
 # Dispatcher Data Types
@@ -88,9 +89,7 @@ class IDispatcher(ABC):
         pass
 
     @abstractmethod
-    async def dispatch_to_all(
-        self, request: DispatchRequest
-    ) -> Result[AggregatedResult]:
+    async def dispatch_to_all(self, request: DispatchRequest) -> Result[AggregatedResult]:
         """Dispatch a request to all available plugins"""
         pass
 
@@ -157,23 +156,17 @@ class IResultAggregator(ABC):
     """Interface for aggregating results from multiple plugins"""
 
     @abstractmethod
-    def aggregate_search_results(
-        self, results: List[DispatchResult]
-    ) -> List[SearchResult]:
+    def aggregate_search_results(self, results: List[DispatchResult]) -> List[SearchResult]:
         """Aggregate search results from multiple plugins"""
         pass
 
     @abstractmethod
-    def aggregate_symbol_definitions(
-        self, results: List[DispatchResult]
-    ) -> List[SymbolDefinition]:
+    def aggregate_symbol_definitions(self, results: List[DispatchResult]) -> List[SymbolDefinition]:
         """Aggregate symbol definitions from multiple plugins"""
         pass
 
     @abstractmethod
-    def aggregate_symbol_references(
-        self, results: List[DispatchResult]
-    ) -> List[SymbolReference]:
+    def aggregate_symbol_references(self, results: List[DispatchResult]) -> List[SymbolReference]:
         """Aggregate symbol references from multiple plugins"""
         pass
 
@@ -189,16 +182,12 @@ class IResultMerger(ABC):
     """Interface for merging specific types of results"""
 
     @abstractmethod
-    def merge_search_results(
-        self, results: List[List[SearchResult]]
-    ) -> List[SearchResult]:
+    def merge_search_results(self, results: List[List[SearchResult]]) -> List[SearchResult]:
         """Merge and deduplicate search results"""
         pass
 
     @abstractmethod
-    def rank_results(
-        self, results: List[SearchResult], query: str
-    ) -> List[SearchResult]:
+    def rank_results(self, results: List[SearchResult], query: str) -> List[SearchResult]:
         """Rank search results by relevance"""
         pass
 
@@ -212,9 +201,7 @@ class IResultFilter(ABC):
     """Interface for filtering aggregated results"""
 
     @abstractmethod
-    def filter_by_score(
-        self, results: List[SearchResult], min_score: float
-    ) -> List[SearchResult]:
+    def filter_by_score(self, results: List[SearchResult], min_score: float) -> List[SearchResult]:
         """Filter results by minimum score"""
         pass
 
@@ -252,9 +239,7 @@ class IExecutionCoordinator(ABC):
         pass
 
     @abstractmethod
-    async def execute_with_timeout(
-        self, operation: Callable, timeout: float
-    ) -> Result[Any]:
+    async def execute_with_timeout(self, operation: Callable, timeout: float) -> Result[Any]:
         """Execute an operation with a timeout"""
         pass
 
@@ -280,9 +265,7 @@ class ILoadBalancer(ABC):
         pass
 
     @abstractmethod
-    def update_plugin_metrics(
-        self, plugin_name: str, execution_time: float, success: bool
-    ) -> None:
+    def update_plugin_metrics(self, plugin_name: str, execution_time: float, success: bool) -> None:
         """Update metrics for a plugin"""
         pass
 
@@ -378,9 +361,7 @@ class IDispatchMonitor(ABC):
     """Interface for monitoring dispatch operations"""
 
     @abstractmethod
-    def record_dispatch(
-        self, request: DispatchRequest, result: AggregatedResult
-    ) -> None:
+    def record_dispatch(self, request: DispatchRequest, result: AggregatedResult) -> None:
         """Record a dispatch operation"""
         pass
 

@@ -3,20 +3,21 @@ Prometheus metrics exporter for MCP Server.
 Provides detailed metrics for monitoring and alerting.
 """
 
-import time
 import logging
-from typing import Dict, Any, Optional, Callable
+import time
+from typing import Any, Callable, Dict, Optional
+
 from prometheus_client import (
-    Counter,
-    Histogram,
-    Gauge,
-    Summary,
-    Info,
-    CollectorRegistry,
-    generate_latest,
     CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    Counter,
+    Gauge,
+    Histogram,
+    Info,
+    Summary,
+    generate_latest,
 )
-from prometheus_client.core import GaugeMetricFamily, CounterMetricFamily
+from prometheus_client.core import CounterMetricFamily, GaugeMetricFamily
 
 logger = logging.getLogger(__name__)
 
@@ -203,27 +204,17 @@ class PrometheusExporter:
 
     def record_request(self, method: str, endpoint: str, status: int, duration: float):
         """Record HTTP request metrics."""
-        self.request_count.labels(
-            method=method, endpoint=endpoint, status=str(status)
-        ).inc()
+        self.request_count.labels(method=method, endpoint=endpoint, status=str(status)).inc()
         self.request_duration.labels(method=method, endpoint=endpoint).observe(duration)
 
-    def record_plugin_load(
-        self, plugin: str, language: str, duration: float, success: bool
-    ):
+    def record_plugin_load(self, plugin: str, language: str, duration: float, success: bool):
         """Record plugin load metrics."""
-        self.plugin_load_duration.labels(plugin=plugin, language=language).observe(
-            duration
-        )
-        self.plugin_status.labels(plugin=plugin, language=language).set(
-            1 if success else 0
-        )
+        self.plugin_load_duration.labels(plugin=plugin, language=language).observe(duration)
+        self.plugin_status.labels(plugin=plugin, language=language).set(1 if success else 0)
 
     def record_plugin_error(self, plugin: str, language: str, error_type: str):
         """Record plugin error."""
-        self.plugin_errors.labels(
-            plugin=plugin, language=language, error_type=error_type
-        ).inc()
+        self.plugin_errors.labels(plugin=plugin, language=language, error_type=error_type).inc()
 
     def record_indexing(self, language: str, symbols_count: int, duration: float):
         """Record indexing metrics."""
@@ -231,9 +222,7 @@ class PrometheusExporter:
         self.indexing_duration.labels(language=language).observe(duration)
         # Note: Individual symbol counts would be recorded separately
 
-    def record_search(
-        self, search_type: str, language: str, duration: float, results_count: int
-    ):
+    def record_search(self, search_type: str, language: str, duration: float, results_count: int):
         """Record search metrics."""
         self.search_requests.labels(search_type=search_type, language=language).inc()
         self.search_duration.labels(search_type=search_type).observe(duration)
@@ -287,9 +276,7 @@ class PrometheusExporter:
 
     def set_build_info(self, version: str, commit: str = "", build_time: str = ""):
         """Set build information."""
-        self.build_info.info(
-            {"version": version, "commit": commit, "build_time": build_time}
-        )
+        self.build_info.info({"version": version, "commit": commit, "build_time": build_time})
 
     def generate_metrics(self) -> bytes:
         """Generate metrics in Prometheus format."""
@@ -318,9 +305,7 @@ class PrometheusCollector:
 
         # Plugin metrics
         if "plugins" in metrics:
-            active_plugins = GaugeMetricFamily(
-                "mcp_active_plugins_total", "Total active plugins"
-            )
+            active_plugins = GaugeMetricFamily("mcp_active_plugins_total", "Total active plugins")
             active_plugins.add_metric([], len(metrics["plugins"]))
             yield active_plugins
 
@@ -336,23 +321,17 @@ class PrometheusCollector:
 
         # Index metrics
         if "index" in metrics:
-            total_files = GaugeMetricFamily(
-                "mcp_indexed_files_total", "Total indexed files"
-            )
+            total_files = GaugeMetricFamily("mcp_indexed_files_total", "Total indexed files")
             total_files.add_metric([], metrics["index"].get("total_files", 0))
             yield total_files
 
-            total_symbols = GaugeMetricFamily(
-                "mcp_indexed_symbols_total", "Total indexed symbols"
-            )
+            total_symbols = GaugeMetricFamily("mcp_indexed_symbols_total", "Total indexed symbols")
             total_symbols.add_metric([], metrics["index"].get("total_symbols", 0))
             yield total_symbols
 
         # Database metrics
         if "database" in metrics:
-            db_size = GaugeMetricFamily(
-                "mcp_database_size_bytes", "Database size in bytes"
-            )
+            db_size = GaugeMetricFamily("mcp_database_size_bytes", "Database size in bytes")
             db_size.add_metric([], metrics["database"].get("size_bytes", 0))
             yield db_size
 

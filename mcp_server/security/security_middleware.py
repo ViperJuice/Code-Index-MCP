@@ -1,34 +1,32 @@
 """FastAPI security middleware for authentication and authorization."""
 
-import time
 import logging
-from typing import Dict, List, Optional, Callable, Any
+import time
 from datetime import datetime
+from typing import Any, Callable, Dict, List, Optional
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, Request, Response, HTTPException, status, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import JSONResponse
-from starlette.middleware.base import RequestResponseEndpoint
 
 from .auth_manager import (
-    AuthManager,
     AuthenticationError,
+    AuthManager,
     AuthorizationError,
     SecurityError,
 )
 from .models import (
-    TokenData,
     AccessRequest,
     Permission,
     SecurityConfig,
     SecurityEvent,
+    TokenData,
     User,
     UserRole,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -61,9 +59,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.auth_manager = auth_manager
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         """Process request with rate limiting."""
         client_ip = self._get_client_ip(request)
 
@@ -103,13 +99,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
     def __init__(self, app: FastAPI, security_headers: Optional[Dict[str, str]] = None):
         super().__init__(app)
-        self.security_headers = (
-            security_headers or SecurityHeaders.get_default_headers()
-        )
+        self.security_headers = security_headers or SecurityHeaders.get_default_headers()
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         """Add security headers to response."""
         response = await call_next(request)
 
@@ -142,9 +134,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             "/api/v1/auth/refresh",
         ]
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         """Process request with authentication."""
         # Skip authentication for excluded paths
         if self._is_excluded_path(request.url.path):
@@ -218,9 +208,7 @@ class AuthorizationMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.auth_manager = auth_manager
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         """Process request with authorization."""
         # Skip authorization if not authenticated
         if not hasattr(request.state, "user_id"):
@@ -310,9 +298,7 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.max_request_size = max_request_size
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         """Validate and sanitize incoming requests."""
         # Check request size
         content_length = request.headers.get("content-length")
@@ -378,15 +364,11 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
 def get_current_user(request: Request) -> TokenData:
     """Get current user from request state."""
     if not hasattr(request.state, "token_data"):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     return request.state.token_data
 
 
-def get_current_active_user(
-    request: Request, auth_manager: AuthManager = Depends()
-) -> User:
+def get_current_active_user(request: Request, auth_manager: AuthManager = Depends()) -> User:
     """Get current active user."""
     token_data = get_current_user(request)
     # In a real implementation, you'd fetch the user from the database
@@ -435,9 +417,7 @@ def require_role(role: UserRole):
                     detail=f"Role '{role.value}' or higher required",
                 )
         except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="Invalid role"
-            )
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid role")
 
         return current_user
 
@@ -478,9 +458,7 @@ class SecurityMiddlewareStack:
         self.app.add_middleware(AuthorizationMiddleware, auth_manager=self.auth_manager)
 
         # Add authentication middleware last (executes first)
-        self.app.add_middleware(
-            AuthenticationMiddleware, auth_manager=self.auth_manager
-        )
+        self.app.add_middleware(AuthenticationMiddleware, auth_manager=self.auth_manager)
 
     def add_security_routes(self):
         """Add security-related routes."""

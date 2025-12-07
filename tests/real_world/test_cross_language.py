@@ -5,11 +5,12 @@ Tests cross-language symbol resolution and multi-language project capabilities.
 Validates symbol discovery, reference tracking, and integration across different programming languages.
 """
 
-import pytest
-import tempfile
 import os
+import tempfile
 from pathlib import Path
-from typing import Dict, List, Any, Set, Tuple
+from typing import Any, Dict, List, Set, Tuple
+
+import pytest
 
 
 @pytest.mark.cross_language
@@ -515,9 +516,9 @@ database:
                         plugin_name,
                         plugin_instance,
                     ) in plugin_manager.get_active_plugins().items():
-                        if hasattr(
-                            plugin_instance, "supports"
-                        ) and plugin_instance.supports(file_path):
+                        if hasattr(plugin_instance, "supports") and plugin_instance.supports(
+                            file_path
+                        ):
                             supporting_plugin = plugin_instance
                             break
 
@@ -542,9 +543,7 @@ database:
             symbols_by_language[language] = total_symbols
 
         # Validate multi-language indexing
-        successful_languages = [
-            lang for lang, count in indexed_by_language.items() if count > 0
-        ]
+        successful_languages = [lang for lang, count in indexed_by_language.items() if count > 0]
         assert (
             len(successful_languages) >= 3
         ), f"Should index multiple languages: {successful_languages}"
@@ -558,9 +557,7 @@ database:
         print(f"Multi-language indexing: {successful_languages}")
         print(f"Total: {total_indexed} files, {total_symbols} symbols")
 
-    def test_common_symbol_patterns_across_languages(
-        self, setup_multi_language_project
-    ):
+    def test_common_symbol_patterns_across_languages(self, setup_multi_language_project):
         """Test finding common patterns across different languages."""
         project_data = setup_multi_language_project
         plugin_manager = project_data["plugin_manager"]
@@ -577,9 +574,7 @@ database:
                     plugin_name,
                     plugin_instance,
                 ) in plugin_manager.get_active_plugins().items():
-                    if hasattr(
-                        plugin_instance, "supports"
-                    ) and plugin_instance.supports(file_path):
+                    if hasattr(plugin_instance, "supports") and plugin_instance.supports(file_path):
                         supporting_plugin = plugin_instance
                         break
 
@@ -700,9 +695,7 @@ database:
                     plugin_name,
                     plugin_instance,
                 ) in plugin_manager.get_active_plugins().items():
-                    if hasattr(
-                        plugin_instance, "supports"
-                    ) and plugin_instance.supports(file_path):
+                    if hasattr(plugin_instance, "supports") and plugin_instance.supports(file_path):
                         supporting_plugin = plugin_instance
                         break
 
@@ -769,12 +762,7 @@ database:
             for symbol_name in symbol_definitions.keys():
                 if (
                     concept.lower() in symbol_name.lower()
-                    and len(
-                        set(
-                            defn["language"] for defn in symbol_definitions[symbol_name]
-                        )
-                    )
-                    > 1
+                    and len(set(defn["language"] for defn in symbol_definitions[symbol_name])) > 1
                 ):
                     found_cross_language.append(concept)
                     break
@@ -839,9 +827,7 @@ database:
                     plugin_name,
                     plugin_instance,
                 ) in plugin_manager.get_active_plugins().items():
-                    if hasattr(
-                        plugin_instance, "supports"
-                    ) and plugin_instance.supports(file_path):
+                    if hasattr(plugin_instance, "supports") and plugin_instance.supports(file_path):
                         supporting_plugin = plugin_instance
                         break
 
@@ -899,14 +885,10 @@ database:
 
         # Validate configuration integration
         assert len(config_symbols) >= 1, "Should index configuration files"
-        assert (
-            len(code_config_references) >= 1
-        ), "Should find config-related symbols in code"
+        assert len(code_config_references) >= 1, "Should find config-related symbols in code"
 
         print(f"Configuration files indexed: {list(config_symbols.keys())}")
-        print(
-            f"Code files with config references: {list(code_config_references.keys())}"
-        )
+        print(f"Code files with config references: {list(code_config_references.keys())}")
 
         # Check for consistent naming patterns
         for code_file, references in code_config_references.items():
@@ -943,9 +925,7 @@ database:
                     plugin_name,
                     plugin_instance,
                 ) in plugin_manager.get_active_plugins().items():
-                    if hasattr(
-                        plugin_instance, "supports"
-                    ) and plugin_instance.supports(file_path):
+                    if hasattr(plugin_instance, "supports") and plugin_instance.supports(file_path):
                         supporting_plugin = plugin_instance
                         break
 
@@ -1012,9 +992,7 @@ database:
         # Try to use kubernetes repository which has multiple languages
         repo_path = Path("test_workspace/real_repos/kubernetes")
         if not repo_path.exists():
-            pytest.skip(
-                "Kubernetes repository not available for multi-language testing"
-            )
+            pytest.skip("Kubernetes repository not available for multi-language testing")
 
         try:
             from mcp_server.plugin_system import PluginManager
@@ -1066,9 +1044,7 @@ database:
                                     break
 
                             if supporting_plugin:
-                                content = file_path.read_text(
-                                    encoding="utf-8", errors="ignore"
-                                )
+                                content = file_path.read_text(encoding="utf-8", errors="ignore")
                                 result = supporting_plugin.indexFile(file_path, content)
 
                                 if result and "symbols" in result:

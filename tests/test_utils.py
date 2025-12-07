@@ -1,12 +1,13 @@
 """Test utilities for document processing tests."""
 
 import json
-import time
-from pathlib import Path
-from typing import Dict, List, Any, Optional
-from contextlib import contextmanager
-import psutil
 import os
+import time
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import psutil
 
 
 def load_test_data(filename: str) -> Any:

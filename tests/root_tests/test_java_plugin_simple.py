@@ -3,12 +3,13 @@
 
 import tempfile
 from pathlib import Path
+
 from mcp_server.plugins.java_plugin import Plugin
 
 
 def test_java_plugin_simple():
     """Test basic Java plugin functionality."""
-    
+
     # Simple Java code
     java_code = """package com.example;
 
@@ -31,30 +32,30 @@ public class HelloWorld {
         hw.sayHello();
     }
 }"""
-    
+
     # Create plugin without semantic search to simplify
     plugin = Plugin(enable_semantic=False)
-    
+
     print("1. Testing file support:")
     assert plugin.supports("HelloWorld.java")
     assert not plugin.supports("hello.py")
     print("✓ File support works")
-    
+
     print("\n2. Testing indexing:")
     shard = plugin.indexFile("HelloWorld.java", java_code)
     print(f"✓ Found {len(shard['symbols'])} symbols:")
-    for sym in shard['symbols']:
+    for sym in shard["symbols"]:
         print(f"  - {sym['kind']}: {sym['symbol']}")
-    
+
     print("\n3. Testing getDefinition:")
     definition = plugin.getDefinition("HelloWorld")
     if definition:
         print(f"✓ Found definition: {definition.get('signature', 'N/A')}")
-    
+
     print("\n4. Testing search:")
     results = list(plugin.search("HelloWorld"))
     print(f"✓ Search returned {len(results)} results")
-    
+
     print("\n✅ Basic test passed!")
 
 

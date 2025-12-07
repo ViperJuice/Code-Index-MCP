@@ -3,31 +3,31 @@
 This package provides dynamic plugin discovery, loading, and lifecycle management.
 """
 
-from .plugin_manager import PluginManager
-from .models import (
-    PluginInfo,
-    PluginConfig,
-    PluginState,
-    PluginType,
-    PluginSystemConfig,
-    PluginInstance,
-    PluginError,
-    PluginNotFoundError,
-    PluginLoadError,
-    PluginInitError,
-    PluginValidationError,
-    PluginConfigError,
-)
+from .config import PluginConfigManager, get_config_manager
+from .discovery import PluginDiscovery, get_plugin_discovery
 from .interfaces import (
+    ILifecycleManager,
     IPluginDiscovery,
     IPluginLoader,
-    IPluginRegistry,
-    ILifecycleManager,
     IPluginManager,
+    IPluginRegistry,
 )
-from .discovery import PluginDiscovery, get_plugin_discovery
 from .loader import PluginLoader, get_plugin_loader
-from .config import PluginConfigManager, get_config_manager
+from .models import (
+    PluginConfig,
+    PluginConfigError,
+    PluginError,
+    PluginInfo,
+    PluginInitError,
+    PluginInstance,
+    PluginLoadError,
+    PluginNotFoundError,
+    PluginState,
+    PluginSystemConfig,
+    PluginType,
+    PluginValidationError,
+)
+from .plugin_manager import PluginManager
 
 __all__ = [
     # Main class

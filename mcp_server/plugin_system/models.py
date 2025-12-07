@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Set
+from typing import Any, Dict, List, Optional, Set
 
 
 class PluginState(Enum):
@@ -161,9 +161,7 @@ class PluginSystemConfig:
 
     def __post_init__(self):
         """Ensure paths are Path objects and set defaults."""
-        self.plugin_dirs = [
-            Path(p) if isinstance(p, str) else p for p in self.plugin_dirs
-        ]
+        self.plugin_dirs = [Path(p) if isinstance(p, str) else p for p in self.plugin_dirs]
         if self.config_file and isinstance(self.config_file, str):
             self.config_file = Path(self.config_file)
 

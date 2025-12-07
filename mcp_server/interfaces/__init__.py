@@ -21,36 +21,36 @@ Usage:
     from mcp_server.interfaces.shared_interfaces import ILogger, Result
 """
 
-# Re-export key interfaces for convenience
-from .shared_interfaces import (
-    ILogger,
-    IMetrics,
-    IConfig,
-    ICache,
-    IEventBus,
-    Result,
-    Error,
-    Event,
-    LogLevel,
-    IndexStatus,
-    PluginStatus,
-    ISecurityContext,
-    IValidator,
-    IAsyncSupport,
-    IRepository,
-    IAsyncRepository,
-    IFactory,
-    IObserver,
-    IObservable,
+from .plugin_interfaces import (
+    ILanguageAnalyzer,
+    IPlugin,
+    IPluginDiscovery,
+    IPluginLoader,
+    IPluginManager,
+    IPluginRegistry,
 )
 
-from .plugin_interfaces import (
-    IPlugin,
-    ILanguageAnalyzer,
-    IPluginRegistry,
-    IPluginManager,
-    IPluginLoader,
-    IPluginDiscovery,
+# Re-export key interfaces for convenience
+from .shared_interfaces import (
+    Error,
+    Event,
+    IAsyncRepository,
+    IAsyncSupport,
+    ICache,
+    IConfig,
+    IEventBus,
+    IFactory,
+    ILogger,
+    IMetrics,
+    IndexStatus,
+    IObservable,
+    IObserver,
+    IRepository,
+    ISecurityContext,
+    IValidator,
+    LogLevel,
+    PluginStatus,
+    Result,
 )
 
 __all__ = [

@@ -1,18 +1,19 @@
 """Base test class for document processing tests."""
 
-import pytest
-import tempfile
-import shutil
-from pathlib import Path
-from typing import Dict, Any, Optional
 import logging
-from unittest.mock import Mock, MagicMock
+import shutil
+import tempfile
+from pathlib import Path
+from typing import Any, Dict, Optional
+from unittest.mock import MagicMock, Mock
 
-from mcp_server.storage.sqlite_store import SQLiteStore
+import pytest
+
+from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
 from mcp_server.plugins.plaintext_plugin.plugin import PlainTextPlugin
-from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from mcp_server.plugins.plugin_factory import PluginFactory
+from mcp_server.storage.sqlite_store import SQLiteStore
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +36,7 @@ class BaseDocumentTest:
         self.mock_qdrant_client = MagicMock()
 
         # Initialize plugins
-        self.markdown_plugin = MarkdownPlugin(
-            sqlite_store=self.store, enable_semantic=False
-        )
+        self.markdown_plugin = MarkdownPlugin(sqlite_store=self.store, enable_semantic=False)
         self.plaintext_config = {
             "name": "plaintext",
             "code": "plaintext",

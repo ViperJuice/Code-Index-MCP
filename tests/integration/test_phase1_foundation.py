@@ -2,8 +2,9 @@
 
 import sqlite3
 import time
-import pytest
 from pathlib import Path
+
+import pytest
 
 from mcp_server.storage.sqlite_store import SQLiteStore
 
@@ -30,14 +31,15 @@ class TestPhase1Foundation:
         # Test with bm25_content table
         db1 = tmp_path / "bm25.db"
         conn = sqlite3.connect(str(db1))
-        conn.execute('''
+        conn.execute(
+            """
             CREATE VIRTUAL TABLE bm25_content USING fts5(
                 filepath, content, language
             )
-        ''')
+        """
+        )
         conn.execute(
-            "INSERT INTO bm25_content VALUES (?, ?, ?)",
-            ("/test.py", "def hello(): pass", "python")
+            "INSERT INTO bm25_content VALUES (?, ?, ?)", ("/test.py", "def hello(): pass", "python")
         )
         conn.commit()
         conn.close()
@@ -68,8 +70,13 @@ class TestPhase1Foundation:
         conn.close()
 
         expected_columns = {
-            "id", "repository_id", "old_relative_path",
-            "new_relative_path", "content_hash", "moved_at", "move_type"
+            "id",
+            "repository_id",
+            "old_relative_path",
+            "new_relative_path",
+            "content_hash",
+            "moved_at",
+            "move_type",
         }
         assert expected_columns.issubset(columns)
 
@@ -89,7 +96,7 @@ class TestPhase1Foundation:
             "idx_moves_content_hash",
             "idx_moves_timestamp",
             "idx_moves_old_path",
-            "idx_moves_new_path"
+            "idx_moves_new_path",
         }
         assert expected_indexes.issubset(indexes)
 
@@ -123,18 +130,13 @@ class TestPhase1Foundation:
 
         # Create repository and file
         repo_id = store.create_repository("/test/repo", "test-repo")
-        file_id = store.store_file(
-            repo_id,
-            "/test/repo/example.py",
-            language="python",
-            size=100
-        )
+        file_id = store.store_file(repo_id, "/test/repo/example.py", language="python", size=100)
 
         # Insert content into fts_code
         with store._get_connection() as conn:
             conn.execute(
                 "INSERT INTO fts_code (content, file_id) VALUES (?, ?)",
-                ("def example_function(): pass", file_id)
+                ("def example_function(): pass", file_id),
             )
 
         # Search should work
@@ -225,7 +227,7 @@ class TestPhase1Foundation:
                     """INSERT INTO file_moves
                        (repository_id, old_relative_path, new_relative_path, content_hash, move_type)
                        VALUES (?, ?, ?, ?, ?)""",
-                    (99999, "old.py", "new.py", "hash123", "rename")
+                    (99999, "old.py", "new.py", "hash123", "rename"),
                 )
 
     def test_bm25_search_empty_database(self, tmp_path):

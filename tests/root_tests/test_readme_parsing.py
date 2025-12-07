@@ -3,24 +3,26 @@ Comprehensive tests for README file parsing and processing.
 
 This test suite covers:
 - README file structure recognition
-- Installation section detection  
+- Installation section detection
 - Usage example extraction
 - API documentation parsing
 - Badge and metadata extraction
 - Cross-reference link handling
 """
 
-import pytest
-import tempfile
 import re
-from pathlib import Path
-from typing import Dict, List, Any, Tuple
-from unittest.mock import Mock, patch
-from dataclasses import dataclass
 
 # Import the document processing components
 import sys
-sys.path.insert(0, '/app')
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
+from unittest.mock import Mock, patch
+
+import pytest
+
+sys.path.insert(0, "/app")
 
 from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
 from mcp_server.storage.sqlite_store import SQLiteStore
@@ -28,14 +30,14 @@ from mcp_server.storage.sqlite_store import SQLiteStore
 
 class TestReadmeStructureRecognition:
     """Test recognition of common README file structures."""
-    
+
     @pytest.fixture
     def markdown_plugin(self, tmp_path):
         """Create a MarkdownPlugin instance."""
         db_path = tmp_path / "readme_test.db"
         store = SQLiteStore(str(db_path))
         return MarkdownPlugin(sqlite_store=store, enable_semantic=False)
-    
+
     def test_standard_readme_structure(self, markdown_plugin, tmp_path):
         """Test parsing of standard README structure."""
         readme_content = """# Project Name
@@ -86,25 +88,30 @@ Guidelines for contributing to the project.
 
 MIT License information.
 """
-        
+
         file_path = tmp_path / "README.md"
         file_path.write_text(readme_content)
-        
+
         # Test structure extraction
         structure = markdown_plugin.extract_structure(readme_content, file_path)
-        
+
         # Verify standard sections are identified
         section_titles = [s.heading for s in structure.sections]
         expected_sections = ["Installation", "Usage", "API Reference", "Contributing", "License"]
-        
-        found_sections = sum(1 for expected in expected_sections 
-                           if any(expected.lower() in title.lower() for title in section_titles))
+
+        found_sections = sum(
+            1
+            for expected in expected_sections
+            if any(expected.lower() in title.lower() for title in section_titles)
+        )
         assert found_sections >= 4, f"Should find most standard sections, found: {section_titles}"
-        
+
         # Verify table of contents detection
-        toc_section = next((s for s in structure.sections if "table of contents" in s.heading.lower()), None)
+        toc_section = next(
+            (s for s in structure.sections if "table of contents" in s.heading.lower()), None
+        )
         assert toc_section is not None, "Should identify table of contents section"
-    
+
     def test_minimal_readme_structure(self, markdown_plugin, tmp_path):
         """Test parsing of minimal README structure."""
         minimal_readme = """# Simple Project
@@ -119,21 +126,21 @@ This is a simple project that does something useful.
 
 That's it!
 """
-        
+
         file_path = tmp_path / "README.md"
         file_path.write_text(minimal_readme)
-        
+
         # Test minimal structure handling
         structure = markdown_plugin.extract_structure(minimal_readme, file_path)
-        
+
         # Should handle minimal structure gracefully
         assert len(structure.sections) >= 1
         assert structure.title == "Simple Project"
-        
+
         # Should identify usage section
         usage_section = next((s for s in structure.sections if "use" in s.heading.lower()), None)
         assert usage_section is not None, "Should identify usage section"
-    
+
     def test_complex_readme_structure(self, markdown_plugin, tmp_path):
         """Test parsing of complex README with nested sections."""
         complex_readme = """# Advanced Project
@@ -463,24 +470,25 @@ SOFTWARE.
 - Discussions: [GitHub Discussions](https://github.com/user/project/discussions)
 - Email: support@example.com
 """
-        
+
         file_path = tmp_path / "README.md"
         file_path.write_text(complex_readme)
-        
+
         # Test complex structure handling
         structure = markdown_plugin.extract_structure(complex_readme, file_path)
-        
+
         # Should identify many sections
         assert len(structure.sections) >= 10, "Should identify many sections in complex README"
-        
+
         # Check for key sections
         section_titles = [s.heading.lower() for s in structure.sections]
         key_sections = ["installation", "usage", "api", "contributing", "license"]
-        
-        found_key_sections = sum(1 for key in key_sections 
-                               if any(key in title for title in section_titles))
+
+        found_key_sections = sum(
+            1 for key in key_sections if any(key in title for title in section_titles)
+        )
         assert found_key_sections >= 4, "Should find most key sections"
-        
+
         # Check for nested sections
         nested_sections = [s for s in structure.sections if s.level >= 3]
         assert len(nested_sections) >= 5, "Should identify nested subsections"
@@ -488,14 +496,14 @@ SOFTWARE.
 
 class TestInstallationSectionDetection:
     """Test detection and parsing of installation sections."""
-    
+
     @pytest.fixture
     def markdown_plugin(self, tmp_path):
         """Create a MarkdownPlugin instance."""
         db_path = tmp_path / "install_test.db"
         store = SQLiteStore(str(db_path))
         return MarkdownPlugin(sqlite_store=store, enable_semantic=False)
-    
+
     def test_basic_installation_section(self, markdown_plugin, tmp_path):
         """Test detection of basic installation instructions."""
         readme_with_install = """# My Project
@@ -520,21 +528,23 @@ yarn add my-project
 
 Use the project like this...
 """
-        
+
         file_path = tmp_path / "README.md"
         file_path.write_text(readme_with_install)
-        
+
         # Test installation section detection
         structure = markdown_plugin.extract_structure(readme_with_install, file_path)
-        
+
         # Find installation section
-        install_section = next((s for s in structure.sections if "install" in s.heading.lower()), None)
+        install_section = next(
+            (s for s in structure.sections if "install" in s.heading.lower()), None
+        )
         assert install_section is not None, "Should detect installation section"
-        
+
         # Verify installation content
         assert "npm install" in install_section.content
         assert "yarn add" in install_section.content
-    
+
     def test_multiple_installation_methods(self, markdown_plugin, tmp_path):
         """Test detection of multiple installation methods."""
         readme_multi_install = """# Multi-Install Project
@@ -587,25 +597,33 @@ npm install
 npm run build
 ```
 """
-        
+
         file_path = tmp_path / "README.md"
         file_path.write_text(readme_multi_install)
-        
+
         # Test multiple installation methods detection
         structure = markdown_plugin.extract_structure(readme_multi_install, file_path)
-        
+
         # Should detect main installation section
-        install_section = next((s for s in structure.sections if "install" in s.heading.lower()), None)
+        install_section = next(
+            (s for s in structure.sections if "install" in s.heading.lower()), None
+        )
         assert install_section is not None
-        
+
         # Should detect installation subsections
-        install_subsections = [s for s in structure.sections 
-                             if s.level > 2 and ("install" in s.heading.lower() or 
-                                                "npm" in s.heading.lower() or 
-                                                "yarn" in s.heading.lower() or
-                                                "cdn" in s.heading.lower())]
+        install_subsections = [
+            s
+            for s in structure.sections
+            if s.level > 2
+            and (
+                "install" in s.heading.lower()
+                or "npm" in s.heading.lower()
+                or "yarn" in s.heading.lower()
+                or "cdn" in s.heading.lower()
+            )
+        ]
         assert len(install_subsections) >= 3, "Should detect multiple installation methods"
-    
+
     def test_installation_with_prerequisites(self, markdown_plugin, tmp_path):
         """Test detection of installation prerequisites."""
         readme_with_prereqs = """# Project with Prerequisites
@@ -680,25 +698,27 @@ Or test the CLI:
 project-with-prereqs --version
 ```
 """
-        
+
         file_path = tmp_path / "README.md"
         file_path.write_text(readme_with_prereqs)
-        
+
         # Test prerequisite detection
         structure = markdown_plugin.extract_structure(readme_with_prereqs, file_path)
-        
+
         # Should detect prerequisites section
-        prereq_section = next((s for s in structure.sections if "prerequis" in s.heading.lower()), None)
+        prereq_section = next(
+            (s for s in structure.sections if "prerequis" in s.heading.lower()), None
+        )
         assert prereq_section is not None, "Should detect prerequisites section"
-        
+
         # Should contain prerequisite information
         assert "Node.js" in prereq_section.content
         assert "Python" in prereq_section.content
-        
+
         # Should detect verification section
         verification_sections = [s for s in structure.sections if "verif" in s.heading.lower()]
         assert len(verification_sections) > 0, "Should detect verification section"
-    
+
     def test_platform_specific_installation(self, markdown_plugin, tmp_path):
         """Test detection of platform-specific installation instructions."""
         readme_platform_specific = """# Cross-Platform Project
@@ -800,36 +820,43 @@ services:
       - "8080:8080"
 ```
 """
-        
+
         file_path = tmp_path / "README.md"
         file_path.write_text(readme_platform_specific)
-        
+
         # Test platform-specific detection
         structure = markdown_plugin.extract_structure(readme_platform_specific, file_path)
-        
+
         # Should detect platform sections
-        platform_sections = [s for s in structure.sections 
-                            if any(platform in s.heading.lower() 
-                                 for platform in ["windows", "macos", "linux", "docker"])]
+        platform_sections = [
+            s
+            for s in structure.sections
+            if any(
+                platform in s.heading.lower()
+                for platform in ["windows", "macos", "linux", "docker"]
+            )
+        ]
         assert len(platform_sections) >= 3, "Should detect multiple platform sections"
-        
+
         # Should detect package manager subsections
-        package_manager_sections = [s for s in structure.sections 
-                                  if any(pm in s.heading.lower() 
-                                       for pm in ["homebrew", "chocolatey", "apt", "yum"])]
+        package_manager_sections = [
+            s
+            for s in structure.sections
+            if any(pm in s.heading.lower() for pm in ["homebrew", "chocolatey", "apt", "yum"])
+        ]
         assert len(package_manager_sections) >= 2, "Should detect package manager sections"
 
 
 class TestUsageExampleExtraction:
     """Test extraction of usage examples and code snippets."""
-    
+
     @pytest.fixture
     def markdown_plugin(self, tmp_path):
         """Create a MarkdownPlugin instance."""
         db_path = tmp_path / "usage_test.db"
         store = SQLiteStore(str(db_path))
         return MarkdownPlugin(sqlite_store=store, enable_semantic=False)
-    
+
     def test_basic_usage_examples(self, markdown_plugin, tmp_path):
         """Test extraction of basic usage examples."""
         readme_with_usage = """# Example Project
@@ -877,21 +904,21 @@ example-project --input file.txt --output result.txt
 example-project --help
 ```
 """
-        
+
         file_path = tmp_path / "README.md"
         file_path.write_text(readme_with_usage)
-        
+
         # Test usage example extraction
         result = markdown_plugin.indexFile(file_path, readme_with_usage)
-        
+
         # Should extract code symbols from examples
         code_symbols = [s for s in result["symbols"] if s.get("metadata", {}).get("in_code_block")]
         assert len(code_symbols) > 0, "Should extract symbols from code examples"
-        
+
         # Should identify usage section
         usage_symbols = [s for s in result["symbols"] if "usage" in s["symbol"].lower()]
         assert len(usage_symbols) > 0, "Should identify usage sections"
-    
+
     def test_multiple_language_examples(self, markdown_plugin, tmp_path):
         """Test extraction of examples in multiple programming languages."""
         readme_multi_lang = """# Multi-Language SDK
@@ -987,28 +1014,28 @@ curl -X POST \\
      https://api.example.com/data
 ```
 """
-        
+
         file_path = tmp_path / "README.md"
         file_path.write_text(readme_multi_lang)
-        
+
         # Test multi-language extraction
         result = markdown_plugin.indexFile(file_path, readme_multi_lang)
-        
+
         # Should extract symbols from different languages
         code_symbols = [s for s in result["symbols"] if s.get("metadata", {}).get("in_code_block")]
-        
+
         # Check for different languages
         languages = set()
         for symbol in code_symbols:
             lang = symbol.get("metadata", {}).get("language", "")
             if lang:
                 languages.add(lang)
-        
+
         # Should detect multiple languages
         expected_languages = {"javascript", "python", "java", "go"}
         found_languages = languages & expected_languages
         assert len(found_languages) >= 2, f"Should detect multiple languages, found: {languages}"
-    
+
     def test_interactive_examples(self, markdown_plugin, tmp_path):
         """Test extraction of interactive usage examples."""
         readme_interactive = """# Interactive Tool
@@ -1092,20 +1119,25 @@ Then run with config:
 interactive-tool --config tool.conf
 ```
 """
-        
+
         file_path = tmp_path / "README.md"
         file_path.write_text(readme_interactive)
-        
+
         # Test interactive example extraction
         structure = markdown_plugin.extract_structure(readme_interactive, file_path)
-        
+
         # Should identify interactive sections
-        interactive_sections = [s for s in structure.sections 
-                              if "interactive" in s.heading.lower() or "programmatic" in s.heading.lower()]
+        interactive_sections = [
+            s
+            for s in structure.sections
+            if "interactive" in s.heading.lower() or "programmatic" in s.heading.lower()
+        ]
         assert len(interactive_sections) >= 2, "Should identify interactive usage sections"
-        
+
         # Should preserve command sequences in interactive examples
-        quick_start = next((s for s in structure.sections if "quick start" in s.heading.lower()), None)
+        quick_start = next(
+            (s for s in structure.sections if "quick start" in s.heading.lower()), None
+        )
         if quick_start:
             assert "load data.csv" in quick_start.content
             assert "process" in quick_start.content
@@ -1114,14 +1146,14 @@ interactive-tool --config tool.conf
 
 class TestAPIDocumentationParsing:
     """Test parsing of API documentation within README files."""
-    
+
     @pytest.fixture
     def markdown_plugin(self, tmp_path):
         """Create a MarkdownPlugin instance."""
         db_path = tmp_path / "api_test.db"
         store = SQLiteStore(str(db_path))
         return MarkdownPlugin(sqlite_store=store, enable_semantic=False)
-    
+
     def test_class_api_documentation(self, markdown_plugin, tmp_path):
         """Test extraction of class-based API documentation."""
         readme_class_api = """# SDK Documentation
@@ -1296,28 +1328,31 @@ Parses API response data.
 
 Parsed data object.
 """
-        
+
         file_path = tmp_path / "README.md"
         file_path.write_text(readme_class_api)
-        
+
         # Test API documentation extraction
         result = markdown_plugin.indexFile(file_path, readme_class_api)
-        
+
         # Should extract API class symbols
-        api_symbols = [s for s in result["symbols"] 
-                      if s["kind"] in ["class", "method", "function"]]
-        
+        api_symbols = [s for s in result["symbols"] if s["kind"] in ["class", "method", "function"]]
+
         # Should find class reference
         class_symbols = [s for s in api_symbols if s["kind"] == "class"]
         assert len(class_symbols) > 0, "Should extract API class symbols"
-        
+
         # Should find method references
-        method_symbols = [s for s in api_symbols if "method" in s.get("metadata", {}).get("description", "").lower()]
-        
+        method_symbols = [
+            s
+            for s in api_symbols
+            if "method" in s.get("metadata", {}).get("description", "").lower()
+        ]
+
         # Should extract function documentation
         function_symbols = [s for s in result["symbols"] if s["kind"] == "function"]
         assert len(function_symbols) > 0, "Should extract function symbols"
-    
+
     def test_rest_api_documentation(self, markdown_plugin, tmp_path):
         """Test extraction of REST API documentation."""
         readme_rest_api = """# REST API Documentation
@@ -1621,38 +1656,40 @@ Triggered when data is modified.
 }
 ```
 """
-        
+
         file_path = tmp_path / "README.md"
         file_path.write_text(readme_rest_api)
-        
+
         # Test REST API documentation extraction
         structure = markdown_plugin.extract_structure(readme_rest_api, file_path)
-        
+
         # Should identify API endpoint sections
-        endpoint_sections = [s for s in structure.sections 
-                           if any(method in s.heading.upper() 
-                                for method in ["GET", "POST", "PUT", "DELETE"])]
+        endpoint_sections = [
+            s
+            for s in structure.sections
+            if any(method in s.heading.upper() for method in ["GET", "POST", "PUT", "DELETE"])
+        ]
         assert len(endpoint_sections) >= 4, "Should identify REST API endpoint sections"
-        
+
         # Should identify authentication section
         auth_sections = [s for s in structure.sections if "auth" in s.heading.lower()]
         assert len(auth_sections) > 0, "Should identify authentication section"
-        
-        # Should identify error handling sections  
+
+        # Should identify error handling sections
         error_sections = [s for s in structure.sections if "error" in s.heading.lower()]
         assert len(error_sections) > 0, "Should identify error response sections"
 
 
 class TestBadgeAndMetadataExtraction:
     """Test extraction of badges and metadata from README files."""
-    
+
     @pytest.fixture
     def markdown_plugin(self, tmp_path):
         """Create a MarkdownPlugin instance."""
         db_path = tmp_path / "badge_test.db"
         store = SQLiteStore(str(db_path))
         return MarkdownPlugin(sqlite_store=store, enable_semantic=False)
-    
+
     def test_badge_extraction(self, markdown_plugin, tmp_path):
         """Test extraction of various badge types."""
         readme_with_badges = """# Project with Badges
@@ -1680,23 +1717,26 @@ A project with comprehensive badges showing build status, coverage, version, and
 npm install project
 ```
 """
-        
+
         file_path = tmp_path / "README.md"
         file_path.write_text(readme_with_badges)
-        
+
         # Test badge extraction
         result = markdown_plugin.indexFile(file_path, readme_with_badges)
-        
+
         # Should extract image/link symbols for badges
-        image_symbols = [s for s in result["symbols"] 
-                        if s["kind"] == "image" or 
-                        (s["kind"] == "link" and "badge" in s.get("metadata", {}).get("url", ""))]
-        
+        image_symbols = [
+            s
+            for s in result["symbols"]
+            if s["kind"] == "image"
+            or (s["kind"] == "link" and "badge" in s.get("metadata", {}).get("url", ""))
+        ]
+
         # May find some badge-related symbols depending on implementation
         # At minimum should parse the content without errors
         assert result is not None
         assert len(result["symbols"]) > 0
-    
+
     def test_metadata_extraction_from_badges(self, markdown_plugin, tmp_path):
         """Test extraction of project metadata from badges."""
         readme_metadata_badges = """# Project Metadata
@@ -1719,23 +1759,23 @@ The badges above indicate:
 - Supported platforms: Linux, macOS, Windows
 - Primary language: TypeScript
 """
-        
+
         file_path = tmp_path / "README.md"
         file_path.write_text(readme_metadata_badges)
-        
+
         # Test metadata extraction
         metadata = markdown_plugin.extract_metadata(readme_metadata_badges, file_path)
-        
+
         # Should extract basic metadata
         assert metadata.title == "Project Metadata"
         assert metadata.document_type == "markdown"
-        
+
         # Content should contain metadata information
         content = markdown_plugin.parse_content(readme_metadata_badges, file_path)
         assert "version" in content.lower()
         assert "license" in content.lower()
         assert "typescript" in content.lower()
-    
+
     def test_shield_style_badges(self, markdown_plugin, tmp_path):
         """Test extraction of shields.io style badges."""
         readme_shields = """# Shields.io Badge Examples
@@ -1766,36 +1806,38 @@ The badges above show:
 - Docker usage metrics
 - Code coverage percentage
 """
-        
+
         file_path = tmp_path / "README.md"
         file_path.write_text(readme_shields)
-        
+
         # Test shields.io badge handling
         result = markdown_plugin.indexFile(file_path, readme_shields)
-        
+
         # Should handle shields badges without errors
         assert result is not None
         assert len(result["symbols"]) > 0
-        
+
         # Should extract title and structure properly
         structure = markdown_plugin.extract_structure(readme_shields, file_path)
         assert structure.title == "Shields.io Badge Examples"
-        
+
         # Should identify badges explanation section
-        explanation_section = next((s for s in structure.sections if "explained" in s.heading.lower()), None)
+        explanation_section = next(
+            (s for s in structure.sections if "explained" in s.heading.lower()), None
+        )
         assert explanation_section is not None
 
 
 class TestCrossReferenceLinkHandling:
     """Test handling of cross-reference links in README files."""
-    
+
     @pytest.fixture
     def markdown_plugin(self, tmp_path):
         """Create a MarkdownPlugin instance."""
         db_path = tmp_path / "links_test.db"
         store = SQLiteStore(str(db_path))
         return MarkdownPlugin(sqlite_store=store, enable_semantic=False)
-    
+
     def test_internal_section_links(self, markdown_plugin, tmp_path):
         """Test handling of internal section reference links."""
         readme_internal_links = """# Project Documentation
@@ -1865,23 +1907,27 @@ Before contributing, read the [API Reference](#api-reference) and ensure you und
 
 MIT License. See installation instructions in [Installation](#installation).
 """
-        
+
         file_path = tmp_path / "README.md"
         file_path.write_text(readme_internal_links)
-        
+
         # Test internal link handling
         structure = markdown_plugin.extract_structure(readme_internal_links, file_path)
-        
+
         # Should identify table of contents
-        toc_section = next((s for s in structure.sections if "table of contents" in s.heading.lower()), None)
+        toc_section = next(
+            (s for s in structure.sections if "table of contents" in s.heading.lower()), None
+        )
         assert toc_section is not None, "Should identify table of contents"
-        
+
         # Should preserve cross-references in content
-        config_section = next((s for s in structure.sections if "configuration" in s.heading.lower()), None)
+        config_section = next(
+            (s for s in structure.sections if "configuration" in s.heading.lower()), None
+        )
         if config_section:
             # Should contain references to other sections
             assert "installation" in config_section.content.lower()
-    
+
     def test_external_documentation_links(self, markdown_plugin, tmp_path):
         """Test handling of external documentation links."""
         readme_external_links = """# External References
@@ -1936,22 +1982,22 @@ This project builds upon several external resources:
 - [Discord Server](https://discord.gg/nodejs) - Real-time chat
 - [Twitter](https://twitter.com/nodejs) - Latest news
 """
-        
+
         file_path = tmp_path / "README.md"
         file_path.write_text(readme_external_links)
-        
+
         # Test external link handling
         result = markdown_plugin.indexFile(file_path, readme_external_links)
-        
+
         # Should handle external links without errors
         assert result is not None
         assert len(result["symbols"]) > 0
-        
+
         # Should preserve link information in content
         content = markdown_plugin.parse_content(readme_external_links, file_path)
         assert "nodejs.org" in content
         assert "github.com" in content
-    
+
     def test_relative_file_links(self, markdown_plugin, tmp_path):
         """Test handling of relative file links."""
         readme_relative_links = """# Project with File References
@@ -2001,36 +2047,40 @@ Documentation includes these diagrams:
 - [Flow Chart](docs/images/flow.svg)
 - [Component Diagram](docs/diagrams/components.puml)
 """
-        
+
         file_path = tmp_path / "README.md"
         file_path.write_text(readme_relative_links)
-        
+
         # Test relative link handling
         structure = markdown_plugin.extract_structure(readme_relative_links, file_path)
-        
+
         # Should identify sections with file references
-        doc_structure_section = next((s for s in structure.sections if "documentation structure" in s.heading.lower()), None)
+        doc_structure_section = next(
+            (s for s in structure.sections if "documentation structure" in s.heading.lower()), None
+        )
         assert doc_structure_section is not None
-        
+
         # Should preserve file references
         assert "CHANGELOG.md" in doc_structure_section.content
         assert "docs/API.md" in doc_structure_section.content
-        
+
         # Should handle image references
         image_section = next((s for s in structure.sections if "image" in s.heading.lower()), None)
         if image_section:
-            assert "architecture.png" in image_section.content or "flow.svg" in image_section.content
+            assert (
+                "architecture.png" in image_section.content or "flow.svg" in image_section.content
+            )
 
 
 class TestReadmeIntegration:
     """Integration tests for README parsing with various formats and styles."""
-    
+
     @pytest.fixture
     def readme_workspace(self, tmp_path):
         """Create workspace with various README styles."""
         workspace = tmp_path / "readme_workspace"
         workspace.mkdir()
-        
+
         # Create different README styles
         readmes = {
             "minimal": """# Simple Tool
@@ -2049,7 +2099,6 @@ pip install simple-tool
 simple-tool --help
 ```
 """,
-            
             "comprehensive": """# Comprehensive Framework
 
 [![Build](https://img.shields.io/travis/user/repo.svg)](https://travis-ci.org/user/repo)
@@ -2124,7 +2173,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 MIT License - see [LICENSE](LICENSE) file.
 """,
-            
             "library": """# Math Utilities Library
 
 A collection of mathematical utility functions.
@@ -2180,7 +2228,6 @@ calc.chain()
 console.log(calc.result);
 ```
 """,
-            
             "service": """# Microservice Template
 
 Template for creating microservices.
@@ -2255,65 +2302,55 @@ spec:
 - Health check: `GET /health`
 - Metrics: `GET /metrics`
 - Logs: Structured JSON logging
-"""
+""",
         }
-        
+
         for name, content in readmes.items():
             file_path = workspace / f"README_{name}.md"
             file_path.write_text(content)
-        
+
         return workspace
-    
+
     @pytest.fixture
     def integration_setup(self, readme_workspace, tmp_path):
         """Set up integration test environment."""
         db_path = tmp_path / "integration_test.db"
         store = SQLiteStore(str(db_path))
         plugin = MarkdownPlugin(sqlite_store=store, enable_semantic=False)
-        
+
         # Index all README files
         results = {}
         for readme_file in readme_workspace.glob("README_*.md"):
             content = readme_file.read_text()
             result = plugin.indexFile(readme_file, content)
             results[readme_file.stem] = result
-        
-        return {
-            'workspace': readme_workspace,
-            'plugin': plugin,
-            'results': results
-        }
-    
+
+        return {"workspace": readme_workspace, "plugin": plugin, "results": results}
+
     def test_readme_type_recognition(self, integration_setup):
         """Test recognition of different README types."""
-        results = integration_setup['results']
-        
+        results = integration_setup["results"]
+
         # Should process all README types
         assert len(results) == 4
-        
+
         # Each should have symbols
         for readme_type, result in results.items():
-            assert len(result['symbols']) > 0, f"Should extract symbols from {readme_type} README"
-            assert result['language'] == 'markdown'
-    
+            assert len(result["symbols"]) > 0, f"Should extract symbols from {readme_type} README"
+            assert result["language"] == "markdown"
+
     def test_cross_readme_search(self, integration_setup):
         """Test searching across different README types."""
-        plugin = integration_setup['plugin']
-        
+        plugin = integration_setup["plugin"]
+
         # Search for common terms
-        search_terms = [
-            "installation",
-            "documentation", 
-            "examples",
-            "API",
-            "deployment"
-        ]
-        
+        search_terms = ["installation", "documentation", "examples", "API", "deployment"]
+
         for term in search_terms:
             # Simulate search (would need dispatcher for full search)
             # Here we check if content parsing works
             try:
-                for readme_file in integration_setup['workspace'].glob("README_*.md"):
+                for readme_file in integration_setup["workspace"].glob("README_*.md"):
                     content = readme_file.read_text()
                     parsed = plugin.parse_content(content, readme_file)
                     # Should parse without errors
@@ -2321,49 +2358,50 @@ spec:
                     assert len(parsed) > 0
             except Exception as e:
                 pytest.fail(f"README parsing failed for term '{term}': {e}")
-    
+
     def test_readme_structure_consistency(self, integration_setup):
         """Test consistent structure extraction across README types."""
-        plugin = integration_setup['plugin']
-        
+        plugin = integration_setup["plugin"]
+
         structures = {}
-        for readme_file in integration_setup['workspace'].glob("README_*.md"):
+        for readme_file in integration_setup["workspace"].glob("README_*.md"):
             content = readme_file.read_text()
             structure = plugin.extract_structure(content, readme_file)
             structures[readme_file.stem] = structure
-        
+
         # All should have valid structures
         for readme_type, structure in structures.items():
             assert structure.title is not None, f"{readme_type} should have title"
             assert len(structure.sections) > 0, f"{readme_type} should have sections"
-    
+
     def test_readme_metadata_extraction(self, integration_setup):
         """Test metadata extraction from different README types."""
-        plugin = integration_setup['plugin']
-        
+        plugin = integration_setup["plugin"]
+
         metadatas = {}
-        for readme_file in integration_setup['workspace'].glob("README_*.md"):
+        for readme_file in integration_setup["workspace"].glob("README_*.md"):
             content = readme_file.read_text()
             metadata = plugin.extract_metadata(content, readme_file)
             metadatas[readme_file.stem] = metadata
-        
+
         # All should have valid metadata
         for readme_type, metadata in metadatas.items():
             assert metadata.title is not None, f"{readme_type} should have title"
-            assert metadata.document_type == 'markdown'
+            assert metadata.document_type == "markdown"
             assert isinstance(metadata.tags, list)
-    
+
     def test_readme_code_extraction(self, integration_setup):
         """Test code example extraction from READMEs."""
-        results = integration_setup['results']
-        
+        results = integration_setup["results"]
+
         # Should extract code symbols from code blocks
         total_code_symbols = 0
         for readme_type, result in results.items():
-            code_symbols = [s for s in result['symbols'] 
-                          if s.get('metadata', {}).get('in_code_block')]
+            code_symbols = [
+                s for s in result["symbols"] if s.get("metadata", {}).get("in_code_block")
+            ]
             total_code_symbols += len(code_symbols)
-        
+
         # Should find some code symbols across all READMEs
         assert total_code_symbols > 0, "Should extract code symbols from README examples"
 

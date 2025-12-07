@@ -13,17 +13,17 @@ from mcp_server.storage.sqlite_store import SQLiteStore
 
 def test_plaintext_plugin():
     """Test the Plain Text plugin with sample content."""
-    
+
     # Initialize plugin
     language_config = {
-        'name': 'plaintext',
-        'code': 'plaintext',  # Required by the base class
-        'extensions': ['.txt', '.text', '.md'],
-        'file_pattern': r'.*\.(txt|text|md|markdown|rst|log|readme)$'
+        "name": "plaintext",
+        "code": "plaintext",  # Required by the base class
+        "extensions": [".txt", ".text", ".md"],
+        "file_pattern": r".*\.(txt|text|md|markdown|rst|log|readme)$",
     }
-    
+
     plugin = PlainTextPlugin(language_config, enable_semantic=False)
-    
+
     # Test content with various structures
     test_content = """# Technical Documentation
 
@@ -93,13 +93,13 @@ https://example.com/documentation
 
     # Test file path
     test_file = Path("/tmp/test_document.txt")
-    
+
     print("Testing Plain Text Plugin")
     print("=" * 50)
-    
+
     # Test supports method
     print(f"\nSupports .txt files: {plugin.supports(test_file)}")
-    
+
     # Test metadata extraction
     print("\nExtracting metadata...")
     metadata = plugin.extract_metadata(test_content, test_file)
@@ -108,29 +108,29 @@ https://example.com/documentation
     print(f"Date: {metadata.created_date}")
     print(f"Document Type: {metadata.document_type}")
     print(f"Tags: {metadata.tags[:5]}")
-    
+
     # Test structure extraction
     print("\nExtracting structure...")
     structure = plugin.extract_structure(test_content, test_file)
     print(f"Found {len(structure.sections)} sections")
     print(f"Found {len(structure.headings)} headings")
-    
+
     print("\nSection titles:")
     for section in structure.sections[:5]:
         print(f"  - {section['title']} (Level {section['level']})")
-    
+
     # Test chunking
     print("\nChunking document...")
     chunks = plugin.chunk_document(test_content, test_file)
     print(f"Created {len(chunks)} chunks")
-    
+
     print("\nFirst 3 chunks:")
     for i, chunk in enumerate(chunks[:3]):
         print(f"\nChunk {i + 1}:")
         print(f"  Position: {chunk.start_pos}-{chunk.end_pos}")
         print(f"  Metadata: {chunk.metadata}")
         print(f"  Content preview: {chunk.content[:100]}...")
-    
+
     # Test NLP analysis
     print("\nTesting NLP analysis...")
     analysis = plugin.nlp_processor.analyze_text(test_content)
@@ -138,24 +138,24 @@ https://example.com/documentation
     print(f"Readability score: {analysis.readability_score:.2f}")
     print(f"Average sentence length: {analysis.avg_sentence_length:.2f} words")
     print(f"Vocabulary richness: {analysis.vocabulary_richness:.2f}")
-    
+
     print("\nTop topics:")
     for topic in analysis.topics[:3]:
         print(f"  - Keywords: {', '.join(topic.keywords[:3])}")
         print(f"    Score: {topic.score:.3f}")
-    
+
     # Test search (without semantic indexing)
     print("\nTesting search...")
     search_results = plugin.search("NLP capabilities", {"semantic": False, "limit": 5})
     print(f"Found {len(search_results)} results")
-    
+
     for i, result in enumerate(search_results):
         print(f"\nResult {i + 1}:")
         print(f"  File: {result['file']}")
         print(f"  Snippet: {result['snippet']}")
-        if 'relevance' in result:
+        if "relevance" in result:
             print(f"  Relevance: {result['relevance']}")
-    
+
     # Test sentence splitting
     print("\nTesting sentence splitter...")
     test_text = "Dr. Smith said: 'Hello.' This is a test. Visit https://example.com for more info. The price is $3.50."
@@ -163,14 +163,14 @@ https://example.com/documentation
     print(f"Split into {len(sentences)} sentences:")
     for i, sent in enumerate(sentences):
         print(f"  {i + 1}. {sent}")
-    
+
     # Test topic extraction
     print("\nTesting topic extractor...")
     keywords = plugin.topic_extractor.extract_keywords(test_content, max_keywords=10)
     print("Top keywords:")
     for keyword, score in keywords[:5]:
         print(f"  - {keyword}: {score:.3f}")
-    
+
     print("\n" + "=" * 50)
     print("All tests completed successfully!")
 

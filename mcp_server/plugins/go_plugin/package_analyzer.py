@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import re
-from pathlib import Path
-from typing import Dict, List, Set, Optional, Tuple
-from dataclasses import dataclass, field
 import logging
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -70,9 +70,7 @@ class GoPackageAnalyzer:
     def __init__(self, module_resolver):
         self.module_resolver = module_resolver
         self.packages: Dict[str, PackageInfo] = {}
-        self._import_pattern = re.compile(
-            r'import\s+(?:\(\s*((?:[^)]+))\s*\)|"([^"]+)")'
-        )
+        self._import_pattern = re.compile(r'import\s+(?:\(\s*((?:[^)]+))\s*\)|"([^"]+)")')
         self._package_pattern = re.compile(r"^\s*package\s+(\w+)")
         self._type_pattern = re.compile(r"type\s+(\w+)\s+(?:struct|interface|\w+)")
         self._func_pattern = re.compile(
@@ -85,9 +83,7 @@ class GoPackageAnalyzer:
             return None
 
         # Get all Go files in the package
-        go_files = [
-            f for f in package_path.glob("*.go") if not f.name.endswith("_test.go")
-        ]
+        go_files = [f for f in package_path.glob("*.go") if not f.name.endswith("_test.go")]
 
         if not go_files:
             return None
@@ -144,9 +140,7 @@ class GoPackageAnalyzer:
             imports.add(match.group(1))
 
         # Grouped imports
-        import_block_match = re.search(
-            r"import\s*\(((?:[^)]|\n)+)\)", content, re.MULTILINE
-        )
+        import_block_match = re.search(r"import\s*\(((?:[^)]|\n)+)\)", content, re.MULTILINE)
         if import_block_match:
             import_block = import_block_match.group(1)
             for line in import_block.split("\n"):
@@ -160,9 +154,7 @@ class GoPackageAnalyzer:
 
         return imports
 
-    def _extract_declarations(
-        self, file_path: Path, lines: List[str], package_info: PackageInfo
-    ):
+    def _extract_declarations(self, file_path: Path, lines: List[str], package_info: PackageInfo):
         """Extract type and function declarations."""
         i = 0
         while i < len(lines):
@@ -206,9 +198,7 @@ class GoPackageAnalyzer:
         if type_match and "struct" not in line and "interface" not in line:
             type_name = type_match.group(1)
             base_type = type_match.group(2)
-            type_info = TypeInfo(
-                name=type_name, kind="alias", file=file_path, line=start_line + 1
-            )
+            type_info = TypeInfo(name=type_name, kind="alias", file=file_path, line=start_line + 1)
             package_info.types[type_name] = type_info
             return
 
@@ -242,9 +232,7 @@ class GoPackageAnalyzer:
 
                 package_info.interfaces[interface_name] = interface_info
 
-    def _parse_struct_fields(
-        self, lines: List[str], start_line: int, type_info: TypeInfo
-    ):
+    def _parse_struct_fields(self, lines: List[str], start_line: int, type_info: TypeInfo):
         """Parse struct fields."""
         i = start_line
         brace_count = lines[i].count("{") - lines[i].count("}")
@@ -283,9 +271,7 @@ class GoPackageAnalyzer:
 
             if line and not line.startswith("//") and not line == "}":
                 # Parse method signature
-                method_match = re.match(
-                    r"(\w+)\s*\(([^)]*)\)(?:\s*\(([^)]*)\))?(?:\s+(.+))?", line
-                )
+                method_match = re.match(r"(\w+)\s*\(([^)]*)\)(?:\s*\(([^)]*)\))?(?:\s+(.+))?", line)
                 if method_match:
                     method_name = method_match.group(1)
                     params = method_match.group(2) or ""
@@ -404,9 +390,7 @@ class GoPackageAnalyzer:
             const_value = const_match.group(2)
             package_info.constants[const_name] = const_value
 
-    def _parse_var_declaration(
-        self, lines: List[str], start_line: int, package_info: PackageInfo
-    ):
+    def _parse_var_declaration(self, lines: List[str], start_line: int, package_info: PackageInfo):
         """Parse var declarations."""
         line = lines[start_line].strip()
 

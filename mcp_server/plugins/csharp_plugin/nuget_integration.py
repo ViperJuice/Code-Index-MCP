@@ -1,14 +1,14 @@
 """NuGet package integration for C# project analysis."""
 
-import json
-import xml.etree.ElementTree as ET
-from pathlib import Path
-from typing import Dict, List, Optional, Set, Any
-import re
-import logging
-from dataclasses import dataclass
-from urllib.parse import urljoin
 import hashlib
+import json
+import logging
+import re
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set
+from urllib.parse import urljoin
 
 logger = logging.getLogger(__name__)
 
@@ -84,9 +84,7 @@ class NuGetIntegration:
                 "Microsoft.Extensions.DependencyInjection"
             },
             "Microsoft.Extensions.Logging": {"Microsoft.Extensions.Logging"},
-            "Microsoft.Extensions.Configuration": {
-                "Microsoft.Extensions.Configuration"
-            },
+            "Microsoft.Extensions.Configuration": {"Microsoft.Extensions.Configuration"},
             # Popular third-party packages
             "Newtonsoft.Json": {"Newtonsoft.Json"},
             "AutoMapper": {"AutoMapper"},
@@ -134,9 +132,7 @@ class NuGetIntegration:
 
             # Get available namespaces from packages
             for package in packages:
-                namespaces = self._get_package_namespaces(
-                    package["name"], package["version"]
-                )
+                namespaces = self._get_package_namespaces(package["name"], package["version"])
                 analysis["package_namespaces"].update(namespaces)
 
             # Check for packages.config (legacy)
@@ -283,9 +279,7 @@ class NuGetIntegration:
 
         # Try to analyze package from cache
         if self.global_packages_path:
-            package_path = (
-                Path(self.global_packages_path) / package_name.lower() / version
-            )
+            package_path = Path(self.global_packages_path) / package_name.lower() / version
             if package_path.exists():
                 return self._analyze_package_assemblies(package_path)
 
@@ -359,9 +353,7 @@ class NuGetIntegration:
 
         return namespaces
 
-    def get_package_info(
-        self, package_name: str, version: str = None
-    ) -> Optional[PackageInfo]:
+    def get_package_info(self, package_name: str, version: str = None) -> Optional[PackageInfo]:
         """Get detailed information about a specific package."""
         cache_key = f"{package_name}:{version or 'latest'}"
 
@@ -375,9 +367,7 @@ class NuGetIntegration:
 
         return package_info
 
-    def _load_package_info(
-        self, package_name: str, version: str = None
-    ) -> Optional[PackageInfo]:
+    def _load_package_info(self, package_name: str, version: str = None) -> Optional[PackageInfo]:
         """Load package information from local cache or registry."""
         if not self.global_packages_path:
             return None
@@ -410,9 +400,7 @@ class NuGetIntegration:
             return self._parse_package_metadata(nuspec_files[0], package_name, version)
 
         except Exception as e:
-            logger.debug(
-                f"Error loading package info for {package_name}:{version}: {e}"
-            )
+            logger.debug(f"Error loading package info for {package_name}:{version}: {e}")
             return None
 
     def _parse_package_metadata(
@@ -445,9 +433,7 @@ class NuGetIntegration:
                 # Authors
                 authors_elem = metadata.find("nuget:authors", ns)
                 if authors_elem is not None and authors_elem.text:
-                    package_info.authors = [
-                        a.strip() for a in authors_elem.text.split(",")
-                    ]
+                    package_info.authors = [a.strip() for a in authors_elem.text.split(",")]
 
                 # Dependencies
                 deps_group = metadata.find(".//nuget:dependencies/nuget:group", ns)
@@ -461,24 +447,18 @@ class NuGetIntegration:
                         dep_version = dep.get("version")
                         if dep_id:
                             package_info.dependencies.append(
-                                PackageReference(
-                                    name=dep_id, version=dep_version or "latest"
-                                )
+                                PackageReference(name=dep_id, version=dep_version or "latest")
                             )
 
             # Get namespaces
-            package_info.namespaces = self._get_package_namespaces(
-                package_name, version
-            )
+            package_info.namespaces = self._get_package_namespaces(package_name, version)
 
         except Exception as e:
             logger.debug(f"Error parsing package metadata from {nuspec_path}: {e}")
 
         return package_info
 
-    def resolve_dependencies(
-        self, packages: List[PackageReference]
-    ) -> List[PackageReference]:
+    def resolve_dependencies(self, packages: List[PackageReference]) -> List[PackageReference]:
         """Resolve transitive dependencies for a list of packages."""
         resolved = []
         visited = set()
@@ -501,9 +481,7 @@ class NuGetIntegration:
 
         return resolved
 
-    def get_available_types_from_packages(
-        self, project_path: str
-    ) -> Dict[str, Set[str]]:
+    def get_available_types_from_packages(self, project_path: str) -> Dict[str, Set[str]]:
         """Get available types from all packages in a project.
 
         Args:
@@ -518,9 +496,7 @@ class NuGetIntegration:
             packages = self.project_packages[project_path]
 
             for package in packages:
-                namespaces = self._get_package_namespaces(
-                    package["name"], package["version"]
-                )
+                namespaces = self._get_package_namespaces(package["name"], package["version"])
 
                 for namespace in namespaces:
                     if namespace not in available_types:

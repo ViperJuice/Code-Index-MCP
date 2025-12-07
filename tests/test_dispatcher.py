@@ -10,14 +10,14 @@ Tests cover:
 """
 
 import hashlib
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
 from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
-from mcp_server.plugin_base import IPlugin, SymbolDef, SearchResult
+from mcp_server.plugin_base import IPlugin, SearchResult, SymbolDef
 
 
 class TestDispatcherInitialization:
@@ -104,9 +104,7 @@ class TestSymbolLookup:
 
     def test_lookup_found(self, mock_plugin):
         """Test successful symbol lookup."""
-        expected_symbol = SymbolDef(
-            name="test_func", kind="function", path="/test.py", line=10
-        )
+        expected_symbol = SymbolDef(name="test_func", kind="function", path="/test.py", line=10)
         mock_plugin.getDefinition.return_value = expected_symbol
 
         dispatcher = Dispatcher([mock_plugin])
@@ -130,9 +128,7 @@ class TestSymbolLookup:
         plugin1 = Mock(spec=IPlugin, lang="python")
         plugin1.getDefinition.return_value = None
 
-        expected_symbol = SymbolDef(
-            name="found", kind="class", path="/found.js", line=5
-        )
+        expected_symbol = SymbolDef(name="found", kind="class", path="/found.js", line=5)
         plugin2 = Mock(spec=IPlugin, lang="javascript")
         plugin2.getDefinition.return_value = expected_symbol
 
@@ -172,9 +168,7 @@ class TestSearch:
         results = list(dispatcher.search("func"))
 
         assert results == expected_results
-        mock_plugin.search.assert_called_once_with(
-            "func", {"semantic": False, "limit": 20}
-        )
+        mock_plugin.search.assert_called_once_with("func", {"semantic": False, "limit": 20})
 
     def test_search_semantic(self, mock_plugin):
         """Test semantic search."""
@@ -183,9 +177,7 @@ class TestSearch:
         dispatcher = Dispatcher([mock_plugin])
         list(dispatcher.search("test", semantic=True, limit=10))
 
-        mock_plugin.search.assert_called_once_with(
-            "test", {"semantic": True, "limit": 10}
-        )
+        mock_plugin.search.assert_called_once_with("test", {"semantic": True, "limit": 10})
 
     def test_search_multiple_plugins(self):
         """Test search results from multiple plugins are combined."""
@@ -364,9 +356,7 @@ class TestIndexFile:
         test_file.write_text("def hello(): pass")
 
         mock_plugin.supports.return_value = True
-        mock_plugin.indexFile.return_value = {
-            "symbols": [{"name": "hello", "kind": "function"}]
-        }
+        mock_plugin.indexFile.return_value = {"symbols": [{"name": "hello", "kind": "function"}]}
 
         dispatcher.index_file(test_file)
 

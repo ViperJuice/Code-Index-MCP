@@ -1,10 +1,10 @@
 """Topic modeling and keyword extraction for plain text."""
 
+import math
 import re
 from collections import Counter, defaultdict
-from typing import List, Dict, Set, Tuple
 from dataclasses import dataclass
-import math
+from typing import Dict, List, Set, Tuple
 
 
 @dataclass
@@ -153,9 +153,7 @@ class TopicExtractor:
         self.acronym_pattern = re.compile(r"\b[A-Z]{2,}\b")
         self.word_pattern = re.compile(r"\b\w+\b")
 
-    def extract_keywords(
-        self, text: str, max_keywords: int = 20
-    ) -> List[Tuple[str, float]]:
+    def extract_keywords(self, text: str, max_keywords: int = 20) -> List[Tuple[str, float]]:
         """Extract keywords using TF-IDF-like scoring."""
         # Tokenize and clean
         words = self.word_pattern.findall(text.lower())
@@ -227,9 +225,7 @@ class TopicExtractor:
                 related_scores = sorted(
                     cooccurrence[seed_keyword].items(), key=lambda x: x[1], reverse=True
                 )
-                related = [
-                    kw for kw, _ in related_scores[:5] if kw not in used_keywords
-                ]
+                related = [kw for kw, _ in related_scores[:5] if kw not in used_keywords]
 
             if len(related) >= 2:  # Only create topic if we have related terms
                 topic_keywords = [seed_keyword] + related[:4]
@@ -238,11 +234,7 @@ class TopicExtractor:
                 # Calculate topic score based on keyword frequencies
                 topic_score = sum(
                     next(
-                        (
-                            score
-                            for kw, score in self.extract_keywords(text, 50)
-                            if kw == k
-                        ),
+                        (score for kw, score in self.extract_keywords(text, 50) if kw == k),
                         0,
                     )
                     for k in topic_keywords
@@ -336,9 +328,7 @@ class TopicExtractor:
 
         for keyword in keywords:
             # Find words that often appear near this keyword
-            pattern = re.compile(
-                rf"\b(\w+)\s+{re.escape(keyword)}|{re.escape(keyword)}\s+(\w+)\b"
-            )
+            pattern = re.compile(rf"\b(\w+)\s+{re.escape(keyword)}|{re.escape(keyword)}\s+(\w+)\b")
             matches = pattern.findall(text_lower)
 
             for match in matches:

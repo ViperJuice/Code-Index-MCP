@@ -12,20 +12,21 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Generator, Dict, Any, List
+from typing import Any, Dict, Generator, List
 from unittest.mock import Mock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
+from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
+from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher as Dispatcher
+
 # Import our modules
 from mcp_server.gateway import app
-from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher as Dispatcher
-from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
+from mcp_server.plugin_base import IPlugin, SearchResult, SymbolDef
+from mcp_server.plugins.python_plugin.plugin import Plugin as PythonPlugin
 from mcp_server.storage.sqlite_store import SQLiteStore
 from mcp_server.watcher import FileWatcher
-from mcp_server.plugin_base import IPlugin, SymbolDef, SearchResult
-from mcp_server.plugins.python_plugin.plugin import Plugin as PythonPlugin
 
 
 # Performance tracking
@@ -234,9 +235,7 @@ def mock_plugin() -> Mock:
         signature="def test_function()",
     )
     plugin.search.return_value = [
-        SearchResult(
-            name="test_function", kind="function", path="/test/file.py", score=1.0
-        )
+        SearchResult(name="test_function", kind="function", path="/test/file.py", score=1.0)
     ]
     return plugin
 
@@ -261,9 +260,7 @@ def dispatcher_with_mock(mock_plugin: Mock) -> Dispatcher:
 
 # File watcher fixtures
 @pytest.fixture
-def file_watcher(
-    temp_code_directory: Path, dispatcher_with_plugins: Dispatcher
-) -> FileWatcher:
+def file_watcher(temp_code_directory: Path, dispatcher_with_plugins: Dispatcher) -> FileWatcher:
     """Create a file watcher instance."""
     watcher = FileWatcher(temp_code_directory, dispatcher_with_plugins)
     yield watcher
@@ -329,12 +326,8 @@ def sample_symbol_def() -> SymbolDef:
 def sample_search_results() -> List[SearchResult]:
     """Sample search results for testing."""
     return [
-        SearchResult(
-            name="function_one", kind="function", path="/test/file1.py", score=0.95
-        ),
-        SearchResult(
-            name="function_two", kind="function", path="/test/file2.py", score=0.85
-        ),
+        SearchResult(name="function_one", kind="function", path="/test/file1.py", score=0.95),
+        SearchResult(name="function_two", kind="function", path="/test/file2.py", score=0.85),
         SearchResult(name="ClassOne", kind="class", path="/test/file3.py", score=0.75),
     ]
 

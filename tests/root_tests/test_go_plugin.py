@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Test script for the Go plugin functionality."""
 import os
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
 
 from mcp_server.plugins.go_plugin import Plugin as GoPlugin
@@ -14,7 +14,7 @@ def create_test_go_project():
     # Create temporary directory
     test_dir = tempfile.mkdtemp(prefix="go_test_")
     os.chdir(test_dir)
-    
+
     # Create go.mod
     go_mod = """module github.com/example/testproject
 
@@ -28,7 +28,7 @@ require (
 replace github.com/example/internal => ./internal
 """
     Path("go.mod").write_text(go_mod)
-    
+
     # Create main.go
     main_go = """package main
 
@@ -76,10 +76,10 @@ func main() {
 }
 """
     Path("main.go").write_text(main_go)
-    
+
     # Create internal/handlers directory
     os.makedirs("internal/handlers", exist_ok=True)
-    
+
     # Create handlers.go
     handlers_go = """package handlers
 
@@ -127,7 +127,7 @@ func NewHandler(service UserService) *Handler {
 }
 """
     Path("internal/handlers/handlers.go").write_text(handlers_go)
-    
+
     # Create service.go
     service_go = """package handlers
 
@@ -165,7 +165,7 @@ func (s *memoryService) GetUser(id int) (*User, error) {
 }
 """
     Path("internal/handlers/service.go").write_text(service_go)
-    
+
     return test_dir
 
 
@@ -173,15 +173,15 @@ def test_go_plugin():
     """Test the Go plugin functionality."""
     print("Creating test Go project...")
     test_dir = create_test_go_project()
-    
+
     try:
         # Initialize SQLite store
         sqlite_store = SQLiteStore(":memory:")
-        
+
         # Create Go plugin
         print("\nInitializing Go plugin...")
         plugin = GoPlugin(sqlite_store=sqlite_store, enable_semantic=False)
-        
+
         # Test 1: Module resolution
         print("\n1. Testing module resolution...")
         module_info = plugin.get_module_info()
@@ -189,13 +189,13 @@ def test_go_plugin():
             print(f"   Module: {module_info['name']}")
             print(f"   Go version: {module_info['version']}")
             print(f"   Dependencies: {len(module_info['dependencies'])}")
-            for dep in module_info['dependencies']:
+            for dep in module_info["dependencies"]:
                 print(f"     - {dep['module']} {dep['version']}")
-            if module_info['replacements']:
+            if module_info["replacements"]:
                 print(f"   Replacements:")
-                for old, new in module_info['replacements'].items():
+                for old, new in module_info["replacements"].items():
                     print(f"     - {old} => {new}")
-        
+
         # Test 2: Index files
         print("\n2. Indexing Go files...")
         go_files = list(Path(".").rglob("*.go"))
@@ -203,9 +203,9 @@ def test_go_plugin():
             content = go_file.read_text()
             shard = plugin.indexFile(go_file, content)
             print(f"   Indexed {go_file}: {len(shard['symbols'])} symbols")
-            for symbol in shard['symbols'][:3]:  # Show first 3 symbols
+            for symbol in shard["symbols"][:3]:  # Show first 3 symbols
                 print(f"     - {symbol['kind']}: {symbol['symbol']} (line {symbol['line']})")
-        
+
         # Test 3: Package analysis
         print("\n3. Testing package analysis...")
         package_info = plugin.get_package_info(str(Path("internal/handlers")))
@@ -215,7 +215,7 @@ def test_go_plugin():
             print(f"   Types: {package_info['types']}")
             print(f"   Functions: {package_info['functions']}")
             print(f"   Interfaces: {package_info['interfaces']}")
-        
+
         # Test 4: Interface satisfaction
         print("\n4. Testing interface satisfaction...")
         result = plugin.check_interface_implementation("memoryService", "UserService")
@@ -223,11 +223,11 @@ def test_go_plugin():
             print(f"   Type: {result['type']}")
             print(f"   Interface: {result['interface']}")
             print(f"   Satisfied: {result['satisfied']}")
-            if result['implemented_methods']:
+            if result["implemented_methods"]:
                 print(f"   Implemented methods: {result['implemented_methods']}")
-            if result['missing_methods']:
+            if result["missing_methods"]:
                 print(f"   Missing methods: {result['missing_methods']}")
-        
+
         # Test 5: Symbol definition
         print("\n5. Testing symbol definition lookup...")
         symbols_to_find = ["Server", "UserService", "NewServer"]
@@ -239,14 +239,14 @@ def test_go_plugin():
                 print(f"     File: {definition['defined_in']}")
                 print(f"     Line: {definition['line']}")
                 print(f"     Signature: {definition['signature']}")
-        
+
         # Test 6: Find references
         print("\n6. Testing reference finding...")
         refs = plugin.findReferences("User")
         print(f"   Found {len(refs)} references to 'User'")
         for ref in refs[:5]:  # Show first 5
             print(f"     - {ref.file}:{ref.line}")
-        
+
         # Test 7: Search functionality
         print("\n7. Testing search...")
         search_results = list(plugin.search("Handler", {"limit": 5}))
@@ -254,9 +254,9 @@ def test_go_plugin():
         for result in search_results:
             print(f"     - {result['file']}:{result['line']}")
             print(f"       {result['snippet'][:80]}...")
-        
+
         print("\n✅ All tests completed successfully!")
-        
+
     finally:
         # Cleanup
         os.chdir("/")

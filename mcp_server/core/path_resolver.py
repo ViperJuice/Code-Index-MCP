@@ -6,10 +6,10 @@ as relative to the repository root, enabling true index portability.
 """
 
 import hashlib
+import logging
 import os
 from pathlib import Path
-from typing import Optional, Union, Tuple, Dict, Any
-import logging
+from typing import Any, Dict, Optional, Tuple, Union
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class PathResolver:
         self,
         repository_root: Optional[Path] = None,
         index_storage_path: Optional[Path] = None,
-        storage_strategy: str = "centralized"
+        storage_strategy: str = "centralized",
     ):
         """
         Initialize the path resolver.
@@ -54,9 +54,7 @@ class PathResolver:
             relative = path.relative_to(self.repository_root)
             return str(relative).replace("\\", "/")  # Normalize to forward slashes
         except ValueError:
-            raise ValueError(
-                f"Path {path} is outside repository root {self.repository_root}"
-            )
+            raise ValueError(f"Path {path} is outside repository root {self.repository_root}")
 
     def resolve_path(self, relative_path: str) -> Path:
         """
@@ -187,21 +185,21 @@ class PathResolver:
         # Default to current directory
         logger.warning("Could not detect repository root, using current directory")
         return Path.cwd()
-    
+
     def _get_default_index_path(self) -> Path:
         """Get default path for centralized index storage."""
         # Check environment variable first
         env_path = os.getenv("MCP_INDEX_STORAGE_PATH")
         if env_path:
             return Path(env_path).expanduser()
-        
+
         # Default to ~/.mcp/indexes
         return Path.home() / ".mcp" / "indexes"
-    
+
     def get_index_storage_path(self) -> Path:
         """
         Get the path where indexes should be stored based on strategy.
-        
+
         Returns:
             Path to index storage location
         """

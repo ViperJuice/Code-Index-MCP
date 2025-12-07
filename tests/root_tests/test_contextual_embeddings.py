@@ -10,16 +10,17 @@ from pathlib import Path
 # Add the project root to the Python path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from mcp_server.storage.sqlite_store import SQLiteStore
 from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
 from mcp_server.plugins.plaintext_plugin.plugin import PlainTextPlugin
+from mcp_server.storage.sqlite_store import SQLiteStore
+
 
 def test_contextual_embeddings():
     """Test the enhanced contextual embedding functionality."""
-    
+
     # Initialize storage
     store = SQLiteStore(":memory:")
-    
+
     # Test data with hierarchical structure
     test_markdown = """# Code Index MCP Server Documentation
 
@@ -173,84 +174,82 @@ Troubleshooting:
 - If you encounter permission errors, try using sudo (Linux/macOS)
 - On Windows, run as Administrator if needed
 - Check the logs in ~/.mcp/logs/ for detailed error messages
-"""
+""",
     }
-    
+
     # Initialize plugins
     markdown_plugin = MarkdownPlugin(
-        language_config={'name': 'markdown', 'code': 'md'},
-        sqlite_store=store,
-        enable_semantic=True
+        language_config={"name": "markdown", "code": "md"}, sqlite_store=store, enable_semantic=True
     )
-    
+
     plaintext_plugin = PlainTextPlugin(
-        language_config={'name': 'plaintext', 'code': 'txt'},
+        language_config={"name": "plaintext", "code": "txt"},
         sqlite_store=store,
-        enable_semantic=True
+        enable_semantic=True,
     )
-    
+
     print("Testing Contextual Embeddings Implementation")
     print("=" * 60)
-    
+
     # Index test files
     for filename, content in test_files.items():
         print(f"\nIndexing {filename}...")
-        
-        if filename.endswith('.md'):
+
+        if filename.endswith(".md"):
             result = markdown_plugin.indexFile(filename, content)
         else:
             result = plaintext_plugin.indexFile(filename, content)
-        
+
         print(f"  - Indexed {len(result['symbols'])} symbols")
-    
+
     print("\n" + "=" * 60)
     print("Testing Semantic Search with Context")
     print("=" * 60)
-    
+
     # Test queries
     test_queries = [
         "how to install the mcp server",
         "configure voyage api key",
         "search for markdown headers",
         "troubleshooting installation issues",
-        "python version requirements"
+        "python version requirements",
     ]
-    
+
     for query in test_queries:
         print(f"\nQuery: '{query}'")
-        
+
         # Search in markdown
-        md_results = markdown_plugin.search(query, {'semantic': True, 'limit': 3})
-        
+        md_results = markdown_plugin.search(query, {"semantic": True, "limit": 3})
+
         if md_results:
             print("\nMarkdown Results:")
             for i, result in enumerate(md_results, 1):
                 print(f"\n  {i}. File: {result['file']}")
                 print(f"     Score: {result.get('score', 'N/A'):.3f}")
-                
-                metadata = result.get('metadata', {})
-                if metadata.get('section_hierarchy'):
+
+                metadata = result.get("metadata", {})
+                if metadata.get("section_hierarchy"):
                     print(f"     Section: {' > '.join(metadata['section_hierarchy'])}")
-                elif metadata.get('section'):
+                elif metadata.get("section"):
                     print(f"     Section: {metadata['section']}")
-                
+
                 print(f"     Snippet: {result['snippet'][:100]}...")
-                
+
                 # Show context if available
-                if result.get('context_before'):
+                if result.get("context_before"):
                     print(f"     Context Before: ...{result['context_before'][-50:]}")
-                if result.get('context_after'):
+                if result.get("context_after"):
                     print(f"     Context After: {result['context_after'][:50]}...")
-        
+
         # Search in plaintext
-        txt_results = plaintext_plugin.search(query, {'semantic': True, 'limit': 2})
-        
+        txt_results = plaintext_plugin.search(query, {"semantic": True, "limit": 2})
+
         if txt_results:
             print("\nPlaintext Results:")
             for i, result in enumerate(txt_results, 1):
                 print(f"\n  {i}. File: {result['file']}")
                 print(f"     Snippet: {result['snippet'][:100]}...")
-    
+
     print("\n" + "=" * 60)
     print("Contextual Embedding Features Demonstrated:")
     print("=" * 60)
@@ -259,14 +258,14 @@ Troubleshooting:
     print("✓ Surrounding chunk context (before/after)")
     print("✓ Enhanced metadata in search results")
     print("✓ Contextual text used for embedding generation")
-    
+
     # Demonstrate chunk inspection
     print("\n" + "=" * 60)
     print("Chunk Metadata Example")
     print("=" * 60)
-    
+
     # Get a chunk from the cache to show metadata
-    if hasattr(markdown_plugin, '_chunk_cache') and markdown_plugin._chunk_cache:
+    if hasattr(markdown_plugin, "_chunk_cache") and markdown_plugin._chunk_cache:
         file_path, chunks = next(iter(markdown_plugin._chunk_cache.items()))
         if chunks:
             chunk = chunks[0]
@@ -274,22 +273,24 @@ Troubleshooting:
             print(f"  Index: {chunk.chunk_index}")
             print(f"  Content preview: {chunk.content[:80]}...")
             print(f"  Metadata keys: {list(chunk.metadata.keys())}")
-            
-            if chunk.metadata.get('contextual_text'):
+
+            if chunk.metadata.get("contextual_text"):
                 print(f"\nContextual Text Structure:")
-                context_lines = chunk.metadata['contextual_text'].split('\n\n')
+                context_lines = chunk.metadata["contextual_text"].split("\n\n")
                 for line in context_lines[:5]:  # Show first 5 lines
                     if line.strip():
                         print(f"  - {line[:80]}...")
 
+
 if __name__ == "__main__":
     # Set a dummy API key if not present (for testing without actual API)
-    if 'VOYAGE_API_KEY' not in os.environ:
-        os.environ['VOYAGE_API_KEY'] = 'dummy-key-for-testing'
-    
+    if "VOYAGE_API_KEY" not in os.environ:
+        os.environ["VOYAGE_API_KEY"] = "dummy-key-for-testing"
+
     try:
         test_contextual_embeddings()
     except Exception as e:
         print(f"\nError during testing: {e}")
         import traceback
+
         traceback.print_exc()

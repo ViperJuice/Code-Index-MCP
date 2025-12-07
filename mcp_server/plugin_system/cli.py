@@ -4,17 +4,18 @@ Plugin management CLI tool.
 Provides commands for discovering, loading, and managing plugins.
 """
 
-import click
 import json
-import yaml
 import logging
 from pathlib import Path
 from typing import Optional
+
+import click
+import yaml
 from tabulate import tabulate
 
+from .config import get_config_manager
 from .discovery import get_plugin_discovery
 from .loader import get_plugin_loader
-from .config import get_config_manager
 from .models import PluginConfig
 
 # Configure logging
@@ -153,11 +154,7 @@ def list():
                 language,
                 plugin.__class__.__name__,
                 state.value,
-                (
-                    "Yes"
-                    if hasattr(plugin, "enable_semantic") and plugin.enable_semantic
-                    else "No"
-                ),
+                ("Yes" if hasattr(plugin, "enable_semantic") and plugin.enable_semantic else "No"),
             ]
         )
 
@@ -319,9 +316,7 @@ def test(language: str):
         if result.symbols:
             click.echo("\nSymbols found:")
             for symbol in result.symbols[:5]:  # Show first 5
-                click.echo(
-                    f"  - {symbol.name} ({symbol.symbol_type}) at line {symbol.line}"
-                )
+                click.echo(f"  - {symbol.name} ({symbol.symbol_type}) at line {symbol.line}")
 
             if len(result.symbols) > 5:
                 click.echo(f"  ... and {len(result.symbols) - 5} more")

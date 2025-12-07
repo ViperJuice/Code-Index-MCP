@@ -1,24 +1,25 @@
 #!/usr/bin/env python3
 """Performance tests for memory usage and resource management."""
 
-import pytest
-import time
-import gc
-import psutil
-import tracemalloc
-import statistics
-import weakref
 import concurrent.futures
+import gc
+import statistics
+import time
+import tracemalloc
+import weakref
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
+
+import psutil
+import pytest
 
 from tests.base_test import BaseDocumentTest
 from tests.test_utils import (
-    memory_monitor,
-    generate_large_content,
+    assert_memory_usage,
     create_test_markdown,
     create_test_plaintext,
-    assert_memory_usage,
+    generate_large_content,
+    memory_monitor,
 )
 
 
@@ -147,12 +148,8 @@ class TestDocumentMemoryUsage(BaseDocumentTest):
             profiler.checkpoint(f"after_{size_name}")
 
             # Get memory stats
-            before = next(
-                s for s in profiler.snapshots if s["label"] == f"before_{size_name}"
-            )
-            after = next(
-                s for s in profiler.snapshots if s["label"] == f"after_{size_name}"
-            )
+            before = next(s for s in profiler.snapshots if s["label"] == f"before_{size_name}")
+            after = next(s for s in profiler.snapshots if s["label"] == f"after_{size_name}")
 
             memory_used = after["memory"]["rss"] - before["memory"]["rss"]
             memory_ratio = memory_used / size_mb if size_mb > 0 else 0
@@ -190,9 +187,7 @@ class TestDocumentMemoryUsage(BaseDocumentTest):
 
         # Memory assertions
         for name, data in results.items():
-            assert_memory_usage(
-                data["memory_ratio"], 2.0, f"Processing {name} document"
-            )
+            assert_memory_usage(data["memory_ratio"], 2.0, f"Processing {name} document")
 
     @pytest.mark.performance
     def test_memory_leak_detection(self):
@@ -235,9 +230,7 @@ class TestDocumentMemoryUsage(BaseDocumentTest):
             iteration_memories.append(end_checkpoint["delta"]["rss"])
 
             if (i + 1) % 5 == 0:
-                print(
-                    f"  After {i + 1} iterations: {end_checkpoint['delta']['rss']:.1f}MB"
-                )
+                print(f"  After {i + 1} iterations: {end_checkpoint['delta']['rss']:.1f}MB")
 
         profile_summary = profiler.stop()
 
@@ -263,9 +256,7 @@ class TestDocumentMemoryUsage(BaseDocumentTest):
         assert (
             growth < 5.0
         ), f"Potential memory leak: {growth:.2f}MB growth over {num_iterations} iterations"
-        assert (
-            growth_percent < 20
-        ), f"Memory grew by {growth_percent:.1f}% - potential leak"
+        assert growth_percent < 20, f"Memory grew by {growth_percent:.1f}% - potential leak"
 
     @pytest.mark.performance
     def test_resource_cleanup_effectiveness(self):
@@ -424,14 +415,10 @@ class TestDocumentMemoryUsage(BaseDocumentTest):
             profiler.checkpoint("gc_enabled_end")
 
             gc_count_after = gc.get_count()
-            gc_collections = sum(
-                gc_count_after[i] - gc_count_before[i] for i in range(3)
-            )
+            gc_collections = sum(gc_count_after[i] - gc_count_before[i] for i in range(3))
 
             gc_enabled_avg = statistics.mean(gc_enabled_times)
-            gc_enabled_memory = (
-                profiler.snapshots[-1]["delta"]["rss"] - gc_disabled_memory
-            )
+            gc_enabled_memory = profiler.snapshots[-1]["delta"]["rss"] - gc_disabled_memory
 
             print(f"  Avg processing time: {gc_enabled_avg:.1f}ms")
             print(f"  Memory increase: {gc_enabled_memory:.1f}MB")
@@ -501,13 +488,9 @@ class TestDocumentMemoryUsage(BaseDocumentTest):
             # Process documents concurrently
             start_time = time.perf_counter()
 
-            with concurrent.futures.ThreadPoolExecutor(
-                max_workers=num_workers
-            ) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
                 futures = [executor.submit(process_document, doc) for doc in docs]
-                results_list = [
-                    f.result() for f in concurrent.futures.as_completed(futures)
-                ]
+                results_list = [f.result() for f in concurrent.futures.as_completed(futures)]
 
             end_time = time.perf_counter()
 
@@ -520,24 +503,16 @@ class TestDocumentMemoryUsage(BaseDocumentTest):
 
             # Get memory stats
             start_checkpoint = next(
-                s
-                for s in profiler.snapshots
-                if s["label"] == f"workers_{num_workers}_start"
+                s for s in profiler.snapshots if s["label"] == f"workers_{num_workers}_start"
             )
             end_checkpoint = next(
-                s
-                for s in profiler.snapshots
-                if s["label"] == f"workers_{num_workers}_end"
+                s for s in profiler.snapshots if s["label"] == f"workers_{num_workers}_end"
             )
             cleanup_checkpoint = next(
-                s
-                for s in profiler.snapshots
-                if s["label"] == f"workers_{num_workers}_cleanup"
+                s for s in profiler.snapshots if s["label"] == f"workers_{num_workers}_cleanup"
             )
 
-            memory_used = (
-                end_checkpoint["memory"]["rss"] - start_checkpoint["memory"]["rss"]
-            )
+            memory_used = end_checkpoint["memory"]["rss"] - start_checkpoint["memory"]["rss"]
             memory_after_cleanup = (
                 cleanup_checkpoint["memory"]["rss"] - start_checkpoint["memory"]["rss"]
             )
@@ -580,9 +555,7 @@ class TestDocumentMemoryUsage(BaseDocumentTest):
             worker_ratio = worker_list[-1] / worker_list[0]
 
             print(f"\nMemory scaling: {mem_ratio:.1f}x for {worker_ratio:.1f}x workers")
-            assert (
-                mem_ratio < worker_ratio * 0.7
-            ), f"Memory scales too steeply: {mem_ratio:.1f}x"
+            assert mem_ratio < worker_ratio * 0.7, f"Memory scales too steeply: {mem_ratio:.1f}x"
 
     @pytest.mark.performance
     def test_memory_pressure_handling(self):
@@ -664,9 +637,7 @@ class TestDocumentMemoryUsage(BaseDocumentTest):
         print(f"Final memory: {profile_summary['final_mb']:.1f}MB")
 
         # Should handle at least some documents gracefully
-        assert (
-            documents_processed >= 3
-        ), "Failed to process minimum documents under memory pressure"
+        assert documents_processed >= 3, "Failed to process minimum documents under memory pressure"
 
         # Memory should be recoverable
         memory_recovered = profile_summary["peak_mb"] - profile_summary["final_mb"]

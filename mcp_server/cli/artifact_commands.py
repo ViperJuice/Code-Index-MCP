@@ -6,11 +6,12 @@ index artifacts using GitHub Actions Artifacts storage.
 """
 
 import os
-import sys
-import click
 import subprocess
+import sys
 from pathlib import Path
 from typing import Optional
+
+import click
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
@@ -26,9 +27,7 @@ def artifact():
 @artifact.command()
 @click.option("--validate", is_flag=True, help="Validate indexes before upload")
 @click.option("--compress-only", is_flag=True, help="Only compress, do not upload")
-@click.option(
-    "--no-secure", is_flag=True, help="Disable secure export (include all files)"
-)
+@click.option("--no-secure", is_flag=True, help="Disable secure export (include all files)")
 def push(validate: bool, compress_only: bool, no_secure: bool):
     """Upload local indexes to GitHub Actions Artifacts."""
     try:
@@ -221,14 +220,10 @@ def sync():
                 if has_artifacts:
                     click.echo("\n✅ Remote artifacts available")
                     click.echo("   Use 'mcp_cli.py artifact pull --latest' to update")
-                    click.echo(
-                        "   Use 'mcp_cli.py artifact push' to upload your indexes"
-                    )
+                    click.echo("   Use 'mcp_cli.py artifact push' to upload your indexes")
                 else:
                     click.echo("\n📤 No remote artifacts found")
-                    click.echo(
-                        "   Use 'mcp_cli.py artifact push' to upload your indexes"
-                    )
+                    click.echo("   Use 'mcp_cli.py artifact push' to upload your indexes")
 
             click.echo("\n✅ Sync check complete!")
 
@@ -238,15 +233,9 @@ def sync():
 
 
 @artifact.command()
-@click.option(
-    "--older-than", type=int, default=30, help="Delete artifacts older than N days"
-)
-@click.option(
-    "--keep-latest", type=int, default=5, help="Keep at least N latest artifacts"
-)
-@click.option(
-    "--dry-run", is_flag=True, help="Show what would be deleted without deleting"
-)
+@click.option("--older-than", type=int, default=30, help="Delete artifacts older than N days")
+@click.option("--keep-latest", type=int, default=5, help="Keep at least N latest artifacts")
+@click.option("--dry-run", is_flag=True, help="Show what would be deleted without deleting")
 def cleanup(older_than: int, keep_latest: int, dry_run: bool):
     """Clean up old artifacts to save storage."""
     try:

@@ -19,19 +19,19 @@ Usage:
         --format FORMAT    Report format: text|json|html|all (default: all)
 """
 
-import asyncio
 import argparse
+import asyncio
 import logging
 import sys
 import tempfile
-from pathlib import Path
-from typing import List, Dict, Any, Optional
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 # Import MCP Server components
 from ..plugin_base import IPlugin
 from .benchmark_runner import BenchmarkRunner
-from .benchmark_suite import BenchmarkSuite, BenchmarkResult
+from .benchmark_suite import BenchmarkResult, BenchmarkSuite
 
 
 def setup_logging(verbose: bool = False):
@@ -1048,9 +1048,7 @@ async def run_comprehensive_benchmarks(
 
     # Run full benchmark suite
     logging.info("Running full benchmark suite...")
-    full_result = runner.run_benchmarks(
-        plugins, save_results=True, compare_with_previous=True
-    )
+    full_result = runner.run_benchmarks(plugins, save_results=True, compare_with_previous=True)
 
     # Generate comprehensive report
     logging.info("Generating comprehensive report...")
@@ -1179,9 +1177,7 @@ def main():
                 logging.info("✅ All performance requirements met!")
                 sys.exit(0)
             else:
-                logging.error(
-                    f"❌ Performance requirements not met: {passed}/{total} SLOs passed"
-                )
+                logging.error(f"❌ Performance requirements not met: {passed}/{total} SLOs passed")
                 sys.exit(1)
         else:
             logging.info("✅ Benchmarks completed successfully")

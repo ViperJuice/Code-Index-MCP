@@ -1,13 +1,14 @@
 """FastAPI middleware for automatic metrics collection."""
 
-import time
 import logging
+import time
 from typing import Callable, Optional
+
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
-from ..metrics import get_metrics_collector, get_health_checker
+from ..metrics import get_health_checker, get_metrics_collector
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +48,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         # Track active requests
         self.metrics_collector.set_gauge(
             "http_requests_active",
-            self.metrics_collector.get_metric_value("http_requests_active", {})
-            or 0 + 1,
+            self.metrics_collector.get_metric_value("http_requests_active", {}) or 0 + 1,
         )
 
         try:
@@ -99,9 +99,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
 
             # Detailed endpoint metrics
             if self.enable_detailed_metrics:
-                self._record_endpoint_metrics(
-                    method, normalized_path, status_code, duration
-                )
+                self._record_endpoint_metrics(method, normalized_path, status_code, duration)
 
             return response
 
@@ -136,9 +134,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             current_active = (
                 self.metrics_collector.get_metric_value("http_requests_active", {}) or 0
             )
-            self.metrics_collector.set_gauge(
-                "http_requests_active", max(0, current_active - 1)
-            )
+            self.metrics_collector.set_gauge("http_requests_active", max(0, current_active - 1))
 
     def _normalize_path(self, path: str) -> str:
         """Normalize URL path for metrics to avoid high cardinality.
@@ -376,7 +372,5 @@ def setup_metrics_middleware(app, enable_detailed_metrics: bool = True) -> None:
         enable_detailed_metrics: Whether to enable detailed per-endpoint metrics
     """
     middleware = MetricsMiddleware(app, enable_detailed_metrics)
-    app.add_middleware(
-        MetricsMiddleware, enable_detailed_metrics=enable_detailed_metrics
-    )
+    app.add_middleware(MetricsMiddleware, enable_detailed_metrics=enable_detailed_metrics)
     logger.info("Added metrics middleware to FastAPI application")

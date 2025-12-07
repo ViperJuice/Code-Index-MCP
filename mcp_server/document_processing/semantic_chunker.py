@@ -2,25 +2,25 @@
 
 import hashlib
 import re
+import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Tuple, Any, Set
-import uuid
+from typing import Any, Dict, List, Optional, Set, Tuple
 
+from .chunk_optimizer import (
+    ChunkingConfig,
+    ChunkingStrategy,
+    ChunkOptimizer,
+    HybridChunkingStrategy,
+    TokenEstimator,
+)
 from .document_interfaces import (
     ChunkMetadata,
     ChunkType,
     DocumentChunk,
     DocumentStructure,
-    Section,
     ProcessedDocument,
-)
-from .chunk_optimizer import (
-    ChunkOptimizer,
-    ChunkingConfig,
-    ChunkingStrategy,
-    HybridChunkingStrategy,
-    TokenEstimator,
+    Section,
 )
 
 
@@ -110,9 +110,7 @@ class DocumentTypeDetector:
             ],
         }
 
-    def detect_type(
-        self, content: str, metadata: Optional[Dict[str, Any]] = None
-    ) -> DocumentType:
+    def detect_type(self, content: str, metadata: Optional[Dict[str, Any]] = None) -> DocumentType:
         """Detect document type from content and metadata."""
         # Check metadata hints first
         if metadata:
@@ -139,9 +137,7 @@ class DocumentTypeDetector:
         for doc_type, patterns in self.type_patterns.items():
             score = 0
             for pattern in patterns:
-                matches = len(
-                    re.findall(pattern, content[:2000])
-                )  # Check first 2000 chars
+                matches = len(re.findall(pattern, content[:2000]))  # Check first 2000 chars
                 score += matches
             scores[doc_type] = score
 
@@ -305,15 +301,11 @@ class HierarchicalChunker:
             # Chunk the section's direct content
             if section_tokens > self.max_chunk_size:
                 # Split large section content
-                sub_chunks = self._split_section_content(
-                    section.content, hierarchy, section
-                )
+                sub_chunks = self._split_section_content(section.content, hierarchy, section)
                 chunks.extend(sub_chunks)
             else:
                 # Create chunk for section content
-                chunk = self._create_section_chunk(
-                    section.content, hierarchy, len(chunks), section
-                )
+                chunk = self._create_section_chunk(section.content, hierarchy, len(chunks), section)
                 chunks.append(chunk)
 
         # Process child sections
@@ -335,15 +327,11 @@ class HierarchicalChunker:
 
             if section_tokens > self.max_chunk_size:
                 # Split large section
-                sub_chunks = self._split_section_content(
-                    section.content, hierarchy, section
-                )
+                sub_chunks = self._split_section_content(section.content, hierarchy, section)
                 chunks.extend(sub_chunks)
             else:
                 # Create single chunk
-                chunk = self._create_section_chunk(
-                    section.content, hierarchy, len(chunks), section
-                )
+                chunk = self._create_section_chunk(section.content, hierarchy, len(chunks), section)
                 chunks.append(chunk)
 
     def _get_full_section_content(self, section: Section) -> str:
@@ -590,16 +578,12 @@ class SemanticChunker:
             # Chunk by endpoints
             for i, match in enumerate(endpoints):
                 start = match.start()
-                end = (
-                    endpoints[i + 1].start() if i + 1 < len(endpoints) else len(content)
-                )
+                end = endpoints[i + 1].start() if i + 1 < len(endpoints) else len(content)
 
                 endpoint_content = content[start:end].strip()
                 if endpoint_content:
                     # Check size and split if needed
-                    tokens = self.optimizer.token_estimator.estimate_tokens(
-                        endpoint_content
-                    )
+                    tokens = self.optimizer.token_estimator.estimate_tokens(endpoint_content)
 
                     if tokens > self.config.max_chunk_size:
                         # Split large endpoint documentation
@@ -670,12 +654,8 @@ class SemanticChunker:
 
                 if is_important:
                     # Try to keep important sections together
-                    full_content = self.hierarchical_chunker._get_full_section_content(
-                        section
-                    )
-                    tokens = self.optimizer.token_estimator.estimate_tokens(
-                        full_content
-                    )
+                    full_content = self.hierarchical_chunker._get_full_section_content(section)
+                    tokens = self.optimizer.token_estimator.estimate_tokens(full_content)
 
                     if tokens <= self.config.max_chunk_size * 1.2:  # Allow 20% larger
                         chunk = self._create_readme_chunk(full_content, section)
@@ -723,9 +703,7 @@ class SemanticChunker:
 
         return chunks
 
-    def _get_context_snippet(
-        self, content: str, target_tokens: int, from_end: bool
-    ) -> str:
+    def _get_context_snippet(self, content: str, target_tokens: int, from_end: bool) -> str:
         """Get a context snippet of approximately target_tokens size."""
         # Estimate characters needed
         target_chars = int(target_tokens / self.config.token_estimation_factor)
@@ -763,9 +741,7 @@ class SemanticChunker:
         # Find sections
         sections = []
         for marker in section_markers:
-            pattern = re.compile(
-                rf"(?:^|\n)({marker}[:\s])", re.IGNORECASE | re.MULTILINE
-            )
+            pattern = re.compile(rf"(?:^|\n)({marker}[:\s])", re.IGNORECASE | re.MULTILINE)
             for match in pattern.finditer(content):
                 sections.append((match.start(), marker))
 
@@ -911,24 +887,19 @@ class SemanticChunker:
 
                 # Check if chunks are from same section
                 same_section = (
-                    current.metadata.section_hierarchy
-                    == next_chunk.metadata.section_hierarchy
+                    current.metadata.section_hierarchy == next_chunk.metadata.section_hierarchy
                 )
 
                 if same_section:
                     # Calculate similarity
-                    coherence = (
-                        self.optimizer.semantic_analyzer.calculate_coherence_score(
-                            current.content, next_chunk.content
-                        )
+                    coherence = self.optimizer.semantic_analyzer.calculate_coherence_score(
+                        current.content, next_chunk.content
                     )
 
                     # Check combined size
                     combined_tokens = self.optimizer.token_estimator.estimate_tokens(
                         current.content
-                    ) + self.optimizer.token_estimator.estimate_tokens(
-                        next_chunk.content
-                    )
+                    ) + self.optimizer.token_estimator.estimate_tokens(next_chunk.content)
 
                     if (
                         coherence >= similarity_threshold

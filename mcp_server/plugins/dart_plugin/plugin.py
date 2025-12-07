@@ -1,35 +1,37 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Optional, Dict, List, Set, Tuple, Any
-import re
 import logging
+import re
 from datetime import datetime
-
-# Base plugin interface from plugin_base.py
-from ...plugin_base import (
-    IPlugin,
-    IndexShard,
-    SymbolDef,
-    Reference,
-    SearchResult,
-    SearchOpts,
-)
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 # Interfaces from shared interfaces
 from ...interfaces.plugin_interfaces import (
     IDartPlugin,
     ILanguageAnalyzer,
-    SymbolDefinition,
-    SymbolReference,
-    SearchResult as SearchResultInterface,
     IndexedFile,
 )
-from ...interfaces.shared_interfaces import Result, Error
+from ...interfaces.plugin_interfaces import SearchResult as SearchResultInterface
+from ...interfaces.plugin_interfaces import (
+    SymbolDefinition,
+    SymbolReference,
+)
+from ...interfaces.shared_interfaces import Error, Result
+
+# Base plugin interface from plugin_base.py
+from ...plugin_base import (
+    IndexShard,
+    IPlugin,
+    Reference,
+    SearchOpts,
+    SearchResult,
+    SymbolDef,
+)
+from ...storage.sqlite_store import SQLiteStore
 
 # Utilities
 from ...utils.fuzzy_indexer import FuzzyIndexer
-from ...storage.sqlite_store import SQLiteStore
 
 logger = logging.getLogger(__name__)
 
@@ -102,9 +104,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
         """Check if this plugin can handle the given file"""
         return Path(file_path).suffix == ".dart"
 
-    def index(
-        self, file_path: str, content: Optional[str] = None
-    ) -> Result[IndexedFile]:
+    def index(self, file_path: str, content: Optional[str] = None) -> Result[IndexedFile]:
         """Index a file and extract symbols using Result pattern"""
         try:
             if content is None:
@@ -161,9 +161,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
             # First check cache
             for file_path, symbols in self._symbol_cache.items():
                 for sym_def in symbols:
-                    if sym_def.symbol == symbol or sym_def.symbol.endswith(
-                        f".{symbol}"
-                    ):
+                    if sym_def.symbol == symbol or sym_def.symbol.endswith(f".{symbol}"):
                         return Result.success_result(sym_def)
 
             # Search in all Dart files
@@ -179,9 +177,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
             )
             return Result.error_result(error)
 
-    def get_references(
-        self, symbol: str, context: Dict[str, Any]
-    ) -> Result[List[SymbolReference]]:
+    def get_references(self, symbol: str, context: Dict[str, Any]) -> Result[List[SymbolReference]]:
         """Get all references to a symbol using Result pattern"""
         try:
             references = self._find_symbol_references(symbol)
@@ -231,9 +227,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
             )
             return Result.error_result(error)
 
-    def get_completions(
-        self, file_path: str, line: int, column: int
-    ) -> Result[List[str]]:
+    def get_completions(self, file_path: str, line: int, column: int) -> Result[List[str]]:
         """Get code completions at a position"""
         try:
             # Basic completion based on symbols in scope
@@ -316,9 +310,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
             )
             return Result.error_result(error)
 
-    def resolve_type(
-        self, symbol: str, context: Dict[str, Any]
-    ) -> Result[Optional[str]]:
+    def resolve_type(self, symbol: str, context: Dict[str, Any]) -> Result[Optional[str]]:
         """Resolve the type of a symbol"""
         try:
             symbol_type = self._resolve_symbol_type(symbol, context)
@@ -418,14 +410,10 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
         """Find all references to a symbol (legacy interface)"""
         result = self.get_references(symbol, {})
         if result.success and result.value:
-            return [
-                Reference(file=ref.file_path, line=ref.line) for ref in result.value
-            ]
+            return [Reference(file=ref.file_path, line=ref.line) for ref in result.value]
         return []
 
-    def search(
-        self, query: str, opts: SearchOpts | None = None
-    ) -> Iterable[SearchResult]:
+    def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:
         """Search for code snippets matching a query (legacy interface)"""
         options = {}
         if opts:
@@ -439,9 +427,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
 
         # Convert to legacy format
         return [
-            SearchResult(
-                file=result["file"], line=result["line"], snippet=result["snippet"]
-            )
+            SearchResult(file=result["file"], line=result["line"], snippet=result["snippet"])
             for result in fuzzy_results
         ]
 
@@ -459,8 +445,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
             try:
                 # Skip common build and cache directories
                 if any(
-                    part in path.parts
-                    for part in ["build", ".dart_tool", ".pub-cache", "packages"]
+                    part in path.parts for part in ["build", ".dart_tool", ".pub-cache", "packages"]
                 ):
                     continue
 
@@ -470,9 +455,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
                 logger.warning(f"Failed to pre-index {path}: {e}")
                 continue
 
-    def _extract_all_symbols(
-        self, content: str, file_path: str
-    ) -> List[SymbolDefinition]:
+    def _extract_all_symbols(self, content: str, file_path: str) -> List[SymbolDefinition]:
         """Extract all symbols and convert to SymbolDefinition format"""
         symbols = []
 
@@ -487,9 +470,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
 
         return symbols
 
-    def _extract_dart_classes(
-        self, content: str, file_path: str
-    ) -> List[SymbolDefinition]:
+    def _extract_dart_classes(self, content: str, file_path: str) -> List[SymbolDefinition]:
         """Extract class definitions including Flutter widgets"""
         symbols = []
 
@@ -512,12 +493,8 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
             line_no = content[:class_keyword_pos].count("\n") + 1
 
             # Determine if it's a Flutter widget
-            is_widget = self._is_flutter_widget(
-                class_name, extends_class, content, match.start()
-            )
-            is_state = self._is_flutter_state(
-                class_name, extends_class, content, match.start()
-            )
+            is_widget = self._is_flutter_widget(class_name, extends_class, content, match.start())
+            is_state = self._is_flutter_state(class_name, extends_class, content, match.start())
 
             # Build signature
             signature_parts = []
@@ -562,9 +539,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
 
             # Extract class members
             symbols.extend(
-                self._extract_class_members(
-                    content, class_name, match.start(), file_path
-                )
+                self._extract_class_members(content, class_name, match.start(), file_path)
             )
 
         return symbols
@@ -668,9 +643,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
 
         return symbols
 
-    def _extract_dart_enums(
-        self, content: str, file_path: str
-    ) -> List[SymbolDefinition]:
+    def _extract_dart_enums(self, content: str, file_path: str) -> List[SymbolDefinition]:
         """Extract enum definitions"""
         symbols = []
         enum_pattern = r"^\s*enum\s+(\w+)\s*\{"
@@ -694,9 +667,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
 
         return symbols
 
-    def _extract_dart_mixins(
-        self, content: str, file_path: str
-    ) -> List[SymbolDefinition]:
+    def _extract_dart_mixins(self, content: str, file_path: str) -> List[SymbolDefinition]:
         """Extract mixin definitions"""
         symbols = []
         mixin_pattern = r"^\s*mixin\s+(\w+)(?:\s+on\s+([\w\s,<>]+))?\s*\{"
@@ -725,9 +696,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
 
         return symbols
 
-    def _extract_dart_extensions(
-        self, content: str, file_path: str
-    ) -> List[SymbolDefinition]:
+    def _extract_dart_extensions(self, content: str, file_path: str) -> List[SymbolDefinition]:
         """Extract extension definitions"""
         symbols = []
         extension_pattern = r"^\s*extension\s+(\w+)?\s*on\s+(\w+(?:<[^>]*>)?)\s*\{"
@@ -754,9 +723,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
 
         return symbols
 
-    def _extract_dart_functions(
-        self, content: str, file_path: str
-    ) -> List[SymbolDefinition]:
+    def _extract_dart_functions(self, content: str, file_path: str) -> List[SymbolDefinition]:
         """Extract top-level function definitions"""
         symbols = []
 
@@ -820,16 +787,12 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
 
         return symbols
 
-    def _extract_dart_variables(
-        self, content: str, file_path: str
-    ) -> List[SymbolDefinition]:
+    def _extract_dart_variables(self, content: str, file_path: str) -> List[SymbolDefinition]:
         """Extract top-level variables and constants"""
         symbols = []
 
         # Variable pattern: captures const/final, type, name
-        var_pattern = (
-            r"^\s*(const\s+|final\s+|var\s+)(?:(\w+(?:<[^>]*>)?)\s+)?(\w+)\s*="
-        )
+        var_pattern = r"^\s*(const\s+|final\s+|var\s+)(?:(\w+(?:<[^>]*>)?)\s+)?(\w+)\s*="
 
         for match in re.finditer(var_pattern, content, re.MULTILINE):
             modifier = match.group(1).strip()
@@ -837,9 +800,9 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
             var_name = match.group(3)
 
             # Skip if this is inside a class or function
-            if self._is_inside_class(
+            if self._is_inside_class(content, match.start()) or self._is_inside_function(
                 content, match.start()
-            ) or self._is_inside_function(content, match.start()):
+            ):
                 continue
 
             line_no = content[: match.start()].count("\n") + 1
@@ -874,9 +837,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
 
         return symbols
 
-    def _extract_dart_typedefs(
-        self, content: str, file_path: str
-    ) -> List[SymbolDefinition]:
+    def _extract_dart_typedefs(self, content: str, file_path: str) -> List[SymbolDefinition]:
         """Extract typedef definitions"""
         symbols = []
         typedef_pattern = r"^\s*typedef\s+(\w+)\s*=\s*([^;]+);"
@@ -918,9 +879,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
             "ImplicitlyAnimatedWidget",
         }
 
-        class_pattern = (
-            r"^\s*class\s+(\w+)(?:\s*<[^>]*>)?\s+extends\s+(\w+(?:<[^>]*>)?)"
-        )
+        class_pattern = r"^\s*class\s+(\w+)(?:\s*<[^>]*>)?\s+extends\s+(\w+(?:<[^>]*>)?)"
 
         for match in re.finditer(class_pattern, content, re.MULTILINE):
             class_name = match.group(1)
@@ -967,9 +926,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
                     pubspec_content = pubspec_path.read_text(encoding="utf-8")
                     # Simple extraction of dependencies
                     dep_pattern = r"^\s*(\w+):\s*"
-                    for match in re.finditer(
-                        dep_pattern, pubspec_content, re.MULTILINE
-                    ):
+                    for match in re.finditer(dep_pattern, pubspec_content, re.MULTILINE):
                         dep_name = match.group(1)
                         if dep_name not in [
                             "dependencies",
@@ -1005,8 +962,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
             try:
                 # Skip build and cache directories
                 if any(
-                    part in path.parts
-                    for part in ["build", ".dart_tool", ".pub-cache", "packages"]
+                    part in path.parts for part in ["build", ".dart_tool", ".pub-cache", "packages"]
                 ):
                     continue
 
@@ -1014,9 +970,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
                 symbols = self._extract_all_symbols(content, str(path))
 
                 for sym_def in symbols:
-                    if sym_def.symbol == symbol or sym_def.symbol.endswith(
-                        f".{symbol}"
-                    ):
+                    if sym_def.symbol == symbol or sym_def.symbol.endswith(f".{symbol}"):
                         return sym_def
             except Exception:
                 continue
@@ -1033,8 +987,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
             try:
                 # Skip build and cache directories
                 if any(
-                    part in path.parts
-                    for part in ["build", ".dart_tool", ".pub-cache", "packages"]
+                    part in path.parts for part in ["build", ".dart_tool", ".pub-cache", "packages"]
                 ):
                     continue
 
@@ -1119,9 +1072,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
         except Exception:
             return False
 
-    def _get_dart_completions(
-        self, file_path: str, line: int, column: int
-    ) -> List[str]:
+    def _get_dart_completions(self, file_path: str, line: int, column: int) -> List[str]:
         """Get basic code completions"""
         completions = []
 
@@ -1199,9 +1150,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
 
         return list(set(completions))  # Remove duplicates
 
-    def _resolve_symbol_type(
-        self, symbol: str, context: Dict[str, Any]
-    ) -> Optional[str]:
+    def _resolve_symbol_type(self, symbol: str, context: Dict[str, Any]) -> Optional[str]:
         """Resolve the type of a symbol"""
         # Look for the symbol definition
         definition = self._find_symbol_definition(symbol)
@@ -1426,7 +1375,9 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
         imports = []
 
         # Import pattern: import 'package:name/path.dart' as alias show/hide symbols;
-        import_pattern = r"import\s+['\"]([^'\"]+)['\"](?:\s+as\s+(\w+))?(?:\s+(show|hide)\s+([^;]+))?\s*;"
+        import_pattern = (
+            r"import\s+['\"]([^'\"]+)['\"](?:\s+as\s+(\w+))?(?:\s+(show|hide)\s+([^;]+))?\s*;"
+        )
 
         for match in re.finditer(import_pattern, content, re.MULTILINE):
             import_path = match.group(1)
@@ -1453,9 +1404,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
         exports = []
 
         # Export pattern
-        export_pattern = (
-            r"export\s+['\"]([^'\"]+)['\"](?:\s+(show|hide)\s+([^;]+))?\s*;"
-        )
+        export_pattern = r"export\s+['\"]([^'\"]+)['\"](?:\s+(show|hide)\s+([^;]+))?\s*;"
 
         for match in re.finditer(export_pattern, content, re.MULTILINE):
             export_path = match.group(1)

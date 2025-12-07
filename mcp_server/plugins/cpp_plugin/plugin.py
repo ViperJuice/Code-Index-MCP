@@ -1,34 +1,36 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Optional, Dict, List, Set, Tuple, Any
 import ctypes
 import logging
 import re
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
-from tree_sitter import Language, Parser, Node
 import tree_sitter_languages
+from tree_sitter import Language, Node, Parser
 
-from ...plugin_base import (
-    IPlugin,
-    IndexShard,
-    SymbolDef,
-    Reference,
-    SearchResult,
-    SearchOpts,
-)
 from ...interfaces.plugin_interfaces import (
     ICppPlugin,
     ILanguageAnalyzer,
+    IndexedFile,
+)
+from ...interfaces.plugin_interfaces import SearchResult as InterfaceSearchResult
+from ...interfaces.plugin_interfaces import (
     SymbolDefinition,
     SymbolReference,
-    IndexedFile,
-    SearchResult as InterfaceSearchResult,
 )
-from ...interfaces.shared_interfaces import Result, Error
-from ...utils.fuzzy_indexer import FuzzyIndexer
+from ...interfaces.shared_interfaces import Error, Result
+from ...plugin_base import (
+    IndexShard,
+    IPlugin,
+    Reference,
+    SearchOpts,
+    SearchResult,
+    SymbolDef,
+)
 from ...storage.sqlite_store import SQLiteStore
+from ...utils.fuzzy_indexer import FuzzyIndexer
 
 logger = logging.getLogger(__name__)
 
@@ -227,9 +229,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
                     return_type = self._extract_return_type(node, content)
                     is_template = self._has_template_parameters(node, content)
                     template_params = (
-                        self._extract_template_parameters(node, content)
-                        if is_template
-                        else ""
+                        self._extract_template_parameters(node, content) if is_template else ""
                     )
 
                     signature = f"{template_params}{return_type} {name}({params})"
@@ -275,10 +275,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
                 if is_template:
                     template_params = (
                         self._extract_template_parameters(node, content)
-                        or (
-                            node.parent
-                            and self._extract_template_parameters(node.parent, content)
-                        )
+                        or (node.parent and self._extract_template_parameters(node.parent, content))
                         or ""
                     )
                 base_classes = self._extract_base_classes(node, content)
@@ -383,9 +380,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
                 if name:
                     type_spec = node.child_by_field_name("type")
                     type_str = (
-                        content[type_spec.start_byte : type_spec.end_byte]
-                        if type_spec
-                        else "..."
+                        content[type_spec.start_byte : type_spec.end_byte] if type_spec else "..."
                     )
 
                     signature = f"typedef {type_str} {name}"
@@ -405,9 +400,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
                 name = content[name_node.start_byte : name_node.end_byte]
                 value_node = node.child_by_field_name("value")
                 value_str = (
-                    content[value_node.start_byte : value_node.end_byte]
-                    if value_node
-                    else "..."
+                    content[value_node.start_byte : value_node.end_byte] if value_node else "..."
                 )
 
                 signature = f"using {name} = {value_str}"
@@ -432,9 +425,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
                     return_type = self._extract_return_type(node, content)
                     is_template = self._has_template_parameters(node, content)
                     template_params = (
-                        self._extract_template_parameters(node, content)
-                        if is_template
-                        else ""
+                        self._extract_template_parameters(node, content) if is_template else ""
                     )
 
                     signature = f"{template_params}{return_type} {name}({params})"
@@ -493,9 +484,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
                 if name:
                     type_node = node.child_by_field_name("type")
                     type_str = (
-                        content[type_node.start_byte : type_node.end_byte]
-                        if type_node
-                        else "auto"
+                        content[type_node.start_byte : type_node.end_byte] if type_node else "auto"
                     )
                     is_static = self._has_storage_class(node, content, "static")
 
@@ -524,15 +513,11 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
                     is_override = self._has_storage_class(node, content, "override")
                     is_template = self._has_template_parameters(node, content)
                     template_params = (
-                        self._extract_template_parameters(node, content)
-                        if is_template
-                        else ""
+                        self._extract_template_parameters(node, content) if is_template else ""
                     )
 
                     # Check for constructor/destructor
-                    class_name = (
-                        self._namespace_stack[-1] if self._namespace_stack else ""
-                    )
+                    class_name = self._namespace_stack[-1] if self._namespace_stack else ""
                     if name == class_name:
                         kind = "constructor"
                         signature = f"{template_params}{name}({params})"
@@ -686,17 +671,13 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
                         # Get parameter type
                         type_node = child.child_by_field_name("type")
                         type_str = (
-                            content[type_node.start_byte : type_node.end_byte]
-                            if type_node
-                            else ""
+                            content[type_node.start_byte : type_node.end_byte] if type_node else ""
                         )
 
                         # Get parameter name if present
                         declarator_node = child.child_by_field_name("declarator")
                         if declarator_node:
-                            param_name = self._extract_field_name(
-                                declarator_node, content
-                            )
+                            param_name = self._extract_field_name(declarator_node, content)
                             if param_name:
                                 params.append(f"{type_str} {param_name}")
                             else:
@@ -707,9 +688,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
                         params.append("...")
 
                 return ", ".join(params)
-        elif (
-            declarator.type == "qualified_identifier" or declarator.type == "identifier"
-        ):
+        elif declarator.type == "qualified_identifier" or declarator.type == "identifier":
             # Look for parameters in parent node
             parent = declarator.parent
             if parent and parent.type == "function_declarator":
@@ -757,9 +736,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
                 # Parse the base classes
                 for subchild in child.named_children:
                     if subchild.type in ["type_identifier", "qualified_identifier"]:
-                        base_classes.append(
-                            content[subchild.start_byte : subchild.end_byte]
-                        )
+                        base_classes.append(content[subchild.start_byte : subchild.end_byte])
                     elif subchild.type == "access_specifier":
                         # Skip access specifiers like public/private/protected
                         continue
@@ -869,9 +846,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
             nodes.extend(self._walk_tree(child))
         return nodes
 
-    def _symbol_to_def(
-        self, symbol: Dict[str, Any], file_path: str, content: str
-    ) -> SymbolDef:
+    def _symbol_to_def(self, symbol: Dict[str, Any], file_path: str, content: str) -> SymbolDef:
         """Convert internal symbol representation to SymbolDef."""
         # Extract documentation if available
         doc = None
@@ -906,9 +881,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
                                     # Parse the comment
                                     comment = "\n".join(comment_lines)
                                     # Remove comment markers
-                                    comment = re.sub(
-                                        r"^\s*\*/?", "", comment, flags=re.MULTILINE
-                                    )
+                                    comment = re.sub(r"^\s*\*/?", "", comment, flags=re.MULTILINE)
                                     doc = comment.strip()
                                     break
                             break
@@ -921,9 +894,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
             "doc": doc,
             "defined_in": file_path,
             "line": symbol.get("line", 1),
-            "span": symbol.get(
-                "span", (symbol.get("line", 1), symbol.get("line", 1) + 1)
-            ),
+            "span": symbol.get("span", (symbol.get("line", 1), symbol.get("line", 1) + 1)),
         }
 
     def getDefinition(self, symbol: str) -> SymbolDef | None:
@@ -931,9 +902,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
         # First check cache
         for file_path, symbols in self._symbol_cache.items():
             for sym_def in symbols:
-                if sym_def["symbol"] == symbol or sym_def["symbol"].endswith(
-                    f"::{symbol}"
-                ):
+                if sym_def["symbol"] == symbol or sym_def["symbol"].endswith(f"::{symbol}"):
                     return sym_def
 
         # Search in all supported files
@@ -953,8 +922,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
                 try:
                     # Skip build directories
                     if any(
-                        part in path.parts
-                        for part in ["build", "cmake-build", "out", "bin", "obj"]
+                        part in path.parts for part in ["build", "cmake-build", "out", "bin", "obj"]
                     ):
                         continue
 
@@ -962,9 +930,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
                     shard = self.indexFile(path, content)
 
                     for sym in shard["symbols"]:
-                        if sym["symbol"] == symbol or sym["symbol"].endswith(
-                            f"::{symbol}"
-                        ):
+                        if sym["symbol"] == symbol or sym["symbol"].endswith(f"::{symbol}"):
                             return self._symbol_to_def(sym, str(path), content)
                 except Exception:
                     continue
@@ -993,8 +959,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
                 try:
                     # Skip build directories
                     if any(
-                        part in path.parts
-                        for part in ["build", "cmake-build", "out", "bin", "obj"]
+                        part in path.parts for part in ["build", "cmake-build", "out", "bin", "obj"]
                     ):
                         continue
 
@@ -1024,9 +989,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
 
         return refs
 
-    def search(
-        self, query: str, opts: SearchOpts | None = None
-    ) -> Iterable[SearchResult]:
+    def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:
         """Search for code snippets matching a query."""
         limit = 20
         if opts and "limit" in opts:
@@ -1067,9 +1030,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
         """Check if this plugin can handle the given file"""
         return self.supports(file_path)
 
-    def index(
-        self, file_path: str, content: Optional[str] = None
-    ) -> Result[IndexedFile]:
+    def index(self, file_path: str, content: Optional[str] = None) -> Result[IndexedFile]:
         """Index a file and extract symbols"""
         try:
             if content is None:
@@ -1144,9 +1105,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
             )
             return Result.error_result(error)
 
-    def get_references(
-        self, symbol: str, context: Dict[str, Any]
-    ) -> Result[List[SymbolReference]]:
+    def get_references(self, symbol: str, context: Dict[str, Any]) -> Result[List[SymbolReference]]:
         """Get all references to a symbol"""
         try:
             references = self.findReferences(symbol)
@@ -1239,9 +1198,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
             )
             return Result.error_result(error)
 
-    def get_completions(
-        self, file_path: str, line: int, column: int
-    ) -> Result[List[str]]:
+    def get_completions(self, file_path: str, line: int, column: int) -> Result[List[str]]:
         """Get code completions at a position"""
         # Basic implementation - in a real plugin this would be more sophisticated
         try:
@@ -1469,9 +1426,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
             )
             return Result.error_result(error)
 
-    def resolve_type(
-        self, symbol: str, context: Dict[str, Any]
-    ) -> Result[Optional[str]]:
+    def resolve_type(self, symbol: str, context: Dict[str, Any]) -> Result[Optional[str]]:
         """Resolve the type of a symbol"""
         try:
             # Look up the symbol definition

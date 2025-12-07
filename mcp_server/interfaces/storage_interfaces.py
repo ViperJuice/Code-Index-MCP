@@ -5,11 +5,12 @@ All interfaces related to data persistence, storage engines, and database operat
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any, Tuple, Union, AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime
-from .shared_interfaces import Result, IAsyncRepository, IRepository
-from .plugin_interfaces import SymbolDefinition, SymbolReference, IndexedFile
+from typing import Any, AsyncIterator, Dict, List, Optional, Tuple, Union
+
+from .plugin_interfaces import IndexedFile, SymbolDefinition, SymbolReference
+from .shared_interfaces import IAsyncRepository, IRepository, Result
 
 # ========================================
 # Storage Data Types
@@ -92,16 +93,12 @@ class IStorageEngine(ABC):
         pass
 
     @abstractmethod
-    async def execute_query(
-        self, query: str, params: List[Any] = None
-    ) -> Result[QueryResult]:
+    async def execute_query(self, query: str, params: List[Any] = None) -> Result[QueryResult]:
         """Execute a raw SQL query"""
         pass
 
     @abstractmethod
-    async def execute_many(
-        self, query: str, params_list: List[List[Any]]
-    ) -> Result[int]:
+    async def execute_many(self, query: str, params_list: List[List[Any]]) -> Result[int]:
         """Execute a query with multiple parameter sets"""
         pass
 
@@ -148,9 +145,7 @@ class IQueryEngine(ABC):
         pass
 
     @abstractmethod
-    async def update(
-        self, table: str, data: Dict[str, Any], where: Dict[str, Any]
-    ) -> Result[int]:
+    async def update(self, table: str, data: Dict[str, Any], where: Dict[str, Any]) -> Result[int]:
         """Update records"""
         pass
 
@@ -186,9 +181,7 @@ class ISchemaManager(ABC):
         pass
 
     @abstractmethod
-    async def alter_table(
-        self, table_name: str, changes: List[Dict[str, Any]]
-    ) -> Result[None]:
+    async def alter_table(self, table_name: str, changes: List[Dict[str, Any]]) -> Result[None]:
         """Alter a table structure"""
         pass
 
@@ -252,9 +245,7 @@ class IFTSEngine(ABC):
         pass
 
     @abstractmethod
-    async def delete_fts_content(
-        self, table_name: str, document_id: str
-    ) -> Result[None]:
+    async def delete_fts_content(self, table_name: str, document_id: str) -> Result[None]:
         """Delete FTS content"""
         pass
 
@@ -268,23 +259,17 @@ class ITextSearcher(ABC):
     """Interface for text search operations"""
 
     @abstractmethod
-    async def search_exact(
-        self, query: str, field: str = None
-    ) -> Result[List[Dict[str, Any]]]:
+    async def search_exact(self, query: str, field: str = None) -> Result[List[Dict[str, Any]]]:
         """Exact text search"""
         pass
 
     @abstractmethod
-    async def search_phrase(
-        self, phrase: str, field: str = None
-    ) -> Result[List[Dict[str, Any]]]:
+    async def search_phrase(self, phrase: str, field: str = None) -> Result[List[Dict[str, Any]]]:
         """Phrase search"""
         pass
 
     @abstractmethod
-    async def search_boolean(
-        self, query: str, field: str = None
-    ) -> Result[List[Dict[str, Any]]]:
+    async def search_boolean(self, query: str, field: str = None) -> Result[List[Dict[str, Any]]]:
         """Boolean search (AND, OR, NOT)"""
         pass
 
@@ -453,9 +438,7 @@ class IBackupManager(ABC):
         pass
 
     @abstractmethod
-    async def restore_backup(
-        self, backup_id: str, options: Dict[str, Any] = None
-    ) -> Result[None]:
+    async def restore_backup(self, backup_id: str, options: Dict[str, Any] = None) -> Result[None]:
         """Restore from backup"""
         pass
 
@@ -479,9 +462,7 @@ class IDataExporter(ABC):
     """Interface for data export"""
 
     @abstractmethod
-    async def export_to_json(
-        self, tables: List[str] = None, file_path: str = None
-    ) -> Result[str]:
+    async def export_to_json(self, tables: List[str] = None, file_path: str = None) -> Result[str]:
         """Export data to JSON"""
         pass
 
@@ -491,16 +472,12 @@ class IDataExporter(ABC):
         pass
 
     @abstractmethod
-    async def export_to_sql(
-        self, tables: List[str] = None, file_path: str = None
-    ) -> Result[str]:
+    async def export_to_sql(self, tables: List[str] = None, file_path: str = None) -> Result[str]:
         """Export data to SQL"""
         pass
 
     @abstractmethod
-    async def import_from_json(
-        self, file_path: str, options: Dict[str, Any] = None
-    ) -> Result[int]:
+    async def import_from_json(self, file_path: str, options: Dict[str, Any] = None) -> Result[int]:
         """Import data from JSON"""
         pass
 
@@ -524,9 +501,7 @@ class IStorageMonitor(ABC):
         pass
 
     @abstractmethod
-    async def get_slow_queries(
-        self, threshold: float = 1.0
-    ) -> Result[List[Dict[str, Any]]]:
+    async def get_slow_queries(self, threshold: float = 1.0) -> Result[List[Dict[str, Any]]]:
         """Get slow queries"""
         pass
 

@@ -4,14 +4,14 @@ import importlib
 import importlib.util
 import logging
 import sys
-from pathlib import Path
-from typing import Type, Dict, Optional, Any
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Optional, Type
 
+from ..interfaces.shared_interfaces import Error, Result
 from ..plugin_base import IPlugin
 from .interfaces import IPluginLoader
 from .models import PluginInfo, PluginLoadError
-from ..interfaces.shared_interfaces import Result, Error
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +50,7 @@ class PluginLoader(IPluginLoader):
 
         except Exception as e:
             logger.error(f"Failed to load plugin {plugin_info.name}: {e}")
-            raise PluginLoadError(
-                f"Failed to load plugin {plugin_info.name}: {str(e)}"
-            ) from e
+            raise PluginLoadError(f"Failed to load plugin {plugin_info.name}: {str(e)}") from e
 
     def load_plugin_safe(self, plugin_info: PluginInfo) -> Result[Type[IPlugin]]:
         """Load a plugin class using Result pattern for error handling."""
@@ -94,9 +92,7 @@ class PluginLoader(IPluginLoader):
                 del sys.modules[module_name]
 
             # Also remove any submodules
-            to_remove = [
-                name for name in sys.modules if name.startswith(f"{module_name}.")
-            ]
+            to_remove = [name for name in sys.modules if name.startswith(f"{module_name}.")]
             for name in to_remove:
                 del sys.modules[name]
 
@@ -144,9 +140,7 @@ class PluginLoader(IPluginLoader):
                         return getattr(module, "plugin")
                     return module
                 except ImportError as e:
-                    logger.debug(
-                        f"Standard import failed for {plugin_info.module_name}: {e}"
-                    )
+                    logger.debug(f"Standard import failed for {plugin_info.module_name}: {e}")
 
         # Try loading from file path
         module_path = plugin_info.path / "plugin.py"
@@ -157,9 +151,7 @@ class PluginLoader(IPluginLoader):
             raise PluginLoadError(f"Plugin module not found at {plugin_info.path}")
 
         # Load module from file
-        spec = importlib.util.spec_from_file_location(
-            plugin_info.module_name, module_path
-        )
+        spec = importlib.util.spec_from_file_location(plugin_info.module_name, module_path)
         if spec is None or spec.loader is None:
             raise PluginLoadError(f"Failed to create module spec for {module_path}")
 
@@ -191,16 +183,10 @@ class PluginLoader(IPluginLoader):
         # Look for any class that implements IPlugin
         for attr_name in dir(module):
             attr = getattr(module, attr_name)
-            if (
-                isinstance(attr, type)
-                and issubclass(attr, IPlugin)
-                and attr is not IPlugin
-            ):
+            if isinstance(attr, type) and issubclass(attr, IPlugin) and attr is not IPlugin:
                 return attr
 
-        raise PluginLoadError(
-            f"No IPlugin implementation found in {plugin_info.module_name}"
-        )
+        raise PluginLoadError(f"No IPlugin implementation found in {plugin_info.module_name}")
 
     def _validate_plugin_class(self, plugin_class: Type[IPlugin]) -> bool:
         """Validate that a plugin class properly implements IPlugin."""

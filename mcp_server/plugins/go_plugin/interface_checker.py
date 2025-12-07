@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Set, Optional, Tuple
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Set, Tuple
 
-from .package_analyzer import PackageInfo, TypeInfo, InterfaceInfo, FunctionInfo
+from .package_analyzer import FunctionInfo, InterfaceInfo, PackageInfo, TypeInfo
 
 logger = logging.getLogger(__name__)
 
@@ -120,9 +120,7 @@ class GoInterfaceChecker:
 
         return methods
 
-    def _get_all_interface_methods(
-        self, interface_info: InterfaceInfo
-    ) -> Dict[str, str]:
+    def _get_all_interface_methods(self, interface_info: InterfaceInfo) -> Dict[str, str]:
         """Get all methods required by an interface including embedded interfaces."""
         methods = dict(interface_info.methods)
 
@@ -133,9 +131,7 @@ class GoInterfaceChecker:
 
         return methods
 
-    def _find_method_signature(
-        self, type_info: TypeInfo, method_name: str
-    ) -> Optional[str]:
+    def _find_method_signature(self, type_info: TypeInfo, method_name: str) -> Optional[str]:
         """Find the signature of a method for a type."""
         # Look through the package for the method
         for package_info in self.package_analyzer.packages.values():
@@ -168,9 +164,7 @@ class GoInterfaceChecker:
 
         return methods
 
-    def _get_embedded_interface_methods(
-        self, embedded_interface: str
-    ) -> Dict[str, str]:
+    def _get_embedded_interface_methods(self, embedded_interface: str) -> Dict[str, str]:
         """Get methods from an embedded interface."""
         methods = {}
 
@@ -210,9 +204,7 @@ class GoInterfaceChecker:
         import re
 
         # Extract method name, params, and returns
-        match = re.search(
-            r"(\w+)\s*\(([^)]*)\)(?:\s*\(([^)]*)\))?(?:\s+(.+))?", signature
-        )
+        match = re.search(r"(\w+)\s*\(([^)]*)\)(?:\s*\(([^)]*)\))?(?:\s+(.+))?", signature)
         if match:
             method_name = match.group(1)
             params = match.group(2) or ""
@@ -279,9 +271,7 @@ class GoInterfaceChecker:
                     if implementing_types:
                         report_lines.append("\nImplemented by:")
                         for type_info in implementing_types:
-                            report_lines.append(
-                                f"  - {type_info.name} ({type_info.file})"
-                            )
+                            report_lines.append(f"  - {type_info.name} ({type_info.file})")
                     else:
                         report_lines.append("\nNo implementations found.")
 

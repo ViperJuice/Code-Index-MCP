@@ -6,9 +6,10 @@ authentication, validation, and health monitoring.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any, Union
 from dataclasses import dataclass
-from .shared_interfaces import Result, ISecurityContext, IValidator
+from typing import Any, Dict, List, Optional, Union
+
+from .shared_interfaces import ISecurityContext, IValidator, Result
 
 # ========================================
 # Request/Response Data Types
@@ -86,9 +87,7 @@ class IRouteRegistry(ABC):
     """Interface for route registration and discovery"""
 
     @abstractmethod
-    def register_handler(
-        self, path: str, method: str, handler: IRequestHandler
-    ) -> None:
+    def register_handler(self, path: str, method: str, handler: IRequestHandler) -> None:
         """Register a request handler for a path and method"""
         pass
 
@@ -136,9 +135,7 @@ class IAuthenticationProvider(ABC):
     """Interface for authentication providers"""
 
     @abstractmethod
-    async def authenticate(
-        self, credentials: Dict[str, Any]
-    ) -> Result[ISecurityContext]:
+    async def authenticate(self, credentials: Dict[str, Any]) -> Result[ISecurityContext]:
         """Authenticate a user with credentials"""
         pass
 
@@ -162,9 +159,7 @@ class IAuthorizationProvider(ABC):
     """Interface for authorization providers"""
 
     @abstractmethod
-    def is_authorized(
-        self, context: ISecurityContext, resource: str, action: str
-    ) -> bool:
+    def is_authorized(self, context: ISecurityContext, resource: str, action: str) -> bool:
         """Check if a security context is authorized for an action on a resource"""
         pass
 
@@ -212,9 +207,7 @@ class IRequestValidator(ABC, IValidator):
         pass
 
     @abstractmethod
-    def validate_path_params(
-        self, path: str, params: Dict[str, str]
-    ) -> ValidationResult:
+    def validate_path_params(self, path: str, params: Dict[str, str]) -> ValidationResult:
         """Validate path parameters"""
         pass
 
@@ -262,16 +255,12 @@ class IMiddleware(ABC):
     """Base interface for middleware components"""
 
     @abstractmethod
-    async def process_request(
-        self, request: APIRequest
-    ) -> Union[APIRequest, APIResponse]:
+    async def process_request(self, request: APIRequest) -> Union[APIRequest, APIResponse]:
         """Process a request before it reaches the handler"""
         pass
 
     @abstractmethod
-    async def process_response(
-        self, request: APIRequest, response: APIResponse
-    ) -> APIResponse:
+    async def process_response(self, request: APIRequest, response: APIResponse) -> APIResponse:
         """Process a response before it's returned to the client"""
         pass
 

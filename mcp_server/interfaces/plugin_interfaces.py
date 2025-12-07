@@ -6,9 +6,10 @@ plugin management, discovery, loading, and lifecycle management.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any, Set, Type, Callable
 from dataclasses import dataclass
-from .shared_interfaces import Result, PluginStatus, IObservable, Event
+from typing import Any, Callable, Dict, List, Optional, Set, Type
+
+from .shared_interfaces import Event, IObservable, PluginStatus, Result
 
 # ========================================
 # Plugin Data Types
@@ -112,9 +113,7 @@ class IPlugin(ABC):
         pass
 
     @abstractmethod
-    def index(
-        self, file_path: str, content: Optional[str] = None
-    ) -> Result[IndexedFile]:
+    def index(self, file_path: str, content: Optional[str] = None) -> Result[IndexedFile]:
         """Index a file and extract symbols"""
         pass
 
@@ -126,9 +125,7 @@ class IPlugin(ABC):
         pass
 
     @abstractmethod
-    def get_references(
-        self, symbol: str, context: Dict[str, Any]
-    ) -> Result[List[SymbolReference]]:
+    def get_references(self, symbol: str, context: Dict[str, Any]) -> Result[List[SymbolReference]]:
         """Get all references to a symbol"""
         pass
 
@@ -143,9 +140,7 @@ class IPlugin(ABC):
         pass
 
     @abstractmethod
-    def get_completions(
-        self, file_path: str, line: int, column: int
-    ) -> Result[List[str]]:
+    def get_completions(self, file_path: str, line: int, column: int) -> Result[List[str]]:
         """Get code completions at a position"""
         pass
 
@@ -164,9 +159,7 @@ class ILanguageAnalyzer(ABC):
         pass
 
     @abstractmethod
-    def resolve_type(
-        self, symbol: str, context: Dict[str, Any]
-    ) -> Result[Optional[str]]:
+    def resolve_type(self, symbol: str, context: Dict[str, Any]) -> Result[Optional[str]]:
         """Resolve the type of a symbol"""
         pass
 
@@ -245,9 +238,7 @@ class IPluginLoader(ABC):
     """Interface for loading and unloading plugins"""
 
     @abstractmethod
-    def load_plugin(
-        self, plugin_path: str, metadata: PluginMetadata
-    ) -> Result[IPlugin]:
+    def load_plugin(self, plugin_path: str, metadata: PluginMetadata) -> Result[IPlugin]:
         """Load a plugin from the given path"""
         pass
 
@@ -318,9 +309,7 @@ class IPluginManager(IObservable):
         pass
 
     @abstractmethod
-    def execute_on_all_plugins(
-        self, operation: Callable[[IPlugin], Any]
-    ) -> Dict[str, Result[Any]]:
+    def execute_on_all_plugins(self, operation: Callable[[IPlugin], Any]) -> Dict[str, Result[Any]]:
         """Execute an operation on all plugins"""
         pass
 
@@ -373,9 +362,7 @@ class IPythonPlugin(IPlugin):
         pass
 
     @abstractmethod
-    def resolve_module(
-        self, module_name: str, context: Dict[str, Any]
-    ) -> Result[Optional[str]]:
+    def resolve_module(self, module_name: str, context: Dict[str, Any]) -> Result[Optional[str]]:
         """Resolve a module to its file path"""
         pass
 

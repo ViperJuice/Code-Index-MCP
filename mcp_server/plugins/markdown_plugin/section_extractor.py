@@ -2,9 +2,9 @@
 Section extractor for hierarchical document structure extraction.
 """
 
-from typing import List, Dict, Any, Optional, Tuple
-import re
 import logging
+import re
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +27,7 @@ class SectionExtractor:
                 # Process heading
                 level = node.get("depth", 1)
                 title = self._extract_text(node)
-                start_line = (
-                    node.get("position", {}).get("start", {}).get("line", 1) - 1
-                )
+                start_line = node.get("position", {}).get("start", {}).get("line", 1) - 1
 
                 # Create section object
                 section = {
@@ -48,10 +46,7 @@ class SectionExtractor:
                 }
 
                 # Update section hierarchy
-                while (
-                    current_section_stack
-                    and current_section_stack[-1]["level"] >= level
-                ):
+                while current_section_stack and current_section_stack[-1]["level"] >= level:
                     # Close previous sections at same or higher level
                     closed_section = current_section_stack.pop()
                     self._finalize_section(closed_section, content_lines)
@@ -100,9 +95,7 @@ class SectionExtractor:
 
         return sections
 
-    def get_all_sections_flat(
-        self, sections: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    def get_all_sections_flat(self, sections: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Get all sections in a flat list, including nested ones."""
         flat_sections = []
 
@@ -137,9 +130,7 @@ class SectionExtractor:
 
         return search_sections(sections)
 
-    def get_section_path(
-        self, sections: List[Dict[str, Any]], target_id: str
-    ) -> List[str]:
+    def get_section_path(self, sections: List[Dict[str, Any]], target_id: str) -> List[str]:
         """Get the path to a section (list of parent section titles)."""
         path = []
 
@@ -186,9 +177,7 @@ class SectionExtractor:
         process_sections(sections)
         return toc
 
-    def get_section_content(
-        self, section: Dict[str, Any], include_subsections: bool = True
-    ) -> str:
+    def get_section_content(self, section: Dict[str, Any], include_subsections: bool = True) -> str:
         """Get the full content of a section."""
         content_parts = [section.get("content", "")]
 

@@ -4,20 +4,21 @@ Real-world symbol search and retrieval tests for Code-Index-MCP.
 Tests search accuracy and performance on actual GitHub repositories.
 """
 
-import pytest
-import time
 import asyncio
-from pathlib import Path
-from typing import Dict, List, Any, Optional
+import os
 import subprocess
 import tempfile
-import os
+import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from mcp_server.storage.sqlite_store import SQLiteStore
+import pytest
+
 from mcp_server.dispatcher.dispatcher import Dispatcher
-from mcp_server.plugin_system.plugin_manager import PluginManager
-from mcp_server.utils.fuzzy_indexer import FuzzyIndexer
 from mcp_server.interfaces.shared_interfaces import Result
+from mcp_server.plugin_system.plugin_manager import PluginManager
+from mcp_server.storage.sqlite_store import SQLiteStore
+from mcp_server.utils.fuzzy_indexer import FuzzyIndexer
 
 
 class TestSymbolSearch:
@@ -66,9 +67,7 @@ class TestSymbolSearch:
         """Provide fuzzy search indexer."""
         return FuzzyIndexer()
 
-    def ensure_repository_exists(
-        self, workspace_dir: Path, repo_name: str, repo_url: str
-    ) -> Path:
+    def ensure_repository_exists(self, workspace_dir: Path, repo_name: str, repo_url: str) -> Path:
         """Ensure repository exists in workspace, download if needed."""
         repo_path = workspace_dir / repo_name
 
@@ -101,9 +100,7 @@ class TestSymbolSearch:
         """Setup and index a repository for testing."""
         repo_path = self.ensure_repository_exists(workspace_dir, repo_name, repo_url)
 
-        repo_id = test_db.create_repository(
-            str(repo_path), repo_name, {"type": "search_test"}
-        )
+        repo_id = test_db.create_repository(str(repo_path), repo_name, {"type": "search_test"})
 
         # Index files and build search index
         indexed_count = 0
@@ -122,9 +119,7 @@ class TestSymbolSearch:
                         continue
 
                     # Index with plugin
-                    result = self.index_file_with_plugin(
-                        str(file_path), content, dispatcher
-                    )
+                    result = self.index_file_with_plugin(str(file_path), content, dispatcher)
                     if result.success:
                         # Store in database
                         file_id = test_db.store_file(
@@ -195,17 +190,13 @@ class TestSymbolSearch:
             result = plugin.indexFile(file_path, content)
 
             return (
-                Result.success(result)
-                if result
-                else Result.error("Plugin returned empty result")
+                Result.success(result) if result else Result.error("Plugin returned empty result")
             )
 
         except Exception as e:
             return Result.error(f"Error indexing {file_path}: {str(e)}")
 
-    def lookup_symbol(
-        self, symbol_name: str, fuzzy_indexer: FuzzyIndexer
-    ) -> List[Dict]:
+    def lookup_symbol(self, symbol_name: str, fuzzy_indexer: FuzzyIndexer) -> List[Dict]:
         """Look up a symbol using fuzzy search."""
         results = fuzzy_indexer.search(symbol_name, limit=10)
         return [
@@ -242,9 +233,7 @@ class TestSymbolSearch:
                     results.append(
                         {
                             "file_path": file_data.get("path", ""),
-                            "content": (
-                                content[:200] + "..." if len(content) > 200 else content
-                            ),
+                            "content": (content[:200] + "..." if len(content) > 200 else content),
                             "line": 1,
                         }
                     )
@@ -316,17 +305,11 @@ class TestSymbolSearch:
         assert (
             found_symbols >= len(search_terms) * 0.6
         ), f"Symbol discovery rate too low: {found_symbols}/{len(search_terms)}"
-        assert (
-            total_results >= len(search_terms) * 2
-        ), f"Total results too few: {total_results}"
+        assert total_results >= len(search_terms) * 2, f"Total results too few: {total_results}"
 
         # Performance validation
-        avg_search_time = sum(r["search_time_ms"] for r in results.values()) / len(
-            results
-        )
-        assert (
-            avg_search_time < 200
-        ), f"Average search time too slow: {avg_search_time:.2f}ms"
+        avg_search_time = sum(r["search_time_ms"] for r in results.values()) / len(results)
+        assert avg_search_time < 200, f"Average search time too slow: {avg_search_time:.2f}ms"
 
         print(f"Symbol search results for {repo_name}:")
         for term, result in results.items():
@@ -336,9 +319,7 @@ class TestSymbolSearch:
             )
 
     @pytest.mark.integration
-    def test_cross_language_search(
-        self, workspace_dir, test_db, dispatcher, fuzzy_indexer
-    ):
+    def test_cross_language_search(self, workspace_dir, test_db, dispatcher, fuzzy_indexer):
         """Test search across multiple languages in VS Code repository."""
         repo_id = self.setup_indexed_repository(
             workspace_dir,
@@ -438,15 +419,9 @@ class TestSymbolSearch:
             avg_time = sum(lookup_times) / len(lookup_times) if lookup_times else 0
             max_time = max(lookup_times) if lookup_times else 0
 
-            assert (
-                avg_time < 100
-            ), f"Average lookup time too high for {size} repo: {avg_time:.2f}ms"
-            assert (
-                max_time < 200
-            ), f"Max lookup time too high for {size} repo: {max_time:.2f}ms"
-            assert (
-                successful_lookups >= len(symbols) * 0.5
-            ), f"Success rate too low for {size} repo"
+            assert avg_time < 100, f"Average lookup time too high for {size} repo: {avg_time:.2f}ms"
+            assert max_time < 200, f"Max lookup time too high for {size} repo: {max_time:.2f}ms"
+            assert successful_lookups >= len(symbols) * 0.5, f"Success rate too low for {size} repo"
 
             performance_results[size] = {
                 "avg_time_ms": avg_time,
@@ -481,12 +456,8 @@ class TestSymbolSearch:
             start_time = time.perf_counter()
 
             # Run search in thread pool to avoid blocking
-            symbol_results = await asyncio.to_thread(
-                self.lookup_symbol, query, fuzzy_indexer
-            )
-            content_results = await asyncio.to_thread(
-                self.search_code, query, test_db, repo_id
-            )
+            symbol_results = await asyncio.to_thread(self.lookup_symbol, query, fuzzy_indexer)
+            content_results = await asyncio.to_thread(self.search_code, query, test_db, repo_id)
 
             end_time = time.perf_counter()
             search_time = (end_time - start_time) * 1000
@@ -509,12 +480,8 @@ class TestSymbolSearch:
         max_search_time = max(search_times)
         avg_search_time = sum(search_times) / len(search_times)
 
-        assert (
-            max_search_time < 1000
-        ), f"Slowest query too slow: {max_search_time:.2f}ms"
-        assert (
-            avg_search_time < 200
-        ), f"Average search time too slow: {avg_search_time:.2f}ms"
+        assert max_search_time < 1000, f"Slowest query too slow: {max_search_time:.2f}ms"
+        assert avg_search_time < 200, f"Average search time too slow: {avg_search_time:.2f}ms"
 
         # Verify we got results
         total_results = sum(r[1] for r in results)
@@ -550,9 +517,7 @@ class TestSymbolSearch:
         return symbol_map.get(repo_name, ["function", "class", "method", "variable"])
 
     @pytest.mark.integration
-    def test_search_result_quality(
-        self, workspace_dir, test_db, dispatcher, fuzzy_indexer
-    ):
+    def test_search_result_quality(self, workspace_dir, test_db, dispatcher, fuzzy_indexer):
         """Test the quality and relevance of search results."""
         repo_id = self.setup_indexed_repository(
             workspace_dir,
@@ -587,9 +552,7 @@ class TestSymbolSearch:
         if exact_results and fuzzy_results:
             exact_precision = exact_score / len(exact_results)
             fuzzy_precision = fuzzy_score / len(fuzzy_results)
-            assert (
-                exact_precision >= fuzzy_precision
-            ), "Exact search should have higher precision"
+            assert exact_precision >= fuzzy_precision, "Exact search should have higher precision"
 
         print(f"Search quality test:")
         print(f"  Exact matches: {len(exact_results)}")

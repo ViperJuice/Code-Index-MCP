@@ -1,9 +1,10 @@
 """Java interoperability analysis for Kotlin code."""
 
 import logging
-from typing import Dict, List, Any, Optional, Set
-import tree_sitter
 import re
+from typing import Any, Dict, List, Optional, Set
+
+import tree_sitter
 
 logger = logging.getLogger(__name__)
 
@@ -276,24 +277,16 @@ class JavaInteropAnalyzer:
             for query_name, query_str in self.java_interop_queries.items():
                 try:
                     # Use regex-based analysis as fallback
-                    pattern_results = self._analyze_pattern_with_regex(
-                        query_name, content, lines
-                    )
-                    self._categorize_interop_results(
-                        query_name, pattern_results, analysis_result
-                    )
+                    pattern_results = self._analyze_pattern_with_regex(query_name, content, lines)
+                    self._categorize_interop_results(query_name, pattern_results, analysis_result)
                 except Exception as e:
                     logger.debug(f"Query {query_name} failed: {e}")
 
             # Analyze potential interop issues
-            analysis_result["potential_issues"] = self._analyze_interop_issues(
-                content, lines
-            )
+            analysis_result["potential_issues"] = self._analyze_interop_issues(content, lines)
 
             # Analyze platform types
-            analysis_result["platform_types"].extend(
-                self._analyze_platform_types(content, lines)
-            )
+            analysis_result["platform_types"].extend(self._analyze_platform_types(content, lines))
 
             # Analyze collections interop
             analysis_result["collection_interop"].extend(
@@ -306,14 +299,12 @@ class JavaInteropAnalyzer:
             )
 
             # Analyze performance considerations
-            analysis_result["performance_considerations"] = (
-                self._analyze_performance_interop(analysis_result, content)
+            analysis_result["performance_considerations"] = self._analyze_performance_interop(
+                analysis_result, content
             )
 
             # Calculate statistics
-            analysis_result["statistics"] = self._calculate_interop_statistics(
-                analysis_result
-            )
+            analysis_result["statistics"] = self._calculate_interop_statistics(analysis_result)
 
             return analysis_result
 
@@ -373,9 +364,7 @@ class JavaInteropAnalyzer:
                 }
 
                 # Add pattern-specific metadata
-                result.update(
-                    self._get_interop_metadata(pattern_name, match, content, line_num)
-                )
+                result.update(self._get_interop_metadata(pattern_name, match, content, line_num))
 
                 results.append(result)
 
@@ -390,16 +379,12 @@ class JavaInteropAnalyzer:
         if pattern_name == "jvm_annotations":
             annotation_type = match.group(1) if match.groups() else "unknown"
             metadata["annotation_type"] = annotation_type
-            metadata["java_visibility"] = self._get_java_visibility_impact(
-                annotation_type
-            )
+            metadata["java_visibility"] = self._get_java_visibility_impact(annotation_type)
 
         elif pattern_name == "java_imports":
             import_path = match.group(1) if match.groups() else "unknown"
             metadata["import_package"] = import_path
-            metadata["compatibility_level"] = self._assess_java_compatibility(
-                import_path
-            )
+            metadata["compatibility_level"] = self._assess_java_compatibility(import_path)
 
         elif pattern_name == "java_collections":
             collection_type = match.group(1) if match.groups() else "unknown"
@@ -497,9 +482,7 @@ class JavaInteropAnalyzer:
             result["category"] = category
             analysis_result[category].append(result)
 
-    def _analyze_interop_issues(
-        self, content: str, lines: List[str]
-    ) -> List[Dict[str, Any]]:
+    def _analyze_interop_issues(self, content: str, lines: List[str]) -> List[Dict[str, Any]]:
         """Analyze potential Java interop issues."""
         issues = []
 
@@ -528,9 +511,7 @@ class JavaInteropAnalyzer:
 
         return issues
 
-    def _analyze_platform_types(
-        self, content: str, lines: List[str]
-    ) -> List[Dict[str, Any]]:
+    def _analyze_platform_types(self, content: str, lines: List[str]) -> List[Dict[str, Any]]:
         """Analyze platform type usage."""
         platform_types = []
 
@@ -558,9 +539,7 @@ class JavaInteropAnalyzer:
 
         return platform_types
 
-    def _analyze_collections_interop(
-        self, content: str, lines: List[str]
-    ) -> List[Dict[str, Any]]:
+    def _analyze_collections_interop(self, content: str, lines: List[str]) -> List[Dict[str, Any]]:
         """Analyze collections interoperability."""
         collection_issues = []
 
@@ -575,9 +554,7 @@ class JavaInteropAnalyzer:
                 context = "\n".join(lines[context_start:context_end])
 
                 collection_type = pattern.replace("<", "").replace(">", "")
-                kotlin_alternative = self._get_kotlin_collection_alternative(
-                    collection_type
-                )
+                kotlin_alternative = self._get_kotlin_collection_alternative(collection_type)
 
                 collection_issue = {
                     "type": "java_collection_usage",
@@ -586,9 +563,7 @@ class JavaInteropAnalyzer:
                     "match": match.group(),
                     "context": context,
                     "kotlin_alternative": kotlin_alternative,
-                    "performance_impact": self._assess_collection_performance(
-                        collection_type
-                    ),
+                    "performance_impact": self._assess_collection_performance(collection_type),
                 }
 
                 collection_issues.append(collection_issue)
@@ -609,9 +584,7 @@ class JavaInteropAnalyzer:
         }
         return performance_map.get(collection_type, "unknown")
 
-    def _analyze_null_safety_interop(
-        self, content: str, lines: List[str]
-    ) -> List[Dict[str, Any]]:
+    def _analyze_null_safety_interop(self, content: str, lines: List[str]) -> List[Dict[str, Any]]:
         """Analyze null safety issues in Java interop."""
         null_safety_issues = []
 
@@ -680,9 +653,7 @@ class JavaInteropAnalyzer:
             )
 
         # Check for excessive boxing/unboxing
-        boxing_patterns = re.findall(
-            r"(Integer|Double|Float|Long|Boolean)\s*\(", content
-        )
+        boxing_patterns = re.findall(r"(Integer|Double|Float|Long|Boolean)\s*\(", content)
         if len(boxing_patterns) > 5:
             performance_issues.append(
                 {
@@ -735,9 +706,7 @@ class JavaInteropAnalyzer:
         }
         return alternatives.get(pattern, "Use Kotlin idiomatic equivalent")
 
-    def _calculate_interop_statistics(
-        self, analysis_result: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _calculate_interop_statistics(self, analysis_result: Dict[str, Any]) -> Dict[str, Any]:
         """Calculate Java interop statistics."""
         stats = {
             "jvm_annotation_count": len(analysis_result["jvm_annotations"]),
@@ -745,9 +714,7 @@ class JavaInteropAnalyzer:
             "platform_type_count": len(analysis_result["platform_types"]),
             "collection_interop_count": len(analysis_result["collection_interop"]),
             "null_safety_issue_count": len(analysis_result["null_safety_issues"]),
-            "performance_consideration_count": len(
-                analysis_result["performance_considerations"]
-            ),
+            "performance_consideration_count": len(analysis_result["performance_considerations"]),
             "compatibility_issue_count": len(analysis_result["compatibility_issues"]),
             "best_practice_count": len(analysis_result["best_practices"]),
             "interop_pattern_count": len(analysis_result["interop_patterns"]),
@@ -772,10 +739,7 @@ class JavaInteropAnalyzer:
                 100,
                 max(
                     0,
-                    int(
-                        ((total_interop_usage - issue_count) / total_interop_usage)
-                        * 100
-                    ),
+                    int(((total_interop_usage - issue_count) / total_interop_usage) * 100),
                 ),
             )
         else:
@@ -805,24 +769,16 @@ class JavaInteropAnalyzer:
         stats = analysis_result.get("statistics", {})
 
         if stats.get("potential_issue_count", 0) > 0:
-            recommendations.append(
-                "Replace Java-style patterns with Kotlin idiomatic equivalents"
-            )
+            recommendations.append("Replace Java-style patterns with Kotlin idiomatic equivalents")
 
         if stats.get("null_safety_issue_count", 0) > 0:
-            recommendations.append(
-                "Add null safety annotations or checks for Java interop code"
-            )
+            recommendations.append("Add null safety annotations or checks for Java interop code")
 
         if stats.get("platform_type_count", 0) > 0:
-            recommendations.append(
-                "Explicitly declare nullability for platform types from Java"
-            )
+            recommendations.append("Explicitly declare nullability for platform types from Java")
 
         if stats.get("collection_interop_count", 0) > 3:
-            recommendations.append(
-                "Consider using Kotlin collections instead of Java collections"
-            )
+            recommendations.append("Consider using Kotlin collections instead of Java collections")
 
         if stats.get("interop_quality_score", 100) < 70:
             recommendations.append(

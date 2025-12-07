@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Comprehensive test for all specialized language plugins."""
 
+import os
 import sys
 import tempfile
-import os
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -15,11 +15,11 @@ from mcp_server.storage.sqlite_store import SQLiteStore
 def test_all_specialized_plugins():
     """Test all specialized plugins with sample code."""
     print("=== Testing All Specialized Language Plugins ===\n")
-    
+
     # Test data for each specialized plugin
     test_cases = {
         "java": {
-            "code": '''package com.example.app;
+            "code": """package com.example.app;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -43,13 +43,12 @@ public class UserService<T extends BaseEntity> {
 interface Repository<T> {
     List<T> findAll();
     Optional<T> findById(Long id);
-}''',
+}""",
             "extension": ".java",
-            "expected_features": ["generics", "imports", "interface", "class"]
+            "expected_features": ["generics", "imports", "interface", "class"],
         },
-        
         "go": {
-            "code": '''package main
+            "code": """package main
 
 import (
     "fmt"
@@ -86,13 +85,12 @@ func (r *userRepo) GetByID(ctx context.Context, id int) (*User, error) {
     query := "SELECT id, name FROM users WHERE id = $1"
     err := r.db.QueryRowContext(ctx, query, id).Scan(&user.ID, &user.Name)
     return user, err
-}''',
+}""",
             "extension": ".go",
-            "expected_features": ["interface", "struct", "method", "function"]
+            "expected_features": ["interface", "struct", "method", "function"],
         },
-        
         "rust": {
-            "code": '''use std::collections::HashMap;
+            "code": """use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -136,13 +134,12 @@ impl Repository<User> for InMemoryUserRepo {
     fn find_by_id(&self, id: u64) -> Result<Option<User>, Self::Error> {
         Ok(self.users.get(&id).cloned())
     }
-}''',
+}""",
             "extension": ".rs",
-            "expected_features": ["trait", "struct", "impl", "use"]
+            "expected_features": ["trait", "struct", "impl", "use"],
         },
-        
         "typescript": {
-            "code": '''interface User {
+            "code": """interface User {
     id: number;
     name: string;
     email: string;
@@ -175,13 +172,12 @@ class UserService<T extends User> {
     }
 }
 
-export { User, UserRole, UserService };''',
+export { User, UserRole, UserService };""",
             "extension": ".ts",
-            "expected_features": ["interface", "type", "class", "generic"]
+            "expected_features": ["interface", "type", "class", "generic"],
         },
-        
         "csharp": {
-            "code": '''using System;
+            "code": """using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Linq;
@@ -230,13 +226,12 @@ namespace UserManagement
             return users.Where(u => u.CreatedAt > DateTime.UtcNow.AddDays(-30));
         }
     }
-}''',
+}""",
             "extension": ".cs",
-            "expected_features": ["namespace", "interface", "class", "async"]
+            "expected_features": ["namespace", "interface", "class", "async"],
         },
-        
         "swift": {
-            "code": '''import Foundation
+            "code": """import Foundation
 
 protocol Drawable {
     func draw()
@@ -290,13 +285,12 @@ class UserService: ObservableObject {
             users.append(created)
         }
     }
-}''',
+}""",
             "extension": ".swift",
-            "expected_features": ["protocol", "struct", "class", "@propertyWrapper"]
+            "expected_features": ["protocol", "struct", "class", "@propertyWrapper"],
         },
-        
         "kotlin": {
-            "code": '''import kotlinx.coroutines.*
+            "code": """import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
 data class User(
@@ -342,132 +336,135 @@ class UserService(
 
 // Extension function
 fun User.isValid(): Boolean = 
-    name.isNotBlank() && (email == null || email.contains("@"))''',
+    name.isNotBlank() && (email == null || email.contains("@"))""",
             "extension": ".kt",
-            "expected_features": ["data class", "interface", "suspend", "extension"]
-        }
+            "expected_features": ["data class", "interface", "suspend", "extension"],
+        },
     }
-    
+
     # Create temporary directory
     temp_dir = tempfile.mkdtemp()
     original_dir = os.getcwd()
     os.chdir(temp_dir)
-    
+
     results = {}
-    
+
     try:
         # Create SQLite store
         store = SQLiteStore(":memory:")
-        
+
         for language, test_data in test_cases.items():
             print(f"\n--- Testing {language.upper()} Plugin ---")
-            
+
             try:
                 # Create plugin
                 plugin = PluginFactory.create_plugin(language, store, enable_semantic=False)
                 print(f"✓ Created {language} plugin: {plugin.__class__.__name__}")
-                
+
                 # Create test file
                 filename = f"test{test_data['extension']}"
                 test_file = Path(filename)
-                test_file.write_text(test_data['code'])
-                
+                test_file.write_text(test_data["code"])
+
                 # Index the file
-                shard = plugin.indexFile(test_file, test_data['code'])
-                symbols = shard.get('symbols', [])
-                
+                shard = plugin.indexFile(test_file, test_data["code"])
+                symbols = shard.get("symbols", [])
+
                 print(f"✓ Indexed file with {len(symbols)} symbols")
-                
+
                 # Show symbol types found
                 if symbols:
-                    symbol_types = set(s.get('kind', 'unknown') for s in symbols)
+                    symbol_types = set(s.get("kind", "unknown") for s in symbols)
                     print(f"  Symbol types: {', '.join(sorted(symbol_types))}")
-                    
+
                     # Show some symbols
                     for i, symbol in enumerate(symbols[:5]):
-                        print(f"    {i+1}. {symbol.get('kind', 'unknown')}: {symbol.get('symbol', 'N/A')}")
-                
+                        print(
+                            f"    {i+1}. {symbol.get('kind', 'unknown')}: {symbol.get('symbol', 'N/A')}"
+                        )
+
                 # Test search functionality
                 search_results = list(plugin.search("user", {"limit": 5}))
                 print(f"✓ Search for 'user' found {len(search_results)} results")
-                
+
                 # Test definition lookup if available
-                if hasattr(plugin, 'getDefinition'):
+                if hasattr(plugin, "getDefinition"):
                     # Try to find a class or function definition
-                    test_symbols = ['User', 'UserService', 'createUser', 'create']
+                    test_symbols = ["User", "UserService", "createUser", "create"]
                     for test_sym in test_symbols:
                         definition = plugin.getDefinition(test_sym)
                         if definition:
-                            print(f"✓ Found definition for '{test_sym}': {definition.get('kind', 'unknown')}")
+                            print(
+                                f"✓ Found definition for '{test_sym}': {definition.get('kind', 'unknown')}"
+                            )
                             break
-                
+
                 # Check for advanced features based on plugin type
                 advanced_features = []
-                
-                if hasattr(plugin, 'analyze_imports'):
+
+                if hasattr(plugin, "analyze_imports"):
                     imports = plugin.analyze_imports(test_file)
                     if imports:
                         advanced_features.append(f"Import analysis ({len(imports)} imports)")
-                
-                if hasattr(plugin, 'get_project_dependencies'):
+
+                if hasattr(plugin, "get_project_dependencies"):
                     deps = plugin.get_project_dependencies()
                     if deps:
                         advanced_features.append(f"Dependency analysis ({len(deps)} deps)")
-                
-                if hasattr(plugin, 'findReferences'):
-                    refs = plugin.findReferences('User')
+
+                if hasattr(plugin, "findReferences"):
+                    refs = plugin.findReferences("User")
                     if refs:
                         advanced_features.append(f"Reference tracking ({len(refs)} refs)")
-                
+
                 if advanced_features:
                     print(f"✓ Advanced features: {', '.join(advanced_features)}")
-                
+
                 results[language] = {
-                    'success': True,
-                    'symbols': len(symbols),
-                    'search_results': len(search_results),
-                    'plugin_type': plugin.__class__.__name__
+                    "success": True,
+                    "symbols": len(symbols),
+                    "search_results": len(search_results),
+                    "plugin_type": plugin.__class__.__name__,
                 }
-                
+
             except Exception as e:
                 print(f"✗ Error testing {language}: {e}")
-                results[language] = {
-                    'success': False,
-                    'error': str(e),
-                    'plugin_type': 'Failed'
-                }
-            
+                results[language] = {"success": False, "error": str(e), "plugin_type": "Failed"}
+
             finally:
                 # Cleanup
                 if test_file.exists():
                     test_file.unlink()
-    
+
     finally:
         # Restore directory
         os.chdir(original_dir)
         import shutil
+
         shutil.rmtree(temp_dir)
-    
+
     # Summary
     print("\n=== Test Summary ===")
-    successful = [lang for lang, result in results.items() if result.get('success', False)]
-    failed = [lang for lang, result in results.items() if not result.get('success', False)]
-    
+    successful = [lang for lang, result in results.items() if result.get("success", False)]
+    failed = [lang for lang, result in results.items() if not result.get("success", False)]
+
     print(f"✅ Successful: {len(successful)}/{len(results)} plugins")
     print(f"❌ Failed: {len(failed)}/{len(results)} plugins")
-    
+
     if successful:
         print(f"\nSuccessful plugins:")
         for lang in successful:
             result = results[lang]
-            print(f"  {lang}: {result['symbols']} symbols, {result['search_results']} search results ({result['plugin_type']})")
-    
+            print(
+                f"  {lang}: {result['symbols']} symbols, {result['search_results']} search results ({result['plugin_type']})"
+            )
+
     if failed:
         print(f"\nFailed plugins:")
         for lang in failed:
             result = results[lang]
             print(f"  {lang}: {result.get('error', 'Unknown error')}")
-    
+
     return len(successful) == len(results)
 
 

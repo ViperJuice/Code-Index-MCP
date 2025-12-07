@@ -8,11 +8,11 @@ tree as an S-expression string.
 
 from __future__ import annotations
 
-from pathlib import Path
 import ctypes
+from pathlib import Path
 
-from tree_sitter import Language, Parser
 import tree_sitter_languages
+from tree_sitter import Language, Parser
 
 
 class TreeSitterWrapper:

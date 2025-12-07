@@ -5,10 +5,11 @@ All interfaces related to caching strategies, cache management, and performance 
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any, Callable, Union, Set
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from .shared_interfaces import Result, ICache
+from typing import Any, Callable, Dict, List, Optional, Set, Union
+
+from .shared_interfaces import ICache, Result
 
 # ========================================
 # Cache Data Types
@@ -112,9 +113,7 @@ class ICacheManager(ABC, ICache):
         pass
 
     @abstractmethod
-    async def set_multiple(
-        self, items: Dict[str, Any], ttl: Optional[int] = None
-    ) -> None:
+    async def set_multiple(self, items: Dict[str, Any], ttl: Optional[int] = None) -> None:
         """Set multiple values"""
         pass
 
@@ -133,9 +132,7 @@ class ICacheBackend(ABC):
     """Interface for cache backends (Redis, Memory, etc.)"""
 
     @abstractmethod
-    async def connect(
-        self, connection_string: str, options: Dict[str, Any] = None
-    ) -> Result[None]:
+    async def connect(self, connection_string: str, options: Dict[str, Any] = None) -> Result[None]:
         """Connect to cache backend"""
         pass
 
@@ -164,16 +161,12 @@ class ICacheStrategy(ABC):
     """Interface for cache strategies"""
 
     @abstractmethod
-    def should_cache(
-        self, key: str, value: Any, context: Dict[str, Any] = None
-    ) -> bool:
+    def should_cache(self, key: str, value: Any, context: Dict[str, Any] = None) -> bool:
         """Determine if value should be cached"""
         pass
 
     @abstractmethod
-    def get_ttl(
-        self, key: str, value: Any, context: Dict[str, Any] = None
-    ) -> Optional[int]:
+    def get_ttl(self, key: str, value: Any, context: Dict[str, Any] = None) -> Optional[int]:
         """Get TTL for cache entry"""
         pass
 
@@ -183,9 +176,7 @@ class ICacheStrategy(ABC):
         pass
 
     @abstractmethod
-    def get_tags(
-        self, key: str, value: Any, context: Dict[str, Any] = None
-    ) -> List[str]:
+    def get_tags(self, key: str, value: Any, context: Dict[str, Any] = None) -> List[str]:
         """Get tags for cache entry"""
         pass
 
@@ -199,9 +190,7 @@ class IEvictionPolicy(ABC):
     """Interface for cache eviction policies"""
 
     @abstractmethod
-    def select_eviction_candidates(
-        self, entries: List[CacheEntry], count: int
-    ) -> List[str]:
+    def select_eviction_candidates(self, entries: List[CacheEntry], count: int) -> List[str]:
         """Select entries for eviction"""
         pass
 
@@ -292,9 +281,7 @@ class ICacheNotifier(ABC):
         pass
 
     @abstractmethod
-    async def subscribe_to_invalidations(
-        self, callback: Callable[[List[str], str], None]
-    ) -> None:
+    async def subscribe_to_invalidations(self, callback: Callable[[List[str], str], None]) -> None:
         """Subscribe to invalidation notifications"""
         pass
 
@@ -328,9 +315,7 @@ class IDistributedCache(ABC, ICacheManager):
         pass
 
     @abstractmethod
-    async def replicate_to_nodes(
-        self, key: str, value: Any, nodes: List[str]
-    ) -> Result[None]:
+    async def replicate_to_nodes(self, key: str, value: Any, nodes: List[str]) -> Result[None]:
         """Replicate data to specific nodes"""
         pass
 
@@ -373,23 +358,17 @@ class ICacheWarmer(ABC):
     """Interface for cache warming"""
 
     @abstractmethod
-    async def warm_cache(
-        self, keys: List[str], loader: Callable[[str], Any]
-    ) -> Result[int]:
+    async def warm_cache(self, keys: List[str], loader: Callable[[str], Any]) -> Result[int]:
         """Warm cache with specific keys"""
         pass
 
     @abstractmethod
-    async def warm_from_source(
-        self, source: str, loader: Callable[[str], Any]
-    ) -> Result[int]:
+    async def warm_from_source(self, source: str, loader: Callable[[str], Any]) -> Result[int]:
         """Warm cache from data source"""
         pass
 
     @abstractmethod
-    async def schedule_warming(
-        self, schedule: str, loader: Callable[[str], Any]
-    ) -> Result[str]:
+    async def schedule_warming(self, schedule: str, loader: Callable[[str], Any]) -> Result[str]:
         """Schedule cache warming"""
         pass
 
@@ -408,9 +387,7 @@ class IPrefetcher(ABC):
         pass
 
     @abstractmethod
-    async def register_prefetch_rule(
-        self, pattern: str, related_keys: List[str]
-    ) -> None:
+    async def register_prefetch_rule(self, pattern: str, related_keys: List[str]) -> None:
         """Register prefetch rule"""
         pass
 
@@ -494,9 +471,7 @@ class IQueryCache(ABC):
         pass
 
     @abstractmethod
-    async def get_cached_query(
-        self, query: str, params: Dict[str, Any]
-    ) -> Optional[Any]:
+    async def get_cached_query(self, query: str, params: Dict[str, Any]) -> Optional[Any]:
         """Get cached query result"""
         pass
 
@@ -562,9 +537,7 @@ class IImageCache(ABC):
         pass
 
     @abstractmethod
-    async def cache_file_metadata(
-        self, file_path: str, metadata: Dict[str, Any]
-    ) -> None:
+    async def cache_file_metadata(self, file_path: str, metadata: Dict[str, Any]) -> None:
         """Cache file metadata"""
         pass
 

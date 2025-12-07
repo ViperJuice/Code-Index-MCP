@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from typing import Dict, List, Any, Optional
 import logging
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -77,9 +77,7 @@ class TSConfigParser:
             logger.warning(f"Cannot resolve extends: {extends}")
             return {}
 
-    def _merge_configs(
-        self, base: Dict[str, Any], override: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _merge_configs(self, base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
         """Merge TypeScript configurations."""
         merged = base.copy()
 
@@ -95,9 +93,7 @@ class TSConfigParser:
 
         return merged
 
-    def _resolve_paths(
-        self, tsconfig_path: Path, config: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _resolve_paths(self, tsconfig_path: Path, config: Dict[str, Any]) -> Dict[str, Any]:
         """Resolve relative paths in the configuration."""
         if "compilerOptions" not in config:
             return config
@@ -108,9 +104,7 @@ class TSConfigParser:
         if base_url:
             # Convert relative baseUrl to absolute
             if not Path(base_url).is_absolute():
-                compiler_options["baseUrl"] = str(
-                    (tsconfig_path.parent / base_url).resolve()
-                )
+                compiler_options["baseUrl"] = str((tsconfig_path.parent / base_url).resolve())
 
         # Resolve paths mapping
         if "paths" in compiler_options:
@@ -260,9 +254,7 @@ class TSConfigParser:
             prefix, suffix = pattern.split("*", 1)
             if module_name.startswith(prefix) and module_name.endswith(suffix):
                 wildcard = module_name[
-                    len(prefix) : (
-                        len(module_name) - len(suffix) if suffix else len(module_name)
-                    )
+                    len(prefix) : (len(module_name) - len(suffix) if suffix else len(module_name))
                 ]
                 resolved_path = mapped_path.replace("*", wildcard)
                 return base_path / resolved_path

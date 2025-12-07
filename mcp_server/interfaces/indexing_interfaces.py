@@ -5,16 +5,17 @@ All interfaces related to code indexing, search optimization, and semantic analy
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any, Set, Tuple, Callable, AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime
-from .shared_interfaces import Result, IndexStatus, IAsyncRepository, IObservable, Event
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Set, Tuple
+
 from .plugin_interfaces import (
+    IndexedFile,
+    SearchResult,
     SymbolDefinition,
     SymbolReference,
-    SearchResult,
-    IndexedFile,
 )
+from .shared_interfaces import Event, IAsyncRepository, IndexStatus, IObservable, Result
 
 # ========================================
 # Indexing Data Types
@@ -106,9 +107,7 @@ class IIndexEngine(IObservable):
         pass
 
     @abstractmethod
-    async def index_file(
-        self, file_path: str, force: bool = False
-    ) -> Result[IndexedFile]:
+    async def index_file(self, file_path: str, force: bool = False) -> Result[IndexedFile]:
         """Index a single file"""
         pass
 
@@ -144,9 +143,7 @@ class IIndexCoordinator(ABC):
     """Interface for coordinating indexing operations across plugins"""
 
     @abstractmethod
-    async def coordinate_indexing(
-        self, files: List[str]
-    ) -> Result[Dict[str, IndexedFile]]:
+    async def coordinate_indexing(self, files: List[str]) -> Result[Dict[str, IndexedFile]]:
         """Coordinate indexing across multiple plugins"""
         pass
 
@@ -182,16 +179,12 @@ class IParseCoordinator(ABC):
         pass
 
     @abstractmethod
-    async def parse_content(
-        self, content: str, language: str
-    ) -> Result[List[SymbolDefinition]]:
+    async def parse_content(self, content: str, language: str) -> Result[List[SymbolDefinition]]:
         """Parse content for a specific language"""
         pass
 
     @abstractmethod
-    async def batch_parse(
-        self, files: List[str]
-    ) -> Result[Dict[str, List[SymbolDefinition]]]:
+    async def batch_parse(self, files: List[str]) -> Result[Dict[str, List[SymbolDefinition]]]:
         """Parse multiple files in batch"""
         pass
 
@@ -231,9 +224,7 @@ class ISearchEngine(ABC):
         pass
 
     @abstractmethod
-    async def search_fuzzy(
-        self, query: str, options: Dict[str, Any]
-    ) -> Result[List[SearchResult]]:
+    async def search_fuzzy(self, query: str, options: Dict[str, Any]) -> Result[List[SearchResult]]:
         """Perform fuzzy search"""
         pass
 
@@ -302,16 +293,12 @@ class IFuzzyIndexer(ABC):
         pass
 
     @abstractmethod
-    async def search_fuzzy(
-        self, query: str, max_distance: int = 2
-    ) -> Result[List[SearchResult]]:
+    async def search_fuzzy(self, query: str, max_distance: int = 2) -> Result[List[SearchResult]]:
         """Search with fuzzy matching"""
         pass
 
     @abstractmethod
-    async def get_suggestions(
-        self, partial_query: str, limit: int = 10
-    ) -> Result[List[str]]:
+    async def get_suggestions(self, partial_query: str, limit: int = 10) -> Result[List[str]]:
         """Get search suggestions"""
         pass
 
@@ -415,9 +402,7 @@ class IIndexStore(IAsyncRepository[IndexEntry]):
     """Interface for storing index data"""
 
     @abstractmethod
-    async def store_symbols(
-        self, file_path: str, symbols: List[SymbolDefinition]
-    ) -> Result[None]:
+    async def store_symbols(self, file_path: str, symbols: List[SymbolDefinition]) -> Result[None]:
         """Store symbols for a file"""
         pass
 
@@ -472,16 +457,12 @@ class IIncrementalIndexer(ABC):
     """Interface for incremental indexing"""
 
     @abstractmethod
-    async def process_file_change(
-        self, file_path: str, change_type: str
-    ) -> Result[None]:
+    async def process_file_change(self, file_path: str, change_type: str) -> Result[None]:
         """Process a file change (created, modified, deleted)"""
         pass
 
     @abstractmethod
-    async def get_incremental_updates(
-        self, since: datetime
-    ) -> Result[List[IndexEntry]]:
+    async def get_incremental_updates(self, since: datetime) -> Result[List[IndexEntry]]:
         """Get incremental updates since a timestamp"""
         pass
 
@@ -561,9 +542,7 @@ class IIndexPerformanceMonitor(ABC):
         pass
 
     @abstractmethod
-    async def record_search_time(
-        self, query: str, time_taken: float, result_count: int
-    ) -> None:
+    async def record_search_time(self, query: str, time_taken: float, result_count: int) -> None:
         """Record search performance"""
         pass
 
@@ -582,9 +561,7 @@ class IBenchmarkRunner(ABC):
     """Interface for running performance benchmarks"""
 
     @abstractmethod
-    async def run_indexing_benchmark(
-        self, file_paths: List[str]
-    ) -> Result[Dict[str, Any]]:
+    async def run_indexing_benchmark(self, file_paths: List[str]) -> Result[Dict[str, Any]]:
         """Run indexing performance benchmark"""
         pass
 

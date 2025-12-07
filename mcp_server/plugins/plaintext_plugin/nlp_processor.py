@@ -1,13 +1,13 @@
 """Natural language processing features for plain text."""
 
 import re
-from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
+from typing import Dict, List, Optional, Tuple
 
+from .paragraph_detector import Paragraph, ParagraphDetector
 from .sentence_splitter import SentenceSplitter
-from .paragraph_detector import ParagraphDetector, Paragraph
-from .topic_extractor import TopicExtractor, Topic
+from .topic_extractor import Topic, TopicExtractor
 
 
 class TextType(Enum):

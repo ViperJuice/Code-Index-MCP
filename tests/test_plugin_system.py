@@ -1,29 +1,30 @@
 """Tests for the plugin system."""
 
-import pytest
-import tempfile
 import json
-import yaml
+import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
+import pytest
+import yaml
+
+from mcp_server.interfaces.shared_interfaces import Error, Result
 from mcp_server.plugin_base import IPlugin
 from mcp_server.plugin_system import (
-    PluginManager,
-    PluginInfo,
     PluginConfig,
-    PluginState,
-    PluginType,
-    PluginSystemConfig,
-    PluginNotFoundError,
-    PluginLoadError,
+    PluginInfo,
     PluginInitError,
     PluginInstance,
+    PluginLoadError,
+    PluginManager,
+    PluginNotFoundError,
+    PluginState,
+    PluginSystemConfig,
+    PluginType,
 )
 from mcp_server.plugin_system.plugin_discovery import PluginDiscovery
 from mcp_server.plugin_system.plugin_loader import PluginLoader
 from mcp_server.plugin_system.plugin_registry import PluginRegistry
-from mcp_server.interfaces.shared_interfaces import Result, Error
 
 
 class MockPlugin(IPlugin):
@@ -471,8 +472,7 @@ class TestPluginManager:
                     "state": PluginState.LOADED,
                     "error": None,
                     "is_active": property(
-                        lambda self: self.state
-                        in (PluginState.INITIALIZED, PluginState.STARTED)
+                        lambda self: self.state in (PluginState.INITIALIZED, PluginState.STARTED)
                     ),
                 },
             )()
@@ -515,8 +515,7 @@ class TestPluginManager:
                     "state": PluginState.LOADED,
                     "error": None,
                     "is_active": property(
-                        lambda self: self.state
-                        in (PluginState.INITIALIZED, PluginState.STARTED)
+                        lambda self: self.state in (PluginState.INITIALIZED, PluginState.STARTED)
                     ),
                 },
             )()

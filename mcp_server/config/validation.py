@@ -6,12 +6,13 @@ import os
 import re
 import secrets
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
+
+from mcp_server.core.path_utils import PathUtils
 
 from .environment import Environment, get_environment, is_production
 from .settings import Settings
-from mcp_server.core.path_utils import PathUtils
 
 
 class ConfigurationError(Exception):
@@ -62,14 +63,10 @@ def validate_security_config(settings: Settings) -> List[str]:
 
         # Check token expiration times
         if security.access_token_expire_minutes > 60:
-            warnings.append(
-                "Access token expiration > 60 minutes may be too long for production"
-            )
+            warnings.append("Access token expiration > 60 minutes may be too long for production")
 
         if security.refresh_token_expire_days > 30:
-            warnings.append(
-                "Refresh token expiration > 30 days may be too long for production"
-            )
+            warnings.append("Refresh token expiration > 30 days may be too long for production")
 
         # CORS validation
         if "*" in security.cors_allowed_origins:
@@ -79,15 +76,11 @@ def validate_security_config(settings: Settings) -> List[str]:
         if not security.rate_limit_enabled:
             warnings.append("Rate limiting is disabled in production")
         elif security.rate_limit_requests > 1000:
-            warnings.append(
-                "Rate limit may be too high for production (>1000 req/hour)"
-            )
+            warnings.append("Rate limit may be too high for production (>1000 req/hour)")
 
         # Admin settings validation
         if security.default_admin_email == "admin@localhost":
-            errors.append(
-                "Default admin email must be changed from localhost in production"
-            )
+            errors.append("Default admin email must be changed from localhost in production")
 
     # Password policy validation
     if not any(
@@ -142,9 +135,7 @@ def validate_database_config(settings: Settings) -> List[str]:
         if parsed.scheme == "postgresql":
             # PostgreSQL production checks
             if not parsed.password or len(parsed.password) < 12:
-                issues.append(
-                    "Database password should be at least 12 characters for production"
-                )
+                issues.append("Database password should be at least 12 characters for production")
 
             if parsed.hostname in ["localhost", "127.0.0.1"]:
                 issues.append("Database host should not be localhost in production")

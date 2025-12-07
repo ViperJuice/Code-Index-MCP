@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """Test document-specific indexing functionality."""
 
-from pathlib import Path
-import tempfile
 import shutil
+import tempfile
+from pathlib import Path
 
 from mcp_server.utils.semantic_indexer import SemanticIndexer
 
 
 def create_test_documents(temp_dir: Path) -> None:
     """Create test documentation files."""
-    
+
     # Create README.md
     readme_content = """# MCP Server Documentation
 
@@ -58,10 +58,10 @@ POST /api/index
 
 Indexes new content.
 """
-    
+
     readme_path = temp_dir / "README.md"
     readme_path.write_text(readme_content)
-    
+
     # Create API documentation
     api_doc_content = """# API Documentation
 
@@ -127,11 +127,11 @@ POST /api/index/directory
 }
 ```
 """
-    
+
     api_path = temp_dir / "docs" / "api.md"
     api_path.parent.mkdir(exist_ok=True)
     api_path.write_text(api_doc_content)
-    
+
     # Create tutorial
     tutorial_content = """# Getting Started Tutorial
 
@@ -184,72 +184,65 @@ curl "http://localhost:8080/api/search?q=parse_function"
 - Explore the [API Documentation](./api.md)
 - Learn about [Advanced Features](./advanced.md)
 """
-    
+
     tutorial_path = temp_dir / "docs" / "tutorial.md"
     tutorial_path.write_text(tutorial_content)
 
 
 def test_document_indexing():
     """Test the document indexing functionality."""
-    
+
     # Create temporary directory with test documents
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
         create_test_documents(temp_path)
-        
+
         # Initialize indexer
         indexer = SemanticIndexer(collection="test-docs")
-        
+
         print("Testing document indexing...")
         print("-" * 50)
-        
+
         # Test 1: Index README
         print("\n1. Indexing README.md:")
         result = indexer.index_document(
             temp_path / "README.md",
             metadata={
                 "tags": ["documentation", "readme", "main"],
-                "summary": "Main project documentation"
-            }
+                "summary": "Main project documentation",
+            },
         )
         print(f"   - Indexed {result['total_sections']} sections")
-        for section in result['sections']:
+        for section in result["sections"]:
             print(f"     - {section['context']} (lines {section['lines']})")
-        
+
         # Test 2: Index API documentation
         print("\n2. Indexing API documentation:")
-        result = indexer.index_document(
-            temp_path / "docs" / "api.md",
-            doc_type="api"
-        )
+        result = indexer.index_document(temp_path / "docs" / "api.md", doc_type="api")
         print(f"   - Indexed {result['total_sections']} sections")
-        
+
         # Test 3: Index documentation directory
         print("\n3. Indexing documentation directory:")
         result = indexer.index_documentation_directory(temp_path)
         print(f"   - Indexed {result['total_files']} files")
         print(f"   - Total sections: {result['total_sections']}")
-        
+
         # Test 4: Natural language queries
         print("\n4. Testing natural language queries:")
-        
+
         queries = [
             ("How do I install the server?", ["readme", "tutorial"]),
             ("What authentication methods are supported?", ["api"]),
             ("Show me the search API endpoints", ["api"]),
             ("Getting started guide", ["tutorial", "readme"]),
         ]
-        
+
         for query, doc_types in queries:
             print(f"\n   Query: '{query}'")
             print(f"   Document types: {doc_types}")
-            
-            results = indexer.query_natural_language(
-                query, 
-                limit=3,
-                doc_types=doc_types
-            )
-            
+
+            results = indexer.query_natural_language(query, limit=3, doc_types=doc_types)
+
             for i, result in enumerate(results, 1):
                 print(f"\n   Result {i}:")
                 print(f"     - File: {Path(result['file']).name}")
@@ -257,8 +250,8 @@ def test_document_indexing():
                 print(f"     - Score: {result['score']:.3f}")
                 print(f"     - Weighted Score: {result['weighted_score']:.3f}")
                 print(f"     - Type: {result.get('doc_type', 'unknown')}")
-                if 'content' in result:
-                    preview = result['content'][:100].replace('\n', ' ')
+                if "content" in result:
+                    preview = result["content"][:100].replace("\n", " ")
                     print(f"     - Preview: {preview}...")
 
 

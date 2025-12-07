@@ -1,37 +1,38 @@
 """Comprehensive tests for the security layer."""
 
-import pytest
 import asyncio
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
-from fastapi.testclient import TestClient
-from fastapi import FastAPI
+
 import jwt
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from mcp_server.security import (
-    SecurityConfig,
-    AuthManager,
-    User,
-    UserRole,
-    Permission,
-    AuthCredentials,
-    TokenData,
+    AccessLevel,
     AccessRequest,
     AccessRule,
-    AccessLevel,
+    AuthCredentials,
     AuthenticationError,
+    AuthManager,
     AuthorizationError,
-    SecurityError,
     PasswordManager,
+    Permission,
     RateLimiter,
+    SecurityConfig,
+    SecurityError,
     SecurityMiddlewareStack,
+    TokenData,
+    User,
+    UserRole,
 )
 from mcp_server.security.security_middleware import (
-    RateLimitMiddleware,
-    SecurityHeadersMiddleware,
     AuthenticationMiddleware,
     AuthorizationMiddleware,
+    RateLimitMiddleware,
     RequestValidationMiddleware,
+    SecurityHeadersMiddleware,
 )
 
 
@@ -84,25 +85,19 @@ class TestSecurityConfig:
 
     def test_valid_config(self):
         """Test valid security configuration."""
-        config = SecurityConfig(
-            jwt_secret_key="test-secret-key-at-least-32-characters-long"
-        )
+        config = SecurityConfig(jwt_secret_key="test-secret-key-at-least-32-characters-long")
         assert config.jwt_secret_key == "test-secret-key-at-least-32-characters-long"
         assert config.jwt_algorithm == "HS256"
         assert config.access_token_expire_minutes == 30
 
     def test_invalid_secret_key(self):
         """Test invalid JWT secret key."""
-        with pytest.raises(
-            ValueError, match="JWT secret key must be at least 32 characters long"
-        ):
+        with pytest.raises(ValueError, match="JWT secret key must be at least 32 characters long"):
             SecurityConfig(jwt_secret_key="short")
 
     def test_invalid_token_expire_time(self):
         """Test invalid token expiration time."""
-        with pytest.raises(
-            ValueError, match="Access token expire minutes must be positive"
-        ):
+        with pytest.raises(ValueError, match="Access token expire minutes must be positive"):
             SecurityConfig(
                 jwt_secret_key="test-secret-key-at-least-32-characters-long",
                 access_token_expire_minutes=0,
@@ -194,9 +189,7 @@ class TestAuthManager:
     @pytest.mark.asyncio
     async def test_create_user_weak_password(self, auth_manager):
         """Test weak password rejection."""
-        with pytest.raises(
-            SecurityError, match="Password does not meet strength requirements"
-        ):
+        with pytest.raises(SecurityError, match="Password does not meet strength requirements"):
             await auth_manager.create_user("user", "weak", "test@example.com")
 
     @pytest.mark.asyncio
@@ -390,9 +383,7 @@ class TestSecurityMiddleware:
         assert response.status_code != 415
 
         # Test invalid content type
-        response = client.post(
-            "/test", data="test data", headers={"content-type": "invalid/type"}
-        )
+        response = client.post("/test", data="test data", headers={"content-type": "invalid/type"})
         assert response.status_code == 415
 
     def test_request_validation_suspicious_patterns(self):
@@ -435,9 +426,7 @@ class TestIntegration:
         )
 
         # Authenticate
-        credentials = AuthCredentials(
-            username="integration_user", password="integration_pass123!"
-        )
+        credentials = AuthCredentials(username="integration_user", password="integration_pass123!")
         authenticated_user = await auth_manager.authenticate_user(credentials)
         assert authenticated_user.id == user.id
 

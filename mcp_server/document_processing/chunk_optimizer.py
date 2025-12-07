@@ -1,11 +1,11 @@
 """Chunk optimizer for document processing with various chunking strategies."""
 
 import re
+import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Tuple, Any
-import uuid
+from typing import Any, Dict, List, Optional, Tuple
 
 from .document_interfaces import (
     ChunkMetadata,
@@ -122,9 +122,7 @@ class SentenceSplitter:
 
     def is_list_item(self, text: str) -> bool:
         """Check if text is a list item."""
-        return bool(
-            self.list_pattern.match(text) or self.numbered_list_pattern.match(text)
-        )
+        return bool(self.list_pattern.match(text) or self.numbered_list_pattern.match(text))
 
 
 class ParagraphSplitter:
@@ -158,10 +156,7 @@ class ParagraphSplitter:
             current_tokens = estimator.estimate_tokens(current)
             para_tokens = estimator.estimate_tokens(para)
 
-            if (
-                current_tokens < min_size
-                and current_tokens + para_tokens < min_size * 3
-            ):
+            if current_tokens < min_size and current_tokens + para_tokens < min_size * 3:
                 current = current + "\n\n" + para
             else:
                 result.append(current)
@@ -254,11 +249,7 @@ class ChunkOptimizer:
         boundaries = self.semantic_analyzer.find_topic_boundaries(content)
         if boundaries:
             avg_segment_size = total_tokens / (len(boundaries) + 1)
-            if (
-                self.config.min_chunk_size
-                <= avg_segment_size
-                <= self.config.max_chunk_size
-            ):
+            if self.config.min_chunk_size <= avg_segment_size <= self.config.max_chunk_size:
                 return int(avg_segment_size)
 
         return self.config.max_chunk_size
@@ -277,9 +268,7 @@ class ChunkOptimizer:
                 break
 
             # Find best split point in range
-            best_pos = self._find_best_split_in_range(
-                text, search_start, search_end, current_pos
-            )
+            best_pos = self._find_best_split_in_range(text, search_start, search_end, current_pos)
 
             if best_pos > current_pos:
                 split_points.append(best_pos)
@@ -291,9 +280,7 @@ class ChunkOptimizer:
 
         return split_points
 
-    def _find_best_split_in_range(
-        self, text: str, start: int, end: int, last_pos: int
-    ) -> int:
+    def _find_best_split_in_range(self, text: str, start: int, end: int, last_pos: int) -> int:
         """Find the best split point in a given range."""
         # Priority order: paragraph > sentence > word > character
 
@@ -316,9 +303,7 @@ class ChunkOptimizer:
         # Default to end
         return end
 
-    def balance_chunk_sizes(
-        self, chunks: List[str], min_size: int, max_size: int
-    ) -> List[str]:
+    def balance_chunk_sizes(self, chunks: List[str], min_size: int, max_size: int) -> List[str]:
         """Balance chunk sizes by merging small chunks and splitting large ones."""
         balanced = []
         current = ""
@@ -441,14 +426,11 @@ class FixedSizeChunkingStrategy(IChunkStrategy):
         chunk_size = self.optimizer.config.max_chunk_size
 
         # Calculate character positions for chunks
-        char_chunk_size = int(
-            chunk_size / self.optimizer.config.token_estimation_factor
-        )
+        char_chunk_size = int(chunk_size / self.optimizer.config.token_estimation_factor)
 
         # Calculate overlap in characters
         char_overlap_size = int(
-            self.optimizer.config.overlap_size
-            / self.optimizer.config.token_estimation_factor
+            self.optimizer.config.overlap_size / self.optimizer.config.token_estimation_factor
         )
 
         # Use step size instead of subtracting overlap from chunk size
@@ -474,9 +456,7 @@ class FixedSizeChunkingStrategy(IChunkStrategy):
         """Validate chunk meets criteria."""
         tokens = self.optimizer.token_estimator.estimate_tokens(chunk.content)
         return (
-            self.optimizer.config.min_chunk_size
-            <= tokens
-            <= self.optimizer.config.max_chunk_size
+            self.optimizer.config.min_chunk_size <= tokens <= self.optimizer.config.max_chunk_size
         )
 
     def merge_small_chunks(self, chunks: List[DocumentChunk]) -> List[DocumentChunk]:
@@ -488,15 +468,12 @@ class FixedSizeChunkingStrategy(IChunkStrategy):
         current = chunks[0]
 
         for chunk in chunks[1:]:
-            current_tokens = self.optimizer.token_estimator.estimate_tokens(
-                current.content
-            )
+            current_tokens = self.optimizer.token_estimator.estimate_tokens(current.content)
             chunk_tokens = self.optimizer.token_estimator.estimate_tokens(chunk.content)
 
             if (
                 current_tokens < self.optimizer.config.min_chunk_size
-                and current_tokens + chunk_tokens
-                <= self.optimizer.config.max_chunk_size
+                and current_tokens + chunk_tokens <= self.optimizer.config.max_chunk_size
             ):
                 # Merge chunks
                 current.content = current.content + "\n\n" + chunk.content
@@ -571,8 +548,7 @@ class SentenceBasedChunkingStrategy(IChunkStrategy):
                 overlap_sentences = self._get_overlap_sentences(current_sentences)
                 current_sentences = overlap_sentences + [sentence]
                 current_tokens = sum(
-                    self.optimizer.token_estimator.estimate_tokens(s)
-                    for s in current_sentences
+                    self.optimizer.token_estimator.estimate_tokens(s) for s in current_sentences
                 )
             else:
                 current_sentences.append(sentence)
@@ -592,9 +568,7 @@ class SentenceBasedChunkingStrategy(IChunkStrategy):
         # Check if chunk ends with complete sentence
         ends_with_sentence = chunk.content.rstrip().endswith((".", "!", "?"))
         return (
-            self.optimizer.config.min_chunk_size
-            <= tokens
-            <= self.optimizer.config.max_chunk_size
+            self.optimizer.config.min_chunk_size <= tokens <= self.optimizer.config.max_chunk_size
             and ends_with_sentence
         )
 
@@ -610,9 +584,7 @@ class SentenceBasedChunkingStrategy(IChunkStrategy):
             if tokens < self.optimizer.config.min_chunk_size and i + 1 < len(chunks):
                 # Try to merge with next chunk
                 next_chunk = chunks[i + 1]
-                next_tokens = self.optimizer.token_estimator.estimate_tokens(
-                    next_chunk.content
-                )
+                next_tokens = self.optimizer.token_estimator.estimate_tokens(next_chunk.content)
 
                 if tokens + next_tokens <= self.optimizer.config.max_chunk_size:
                     # Merge
@@ -697,9 +669,7 @@ class ParagraphBasedChunkingStrategy(IChunkStrategy):
         """Validate chunk meets criteria."""
         tokens = self.optimizer.token_estimator.estimate_tokens(chunk.content)
         return (
-            self.optimizer.config.min_chunk_size
-            <= tokens
-            <= self.optimizer.config.max_chunk_size
+            self.optimizer.config.min_chunk_size <= tokens <= self.optimizer.config.max_chunk_size
         )
 
     def merge_small_chunks(self, chunks: List[DocumentChunk]) -> List[DocumentChunk]:
@@ -740,9 +710,7 @@ class SemanticBasedChunkingStrategy(IChunkStrategy):
 
         if not boundaries:
             # Fall back to paragraph-based
-            return ParagraphBasedChunkingStrategy(self.optimizer).chunk(
-                content, structure
-            )
+            return ParagraphBasedChunkingStrategy(self.optimizer).chunk(content, structure)
 
         chunks = []
         start = 0
@@ -815,9 +783,7 @@ class SemanticBasedChunkingStrategy(IChunkStrategy):
             return [segment]
 
         # Use sentence splitter for large segments
-        return self.optimizer._split_large_chunk(
-            segment, self.optimizer.config.max_chunk_size
-        )
+        return self.optimizer._split_large_chunk(segment, self.optimizer.config.max_chunk_size)
 
     def _create_chunk(
         self, content: str, index: int, structure: DocumentStructure
@@ -891,9 +857,7 @@ class HybridChunkingStrategy(IChunkStrategy):
         """Validate chunk meets criteria."""
         tokens = self.optimizer.token_estimator.estimate_tokens(chunk.content)
         return (
-            self.optimizer.config.min_chunk_size
-            <= tokens
-            <= self.optimizer.config.max_chunk_size
+            self.optimizer.config.min_chunk_size <= tokens <= self.optimizer.config.max_chunk_size
         )
 
     def merge_small_chunks(self, chunks: List[DocumentChunk]) -> List[DocumentChunk]:

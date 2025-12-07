@@ -1,9 +1,9 @@
 """Java type analyzer with generics support."""
 
 import logging
-from typing import Dict, List, Optional, Set, Tuple, Any
-from dataclasses import dataclass, field
 import re
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from mcp_server.plugins.specialized_plugin_base import ITypeAnalyzer, TypeInfo
 
@@ -168,9 +168,7 @@ class JavaTypeAnalyzer(ITypeAnalyzer):
 
     def _analyze_interface(self, interface_node, package: str, file_path: str):
         """Analyze an interface declaration."""
-        full_name = (
-            f"{package}.{interface_node.name}" if package else interface_node.name
-        )
+        full_name = f"{package}.{interface_node.name}" if package else interface_node.name
 
         # Extract modifiers
         modifiers = interface_node.modifiers or []
@@ -214,9 +212,7 @@ class JavaTypeAnalyzer(ITypeAnalyzer):
         full_name = f"{package}.{enum_node.name}" if package else enum_node.name
 
         # Enums are final by default
-        type_info = JavaTypeInfo(
-            type_name=full_name, is_final=True, super_types=["java.lang.Enum"]
-        )
+        type_info = JavaTypeInfo(type_name=full_name, is_final=True, super_types=["java.lang.Enum"])
 
         self.type_registry[full_name] = type_info
         self.type_registry[enum_node.name] = type_info

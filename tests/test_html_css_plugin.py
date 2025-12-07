@@ -1,8 +1,9 @@
 """Tests for the HTML/CSS plugin."""
 
-import pytest
 from pathlib import Path
 from unittest.mock import Mock
+
+import pytest
 
 from mcp_server.plugins.html_css_plugin.plugin import Plugin
 from mcp_server.storage.sqlite_store import SQLiteStore
@@ -167,16 +168,10 @@ class TestHTMLCSSPlugin:
         symbols = result["symbols"]
 
         # Check different selector types
-        assert any(
-            s["symbol"] == "body" and s["kind"] == "element-selector" for s in symbols
-        )
+        assert any(s["symbol"] == "body" and s["kind"] == "element-selector" for s in symbols)
         assert any(s["symbol"] == "#header" and s["kind"] == "id" for s in symbols)
-        assert any(
-            s["symbol"] == ".container" and s["kind"] == "class" for s in symbols
-        )
-        assert any(
-            s["symbol"] == ".text-primary" and s["kind"] == "class" for s in symbols
-        )
+        assert any(s["symbol"] == ".container" and s["kind"] == "class" for s in symbols)
+        assert any(s["symbol"] == ".text-primary" and s["kind"] == "class" for s in symbols)
 
     def test_index_css_complex_selectors(self, plugin):
         """Test indexing CSS file with complex selectors."""
@@ -217,12 +212,9 @@ class TestHTMLCSSPlugin:
         # Check complex selectors
         assert any(s["symbol"] == ".container .row" for s in symbols)
         assert any(s["symbol"] == ".nav > li" for s in symbols)
+        assert any(s["symbol"] == "a:hover" and s["kind"] == "pseudo-selector" for s in symbols)
         assert any(
-            s["symbol"] == "a:hover" and s["kind"] == "pseudo-selector" for s in symbols
-        )
-        assert any(
-            s["symbol"] == ".button:active" and s["kind"] == "pseudo-selector"
-            for s in symbols
+            s["symbol"] == ".button:active" and s["kind"] == "pseudo-selector" for s in symbols
         )
         assert any(
             s["symbol"] == '[data-toggle="modal"]' and s["kind"] == "attribute-selector"
@@ -356,8 +348,8 @@ class TestHTMLCSSPlugin:
     def test_find_references(self, plugin):
         """Test finding references across HTML and CSS files."""
         # Create a temporary directory structure
-        import tempfile
         import os
+        import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
             old_cwd = os.getcwd()
@@ -436,9 +428,7 @@ class TestHTMLCSSPlugin:
 
         # Test search functionality
         search_results = plugin.search("search")
-        content_found = any(
-            "index.html" in str(r.get("file", "")) for r in search_results
-        )
+        content_found = any("index.html" in str(r.get("file", "")) for r in search_results)
         if not content_found:
             # Search may not find our test content due to pre-indexing of other files
             # The important thing is that search functionality works

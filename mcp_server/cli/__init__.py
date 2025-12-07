@@ -6,9 +6,10 @@ including index management, diagnostics, and maintenance operations.
 """
 
 import click
+
 from .. import __version__
-from .index_management import index
 from .artifact_commands import artifact
+from .index_management import index
 from .repository_commands import repository
 
 

@@ -5,14 +5,15 @@ Tests advanced indexing options and capabilities with real codebases.
 Validates parallel processing, embedding generation, and optimization features.
 """
 
-import pytest
 import asyncio
 import os
 import tempfile
 import time
-from pathlib import Path
-from typing import List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Any, Dict, List
+
+import pytest
 
 
 @pytest.mark.advanced_indexing
@@ -208,9 +209,7 @@ class UserManager:
 
         # Create temporary files
         for i, code in enumerate(test_code_samples):
-            with tempfile.NamedTemporaryFile(
-                suffix=f"_test_{i}.py", mode="w", delete=False
-            ) as f:
+            with tempfile.NamedTemporaryFile(suffix=f"_test_{i}.py", mode="w", delete=False) as f:
                 f.write(code)
                 f.flush()
                 test_files.append(Path(f.name))
@@ -280,15 +279,11 @@ class UserManager:
 
             if single_thread_throughput > 0:
                 speedup = multi_thread_throughput / single_thread_throughput
-                assert (
-                    speedup >= 1.2
-                ), f"Multi-threading should provide speedup: {speedup:.2f}x"
+                assert speedup >= 1.2, f"Multi-threading should provide speedup: {speedup:.2f}x"
                 print(f"Best speedup: {speedup:.2f}x with parallel processing")
 
             # Verify all files were processed successfully
-            best_result = max(
-                performance_results.values(), key=lambda x: x["successful"]
-            )
+            best_result = max(performance_results.values(), key=lambda x: x["successful"])
             assert (
                 best_result["successful"] >= len(test_files) - 1
             ), "Should successfully index most files"
@@ -315,9 +310,7 @@ class UserManager:
         engine = indexer_components["engine"]
 
         # Setup semantic indexer
-        semantic_indexer = SemanticIndexer(
-            collection="test-embedding", qdrant_path=":memory:"
-        )
+        semantic_indexer = SemanticIndexer(collection="test-embedding", qdrant_path=":memory:")
 
         # Test code with rich semantic content
         test_code = '''
@@ -399,17 +392,13 @@ class SessionManager:
 
             try:
                 # Index with embedding generation enabled
-                options = IndexOptions(
-                    generate_embeddings=True, semantic_indexer=semantic_indexer
-                )
+                options = IndexOptions(generate_embeddings=True, semantic_indexer=semantic_indexer)
 
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
 
                 try:
-                    result = loop.run_until_complete(
-                        engine.index_file(str(temp_path), options)
-                    )
+                    result = loop.run_until_complete(engine.index_file(str(temp_path), options))
 
                     assert (
                         result.success
@@ -428,9 +417,7 @@ class SessionManager:
                     session_results = list(
                         semantic_indexer.query("session token management", limit=3)
                     )
-                    assert (
-                        len(session_results) > 0
-                    ), "Should find session-related matches"
+                    assert len(session_results) > 0, "Should find session-related matches"
 
                     print(f"Embedded indexing: {result.symbols_count} symbols")
                     print(
@@ -463,9 +450,7 @@ class Class{i}:
 
 CONSTANT_{i} = {i}
 '''
-            with tempfile.NamedTemporaryFile(
-                suffix=f"_batch_{i}.py", mode="w", delete=False
-            ) as f:
+            with tempfile.NamedTemporaryFile(suffix=f"_batch_{i}.py", mode="w", delete=False) as f:
                 f.write(code)
                 f.flush()
                 test_files.append(Path(f.name))
@@ -492,9 +477,7 @@ CONSTANT_{i} = {i}
                         results = []
                         for i in range(0, len(test_files), batch_size):
                             batch = test_files[i : i + batch_size]
-                            batch_tasks = [
-                                engine.index_file(str(f), options) for f in batch
-                            ]
+                            batch_tasks = [engine.index_file(str(f), options) for f in batch]
                             batch_results = await asyncio.gather(
                                 *batch_tasks, return_exceptions=True
                             )
@@ -536,9 +519,7 @@ CONSTANT_{i} = {i}
             optimal_batch = max(batch_results.items(), key=lambda x: x[1]["throughput"])
             optimal_size, optimal_stats = optimal_batch
 
-            print(
-                f"Optimal batch size: {optimal_size} ({optimal_stats['throughput']:.1f} files/s)"
-            )
+            print(f"Optimal batch size: {optimal_size} ({optimal_stats['throughput']:.1f} files/s)")
 
             # Verify batch processing improves over single-file processing
             single_throughput = batch_results[1]["throughput"]
@@ -671,9 +652,7 @@ def decorator_function(func):
 
                 # Verify all configurations work
                 for config_name, result in results.items():
-                    assert result[
-                        "success"
-                    ], f"Configuration '{config_name}' should succeed"
+                    assert result["success"], f"Configuration '{config_name}' should succeed"
                     assert (
                         result["symbols_count"] > 0
                     ), f"Configuration '{config_name}' should extract symbols"
@@ -751,9 +730,7 @@ def decorator_function(func):
                     asyncio.set_event_loop(loop)
 
                     try:
-                        result = loop.run_until_complete(
-                            engine.index_file(str(temp_path), options)
-                        )
+                        result = loop.run_until_complete(engine.index_file(str(temp_path), options))
 
                         results[scenario["name"]] = {
                             "success": result.success,
@@ -781,9 +758,7 @@ def decorator_function(func):
                         assert (
                             result["error"] is not None
                         ), f"Failed scenario '{scenario_name}' should have error message"
-                        print(
-                            f"Expected failure for '{scenario_name}': {result['error']}"
-                        )
+                        print(f"Expected failure for '{scenario_name}': {result['error']}")
 
                 print(
                     f"Scenario '{scenario_name}': success={actual_success}, symbols={result['symbols_count']}"
@@ -938,16 +913,12 @@ def async_operation_{func_num}(data: Dict[str, Any]) -> Dict[str, Any]:
                     asyncio.set_event_loop(loop)
 
                     try:
-                        result = loop.run_until_complete(
-                            engine.index_file(str(temp_path), options)
-                        )
+                        result = loop.run_until_complete(engine.index_file(str(temp_path), options))
                         assert result.success, f"Should index large file {file_num}"
 
                         # Record memory after indexing
                         current_memory = process.memory_info().rss / 1024 / 1024
-                        memory_samples.append(
-                            (f"after_file_{file_num}", current_memory)
-                        )
+                        memory_samples.append((f"after_file_{file_num}", current_memory))
 
                     finally:
                         loop.close()
@@ -969,9 +940,7 @@ def async_operation_{func_num}(data: Dict[str, Any]) -> Dict[str, Any]:
             if len(memory_samples) >= 4:
                 first_file_memory = memory_samples[1][1]
                 last_file_memory = memory_samples[-1][1]
-                per_file_growth = (last_file_memory - first_file_memory) / (
-                    len(memory_samples) - 2
-                )
+                per_file_growth = (last_file_memory - first_file_memory) / (len(memory_samples) - 2)
 
                 assert (
                     per_file_growth < 50
@@ -997,9 +966,7 @@ class TestAdvancedIndexingIntegration:
         # Try to use requests repository if available
         repo_path = Path("test_workspace/real_repos/requests")
         if not repo_path.exists():
-            pytest.skip(
-                "Requests repository not available for advanced indexing testing"
-            )
+            pytest.skip("Requests repository not available for advanced indexing testing")
 
         try:
             from mcp_server.indexer.index_engine import IndexEngine, IndexOptions
