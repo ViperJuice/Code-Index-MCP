@@ -113,6 +113,18 @@ class HybridSearch:
         # Statistics
         self._search_stats = defaultdict(int)
 
+        # Track semantic search availability
+        self._semantic_temporarily_disabled = False
+
+        # Check semantic indexer availability on init
+        if self.semantic_indexer and self.config.enable_semantic:
+            if not self.semantic_indexer.is_available:
+                logger.warning(
+                    "Semantic search is enabled in config but Qdrant is not available. "
+                    "Disabling semantic search. HybridSearch will use BM25 and fuzzy search only."
+                )
+                self.config.enable_semantic = False
+
     def _initialize_reranker(self):
         """Initialize the reranker based on settings."""
         try:
@@ -301,37 +313,71 @@ class HybridSearch:
     async def _search_semantic(
         self, query: str, filters: Optional[Dict[str, Any]]
     ) -> List[SearchResult]:
-        """Perform semantic search."""
+        """Perform semantic search with availability checks."""
+        # Check if semantic search is temporarily disabled
+        if self._semantic_temporarily_disabled:
+            logger.debug("Semantic search is temporarily disabled due to previous errors")
+            return []
+
+        # Check if semantic indexer is available before attempting search
+        if not self.semantic_indexer.is_available:
+            logger.warning(
+                "Semantic indexer is not available. Skipping semantic search. "
+                f"Connection mode: {self.semantic_indexer.connection_mode}"
+            )
+            self._search_stats["semantic_unavailable"] += 1
+            return []
+
+        # Validate connection is still active
+        if not self.semantic_indexer.validate_connection():
+            logger.warning(
+                "Semantic indexer connection validation failed. "
+                "Temporarily disabling semantic search."
+            )
+            self._semantic_temporarily_disabled = True
+            self._search_stats["semantic_connection_failures"] += 1
+            return []
+
         # Run semantic search
         loop = asyncio.get_event_loop()
 
         def run_search():
-            # Semantic search with filters
-            kwargs = {
-                "k": self.config.individual_limit,
-                "threshold": self.config.min_semantic_score,
-            }
-            if filters:
-                kwargs.update(filters)
+            try:
+                # Semantic search with filters
+                kwargs = {
+                    "k": self.config.individual_limit,
+                    "threshold": self.config.min_semantic_score,
+                }
+                if filters:
+                    kwargs.update(filters)
 
-            results = self.semantic_indexer.search(query, **kwargs)
+                results = self.semantic_indexer.search(query, **kwargs)
 
-            search_results = []
-            for r in results:
-                search_results.append(
-                    SearchResult(
-                        doc_id=r.get("filepath", ""),
-                        filepath=r.get("filepath", ""),
-                        score=r.get("score", 0.0),
-                        snippet=r.get("content", "")[:200],
-                        metadata=r,
-                        source="semantic",
+                search_results = []
+                for r in results:
+                    search_results.append(
+                        SearchResult(
+                            doc_id=r.get("filepath", ""),
+                            filepath=r.get("filepath", ""),
+                            score=r.get("score", 0.0),
+                            snippet=r.get("content", "")[:200],
+                            metadata=r,
+                            source="semantic",
+                        )
                     )
+                return search_results
+            except Exception as e:
+                logger.error(
+                    f"Semantic search failed with error: {e}. "
+                    "Temporarily disabling semantic search."
                 )
-            return search_results
+                self._semantic_temporarily_disabled = True
+                self._search_stats["semantic_search_errors"] += 1
+                return []
 
         results = await loop.run_in_executor(None, run_search)
-        self._search_stats["semantic_searches"] += 1
+        if results:  # Only count successful searches
+            self._search_stats["semantic_searches"] += 1
         return results
 
     async def _search_fuzzy(
@@ -676,8 +722,88 @@ class HybridSearch:
         if fuzzy is not None:
             self.config.enable_fuzzy = fuzzy
 
+    def retry_semantic_search(self) -> bool:
+        """
+        Attempt to re-enable semantic search after it was temporarily disabled.
+
+        This method checks if the semantic indexer is now available and
+        re-enables semantic search if possible.
+
+        Returns:
+            True if semantic search was successfully re-enabled, False otherwise
+        """
+        if not self.semantic_indexer:
+            logger.warning("Cannot retry semantic search: no semantic indexer configured")
+            return False
+
+        if not self._semantic_temporarily_disabled and self.config.enable_semantic:
+            logger.info("Semantic search is already enabled")
+            return True
+
+        # Check if semantic indexer is now available
+        if self.semantic_indexer.is_available and self.semantic_indexer.validate_connection():
+            self._semantic_temporarily_disabled = False
+            self.config.enable_semantic = True
+            logger.info(
+                f"Semantic search re-enabled successfully. "
+                f"Connection mode: {self.semantic_indexer.connection_mode}"
+            )
+            self._search_stats["semantic_reactivations"] += 1
+            return True
+        else:
+            logger.warning(
+                "Cannot re-enable semantic search: Qdrant is still unavailable. "
+                f"Connection mode: {self.semantic_indexer.connection_mode}"
+            )
+            return False
+
+    def get_search_capabilities(self) -> Dict[str, Any]:
+        """
+        Get current search capabilities and availability status.
+
+        Returns:
+            Dictionary with detailed information about available search methods
+        """
+        capabilities = {
+            "bm25": {
+                "available": self.bm25_indexer is not None,
+                "enabled": self.config.enable_bm25,
+                "status": "operational" if (self.bm25_indexer and self.config.enable_bm25) else "disabled"
+            },
+            "semantic": {
+                "available": False,
+                "enabled": self.config.enable_semantic,
+                "status": "not_configured"
+            },
+            "fuzzy": {
+                "available": self.fuzzy_indexer is not None,
+                "enabled": self.config.enable_fuzzy,
+                "status": "operational" if (self.fuzzy_indexer and self.config.enable_fuzzy) else "disabled"
+            }
+        }
+
+        # Add detailed semantic search status
+        if self.semantic_indexer:
+            is_available = self.semantic_indexer.is_available
+            connection_mode = self.semantic_indexer.connection_mode
+
+            capabilities["semantic"]["available"] = is_available
+            capabilities["semantic"]["connection_mode"] = connection_mode
+            capabilities["semantic"]["temporarily_disabled"] = self._semantic_temporarily_disabled
+
+            if self._semantic_temporarily_disabled:
+                capabilities["semantic"]["status"] = "temporarily_disabled"
+            elif not is_available:
+                capabilities["semantic"]["status"] = "unavailable"
+            elif self.config.enable_semantic:
+                capabilities["semantic"]["status"] = "operational"
+            else:
+                capabilities["semantic"]["status"] = "disabled_by_config"
+
+        return capabilities
+
     def get_statistics(self) -> Dict[str, Any]:
-        """Get search statistics."""
+        """Get search statistics including semantic availability."""
         stats = dict(self._search_stats)
 
         # Add cache statistics
@@ -701,6 +827,18 @@ class HybridSearch:
             },
             "rrf_k": self.config.rrf_k,
         }
+
+        # Add semantic search availability status
+        stats["semantic_status"] = {
+            "configured": self.semantic_indexer is not None,
+            "temporarily_disabled": self._semantic_temporarily_disabled,
+        }
+
+        if self.semantic_indexer:
+            stats["semantic_status"].update({
+                "available": self.semantic_indexer.is_available,
+                "connection_mode": self.semantic_indexer.connection_mode,
+            })
 
         return stats
 
