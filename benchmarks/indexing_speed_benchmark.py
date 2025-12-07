@@ -424,7 +424,10 @@ Invalid inputs return empty results.
     
     def save_results(self, results: dict, filename: str = "indexing_speed_benchmark_results.json"):
         """Save benchmark results."""
-        output_path = f"/app/benchmarks/{filename}"
+        # Use environment variable or fallback to relative path for CI/CD compatibility
+        base_path = os.environ.get('BENCHMARK_OUTPUT_DIR', os.path.dirname(os.path.abspath(__file__)))
+        output_path = os.path.join(base_path, filename)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, 'w') as f:
             json.dump(results, f, indent=2)
         print(f"\nResults saved to {output_path}")
