@@ -23,3 +23,8 @@ build-backend = "setuptools.build_meta"
 where = ["."]
 include = ["mcp_server*"]
 exclude = ["tests*", "data*", "logs*", "config*", "backup*", "docker*", "ai_docs*", "test_results*", "architecture*", "nginx*", "k8s*"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]

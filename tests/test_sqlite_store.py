@@ -720,6 +720,121 @@ class TestConcurrency:
         assert len(results) == 20
 
 
+class TestSQLiteStoreHealthCheck:
+    """Tests for SQLiteStore.health_check() method."""
+
+    def test_health_check_fresh_database(self, tmp_path):
+        """Verify health check returns healthy for fresh database."""
+        db_path = tmp_path / "test.db"
+        store = SQLiteStore(str(db_path))
+
+        health = store.health_check()
+
+        assert health["status"] == "healthy"
+        assert health["fts5"] == True
+        assert health["wal"] == True
+        assert health["version"] >= 1
+        assert health["error"] is None
+        # Check all required tables exist
+        assert health["tables"]["file_moves"] == True
+        assert health["tables"]["files"] == True
+        assert health["tables"]["symbols"] == True
+        assert health["tables"]["repositories"] == True
+        assert health["tables"]["schema_version"] == True
+
+    def test_health_check_missing_tables(self, tmp_path):
+        """Verify health check detects missing tables."""
+        # Create database with missing tables
+        db_path = tmp_path / "incomplete.db"
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("CREATE TABLE schema_version (version INTEGER PRIMARY KEY)")
+        conn.execute("INSERT INTO schema_version VALUES (1)")
+        conn.close()
+
+        store = SQLiteStore(str(db_path))
+        health = store.health_check()
+
+        assert health["status"] in ["degraded", "unhealthy"]
+        assert health["error"] is not None
+        assert "missing" in health["error"].lower()
+
+    def test_health_check_file_moves_table_exists(self, tmp_path):
+        """Verify file_moves table is created in fresh database."""
+        db_path = tmp_path / "test.db"
+        store = SQLiteStore(str(db_path))
+
+        health = store.health_check()
+
+        assert health["tables"]["file_moves"] == True
+
+    def test_check_column_exists(self, tmp_path):
+        """Test _check_column_exists helper."""
+        db_path = tmp_path / "test.db"
+        store = SQLiteStore(str(db_path))
+
+        # Use a connection to test
+        conn = sqlite3.connect(str(db_path))
+
+        # Should return True for existing columns
+        assert store._check_column_exists(conn, "files", "path") == True
+        assert store._check_column_exists(conn, "files", "language") == True
+        assert store._check_column_exists(conn, "files", "relative_path") == True
+
+        # Should return False for non-existing columns
+        assert store._check_column_exists(conn, "files", "nonexistent_column") == False
+
+        conn.close()
+
+    def test_health_check_all_core_tables(self, tmp_path):
+        """Verify all core tables are checked by health_check."""
+        db_path = tmp_path / "test.db"
+        store = SQLiteStore(str(db_path))
+
+        health = store.health_check()
+
+        # Verify all core tables are present in the check
+        core_tables = [
+            "schema_version", "repositories", "files", "symbols",
+            "symbol_references", "imports", "fts_symbols", "fts_code",
+            "symbol_trigrams", "embeddings", "query_cache", "parse_cache",
+            "migrations", "index_config", "file_moves"
+        ]
+
+        for table in core_tables:
+            assert table in health["tables"], f"Table {table} not checked in health_check"
+            assert health["tables"][table] == True, f"Table {table} should exist in fresh database"
+
+    def test_health_check_fts5_support(self, tmp_path):
+        """Verify health check reports FTS5 support."""
+        db_path = tmp_path / "test.db"
+        store = SQLiteStore(str(db_path))
+
+        health = store.health_check()
+
+        # FTS5 should be available in modern SQLite
+        assert health["fts5"] == True
+
+    def test_health_check_wal_mode(self, tmp_path):
+        """Verify health check reports WAL mode."""
+        db_path = tmp_path / "test.db"
+        store = SQLiteStore(str(db_path))
+
+        health = store.health_check()
+
+        # WAL mode should be enabled by _init_database
+        assert health["wal"] == True
+
+    def test_health_check_schema_version(self, tmp_path):
+        """Verify health check returns schema version."""
+        db_path = tmp_path / "test.db"
+        store = SQLiteStore(str(db_path))
+
+        health = store.health_check()
+
+        # Fresh database should have version 1
+        assert health["version"] == 1
+
+
 class TestPerformance:
     """Performance benchmarks for database operations."""
 

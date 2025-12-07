@@ -49,7 +49,7 @@ app = FastAPI(
     title="MCP Server",
     description="Code Index MCP Server with Security, Metrics, and Health Checks",
 )
-dispatcher: Dispatcher | None = None
+dispatcher: EnhancedDispatcher | None = None
 sqlite_store: SQLiteStore | None = None
 file_watcher: FileWatcher | None = None
 plugin_manager: PluginManager | None = None

@@ -76,6 +76,14 @@ class SQLiteStore:
             else:
                 logger.info(f"Using existing database at {self.db_path}")
 
+                # Check for missing columns that may need migration
+                if not self._check_column_exists(conn, "files", "content_hash"):
+                    logger.warning("Column 'content_hash' missing from 'files' table - migration may be needed")
+                if not self._check_column_exists(conn, "files", "is_deleted"):
+                    logger.warning("Column 'is_deleted' missing from 'files' table - migration may be needed")
+                if not self._check_column_exists(conn, "files", "deleted_at"):
+                    logger.warning("Column 'deleted_at' missing from 'files' table - migration may be needed")
+
     def _run_migrations(self):
         """Run any pending database migrations."""
         # Skip migrations for BM25-only databases
@@ -142,6 +150,16 @@ class SQLiteStore:
             return fts5_enabled
         except Exception as e:
             logger.warning(f"Could not check FTS5 support: {e}")
+            return False
+
+    def _check_column_exists(self, conn: sqlite3.Connection, table: str, column: str) -> bool:
+        """Check if a column exists in a table."""
+        try:
+            cursor = conn.execute(f"PRAGMA table_info({table})")
+            columns = [row[1] for row in cursor.fetchall()]
+            return column in columns
+        except Exception as e:
+            logger.warning(f"Could not check column {table}.{column}: {e}")
             return False
 
     def _init_schema(self, conn: sqlite3.Connection):
@@ -314,16 +332,33 @@ class SQLiteStore:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 description TEXT
             );
-            
+
+            -- File Moves Tracking
+            CREATE TABLE IF NOT EXISTS file_moves (
+                id INTEGER PRIMARY KEY,
+                repository_id INTEGER NOT NULL,
+                old_relative_path TEXT NOT NULL,
+                new_relative_path TEXT NOT NULL,
+                content_hash TEXT NOT NULL,
+                moved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                move_type TEXT CHECK(move_type IN ('rename', 'relocate', 'restructure')),
+                FOREIGN KEY (repository_id) REFERENCES repositories(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_moves_content_hash ON file_moves(content_hash);
+            CREATE INDEX IF NOT EXISTS idx_moves_timestamp ON file_moves(moved_at);
+            CREATE INDEX IF NOT EXISTS idx_moves_old_path ON file_moves(old_relative_path);
+            CREATE INDEX IF NOT EXISTS idx_moves_new_path ON file_moves(new_relative_path);
+
             -- Insert initial index configuration
             INSERT OR IGNORE INTO index_config (config_key, config_value, description) VALUES
                 ('embedding_model', 'voyage-code-3', 'Current embedding model used for vector search'),
                 ('model_dimension', '1024', 'Embedding vector dimension'),
                 ('distance_metric', 'cosine', 'Distance metric for vector similarity'),
                 ('index_version', '1.0', 'Index schema version');
-            
+
             -- Insert initial schema version
-            INSERT INTO schema_version (version, description) 
+            INSERT INTO schema_version (version, description)
             VALUES (1, 'Initial schema creation');
         """
         )
@@ -764,6 +799,96 @@ class SQLiteStore:
                 cursor = conn.execute(f"SELECT COUNT(*) FROM {table}")
                 stats[table] = cursor.fetchone()[0]
         return stats
+
+    def health_check(self) -> Dict[str, Any]:
+        """
+        Perform health check on database.
+
+        Returns:
+            Dictionary containing:
+            - status: "healthy" | "degraded" | "unhealthy"
+            - tables: Dict[str, bool] - table existence check
+            - fts5: bool - FTS5 availability
+            - wal: bool - WAL mode status
+            - version: int - schema version (0 if not available)
+            - error: Optional[str] - error message if unhealthy
+        """
+        result = {
+            "status": "healthy",
+            "tables": {},
+            "fts5": False,
+            "wal": False,
+            "version": 0,
+            "error": None
+        }
+
+        try:
+            with self._get_connection() as conn:
+                # Check required tables
+                required_tables = [
+                    "schema_version",
+                    "repositories",
+                    "files",
+                    "symbols",
+                    "symbol_references",
+                    "imports",
+                    "fts_symbols",
+                    "fts_code",
+                    "symbol_trigrams",
+                    "embeddings",
+                    "query_cache",
+                    "parse_cache",
+                    "migrations",
+                    "index_config",
+                    "file_moves"
+                ]
+
+                for table in required_tables:
+                    cursor = conn.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                        (table,)
+                    )
+                    result["tables"][table] = cursor.fetchone() is not None
+
+                # Check FTS5 support
+                result["fts5"] = self._check_fts5_support(conn)
+
+                # Check WAL mode
+                cursor = conn.execute("PRAGMA journal_mode")
+                journal_mode = cursor.fetchone()[0].upper()
+                result["wal"] = journal_mode == "WAL"
+
+                # Get schema version
+                if result["tables"].get("schema_version", False):
+                    try:
+                        cursor = conn.execute("SELECT MAX(version) FROM schema_version")
+                        version_row = cursor.fetchone()
+                        result["version"] = version_row[0] if version_row and version_row[0] else 0
+                    except sqlite3.OperationalError:
+                        result["version"] = 0
+
+                # Determine health status
+                missing_tables = [table for table, exists in result["tables"].items() if not exists]
+                if missing_tables:
+                    if len(missing_tables) > 5:
+                        result["status"] = "unhealthy"
+                        result["error"] = f"Critical tables missing: {', '.join(missing_tables[:5])} and {len(missing_tables) - 5} more"
+                    else:
+                        result["status"] = "degraded"
+                        result["error"] = f"Some tables missing: {', '.join(missing_tables)}"
+                elif not result["fts5"]:
+                    result["status"] = "degraded"
+                    result["error"] = "FTS5 support not available - search functionality limited"
+                elif not result["wal"]:
+                    result["status"] = "degraded"
+                    result["error"] = "WAL mode not enabled - concurrency may be affected"
+
+        except Exception as e:
+            result["status"] = "unhealthy"
+            result["error"] = f"Database health check failed: {str(e)}"
+            logger.error(f"Health check error: {e}")
+
+        return result
 
     # Enhanced FTS5 search methods for BM25
 
