@@ -87,7 +87,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile.production
+          file: ./docker/dockerfiles/Dockerfile.production
           platforms: ${{ matrix.platform }}
           push: false
           tags: ${{ steps.meta.outputs.tags }}
@@ -101,9 +101,9 @@ jobs:
             VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: image-${{ matrix.platform }}
+          name: image-${{ strategy.job-index }}
           path: /tmp/image-${{ matrix.platform }}.tar
           retention-days: 1
 
@@ -122,9 +122,9 @@ jobs:
     
     steps:
       - name: Download artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: image-${{ matrix.platform }}
+          name: image-${{ strategy.job-index }}
           path: /tmp
 
       - name: Load Docker image
@@ -162,9 +162,9 @@ jobs:
           output-file: sbom-${{ matrix.platform }}.spdx.json
 
       - name: Upload SBOM
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: sbom-${{ matrix.platform }}
+          name: sbom-${{ strategy.job-index }}
           path: sbom-${{ matrix.platform }}.spdx.json
 
   push-manifests:
@@ -187,7 +187,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: /tmp/artifacts
 

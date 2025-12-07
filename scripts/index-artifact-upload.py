@@ -23,7 +23,7 @@ sys.path.insert(0, str(project_root))
 
 from mcp_server.config.settings import get_settings
 # Import secure export functionality
-sys.path.insert(0, str(project_root.parent))
+sys.path.insert(0, str(project_root / "scripts" / "utilities"))
 from secure_index_export import SecureIndexExporter
 
 
