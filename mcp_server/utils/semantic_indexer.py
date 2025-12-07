@@ -76,6 +76,8 @@ class SemanticIndexer:
         self.path_resolver = path_resolver or PathResolver()
 
         # Initialize Qdrant client with server mode preference
+        self._qdrant_available = False
+        self._connection_mode = None  # 'server', 'file', or 'memory'
         self.qdrant = self._init_qdrant_client(qdrant_path)
         self.wrapper = TreeSitterWrapper()
 
@@ -103,54 +105,198 @@ class SemanticIndexer:
         self._update_metadata()
         
     def _init_qdrant_client(self, qdrant_path: str) -> QdrantClient:
-        """Initialize Qdrant client with server mode preference."""
+        """Initialize Qdrant client with server mode preference.
+
+        Tries to connect in the following order:
+        1. Server mode (if QDRANT_USE_SERVER=true)
+        2. Explicit HTTP URL (if qdrant_path starts with http)
+        3. Memory mode (if qdrant_path is :memory:)
+        4. File-based mode (local storage)
+
+        Sets _qdrant_available and _connection_mode on success.
+
+        Returns:
+            Configured QdrantClient instance
+
+        Raises:
+            RuntimeError: If all connection methods fail
+        """
         # First, try server mode (recommended for concurrent access)
         server_url = os.environ.get("QDRANT_URL", "http://localhost:6333")
-        
+
         if os.environ.get("QDRANT_USE_SERVER", "true").lower() == "true":
             try:
                 # Try connecting to Qdrant server
+                logger.info(f"Attempting to connect to Qdrant server at {server_url}")
                 client = QdrantClient(url=server_url, timeout=5)
-                # Test connection
+                # Test connection with actual API call
                 client.get_collections()
-                logging.info(f"Connected to Qdrant server at {server_url}")
+                logger.info(f"Successfully connected to Qdrant server at {server_url}")
+                self._qdrant_available = True
+                self._connection_mode = "server"
                 return client
             except Exception as e:
-                logging.warning(f"Qdrant server not available at {server_url}: {e}")
-        
+                logger.warning(
+                    f"Qdrant server not available at {server_url}: {type(e).__name__}: {e}. "
+                    "Falling back to file-based mode."
+                )
+
         # Support explicit HTTP URLs
         if qdrant_path.startswith("http"):
-            return QdrantClient(url=qdrant_path)
-        
+            try:
+                logger.info(f"Connecting to Qdrant at explicit URL: {qdrant_path}")
+                client = QdrantClient(url=qdrant_path, timeout=5)
+                # Test connection
+                client.get_collections()
+                logger.info(f"Successfully connected to Qdrant at {qdrant_path}")
+                self._qdrant_available = True
+                self._connection_mode = "server"
+                return client
+            except Exception as e:
+                logger.error(
+                    f"Failed to connect to Qdrant server at {qdrant_path}: {type(e).__name__}: {e}"
+                )
+                raise RuntimeError(
+                    f"Cannot connect to Qdrant server at {qdrant_path}. "
+                    f"Error: {e}. Please check the URL and ensure the server is running."
+                )
+
         # Memory mode
         if qdrant_path == ":memory:":
-            return QdrantClient(location=":memory:")
-        
+            try:
+                logger.info("Initializing Qdrant in memory mode")
+                client = QdrantClient(location=":memory:")
+                self._qdrant_available = True
+                self._connection_mode = "memory"
+                logger.info("Qdrant memory mode initialized successfully")
+                return client
+            except Exception as e:
+                logger.error(f"Failed to initialize Qdrant in memory mode: {e}")
+                raise RuntimeError(f"Failed to initialize Qdrant in memory mode: {e}")
+
         # Local file path with lock cleanup
         try:
+            logger.info(f"Initializing file-based Qdrant at {qdrant_path}")
+
             # Clean up any stale locks
             lock_file = Path(qdrant_path) / ".lock"
             if lock_file.exists():
-                logging.warning(f"Removing stale Qdrant lock file: {lock_file}")
-                lock_file.unlink()
-            
+                logger.warning(f"Removing stale Qdrant lock file: {lock_file}")
+                try:
+                    lock_file.unlink()
+                except Exception as lock_error:
+                    logger.error(f"Failed to remove lock file: {lock_error}")
+                    # Continue anyway - Qdrant might handle it
+
             client = QdrantClient(path=qdrant_path)
-            logging.info(f"Using file-based Qdrant at {qdrant_path}")
+            # Test that client is functional
+            try:
+                client.get_collections()
+            except Exception as test_error:
+                logger.warning(f"Initial collection check failed: {test_error}")
+                # This is okay - collection might not exist yet
+
+            self._qdrant_available = True
+            self._connection_mode = "file"
+            logger.info(f"File-based Qdrant initialized successfully at {qdrant_path}")
             return client
         except Exception as e:
-            logging.error(f"Failed to initialize Qdrant: {e}")
-            raise
+            logger.error(
+                f"Failed to initialize file-based Qdrant at {qdrant_path}: "
+                f"{type(e).__name__}: {e}"
+            )
+            raise RuntimeError(
+                f"Failed to initialize Qdrant vector store. "
+                f"Attempted path: {qdrant_path}. Error: {e}. "
+                f"Please check file permissions and disk space."
+            )
+
+    @property
+    def is_available(self) -> bool:
+        """Check if Qdrant is available without throwing exceptions.
+
+        This property can be used by other components (like HybridSearch)
+        to gracefully degrade functionality when Qdrant is unavailable.
+
+        Returns:
+            True if Qdrant is initialized and available, False otherwise
+        """
+        return self._qdrant_available
+
+    @property
+    def connection_mode(self) -> Optional[str]:
+        """Get the current connection mode.
+
+        Returns:
+            'server', 'file', 'memory', or None if not connected
+        """
+        return self._connection_mode
+
+    def validate_connection(self) -> bool:
+        """Validate that the Qdrant connection is still active.
+
+        This method is useful for long-running processes to ensure
+        the connection hasn't been lost or corrupted.
+
+        Returns:
+            True if connection is valid and responsive, False otherwise
+        """
+        if not self._qdrant_available:
+            logger.warning("Qdrant is not available - connection was never established")
+            return False
+
+        try:
+            # Attempt a simple operation to verify connection
+            collections = self.qdrant.get_collections()
+            # Check if our collection exists
+            collection_exists = any(
+                c.name == self.collection for c in collections.collections
+            )
+            if collection_exists:
+                logger.debug(f"Qdrant connection valid - collection '{self.collection}' exists")
+            else:
+                logger.warning(
+                    f"Qdrant connection active but collection '{self.collection}' not found"
+                )
+            return True
+        except Exception as e:
+            logger.error(
+                f"Qdrant connection validation failed: {type(e).__name__}: {e}"
+            )
+            self._qdrant_available = False
+            return False
 
     def _ensure_collection(self) -> None:
-        exists = any(
-            c.name == self.collection for c in self.qdrant.get_collections().collections
-        )
-        if not exists:
-            self.qdrant.recreate_collection(
-                collection_name=self.collection,
-                vectors_config=models.VectorParams(
-                    size=1024, distance=models.Distance.COSINE
-                ),
+        """Ensure the collection exists in Qdrant.
+
+        Raises:
+            RuntimeError: If collection cannot be created or verified
+        """
+        if not self._qdrant_available:
+            raise RuntimeError("Qdrant is not available - cannot ensure collection")
+
+        try:
+            collections = self.qdrant.get_collections()
+            exists = any(c.name == self.collection for c in collections.collections)
+
+            if not exists:
+                logger.info(f"Creating Qdrant collection: {self.collection}")
+                self.qdrant.recreate_collection(
+                    collection_name=self.collection,
+                    vectors_config=models.VectorParams(
+                        size=1024, distance=models.Distance.COSINE
+                    ),
+                )
+                logger.info(f"Successfully created collection: {self.collection}")
+            else:
+                logger.debug(f"Collection already exists: {self.collection}")
+        except Exception as e:
+            logger.error(
+                f"Failed to ensure collection '{self.collection}': {type(e).__name__}: {e}"
+            )
+            self._qdrant_available = False
+            raise RuntimeError(
+                f"Failed to create or verify Qdrant collection '{self.collection}': {e}"
             )
 
     # ------------------------------------------------------------------
@@ -312,7 +458,23 @@ class SemanticIndexer:
                     )
                 )
 
-            self.qdrant.upsert(collection_name=self.collection, points=points)
+            # Upsert to Qdrant with error handling
+            if not self._qdrant_available:
+                raise RuntimeError(
+                    f"Qdrant is not available - cannot index file {path}"
+                )
+
+            try:
+                self.qdrant.upsert(collection_name=self.collection, points=points)
+            except Exception as e:
+                logger.error(
+                    f"Failed to upsert {len(points)} points for file {path}: "
+                    f"{type(e).__name__}: {e}"
+                )
+                self._qdrant_available = False
+                raise RuntimeError(
+                    f"Failed to store embeddings for {path} in Qdrant: {e}"
+                )
 
         return {
             "file": str(path),
@@ -331,26 +493,53 @@ class SemanticIndexer:
 
     # ------------------------------------------------------------------
     def query(self, text: str, limit: int = 5) -> Iterable[dict[str, Any]]:
-        """Query indexed code snippets using a natural language description."""
+        """Query indexed code snippets using a natural language description.
 
-        embedding = self.voyage.embed(
-            [text],
-            model="voyage-code-3",
-            input_type="document",
-            output_dimension=1024,
-            output_dtype="float",
-        ).embeddings[0]
+        Args:
+            text: Natural language query
+            limit: Maximum number of results
 
-        results = self.qdrant.search(
-            collection_name=self.collection,
-            query_vector=embedding,
-            limit=limit,
-        )
+        Yields:
+            Search results with metadata and scores
 
-        for res in results:
-            payload = res.payload or {}
-            payload["score"] = res.score
-            yield payload
+        Raises:
+            RuntimeError: If Qdrant is unavailable or query fails
+        """
+        if not self._qdrant_available:
+            raise RuntimeError(
+                "Qdrant is not available - cannot perform semantic search. "
+                "Check connection status with validate_connection()."
+            )
+
+        try:
+            embedding = self.voyage.embed(
+                [text],
+                model="voyage-code-3",
+                input_type="document",
+                output_dimension=1024,
+                output_dtype="float",
+            ).embeddings[0]
+        except Exception as e:
+            raise RuntimeError(f"Failed to generate query embedding: {e}")
+
+        try:
+            results = self.qdrant.search(
+                collection_name=self.collection,
+                query_vector=embedding,
+                limit=limit,
+            )
+
+            for res in results:
+                payload = res.payload or {}
+                payload["score"] = res.score
+                yield payload
+        except Exception as e:
+            logger.error(f"Qdrant search failed: {type(e).__name__}: {e}")
+            self._qdrant_available = False
+            raise RuntimeError(
+                f"Semantic search failed - Qdrant error: {e}. "
+                "Connection may have been lost."
+            )
 
     # ------------------------------------------------------------------
     def index_symbol(
@@ -429,8 +618,21 @@ class SemanticIndexer:
 
             point = models.PointStruct(id=point_id, vector=embedding, payload=payload)
 
-            # Upsert to Qdrant
-            self.qdrant.upsert(collection_name=self.collection, points=[point])
+            # Upsert to Qdrant with error handling
+            if not self._qdrant_available:
+                raise RuntimeError("Qdrant is not available - cannot index symbol")
+
+            try:
+                self.qdrant.upsert(collection_name=self.collection, points=[point])
+            except Exception as upsert_error:
+                logger.error(
+                    f"Qdrant upsert failed for symbol '{name}': "
+                    f"{type(upsert_error).__name__}: {upsert_error}"
+                )
+                self._qdrant_available = False
+                raise RuntimeError(
+                    f"Failed to store symbol '{name}' in Qdrant: {upsert_error}"
+                )
         except Exception as e:
             if "API key" in str(e) or "authentication" in str(e).lower():
                 raise RuntimeError(
@@ -452,7 +654,15 @@ class SemanticIndexer:
 
         Returns:
             List of search results with metadata and scores
+
+        Raises:
+            RuntimeError: If Qdrant is unavailable or search fails
         """
+        if not self._qdrant_available:
+            raise RuntimeError(
+                "Qdrant is not available - semantic search unavailable. "
+                "Use is_available property to check before calling."
+            )
         return list(self.query(query, limit))
 
     # ------------------------------------------------------------------
@@ -668,9 +878,24 @@ class SemanticIndexer:
                 }
             )
 
-        # Upsert all sections
+        # Upsert all sections with error handling
         if points:
-            self.qdrant.upsert(collection_name=self.collection, points=points)
+            if not self._qdrant_available:
+                raise RuntimeError(
+                    f"Qdrant is not available - cannot index document {path}"
+                )
+
+            try:
+                self.qdrant.upsert(collection_name=self.collection, points=points)
+            except Exception as e:
+                logger.error(
+                    f"Failed to upsert {len(points)} sections for document {path}: "
+                    f"{type(e).__name__}: {e}"
+                )
+                self._qdrant_available = False
+                raise RuntimeError(
+                    f"Failed to store document sections for {path} in Qdrant: {e}"
+                )
 
         return {
             "file": str(path),
@@ -701,22 +926,40 @@ class SemanticIndexer:
 
         Returns:
             Weighted and filtered search results
-        """
-        # Generate query embedding
-        embedding = self.voyage.embed(
-            [query],
-            model="voyage-code-3",
-            input_type="query",  # Use query type for natural language
-            output_dimension=1024,
-            output_dtype="float",
-        ).embeddings[0]
 
-        # Search with higher limit to allow filtering
-        results = self.qdrant.search(
-            collection_name=self.collection,
-            query_vector=embedding,
-            limit=limit * 2 if doc_types else limit,
-        )
+        Raises:
+            RuntimeError: If Qdrant is unavailable or query fails
+        """
+        if not self._qdrant_available:
+            raise RuntimeError(
+                "Qdrant is not available - cannot perform natural language query"
+            )
+
+        try:
+            # Generate query embedding
+            embedding = self.voyage.embed(
+                [query],
+                model="voyage-code-3",
+                input_type="query",  # Use query type for natural language
+                output_dimension=1024,
+                output_dtype="float",
+            ).embeddings[0]
+        except Exception as e:
+            raise RuntimeError(f"Failed to generate query embedding: {e}")
+
+        try:
+            # Search with higher limit to allow filtering
+            results = self.qdrant.search(
+                collection_name=self.collection,
+                query_vector=embedding,
+                limit=limit * 2 if doc_types else limit,
+            )
+        except Exception as e:
+            logger.error(
+                f"Qdrant natural language query failed: {type(e).__name__}: {e}"
+            )
+            self._qdrant_available = False
+            raise RuntimeError(f"Natural language query failed - Qdrant error: {e}")
 
         weighted_results = []
 
@@ -807,7 +1050,15 @@ class SemanticIndexer:
 
         Returns:
             Number of points removed
+
+        Raises:
+            RuntimeError: If Qdrant is unavailable or deletion fails
         """
+        if not self._qdrant_available:
+            raise RuntimeError(
+                f"Qdrant is not available - cannot remove file {file_path}"
+            )
+
         # Normalize to relative path
         try:
             relative_path = self.path_resolver.normalize_path(file_path)
@@ -824,29 +1075,36 @@ class SemanticIndexer:
             ]
         )
 
-        # Get count before deletion for logging
-        search_result = self.qdrant.search(
-            collection_name=self.collection,
-            query_vector=[0.0] * 1024,  # Dummy vector
-            filter=filter_condition,
-            limit=1000,  # Get all matches
-            with_payload=False,
-            with_vectors=False,
-        )
-
-        point_ids = [point.id for point in search_result]
-
-        if point_ids:
-            # Delete all points
-            self.qdrant.delete(
+        try:
+            # Get count before deletion for logging
+            search_result = self.qdrant.search(
                 collection_name=self.collection,
-                points_selector=models.PointIdsList(points=point_ids),
-            )
-            logger.info(
-                f"Removed {len(point_ids)} embeddings for file: {relative_path}"
+                query_vector=[0.0] * 1024,  # Dummy vector
+                filter=filter_condition,
+                limit=1000,  # Get all matches
+                with_payload=False,
+                with_vectors=False,
             )
 
-        return len(point_ids)
+            point_ids = [point.id for point in search_result]
+
+            if point_ids:
+                # Delete all points
+                self.qdrant.delete(
+                    collection_name=self.collection,
+                    points_selector=models.PointIdsList(points=point_ids),
+                )
+                logger.info(
+                    f"Removed {len(point_ids)} embeddings for file: {relative_path}"
+                )
+
+            return len(point_ids)
+        except Exception as e:
+            logger.error(
+                f"Failed to remove file {relative_path}: {type(e).__name__}: {e}"
+            )
+            self._qdrant_available = False
+            raise RuntimeError(f"Failed to remove file {relative_path} from Qdrant: {e}")
 
     def move_file(
         self,
@@ -863,7 +1121,15 @@ class SemanticIndexer:
 
         Returns:
             Number of points updated
+
+        Raises:
+            RuntimeError: If Qdrant is unavailable or update fails
         """
+        if not self._qdrant_available:
+            raise RuntimeError(
+                f"Qdrant is not available - cannot move file {old_path} -> {new_path}"
+            )
+
         # Normalize paths
         old_relative = self.path_resolver.normalize_path(old_path)
         new_relative = self.path_resolver.normalize_path(new_path)
@@ -877,76 +1143,86 @@ class SemanticIndexer:
             ]
         )
 
-        # Search for all points
-        search_result = self.qdrant.search(
-            collection_name=self.collection,
-            query_vector=[0.0] * 1024,  # Dummy vector
-            filter=filter_condition,
-            limit=1000,
-            with_payload=True,
-            with_vectors=False,
-        )
-
-        if not search_result:
-            logger.warning(f"No embeddings found for file: {old_relative}")
-            return 0
-
-        # Update payloads with new path
-        updated_points = []
-        for point in search_result:
-            # Update payload
-            new_payload = point.payload.copy()
-            new_payload["relative_path"] = new_relative
-            new_payload["file"] = str(new_path)  # Update absolute path too
-
-            # Verify content hash if provided
-            if content_hash and new_payload.get("content_hash") != content_hash:
-                logger.warning(
-                    f"Content hash mismatch for {old_relative} -> {new_relative}"
-                )
-                continue
-
-            updated_points.append(
-                models.PointStruct(
-                    id=point.id,
-                    payload=new_payload,
-                    vector=[],  # Empty vector, we're only updating payload
-                )
-            )
-
-        # Batch update payloads
-        if updated_points:
-            # Qdrant doesn't support payload-only updates directly,
-            # so we need to re-fetch vectors and update
-            point_ids = [p.id for p in updated_points]
-
-            # Fetch full points with vectors
-            full_points = self.qdrant.retrieve(
+        try:
+            # Search for all points
+            search_result = self.qdrant.search(
                 collection_name=self.collection,
-                ids=point_ids,
+                query_vector=[0.0] * 1024,  # Dummy vector
+                filter=filter_condition,
+                limit=1000,
                 with_payload=True,
-                with_vectors=True,
+                with_vectors=False,
             )
 
-            # Create new points with updated payloads
-            new_points = []
-            for i, full_point in enumerate(full_points):
-                new_points.append(
+            if not search_result:
+                logger.warning(f"No embeddings found for file: {old_relative}")
+                return 0
+
+            # Update payloads with new path
+            updated_points = []
+            for point in search_result:
+                # Update payload
+                new_payload = point.payload.copy()
+                new_payload["relative_path"] = new_relative
+                new_payload["file"] = str(new_path)  # Update absolute path too
+
+                # Verify content hash if provided
+                if content_hash and new_payload.get("content_hash") != content_hash:
+                    logger.warning(
+                        f"Content hash mismatch for {old_relative} -> {new_relative}"
+                    )
+                    continue
+
+                updated_points.append(
                     models.PointStruct(
-                        id=full_point.id,
-                        vector=full_point.vector,
-                        payload=updated_points[i].payload,
+                        id=point.id,
+                        payload=new_payload,
+                        vector=[],  # Empty vector, we're only updating payload
                     )
                 )
 
-            # Upsert updated points
-            self.qdrant.upsert(collection_name=self.collection, points=new_points)
+            # Batch update payloads
+            if updated_points:
+                # Qdrant doesn't support payload-only updates directly,
+                # so we need to re-fetch vectors and update
+                point_ids = [p.id for p in updated_points]
 
-            logger.info(
-                f"Updated {len(new_points)} embeddings: {old_relative} -> {new_relative}"
+                # Fetch full points with vectors
+                full_points = self.qdrant.retrieve(
+                    collection_name=self.collection,
+                    ids=point_ids,
+                    with_payload=True,
+                    with_vectors=True,
+                )
+
+                # Create new points with updated payloads
+                new_points = []
+                for i, full_point in enumerate(full_points):
+                    new_points.append(
+                        models.PointStruct(
+                            id=full_point.id,
+                            vector=full_point.vector,
+                            payload=updated_points[i].payload,
+                        )
+                    )
+
+                # Upsert updated points
+                self.qdrant.upsert(collection_name=self.collection, points=new_points)
+
+                logger.info(
+                    f"Updated {len(new_points)} embeddings: {old_relative} -> {new_relative}"
+                )
+
+            return len(updated_points)
+        except Exception as e:
+            logger.error(
+                f"Failed to move file {old_relative} -> {new_relative}: "
+                f"{type(e).__name__}: {e}"
             )
-
-        return len(updated_points)
+            self._qdrant_available = False
+            raise RuntimeError(
+                f"Failed to move file {old_relative} -> {new_relative} in Qdrant: {e}"
+            )
 
     def get_embeddings_by_content_hash(self, content_hash: str) -> List[Dict[str, Any]]:
         """Get all embeddings with a specific content hash.
@@ -956,23 +1232,40 @@ class SemanticIndexer:
 
         Returns:
             List of embedding metadata
+
+        Raises:
+            RuntimeError: If Qdrant is unavailable or query fails
         """
+        if not self._qdrant_available:
+            raise RuntimeError(
+                "Qdrant is not available - cannot query embeddings by content hash"
+            )
+
         filter_condition = Filter(
             must=[
                 FieldCondition(key="content_hash", match=MatchValue(value=content_hash))
             ]
         )
 
-        results = self.qdrant.search(
-            collection_name=self.collection,
-            query_vector=[0.0] * 1024,  # Dummy vector
-            filter=filter_condition,
-            limit=1000,
-            with_payload=True,
-            with_vectors=False,
-        )
+        try:
+            results = self.qdrant.search(
+                collection_name=self.collection,
+                query_vector=[0.0] * 1024,  # Dummy vector
+                filter=filter_condition,
+                limit=1000,
+                with_payload=True,
+                with_vectors=False,
+            )
 
-        return [{"id": res.id, **res.payload} for res in results]
+            return [{"id": res.id, **res.payload} for res in results]
+        except Exception as e:
+            logger.error(
+                f"Failed to get embeddings by content hash: {type(e).__name__}: {e}"
+            )
+            self._qdrant_available = False
+            raise RuntimeError(
+                f"Failed to query embeddings by content hash in Qdrant: {e}"
+            )
 
     def mark_file_deleted(self, file_path: Union[str, Path]) -> int:
         """Mark all embeddings for a file as deleted (soft delete).
@@ -982,7 +1275,15 @@ class SemanticIndexer:
 
         Returns:
             Number of points marked as deleted
+
+        Raises:
+            RuntimeError: If Qdrant is unavailable or update fails
         """
+        if not self._qdrant_available:
+            raise RuntimeError(
+                f"Qdrant is not available - cannot mark file {file_path} as deleted"
+            )
+
         # This is similar to move_file but only updates is_deleted flag
         relative_path = self.path_resolver.normalize_path(file_path)
 
@@ -994,46 +1295,56 @@ class SemanticIndexer:
             ]
         )
 
-        # Search and update
-        search_result = self.qdrant.search(
-            collection_name=self.collection,
-            query_vector=[0.0] * 1024,
-            filter=filter_condition,
-            limit=1000,
-            with_payload=True,
-            with_vectors=False,
-        )
-
-        if not search_result:
-            return 0
-
-        # Update is_deleted flag
-        point_ids = []
-        for point in search_result:
-            point.payload["is_deleted"] = True
-            point_ids.append(point.id)
-
-        # Re-fetch and update (same process as move_file)
-        full_points = self.qdrant.retrieve(
-            collection_name=self.collection,
-            ids=point_ids,
-            with_payload=True,
-            with_vectors=True,
-        )
-
-        updated_points = []
-        for i, full_point in enumerate(full_points):
-            updated_points.append(
-                models.PointStruct(
-                    id=full_point.id,
-                    vector=full_point.vector,
-                    payload=search_result[i].payload,
-                )
+        try:
+            # Search and update
+            search_result = self.qdrant.search(
+                collection_name=self.collection,
+                query_vector=[0.0] * 1024,
+                filter=filter_condition,
+                limit=1000,
+                with_payload=True,
+                with_vectors=False,
             )
 
-        self.qdrant.upsert(collection_name=self.collection, points=updated_points)
+            if not search_result:
+                return 0
 
-        logger.info(
-            f"Marked {len(updated_points)} embeddings as deleted for: {relative_path}"
-        )
-        return len(updated_points)
+            # Update is_deleted flag
+            point_ids = []
+            for point in search_result:
+                point.payload["is_deleted"] = True
+                point_ids.append(point.id)
+
+            # Re-fetch and update (same process as move_file)
+            full_points = self.qdrant.retrieve(
+                collection_name=self.collection,
+                ids=point_ids,
+                with_payload=True,
+                with_vectors=True,
+            )
+
+            updated_points = []
+            for i, full_point in enumerate(full_points):
+                updated_points.append(
+                    models.PointStruct(
+                        id=full_point.id,
+                        vector=full_point.vector,
+                        payload=search_result[i].payload,
+                    )
+                )
+
+            self.qdrant.upsert(collection_name=self.collection, points=updated_points)
+
+            logger.info(
+                f"Marked {len(updated_points)} embeddings as deleted for: {relative_path}"
+            )
+            return len(updated_points)
+        except Exception as e:
+            logger.error(
+                f"Failed to mark file {relative_path} as deleted: "
+                f"{type(e).__name__}: {e}"
+            )
+            self._qdrant_available = False
+            raise RuntimeError(
+                f"Failed to mark file {relative_path} as deleted in Qdrant: {e}"
+            )
