@@ -1,57 +1,52 @@
 """Document processing plugins for code-index-mcp."""
 
 from .base_document_plugin import BaseDocumentPlugin, DocumentMetadata
-
-from .document_interfaces import (
-    DocumentChunk,
-    DocumentStructure,
-    Section,
-    ChunkType,
-    ChunkMetadata,
-    ProcessedDocument,
-    IDocumentProcessor,
-    IChunkStrategy,
-    IStructureExtractor,
-)
-
 from .chunk_optimizer import (
-    ChunkOptimizer,
-    ChunkingStrategy,
     ChunkingConfig,
-    TokenEstimator,
-    SentenceSplitter,
+    ChunkingStrategy,
+    ChunkOptimizer,
+    FixedSizeChunkingStrategy,
+    HybridChunkingStrategy,
+    ParagraphBasedChunkingStrategy,
     ParagraphSplitter,
     SemanticAnalyzer,
-    FixedSizeChunkingStrategy,
-    SentenceBasedChunkingStrategy,
-    ParagraphBasedChunkingStrategy,
     SemanticBasedChunkingStrategy,
-    HybridChunkingStrategy,
+    SentenceBasedChunkingStrategy,
+    SentenceSplitter,
+    TokenEstimator,
     create_chunk_optimizer,
 )
-
-from .metadata_extractor import MetadataExtractor
-
-from .semantic_chunker import (
-    SemanticChunker,
-    DocumentType,
-    DocumentTypeDetector,
-    ContextWindow,
-    ChunkingContext,
-    SemanticBoundaryDetector,
-    HierarchicalChunker,
-    MetadataPreserver,
-    create_semantic_chunker,
-)
-
 from .contextual_embeddings import (
-    ContextualEmbeddingService,
-    DocumentCategory,
+    ContextCache,
     ContextGenerationMetrics,
     ContextPromptTemplate,
+    ContextualEmbeddingService,
+    DocumentCategory,
     PromptTemplateRegistry,
-    ContextCache,
     create_contextual_embedding_service,
+)
+from .document_interfaces import (
+    ChunkMetadata,
+    ChunkType,
+    DocumentChunk,
+    DocumentStructure,
+    IChunkStrategy,
+    IDocumentProcessor,
+    IStructureExtractor,
+    ProcessedDocument,
+    Section,
+)
+from .metadata_extractor import MetadataExtractor
+from .semantic_chunker import (
+    ChunkingContext,
+    ContextWindow,
+    DocumentType,
+    DocumentTypeDetector,
+    HierarchicalChunker,
+    MetadataPreserver,
+    SemanticBoundaryDetector,
+    SemanticChunker,
+    create_semantic_chunker,
 )
 
 __all__ = [

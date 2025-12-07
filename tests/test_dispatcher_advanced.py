@@ -1,28 +1,21 @@
 """Tests for advanced dispatcher components."""
 
-import pytest
 import time
 from pathlib import Path
-from unittest.mock import Mock, MagicMock
-from typing import Dict, List
+from typing import List
 
-from mcp_server.plugin_base import IPlugin, SearchResult, SymbolDef, Reference
+import pytest
+
 from mcp_server.dispatcher import (
-    PluginRouter,
     FileTypeMatcher,
+    PluginCapability,
+    PluginRouter,
+    RankingCriteria,
     ResultAggregator,
-    IPluginRouter,
-    IFileTypeMatcher,
-    IResultAggregator,
     SimpleAggregationStrategy,
     SmartAggregationStrategy,
-    AggregatedResult,
-    AggregationStats,
-    RankingCriteria,
-    PluginCapability,
-    FileTypeInfo,
-    RouteResult,
 )
+from mcp_server.plugin_base import IPlugin, Reference
 
 
 class MockPlugin(IPlugin):
@@ -365,9 +358,7 @@ class TestResultAggregator:
             javascript_plugin: sample_search_results["js_results"],
         }
 
-        aggregated, stats = result_aggregator.aggregate_search_results(
-            results_by_plugin
-        )
+        aggregated, stats = result_aggregator.aggregate_search_results(results_by_plugin)
 
         assert len(aggregated) > 0
         assert stats.total_results == 4  # 2 + 2 results
@@ -381,9 +372,7 @@ class TestResultAggregator:
         """Test search result aggregation with limit."""
         results_by_plugin = {python_plugin: sample_search_results["python_results"]}
 
-        aggregated, stats = result_aggregator.aggregate_search_results(
-            results_by_plugin, limit=1
-        )
+        aggregated, stats = result_aggregator.aggregate_search_results(results_by_plugin, limit=1)
 
         assert len(aggregated) == 1
         assert stats.unique_results == 1
@@ -420,9 +409,7 @@ class TestResultAggregator:
 
         assert best_def == python_def  # Should prefer more complete definition
 
-    def test_aggregate_references(
-        self, result_aggregator, python_plugin, javascript_plugin
-    ):
+    def test_aggregate_references(self, result_aggregator, python_plugin, javascript_plugin):
         """Test reference aggregation."""
         python_refs = [
             Reference(file="/test/file1.py", line=5),
@@ -444,22 +431,16 @@ class TestResultAggregator:
         # Should be sorted by file and line
         assert aggregated_refs[0].file <= aggregated_refs[1].file
 
-    def test_caching_behavior(
-        self, result_aggregator, python_plugin, sample_search_results
-    ):
+    def test_caching_behavior(self, result_aggregator, python_plugin, sample_search_results):
         """Test result caching."""
         results_by_plugin = {python_plugin: sample_search_results["python_results"]}
 
         # First call should miss cache
-        aggregated1, stats1 = result_aggregator.aggregate_search_results(
-            results_by_plugin
-        )
+        aggregated1, stats1 = result_aggregator.aggregate_search_results(results_by_plugin)
         assert stats1.cache_misses > 0
 
         # Second call should hit cache
-        aggregated2, stats2 = result_aggregator.aggregate_search_results(
-            results_by_plugin
-        )
+        aggregated2, stats2 = result_aggregator.aggregate_search_results(results_by_plugin)
         assert stats2.cache_hits > 0
 
         # Results should be the same
@@ -567,9 +548,7 @@ class TestAggregationStrategies:
 class TestIntegration:
     """Integration tests for advanced dispatcher components."""
 
-    def test_router_aggregator_integration(
-        self, plugin_router, python_plugin, javascript_plugin
-    ):
+    def test_router_aggregator_integration(self, plugin_router, python_plugin, javascript_plugin):
         """Test integration between router and aggregator."""
         # Route a Python file
         path = Path("/test/example.py")
@@ -600,9 +579,7 @@ class TestIntegration:
         assert len(aggregated) > 0
         assert stats.plugins_used > 0
 
-    def test_end_to_end_search_flow(
-        self, plugin_router, python_plugin, javascript_plugin
-    ):
+    def test_end_to_end_search_flow(self, plugin_router, python_plugin, javascript_plugin):
         """Test end-to-end search flow with routing and aggregation."""
         # Index some content
         python_plugin.indexFile(
@@ -638,8 +615,7 @@ class TestIntegration:
         assert len(aggregated) > 0
         assert stats.total_results > 0
         assert all(
-            query.lower() in result.primary_result["snippet"].lower()
-            for result in aggregated
+            query.lower() in result.primary_result["snippet"].lower() for result in aggregated
         )
 
     def test_performance_tracking_integration(self, plugin_router, python_plugin):

@@ -9,36 +9,29 @@ This test suite covers:
 - Semantic search integration
 """
 
-import pytest
-import tempfile
-import json
-import time
-from pathlib import Path
-from typing import Dict, List, Any, Tuple
-from unittest.mock import Mock, patch
-from dataclasses import dataclass
-from mcp_server.core.path_utils import PathUtils
-
 # Import the document processing components
 import sys
-sys.path.insert(0, '/app')
+from unittest.mock import Mock, patch
 
+import pytest
+
+sys.path.insert(0, "/app")
+
+from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
 from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
 from mcp_server.plugins.plaintext_plugin.plugin import PlainTextPlugin
-from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
 from mcp_server.storage.sqlite_store import SQLiteStore
-from mcp_server.utils.semantic_indexer import SemanticIndexer
 
 
 class TestNaturalLanguageQueries:
     """Test natural language query processing and understanding."""
-    
+
     @pytest.fixture
     def temp_workspace(self, tmp_path):
         """Create a workspace with various document types."""
         workspace = tmp_path / "search_workspace"
         workspace.mkdir()
-        
+
         # Create installation guide
         install_guide = """# Installation Guide
 
@@ -110,7 +103,7 @@ If download fails:
 - Use offline installation with downloaded packages
 """
         (workspace / "installation.md").write_text(install_guide)
-        
+
         # Create API documentation
         api_docs = """---
 title: API Documentation
@@ -245,7 +238,7 @@ Rate limit headers are included in responses:
 - X-RateLimit-Reset: Reset time (Unix timestamp)
 """
         (workspace / "api.md").write_text(api_docs)
-        
+
         # Create tutorial
         tutorial = """# Getting Started Tutorial
 
@@ -436,7 +429,7 @@ Implement validation and cleansing steps.
 - Check out example projects in our repository
 """
         (workspace / "tutorial.md").write_text(tutorial)
-        
+
         # Create FAQ
         faq = """# Frequently Asked Questions
 
@@ -694,75 +687,79 @@ Yes! Join our:
 - Stack Overflow tag: [our-software]
 """
         (workspace / "faq.md").write_text(faq)
-        
+
         return workspace
-    
+
     @pytest.fixture
     def search_setup(self, temp_workspace, tmp_path):
         """Set up search infrastructure with indexed documents."""
         # Create database
         db_path = tmp_path / "search_test.db"
         store = SQLiteStore(str(db_path))
-        
+
         # Create plugins
         markdown_plugin = MarkdownPlugin(sqlite_store=store, enable_semantic=False)
-        
+
         plaintext_config = {
             "name": "plaintext",
-            "code": "txt", 
+            "code": "txt",
             "extensions": [".txt", ".text"],
-            "language": "plaintext"
+            "language": "plaintext",
         }
-        plaintext_plugin = PlainTextPlugin(plaintext_config, sqlite_store=store, enable_semantic=False)
-        
+        plaintext_plugin = PlainTextPlugin(
+            plaintext_config, sqlite_store=store, enable_semantic=False
+        )
+
         # Create dispatcher
         dispatcher = Dispatcher([markdown_plugin, plaintext_plugin])
-        
+
         # Index all documents
         for doc_file in temp_workspace.glob("*.md"):
             content = doc_file.read_text()
             dispatcher.indexFile(str(doc_file), content)
-        
+
         return {
-            'workspace': temp_workspace,
-            'store': store,
-            'markdown_plugin': markdown_plugin,
-            'plaintext_plugin': plaintext_plugin,
-            'dispatcher': dispatcher
+            "workspace": temp_workspace,
+            "store": store,
+            "markdown_plugin": markdown_plugin,
+            "plaintext_plugin": plaintext_plugin,
+            "dispatcher": dispatcher,
         }
-    
+
     def test_installation_queries(self, search_setup):
         """Test natural language queries about installation."""
-        dispatcher = search_setup['dispatcher']
-        
+        dispatcher = search_setup["dispatcher"]
+
         installation_queries = [
             "how to install",
             "installation guide",
             "setup instructions",
             "install the software",
             "prerequisites for installation",
-            "pip install command"
+            "pip install command",
         ]
-        
+
         for query in installation_queries:
             results = dispatcher.search(query)
-            
+
             # Should find installation-related content
             assert len(results) > 0, f"No results for query: {query}"
-            
+
             # Check if installation guide is in results
-            install_results = [r for r in results if 'installation' in r.get('file', '').lower()]
+            install_results = [r for r in results if "installation" in r.get("file", "").lower()]
             assert len(install_results) > 0, f"No installation results for: {query}"
-            
+
             # Verify content relevance
             for result in install_results[:3]:  # Check top 3 results
-                snippet = result.get('snippet', '').lower()
-                assert any(keyword in snippet for keyword in ['install', 'setup', 'pip', 'requirements'])
-    
+                snippet = result.get("snippet", "").lower()
+                assert any(
+                    keyword in snippet for keyword in ["install", "setup", "pip", "requirements"]
+                )
+
     def test_api_documentation_queries(self, search_setup):
         """Test queries for API documentation."""
-        dispatcher = search_setup['dispatcher']
-        
+        dispatcher = search_setup["dispatcher"]
+
         api_queries = [
             "API documentation",
             "how to use the API",
@@ -770,138 +767,138 @@ Yes! Join our:
             "authentication token",
             "API rate limits",
             "GET users endpoint",
-            "API error codes"
+            "API error codes",
         ]
-        
+
         for query in api_queries:
             results = dispatcher.search(query)
-            
+
             # Should find API-related content
             assert len(results) > 0, f"No results for query: {query}"
-            
+
             # Check for API documentation
-            api_results = [r for r in results if 'api' in r.get('file', '').lower()]
+            api_results = [r for r in results if "api" in r.get("file", "").lower()]
             assert len(api_results) > 0, f"No API results for: {query}"
-            
+
             # Verify API content
             for result in api_results[:3]:
-                snippet = result.get('snippet', '').lower()
-                api_keywords = ['api', 'endpoint', 'authentication', 'request', 'response']
+                snippet = result.get("snippet", "").lower()
+                api_keywords = ["api", "endpoint", "authentication", "request", "response"]
                 assert any(keyword in snippet for keyword in api_keywords)
-    
+
     def test_tutorial_queries(self, search_setup):
         """Test queries for tutorial content."""
-        dispatcher = search_setup['dispatcher']
-        
+        dispatcher = search_setup["dispatcher"]
+
         tutorial_queries = [
             "getting started tutorial",
             "first project",
             "basic concepts",
             "how to create project",
             "workflow examples",
-            "configuration tutorial"
+            "configuration tutorial",
         ]
-        
+
         for query in tutorial_queries:
             results = dispatcher.search(query)
-            
+
             # Should find tutorial content
             assert len(results) > 0, f"No results for query: {query}"
-            
+
             # Check for tutorial file
-            tutorial_results = [r for r in results if 'tutorial' in r.get('file', '').lower()]
+            tutorial_results = [r for r in results if "tutorial" in r.get("file", "").lower()]
             assert len(tutorial_results) > 0, f"No tutorial results for: {query}"
-    
+
     def test_faq_queries(self, search_setup):
-        """Test queries that should find FAQ content.""" 
-        dispatcher = search_setup['dispatcher']
-        
+        """Test queries that should find FAQ content."""
+        dispatcher = search_setup["dispatcher"]
+
         faq_queries = [
             "frequently asked questions",
             "common problems",
             "troubleshooting",
             "how do I",
             "system requirements",
-            "what formats are supported"
+            "what formats are supported",
         ]
-        
+
         for query in faq_queries:
             results = dispatcher.search(query)
-            
+
             # Should find FAQ content
             assert len(results) > 0, f"No results for query: {query}"
-            
+
             # Many queries should find FAQ file
             if query in ["frequently asked questions", "how do I", "troubleshooting"]:
-                faq_results = [r for r in results if 'faq' in r.get('file', '').lower()]
+                faq_results = [r for r in results if "faq" in r.get("file", "").lower()]
                 assert len(faq_results) > 0, f"No FAQ results for: {query}"
-    
+
     def test_specific_technical_queries(self, search_setup):
         """Test specific technical queries."""
-        dispatcher = search_setup['dispatcher']
-        
+        dispatcher = search_setup["dispatcher"]
+
         technical_queries = [
             "rate limiting",
             "HTTP status codes",
             "JSON response format",
             "cron schedule",
             "virtual environment",
-            "PostgreSQL connection"
+            "PostgreSQL connection",
         ]
-        
+
         for query in technical_queries:
             results = dispatcher.search(query)
-            
+
             # Should find relevant technical content
             assert len(results) > 0, f"No results for technical query: {query}"
-            
+
             # Verify technical context
             for result in results[:3]:
-                snippet = result.get('snippet', '').lower()
+                snippet = result.get("snippet", "").lower()
                 # Should contain technical terms or context
                 assert len(snippet) > 20, "Snippet should contain meaningful content"
-    
+
     def test_code_example_queries(self, search_setup):
         """Test queries for code examples."""
-        dispatcher = search_setup['dispatcher']
-        
+        dispatcher = search_setup["dispatcher"]
+
         code_queries = [
             "code examples",
             "python code",
             "configuration example",
             "YAML config",
             "bash commands",
-            "curl example"
+            "curl example",
         ]
-        
+
         for query in code_queries:
             results = dispatcher.search(query)
-            
+
             # Should find code-related content
             assert len(results) > 0, f"No results for code query: {query}"
-            
+
             # Check for code indicators in results
-            code_indicators = ['```', '`', 'bash', 'python', 'yaml', 'json']
+            code_indicators = ["```", "`", "bash", "python", "yaml", "json"]
             found_code = False
-            
+
             for result in results[:5]:
-                snippet = result.get('snippet', '').lower()
+                snippet = result.get("snippet", "").lower()
                 if any(indicator in snippet for indicator in code_indicators):
                     found_code = True
                     break
-            
+
             assert found_code, f"No code content found for: {query}"
 
 
 class TestCrossDocumentSearch:
     """Test search capabilities across multiple documents."""
-    
+
     @pytest.fixture
     def multi_doc_workspace(self, tmp_path):
         """Create workspace with interconnected documents."""
         workspace = tmp_path / "multi_doc_workspace"
         workspace.mkdir()
-        
+
         # Create project overview
         overview = """# Project Overview
 
@@ -969,11 +966,11 @@ For hands-on examples, check our [Tutorial](docs/tutorial.md).
 - GitHub Issues: https://github.com/company/project/issues
 """
         (workspace / "overview.md").write_text(overview)
-        
+
         # Create docs directory
         docs_dir = workspace / "docs"
         docs_dir.mkdir()
-        
+
         # Create API examples
         api_examples = """# API Examples
 
@@ -1284,7 +1281,7 @@ For more examples and detailed documentation, see:
 - [Tutorial](tutorial.md)
 """
         (docs_dir / "api-examples.md").write_text(api_examples)
-        
+
         # Create best practices guide
         best_practices = """# Best Practices Guide
 
@@ -1751,129 +1748,129 @@ For more information, see:
 - [API Examples](api-examples.md)
 """
         (docs_dir / "best-practices.md").write_text(best_practices)
-        
+
         return workspace
-    
+
     @pytest.fixture
     def multi_doc_search_setup(self, multi_doc_workspace, tmp_path):
         """Set up search with multi-document workspace."""
         # Create database
         db_path = tmp_path / "multi_doc_test.db"
         store = SQLiteStore(str(db_path))
-        
+
         # Create plugins
         markdown_plugin = MarkdownPlugin(sqlite_store=store, enable_semantic=False)
-        
+
         # Create dispatcher
         dispatcher = Dispatcher([markdown_plugin])
-        
+
         # Index all documents
         for doc_file in multi_doc_workspace.rglob("*.md"):
             content = doc_file.read_text()
             dispatcher.indexFile(str(doc_file), content)
-        
+
         return {
-            'workspace': multi_doc_workspace,
-            'store': store,
-            'plugin': markdown_plugin,
-            'dispatcher': dispatcher
+            "workspace": multi_doc_workspace,
+            "store": store,
+            "plugin": markdown_plugin,
+            "dispatcher": dispatcher,
         }
-    
+
     def test_cross_document_references(self, multi_doc_search_setup):
         """Test finding content across multiple related documents."""
-        dispatcher = multi_doc_search_setup['dispatcher']
-        
+        dispatcher = multi_doc_search_setup["dispatcher"]
+
         # Search for concepts that span multiple documents
         cross_queries = [
             "REST API authentication",
             "Python SDK examples",
             "Docker deployment",
             "data processing pipeline",
-            "configuration management"
+            "configuration management",
         ]
-        
+
         for query in cross_queries:
             results = dispatcher.search(query)
-            
+
             # Should find results from multiple documents
             assert len(results) > 0, f"No results for cross-doc query: {query}"
-            
+
             # Get unique files from results
-            result_files = set(r.get('file', '') for r in results)
-            
+            result_files = set(r.get("file", "") for r in results)
+
             # For complex queries, should find content in multiple files
             if query in ["REST API authentication", "Python SDK examples"]:
                 assert len(result_files) >= 2, f"Should find results in multiple files for: {query}"
-    
+
     def test_document_type_filtering(self, multi_doc_search_setup):
         """Test filtering results by document type or location."""
-        dispatcher = multi_doc_search_setup['dispatcher']
-        
+        dispatcher = multi_doc_search_setup["dispatcher"]
+
         # Search for API-related content
         results = dispatcher.search("API examples")
-        
+
         # Should find results
         assert len(results) > 0
-        
+
         # Filter by document location
-        api_results = [r for r in results if 'api' in r.get('file', '').lower()]
-        docs_results = [r for r in results if 'docs/' in r.get('file', '')]
-        
+        api_results = [r for r in results if "api" in r.get("file", "").lower()]
+        docs_results = [r for r in results if "docs/" in r.get("file", "")]
+
         # Should find API content in docs directory
         assert len(docs_results) > 0, "Should find API examples in docs"
-    
+
     def test_hierarchical_content_search(self, multi_doc_search_setup):
         """Test searching within document hierarchies."""
-        dispatcher = multi_doc_search_setup['dispatcher']
-        
+        dispatcher = multi_doc_search_setup["dispatcher"]
+
         # Search for content that appears in different sections
         hierarchical_queries = [
             "security best practices",
             "monitoring and logging",
             "error handling",
-            "configuration examples"
+            "configuration examples",
         ]
-        
+
         for query in hierarchical_queries:
             results = dispatcher.search(query)
-            
+
             # Should find hierarchical content
             assert len(results) > 0, f"No results for hierarchical query: {query}"
-            
+
             # Check for section-level context in snippets
             for result in results[:3]:
-                snippet = result.get('snippet', '')
+                snippet = result.get("snippet", "")
                 # Should contain meaningful context
                 assert len(snippet) > 50, "Should provide meaningful context"
-    
+
     def test_reference_following(self, multi_doc_search_setup):
         """Test following references between documents."""
-        dispatcher = multi_doc_search_setup['dispatcher']
-        
+        dispatcher = multi_doc_search_setup["dispatcher"]
+
         # Search for content that references other documents
         reference_queries = [
             "installation guide",
             "API documentation",
             "tutorial examples",
-            "best practices guide"
+            "best practices guide",
         ]
-        
+
         for query in reference_queries:
             results = dispatcher.search(query)
-            
+
             # Should find both the reference and the referenced content
             assert len(results) > 0, f"No results for reference query: {query}"
-            
+
             # Check for document references in snippets
-            reference_indicators = ['see', 'refer', 'check', 'docs/', '.md']
+            reference_indicators = ["see", "refer", "check", "docs/", ".md"]
             found_references = False
-            
+
             for result in results:
-                snippet = result.get('snippet', '').lower()
+                snippet = result.get("snippet", "").lower()
                 if any(indicator in snippet for indicator in reference_indicators):
                     found_references = True
                     break
-            
+
             # At least some results should show document references
             if query in ["installation guide", "API documentation"]:
                 assert found_references, f"Should find document references for: {query}"
@@ -1881,13 +1878,13 @@ For more information, see:
 
 class TestDocumentRanking:
     """Test document-aware result ranking and relevance."""
-    
+
     @pytest.fixture
     def ranking_workspace(self, tmp_path):
         """Create workspace for testing ranking algorithms."""
         workspace = tmp_path / "ranking_workspace"
         workspace.mkdir()
-        
+
         # Create high-quality comprehensive guide
         comprehensive_guide = """# Complete Python Development Guide
 
@@ -2175,7 +2172,7 @@ For more advanced topics, consider exploring:
 Happy coding with Python!
 """
         (workspace / "python_guide.md").write_text(comprehensive_guide)
-        
+
         # Create brief overview
         brief_overview = """# Python Overview
 
@@ -2203,7 +2200,7 @@ print("Hello, World!")
 - Machine learning
 """
         (workspace / "python_overview.md").write_text(brief_overview)
-        
+
         # Create specific installation doc
         install_doc = """# Python Installation Instructions
 
@@ -2235,7 +2232,7 @@ python --version
 That's it! Python is now installed.
 """
         (workspace / "install.md").write_text(install_doc)
-        
+
         # Create API reference
         api_reference = """# Python API Reference
 
@@ -2288,142 +2285,144 @@ Remove first occurrence.
 Sort in place.
 """
         (workspace / "api_ref.md").write_text(api_reference)
-        
+
         return workspace
-    
+
     @pytest.fixture
     def ranking_search_setup(self, ranking_workspace, tmp_path):
         """Set up search with ranking test workspace."""
         # Create database
         db_path = tmp_path / "ranking_test.db"
         store = SQLiteStore(str(db_path))
-        
+
         # Create plugins
         markdown_plugin = MarkdownPlugin(sqlite_store=store, enable_semantic=False)
-        
+
         # Create dispatcher
         dispatcher = Dispatcher([markdown_plugin])
-        
+
         # Index all documents
         for doc_file in ranking_workspace.glob("*.md"):
             content = doc_file.read_text()
             dispatcher.indexFile(str(doc_file), content)
-        
+
         return {
-            'workspace': ranking_workspace,
-            'store': store,
-            'plugin': markdown_plugin,
-            'dispatcher': dispatcher
+            "workspace": ranking_workspace,
+            "store": store,
+            "plugin": markdown_plugin,
+            "dispatcher": dispatcher,
         }
-    
+
     def test_comprehensive_vs_brief_ranking(self, ranking_search_setup):
         """Test that comprehensive documents rank higher for detailed queries."""
-        dispatcher = ranking_search_setup['dispatcher']
-        
+        dispatcher = ranking_search_setup["dispatcher"]
+
         # Detailed query that should favor comprehensive content
         detailed_query = "Python installation virtual environment setup IDE configuration"
-        
+
         results = dispatcher.search(detailed_query)
         assert len(results) > 0
-        
+
         # Check if comprehensive guide ranks high
-        top_files = [r.get('file', '') for r in results[:3]]
-        comprehensive_found = any('python_guide' in f for f in top_files)
-        
+        top_files = [r.get("file", "") for r in results[:3]]
+        comprehensive_found = any("python_guide" in f for f in top_files)
+
         # Comprehensive guide should be in top results for detailed query
         assert comprehensive_found, "Comprehensive guide should rank high for detailed queries"
-    
+
     def test_specific_vs_general_ranking(self, ranking_search_setup):
         """Test that specific documents rank higher for targeted queries."""
-        dispatcher = ranking_search_setup['dispatcher']
-        
+        dispatcher = ranking_search_setup["dispatcher"]
+
         # Specific query for installation only
         specific_query = "how to install Python"
-        
+
         results = dispatcher.search(specific_query)
         assert len(results) > 0
-        
+
         # Check file rankings
-        result_files = [(r.get('file', ''), i) for i, r in enumerate(results[:5])]
-        
+        result_files = [(r.get("file", ""), i) for i, r in enumerate(results[:5])]
+
         # Install doc should rank well for installation query
-        install_positions = [pos for file, pos in result_files if 'install' in file]
-        
+        install_positions = [pos for file, pos in result_files if "install" in file]
+
         if install_positions:
             # Install doc should be in top 3 for installation query
             assert min(install_positions) < 3, "Install doc should rank high for installation query"
-    
+
     def test_api_reference_ranking(self, ranking_search_setup):
         """Test that API references rank high for function queries."""
-        dispatcher = ranking_search_setup['dispatcher']
-        
+        dispatcher = ranking_search_setup["dispatcher"]
+
         # Query for specific Python functions
         function_query = "Python print function len range"
-        
+
         results = dispatcher.search(function_query)
         assert len(results) > 0
-        
+
         # API reference should rank well for function queries
-        api_results = [r for r in results if 'api_ref' in r.get('file', '')]
-        
+        api_results = [r for r in results if "api_ref" in r.get("file", "")]
+
         if api_results:
             # API reference should be in results for function query
             assert len(api_results) > 0, "API reference should be found for function queries"
-    
+
     def test_section_relevance_ranking(self, ranking_search_setup):
         """Test that relevant sections rank higher than document titles."""
-        dispatcher = ranking_search_setup['dispatcher']
-        
+        dispatcher = ranking_search_setup["dispatcher"]
+
         # Query for content that appears in specific sections
         section_query = "object oriented programming classes inheritance"
-        
+
         results = dispatcher.search(section_query)
         assert len(results) > 0
-        
+
         # Should find OOP section content
         oop_content_found = False
         for result in results[:5]:
-            snippet = result.get('snippet', '').lower()
-            if any(term in snippet for term in ['class', 'inheritance', 'object']):
+            snippet = result.get("snippet", "").lower()
+            if any(term in snippet for term in ["class", "inheritance", "object"]):
                 oop_content_found = True
                 break
-        
+
         assert oop_content_found, "Should find OOP section content for OOP query"
-    
+
     def test_code_example_ranking(self, ranking_search_setup):
         """Test that documents with code examples rank higher for implementation queries."""
-        dispatcher = ranking_search_setup['dispatcher']
-        
+        dispatcher = ranking_search_setup["dispatcher"]
+
         # Query for implementation examples
         code_query = "Python code examples functions classes"
-        
+
         results = dispatcher.search(code_query)
         assert len(results) > 0
-        
+
         # Check if results contain code indicators
         code_results = []
         for result in results:
-            snippet = result.get('snippet', '')
-            if any(indicator in snippet for indicator in ['```', 'def ', 'class ', 'import']):
+            snippet = result.get("snippet", "")
+            if any(indicator in snippet for indicator in ["```", "def ", "class ", "import"]):
                 code_results.append(result)
-        
+
         # Should find documents with code examples
         assert len(code_results) > 0, "Should find documents with code examples"
-        
+
         # Code-heavy documents should rank well
-        comprehensive_code_results = [r for r in code_results if 'python_guide' in r.get('file', '')]
+        comprehensive_code_results = [
+            r for r in code_results if "python_guide" in r.get("file", "")
+        ]
         assert len(comprehensive_code_results) > 0, "Comprehensive guide with code should rank well"
 
 
 class TestSectionBasedFiltering:
     """Test filtering search results by document sections."""
-    
+
     @pytest.fixture
     def section_workspace(self, tmp_path):
         """Create workspace with well-structured sections."""
         workspace = tmp_path / "section_workspace"
         workspace.mkdir()
-        
+
         # Create structured documentation
         structured_doc = """# Software Development Guide
 
@@ -2580,153 +2579,153 @@ development, deployment, and operations. Following these practices ensures
 reliable, secure, and maintainable software systems.
 """
         (workspace / "dev_guide.md").write_text(structured_doc)
-        
+
         return workspace
-    
+
     @pytest.fixture
     def section_search_setup(self, section_workspace, tmp_path):
         """Set up search with section test workspace."""
         # Create database
         db_path = tmp_path / "section_test.db"
         store = SQLiteStore(str(db_path))
-        
+
         # Create plugins
         markdown_plugin = MarkdownPlugin(sqlite_store=store, enable_semantic=False)
-        
+
         # Create dispatcher
         dispatcher = Dispatcher([markdown_plugin])
-        
+
         # Index all documents
         for doc_file in section_workspace.glob("*.md"):
             content = doc_file.read_text()
             dispatcher.indexFile(str(doc_file), content)
-        
+
         return {
-            'workspace': section_workspace,
-            'store': store,
-            'plugin': markdown_plugin,
-            'dispatcher': dispatcher
+            "workspace": section_workspace,
+            "store": store,
+            "plugin": markdown_plugin,
+            "dispatcher": dispatcher,
         }
-    
+
     def test_section_specific_queries(self, section_search_setup):
         """Test queries that target specific sections."""
-        dispatcher = section_search_setup['dispatcher']
-        
+        dispatcher = section_search_setup["dispatcher"]
+
         section_queries = [
             ("requirements analysis", "Planning and Design"),
             ("unit testing", "Development Practices"),
             ("CI/CD pipeline", "Deployment and Operations"),
             ("authentication methods", "Security Practices"),
             ("microservices architecture", "Planning and Design"),
-            ("performance monitoring", "Deployment and Operations")
+            ("performance monitoring", "Deployment and Operations"),
         ]
-        
+
         for query, expected_section in section_queries:
             results = dispatcher.search(query)
-            
+
             # Should find relevant results
             assert len(results) > 0, f"No results for section query: {query}"
-            
+
             # Check if results contain section-relevant content
             section_content_found = False
             for result in results[:3]:
-                snippet = result.get('snippet', '').lower()
+                snippet = result.get("snippet", "").lower()
                 # Look for section keywords or related terms
                 if any(term in snippet for term in query.split()):
                     section_content_found = True
                     break
-            
+
             assert section_content_found, f"Should find section content for: {query}"
-    
+
     def test_hierarchical_section_search(self, section_search_setup):
         """Test searching within hierarchical section structure."""
-        dispatcher = section_search_setup['dispatcher']
-        
+        dispatcher = section_search_setup["dispatcher"]
+
         # Query for subsection content
         hierarchical_queries = [
             "functional requirements",
-            "non-functional requirements", 
+            "non-functional requirements",
             "git workflow",
             "integration testing",
             "application monitoring",
-            "role-based access control"
+            "role-based access control",
         ]
-        
+
         for query in hierarchical_queries:
             results = dispatcher.search(query)
-            
+
             # Should find subsection content
             assert len(results) > 0, f"No results for hierarchical query: {query}"
-            
+
             # Verify content depth and relevance
             for result in results[:2]:
-                snippet = result.get('snippet', '')
+                snippet = result.get("snippet", "")
                 # Should contain meaningful content from subsections
                 assert len(snippet) > 30, "Should provide substantial section content"
-    
+
     def test_section_context_preservation(self, section_search_setup):
         """Test that section context is preserved in search results."""
-        dispatcher = section_search_setup['dispatcher']
-        
+        dispatcher = section_search_setup["dispatcher"]
+
         # Query for terms that appear in multiple sections
         context_query = "monitoring performance"
-        
+
         results = dispatcher.search(context_query)
         assert len(results) > 0
-        
+
         # Check if different contexts are represented
         contexts_found = set()
         for result in results:
-            snippet = result.get('snippet', '').lower()
-            
-            if 'application' in snippet or 'metrics' in snippet:
-                contexts_found.add('application_monitoring')
-            if 'infrastructure' in snippet or 'server' in snippet:
-                contexts_found.add('infrastructure_monitoring')
-            if 'performance testing' in snippet or 'load testing' in snippet:
-                contexts_found.add('performance_testing')
-        
+            snippet = result.get("snippet", "").lower()
+
+            if "application" in snippet or "metrics" in snippet:
+                contexts_found.add("application_monitoring")
+            if "infrastructure" in snippet or "server" in snippet:
+                contexts_found.add("infrastructure_monitoring")
+            if "performance testing" in snippet or "load testing" in snippet:
+                contexts_found.add("performance_testing")
+
         # Should find monitoring in different contexts
         assert len(contexts_found) >= 1, "Should find monitoring in different section contexts"
-    
+
     def test_cross_section_queries(self, section_search_setup):
         """Test queries that span multiple sections."""
-        dispatcher = section_search_setup['dispatcher']
-        
+        dispatcher = section_search_setup["dispatcher"]
+
         # Query that relates to multiple sections
         cross_section_query = "security testing deployment"
-        
+
         results = dispatcher.search(cross_section_query)
         assert len(results) > 0
-        
+
         # Should find content from different sections
         section_indicators = {
-            'security': ['authentication', 'authorization', 'encryption'],
-            'testing': ['unit testing', 'integration', 'performance'],
-            'deployment': ['CI/CD', 'pipeline', 'monitoring']
+            "security": ["authentication", "authorization", "encryption"],
+            "testing": ["unit testing", "integration", "performance"],
+            "deployment": ["CI/CD", "pipeline", "monitoring"],
         }
-        
+
         sections_found = set()
         for result in results:
-            snippet = result.get('snippet', '').lower()
-            
+            snippet = result.get("snippet", "").lower()
+
             for section, indicators in section_indicators.items():
                 if any(indicator in snippet for indicator in indicators):
                     sections_found.add(section)
-        
+
         # Should find content from multiple relevant sections
         assert len(sections_found) >= 2, "Should find content across multiple sections"
 
 
 class TestSemanticSearchIntegration:
     """Test integration with semantic search capabilities."""
-    
+
     @pytest.fixture
     def semantic_workspace(self, tmp_path):
         """Create workspace for semantic search testing."""
         workspace = tmp_path / "semantic_workspace"
         workspace.mkdir()
-        
+
         # Create conceptually related documents
         ml_concepts = """# Machine Learning Fundamentals
 
@@ -2825,7 +2824,7 @@ predictions. Success requires understanding algorithms, proper data preparation,
 and rigorous evaluation methodologies.
 """
         (workspace / "ml_concepts.md").write_text(ml_concepts)
-        
+
         # Create data science guide
         data_science = """# Data Science Methodology
 
@@ -2996,7 +2995,7 @@ with business understanding to drive data-informed decisions. Success requires
 continuous learning and adaptation to new tools and methodologies.
 """
         (workspace / "data_science.md").write_text(data_science)
-        
+
         # Create programming concepts doc
         programming_concepts = """# Programming Concepts and Paradigms
 
@@ -3174,131 +3173,151 @@ transcend specific languages and technologies, forming the core knowledge
 every programmer should master.
 """
         (workspace / "programming_concepts.md").write_text(programming_concepts)
-        
+
         return workspace
-    
+
     @pytest.fixture
     def semantic_search_setup(self, semantic_workspace, tmp_path):
         """Set up search with semantic capabilities."""
         # Create database
         db_path = tmp_path / "semantic_test.db"
         store = SQLiteStore(str(db_path))
-        
+
         # Create plugin with semantic search enabled
         markdown_plugin = MarkdownPlugin(sqlite_store=store, enable_semantic=True)
-        
+
         # Mock semantic indexer
-        with patch('mcp_server.utils.semantic_indexer.SemanticIndexer') as mock_indexer_class:
+        with patch("mcp_server.utils.semantic_indexer.SemanticIndexer") as mock_indexer_class:
             mock_indexer = Mock()
             mock_indexer_class.return_value = mock_indexer
-            
+
             # Configure mock to return conceptually similar results
             def mock_search(query, limit=10):
                 # Simulate semantic similarity
-                if 'neural networks' in query.lower():
+                if "neural networks" in query.lower():
                     return [
-                        {'file': str(semantic_workspace / 'ml_concepts.md'), 
-                         'line': 10, 'score': 0.95, 'kind': 'chunk'},
-                        {'file': str(semantic_workspace / 'data_science.md'), 
-                         'line': 5, 'score': 0.85, 'kind': 'chunk'}
+                        {
+                            "file": str(semantic_workspace / "ml_concepts.md"),
+                            "line": 10,
+                            "score": 0.95,
+                            "kind": "chunk",
+                        },
+                        {
+                            "file": str(semantic_workspace / "data_science.md"),
+                            "line": 5,
+                            "score": 0.85,
+                            "kind": "chunk",
+                        },
                     ]
-                elif 'algorithms' in query.lower():
+                elif "algorithms" in query.lower():
                     return [
-                        {'file': str(semantic_workspace / 'programming_concepts.md'), 
-                         'line': 15, 'score': 0.92, 'kind': 'chunk'},
-                        {'file': str(semantic_workspace / 'ml_concepts.md'), 
-                         'line': 8, 'score': 0.78, 'kind': 'chunk'}
+                        {
+                            "file": str(semantic_workspace / "programming_concepts.md"),
+                            "line": 15,
+                            "score": 0.92,
+                            "kind": "chunk",
+                        },
+                        {
+                            "file": str(semantic_workspace / "ml_concepts.md"),
+                            "line": 8,
+                            "score": 0.78,
+                            "kind": "chunk",
+                        },
                     ]
                 else:
                     return []
-            
+
             mock_indexer.search.side_effect = mock_search
             markdown_plugin.semantic_indexer = mock_indexer
-            
+
             # Create dispatcher
             dispatcher = Dispatcher([markdown_plugin])
-            
+
             # Index all documents
             for doc_file in semantic_workspace.glob("*.md"):
                 content = doc_file.read_text()
                 dispatcher.indexFile(str(doc_file), content)
-            
+
             return {
-                'workspace': semantic_workspace,
-                'store': store,
-                'plugin': markdown_plugin,
-                'dispatcher': dispatcher,
-                'mock_indexer': mock_indexer
+                "workspace": semantic_workspace,
+                "store": store,
+                "plugin": markdown_plugin,
+                "dispatcher": dispatcher,
+                "mock_indexer": mock_indexer,
             }
-    
+
     def test_conceptual_similarity_search(self, semantic_search_setup):
         """Test finding conceptually similar content across documents."""
-        dispatcher = semantic_search_setup['dispatcher']
-        
+        dispatcher = semantic_search_setup["dispatcher"]
+
         # Query for related concepts using different terminology
         conceptual_queries = [
             "deep learning neural networks",
-            "machine learning algorithms", 
+            "machine learning algorithms",
             "artificial intelligence models",
-            "data patterns recognition"
+            "data patterns recognition",
         ]
-        
+
         for query in conceptual_queries:
             # Test semantic search
             results = dispatcher.search(query, {"semantic": True})
-            
+
             if results:  # If semantic indexer returned results
                 # Should find conceptually related content
                 assert len(results) > 0, f"No semantic results for: {query}"
-                
+
                 # Verify cross-document conceptual matching
-                result_files = set(r.get('file', '') for r in results)
-                
+                result_files = set(r.get("file", "") for r in results)
+
                 # Should potentially find related concepts in different documents
                 if len(result_files) > 1:
                     assert True, "Found related concepts across multiple documents"
-    
+
     def test_semantic_vs_keyword_search(self, semantic_search_setup):
         """Test differences between semantic and keyword-based search."""
-        dispatcher = semantic_search_setup['dispatcher']
-        
+        dispatcher = semantic_search_setup["dispatcher"]
+
         # Query that should show difference between semantic and keyword search
         query = "learning from data patterns"
-        
+
         # Keyword search
         keyword_results = dispatcher.search(query, {"semantic": False})
-        
+
         # Semantic search (mocked)
         semantic_results = dispatcher.search(query, {"semantic": True})
-        
+
         # Both should return results (even if different)
         # This tests the integration between search types
         assert isinstance(keyword_results, list)
         assert isinstance(semantic_results, list)
-    
+
     def test_hybrid_search_integration(self, semantic_search_setup):
         """Test combining semantic and keyword search results."""
-        dispatcher = semantic_search_setup['dispatcher']
-        mock_indexer = semantic_search_setup['mock_indexer']
-        
+        dispatcher = semantic_search_setup["dispatcher"]
+        mock_indexer = semantic_search_setup["mock_indexer"]
+
         # Configure mock to return results for hybrid testing
         mock_indexer.search.return_value = [
-            {'file': str(semantic_search_setup['workspace'] / 'ml_concepts.md'), 
-             'line': 5, 'score': 0.9, 'kind': 'chunk'}
+            {
+                "file": str(semantic_search_setup["workspace"] / "ml_concepts.md"),
+                "line": 5,
+                "score": 0.9,
+                "kind": "chunk",
+            }
         ]
-        
+
         query = "neural network algorithms"
-        
+
         # Test semantic search
         semantic_results = dispatcher.search(query, {"semantic": True})
-        
+
         # Test keyword search
         keyword_results = dispatcher.search(query, {"semantic": False})
-        
+
         # Both search methods should work
         assert isinstance(semantic_results, list)
         assert isinstance(keyword_results, list)
-        
+
         # If semantic indexer is called, verify it's called correctly
         if mock_indexer.search.called:
             call_args = mock_indexer.search.call_args

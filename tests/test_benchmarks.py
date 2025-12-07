@@ -12,22 +12,19 @@ This module provides:
 import tempfile
 import time
 from pathlib import Path
-from unittest.mock import Mock, patch
+
 import pytest
-import psutil
-import os
 
 from mcp_server.benchmarks import (
-    BenchmarkSuite,
-    BenchmarkRunner,
     BenchmarkResult,
+    BenchmarkRunner,
+    BenchmarkSuite,
     PerformanceMetrics,
-    run_pytest_benchmarks,
 )
-from mcp_server.plugin_base import IPlugin, SymbolDef, SearchResult
 from mcp_server.interfaces.indexing_interfaces import IBenchmarkRunner
 from mcp_server.interfaces.metrics_interfaces import IPerformanceMonitor
 from mcp_server.interfaces.shared_interfaces import Result
+from mcp_server.plugin_base import IPlugin, SearchResult, SymbolDef
 
 
 class MockPlugin(IPlugin):
@@ -68,9 +65,7 @@ class MockPlugin(IPlugin):
                         definition=line,
                     )
                 elif line.startswith("class "):
-                    name = (
-                        line.split("(")[0].split(":")[0].replace("class ", "").strip()
-                    )
+                    name = line.split("(")[0].split(":")[0].replace("class ", "").strip()
                     self._symbols[name] = SymbolDef(
                         name=name,
                         type="class",
@@ -599,9 +594,7 @@ class TestLargeBenchmarks:
         )
 
         # Allow for some memory overhead but ensure sub-linear scaling
-        assert (
-            ratio_500_100 < 6.0
-        ), f"Memory scaling 100→500 files too high: {ratio_500_100:.2f}x"
+        assert ratio_500_100 < 6.0, f"Memory scaling 100→500 files too high: {ratio_500_100:.2f}x"
         assert (
             ratio_1000_500 < 3.0
         ), f"Memory scaling 500→1000 files too high: {ratio_1000_500:.2f}x"
@@ -667,9 +660,7 @@ class TestInterfaceCompliance:
                 assert result.error is not None
 
         # Test run_search_benchmark returns Result
-        result = await benchmark_runner.run_search_benchmark(
-            ["test", "function", "class"]
-        )
+        result = await benchmark_runner.run_search_benchmark(["test", "function", "class"])
         assert isinstance(result, Result)
 
         # Test generate_benchmark_report returns Result
@@ -774,11 +765,7 @@ def generate_test_symbols(count: int, name_prefix: str = "test") -> List[SymbolD
             path=f"/test/{name_prefix}_{i // 10}.py",
             line=i % 100 + 1,
             character=0,
-            definition=(
-                f"def {name_prefix}_{i}():"
-                if i % 2 == 0
-                else f"class {name_prefix}_{i}:"
-            ),
+            definition=(f"def {name_prefix}_{i}():" if i % 2 == 0 else f"class {name_prefix}_{i}:"),
         )
         symbols.append(symbol)
     return symbols

@@ -1,13 +1,13 @@
 """Tests for the C++ language plugin."""
 
-import pytest
-from pathlib import Path
 import tempfile
-import shutil
+from pathlib import Path
 
+import pytest
+
+from mcp_server.interfaces.plugin_interfaces import SymbolDefinition
 from mcp_server.plugins.cpp_plugin.plugin import Plugin
 from mcp_server.storage.sqlite_store import SQLiteStore
-from mcp_server.interfaces.plugin_interfaces import SymbolDefinition
 
 
 @pytest.fixture
@@ -406,9 +406,7 @@ class TestCppPlugin:
         # Find references to MyClass
         refs = plugin.findReferences("MyClass")
         # The original symbol definition counts as a reference too
-        assert (
-            len(refs) >= 0
-        )  # May have 0 if only finding usage references, not definitions
+        assert len(refs) >= 0  # May have 0 if only finding usage references, not definitions
 
         # Try finding references to a more commonly used symbol
         refs = plugin.findReferences("getValue")
@@ -460,9 +458,7 @@ class TestCppPlugin:
         shard = plugin.indexFile(temp_cpp_file, content)
 
         # Find DerivedClass
-        derived_class = next(
-            (s for s in shard["symbols"] if s["symbol"] == "DerivedClass"), None
-        )
+        derived_class = next((s for s in shard["symbols"] if s["symbol"] == "DerivedClass"), None)
         assert derived_class is not None
         # Check that it extends MyClass in some form
         assert (

@@ -1,9 +1,10 @@
 """Tests for the JavaScript/TypeScript plugin."""
 
-import pytest
-from pathlib import Path
-import tempfile
 import shutil
+import tempfile
+from pathlib import Path
+
+import pytest
 
 from mcp_server.plugins.js_plugin.plugin import Plugin
 from mcp_server.storage.sqlite_store import SQLiteStore
@@ -178,16 +179,12 @@ class TestJavaScriptPlugin:
         # Check getter/setter
         assert "Dog.breed" in symbols  # getter
         getter = [
-            s
-            for s in shard["symbols"]
-            if s["symbol"] == "Dog.breed" and s["kind"] == "getter"
+            s for s in shard["symbols"] if s["symbol"] == "Dog.breed" and s["kind"] == "getter"
         ][0]
         assert getter["signature"] == "get breed()"
 
         setter = [
-            s
-            for s in shard["symbols"]
-            if s["symbol"] == "Dog.breed" and s["kind"] == "setter"
+            s for s in shard["symbols"] if s["symbol"] == "Dog.breed" and s["kind"] == "setter"
         ][0]
         assert setter["signature"] == "set breed(value)"
 
@@ -680,7 +677,6 @@ class TestJavaScriptPlugin:
         """Test that minified files are skipped during pre-indexing."""
         # This test would need to mock the _preindex method
         # or test it indirectly through initialization
-        pass
 
     def test_indexed_count(self, plugin):
         """Test getting count of indexed files."""

@@ -1,6 +1,6 @@
 """Custom exception classes for MCP Server."""
 
-from typing import Optional, Any
+from typing import Any, Optional
 
 
 class MCPError(Exception):

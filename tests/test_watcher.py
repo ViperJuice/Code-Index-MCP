@@ -10,25 +10,20 @@ Tests cover:
 - Performance under load
 """
 
-import time
-import tempfile
-import shutil
-from pathlib import Path
-from unittest.mock import Mock, patch, call
 import threading
+import time
+from pathlib import Path
 
 import pytest
 from watchdog.events import (
-    FileCreatedEvent,
-    FileModifiedEvent,
-    FileDeletedEvent,
-    FileMovedEvent,
     DirCreatedEvent,
     DirModifiedEvent,
+    FileCreatedEvent,
+    FileModifiedEvent,
+    FileMovedEvent,
 )
 
 from mcp_server.watcher import FileWatcher, _Handler
-from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
 
 
 class TestHandlerEventHandling:
@@ -239,9 +234,7 @@ class TestFileWatcher:
             dispatcher_with_mock.index_file.assert_called()
 
             # Check the path matches
-            indexed_paths = [
-                call[0][0] for call in dispatcher_with_mock.index_file.call_args_list
-            ]
+            indexed_paths = [call[0][0] for call in dispatcher_with_mock.index_file.call_args_list]
             assert any(str(test_file) in str(path) for path in indexed_paths)
 
         finally:
@@ -283,20 +276,15 @@ class TestFileWatcher:
             time.sleep(0.5)
 
             # Verify indexing was called for code files
-            assert (
-                dispatcher_with_mock.index_file.call_count >= 4
-            )  # Create + modify + JS + rename
+            assert dispatcher_with_mock.index_file.call_count >= 4  # Create + modify + JS + rename
 
             # Verify correct files were indexed
             indexed_paths = [
-                str(call[0][0])
-                for call in dispatcher_with_mock.index_file.call_args_list
+                str(call[0][0]) for call in dispatcher_with_mock.index_file.call_args_list
             ]
 
             # Should have indexed Python and JS files
-            assert any(
-                "test.py" in path or "renamed.py" in path for path in indexed_paths
-            )
+            assert any("test.py" in path or "renamed.py" in path for path in indexed_paths)
             assert any("app.js" in path for path in indexed_paths)
 
             # Should not have indexed txt file
@@ -375,7 +363,7 @@ class TestEdgeCases:
             # This might fail due to permissions, which is expected
             try:
                 test_file.touch()
-            except:
+            except Exception:
                 pass
 
             time.sleep(0.5)
@@ -407,9 +395,7 @@ class TestEdgeCases:
 
             # Last call should be with final content
             if dispatcher_with_mock.index_file.call_count > 0:
-                last_call_path = dispatcher_with_mock.index_file.call_args_list[-1][0][
-                    0
-                ]
+                last_call_path = dispatcher_with_mock.index_file.call_args_list[-1][0][0]
                 assert str(last_call_path) == str(test_file)
 
         finally:
@@ -516,9 +502,7 @@ class TestPerformance:
 
     @pytest.mark.benchmark
     @pytest.mark.slow
-    def test_large_directory_performance(
-        self, tmp_path, dispatcher_with_mock, benchmark_results
-    ):
+    def test_large_directory_performance(self, tmp_path, dispatcher_with_mock, benchmark_results):
         """Test watcher performance with large directory."""
         # Create a large directory structure
         for i in range(10):
@@ -547,9 +531,7 @@ class TestPerformance:
             watcher.stop()
 
     @pytest.mark.benchmark
-    def test_event_processing_speed(
-        self, tmp_path, dispatcher_with_mock, benchmark_results
-    ):
+    def test_event_processing_speed(self, tmp_path, dispatcher_with_mock, benchmark_results):
         """Test speed of event processing."""
         # Mock fast indexing
         dispatcher_with_mock.index_file.return_value = None

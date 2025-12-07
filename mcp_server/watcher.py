@@ -1,11 +1,13 @@
-from pathlib import Path
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
 import logging
+from pathlib import Path
 from typing import Optional
+
+from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
+
+from .core.path_resolver import PathResolver
 from .dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from .plugins.language_registry import get_all_extensions
-from .core.path_resolver import PathResolver
 
 # Note: We've removed ignore pattern checks - ALL files are indexed locally
 # from .core.ignore_patterns import should_ignore_file
@@ -84,10 +86,7 @@ class _Handler(FileSystemEventHandler):
     def handle_file_move(self, old_path: Path, new_path: Path):
         """Handle file move operations efficiently."""
         try:
-            if (
-                old_path.suffix in self.code_extensions
-                and new_path.suffix in self.code_extensions
-            ):
+            if old_path.suffix in self.code_extensions and new_path.suffix in self.code_extensions:
                 # Compute content hash to check if file actually changed
                 if new_path.exists():
                     content_hash = self.path_resolver.compute_content_hash(new_path)
@@ -125,22 +124,18 @@ class _Handler(FileSystemEventHandler):
     def on_modified(self, event):
         """Handle file modification events."""
         # Let on_any_event handle this
-        pass
 
     def on_deleted(self, event):
         """Handle file deletion events."""
         # Let on_any_event handle this
-        pass
 
     def on_moved(self, event):
         """Handle file move events."""
         # Let on_any_event handle this
-        pass
 
     def on_created(self, event):
         """Handle file creation events."""
         # Let on_any_event handle this
-        pass
 
 
 class FileWatcher:

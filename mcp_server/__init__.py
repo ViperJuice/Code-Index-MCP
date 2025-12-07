@@ -21,11 +21,14 @@ def __getattr__(name):
     """Lazy import public API components to avoid circular import issues."""
     if name == "SQLiteStore":
         from .storage.sqlite_store import SQLiteStore
+
         return SQLiteStore
     if name == "EnhancedDispatcher":
         from .dispatcher.dispatcher_enhanced import EnhancedDispatcher
+
         return EnhancedDispatcher
     if name == "PluginFactory":
         from .plugins.plugin_factory import PluginFactory
+
         return PluginFactory
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

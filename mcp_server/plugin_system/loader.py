@@ -3,20 +3,19 @@ Dynamic plugin loader with lifecycle management.
 Handles plugin initialization, configuration, and cleanup.
 """
 
-import os
-import logging
 import asyncio
-import threading
-from typing import Dict, Type, Optional, Any, List
-from contextlib import contextmanager
-from concurrent.futures import ThreadPoolExecutor
-import importlib
 import gc
+import importlib
+import logging
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+from typing import Any, Dict, Optional, Type
 
 from ..interfaces.plugin_interfaces import IPlugin
 from ..storage.sqlite_store import SQLiteStore
 from .discovery import PluginDiscovery
-from .models import PluginState, PluginConfig
+from .models import PluginConfig, PluginState
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +37,7 @@ class PluginLoader:
         self._lock = threading.RLock()
         self._executor = ThreadPoolExecutor(max_workers=4)
 
-    def load_plugin(
-        self, language: str, config: PluginConfig = None
-    ) -> Optional[IPlugin]:
+    def load_plugin(self, language: str, config: PluginConfig = None) -> Optional[IPlugin]:
         """
         Load a plugin with configuration.
 
@@ -98,9 +95,7 @@ class PluginLoader:
                 self.plugin_states[language] = PluginState.ERROR
                 return None
 
-    def _initialize_plugin(
-        self, plugin_class: Type[IPlugin], config: PluginConfig
-    ) -> IPlugin:
+    def _initialize_plugin(self, plugin_class: Type[IPlugin], config: PluginConfig) -> IPlugin:
         """Initialize a plugin with configuration."""
         # Create SQLite store if needed
         sqlite_store = None
@@ -169,9 +164,7 @@ class PluginLoader:
                 logger.error(f"Error unloading plugin for {language}: {e}")
                 self.plugin_states[language] = PluginState.ERROR
 
-    def reload_plugin(
-        self, language: str, config: PluginConfig = None
-    ) -> Optional[IPlugin]:
+    def reload_plugin(self, language: str, config: PluginConfig = None) -> Optional[IPlugin]:
         """
         Reload a plugin with optional new configuration.
 
@@ -293,9 +286,7 @@ class PluginLoader:
             Loaded plugin instance
         """
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            self._executor, self.load_plugin, language, config
-        )
+        return await loop.run_in_executor(self._executor, self.load_plugin, language, config)
 
     def cleanup(self):
         """Clean up all resources."""

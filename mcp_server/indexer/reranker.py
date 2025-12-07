@@ -5,18 +5,14 @@ This module provides implementations for reranking search results to improve rel
 It supports both Cohere's reranking API and local cross-encoder models as fallback.
 """
 
-import os
-import logging
 import asyncio
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass
-import numpy as np
-from abc import ABC, abstractmethod
+import logging
+import os
 
 # Define interfaces inline for now
 from abc import ABC, abstractmethod
 from dataclasses import dataclass as dc
-from typing import Protocol
+from typing import Any, Dict, List, Optional
 
 
 # Define SearchResult inline
@@ -73,8 +69,6 @@ class IRerankerFactory(ABC):
 class MCPError(Exception):
     """Base exception for MCP errors."""
 
-    pass
-
 
 # Simple Result class for this module
 class Result:
@@ -107,12 +101,8 @@ class BaseReranker(IReranker, ABC):
     async def _get_cache_key(self, query: str, results: List[SearchResult]) -> str:
         """Generate cache key for reranking results"""
         # Create a deterministic key based on query and result IDs
-        result_ids = [
-            f"{r.file_path}:{r.line}" for r in results[:10]
-        ]  # Use top 10 for key
-        return (
-            f"rerank:{self.__class__.__name__}:{hash(query)}:{hash(tuple(result_ids))}"
-        )
+        result_ids = [f"{r.file_path}:{r.line}" for r in results[:10]]  # Use top 10 for key
+        return f"rerank:{self.__class__.__name__}:{hash(query)}:{hash(tuple(result_ids))}"
 
     async def _get_cached_results(
         self, query: str, results: List[SearchResult]
@@ -146,9 +136,7 @@ class BaseReranker(IReranker, ABC):
         # Simple cache size limit
         if len(self._cache) > 1000:
             # Remove oldest entries
-            sorted_keys = sorted(
-                self._cache.keys(), key=lambda k: self._cache[k]["timestamp"]
-            )
+            sorted_keys = sorted(self._cache.keys(), key=lambda k: self._cache[k]["timestamp"])
             for key in sorted_keys[:100]:  # Remove oldest 100
                 del self._cache[key]
 
@@ -298,9 +286,7 @@ class LocalCrossEncoderReranker(BaseReranker):
                 logger.info(f"Loading cross-encoder model: {self.model_name}")
                 self.model = CrossEncoder(self.model_name, device=self.device)
                 self.initialized = True
-                logger.info(
-                    f"Initialized local cross-encoder reranker on {self.device}"
-                )
+                logger.info(f"Initialized local cross-encoder reranker on {self.device}")
                 return Result.ok(None)
 
             except ImportError:
@@ -479,9 +465,7 @@ class TFIDFReranker(BaseReranker):
             all_texts = [query] + documents
 
             # Vectorize texts
-            tfidf_matrix = await asyncio.to_thread(
-                self.vectorizer.fit_transform, all_texts
-            )
+            tfidf_matrix = await asyncio.to_thread(self.vectorizer.fit_transform, all_texts)
 
             # Calculate similarities
             query_vector = tfidf_matrix[0:1]
@@ -568,9 +552,7 @@ class HybridReranker(BaseReranker):
         if self.fallback_reranker:
             fallback_result = await self.fallback_reranker.initialize(config)
             if not fallback_result.is_success:
-                logger.warning(
-                    f"Fallback reranker initialization failed: {fallback_result.error}"
-                )
+                logger.warning(f"Fallback reranker initialization failed: {fallback_result.error}")
 
         self.initialized = True
         return Result.ok(None)
@@ -603,18 +585,12 @@ class HybridReranker(BaseReranker):
 
         # If primary fails and we have fallback, use it
         if self.fallback_reranker:
-            logger.warning(
-                f"Primary reranker failed: {primary_result.error}, using fallback"
-            )
+            logger.warning(f"Primary reranker failed: {primary_result.error}, using fallback")
             fallback_result = await self.fallback_reranker.rerank(query, results, top_k)
-            if fallback_result.is_success and isinstance(
-                fallback_result.data, RerankResult
-            ):
+            if fallback_result.is_success and isinstance(fallback_result.data, RerankResult):
                 fallback_result.data.metadata["hybrid"] = True
                 fallback_result.data.metadata["primary_succeeded"] = False
-                fallback_result.data.metadata["fallback_reason"] = str(
-                    primary_result.error
-                )
+                fallback_result.data.metadata["fallback_reason"] = str(primary_result.error)
             return fallback_result
 
         return primary_result
@@ -624,14 +600,10 @@ class HybridReranker(BaseReranker):
         capabilities = {
             "name": "Hybrid Reranker",
             "primary": (
-                self.primary_reranker.get_capabilities()
-                if self.primary_reranker
-                else None
+                self.primary_reranker.get_capabilities() if self.primary_reranker else None
             ),
             "fallback": (
-                self.fallback_reranker.get_capabilities()
-                if self.fallback_reranker
-                else None
+                self.fallback_reranker.get_capabilities() if self.fallback_reranker else None
             ),
             "weight_primary": self.weight_primary,
             "weight_fallback": self.weight_fallback,
@@ -665,9 +637,7 @@ class RerankerFactory(IRerankerFactory):
             fallback_type = config.get("fallback_type", "tfidf")
 
             primary = self.create_reranker(primary_type, config)
-            fallback = (
-                self.create_reranker(fallback_type, config) if fallback_type else None
-            )
+            fallback = self.create_reranker(fallback_type, config) if fallback_type else None
 
             reranker.set_rerankers(primary, fallback)
 

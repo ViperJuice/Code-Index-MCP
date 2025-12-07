@@ -1,34 +1,31 @@
 #!/usr/bin/env python3
 """Performance tests for document indexing speed and efficiency."""
 
-import pytest
-import time
-import tempfile
-import os
-import statistics
 import concurrent.futures
+import statistics
 import threading
+import time
 from pathlib import Path
-from typing import Dict, List, Any, Tuple
+from typing import List
+
+import pytest
 
 from tests.base_test import BaseDocumentTest
 from tests.test_utils import (
-    timer,
-    memory_monitor,
+    assert_memory_usage,
+    assert_performance,
     create_test_markdown,
     create_test_plaintext,
     generate_large_content,
-    assert_performance,
-    assert_memory_usage,
+    memory_monitor,
+    timer,
 )
 
 
 class TestDocumentIndexingPerformance(BaseDocumentTest):
     """Test document indexing performance metrics."""
 
-    def create_test_corpus(
-        self, doc_count: int, doc_type: str = "markdown"
-    ) -> List[Path]:
+    def create_test_corpus(self, doc_count: int, doc_type: str = "markdown") -> List[Path]:
         """Create a corpus of test documents for benchmarking."""
         docs = []
 
@@ -83,9 +80,7 @@ class TestDocumentIndexingPerformance(BaseDocumentTest):
 
             avg_time = statistics.mean(timings)
             p95_time = (
-                statistics.quantiles(timings, n=20)[18]
-                if len(timings) >= 5
-                else max(timings)
+                statistics.quantiles(timings, n=20)[18] if len(timings) >= 5 else max(timings)
             )
 
             results[test_name] = {
@@ -101,12 +96,8 @@ class TestDocumentIndexingPerformance(BaseDocumentTest):
             print(f"  P95 time: {p95_time:.1f} ms")
 
             # Performance assertions
-            assert_performance(
-                avg_time / 1000, 0.1, f"{test_name} average indexing"
-            )  # < 100ms
-            assert_performance(
-                p95_time / 1000, 0.15, f"{test_name} P95 indexing"
-            )  # < 150ms
+            assert_performance(avg_time / 1000, 0.1, f"{test_name} average indexing")  # < 100ms
+            assert_performance(p95_time / 1000, 0.15, f"{test_name} P95 indexing")  # < 150ms
 
     @pytest.mark.performance
     def test_batch_indexing_throughput(self):
@@ -199,9 +190,7 @@ class TestDocumentIndexingPerformance(BaseDocumentTest):
             # Measure concurrent indexing
             start_time = time.perf_counter()
 
-            with concurrent.futures.ThreadPoolExecutor(
-                max_workers=num_workers
-            ) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
                 futures = [executor.submit(index_document, doc) for doc in docs]
                 concurrent.futures.wait(futures)
 
@@ -215,9 +204,7 @@ class TestDocumentIndexingPerformance(BaseDocumentTest):
                 "indexed": indexed_count,
                 "throughput_docs_per_s": throughput,
                 "speedup": (
-                    throughput / results[1]["throughput_docs_per_s"]
-                    if 1 in results
-                    else 1.0
+                    throughput / results[1]["throughput_docs_per_s"] if 1 in results else 1.0
                 ),
             }
 
@@ -348,9 +335,7 @@ class TestDocumentIndexingPerformance(BaseDocumentTest):
             )
             count_ratio = counts[-1] / counts[0]
 
-            print(
-                f"\nMemory scaling: {mem_ratio:.1f}x for {count_ratio:.1f}x documents"
-            )
+            print(f"\nMemory scaling: {mem_ratio:.1f}x for {count_ratio:.1f}x documents")
             assert (
                 mem_ratio < count_ratio
             ), "Memory usage scales linearly or worse with document count"
@@ -373,9 +358,7 @@ class TestDocumentIndexingPerformance(BaseDocumentTest):
 
         for i in range(10):
             # Make a small change
-            updated_content = (
-                initial_content + f"\n\n## Update {i}\n\nThis is update number {i}."
-            )
+            updated_content = initial_content + f"\n\n## Update {i}\n\nThis is update number {i}."
             doc_path.write_text(updated_content)
 
             # Measure update time
@@ -396,7 +379,7 @@ class TestDocumentIndexingPerformance(BaseDocumentTest):
             else max(update_times)
         )
 
-        print(f"\nIncremental Update Summary:")
+        print("\nIncremental Update Summary:")
         print(f"  Average: {avg_update:.1f}ms")
         print(f"  P95: {p95_update:.1f}ms")
 

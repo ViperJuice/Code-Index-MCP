@@ -1,23 +1,20 @@
 """Enhanced plugin base with semantic search support."""
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Iterable, Optional, List, Dict, Any
-from typing_extensions import TypedDict
-from pathlib import Path
-import os
 import logging
+import os
+from abc import abstractmethod
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional
+
+from typing_extensions import TypedDict
 
 from .plugin_base import (
-    IndexShard,
-    Reference,
-    SymbolDef,
-    SearchResult,
-    SearchOpts,
     IPlugin,
+    SearchOpts,
+    SearchResult,
 )
-from .utils.semantic_indexer import SemanticIndexer
 from .storage.sqlite_store import SQLiteStore
+from .utils.semantic_indexer import SemanticIndexer
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +50,7 @@ class PluginWithSemanticSearch(IPlugin):
         self._sqlite_store = sqlite_store
         self._semantic_indexer: Optional[SemanticIndexer] = None
         self._enable_semantic = (
-            enable_semantic
-            and os.getenv("SEMANTIC_SEARCH_ENABLED", "false").lower() == "true"
+            enable_semantic and os.getenv("SEMANTIC_SEARCH_ENABLED", "false").lower() == "true"
         )
 
         if self._enable_semantic:
@@ -62,9 +58,7 @@ class PluginWithSemanticSearch(IPlugin):
                 # Initialize semantic indexer with Qdrant configuration
                 qdrant_host = qdrant_host or os.getenv("QDRANT_HOST", "localhost")
                 qdrant_port = qdrant_port or int(os.getenv("QDRANT_PORT", "6333"))
-                collection_name = os.getenv(
-                    "SEMANTIC_COLLECTION_NAME", "code-embeddings"
-                )
+                collection_name = os.getenv("SEMANTIC_COLLECTION_NAME", "code-embeddings")
 
                 # Create Qdrant URL or use memory
                 if qdrant_host == ":memory:":
@@ -83,9 +77,7 @@ class PluginWithSemanticSearch(IPlugin):
                 self._enable_semantic = False
                 self._semantic_indexer = None
             except Exception as e:
-                logger.debug(
-                    f"Failed to initialize semantic search for {self.lang}: {e}"
-                )
+                logger.debug(f"Failed to initialize semantic search for {self.lang}: {e}")
                 self._enable_semantic = False
                 self._semantic_indexer = None
 
@@ -113,9 +105,7 @@ class PluginWithSemanticSearch(IPlugin):
                 end_line = symbol.get("end_line", start_line + 5)
 
                 lines = content.split("\n")
-                context_lines = lines[
-                    max(0, start_line) : min(len(lines), end_line + 1)
-                ]
+                context_lines = lines[max(0, start_line) : min(len(lines), end_line + 1)]
                 symbol_context = "\n".join(context_lines)
 
                 # Create a searchable text representation
@@ -138,9 +128,7 @@ class PluginWithSemanticSearch(IPlugin):
         except Exception as e:
             logger.error(f"Failed to create embeddings for {path}: {e}")
 
-    def semantic_search(
-        self, query: str, limit: int = 20
-    ) -> List[SemanticSearchResult]:
+    def semantic_search(self, query: str, limit: int = 20) -> List[SemanticSearchResult]:
         """Perform semantic search using vector embeddings.
 
         Args:
@@ -182,9 +170,7 @@ class PluginWithSemanticSearch(IPlugin):
                             )
                         )
                 except Exception as e:
-                    logger.warning(
-                        f"Failed to extract snippet for {result['file']}: {e}"
-                    )
+                    logger.warning(f"Failed to extract snippet for {result['file']}: {e}")
 
             return semantic_results
 
@@ -192,9 +178,7 @@ class PluginWithSemanticSearch(IPlugin):
             logger.error(f"Semantic search failed: {e}")
             return []
 
-    def search(
-        self, query: str, opts: SearchOpts | None = None
-    ) -> Iterable[SearchResult]:
+    def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:
         """Enhanced search with semantic capabilities.
 
         Args:
@@ -223,4 +207,3 @@ class PluginWithSemanticSearch(IPlugin):
         self, query: str, opts: SearchOpts | None = None
     ) -> Iterable[SearchResult]:
         """Traditional search implementation (must be overridden by subclasses)."""
-        pass

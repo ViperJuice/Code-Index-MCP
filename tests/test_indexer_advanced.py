@@ -5,36 +5,35 @@ This module provides extensive testing coverage for the IndexEngine,
 QueryOptimizer, and related components.
 """
 
-import asyncio
-import pytest
-import tempfile
 import os
-from pathlib import Path
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
+import tempfile
 from datetime import datetime, timedelta
+from unittest.mock import Mock
+
+import pytest
 
 from mcp_server.indexer.index_engine import (
-    IndexEngine,
-    IndexResult,
     BatchIndexResult,
+    IndexEngine,
     IndexOptions,
     IndexProgress,
+    IndexResult,
     IndexTask,
 )
 from mcp_server.indexer.query_optimizer import (
-    QueryOptimizer,
-    Query,
-    QueryType,
-    QueryCost,
-    OptimizedQuery,
-    SearchPlan,
     IndexSuggestion,
-    PerformanceReport,
     IndexType,
+    OptimizedQuery,
+    PerformanceReport,
+    Query,
+    QueryCost,
+    QueryOptimizer,
+    QueryType,
+    SearchPlan,
 )
+from mcp_server.plugin_system.interfaces import IPluginManager
 from mcp_server.storage.sqlite_store import SQLiteStore
 from mcp_server.utils.fuzzy_indexer import FuzzyIndexer
-from mcp_server.plugin_system.interfaces import IPluginManager
 
 
 class TestIndexEngine:
@@ -402,9 +401,7 @@ class TestQueryOptimizer:
         queries = [
             Query(QueryType.SYMBOL_SEARCH, "func", {"kind": "function"}),
             Query(QueryType.SYMBOL_SEARCH, "class", {"kind": "class"}),
-            Query(
-                QueryType.SYMBOL_SEARCH, "var", {"kind": "function"}
-            ),  # kind used again
+            Query(QueryType.SYMBOL_SEARCH, "var", {"kind": "function"}),  # kind used again
         ]
 
         suggestions = optimizer.suggest_indexes(queries)
@@ -547,12 +544,8 @@ class TestQueryOptimizer:
 
     def test_estimate_base_rows(self, optimizer):
         """Test base row estimation for different query types."""
-        symbol_rows = optimizer._estimate_base_rows(
-            Query(QueryType.SYMBOL_SEARCH, "test")
-        )
-        semantic_rows = optimizer._estimate_base_rows(
-            Query(QueryType.SEMANTIC_SEARCH, "test")
-        )
+        symbol_rows = optimizer._estimate_base_rows(Query(QueryType.SYMBOL_SEARCH, "test"))
+        semantic_rows = optimizer._estimate_base_rows(Query(QueryType.SEMANTIC_SEARCH, "test"))
 
         # Symbol search should estimate more rows than semantic
         assert symbol_rows > semantic_rows
@@ -625,9 +618,7 @@ class TestIndexEngineIntegration:
         return FuzzyIndexer(real_storage)
 
     @pytest.mark.asyncio
-    async def test_full_indexing_workflow(
-        self, real_storage, real_fuzzy_indexer, tmp_path
-    ):
+    async def test_full_indexing_workflow(self, real_storage, real_fuzzy_indexer, tmp_path):
         """Test complete indexing workflow with real components."""
         # Create mock plugin manager
         mock_plugin_manager = Mock(spec=IPluginManager)

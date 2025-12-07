@@ -1,16 +1,17 @@
 """Health check system for monitoring component status."""
 
 import asyncio
-import time
 import logging
-import psutil
 import sqlite3
-from pathlib import Path
-from typing import Dict, Any, List, Optional, Callable, Awaitable
-from concurrent.futures import ThreadPoolExecutor
 import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Awaitable, Callable, Dict, List, Optional
 
-from . import IHealthCheck, HealthStatus, HealthCheckResult
+import psutil
+
+from . import HealthCheckResult, HealthStatus, IHealthCheck
 
 logger = logging.getLogger(__name__)
 
@@ -61,9 +62,7 @@ class ComponentHealthChecker(IHealthCheck):
                 message="Health check timed out",
             )
         except Exception as e:
-            logger.error(
-                f"Health check for {component_name} failed: {e}", exc_info=True
-            )
+            logger.error(f"Health check for {component_name} failed: {e}", exc_info=True)
             return HealthCheckResult(
                 component=component_name,
                 status=HealthStatus.UNHEALTHY,
@@ -108,9 +107,7 @@ class ComponentHealthChecker(IHealthCheck):
         with self._lock:
             if component_name in self._checks:
                 del self._checks[component_name]
-                logger.info(
-                    f"Unregistered health check for component: {component_name}"
-                )
+                logger.info(f"Unregistered health check for component: {component_name}")
 
     async def get_overall_health(self) -> HealthCheckResult:
         """Get overall system health status."""
@@ -241,9 +238,7 @@ class ComponentHealthChecker(IHealthCheck):
             details = {
                 "disk_total_gb": round(disk_usage.total / (1024**3), 2),
                 "disk_free_gb": round(disk_usage.free / (1024**3), 2),
-                "disk_used_percent": round(
-                    (disk_usage.used / disk_usage.total) * 100, 2
-                ),
+                "disk_used_percent": round((disk_usage.used / disk_usage.total) * 100, 2),
             }
 
             used_percent = (disk_usage.used / disk_usage.total) * 100

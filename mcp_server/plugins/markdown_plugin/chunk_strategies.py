@@ -2,17 +2,16 @@
 Markdown-specific chunking strategies for semantic search optimization.
 """
 
-import re
-from typing import List, Dict, Any, Optional, Tuple
-import logging
 import hashlib
+import logging
 import os
+import re
+from typing import Any, Dict, List, Optional
 
 from mcp_server.document_processing import (
-    DocumentChunk,
-    ChunkType,
     ChunkMetadata,
-    Section,
+    ChunkType,
+    DocumentChunk,
 )
 from mcp_server.document_processing.chunk_optimizer import TokenEstimator
 
@@ -41,15 +40,9 @@ class MarkdownChunkStrategy:
             adaptive_sizing: Enable adaptive chunk sizing based on document size
         """
         # Get settings from environment variables with defaults
-        self.max_chunk_tokens = max_chunk_size or int(
-            os.getenv("MARKDOWN_MAX_CHUNK_TOKENS", "500")
-        )
-        self.min_chunk_tokens = min_chunk_size or int(
-            os.getenv("MARKDOWN_MIN_CHUNK_TOKENS", "100")
-        )
-        self.overlap_tokens = overlap_size or int(
-            os.getenv("MARKDOWN_OVERLAP_TOKENS", "50")
-        )
+        self.max_chunk_tokens = max_chunk_size or int(os.getenv("MARKDOWN_MAX_CHUNK_TOKENS", "500"))
+        self.min_chunk_tokens = min_chunk_size or int(os.getenv("MARKDOWN_MIN_CHUNK_TOKENS", "100"))
+        self.overlap_tokens = overlap_size or int(os.getenv("MARKDOWN_OVERLAP_TOKENS", "50"))
         self.prefer_semantic_boundaries = prefer_semantic_boundaries
         self.adaptive_sizing = adaptive_sizing
 
@@ -58,15 +51,9 @@ class MarkdownChunkStrategy:
 
         # Convert token limits to approximate character limits for compatibility
         # These are used as rough guides, actual limits are enforced in tokens
-        self.max_chunk_size = int(
-            self.max_chunk_tokens / self.token_estimator.estimation_factor
-        )
-        self.min_chunk_size = int(
-            self.min_chunk_tokens / self.token_estimator.estimation_factor
-        )
-        self.overlap_size = int(
-            self.overlap_tokens / self.token_estimator.estimation_factor
-        )
+        self.max_chunk_size = int(self.max_chunk_tokens / self.token_estimator.estimation_factor)
+        self.min_chunk_size = int(self.min_chunk_tokens / self.token_estimator.estimation_factor)
+        self.overlap_size = int(self.overlap_tokens / self.token_estimator.estimation_factor)
 
     def create_chunks(
         self,
@@ -103,15 +90,9 @@ class MarkdownChunkStrategy:
             self.min_chunk_tokens = min(self.min_chunk_tokens * 2, 200)
 
         # Update character limits
-        self.max_chunk_size = int(
-            self.max_chunk_tokens / self.token_estimator.estimation_factor
-        )
-        self.min_chunk_size = int(
-            self.min_chunk_tokens / self.token_estimator.estimation_factor
-        )
-        self.overlap_size = int(
-            self.overlap_tokens / self.token_estimator.estimation_factor
-        )
+        self.max_chunk_size = int(self.max_chunk_tokens / self.token_estimator.estimation_factor)
+        self.min_chunk_size = int(self.min_chunk_tokens / self.token_estimator.estimation_factor)
+        self.overlap_size = int(self.overlap_tokens / self.token_estimator.estimation_factor)
 
         logger.debug(
             f"Adjusted chunk sizes - max_tokens: {self.max_chunk_tokens}, "
@@ -128,7 +109,7 @@ class MarkdownChunkStrategy:
         """Create chunks based on semantic boundaries."""
         chunks = []
         content_lines = content.split("\n")
-        total_chunks = 0  # Will be updated after creating all chunks
+        _ = 0  # Will be updated after creating all chunks
 
         # Flatten sections for processing
         from mcp_server.plugins.markdown_plugin.section_extractor import (
@@ -184,9 +165,7 @@ class MarkdownChunkStrategy:
         # Check if section is small enough to be a single chunk (based on tokens)
         section_tokens = self.token_estimator.estimate_tokens(section_content)
         if section_tokens <= self.max_chunk_tokens:
-            chunk_id = self._generate_chunk_id(
-                file_path, chunk_index_start + len(chunks)
-            )
+            chunk_id = self._generate_chunk_id(file_path, chunk_index_start + len(chunks))
 
             metadata = ChunkMetadata(
                 document_path=file_path,
@@ -204,9 +183,7 @@ class MarkdownChunkStrategy:
             chunk = DocumentChunk(
                 id=chunk_id,
                 content=section_content,
-                type=(
-                    ChunkType.HEADING if section["level"] <= 2 else ChunkType.PARAGRAPH
-                ),
+                type=(ChunkType.HEADING if section["level"] <= 2 else ChunkType.PARAGRAPH),
                 metadata=metadata,
             )
             chunks.append(chunk)
@@ -291,14 +268,9 @@ class MarkdownChunkStrategy:
             # If paragraph itself is too large, split it further
             if paragraph_tokens > self.max_chunk_tokens:
                 # Save current chunk first if it has content
-                if (
-                    current_chunk_content
-                    and current_chunk_tokens >= self.min_chunk_tokens
-                ):
+                if current_chunk_content and current_chunk_tokens >= self.min_chunk_tokens:
                     chunk_content = "\n\n".join(current_chunk_content)
-                    chunk_id = self._generate_chunk_id(
-                        file_path, chunk_index_start + len(chunks)
-                    )
+                    chunk_id = self._generate_chunk_id(file_path, chunk_index_start + len(chunks))
 
                     metadata = ChunkMetadata(
                         document_path=file_path,
@@ -324,13 +296,9 @@ class MarkdownChunkStrategy:
                     current_chunk_tokens = 0
 
                 # Split the large paragraph by sentences or words
-                paragraph_chunks = self._split_paragraph_by_tokens(
-                    paragraph, self.max_chunk_tokens
-                )
+                paragraph_chunks = self._split_paragraph_by_tokens(paragraph, self.max_chunk_tokens)
                 for para_chunk in paragraph_chunks:
-                    chunk_id = self._generate_chunk_id(
-                        file_path, chunk_index_start + len(chunks)
-                    )
+                    chunk_id = self._generate_chunk_id(file_path, chunk_index_start + len(chunks))
 
                     metadata = ChunkMetadata(
                         document_path=file_path,
@@ -361,9 +329,7 @@ class MarkdownChunkStrategy:
                 # Save current chunk if it meets minimum size
                 if current_chunk_tokens >= self.min_chunk_tokens:
                     chunk_content = "\n\n".join(current_chunk_content)
-                    chunk_id = self._generate_chunk_id(
-                        file_path, chunk_index_start + len(chunks)
-                    )
+                    chunk_id = self._generate_chunk_id(file_path, chunk_index_start + len(chunks))
 
                     metadata = ChunkMetadata(
                         document_path=file_path,
@@ -402,9 +368,7 @@ class MarkdownChunkStrategy:
         # Save final chunk
         if current_chunk_content:
             chunk_content = "\n\n".join(current_chunk_content)
-            chunk_id = self._generate_chunk_id(
-                file_path, chunk_index_start + len(chunks)
-            )
+            chunk_id = self._generate_chunk_id(file_path, chunk_index_start + len(chunks))
 
             metadata = ChunkMetadata(
                 document_path=file_path,
@@ -416,9 +380,7 @@ class MarkdownChunkStrategy:
                 keywords=self._extract_keywords(chunk_content),
                 word_count=len(chunk_content.split()),
                 line_start=chunk_start_line,
-                line_end=section.get(
-                    "end_line", chunk_start_line + len(chunk_content.split("\n"))
-                ),
+                line_end=section.get("end_line", chunk_start_line + len(chunk_content.split("\n"))),
             )
 
             chunk = DocumentChunk(
@@ -474,9 +436,7 @@ class MarkdownChunkStrategy:
 
             content_tokens = self.token_estimator.estimate_tokens(content)
             if content_tokens >= self.min_chunk_tokens:
-                chunk_id = self._generate_chunk_id(
-                    file_path, chunk_index_start + len(chunks)
-                )
+                chunk_id = self._generate_chunk_id(file_path, chunk_index_start + len(chunks))
 
                 metadata = ChunkMetadata(
                     document_path=file_path,
@@ -501,12 +461,10 @@ class MarkdownChunkStrategy:
 
         return chunks
 
-    def _create_sliding_window_chunks(
-        self, content: str, file_path: str
-    ) -> List[DocumentChunk]:
+    def _create_sliding_window_chunks(self, content: str, file_path: str) -> List[DocumentChunk]:
         """Create chunks using a sliding window approach."""
         chunks = []
-        content_lines = content.split("\n")
+        _ = content.split("\n")
 
         # Token-based sliding window
         start = 0
@@ -518,9 +476,7 @@ class MarkdownChunkStrategy:
             approx_end = min(start + self.max_chunk_size, len(content))
 
             # Adjust to actual token boundary
-            end = self._find_token_boundary(
-                content, start, approx_end, self.max_chunk_tokens
-            )
+            end = self._find_token_boundary(content, start, approx_end, self.max_chunk_tokens)
 
             # Try to find a good break point
             if end < len(content):
@@ -569,9 +525,7 @@ class MarkdownChunkStrategy:
             # Move start position with token-based overlap
             if end < len(content):
                 # Find overlap position based on tokens
-                overlap_start = self._find_overlap_start(
-                    content, end, self.overlap_tokens
-                )
+                overlap_start = self._find_overlap_start(content, end, self.overlap_tokens)
                 start = overlap_start
             else:
                 start = end
@@ -675,9 +629,7 @@ class MarkdownChunkStrategy:
                 for word in words:
                     # Estimate tokens for word plus space
                     word_with_space = word + " "
-                    word_token_count = self.token_estimator.estimate_tokens(
-                        word_with_space
-                    )
+                    word_token_count = self.token_estimator.estimate_tokens(word_with_space)
 
                     if word_tokens + word_token_count > max_tokens and word_chunk:
                         chunks.append(" ".join(word_chunk))
@@ -719,9 +671,7 @@ class MarkdownChunkStrategy:
         flatten(sections)
         return flat_sections
 
-    def optimize_chunks_for_search(
-        self, chunks: List[DocumentChunk]
-    ) -> List[DocumentChunk]:
+    def optimize_chunks_for_search(self, chunks: List[DocumentChunk]) -> List[DocumentChunk]:
         """Optimize chunks for semantic search."""
         for chunk in chunks:
             # Create embedding text optimized for search
@@ -741,18 +691,14 @@ class MarkdownChunkStrategy:
 
             # Add keywords
             if chunk.metadata.keywords:
-                embedding_parts.append(
-                    f"Keywords: {', '.join(chunk.metadata.keywords[:5])}"
-                )
+                embedding_parts.append(f"Keywords: {', '.join(chunk.metadata.keywords[:5])}")
 
             # Set embedding on the chunk
             chunk.embedding = None  # Will be generated by the semantic indexer
 
             # Store optimized text in context (can be used for embedding generation)
             if not chunk.context_before:
-                chunk.context_before = "\n\n".join(
-                    embedding_parts[:1]
-                )  # Just section info
+                chunk.context_before = "\n\n".join(embedding_parts[:1])  # Just section info
             if not chunk.context_after:
                 chunk.context_after = "\n\n".join(embedding_parts[2:])  # Metadata hints
 
@@ -774,17 +720,14 @@ class MarkdownChunkStrategy:
             if (
                 current_tokens < self.min_chunk_tokens
                 and current_tokens + next_tokens <= self.max_chunk_tokens
-                and next_chunk.metadata.line_start
-                == current_chunk.metadata.line_end + 1
+                and next_chunk.metadata.line_start == current_chunk.metadata.line_end + 1
             ):
 
                 # Merge chunks
                 current_chunk.content += "\n\n" + next_chunk.content
                 current_chunk.metadata.line_end = next_chunk.metadata.line_end
                 current_chunk.metadata.word_count = len(current_chunk.content.split())
-                current_chunk.metadata.keywords = self._extract_keywords(
-                    current_chunk.content
-                )
+                current_chunk.metadata.keywords = self._extract_keywords(current_chunk.content)
 
                 # Merge section hierarchies if compatible
                 if (

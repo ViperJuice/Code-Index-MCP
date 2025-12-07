@@ -7,20 +7,20 @@ caching, events, and other shared concerns.
 """
 
 from abc import ABC, abstractmethod
-from typing import (
-    Any,
-    Dict,
-    List,
-    Optional,
-    Callable,
-    ContextManager,
-    Awaitable,
-    TypeVar,
-    Generic,
-)
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    ContextManager,
+    Dict,
+    Generic,
+    List,
+    Optional,
+    TypeVar,
+)
 
 T = TypeVar("T")
 
@@ -113,59 +113,46 @@ class ILogger(ABC):
     """Logging interface for all components"""
 
     @abstractmethod
-    def log(
-        self, level: LogLevel, message: str, context: Dict[str, Any] = None
-    ) -> None:
+    def log(self, level: LogLevel, message: str, context: Dict[str, Any] = None) -> None:
         """Log a message with specified level and context"""
-        pass
 
     @abstractmethod
     def debug(self, message: str, context: Dict[str, Any] = None) -> None:
         """Log a debug message"""
-        pass
 
     @abstractmethod
     def info(self, message: str, context: Dict[str, Any] = None) -> None:
         """Log an info message"""
-        pass
 
     @abstractmethod
     def warning(self, message: str, context: Dict[str, Any] = None) -> None:
         """Log a warning message"""
-        pass
 
     @abstractmethod
     def error(
         self, message: str, exception: Exception = None, context: Dict[str, Any] = None
     ) -> None:
         """Log an error message with optional exception"""
-        pass
 
 
 class IMetrics(ABC):
     """Metrics collection interface"""
 
     @abstractmethod
-    def increment(
-        self, metric: str, value: int = 1, tags: Dict[str, str] = None
-    ) -> None:
+    def increment(self, metric: str, value: int = 1, tags: Dict[str, str] = None) -> None:
         """Increment a counter metric"""
-        pass
 
     @abstractmethod
     def gauge(self, metric: str, value: float, tags: Dict[str, str] = None) -> None:
         """Set a gauge metric value"""
-        pass
 
     @abstractmethod
     def histogram(self, metric: str, value: float, tags: Dict[str, str] = None) -> None:
         """Record a histogram value"""
-        pass
 
     @abstractmethod
     def timer(self, metric: str, tags: Dict[str, str] = None) -> ContextManager[None]:
         """Create a timing context manager"""
-        pass
 
 
 class IConfig(ABC):
@@ -174,32 +161,26 @@ class IConfig(ABC):
     @abstractmethod
     def get(self, key: str, default: Any = None) -> Any:
         """Get a configuration value"""
-        pass
 
     @abstractmethod
     def get_int(self, key: str, default: int = 0) -> int:
         """Get an integer configuration value"""
-        pass
 
     @abstractmethod
     def get_bool(self, key: str, default: bool = False) -> bool:
         """Get a boolean configuration value"""
-        pass
 
     @abstractmethod
     def get_str(self, key: str, default: str = "") -> str:
         """Get a string configuration value"""
-        pass
 
     @abstractmethod
     def get_dict(self, key: str, default: Dict[str, Any] = None) -> Dict[str, Any]:
         """Get a dictionary configuration value"""
-        pass
 
     @abstractmethod
     def reload(self) -> None:
         """Reload configuration from source"""
-        pass
 
 
 class ICache(ABC):
@@ -208,27 +189,22 @@ class ICache(ABC):
     @abstractmethod
     def get(self, key: str) -> Optional[Any]:
         """Get a value from cache"""
-        pass
 
     @abstractmethod
     def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
         """Set a value in cache with optional TTL"""
-        pass
 
     @abstractmethod
     def delete(self, key: str) -> None:
         """Delete a value from cache"""
-        pass
 
     @abstractmethod
     def exists(self, key: str) -> bool:
         """Check if a key exists in cache"""
-        pass
 
     @abstractmethod
     def clear(self) -> None:
         """Clear all cache entries"""
-        pass
 
 
 class IEventBus(ABC):
@@ -237,17 +213,14 @@ class IEventBus(ABC):
     @abstractmethod
     def publish(self, event: Event) -> None:
         """Publish an event"""
-        pass
 
     @abstractmethod
     def subscribe(self, event_type: str, handler: Callable[[Event], None]) -> None:
         """Subscribe to an event type"""
-        pass
 
     @abstractmethod
     def unsubscribe(self, event_type: str, handler: Callable[[Event], None]) -> None:
         """Unsubscribe from an event type"""
-        pass
 
 
 # ========================================
@@ -262,30 +235,25 @@ class ISecurityContext(ABC):
     @abstractmethod
     def user_id(self) -> Optional[str]:
         """Get the current user ID"""
-        pass
 
     @property
     @abstractmethod
     def roles(self) -> List[str]:
         """Get the current user's roles"""
-        pass
 
     @property
     @abstractmethod
     def permissions(self) -> List[str]:
         """Get the current user's permissions"""
-        pass
 
     @property
     @abstractmethod
     def is_authenticated(self) -> bool:
         """Check if the user is authenticated"""
-        pass
 
     @abstractmethod
     def is_authorized(self, permission: str) -> bool:
         """Check if the user has a specific permission"""
-        pass
 
 
 class IValidator(ABC):
@@ -294,12 +262,10 @@ class IValidator(ABC):
     @abstractmethod
     def validate(self, data: Any, schema: Any) -> Result[Any]:
         """Validate data against a schema"""
-        pass
 
     @abstractmethod
     def sanitize(self, data: Any) -> Any:
         """Sanitize input data"""
-        pass
 
 
 # ========================================
@@ -313,17 +279,14 @@ class IAsyncSupport(ABC):
     @abstractmethod
     async def run_async(self, func: Callable, *args, **kwargs) -> Any:
         """Run a function asynchronously"""
-        pass
 
     @abstractmethod
     async def gather(self, *awaitables: Awaitable) -> List[Any]:
         """Gather multiple awaitables"""
-        pass
 
     @abstractmethod
     def create_task(self, coro) -> Any:
         """Create an async task"""
-        pass
 
 
 # ========================================
@@ -337,27 +300,22 @@ class IRepository(ABC, Generic[T]):
     @abstractmethod
     def find(self, id: str) -> Optional[T]:
         """Find an entity by ID"""
-        pass
 
     @abstractmethod
     def find_all(self, filter_criteria: Dict[str, Any] = None) -> List[T]:
         """Find all entities matching criteria"""
-        pass
 
     @abstractmethod
     def save(self, entity: T) -> T:
         """Save an entity"""
-        pass
 
     @abstractmethod
     def delete(self, id: str) -> bool:
         """Delete an entity by ID"""
-        pass
 
     @abstractmethod
     def exists(self, id: str) -> bool:
         """Check if an entity exists"""
-        pass
 
 
 class IAsyncRepository(ABC, Generic[T]):
@@ -366,27 +324,22 @@ class IAsyncRepository(ABC, Generic[T]):
     @abstractmethod
     async def find(self, id: str) -> Optional[T]:
         """Find an entity by ID"""
-        pass
 
     @abstractmethod
     async def find_all(self, filter_criteria: Dict[str, Any] = None) -> List[T]:
         """Find all entities matching criteria"""
-        pass
 
     @abstractmethod
     async def save(self, entity: T) -> T:
         """Save an entity"""
-        pass
 
     @abstractmethod
     async def delete(self, id: str) -> bool:
         """Delete an entity by ID"""
-        pass
 
     @abstractmethod
     async def exists(self, id: str) -> bool:
         """Check if an entity exists"""
-        pass
 
 
 # ========================================
@@ -400,12 +353,10 @@ class IFactory(ABC, Generic[T]):
     @abstractmethod
     def create(self, *args, **kwargs) -> T:
         """Create an object"""
-        pass
 
     @abstractmethod
     def create_from_config(self, config: Dict[str, Any]) -> T:
         """Create an object from configuration"""
-        pass
 
 
 # ========================================
@@ -419,7 +370,6 @@ class IObserver(ABC):
     @abstractmethod
     def update(self, event: Event) -> None:
         """Handle an update event"""
-        pass
 
 
 class IObservable(ABC):
@@ -428,17 +378,14 @@ class IObservable(ABC):
     @abstractmethod
     def attach(self, observer: IObserver) -> None:
         """Attach an observer"""
-        pass
 
     @abstractmethod
     def detach(self, observer: IObserver) -> None:
         """Detach an observer"""
-        pass
 
     @abstractmethod
     def notify(self, event: Event) -> None:
         """Notify all observers"""
-        pass
 
 
 # ========================================

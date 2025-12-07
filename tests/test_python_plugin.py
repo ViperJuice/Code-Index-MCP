@@ -11,16 +11,12 @@ Tests cover:
 - Performance benchmarks
 """
 
-import ast
-import json
 from pathlib import Path
-from unittest.mock import Mock, patch
 from textwrap import dedent
 
 import pytest
 
 from mcp_server.plugins.python_plugin.plugin import Plugin as PythonPlugin
-from mcp_server.plugin_base import SymbolDef, SearchResult
 
 
 class TestPluginInitialization:
@@ -171,14 +167,14 @@ class TestSymbolExtraction:
         # Check classes
         classes = [s for s in symbols if s["kind"] == "class"]
         assert len(classes) == 2
-        
+
         # The current implementation only extracts top-level symbols
         # Methods are not extracted separately
 
         # Verify class names
         simple_class = next(s for s in classes if s["symbol"] == "SimpleClass")
         assert "class SimpleClass" in simple_class["signature"]
-        
+
         inherited_class = next(s for s in classes if s["symbol"] == "InheritedClass")
         assert "class InheritedClass" in inherited_class["signature"]
 
@@ -338,9 +334,7 @@ class TestImportTracking:
         assert any(imp["module"] == "sys" for imp in imports)
 
         # Check from imports
-        pathlib_import = next(
-            (imp for imp in imports if imp["module"] == "pathlib"), None
-        )
+        pathlib_import = next((imp for imp in imports if imp["module"] == "pathlib"), None)
         assert pathlib_import is not None
         assert "Path" in pathlib_import.get("names", [])
 
@@ -604,9 +598,7 @@ class TestComplexCodeStructures:
         symbols = result["symbols"]
 
         # Should extract class and methods
-        assert any(
-            s["symbol"] == "MyContextManager" and s["kind"] == "class" for s in symbols
-        )
+        assert any(s["symbol"] == "MyContextManager" and s["kind"] == "class" for s in symbols)
         assert any(s["symbol"] == "__enter__" and s["kind"] == "method" for s in symbols)
         assert any(s["symbol"] == "__exit__" and s["kind"] == "method" for s in symbols)
         assert any(s["symbol"] == "function_context_manager" for s in symbols)
@@ -676,9 +668,7 @@ class TestSearchFunctionality:
         # Create repository and file in store
         repo_id = sqlite_store.create_repository("/test", "test")
         file_id = sqlite_store.store_file(
-            repository_id=repo_id,
-            file_path="/test/file.py",
-            language="python"
+            repository_id=repo_id, file_path="/test/file.py", language="python"
         )
 
         # Index the file
@@ -742,9 +732,7 @@ class Calculator:
 
         for filename, code in test_files:
             file_id = sqlite_store.store_file(
-                repository_id=repo_id,
-                file_path=f"/test/{filename}",
-                language="python"
+                repository_id=repo_id, file_path=f"/test/{filename}", language="python"
             )
             result = plugin.indexFile(Path(f"/test/{filename}"), code)
 
@@ -824,10 +812,7 @@ class TestPersistenceIntegration:
 
         file_path = Path("/myproject/main.py")
         file_id = sqlite_store.store_file(
-            repository_id=repo_id,
-            file_path=str(file_path),
-            language="python",
-            size=len(code)
+            repository_id=repo_id, file_path=str(file_path), language="python", size=len(code)
         )
 
         # Index the file
@@ -865,7 +850,7 @@ class TestPerformance:
         """Benchmark file indexing performance."""
         import time
         from contextlib import contextmanager
-        
+
         @contextmanager
         def measure_time(test_name: str, benchmark_results: dict):
             """Context manager to measure test execution time."""
@@ -910,7 +895,7 @@ class Class{i}:
         """Benchmark search performance."""
         import time
         from contextlib import contextmanager
-        
+
         @contextmanager
         def measure_time(test_name: str, benchmark_results: dict):
             """Context manager to measure test execution time."""
@@ -929,9 +914,7 @@ class Class{i}:
             populated_sqlite_store.store_symbol(
                 file_id, f"function_{i}", "function", i * 10, i * 10 + 5
             )
-            populated_sqlite_store.store_symbol(
-                file_id, f"Class_{i}", "class", i * 20, i * 20 + 15
-            )
+            populated_sqlite_store.store_symbol(file_id, f"Class_{i}", "class", i * 20, i * 20 + 15)
 
         with measure_time("python_plugin_search", benchmark_results):
             for _ in range(100):

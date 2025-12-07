@@ -1,9 +1,10 @@
 """Coroutines and concurrency analysis for Kotlin code."""
 
 import logging
-from typing import Dict, List, Any, Optional, Set
-import tree_sitter
 import re
+from typing import Any, Dict, List
+
+import tree_sitter
 
 logger = logging.getLogger(__name__)
 
@@ -255,34 +256,24 @@ class CoroutinesAnalyzer:
             for query_name, query_str in self.coroutine_queries.items():
                 try:
                     # Use regex-based analysis as fallback
-                    pattern_results = self._analyze_pattern_with_regex(
-                        query_name, content, lines
-                    )
-                    self._categorize_coroutine_results(
-                        query_name, pattern_results, analysis_result
-                    )
+                    pattern_results = self._analyze_pattern_with_regex(query_name, content, lines)
+                    self._categorize_coroutine_results(query_name, pattern_results, analysis_result)
                 except Exception as e:
                     logger.debug(f"Query {query_name} failed: {e}")
 
             # Analyze anti-patterns
-            analysis_result["anti_patterns"] = self._analyze_anti_patterns(
-                content, lines
-            )
+            analysis_result["anti_patterns"] = self._analyze_anti_patterns(content, lines)
 
             # Analyze best practices
-            analysis_result["best_practices"] = self._analyze_best_practices(
-                content, lines
-            )
+            analysis_result["best_practices"] = self._analyze_best_practices(content, lines)
 
             # Analyze concurrency complexity
-            analysis_result["concurrency_complexity"] = (
-                self._analyze_concurrency_complexity(analysis_result, content)
+            analysis_result["concurrency_complexity"] = self._analyze_concurrency_complexity(
+                analysis_result, content
             )
 
             # Calculate statistics
-            analysis_result["statistics"] = self._calculate_coroutine_statistics(
-                analysis_result
-            )
+            analysis_result["statistics"] = self._calculate_coroutine_statistics(analysis_result)
 
             return analysis_result
 
@@ -343,9 +334,7 @@ class CoroutinesAnalyzer:
                 }
 
                 # Add pattern-specific metadata
-                result.update(
-                    self._get_pattern_metadata(pattern_name, match, content, line_num)
-                )
+                result.update(self._get_pattern_metadata(pattern_name, match, content, line_num))
 
                 results.append(result)
 
@@ -369,23 +358,19 @@ class CoroutinesAnalyzer:
         elif pattern_name == "dispatchers":
             dispatcher_type = match.group(1) if match.groups() else "unknown"
             metadata["dispatcher_type"] = dispatcher_type
-            metadata["performance_characteristics"] = (
-                self._get_dispatcher_characteristics(dispatcher_type)
+            metadata["performance_characteristics"] = self._get_dispatcher_characteristics(
+                dispatcher_type
             )
 
         elif pattern_name == "flow_operations":
             metadata["flow_operation_type"] = (
-                "transformation"
-                if match.group(1) in ["map", "filter", "transform"]
-                else "terminal"
+                "transformation" if match.group(1) in ["map", "filter", "transform"] else "terminal"
             )
 
         elif pattern_name == "delay_calls":
             delay_time = match.group(1) if match.groups() else "0"
             metadata["delay_ms"] = int(delay_time) if delay_time.isdigit() else 0
-            metadata["performance_impact"] = (
-                "high" if int(delay_time) > 1000 else "medium"
-            )
+            metadata["performance_impact"] = "high" if int(delay_time) > 1000 else "medium"
 
         elif pattern_name == "state_flow_usage":
             flow_type = match.group(1) if match.groups() else "unknown"
@@ -468,9 +453,7 @@ class CoroutinesAnalyzer:
             result["category"] = category
             analysis_result[category].append(result)
 
-    def _analyze_anti_patterns(
-        self, content: str, lines: List[str]
-    ) -> List[Dict[str, Any]]:
+    def _analyze_anti_patterns(self, content: str, lines: List[str]) -> List[Dict[str, Any]]:
         """Analyze coroutine anti-patterns."""
         anti_patterns = []
 
@@ -499,9 +482,7 @@ class CoroutinesAnalyzer:
 
         return anti_patterns
 
-    def _analyze_best_practices(
-        self, content: str, lines: List[str]
-    ) -> List[Dict[str, Any]]:
+    def _analyze_best_practices(self, content: str, lines: List[str]) -> List[Dict[str, Any]]:
         """Analyze coroutine best practices usage."""
         best_practices = []
 
@@ -581,9 +562,7 @@ class CoroutinesAnalyzer:
             "concurrent_operations_count": len(analysis_result["coroutine_builders"]),
             "flow_operations_count": len(analysis_result["flow_operations"]),
             "state_management_complexity": len(analysis_result["state_management"]),
-            "synchronization_primitives": len(
-                analysis_result["concurrency_primitives"]
-            ),
+            "synchronization_primitives": len(analysis_result["concurrency_primitives"]),
             "overall_complexity": "low",
         }
 
@@ -607,15 +586,11 @@ class CoroutinesAnalyzer:
         complexity["nested_coroutines"] = len(nested_patterns)
 
         if complexity["nested_coroutines"] > 0:
-            complexity["nesting_warning"] = (
-                "Nested coroutines detected - consider refactoring"
-            )
+            complexity["nesting_warning"] = "Nested coroutines detected - consider refactoring"
 
         return complexity
 
-    def _calculate_coroutine_statistics(
-        self, analysis_result: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _calculate_coroutine_statistics(self, analysis_result: Dict[str, Any]) -> Dict[str, Any]:
         """Calculate coroutine usage statistics."""
         stats = {
             "suspend_function_count": len(analysis_result["suspend_functions"]),
@@ -623,16 +598,12 @@ class CoroutinesAnalyzer:
             "flow_operation_count": len(analysis_result["flow_operations"]),
             "channel_operation_count": len(analysis_result["channel_operations"]),
             "state_management_count": len(analysis_result["state_management"]),
-            "concurrency_primitive_count": len(
-                analysis_result["concurrency_primitives"]
-            ),
+            "concurrency_primitive_count": len(analysis_result["concurrency_primitives"]),
             "exception_handling_count": len(analysis_result["exception_handling"]),
             "anti_pattern_count": len(analysis_result["anti_patterns"]),
             "best_practice_count": len(analysis_result["best_practices"]),
             "dispatcher_usage_count": len(analysis_result["dispatcher_usage"]),
-            "cancellation_handling_count": len(
-                analysis_result["cancellation_handling"]
-            ),
+            "cancellation_handling_count": len(analysis_result["cancellation_handling"]),
         }
 
         # Calculate coroutine maturity score
@@ -643,18 +614,14 @@ class CoroutinesAnalyzer:
         )
 
         if total_coroutine_usage > 0:
-            good_practices = (
-                stats["best_practice_count"] + stats["exception_handling_count"]
-            )
+            good_practices = stats["best_practice_count"] + stats["exception_handling_count"]
             bad_practices = stats["anti_pattern_count"]
 
             stats["maturity_score"] = min(
                 100,
                 max(
                     0,
-                    int(
-                        ((good_practices - bad_practices) / total_coroutine_usage) * 100
-                    ),
+                    int(((good_practices - bad_practices) / total_coroutine_usage) * 100),
                 ),
             )
         else:
@@ -676,9 +643,7 @@ class CoroutinesAnalyzer:
 
         return stats
 
-    def get_coroutine_recommendations(
-        self, analysis_result: Dict[str, Any]
-    ) -> List[str]:
+    def get_coroutine_recommendations(self, analysis_result: Dict[str, Any]) -> List[str]:
         """Generate coroutine usage recommendations."""
         recommendations = []
         stats = analysis_result.get("statistics", {})

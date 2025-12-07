@@ -1,22 +1,23 @@
 """Kotlin language plugin for advanced code analysis and indexing."""
 
 import logging
-from typing import Dict, List, Any, Optional, Set, Tuple
-from pathlib import Path
-import tree_sitter
 import re
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
 
+import tree_sitter
+
+from ...storage.sqlite_store import SQLiteStore
 from ..specialized_plugin_base import (
-    SpecializedPluginBase,
-    IImportResolver,
-    ITypeAnalyzer,
     IBuildSystemIntegration,
     ICrossFileAnalyzer,
+    IImportResolver,
+    ITypeAnalyzer,
+    SpecializedPluginBase,
 )
-from ...storage.sqlite_store import SQLiteStore
-from .null_safety import NullSafetyAnalyzer
 from .coroutines_analyzer import CoroutinesAnalyzer
 from .java_interop import JavaInteropAnalyzer
+from .null_safety import NullSafetyAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +32,7 @@ class KotlinPlugin(SpecializedPluginBase):
     - Gradle build integration
     """
 
-    def __init__(
-        self, sqlite_store: Optional[SQLiteStore] = None, enable_semantic: bool = True
-    ):
+    def __init__(self, sqlite_store: Optional[SQLiteStore] = None, enable_semantic: bool = True):
         # Create Kotlin language config
         language_config = {
             "code": "kotlin",
@@ -533,9 +532,7 @@ class KotlinPlugin(SpecializedPluginBase):
 
         return type_mapping.get(capture_name, query_type)
 
-    def _extract_node_metadata(
-        self, node: tree_sitter.Node, lines: List[str]
-    ) -> Dict[str, Any]:
+    def _extract_node_metadata(self, node: tree_sitter.Node, lines: List[str]) -> Dict[str, Any]:
         """Extract additional metadata from the node."""
         metadata = {
             "node_type": node.type,
@@ -601,9 +598,7 @@ class KotlinPlugin(SpecializedPluginBase):
                             elif "type" in param_part.type:
                                 param_info["type"] = param_part.text.decode("utf-8")
                             elif param_part.type == "modifiers":
-                                param_info["modifiers"] = self._extract_modifiers(
-                                    param_part
-                                )
+                                param_info["modifiers"] = self._extract_modifiers(param_part)
 
                         if param_info["name"]:
                             parameters.append(param_info)
@@ -674,9 +669,7 @@ class KotlinPlugin(SpecializedPluginBase):
 
         return symbols
 
-    def _analyze_gradle_integration(
-        self, content: str, file_path: str
-    ) -> Dict[str, Any]:
+    def _analyze_gradle_integration(self, content: str, file_path: str) -> Dict[str, Any]:
         """Analyze Gradle build integration patterns."""
         gradle_info = {
             "build_script_patterns": [],
@@ -720,9 +713,7 @@ class KotlinPlugin(SpecializedPluginBase):
             "gradle_integration",
         ]
 
-    def search_symbols(
-        self, query: str, file_path: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    def search_symbols(self, query: str, file_path: Optional[str] = None) -> List[Dict[str, Any]]:
         """Search for symbols with Kotlin-specific patterns."""
         results = super().search_symbols(query, file_path)
 

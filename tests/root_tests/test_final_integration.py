@@ -2,9 +2,9 @@
 """Final comprehensive integration test for 48-language support with tree-sitter queries."""
 
 import asyncio
+import os
 import sys
 import tempfile
-import os
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -15,10 +15,10 @@ import mcp_server_cli
 async def test_complete_integration():
     """Test the complete 48-language support system."""
     print("=== Comprehensive 48-Language Integration Test ===\n")
-    
+
     # Create test files for multiple languages
     test_files = {
-        "algorithm.go": '''package main
+        "algorithm.go": """package main
 
 import "fmt"
 
@@ -42,9 +42,8 @@ func main() {
     calc.Add(5, 3)
     fmt.Printf("Result: %d\\n", calc.result)
     fmt.Printf("Fibonacci(10): %d\\n", fibonacci(10))
-}''',
-        
-        "geometry.rs": '''use std::f64::consts::PI;
+}""",
+        "geometry.rs": """use std::f64::consts::PI;
 
 struct Circle {
     radius: f64,
@@ -76,9 +75,8 @@ impl Shape for Circle {
 
 fn calculate_total_area(shapes: &[Box<dyn Shape>]) -> f64 {
     shapes.iter().map(|s| s.area()).sum()
-}''',
-        
-        "banking.rb": '''module Banking
+}""",
+        "banking.rb": """module Banking
   class Account
     attr_reader :balance, :number
     
@@ -115,9 +113,8 @@ fn calculate_total_area(shapes: &[Box<dyn Shape>]) -> f64 {
       to_account.deposit(amount)
     end
   end
-end''',
-        
-        "user-service.kt": '''data class User(
+end""",
+        "user-service.kt": """data class User(
     val id: Long,
     val username: String,
     val email: String,
@@ -156,9 +153,8 @@ class UserService(private val repository: UserRepository) {
     private fun generateId(): Long {
         return System.currentTimeMillis()
     }
-}''',
-        
-        "inventory.java": '''import java.util.*;
+}""",
+        "inventory.java": """import java.util.*;
 
 public interface Searchable<T> {
     List<T> search(String query);
@@ -218,90 +214,95 @@ public class InventoryManager implements Searchable<Product> {
             .filter(p -> p.getName().toLowerCase().contains(query.toLowerCase()))
             .collect(Collectors.toList());
     }
-}'''
+}""",
     }
-    
+
     # Create temporary directory
     temp_dir = tempfile.mkdtemp()
     original_dir = os.getcwd()
     os.chdir(temp_dir)
-    
+
     try:
         # Write test files
         for filename, content in test_files.items():
             Path(filename).write_text(content)
-        
+
         print("Created test files:")
         for filename in test_files.keys():
             print(f"  - {filename}")
         print()
-        
+
         # Initialize MCP services
         print("Initializing MCP services...")
         await mcp_server_cli.initialize_services()
-        
+
         if mcp_server_cli.dispatcher is None:
             print("❌ Failed to initialize dispatcher")
             return False
-        
+
         dispatcher = mcp_server_cli.dispatcher
         print(f"✓ Dispatcher initialized: {dispatcher.__class__.__name__}")
-        
+
         # Show initial statistics
         print(f"✓ Supports {len(dispatcher.supported_languages)} languages")
         print(f"✓ Initially loaded: {len(dispatcher._plugins)} plugins")
-        
+
         # Index all files and wait for plugins to load
         print("\n--- Indexing Files ---")
         for filename in test_files.keys():
             file_path = Path(filename)
             print(f"Indexing {filename}...")
             dispatcher.index_file(file_path)
-            
+
         # Give plugins time to fully index
         import time
+
         time.sleep(1)
-        
+
         # Show post-indexing statistics
         stats = dispatcher.get_statistics()
         print(f"\n✓ Total plugins loaded: {stats['total_plugins']}")
         print(f"✓ Languages loaded: {', '.join(sorted(stats['loaded_languages']))}")
-        
+
         # Test symbol lookup
         print("\n--- Testing Symbol Lookup ---")
         test_symbols = ["fibonacci", "Circle", "Account", "User", "Product"]
         found_symbols = 0
-        
+
         for symbol in test_symbols:
             definition = dispatcher.lookup(symbol)
             if definition:
-                print(f"✓ Found {symbol}: {definition.get('kind', 'unknown')} in {Path(definition.get('defined_in', '')).name}")
+                print(
+                    f"✓ Found {symbol}: {definition.get('kind', 'unknown')} in {Path(definition.get('defined_in', '')).name}"
+                )
                 found_symbols += 1
             else:
                 print(f"✗ Symbol '{symbol}' not found")
-        
+
         # Test cross-language search
         print("\n--- Testing Cross-Language Search ---")
         search_terms = ["new", "calculate", "account", "user"]
         total_results = 0
-        
+
         for term in search_terms:
             results = list(dispatcher.search(term, limit=10))
             print(f"'{term}': {len(results)} results across languages")
             total_results += len(results)
-        
+
         # Test semantic search if available
         print("\n--- Testing Semantic Search ---")
         semantic_results = list(dispatcher.search("data structure", semantic=True, limit=5))
         print(f"Semantic search for 'data structure': {len(semantic_results)} results")
-        
+
         # Final health check
         print("\n--- Health Check ---")
         health = dispatcher.health_check()
         print(f"Overall status: {health.get('status', 'unknown')}")
-        print(f"Components healthy: {len([c for c in health.get('components', {}).values() if c.get('status') == 'healthy'])}")
+        print(
+            f"Components healthy: {len([c for c in health.get('components', {}).values() if c.get('status') == 'healthy'])}"
+        )
         print(f"Plugin errors: {len(health.get('errors', []))}")
-        
+
         # Summary
         print("\n=== Final Summary ===")
         print(f"✅ Files indexed: {len(test_files)}")
@@ -309,23 +310,26 @@ public class InventoryManager implements Searchable<Product> {
         print(f"✅ Symbols found: {found_symbols}/{len(test_symbols)}")
         print(f"✅ Search results: {total_results}")
         print(f"✅ System status: {health.get('status', 'unknown')}")
-        
+
         # Show detailed language breakdown
-        print(f"\nDetailed language breakdown:")
-        for lang in sorted(stats['loaded_languages']):
-            lang_info = stats['by_language'].get(lang, {})
+        print("\nDetailed language breakdown:")
+        for lang in sorted(stats["loaded_languages"]):
+            lang_info = stats["by_language"].get(lang, {})
             print(f"  - {lang}: {lang_info.get('class', 'Unknown')} plugin")
-        
-        success = (found_symbols >= len(test_symbols) // 2 and 
-                  total_results > 0 and 
-                  health.get('status') == 'healthy')
-        
+
+        success = (
+            found_symbols >= len(test_symbols) // 2
+            and total_results > 0
+            and health.get("status") == "healthy"
+        )
+
         return success
-        
+
     finally:
         # Cleanup
         os.chdir(original_dir)
         import shutil
+
         shutil.rmtree(temp_dir)
 
 

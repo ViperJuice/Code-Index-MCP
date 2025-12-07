@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Dict, List, Any, Optional, Set
-import re
 import logging
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from tree_sitter import Node
 
@@ -20,9 +19,7 @@ class DeclarationHandler:
         self._declaration_cache: Dict[str, Dict[str, Any]] = {}
         self._ambient_declarations: Dict[str, List[Dict[str, Any]]] = {}
 
-    def parse_declaration_file(
-        self, path: Path, content: str, root_node: Node
-    ) -> Dict[str, Any]:
+    def parse_declaration_file(self, path: Path, content: str, root_node: Node) -> Dict[str, Any]:
         """Parse a TypeScript declaration file and extract type information."""
         file_key = str(path)
 
@@ -91,9 +88,7 @@ class DeclarationHandler:
                 if body:
                     nested_scope = scope_path + [module_info["name"]]
                     for child in body.named_children:
-                        self._extract_declarations(
-                            child, content, declarations, nested_scope
-                        )
+                        self._extract_declarations(child, content, declarations, nested_scope)
 
         # Enum declarations
         elif node.type == "enum_declaration":
@@ -234,9 +229,7 @@ class DeclarationHandler:
         if return_type_node:
             # Skip the ':' token
             type_node = (
-                return_type_node.named_children[0]
-                if return_type_node.named_children
-                else None
+                return_type_node.named_children[0] if return_type_node.named_children else None
             )
             if type_node:
                 return_type = content[type_node.start_byte : type_node.end_byte]
@@ -286,13 +279,9 @@ class DeclarationHandler:
         if heritage_node:
             for child in heritage_node.named_children:
                 if child.type == "extends_clause":
-                    type_node = (
-                        child.named_children[0] if child.named_children else None
-                    )
+                    type_node = child.named_children[0] if child.named_children else None
                     if type_node:
-                        extends_clause = content[
-                            type_node.start_byte : type_node.end_byte
-                        ]
+                        extends_clause = content[type_node.start_byte : type_node.end_byte]
                 elif child.type == "implements_clause":
                     for impl_child in child.named_children:
                         implements_clause.append(
@@ -369,14 +358,10 @@ class DeclarationHandler:
                     name_child = child.child_by_field_name("name")
                     value_child = child.child_by_field_name("value")
                     if name_child:
-                        member_name = content[
-                            name_child.start_byte : name_child.end_byte
-                        ]
+                        member_name = content[name_child.start_byte : name_child.end_byte]
                         member_value = None
                         if value_child:
-                            member_value = content[
-                                value_child.start_byte : value_child.end_byte
-                            ]
+                            member_value = content[value_child.start_byte : value_child.end_byte]
                         members.append({"name": member_name, "value": member_value})
 
         return {
@@ -407,14 +392,10 @@ class DeclarationHandler:
                     if type_node:
                         # Skip the ':' token
                         actual_type = (
-                            type_node.named_children[0]
-                            if type_node.named_children
-                            else None
+                            type_node.named_children[0] if type_node.named_children else None
                         )
                         if actual_type:
-                            var_type = content[
-                                actual_type.start_byte : actual_type.end_byte
-                            ]
+                            var_type = content[actual_type.start_byte : actual_type.end_byte]
 
                     variables.append(
                         {
@@ -458,9 +439,7 @@ class DeclarationHandler:
             ]:
                 name_node = declaration.child_by_field_name("name")
                 if name_node:
-                    exported_names.append(
-                        content[name_node.start_byte : name_node.end_byte]
-                    )
+                    exported_names.append(content[name_node.start_byte : name_node.end_byte])
         else:
             # Named exports (export { foo, bar })
             for child in node.named_children:
@@ -479,9 +458,7 @@ class DeclarationHandler:
             "line": node.start_point[0] + 1,
         }
 
-    def _extract_import_declaration(
-        self, node: Node, content: str
-    ) -> Optional[Dict[str, Any]]:
+    def _extract_import_declaration(self, node: Node, content: str) -> Optional[Dict[str, Any]]:
         """Extract import declaration information."""
         source_node = node.child_by_field_name("source")
         if not source_node:
@@ -502,23 +479,17 @@ class DeclarationHandler:
                 elif child.type == "namespace_import":
                     name_node = child.child_by_field_name("name")
                     if name_node:
-                        namespace_import = content[
-                            name_node.start_byte : name_node.end_byte
-                        ]
+                        namespace_import = content[name_node.start_byte : name_node.end_byte]
                 elif child.type == "named_imports":
                     for spec in child.named_children:
                         if spec.type == "import_specifier":
                             name_node = spec.child_by_field_name("name")
                             alias_node = spec.child_by_field_name("alias")
                             if name_node:
-                                name = content[
-                                    name_node.start_byte : name_node.end_byte
-                                ]
+                                name = content[name_node.start_byte : name_node.end_byte]
                                 alias = None
                                 if alias_node:
-                                    alias = content[
-                                        alias_node.start_byte : alias_node.end_byte
-                                    ]
+                                    alias = content[alias_node.start_byte : alias_node.end_byte]
                                 named_imports.append({"name": name, "alias": alias})
 
         return {
@@ -529,9 +500,7 @@ class DeclarationHandler:
             "line": node.start_point[0] + 1,
         }
 
-    def _extract_type_parameters(
-        self, node: Node, content: str
-    ) -> List[Dict[str, Any]]:
+    def _extract_type_parameters(self, node: Node, content: str) -> List[Dict[str, Any]]:
         """Extract type parameters from a node."""
         type_params = []
 
@@ -547,13 +516,9 @@ class DeclarationHandler:
                     default_type = None
 
                     if constraint_node:
-                        constraint = content[
-                            constraint_node.start_byte : constraint_node.end_byte
-                        ]
+                        constraint = content[constraint_node.start_byte : constraint_node.end_byte]
                     if default_node:
-                        default_type = content[
-                            default_node.start_byte : default_node.end_byte
-                        ]
+                        default_type = content[default_node.start_byte : default_node.end_byte]
 
                     type_params.append(
                         {
@@ -572,15 +537,11 @@ class DeclarationHandler:
         for child in node.named_children:
             if child.type in ["extends_clause", "implements_clause"]:
                 for type_child in child.named_children:
-                    heritage.append(
-                        content[type_child.start_byte : type_child.end_byte]
-                    )
+                    heritage.append(content[type_child.start_byte : type_child.end_byte])
 
         return heritage
 
-    def _extract_property_signature(
-        self, node: Node, content: str
-    ) -> Optional[Dict[str, Any]]:
+    def _extract_property_signature(self, node: Node, content: str) -> Optional[Dict[str, Any]]:
         """Extract property signature from interface."""
         name_node = node.child_by_field_name("name")
         if not name_node:
@@ -604,9 +565,7 @@ class DeclarationHandler:
             "line": node.start_point[0] + 1,
         }
 
-    def _extract_method_signature(
-        self, node: Node, content: str
-    ) -> Optional[Dict[str, Any]]:
+    def _extract_method_signature(self, node: Node, content: str) -> Optional[Dict[str, Any]]:
         """Extract method signature from interface."""
         name_node = node.child_by_field_name("name")
         if not name_node:
@@ -625,9 +584,7 @@ class DeclarationHandler:
         return_type_node = node.child_by_field_name("return_type")
         if return_type_node:
             type_node = (
-                return_type_node.named_children[0]
-                if return_type_node.named_children
-                else None
+                return_type_node.named_children[0] if return_type_node.named_children else None
             )
             if type_node:
                 return_type = content[type_node.start_byte : type_node.end_byte]
@@ -639,9 +596,7 @@ class DeclarationHandler:
             "line": node.start_point[0] + 1,
         }
 
-    def _extract_property_declaration(
-        self, node: Node, content: str
-    ) -> Optional[Dict[str, Any]]:
+    def _extract_property_declaration(self, node: Node, content: str) -> Optional[Dict[str, Any]]:
         """Extract property declaration from class."""
         name_node = node.child_by_field_name("name")
         if not name_node:
@@ -660,7 +615,7 @@ class DeclarationHandler:
         is_readonly = self._has_modifier(node, content, "readonly")
         is_private = self._has_modifier(node, content, "private")
         is_protected = self._has_modifier(node, content, "protected")
-        is_public = self._has_modifier(node, content, "public")
+        _ = self._has_modifier(node, content, "public")
 
         visibility = "public"
         if is_private:
@@ -677,9 +632,7 @@ class DeclarationHandler:
             "line": node.start_point[0] + 1,
         }
 
-    def _extract_method_declaration(
-        self, node: Node, content: str
-    ) -> Optional[Dict[str, Any]]:
+    def _extract_method_declaration(self, node: Node, content: str) -> Optional[Dict[str, Any]]:
         """Extract method declaration from class."""
         name_node = node.child_by_field_name("name")
         if not name_node:
@@ -698,9 +651,7 @@ class DeclarationHandler:
         return_type_node = node.child_by_field_name("return_type")
         if return_type_node:
             type_node = (
-                return_type_node.named_children[0]
-                if return_type_node.named_children
-                else None
+                return_type_node.named_children[0] if return_type_node.named_children else None
             )
             if type_node:
                 return_type = content[type_node.start_byte : type_node.end_byte]
@@ -710,7 +661,7 @@ class DeclarationHandler:
         is_async = self._has_modifier(node, content, "async")
         is_private = self._has_modifier(node, content, "private")
         is_protected = self._has_modifier(node, content, "protected")
-        is_public = self._has_modifier(node, content, "public")
+        _ = self._has_modifier(node, content, "public")
 
         visibility = "public"
         if is_private:
@@ -728,9 +679,7 @@ class DeclarationHandler:
             "line": node.start_point[0] + 1,
         }
 
-    def _extract_function_parameters(
-        self, node: Node, content: str
-    ) -> List[Dict[str, Any]]:
+    def _extract_function_parameters(self, node: Node, content: str) -> List[Dict[str, Any]]:
         """Extract function parameters with type information."""
         params = []
 
@@ -746,9 +695,7 @@ class DeclarationHandler:
 
         return params
 
-    def _extract_parameter_info(
-        self, node: Node, content: str
-    ) -> Optional[Dict[str, Any]]:
+    def _extract_parameter_info(self, node: Node, content: str) -> Optional[Dict[str, Any]]:
         """Extract information about a single parameter."""
         pattern_node = node.child_by_field_name("pattern")
         type_node = node.child_by_field_name("type")
@@ -842,9 +789,7 @@ class DeclarationHandler:
 
         return " ".join(sig_parts)
 
-    def get_type_information(
-        self, symbol_name: str, file_path: Path
-    ) -> Optional[Dict[str, Any]]:
+    def get_type_information(self, symbol_name: str, file_path: Path) -> Optional[Dict[str, Any]]:
         """Get type information for a symbol from declaration files."""
         file_key = str(file_path)
 
@@ -856,10 +801,7 @@ class DeclarationHandler:
         # Search in all declaration types
         for decl_type, items in declarations.items():
             for item in items:
-                if (
-                    item.get("name") == symbol_name
-                    or item.get("full_name") == symbol_name
-                ):
+                if item.get("name") == symbol_name or item.get("full_name") == symbol_name:
                     return {
                         "type": decl_type.rstrip("s"),  # Remove plural
                         "declaration": item,

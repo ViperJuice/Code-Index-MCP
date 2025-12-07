@@ -2,13 +2,13 @@
 
 import json
 import logging
-from pathlib import Path
-from typing import List, Optional, Dict, Any
 from datetime import datetime
+from pathlib import Path
+from typing import List, Optional
 
+from ..interfaces.shared_interfaces import Error, Result
 from .interfaces import IPluginDiscovery
 from .models import PluginInfo, PluginType, PluginValidationError
-from ..interfaces.shared_interfaces import Result, Error
 
 logger = logging.getLogger(__name__)
 
@@ -55,17 +55,13 @@ class PluginDiscovery(IPluginDiscovery):
                     plugin_info = self._load_plugin_info(plugin_dir)
                     if plugin_info and plugin_info not in discovered_plugins:
                         discovered_plugins.append(plugin_info)
-                        logger.info(
-                            f"Discovered plugin: {plugin_info.name} v{plugin_info.version}"
-                        )
+                        logger.info(f"Discovered plugin: {plugin_info.name} v{plugin_info.version}")
                 except Exception as e:
                     logger.error(f"Error loading plugin from {plugin_dir}: {e}")
 
         return discovered_plugins
 
-    def discover_plugins_safe(
-        self, plugin_dirs: List[Path]
-    ) -> Result[List[PluginInfo]]:
+    def discover_plugins_safe(self, plugin_dirs: List[Path]) -> Result[List[PluginInfo]]:
         """Discover plugins using Result pattern for error handling."""
         try:
             plugins = self.discover_plugins(plugin_dirs)
@@ -207,9 +203,7 @@ class PluginDiscovery(IPluginDiscovery):
 
             if not plugin_info:
                 # Fallback: create basic info from directory name
-                plugin_name = (
-                    plugin_path.name.replace("_plugin", "").replace("_", " ").title()
-                )
+                plugin_name = plugin_path.name.replace("_plugin", "").replace("_", " ").title()
                 language = plugin_path.name.replace("_plugin", "")
 
                 # Determine file extensions based on language

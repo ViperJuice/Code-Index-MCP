@@ -1,10 +1,10 @@
 """Swift module system and framework import analyzer."""
 
-import re
 import logging
-from pathlib import Path
-from typing import List, Dict, Set, Optional, Tuple, Any
+import re
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set
 
 from ..specialized_plugin_base import ImportInfo
 
@@ -70,9 +70,7 @@ class SwiftModuleAnalyzer:
 
         return imports
 
-    def _parse_import_statement(
-        self, line: str, line_number: int
-    ) -> Optional[ImportInfo]:
+    def _parse_import_statement(self, line: str, line_number: int) -> Optional[ImportInfo]:
         """Parse a single import statement."""
         # Basic import patterns
         patterns = [
@@ -201,9 +199,7 @@ class SwiftModuleAnalyzer:
                 elif ".testTarget" in match.group(0):
                     target_type = "test"
 
-                targets.append(
-                    {"name": name, "type": target_type, "dependencies": dependencies}
-                )
+                targets.append({"name": name, "type": target_type, "dependencies": dependencies})
 
         return targets
 
@@ -250,18 +246,14 @@ class SwiftModuleAnalyzer:
                 import_type="framework" if is_system else "module",
                 imported_symbols=import_info.imported_names + usage_symbols,
                 is_system_framework=is_system,
-                availability=self._detect_availability_requirements(
-                    content, module_name
-                ),
+                availability=self._detect_availability_requirements(content, module_name),
             )
 
             framework_usage[module_name] = framework_info
 
         return framework_usage
 
-    def _find_framework_symbol_usage(
-        self, content: str, framework_name: str
-    ) -> List[str]:
+    def _find_framework_symbol_usage(self, content: str, framework_name: str) -> List[str]:
         """Find symbols from a framework used in the code."""
         symbols = []
 
@@ -286,14 +278,12 @@ class SwiftModuleAnalyzer:
 
         return list(set(symbols))  # Remove duplicates
 
-    def _detect_availability_requirements(
-        self, content: str, framework_name: str
-    ) -> Optional[str]:
+    def _detect_availability_requirements(self, content: str, framework_name: str) -> Optional[str]:
         """Detect availability requirements for framework usage."""
         # Look for @available attributes
         available_patterns = [
             r"@available\(([^)]+)\)",
-            rf"if\s+#available\(([^)]+)\)",
+            r"if\s+#available\(([^)]+)\)",
         ]
 
         availability_info = []
@@ -349,9 +339,7 @@ class SwiftModuleAnalyzer:
 
         return cycles
 
-    def validate_imports(
-        self, content: str, available_modules: Set[str]
-    ) -> List[Dict[str, Any]]:
+    def validate_imports(self, content: str, available_modules: Set[str]) -> List[Dict[str, Any]]:
         """Validate that all imports are available."""
         issues = []
         imports = self.analyze_imports(content)

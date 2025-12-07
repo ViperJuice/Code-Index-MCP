@@ -2,24 +2,23 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-import jedi
-from typing import Optional, Iterable
-import ast
 import logging
-import os
+from pathlib import Path
+from typing import Iterable, Optional
+
+import jedi
 
 from ...plugin_base import (
     IndexShard,
-    SymbolDef,
     Reference,
-    SearchResult,
     SearchOpts,
+    SearchResult,
+    SymbolDef,
 )
 from ...plugin_base_enhanced import PluginWithSemanticSearch
-from ...utils.treesitter_wrapper import TreeSitterWrapper
-from ...utils.fuzzy_indexer import FuzzyIndexer
 from ...storage.sqlite_store import SQLiteStore
+from ...utils.fuzzy_indexer import FuzzyIndexer
+from ...utils.treesitter_wrapper import TreeSitterWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -161,7 +160,7 @@ class PythonPluginSemantic(PluginWithSemanticSearch):
                 # Clean up multiline signatures
                 signature = " ".join(signature.split())
                 return signature
-        except:
+        except Exception:
             pass
 
         # Fallback to simple signature
@@ -180,9 +179,7 @@ class PythonPluginSemantic(PluginWithSemanticSearch):
                 first_stmt = body_node.named_children[0]
                 if first_stmt.type == "expression_statement":
                     expr = (
-                        first_stmt.named_children[0]
-                        if first_stmt.named_child_count > 0
-                        else None
+                        first_stmt.named_children[0] if first_stmt.named_child_count > 0 else None
                     )
                     if expr and expr.type == "string":
                         # Extract the string content
@@ -194,7 +191,7 @@ class PythonPluginSemantic(PluginWithSemanticSearch):
                         elif doc_text.startswith('"') or doc_text.startswith("'"):
                             doc_text = doc_text[1:-1]
                         return doc_text.strip()
-        except:
+        except Exception:
             pass
         return None
 

@@ -12,12 +12,12 @@ tree-sitter based plugins for languages without specific implementations.
 """
 
 import logging
-from typing import Optional, Dict, Type, Union, Callable
 from pathlib import Path
+from typing import Callable, Dict, Optional, Type, Union
 
 from ..storage.sqlite_store import SQLiteStore
-from .language_registry import LANGUAGE_CONFIGS, get_language_by_extension
 from .generic_treesitter_plugin import GenericTreeSitterPlugin
+from .language_registry import LANGUAGE_CONFIGS, get_language_by_extension
 
 logger = logging.getLogger(__name__)
 
@@ -170,9 +170,7 @@ class PluginFactory:
             logger.info(f"Using specific plugin for {language}")
             plugin_class_or_factory = SPECIFIC_PLUGINS[language]
             # Check if it's a callable (factory function) or a class
-            if callable(plugin_class_or_factory) and not isinstance(
-                plugin_class_or_factory, type
-            ):
+            if callable(plugin_class_or_factory) and not isinstance(plugin_class_or_factory, type):
                 # It's a factory function
                 return plugin_class_or_factory(
                     sqlite_store=sqlite_store, enable_semantic=enable_semantic
@@ -188,14 +186,11 @@ class PluginFactory:
             return GenericTreeSitterPlugin(config, sqlite_store, enable_semantic)
 
         # Language not supported
-        supported = sorted(
-            list(SPECIFIC_PLUGINS.keys()) + list(LANGUAGE_CONFIGS.keys())
-        )
+        supported = sorted(list(SPECIFIC_PLUGINS.keys()) + list(LANGUAGE_CONFIGS.keys()))
         raise ValueError(
-            f"Unsupported language: {language}. "
-            f"Supported languages: {', '.join(supported)}"
+            f"Unsupported language: {language}. " f"Supported languages: {', '.join(supported)}"
         )
-    
+
     @classmethod
     def get_plugin(
         cls,
@@ -204,12 +199,12 @@ class PluginFactory:
         enable_semantic: bool = True,
     ):
         """Alias for create_plugin for backward compatibility.
-        
+
         Args:
             language: Language code (e.g., 'python', 'go', 'rust')
             sqlite_store: Optional SQLite storage
             enable_semantic: Whether to enable semantic search
-            
+
         Returns:
             Plugin instance
         """

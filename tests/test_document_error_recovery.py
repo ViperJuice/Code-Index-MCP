@@ -1,16 +1,14 @@
 """Test cases for document error recovery and graceful degradation."""
 
-import pytest
-from pathlib import Path
 import tempfile
-import os
-from unittest.mock import Mock, patch, MagicMock
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
-from mcp_server.document_processing.base_document_plugin import BaseDocumentPlugin
+import pytest
+
 from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
 from mcp_server.plugins.plaintext_plugin.plugin import PlainTextPlugin
 from mcp_server.storage.sqlite_store import SQLiteStore
-from mcp_server.core.errors import MCPError
 
 
 class TestDocumentErrorRecovery:
@@ -37,7 +35,7 @@ class TestDocumentErrorRecovery:
         language_config = {
             "name": "plaintext",
             "code": "plaintext",
-            "extensions": [".txt", ".text", ".plain"]
+            "extensions": [".txt", ".text", ".plain"],
         }
         return PlainTextPlugin(language_config=language_config, sqlite_store=temp_db)
 
@@ -143,9 +141,7 @@ With some concluding text."""
 
         # Mock memory check to simulate low memory
         with patch("psutil.virtual_memory") as mock_memory:
-            mock_memory.return_value = MagicMock(
-                available=100 * 1024 * 1024
-            )  # 100MB available
+            mock_memory.return_value = MagicMock(available=100 * 1024 * 1024)  # 100MB available
 
             # Read the large file content
             file_content = large_file.read_text(encoding="utf-8")
@@ -289,7 +285,6 @@ Content continues...
     def test_plugin_fallback_mechanism(self, tmp_path):
         """Test fallback to generic processing when specific plugin fails."""
         from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
-        from mcp_server.plugins.plugin_factory import PluginFactory
 
         # Create a file that might cause plugin issues
         problem_file = tmp_path / "problem.xyz"  # Unknown extension
@@ -297,10 +292,7 @@ Content continues...
 
         # Create enhanced dispatcher that can use PluginFactory
         dispatcher = EnhancedDispatcher(
-            plugins=None,
-            sqlite_store=temp_db,
-            use_plugin_factory=True,
-            lazy_load=False
+            plugins=None, sqlite_store=temp_db, use_plugin_factory=True, lazy_load=False
         )
 
         # Try to index the file

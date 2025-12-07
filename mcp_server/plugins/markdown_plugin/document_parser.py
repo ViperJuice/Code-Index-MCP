@@ -2,9 +2,9 @@
 Markdown document parser for AST extraction and processing.
 """
 
-import re
-from typing import Dict, Any, List, Optional, Tuple
 import logging
+import re
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -62,9 +62,7 @@ class MarkdownParser:
 
         return ast
 
-    def _parse_heading(
-        self, lines: List[str], start: int
-    ) -> Optional[Tuple[Dict[str, Any], int]]:
+    def _parse_heading(self, lines: List[str], start: int) -> Optional[Tuple[Dict[str, Any], int]]:
         """Parse a heading block."""
         line = lines[start]
 
@@ -144,14 +142,10 @@ class MarkdownParser:
             i = start
 
             while i < len(lines) and (
-                lines[i].startswith("    ")
-                or lines[i].startswith("\t")
-                or not lines[i].strip()
+                lines[i].startswith("    ") or lines[i].startswith("\t") or not lines[i].strip()
             ):
                 if lines[i].strip():
-                    code_lines.append(
-                        lines[i][4:] if lines[i].startswith("    ") else lines[i][1:]
-                    )
+                    code_lines.append(lines[i][4:] if lines[i].startswith("    ") else lines[i][1:])
                 else:
                     code_lines.append("")
                 i += 1
@@ -171,9 +165,7 @@ class MarkdownParser:
 
         return None
 
-    def _parse_list(
-        self, lines: List[str], start: int
-    ) -> Optional[Tuple[Dict[str, Any], int]]:
+    def _parse_list(self, lines: List[str], start: int) -> Optional[Tuple[Dict[str, Any], int]]:
         """Parse a list block."""
         line = lines[start]
 
@@ -183,7 +175,7 @@ class MarkdownParser:
 
         if ordered_match or unordered_match:
             ordered = bool(ordered_match)
-            marker = ordered_match.group(1) if ordered else unordered_match.group(1)
+            _ = ordered_match.group(1) if ordered else unordered_match.group(1)
 
             list_node = {
                 "type": "list",
@@ -193,7 +185,7 @@ class MarkdownParser:
             }
 
             i = start
-            current_indent = 0
+            _ = 0
 
             while i < len(lines):
                 line = lines[i]
@@ -225,9 +217,7 @@ class MarkdownParser:
                         elif next_line.startswith("  ") or next_line.startswith("\t"):
                             # Nested content
                             nested_lines.append(
-                                next_line[2:]
-                                if next_line.startswith("  ")
-                                else next_line[1:]
+                                next_line[2:] if next_line.startswith("  ") else next_line[1:]
                             )
                             j += 1
                         else:
@@ -295,9 +285,7 @@ class MarkdownParser:
 
         return None
 
-    def _parse_table(
-        self, lines: List[str], start: int
-    ) -> Optional[Tuple[Dict[str, Any], int]]:
+    def _parse_table(self, lines: List[str], start: int) -> Optional[Tuple[Dict[str, Any], int]]:
         """Parse a table."""
         if start + 1 < len(lines):
             # Check for table delimiter
@@ -465,15 +453,11 @@ class MarkdownParser:
         for match_type, match in matches:
             # Add text before this match
             if match.start() > last_end:
-                children.append(
-                    {"type": "text", "value": text[last_end : match.start()]}
-                )
+                children.append({"type": "text", "value": text[last_end : match.start()]})
 
             # Add the matched element
             if match_type == "image":
-                children.append(
-                    {"type": "image", "url": match.group(2), "alt": match.group(1)}
-                )
+                children.append({"type": "image", "url": match.group(2), "alt": match.group(1)})
             elif match_type == "link":
                 children.append(
                     {

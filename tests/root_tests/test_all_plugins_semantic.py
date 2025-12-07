@@ -8,6 +8,7 @@ from pathlib import Path
 
 # Load environment
 from dotenv import load_dotenv
+
 load_dotenv()
 
 # Force semantic search
@@ -22,18 +23,18 @@ from mcp_server.storage.sqlite_store import SQLiteStore
 def test_python_plugin():
     """Test Python plugin semantic search."""
     print("\n=== Testing Python Plugin ===")
-    
+
     from mcp_server.plugins.python_plugin import Plugin
-    
+
     store = SQLiteStore(":memory:")
     plugin = Plugin(sqlite_store=store)
-    
+
     # Check if semantic is enabled
     print(f"Plugin type: {plugin.__class__.__name__}")
     print(f"Has semantic features: {hasattr(plugin, '_enable_semantic')}")
-    if hasattr(plugin, '_enable_semantic'):
+    if hasattr(plugin, "_enable_semantic"):
         print(f"Semantic enabled: {plugin._enable_semantic}")
-    
+
     # Create test file
     test_code = '''
 def calculate_prime(n):
@@ -54,34 +55,35 @@ class MathUtils:
             return 1
         return n * self.factorial(n - 1)
 '''
-    
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(test_code)
         test_file = f.name
-    
+
     try:
         # Index the file
         shard = plugin.indexFile(test_file, test_code)
         print(f"Indexed {len(shard['symbols'])} symbols")
-        
+
         # Test semantic search
         queries = [
             "function to check if a number is prime",
             "recursive mathematical calculation",
-            "class for math utilities"
+            "class for math utilities",
         ]
-        
+
         for query in queries:
             print(f"\nQuery: '{query}'")
             results = list(plugin.search(query, {"semantic": True, "limit": 2}))
             print(f"  Results: {len(results)}")
             for r in results:
                 print(f"    - Line {r['line']}: {r['snippet'].strip()[:50]}...")
-        
+
         return True
     except Exception as e:
         print(f"Error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
     finally:
@@ -91,20 +93,20 @@ class MathUtils:
 def test_javascript_plugin():
     """Test JavaScript plugin semantic search."""
     print("\n=== Testing JavaScript Plugin ===")
-    
+
     try:
         from mcp_server.plugins.js_plugin import Plugin
-        
+
         store = SQLiteStore(":memory:")
         plugin = Plugin(sqlite_store=store)
-        
+
         print(f"Plugin type: {plugin.__class__.__name__}")
         print(f"Has semantic features: {hasattr(plugin, '_enable_semantic')}")
-        if hasattr(plugin, '_enable_semantic'):
+        if hasattr(plugin, "_enable_semantic"):
             print(f"Semantic enabled: {plugin._enable_semantic}")
-        
+
         # Create test file
-        test_code = '''
+        test_code = """
 async function fetchUserData(userId) {
     /**
      * Fetch user data from API
@@ -133,38 +135,39 @@ class DataProcessor {
 const calculateSum = (numbers) => {
     return numbers.reduce((acc, num) => acc + num, 0);
 };
-'''
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.js', delete=False) as f:
+"""
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".js", delete=False) as f:
             f.write(test_code)
             test_file = f.name
-        
+
         try:
             # Index the file
             shard = plugin.indexFile(test_file, test_code)
             print(f"Indexed {len(shard['symbols'])} symbols")
-            
+
             # Test semantic search
             queries = [
                 "async function to fetch data from API",
                 "class for data transformation",
-                "function to calculate sum of array"
+                "function to calculate sum of array",
             ]
-            
+
             for query in queries:
                 print(f"\nQuery: '{query}'")
                 results = list(plugin.search(query, {"semantic": True, "limit": 2}))
                 print(f"  Results: {len(results)}")
                 for r in results:
                     print(f"    - Line {r['line']}: {r['snippet'].strip()[:50]}...")
-            
+
             return True
         finally:
             os.unlink(test_file)
-        
+
     except Exception as e:
         print(f"Error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -172,20 +175,20 @@ const calculateSum = (numbers) => {
 def test_c_plugin():
     """Test C plugin semantic search."""
     print("\n=== Testing C Plugin ===")
-    
+
     try:
         from mcp_server.plugins.c_plugin import Plugin
-        
+
         store = SQLiteStore(":memory:")
         plugin = Plugin(sqlite_store=store)
-        
+
         print(f"Plugin type: {plugin.__class__.__name__}")
         print(f"Has semantic features: {hasattr(plugin, '_enable_semantic')}")
-        if hasattr(plugin, '_enable_semantic'):
+        if hasattr(plugin, "_enable_semantic"):
             print(f"Semantic enabled: {plugin._enable_semantic}")
-        
+
         # Create test file
-        test_code = '''
+        test_code = """
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -222,38 +225,39 @@ void printList(Node* head) {
     }
     printf("NULL\\n");
 }
-'''
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.c', delete=False) as f:
+"""
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".c", delete=False) as f:
             f.write(test_code)
             test_file = f.name
-        
+
         try:
             # Index the file
             shard = plugin.indexFile(test_file, test_code)
             print(f"Indexed {len(shard['symbols'])} symbols")
-            
+
             # Test semantic search
             queries = [
                 "function to create a new node for linked list",
                 "data structure for linked list",
-                "function to print list contents"
+                "function to print list contents",
             ]
-            
+
             for query in queries:
                 print(f"\nQuery: '{query}'")
                 results = list(plugin.search(query, {"semantic": True, "limit": 2}))
                 print(f"  Results: {len(results)}")
                 for r in results:
                     print(f"    - Line {r['line']}: {r['snippet'].strip()[:50]}...")
-            
+
             return True
         finally:
             os.unlink(test_file)
-        
+
     except Exception as e:
         print(f"Error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -261,20 +265,20 @@ void printList(Node* head) {
 def test_cpp_plugin():
     """Test C++ plugin semantic search."""
     print("\n=== Testing C++ Plugin ===")
-    
+
     try:
         from mcp_server.plugins.cpp_plugin import Plugin
-        
+
         store = SQLiteStore(":memory:")
         plugin = Plugin(sqlite_store=store)
-        
+
         print(f"Plugin type: {plugin.__class__.__name__}")
         print(f"Has semantic features: {hasattr(plugin, '_enable_semantic')}")
-        if hasattr(plugin, '_enable_semantic'):
+        if hasattr(plugin, "_enable_semantic"):
             print(f"Semantic enabled: {plugin._enable_semantic}")
-        
+
         # Create test file
-        test_code = '''
+        test_code = """
 #include <iostream>
 #include <vector>
 #include <algorithm>
@@ -315,38 +319,39 @@ public:
         return 2 * (width + height);
     }
 };
-'''
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.cpp', delete=False) as f:
+"""
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".cpp", delete=False) as f:
             f.write(test_code)
             test_file = f.name
-        
+
         try:
             # Index the file
             shard = plugin.indexFile(test_file, test_code)
             print(f"Indexed {len(shard['symbols'])} symbols")
-            
+
             # Test semantic search
             queries = [
                 "template class for sorted data container",
                 "class to calculate rectangle area",
-                "method to check if value exists in container"
+                "method to check if value exists in container",
             ]
-            
+
             for query in queries:
                 print(f"\nQuery: '{query}'")
                 results = list(plugin.search(query, {"semantic": True, "limit": 2}))
                 print(f"  Results: {len(results)}")
                 for r in results:
                     print(f"    - Line {r['line']}: {r['snippet'].strip()[:50]}...")
-            
+
             return True
         finally:
             os.unlink(test_file)
-        
+
     except Exception as e:
         print(f"Error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -354,20 +359,20 @@ public:
 def test_dart_plugin():
     """Test Dart plugin semantic search."""
     print("\n=== Testing Dart Plugin ===")
-    
+
     try:
         from mcp_server.plugins.dart_plugin import Plugin
-        
+
         store = SQLiteStore(":memory:")
         plugin = Plugin(sqlite_store=store)
-        
+
         print(f"Plugin type: {plugin.__class__.__name__}")
         print(f"Has semantic features: {hasattr(plugin, '_enable_semantic')}")
-        if hasattr(plugin, '_enable_semantic'):
+        if hasattr(plugin, "_enable_semantic"):
             print(f"Semantic enabled: {plugin._enable_semantic}")
-        
+
         # Create test file
-        test_code = '''
+        test_code = """
 import 'dart:async';
 
 class UserService {
@@ -407,38 +412,39 @@ void processNumbers(List<int> numbers) {
   final average = sum / numbers.length;
   print('Sum: $sum, Average: $average');
 }
-'''
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.dart', delete=False) as f:
+"""
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".dart", delete=False) as f:
             f.write(test_code)
             test_file = f.name
-        
+
         try:
             # Index the file
             shard = plugin.indexFile(test_file, test_code)
             print(f"Indexed {len(shard['symbols'])} symbols")
-            
+
             # Test semantic search
             queries = [
                 "async function to fetch user from API",
                 "class to represent user data",
-                "function to calculate sum and average"
+                "function to calculate sum and average",
             ]
-            
+
             for query in queries:
                 print(f"\nQuery: '{query}'")
                 results = list(plugin.search(query, {"semantic": True, "limit": 2}))
                 print(f"  Results: {len(results)}")
                 for r in results:
                     print(f"    - Line {r['line']}: {r['snippet'].strip()[:50]}...")
-            
+
             return True
         finally:
             os.unlink(test_file)
-        
+
     except Exception as e:
         print(f"Error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -446,20 +452,20 @@ void processNumbers(List<int> numbers) {
 def test_html_css_plugin():
     """Test HTML/CSS plugin semantic search."""
     print("\n=== Testing HTML/CSS Plugin ===")
-    
+
     try:
         from mcp_server.plugins.html_css_plugin import Plugin
-        
+
         store = SQLiteStore(":memory:")
         plugin = Plugin(sqlite_store=store)
-        
+
         print(f"Plugin type: {plugin.__class__.__name__}")
         print(f"Has semantic features: {hasattr(plugin, '_enable_semantic')}")
-        if hasattr(plugin, '_enable_semantic'):
+        if hasattr(plugin, "_enable_semantic"):
             print(f"Semantic enabled: {plugin._enable_semantic}")
-        
+
         # Create test HTML file
-        test_html = '''
+        test_html = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -485,10 +491,10 @@ def test_html_css_plugin():
     </main>
 </body>
 </html>
-'''
-        
+"""
+
         # Create test CSS file
-        test_css = '''
+        test_css = """
 /* Main header styles */
 #main-header {
     background-color: #333;
@@ -523,46 +529,47 @@ def test_html_css_plugin():
     padding: 3rem;
     border-radius: 8px;
 }
-'''
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False) as f:
+"""
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False) as f:
             f.write(test_html)
             html_file = f.name
-            
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.css', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".css", delete=False) as f:
             f.write(test_css)
             css_file = f.name
-        
+
         try:
             # Index the files
             html_shard = plugin.indexFile(html_file, test_html)
             css_shard = plugin.indexFile(css_file, test_css)
-            
+
             print(f"Indexed HTML: {len(html_shard['symbols'])} symbols")
             print(f"Indexed CSS: {len(css_shard['symbols'])} symbols")
-            
+
             # Test semantic search
             queries = [
                 "header navigation styles",
                 "hero section with gradient background",
-                "main content wrapper element"
+                "main content wrapper element",
             ]
-            
+
             for query in queries:
                 print(f"\nQuery: '{query}'")
                 results = list(plugin.search(query, {"semantic": True, "limit": 2}))
                 print(f"  Results: {len(results)}")
                 for r in results:
                     print(f"    - Line {r['line']}: {r['snippet'].strip()[:50]}...")
-            
+
             return True
         finally:
             os.unlink(html_file)
             os.unlink(css_file)
-        
+
     except Exception as e:
         print(f"Error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -573,24 +580,24 @@ def main():
     print(f"SEMANTIC_SEARCH_ENABLED: {os.getenv('SEMANTIC_SEARCH_ENABLED')}")
     print(f"VOYAGE_API_KEY present: {'VOYAGE_API_KEY' in os.environ}")
     print(f"QDRANT_HOST: {os.getenv('QDRANT_HOST')}")
-    
+
     results = {
         "Python": test_python_plugin(),
         "JavaScript": test_javascript_plugin(),
         "C": test_c_plugin(),
         "C++": test_cpp_plugin(),
         "Dart": test_dart_plugin(),
-        "HTML/CSS": test_html_css_plugin()
+        "HTML/CSS": test_html_css_plugin(),
     }
-    
+
     print("\n=== Summary ===")
     for lang, success in results.items():
         status = "✓ Working" if success else "✗ Failed"
         print(f"{lang}: {status}")
-    
+
     implemented = sum(1 for s in results.values() if s)
     print(f"\nSemantic search working for {implemented}/{len(results)} language plugins")
-    
+
     if implemented == len(results):
         print("\n✅ SUCCESS: All language plugins support semantic search!")
     else:

@@ -2,20 +2,20 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Optional, Iterable, Dict, List, Any
 import logging
+from pathlib import Path
+from typing import Dict, Iterable, List, Optional
 
 from ...plugin_base import (
     IndexShard,
-    SymbolDef,
     Reference,
-    SearchResult,
     SearchOpts,
+    SearchResult,
+    SymbolDef,
 )
 from ...plugin_base_enhanced import PluginWithSemanticSearch
-from ...utils.fuzzy_indexer import FuzzyIndexer
 from ...storage.sqlite_store import SQLiteStore
+from ...utils.fuzzy_indexer import FuzzyIndexer
 
 logger = logging.getLogger(__name__)
 
@@ -97,9 +97,7 @@ class HtmlCssPluginSemantic(PluginWithSemanticSearch):
 
         return IndexShard(file=str(path), symbols=symbols, language="html_css")
 
-    def _extract_symbols(
-        self, content: str, file_id: Optional[int] = None
-    ) -> List[Dict]:
+    def _extract_symbols(self, content: str, file_id: Optional[int] = None) -> List[Dict]:
         """Extract symbols from HTML/CSS code."""
         symbols = []
         lines = content.split("\n")
@@ -139,11 +137,7 @@ class HtmlCssPluginSemantic(PluginWithSemanticSearch):
             elif "{" in line:
                 # Extract CSS selectors
                 stripped = line.strip()
-                if (
-                    stripped
-                    and not stripped.startswith("//")
-                    and not stripped.startswith("/*")
-                ):
+                if stripped and not stripped.startswith("//") and not stripped.startswith("/*"):
                     selector = stripped.split("{")[0].strip()
                     if selector:
                         symbols.append(

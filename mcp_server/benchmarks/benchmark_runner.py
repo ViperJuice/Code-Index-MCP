@@ -9,22 +9,19 @@ This module provides:
 """
 
 import json
-import time
-import tempfile
-from pathlib import Path
-from typing import Dict, List, Optional, Any
-from datetime import datetime
-import statistics
 import logging
-from dataclasses import asdict
+import tempfile
+import time
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List
 
-import pytest_benchmark
 from jinja2 import Template
 
-from .benchmark_suite import BenchmarkSuite, BenchmarkResult, PerformanceMetrics
-from ..plugin_base import IPlugin
 from ..interfaces.indexing_interfaces import IBenchmarkRunner
-from ..interfaces.shared_interfaces import Result, Error
+from ..interfaces.shared_interfaces import Error, Result
+from ..plugin_base import IPlugin
+from .benchmark_suite import BenchmarkResult, BenchmarkSuite
 
 logger = logging.getLogger(__name__)
 
@@ -85,15 +82,13 @@ class BenchmarkRunner(IBenchmarkRunner):
 
     # Implementation of IBenchmarkRunner interface methods
 
-    async def run_indexing_benchmark(
-        self, file_paths: List[str]
-    ) -> Result[Dict[str, Any]]:
+    async def run_indexing_benchmark(self, file_paths: List[str]) -> Result[Dict[str, Any]]:
         """Run indexing performance benchmark."""
         try:
             # Create a minimal plugin set for indexing benchmark
-            from ..plugins.python_plugin import PythonPlugin
-            from ..plugins.js_plugin import JSPlugin
             from ..plugins.c_plugin import CPlugin
+            from ..plugins.js_plugin import JSPlugin
+            from ..plugins.python_plugin import PythonPlugin
 
             plugins = [PythonPlugin(), JSPlugin(), CPlugin()]
             suite = BenchmarkSuite(plugins)
@@ -123,9 +118,7 @@ class BenchmarkRunner(IBenchmarkRunner):
                     errors.append(f"Error indexing {file_path}: {str(e)}")
 
             total_time = time.perf_counter() - start_time
-            files_per_minute = (
-                (indexed_count / total_time) * 60 if total_time > 0 else 0
-            )
+            files_per_minute = (indexed_count / total_time) * 60 if total_time > 0 else 0
 
             metrics = {
                 "indexed_files": indexed_count,
@@ -135,9 +128,7 @@ class BenchmarkRunner(IBenchmarkRunner):
                     sum(timing_samples) / len(timing_samples) if timing_samples else 0
                 ),
                 "p95_time_ms": (
-                    sorted(timing_samples)[int(len(timing_samples) * 0.95)]
-                    if timing_samples
-                    else 0
+                    sorted(timing_samples)[int(len(timing_samples) * 0.95)] if timing_samples else 0
                 ),
                 "errors": errors,
                 "meets_target": files_per_minute >= suite.FILES_PER_MINUTE_TARGET,
@@ -157,9 +148,9 @@ class BenchmarkRunner(IBenchmarkRunner):
     async def run_search_benchmark(self, queries: List[str]) -> Result[Dict[str, Any]]:
         """Run search performance benchmark."""
         try:
-            from ..plugins.python_plugin import PythonPlugin
-            from ..plugins.js_plugin import JSPlugin
             from ..plugins.c_plugin import CPlugin
+            from ..plugins.js_plugin import JSPlugin
+            from ..plugins.python_plugin import PythonPlugin
 
             plugins = [PythonPlugin(), JSPlugin(), CPlugin()]
             suite = BenchmarkSuite(plugins)
@@ -208,14 +199,10 @@ class BenchmarkRunner(IBenchmarkRunner):
                     sum(timing_samples) / len(timing_samples) if timing_samples else 0
                 ),
                 "p95_time_ms": (
-                    sorted(timing_samples)[int(len(timing_samples) * 0.95)]
-                    if timing_samples
-                    else 0
+                    sorted(timing_samples)[int(len(timing_samples) * 0.95)] if timing_samples else 0
                 ),
                 "p99_time_ms": (
-                    sorted(timing_samples)[int(len(timing_samples) * 0.99)]
-                    if timing_samples
-                    else 0
+                    sorted(timing_samples)[int(len(timing_samples) * 0.99)] if timing_samples else 0
                 ),
                 "average_results": (
                     sum(result_counts) / len(result_counts) if result_counts else 0
@@ -247,15 +234,16 @@ class BenchmarkRunner(IBenchmarkRunner):
     async def run_memory_benchmark(self, file_count: int) -> Result[Dict[str, Any]]:
         """Run memory usage benchmark."""
         try:
-            from ..plugins.python_plugin import PythonPlugin
-            from ..plugins.js_plugin import JSPlugin
             from ..plugins.c_plugin import CPlugin
+            from ..plugins.js_plugin import JSPlugin
+            from ..plugins.python_plugin import PythonPlugin
 
             plugins = [PythonPlugin(), JSPlugin(), CPlugin()]
             suite = BenchmarkSuite(plugins)
 
-            import psutil
             import gc
+
+            import psutil
 
             # Force garbage collection and get initial memory
             gc.collect()
@@ -279,9 +267,7 @@ class BenchmarkRunner(IBenchmarkRunner):
 
                         # Sample memory every 100 files
                         if i % 100 == 0:
-                            current_memory_mb = process.memory_info().rss / (
-                                1024 * 1024
-                            )
+                            current_memory_mb = process.memory_info().rss / (1024 * 1024)
                             memory_samples.append(current_memory_mb - initial_memory_mb)
 
                     except Exception as e:
@@ -302,8 +288,7 @@ class BenchmarkRunner(IBenchmarkRunner):
                         (total_memory_used * 1024) / file_count if file_count > 0 else 0
                     ),
                     "projected_memory_100k_files_mb": memory_per_100k_files,
-                    "meets_memory_target": memory_per_100k_files
-                    <= suite.MEMORY_TARGET_MB_PER_100K,
+                    "meets_memory_target": memory_per_100k_files <= suite.MEMORY_TARGET_MB_PER_100K,
                     "memory_samples": memory_samples,
                 }
 
@@ -348,31 +333,19 @@ class BenchmarkRunner(IBenchmarkRunner):
                     status = "UNKNOWN"
                     if metric_name == "symbol_lookup":
                         status = (
-                            "PASS"
-                            if p95_ms <= BenchmarkSuite.SYMBOL_LOOKUP_TARGET_MS
-                            else "FAIL"
+                            "PASS" if p95_ms <= BenchmarkSuite.SYMBOL_LOOKUP_TARGET_MS else "FAIL"
                         )
                     elif "search" in metric_name:
-                        status = (
-                            "PASS"
-                            if p95_ms <= BenchmarkSuite.SEARCH_TARGET_MS
-                            else "FAIL"
-                        )
+                        status = "PASS" if p95_ms <= BenchmarkSuite.SEARCH_TARGET_MS else "FAIL"
 
-                    report_lines.append(
-                        f"{metric_name:<30} P95: {p95_ms:>8.2f}ms [{status}]"
-                    )
+                    report_lines.append(f"{metric_name:<30} P95: {p95_ms:>8.2f}ms [{status}]")
 
             # Special metrics
             if "metrics" in latest_result and "indexing" in latest_result["metrics"]:
                 indexing_metric = latest_result["metrics"]["indexing"]
                 if "files_per_minute" in indexing_metric:
                     fpm = indexing_metric["files_per_minute"]
-                    status = (
-                        "PASS"
-                        if fpm >= BenchmarkSuite.FILES_PER_MINUTE_TARGET
-                        else "FAIL"
-                    )
+                    status = "PASS" if fpm >= BenchmarkSuite.FILES_PER_MINUTE_TARGET else "FAIL"
                     report_lines.append(
                         f"{'Indexing Throughput':<30} {fpm:>8.0f} files/min [{status}]"
                     )
@@ -401,22 +374,12 @@ class BenchmarkRunner(IBenchmarkRunner):
                 if "metrics" in latest_result and "metrics" in previous_result:
                     for metric_name in latest_result["metrics"]:
                         if metric_name in previous_result["metrics"]:
-                            current_p95 = latest_result["metrics"][metric_name].get(
-                                "p95", 0
-                            )
-                            previous_p95 = previous_result["metrics"][metric_name].get(
-                                "p95", 0
-                            )
+                            current_p95 = latest_result["metrics"][metric_name].get("p95", 0)
+                            previous_p95 = previous_result["metrics"][metric_name].get("p95", 0)
 
                             if previous_p95 > 0:
-                                change_pct = (
-                                    (current_p95 - previous_p95) / previous_p95
-                                ) * 100
-                                trend = (
-                                    "↑"
-                                    if change_pct > 5
-                                    else "↓" if change_pct < -5 else "→"
-                                )
+                                change_pct = ((current_p95 - previous_p95) / previous_p95) * 100
+                                trend = "↑" if change_pct > 5 else "↓" if change_pct < -5 else "→"
                                 report_lines.append(
                                     f"  {metric_name:<30} {trend} {change_pct:>+6.1f}%"
                                 )
@@ -476,22 +439,15 @@ class BenchmarkRunner(IBenchmarkRunner):
             }
             # Add any custom attributes
             if hasattr(metric, "files_per_minute"):
-                result_dict["metrics"][name][
-                    "files_per_minute"
-                ] = metric.files_per_minute
+                result_dict["metrics"][name]["files_per_minute"] = metric.files_per_minute
             if hasattr(metric, "memory_per_file_count"):
-                result_dict["metrics"][name][
-                    "memory_per_file_count"
-                ] = metric.memory_per_file_count
+                result_dict["metrics"][name]["memory_per_file_count"] = metric.memory_per_file_count
 
         self.history.append(result_dict)
         self._save_history()
 
         # Save individual result file
-        result_file = (
-            self.output_dir
-            / f"benchmark_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        )
+        result_file = self.output_dir / f"benchmark_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         with open(result_file, "w") as f:
             json.dump(result_dict, f, indent=2)
 
@@ -674,7 +630,7 @@ class BenchmarkRunner(IBenchmarkRunner):
         """Generate text summary report."""
         lines = []
         lines.append("=" * 70)
-        lines.append(f"MCP Server Performance Benchmark Report")
+        lines.append("MCP Server Performance Benchmark Report")
         lines.append("=" * 70)
         lines.append(f"Suite: {result.suite_name}")
         lines.append(f"Date: {result.start_time}")
@@ -700,9 +656,7 @@ class BenchmarkRunner(IBenchmarkRunner):
         if "indexing" in result.metrics:
             metric = result.metrics["indexing"]
             if hasattr(metric, "files_per_minute"):
-                lines.append(
-                    f"Indexing Throughput: {metric.files_per_minute:.0f} files/minute"
-                )
+                lines.append(f"Indexing Throughput: {metric.files_per_minute:.0f} files/minute")
 
         # Memory usage
         if "memory_usage" in result.metrics:
@@ -736,9 +690,7 @@ class BenchmarkRunner(IBenchmarkRunner):
 
         return "\n".join(lines)
 
-    def export_for_ci(
-        self, result: BenchmarkResult, output_file: Path = None
-    ) -> Dict[str, Any]:
+    def export_for_ci(self, result: BenchmarkResult, output_file: Path = None) -> Dict[str, Any]:
         """Export results in CI-friendly format (e.g., for GitHub Actions)."""
         if output_file is None:
             output_file = self.output_dir / "ci_metrics.json"

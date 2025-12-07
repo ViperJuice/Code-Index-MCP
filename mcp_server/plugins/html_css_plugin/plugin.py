@@ -1,35 +1,37 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Optional, Dict, List, Set, Tuple, Any
 import ctypes
+import hashlib
 import logging
 import re
-import hashlib
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
-from tree_sitter import Language, Parser, Node
 import tree_sitter_languages
+from tree_sitter import Language, Node, Parser
 
 from ...interfaces.plugin_interfaces import (
     IHtmlCssPlugin,
     ILanguageAnalyzer,
-    SymbolDefinition,
-    SymbolReference,
-    SearchResult as PluginSearchResult,
     IndexedFile,
 )
-from ...interfaces.shared_interfaces import Result, Error
-from ...plugin_base import (
-    IPlugin,
-    IndexShard,
-    SymbolDef,
-    Reference,
-    SearchResult,
-    SearchOpts,
+from ...interfaces.plugin_interfaces import SearchResult as PluginSearchResult
+from ...interfaces.plugin_interfaces import (
+    SymbolDefinition,
+    SymbolReference,
 )
-from ...utils.fuzzy_indexer import FuzzyIndexer
+from ...interfaces.shared_interfaces import Error, Result
+from ...plugin_base import (
+    IndexShard,
+    IPlugin,
+    Reference,
+    SearchOpts,
+    SearchResult,
+    SymbolDef,
+)
 from ...storage.sqlite_store import SQLiteStore
+from ...utils.fuzzy_indexer import FuzzyIndexer
 
 logger = logging.getLogger(__name__)
 
@@ -110,9 +112,7 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
         """Check if this plugin can handle the given file."""
         return self.supports(file_path)
 
-    def index(
-        self, file_path: str, content: Optional[str] = None
-    ) -> Result[IndexedFile]:
+    def index(self, file_path: str, content: Optional[str] = None) -> Result[IndexedFile]:
         """Index a file and extract symbols."""
         try:
             path = Path(file_path)
@@ -201,9 +201,7 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
                 )
             )
 
-    def get_references(
-        self, symbol: str, context: Dict[str, Any]
-    ) -> Result[List[SymbolReference]]:
+    def get_references(self, symbol: str, context: Dict[str, Any]) -> Result[List[SymbolReference]]:
         """Get all references to a symbol."""
         try:
             references = self.findReferences(symbol)
@@ -253,9 +251,7 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
                         line=result.get("line", 1),
                         column=0,
                         snippet=result.get("content", result.get("match", "")),
-                        match_type=(
-                            "fuzzy" if not options.get("semantic") else "semantic"
-                        ),
+                        match_type=("fuzzy" if not options.get("semantic") else "semantic"),
                         score=result.get("score", 1.0),
                         context=None,
                     )
@@ -282,13 +278,13 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
                 tree = self._html_parser.parse(content.encode("utf-8"))
                 if tree.root_node.has_error:
                     return Result.success_result(False)
-            except:
+            except Exception:
                 # If HTML parsing fails, try CSS
                 try:
                     tree = self._css_parser.parse(content.encode("utf-8"))
                     if tree.root_node.has_error:
                         return Result.success_result(False)
-                except:
+                except Exception:
                     return Result.success_result(False)
 
             return Result.success_result(True)
@@ -303,9 +299,7 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
                 )
             )
 
-    def get_completions(
-        self, file_path: str, line: int, column: int
-    ) -> Result[List[str]]:
+    def get_completions(self, file_path: str, line: int, column: int) -> Result[List[str]]:
         """Get code completions at a position."""
         # HTML/CSS completions are complex and context-dependent
         # For now, return basic completions based on context
@@ -337,13 +331,9 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
 
             elif self._is_css_file(path):
                 # Basic CSS completions
-                if "{" not in current_line or current_line.count(
-                    "{"
-                ) > current_line.count("}"):
+                if "{" not in current_line or current_line.count("{") > current_line.count("}"):
                     # In selector context
-                    completions.extend(
-                        [".class", "#id", "element", ":hover", ":active", ":focus"]
-                    )
+                    completions.extend([".class", "#id", "element", ":hover", ":active", ":focus"])
                 else:
                     # In property context
                     completions.extend(
@@ -441,9 +431,7 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
                 )
             )
 
-    def resolve_type(
-        self, symbol: str, context: Dict[str, Any]
-    ) -> Result[Optional[str]]:
+    def resolve_type(self, symbol: str, context: Dict[str, Any]) -> Result[Optional[str]]:
         """Resolve the type of a symbol."""
         try:
             # Determine symbol type based on prefix/pattern
@@ -457,11 +445,7 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
                 return Result.success_result("media-query")
             elif symbol.startswith("--"):
                 return Result.success_result("css-variable")
-            elif (
-                "-" in symbol
-                and not symbol.startswith(".")
-                and not symbol.startswith("#")
-            ):
+            elif "-" in symbol and not symbol.startswith(".") and not symbol.startswith("#"):
                 return Result.success_result("custom-element")
             elif symbol.startswith("[") and symbol.endswith("]"):
                 return Result.success_result("attribute-selector")
@@ -563,9 +547,7 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
                 )
             )
 
-    def _collect_css_selectors(
-        self, node: Node, content: str, selectors: List[str]
-    ) -> None:
+    def _collect_css_selectors(self, node: Node, content: str, selectors: List[str]) -> None:
         """Recursively collect CSS selectors from AST."""
         if node.type == "rule_set":
             for child in node.children:
@@ -576,9 +558,7 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
         for child in node.children:
             self._collect_css_selectors(child, content, selectors)
 
-    def _collect_html_css_usage(
-        self, node: Node, content: str, css_usage: List[str]
-    ) -> None:
+    def _collect_html_css_usage(self, node: Node, content: str, css_usage: List[str]) -> None:
         """Recursively collect CSS class/ID usage from HTML AST."""
         if node.type == "element":
             attributes = self._extract_html_attributes(node, content)
@@ -731,9 +711,7 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
                     # Find tag name in start_tag
                     for tag_child in child.children:
                         if tag_child.type == "tag_name":
-                            tag_name = content[
-                                tag_child.start_byte : tag_child.end_byte
-                            ]
+                            tag_name = content[tag_child.start_byte : tag_child.end_byte]
                             break
                     break
 
@@ -848,9 +826,7 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
                         "tag": tag_name,
                         "id": attributes.get("id"),
                         "classes": (
-                            attributes.get("class", "").split()
-                            if "class" in attributes
-                            else []
+                            attributes.get("class", "").split() if "class" in attributes else []
                         ),
                         "attributes": attributes,
                         "line": node.start_point[0] + 1,
@@ -861,9 +837,7 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
         for child in node.children:
             self._extract_html_symbols(child, content, symbols, elements, file_id)
 
-    def _extract_html_attributes(
-        self, element_node: Node, content: str
-    ) -> Dict[str, str]:
+    def _extract_html_attributes(self, element_node: Node, content: str) -> Dict[str, str]:
         """Extract attributes from an HTML element node."""
         attributes = {}
 
@@ -878,9 +852,7 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
                         # Extract attribute name and value
                         for attr_part in attr_child.children:
                             if attr_part.type == "attribute_name":
-                                attr_name = content[
-                                    attr_part.start_byte : attr_part.end_byte
-                                ]
+                                attr_name = content[attr_part.start_byte : attr_part.end_byte]
                             elif attr_part.type == "quoted_attribute_value":
                                 # Get the actual value inside the quotes
                                 for value_child in attr_part.children:
@@ -1129,9 +1101,7 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
 
         # Continue recursion for all node types
         for child in node.children:
-            self._extract_css_symbols(
-                child, content, symbols, selectors, file_id, parent_selector
-            )
+            self._extract_css_symbols(child, content, symbols, selectors, file_id, parent_selector)
 
     def _extract_css_selectors(self, selectors_node: Node, content: str) -> List[str]:
         """Extract selectors from a selectors node."""
@@ -1147,9 +1117,7 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
         # Filter out empty selectors
         return [s for s in selectors if s]
 
-    def _symbol_to_def(
-        self, symbol: Dict[str, Any], file_path: str, content: str
-    ) -> SymbolDef:
+    def _symbol_to_def(self, symbol: Dict[str, Any], file_path: str, content: str) -> SymbolDef:
         """Convert internal symbol representation to SymbolDef."""
         return {
             "symbol": symbol["symbol"],
@@ -1159,9 +1127,7 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
             "doc": None,  # HTML/CSS don't typically have inline docs
             "defined_in": file_path,
             "line": symbol.get("line", 1),
-            "span": symbol.get(
-                "span", (symbol.get("line", 1), symbol.get("line", 1) + 1)
-            ),
+            "span": symbol.get("span", (symbol.get("line", 1), symbol.get("line", 1) + 1)),
         }
 
     def getDefinition(self, symbol: str) -> SymbolDef | None:
@@ -1229,9 +1195,7 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
 
                         if symbol_type == "id":
                             # Look for id="value" or id='value'
-                            if re.search(
-                                rf'id\s*=\s*["\']({re.escape(symbol_value)})["\']', line
-                            ):
+                            if re.search(rf'id\s*=\s*["\']({re.escape(symbol_value)})["\']', line):
                                 found = True
                         elif symbol_type == "class":
                             # Look for class="... value ..." or class='... value ...'
@@ -1242,9 +1206,9 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
                                 found = True
                         else:
                             # Look for custom elements or data attributes
-                            if re.search(
-                                rf"<{re.escape(symbol_value)}[\s>]", line
-                            ) or re.search(rf"{re.escape(symbol_value)}\s*=", line):
+                            if re.search(rf"<{re.escape(symbol_value)}[\s>]", line) or re.search(
+                                rf"{re.escape(symbol_value)}\s*=", line
+                            ):
                                 found = True
 
                         if found:
@@ -1286,9 +1250,7 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
 
         return refs
 
-    def search(
-        self, query: str, opts: SearchOpts | None = None
-    ) -> Iterable[SearchResult]:
+    def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:
         """Search for code snippets matching a query."""
         limit = 20
         if opts and "limit" in opts:
@@ -1344,9 +1306,7 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
         # If it's a CSS selector, find HTML usage
         if symbol.startswith("#") or symbol.startswith("."):
             refs["html_usage"] = [
-                ref
-                for ref in self.findReferences(symbol)
-                if ref.file.endswith((".html", ".htm"))
+                ref for ref in self.findReferences(symbol) if ref.file.endswith((".html", ".htm"))
             ]
             refs["css_definitions"] = [
                 ref

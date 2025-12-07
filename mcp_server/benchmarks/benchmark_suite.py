@@ -10,24 +10,24 @@ This module defines benchmarks for:
 - Interface compliance with IIndexPerformanceMonitor and IPerformanceMonitor
 """
 
-import time
-import psutil
+import logging
 import os
 import tempfile
-import hashlib
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
-import logging
+import psutil
 
 from ..dispatcher import EnhancedDispatcher as Dispatcher
-from ..plugin_base import IPlugin, SymbolDef, SearchResult
-from ..storage.sqlite_store import SQLiteStore
 from ..interfaces.indexing_interfaces import IIndexPerformanceMonitor
 from ..interfaces.metrics_interfaces import IPerformanceMonitor
-from ..interfaces.shared_interfaces import Result, Error
+from ..interfaces.shared_interfaces import Error, Result
+from ..plugin_base import IPlugin
+from ..storage.sqlite_store import SQLiteStore
 
 logger = logging.getLogger(__name__)
 
@@ -290,9 +290,7 @@ void test_method_{idx}(TestStruct{idx}* s) {{
                     plugin = self.dispatcher._match_plugin(file_path)
                     content = file_path.read_text()
 
-                    _, duration_ms = self._measure_time(
-                        plugin.index, file_path, content
-                    )
+                    _, duration_ms = self._measure_time(plugin.index, file_path, content)
                     metric.add_sample(duration_ms)
                     indexed_count += 1
                 except Exception as e:
@@ -349,9 +347,7 @@ void test_method_{idx}(TestStruct{idx}* s) {{
 
         return memory_usage
 
-    def benchmark_cache_performance(
-        self, iterations: int = 1000
-    ) -> Dict[str, PerformanceMetrics]:
+    def benchmark_cache_performance(self, iterations: int = 1000) -> Dict[str, PerformanceMetrics]:
         """Benchmark cache hit/miss performance."""
         metrics = {}
 
@@ -382,9 +378,7 @@ void test_method_{idx}(TestStruct{idx}* s) {{
 
             for i in range(iterations):
                 unique_symbol = f"nonexistent_symbol_{i}"
-                _, duration_ms = self._measure_time(
-                    self.dispatcher.lookup, unique_symbol
-                )
+                _, duration_ms = self._measure_time(self.dispatcher.lookup, unique_symbol)
                 cache_miss_metric.add_sample(duration_ms)
 
             metrics["cache_hit"] = cache_hit_metric
@@ -450,9 +444,7 @@ void test_method_{idx}(TestStruct{idx}* s) {{
         if len(self._indexing_times) > 10000:
             self._indexing_times = self._indexing_times[-10000:]
 
-    async def record_search_time(
-        self, query: str, time_taken: float, result_count: int
-    ) -> None:
+    async def record_search_time(self, query: str, time_taken: float, result_count: int) -> None:
         """Record search performance."""
         self._search_times.append(
             {
@@ -478,12 +470,8 @@ void test_method_{idx}(TestStruct{idx}* s) {{
                     {
                         "total_operations": len(indexing_times),
                         "mean_time": np.mean(indexing_times) if indexing_times else 0,
-                        "p95_time": (
-                            np.percentile(indexing_times, 95) if indexing_times else 0
-                        ),
-                        "p99_time": (
-                            np.percentile(indexing_times, 99) if indexing_times else 0
-                        ),
+                        "p95_time": (np.percentile(indexing_times, 95) if indexing_times else 0),
+                        "p99_time": (np.percentile(indexing_times, 99) if indexing_times else 0),
                     }
                     if indexing_times
                     else {"total_operations": 0}
@@ -492,12 +480,8 @@ void test_method_{idx}(TestStruct{idx}* s) {{
                     {
                         "total_operations": len(search_times),
                         "mean_time": np.mean(search_times) if search_times else 0,
-                        "p95_time": (
-                            np.percentile(search_times, 95) if search_times else 0
-                        ),
-                        "p99_time": (
-                            np.percentile(search_times, 99) if search_times else 0
-                        ),
+                        "p95_time": (np.percentile(search_times, 95) if search_times else 0),
+                        "p99_time": (np.percentile(search_times, 99) if search_times else 0),
                         "mean_results": (
                             np.mean([r["result_count"] for r in self._search_times])
                             if self._search_times
@@ -607,9 +591,7 @@ void test_method_{idx}(TestStruct{idx}* s) {{
                         self.record_indexing_time(file_path, duration * 1000)
                     )  # Convert to ms
                 else:
-                    loop.run_until_complete(
-                        self.record_indexing_time(file_path, duration * 1000)
-                    )
+                    loop.run_until_complete(self.record_indexing_time(file_path, duration * 1000))
             except RuntimeError:
                 # No event loop, record directly
                 self._indexing_times.append(
@@ -621,9 +603,7 @@ void test_method_{idx}(TestStruct{idx}* s) {{
                 )
 
         elif "search" in operation.lower():
-            query = (
-                labels.get("query", "benchmark_query") if labels else "benchmark_query"
-            )
+            query = labels.get("query", "benchmark_query") if labels else "benchmark_query"
             result_count = int(labels.get("result_count", "0")) if labels else 0
             # Convert to async call in real implementation
             import asyncio
@@ -675,18 +655,14 @@ void test_method_{idx}(TestStruct{idx}* s) {{
             "max_time_ms": float(np.max(times)),
         }
 
-    def validate_performance_requirements(
-        self, result: BenchmarkResult
-    ) -> Dict[str, bool]:
+    def validate_performance_requirements(self, result: BenchmarkResult) -> Dict[str, bool]:
         """Validate results against performance requirements."""
         validations = {}
 
         # Symbol lookup < 100ms (p95)
         if "symbol_lookup" in result.metrics:
             metric = result.metrics["symbol_lookup"]
-            validations["symbol_lookup_slo"] = metric.is_within_slo(
-                self.SYMBOL_LOOKUP_TARGET_MS
-            )
+            validations["symbol_lookup_slo"] = metric.is_within_slo(self.SYMBOL_LOOKUP_TARGET_MS)
 
         # Search < 500ms (p95)
         if "fuzzy_search" in result.metrics:
@@ -704,16 +680,11 @@ void test_method_{idx}(TestStruct{idx}* s) {{
         # Memory usage
         if "memory_usage" in result.metrics:
             metric = result.metrics["memory_usage"]
-            if (
-                hasattr(metric, "memory_per_file_count")
-                and 10000 in metric.memory_per_file_count
-            ):
+            if hasattr(metric, "memory_per_file_count") and 10000 in metric.memory_per_file_count:
                 # Extrapolate to 100K files
                 mb_per_10k = metric.memory_per_file_count[10000]
                 mb_per_100k = mb_per_10k * 10
-                validations["memory_usage"] = (
-                    mb_per_100k <= self.MEMORY_TARGET_MB_PER_100K
-                )
+                validations["memory_usage"] = mb_per_100k <= self.MEMORY_TARGET_MB_PER_100K
 
         return validations
 
@@ -731,9 +702,7 @@ void test_method_{idx}(TestStruct{idx}* s) {{
 
         # Calculate SLO compliance based on recorded data
         if self._search_times:
-            search_p95 = np.percentile(
-                [r["time_taken"] for r in self._search_times], 95
-            )
+            search_p95 = np.percentile([r["time_taken"] for r in self._search_times], 95)
             summary["slo_compliance"]["search_p95_ms"] = {
                 "current": float(search_p95),
                 "target": self.SEARCH_TARGET_MS,
@@ -741,9 +710,7 @@ void test_method_{idx}(TestStruct{idx}* s) {{
             }
 
         if self._indexing_times:
-            indexing_p95 = np.percentile(
-                [r["time_taken"] for r in self._indexing_times], 95
-            )
+            indexing_p95 = np.percentile([r["time_taken"] for r in self._indexing_times], 95)
             summary["slo_compliance"]["indexing_p95_ms"] = {
                 "current": float(indexing_p95),
                 "target": 100,  # 100ms for indexing individual files
@@ -751,9 +718,7 @@ void test_method_{idx}(TestStruct{idx}* s) {{
             }
 
         # Add performance stats
-        summary["performance_stats"]["indexing"] = self.get_performance_stats(
-            "indexing"
-        )
+        summary["performance_stats"]["indexing"] = self.get_performance_stats("indexing")
         summary["performance_stats"]["search"] = self.get_performance_stats("search")
 
         return summary

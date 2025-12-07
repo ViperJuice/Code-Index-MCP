@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Iterable
-from typing_extensions import TypedDict
 from pathlib import Path
+from typing import Iterable
+
+from typing_extensions import TypedDict
 
 
 class IndexShard(TypedDict):
@@ -60,6 +61,4 @@ class IPlugin(ABC):
     def findReferences(self, symbol: str) -> Iterable[Reference]: ...
 
     @abstractmethod
-    def search(
-        self, query: str, opts: SearchOpts | None = None
-    ) -> Iterable[SearchResult]: ...
+    def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]: ...

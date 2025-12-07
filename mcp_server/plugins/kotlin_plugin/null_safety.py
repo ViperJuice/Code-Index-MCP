@@ -1,9 +1,10 @@
 """Null safety analysis for Kotlin code."""
 
 import logging
-from typing import Dict, List, Any, Optional, Set
-import tree_sitter
 import re
+from typing import Any, Dict, List
+
+import tree_sitter
 
 logger = logging.getLogger(__name__)
 
@@ -247,29 +248,19 @@ class NullSafetyAnalyzer:
                 try:
                     # Note: This would need access to tree-sitter Kotlin parser
                     # For now, we'll use regex-based analysis as fallback
-                    pattern_results = self._analyze_pattern_with_regex(
-                        query_name, content, lines
-                    )
-                    self._categorize_pattern_results(
-                        query_name, pattern_results, analysis_result
-                    )
+                    pattern_results = self._analyze_pattern_with_regex(query_name, content, lines)
+                    self._categorize_pattern_results(query_name, pattern_results, analysis_result)
                 except Exception as e:
                     logger.debug(f"Query {query_name} failed: {e}")
 
             # Analyze potential risks
-            analysis_result["potential_risks"] = self._analyze_null_safety_risks(
-                content, lines
-            )
+            analysis_result["potential_risks"] = self._analyze_null_safety_risks(content, lines)
 
             # Analyze Java interop risks
-            analysis_result["java_interop_risks"] = self._analyze_java_interop_risks(
-                content, lines
-            )
+            analysis_result["java_interop_risks"] = self._analyze_java_interop_risks(content, lines)
 
             # Calculate statistics
-            analysis_result["statistics"] = self._calculate_null_safety_statistics(
-                analysis_result
-            )
+            analysis_result["statistics"] = self._calculate_null_safety_statistics(analysis_result)
 
             return analysis_result
 
@@ -374,9 +365,7 @@ class NullSafetyAnalyzer:
 
             analysis_result[category].append(result)
 
-    def _analyze_null_safety_risks(
-        self, content: str, lines: List[str]
-    ) -> List[Dict[str, Any]]:
+    def _analyze_null_safety_risks(self, content: str, lines: List[str]) -> List[Dict[str, Any]]:
         """Analyze potential null safety risks in the code."""
         risks = []
 
@@ -422,9 +411,7 @@ class NullSafetyAnalyzer:
 
         return risks
 
-    def _analyze_java_interop_risks(
-        self, content: str, lines: List[str]
-    ) -> List[Dict[str, Any]]:
+    def _analyze_java_interop_risks(self, content: str, lines: List[str]) -> List[Dict[str, Any]]:
         """Analyze Java interoperability that might introduce null safety issues."""
         risks = []
 
@@ -464,9 +451,7 @@ class NullSafetyAnalyzer:
 
         return descriptions.get(pattern, "Potential null safety issue")
 
-    def _calculate_null_safety_statistics(
-        self, analysis_result: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _calculate_null_safety_statistics(self, analysis_result: Dict[str, Any]) -> Dict[str, Any]:
         """Calculate null safety statistics from the analysis."""
         stats = {
             "total_nullable_usages": len(analysis_result["nullable_usages"]),
@@ -497,9 +482,7 @@ class NullSafetyAnalyzer:
                 + stats["smart_cast_count"]
             )
 
-            stats["safety_score"] = min(
-                100, int((safe_operations / total_operations) * 100)
-            )
+            stats["safety_score"] = min(100, int((safe_operations / total_operations) * 100))
         else:
             stats["safety_score"] = 100
 
@@ -513,9 +496,7 @@ class NullSafetyAnalyzer:
 
         return stats
 
-    def get_null_safety_recommendations(
-        self, analysis_result: Dict[str, Any]
-    ) -> List[str]:
+    def get_null_safety_recommendations(self, analysis_result: Dict[str, Any]) -> List[str]:
         """Generate null safety recommendations based on analysis."""
         recommendations = []
         stats = analysis_result.get("statistics", {})

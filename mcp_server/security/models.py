@@ -1,10 +1,11 @@
 """Security data models for authentication and authorization."""
 
-from datetime import datetime, timedelta
-from enum import Enum
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field, validator
 import uuid
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field, validator
 
 
 class UserRole(str, Enum):
@@ -155,9 +156,7 @@ class SecurityConfig(BaseModel):
     rate_limit_requests: int = 100
     rate_limit_window_minutes: int = 1
     cors_origins: List[str] = Field(default_factory=lambda: ["*"])
-    cors_methods: List[str] = Field(
-        default_factory=lambda: ["GET", "POST", "PUT", "DELETE"]
-    )
+    cors_methods: List[str] = Field(default_factory=lambda: ["GET", "POST", "PUT", "DELETE"])
     cors_headers: List[str] = Field(default_factory=lambda: ["*"])
     security_headers: Dict[str, str] = Field(
         default_factory=lambda: {

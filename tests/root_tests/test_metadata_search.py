@@ -6,34 +6,28 @@ such as tags, categories, dates, authors, and other document properties
 beyond just the content.
 """
 
-import pytest
-import tempfile
-import json
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Dict, List, Any
-from mcp_server.core.path_utils import PathUtils
-
 # Import system components
 import sys
-sys.path.insert(0, '/app')
 
-from tests.base_test import BaseDocumentTest
-from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
-from mcp_server.plugins.markdown_plugin.frontmatter_parser import FrontmatterParser
+import pytest
+
+sys.path.insert(0, "/app")
+
 from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
+from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
 from mcp_server.storage.sqlite_store import SQLiteStore
+from tests.base_test import BaseDocumentTest
 
 
 class TestMetadataSearch(BaseDocumentTest):
     """Test frontmatter parsing, metadata filtering, tags, and custom fields."""
-    
+
     @pytest.fixture
     def metadata_rich_docs(self, tmp_path):
         """Create documents with rich metadata."""
         workspace = tmp_path / "metadata_docs"
         workspace.mkdir()
-        
+
         # Blog post with full metadata
         blog_post1 = """---
 title: "Understanding Microservices Architecture"
@@ -99,7 +93,7 @@ Microservices offer great benefits but also introduce complexity. Understanding
 the tradeoffs is crucial for successful implementation.
 """
         (workspace / "microservices-guide.md").write_text(blog_post1)
-        
+
         # Tutorial with metadata
         tutorial = """---
 title: "Getting Started with Docker"
@@ -187,7 +181,7 @@ docker rm <container-id>
 - Community forums and tutorials
 """
         (workspace / "docker-tutorial.md").write_text(tutorial)
-        
+
         # API documentation with version metadata
         api_doc = """---
 title: "REST API v2 Documentation"
@@ -284,7 +278,7 @@ The following endpoints are deprecated and will be removed in v3:
 - Performance improvements
 """
         (workspace / "api-v2-docs.md").write_text(api_doc)
-        
+
         # Technical specification
         tech_spec = """---
 title: "Database Schema Design"
@@ -381,7 +375,7 @@ CREATE INDEX idx_orgs_plan ON organizations(plan_type);
 - Join operations: < 100ms
 """
         (workspace / "db-schema-spec.md").write_text(tech_spec)
-        
+
         # Release notes with version metadata
         release_notes = """---
 title: "Release Notes - Version 3.0"
@@ -480,7 +474,7 @@ The following features will be removed in v4:
 - SOAP API endpoints
 """
         (workspace / "release-notes-v3.md").write_text(release_notes)
-        
+
         # Research paper with academic metadata
         research_paper = """---
 title: "Optimizing Distributed Systems Performance"
@@ -546,7 +540,7 @@ distributed systems operating at scale.
 3. Chen, L. (2023). "Network Optimization Strategies"
 """
         (workspace / "distributed-systems-research.md").write_text(research_paper)
-        
+
         # Meeting notes with metadata
         meeting_notes = """---
 title: "Architecture Review Meeting"
@@ -639,317 +633,295 @@ February 5, 2024 - Progress Review
 - Recording: [Link to Zoom recording]
 """
         (workspace / "architecture-meeting-notes.md").write_text(meeting_notes)
-        
+
         return workspace
-    
+
     @pytest.fixture
     def metadata_setup(self, metadata_rich_docs, tmp_path):
         """Set up search with metadata-rich documents."""
         db_path = tmp_path / "metadata_test.db"
         store = SQLiteStore(str(db_path))
-        
+
         # Create plugin
         markdown_plugin = MarkdownPlugin(sqlite_store=store, enable_semantic=False)
-        
+
         # Create dispatcher
         dispatcher = Dispatcher([markdown_plugin])
-        
+
         # Index all documents
         for doc_file in metadata_rich_docs.glob("*.md"):
             content = doc_file.read_text()
             dispatcher.indexFile(str(doc_file), content)
-        
-        return {
-            'dispatcher': dispatcher,
-            'store': store,
-            'workspace': metadata_rich_docs
-        }
-    
+
+        return {"dispatcher": dispatcher, "store": store, "workspace": metadata_rich_docs}
+
     def test_search_by_author(self, metadata_setup):
         """Test finding documents by author."""
-        dispatcher = metadata_setup['dispatcher']
-        
+        dispatcher = metadata_setup["dispatcher"]
+
         # Search for specific authors
-        author_queries = [
-            "Jane Smith",
-            "Bob Johnson",
-            "Sarah Chen",
-            "Dr. Emily Brown"
-        ]
-        
+        author_queries = ["Jane Smith", "Bob Johnson", "Sarah Chen", "Dr. Emily Brown"]
+
         for author in author_queries:
             results = dispatcher.search(author)
-            
+
             # Should find documents by this author
             assert len(results) > 0, f"No results for author: {author}"
-            
+
             # Verify author appears in results
             author_found = False
             for result in results[:3]:
-                content = result.get('snippet', '')
+                content = result.get("snippet", "")
                 if author.lower() in content.lower():
                     author_found = True
                     break
-            
+
             assert author_found, f"Author {author} not found in results"
-    
+
     def test_search_by_category(self, metadata_setup):
         """Test finding documents by category."""
-        dispatcher = metadata_setup['dispatcher']
-        
+        dispatcher = metadata_setup["dispatcher"]
+
         # Search for categories
         category_queries = [
             "architecture",
-            "tutorial", 
+            "tutorial",
             "api-reference",
             "technical-specification",
-            "release-notes"
+            "release-notes",
         ]
-        
+
         for category in category_queries:
             results = dispatcher.search(category)
-            
+
             # Should find categorized documents
             if len(results) > 0:
                 # Categories often appear in metadata or content
                 assert True, f"Found documents for category: {category}"
-    
+
     def test_search_by_tags(self, metadata_setup):
         """Test finding documents by tags."""
-        dispatcher = metadata_setup['dispatcher']
-        
+        dispatcher = metadata_setup["dispatcher"]
+
         # Search for tagged content
-        tag_queries = [
-            "microservices",
-            "docker",
-            "devops",
-            "distributed-systems",
-            "beginner"
-        ]
-        
+        tag_queries = ["microservices", "docker", "devops", "distributed-systems", "beginner"]
+
         for tag in tag_queries:
             results = dispatcher.search(tag)
-            
+
             # Should find tagged documents
             assert len(results) > 0, f"No results for tag: {tag}"
-            
+
             # Verify tag relevance
             tag_found = False
             for result in results[:5]:
-                content = result.get('snippet', '').lower()
-                if tag.replace('-', ' ') in content or tag in content:
+                content = result.get("snippet", "").lower()
+                if tag.replace("-", " ") in content or tag in content:
                     tag_found = True
                     break
-            
+
             assert tag_found, f"Tag {tag} content not found"
-    
+
     def test_search_by_difficulty(self, metadata_setup):
         """Test finding documents by difficulty level."""
-        dispatcher = metadata_setup['dispatcher']
-        
+        dispatcher = metadata_setup["dispatcher"]
+
         # Search for difficulty levels
         difficulty_queries = [
             "beginner tutorial",
             "intermediate guide",
             "beginner docker",
-            "intermediate microservices"
+            "intermediate microservices",
         ]
-        
+
         for query in difficulty_queries:
             results = dispatcher.search(query)
-            
+
             # Should find appropriately leveled content
             if len(results) > 0:
                 # Difficulty often mentioned in tutorials
                 assert True, f"Found content for: {query}"
-    
+
     def test_search_by_document_type(self, metadata_setup):
         """Test finding documents by type."""
-        dispatcher = metadata_setup['dispatcher']
-        
+        dispatcher = metadata_setup["dispatcher"]
+
         # Search for document types
         type_queries = [
             "release notes",
             "technical specification",
             "meeting notes",
             "research paper",
-            "api reference"
+            "api reference",
         ]
-        
+
         for doc_type in type_queries:
             results = dispatcher.search(doc_type)
-            
+
             # Should find documents of this type
             assert len(results) > 0, f"No results for document type: {doc_type}"
-            
+
             # Verify type appears in content
             type_found = False
             for result in results[:3]:
-                content = result.get('snippet', '').lower()
-                if doc_type.replace(' ', '-') in content or doc_type in content:
+                content = result.get("snippet", "").lower()
+                if doc_type.replace(" ", "-") in content or doc_type in content:
                     type_found = True
                     break
-            
+
             assert type_found, f"Document type {doc_type} not found"
-    
+
     def test_search_by_version(self, metadata_setup):
         """Test finding documents by version."""
-        dispatcher = metadata_setup['dispatcher']
-        
+        dispatcher = metadata_setup["dispatcher"]
+
         # Search for versioned content
-        version_queries = [
-            "version 3.0",
-            "v2 documentation",
-            "api version 2",
-            "version 3.1"
-        ]
-        
+        version_queries = ["version 3.0", "v2 documentation", "api version 2", "version 3.1"]
+
         for query in version_queries:
             results = dispatcher.search(query)
-            
+
             # Should find versioned documents
             if len(results) > 0:
                 assert True, f"Found versioned content: {query}"
-    
+
     def test_search_by_date_references(self, metadata_setup):
         """Test finding documents with date references."""
-        dispatcher = metadata_setup['dispatcher']
-        
+        dispatcher = metadata_setup["dispatcher"]
+
         # Search for date-related content
-        date_queries = [
-            "January 2024",
-            "2024-01-15",
-            "last updated 2024",
-            "release date January"
-        ]
-        
+        date_queries = ["January 2024", "2024-01-15", "last updated 2024", "release date January"]
+
         for query in date_queries:
             results = dispatcher.search(query)
-            
+
             # Should find dated documents
             if len(results) > 0:
                 # Dates appear in many contexts
                 assert True, f"Found dated content: {query}"
-    
+
     def test_search_by_status(self, metadata_setup):
         """Test finding documents by status."""
-        dispatcher = metadata_setup['dispatcher']
-        
+        dispatcher = metadata_setup["dispatcher"]
+
         # Search for document status
         status_queries = [
             "published",
             "stable api",
             "deprecated endpoints",
             "approved specification",
-            "breaking changes"
+            "breaking changes",
         ]
-        
+
         for query in status_queries:
             results = dispatcher.search(query)
-            
+
             # Should find status-related content
             assert len(results) >= 0, f"Should handle status query: {query}"
-            
+
             if len(results) > 0:
                 # Status information is important
                 assert True, f"Found status information: {query}"
-    
+
     def test_combined_metadata_search(self, metadata_setup):
         """Test searching with multiple metadata criteria."""
-        dispatcher = metadata_setup['dispatcher']
-        
+        dispatcher = metadata_setup["dispatcher"]
+
         # Combined metadata queries
         combined_queries = [
             "Jane Smith architecture",  # Author + topic
             "beginner docker tutorial",  # Difficulty + tag + type
             "version 2 api stable",  # Version + type + status
             "release notes breaking changes",  # Type + content
-            "technical specification database"  # Type + topic
+            "technical specification database",  # Type + topic
         ]
-        
+
         for query in combined_queries:
             results = dispatcher.search(query)
-            
+
             # Should handle combined queries
             assert len(results) >= 0, f"Should handle combined query: {query}"
-            
+
             if len(results) > 0:
                 # Check relevance of results
                 query_terms = query.lower().split()
                 relevant_results = 0
-                
+
                 for result in results[:5]:
-                    content = result.get('snippet', '').lower()
+                    content = result.get("snippet", "").lower()
                     matching_terms = sum(1 for term in query_terms if term in content)
                     if matching_terms >= 2:  # At least 2 terms match
                         relevant_results += 1
-                
-                assert relevant_results > 0 or len(results) > 0, \
-                    f"Should find relevant results for: {query}"
-    
+
+                assert (
+                    relevant_results > 0 or len(results) > 0
+                ), f"Should find relevant results for: {query}"
+
     def test_metadata_special_queries(self, metadata_setup):
         """Test special metadata-focused queries."""
-        dispatcher = metadata_setup['dispatcher']
-        
+        dispatcher = metadata_setup["dispatcher"]
+
         # Special metadata queries (may not be directly supported but test behavior)
         special_queries = [
             "documents by Sarah Chen",
             "all release notes",
             "tutorials for beginners",
             "peer reviewed research",
-            "internal documentation"
+            "internal documentation",
         ]
-        
+
         for query in special_queries:
             results = dispatcher.search(query)
-            
+
             # System should handle these gracefully
             assert isinstance(results, list), f"Should return results list for: {query}"
-            
+
             # If results found, verify relevance
             if len(results) > 0:
                 # Extract key terms from query
                 if "Sarah Chen" in query:
-                    assert any("Sarah Chen" in r.get('snippet', '') for r in results[:3])
+                    assert any("Sarah Chen" in r.get("snippet", "") for r in results[:3])
                 elif "release notes" in query:
-                    assert any("release" in r.get('snippet', '').lower() for r in results[:3])
-    
+                    assert any("release" in r.get("snippet", "").lower() for r in results[:3])
+
     def test_metadata_filtering_scenarios(self, metadata_setup):
         """Test real-world metadata filtering scenarios."""
-        dispatcher = metadata_setup['dispatcher']
-        
+        dispatcher = metadata_setup["dispatcher"]
+
         # Real-world search scenarios
         scenarios = [
             "find all architecture documents from Jane",
             "latest API documentation version 2",
             "beginner tutorials about containers",
             "technical specifications approved this month",
-            "meeting notes with action items"
+            "meeting notes with action items",
         ]
-        
+
         for scenario in scenarios:
             results = dispatcher.search(scenario)
-            
+
             # Should provide useful results for natural queries
             assert len(results) >= 0, f"Should handle scenario: {scenario}"
-            
+
             if len(results) > 0:
                 # Verify we found relevant content
                 key_terms = scenario.lower().split()
                 # Remove common words
-                key_terms = [t for t in key_terms if t not in 
-                            ['find', 'all', 'from', 'the', 'with', 'about']]
-                
+                key_terms = [
+                    t for t in key_terms if t not in ["find", "all", "from", "the", "with", "about"]
+                ]
+
                 # Check if results contain key terms
                 relevant_found = False
                 for result in results[:5]:
-                    content = result.get('snippet', '').lower()
+                    content = result.get("snippet", "").lower()
                     if any(term in content for term in key_terms):
                         relevant_found = True
                         break
-                
-                assert relevant_found or len(results) > 0, \
-                    f"Should find relevant content for scenario: {scenario}"
+
+                assert (
+                    relevant_found or len(results) > 0
+                ), f"Should find relevant content for scenario: {scenario}"
 
 
 if __name__ == "__main__":

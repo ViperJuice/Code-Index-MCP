@@ -1,8 +1,8 @@
 """Trait analysis for Rust code."""
 
 import re
-from typing import List, Dict, Optional, Set, Tuple
 from dataclasses import dataclass
+from typing import Dict, List, Optional, Set, Tuple
 
 
 @dataclass
@@ -185,9 +185,7 @@ class RustTraitAnalyzer:
                     lifetime_name = match.group(1)
                     if lifetime_name not in ["static", "a", "b"]:  # Filter common ones
                         lifetimes.append(
-                            LifetimeInfo(
-                                name=lifetime_name, line_number=i + 1, context=context
-                            )
+                            LifetimeInfo(name=lifetime_name, line_number=i + 1, context=context)
                         )
 
         return lifetimes

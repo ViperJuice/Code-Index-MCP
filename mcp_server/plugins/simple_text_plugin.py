@@ -1,11 +1,11 @@
 """Simple text plugin for indexing configuration and other text files."""
 
-from pathlib import Path
-from typing import List, Dict, Any, Optional, Iterable
-import logging
 import hashlib
+import logging
+from pathlib import Path
+from typing import Any, Dict, Iterable, Optional
 
-from ..plugin_base import IPlugin, IndexShard, SymbolDef, SearchResult, Reference
+from ..plugin_base import IndexShard, IPlugin, Reference, SearchResult, SymbolDef
 
 logger = logging.getLogger(__name__)
 

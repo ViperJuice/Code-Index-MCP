@@ -4,11 +4,11 @@ This package provides Prometheus-compatible metrics collection, health checks,
 and performance monitoring for all system components.
 """
 
+import time
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from enum import Enum
-import time
+from typing import Any, Dict, List, Optional
 
 
 class HealthStatus(Enum):
@@ -73,12 +73,9 @@ class IMetricsCollector(ABC):
             value: Value to add (default 1.0)
             labels: Optional labels for the metric
         """
-        pass
 
     @abstractmethod
-    def set_gauge(
-        self, name: str, value: float, labels: Optional[Dict[str, str]] = None
-    ) -> None:
+    def set_gauge(self, name: str, value: float, labels: Optional[Dict[str, str]] = None) -> None:
         """Set a gauge metric value.
 
         Args:
@@ -86,7 +83,6 @@ class IMetricsCollector(ABC):
             value: Value to set
             labels: Optional labels for the metric
         """
-        pass
 
     @abstractmethod
     def observe_histogram(
@@ -99,7 +95,6 @@ class IMetricsCollector(ABC):
             value: Value to observe
             labels: Optional labels for the metric
         """
-        pass
 
     @abstractmethod
     def time_function(self, name: str, labels: Optional[Dict[str, str]] = None):
@@ -112,7 +107,6 @@ class IMetricsCollector(ABC):
         Returns:
             Context manager that records execution time
         """
-        pass
 
     @abstractmethod
     def get_metrics(self) -> str:
@@ -121,7 +115,6 @@ class IMetricsCollector(ABC):
         Returns:
             Prometheus-formatted metrics string
         """
-        pass
 
     @abstractmethod
     def get_metric_families(self) -> List[Dict[str, Any]]:
@@ -130,7 +123,6 @@ class IMetricsCollector(ABC):
         Returns:
             List of metric family dictionaries
         """
-        pass
 
 
 class IHealthCheck(ABC):
@@ -146,7 +138,6 @@ class IHealthCheck(ABC):
         Returns:
             Health check result
         """
-        pass
 
     @abstractmethod
     async def check_all_components(self) -> List[HealthCheckResult]:
@@ -155,7 +146,6 @@ class IHealthCheck(ABC):
         Returns:
             List of health check results for all components
         """
-        pass
 
     @abstractmethod
     def register_health_check(self, component_name: str, check_func: callable) -> None:
@@ -165,7 +155,6 @@ class IHealthCheck(ABC):
             component_name: Name of the component
             check_func: Async function that returns HealthCheckResult
         """
-        pass
 
     @abstractmethod
     def unregister_health_check(self, component_name: str) -> None:
@@ -174,7 +163,6 @@ class IHealthCheck(ABC):
         Args:
             component_name: Name of the component
         """
-        pass
 
     @abstractmethod
     async def get_overall_health(self) -> HealthCheckResult:
@@ -183,12 +171,12 @@ class IHealthCheck(ABC):
         Returns:
             Overall health check result
         """
-        pass
 
+
+from .health_check import ComponentHealthChecker  # noqa: E402
 
 # Import implementations
-from .metrics_collector import PrometheusMetricsCollector
-from .health_check import ComponentHealthChecker
+from .metrics_collector import PrometheusMetricsCollector  # noqa: E402
 
 
 # Factory functions

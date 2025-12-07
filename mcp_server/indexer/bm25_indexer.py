@@ -5,19 +5,16 @@ This module provides BM25-based full-text search indexing using SQLite's FTS5
 extension, which includes built-in BM25 ranking algorithms.
 """
 
-import sqlite3
-import logging
 import hashlib
-import json
-from typing import List, Dict, Any, Optional, Tuple
-from datetime import datetime
-from pathlib import Path
-from contextlib import contextmanager
-
-from ..storage.sqlite_store import SQLiteStore
+import logging
+import sqlite3
 
 # Interface definition inline for now
 from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from ..storage.sqlite_store import SQLiteStore
 
 logger = logging.getLogger(__name__)
 
@@ -150,9 +147,7 @@ class BM25Indexer(IIndexer):
             logger.error(f"Failed to index documents: {e}")
             return False
 
-    def add_document(
-        self, doc_id: str, content: str, metadata: Optional[Dict] = None
-    ) -> None:
+    def add_document(self, doc_id: str, content: str, metadata: Optional[Dict] = None) -> None:
         """
         Add a document to the BM25 index.
 
@@ -165,9 +160,7 @@ class BM25Indexer(IIndexer):
             # Get or create file record
             file_record = self.storage.get_file(doc_id)
             if not file_record:
-                logger.warning(
-                    f"File record not found for {doc_id}, skipping BM25 indexing"
-                )
+                logger.warning(f"File record not found for {doc_id}, skipping BM25 indexing")
                 return
 
             file_id = file_record["id"]
@@ -496,9 +489,7 @@ class BM25Indexer(IIndexer):
 
             logger.debug(f"Removed {doc_id} from BM25 index")
 
-    def update_document(
-        self, doc_id: str, content: str, metadata: Optional[Dict] = None
-    ) -> None:
+    def update_document(self, doc_id: str, content: str, metadata: Optional[Dict] = None) -> None:
         """
         Update a document in the BM25 index.
 
@@ -565,17 +556,13 @@ class BM25Indexer(IIndexer):
         """Optimize the FTS5 index for better performance."""
         with self.storage._get_connection() as conn:
             # Optimize main content table
-            conn.execute(
-                f"INSERT INTO {self.table_name}({self.table_name}) VALUES('optimize')"
-            )
+            conn.execute(f"INSERT INTO {self.table_name}({self.table_name}) VALUES('optimize')")
 
             # Optimize symbol table
             conn.execute("INSERT INTO bm25_symbols(bm25_symbols) VALUES('optimize')")
 
             # Optimize document table
-            conn.execute(
-                "INSERT INTO bm25_documents(bm25_documents) VALUES('optimize')"
-            )
+            conn.execute("INSERT INTO bm25_documents(bm25_documents) VALUES('optimize')")
 
             logger.info("BM25 index optimized")
 
@@ -583,9 +570,7 @@ class BM25Indexer(IIndexer):
         """Rebuild the entire FTS5 index."""
         with self.storage._get_connection() as conn:
             # Rebuild main content table
-            conn.execute(
-                f"INSERT INTO {self.table_name}({self.table_name}) VALUES('rebuild')"
-            )
+            conn.execute(f"INSERT INTO {self.table_name}({self.table_name}) VALUES('rebuild')")
 
             # Rebuild symbol table
             conn.execute("INSERT INTO bm25_symbols(bm25_symbols) VALUES('rebuild')")

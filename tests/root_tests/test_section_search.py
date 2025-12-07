@@ -6,32 +6,29 @@ of documents, find content based on heading hierarchy, and get results
 that understand document structure context.
 """
 
-import pytest
-import tempfile
-from pathlib import Path
-from typing import Dict, List, Tuple
-from collections import defaultdict
-
 # Import system components
 import sys
-sys.path.insert(0, '/app')
+from collections import defaultdict
 
-from tests.base_test import BaseDocumentTest
-from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
-from mcp_server.plugins.markdown_plugin.section_extractor import SectionExtractor
+import pytest
+
+sys.path.insert(0, "/app")
+
 from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
+from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
 from mcp_server.storage.sqlite_store import SQLiteStore
+from tests.base_test import BaseDocumentTest
 
 
 class TestSectionSearch(BaseDocumentTest):
     """Test section-specific search, heading search, and nested queries."""
-    
+
     @pytest.fixture
     def sectioned_documents(self, tmp_path):
         """Create documents with clear section structure."""
         workspace = tmp_path / "sections"
         workspace.mkdir()
-        
+
         # Comprehensive guide with nested sections
         guide = """# Complete Platform Guide
 
@@ -489,7 +486,7 @@ deployment.wait_for_completion()
 ```
 """
         (workspace / "platform-guide.md").write_text(guide)
-        
+
         # FAQ document with Q&A sections
         faq = """# Frequently Asked Questions
 
@@ -801,7 +798,7 @@ Yes! Join our community:
 - **Reddit**: r/platformio
 """
         (workspace / "faq.md").write_text(faq)
-        
+
         # Technical documentation with code sections
         tech_doc = """# Technical Architecture Documentation
 
@@ -1003,7 +1000,7 @@ def cache(expiration=3600):
 ##### Cache Invalidation
 ```python
 def invalidate_cache(pattern):
-    """Invalidate cache entries matching pattern"""
+    \"\"\"Invalidate cache entries matching pattern\"\"\"
     for key in redis_client.scan_iter(match=pattern):
         redis_client.delete(key)
 
@@ -1355,328 +1352,331 @@ async def get_data():
 ```
 """
         (workspace / "technical-architecture.md").write_text(tech_doc)
-        
+
         return workspace
-    
+
     @pytest.fixture
     def section_setup(self, sectioned_documents, tmp_path):
         """Set up search with sectioned documents."""
         db_path = tmp_path / "section_test.db"
         store = SQLiteStore(str(db_path))
-        
+
         # Create plugin
         markdown_plugin = MarkdownPlugin(sqlite_store=store, enable_semantic=False)
-        
+
         # Create dispatcher
         dispatcher = Dispatcher([markdown_plugin])
-        
+
         # Index all documents
         for doc_file in sectioned_documents.glob("*.md"):
             content = doc_file.read_text()
             dispatcher.indexFile(str(doc_file), content)
-        
-        return {
-            'dispatcher': dispatcher,
-            'store': store,
-            'workspace': sectioned_documents
-        }
-    
+
+        return {"dispatcher": dispatcher, "store": store, "workspace": sectioned_documents}
+
     def test_top_level_section_search(self, section_setup):
         """Test searching in top-level sections."""
-        dispatcher = section_setup['dispatcher']
-        
+        dispatcher = section_setup["dispatcher"]
+
         # Search for top-level sections
         section_queries = [
             "Getting Started",
-            "Configuration", 
+            "Configuration",
             "Advanced Features",
             "Troubleshooting",
-            "API Reference"
+            "API Reference",
         ]
-        
+
         for section in section_queries:
             results = dispatcher.search(section)
-            
+
             # Should find section headers
             assert len(results) > 0, f"No results for section: {section}"
-            
+
             # Verify section content found
             section_found = False
             for result in results[:3]:
-                content = result.get('snippet', '')
+                content = result.get("snippet", "")
                 if section.lower() in content.lower():
                     section_found = True
                     break
-            
+
             assert section_found, f"Section {section} not found in results"
-    
+
     def test_nested_section_search(self, section_setup):
         """Test searching in nested subsections."""
-        dispatcher = section_setup['dispatcher']
-        
+        dispatcher = section_setup["dispatcher"]
+
         # Search for nested sections
         nested_queries = [
             "System Requirements hardware",
             "Manual Installation steps",
             "Environment Variables security",
             "Plugin System custom",
-            "Database Design schema"
+            "Database Design schema",
         ]
-        
+
         for query in nested_queries:
             results = dispatcher.search(query)
-            
+
             # Should find nested content
             assert len(results) >= 0, f"Should handle nested query: {query}"
-            
+
             if len(results) > 0:
                 # Check content relevance
                 query_terms = query.lower().split()
                 relevant_found = False
-                
+
                 for result in results[:5]:
-                    content = result.get('snippet', '').lower()
+                    content = result.get("snippet", "").lower()
                     matching_terms = sum(1 for term in query_terms if term in content)
                     if matching_terms >= 2:
                         relevant_found = True
                         break
-                
-                assert relevant_found or len(results) > 0, f"Should find relevant nested content: {query}"
-    
+
+                assert (
+                    relevant_found or len(results) > 0
+                ), f"Should find relevant nested content: {query}"
+
     def test_code_section_search(self, section_setup):
         """Test searching within code sections."""
-        dispatcher = section_setup['dispatcher']
-        
+        dispatcher = section_setup["dispatcher"]
+
         # Search for code-related content
         code_queries = [
             "FastAPI middleware",
             "PostgreSQL CREATE TABLE",
             "docker multi-stage build",
             "kubernetes deployment yaml",
-            "prometheus metrics"
+            "prometheus metrics",
         ]
-        
+
         for query in code_queries:
             results = dispatcher.search(query)
-            
+
             if len(results) > 0:
                 # Should find code sections
                 code_found = False
                 for result in results[:5]:
-                    content = result.get('snippet', '')
+                    content = result.get("snippet", "")
                     # Look for code indicators
-                    if any(indicator in content for indicator in ['```', 'import', 'CREATE', 'FROM']):
+                    if any(
+                        indicator in content for indicator in ["```", "import", "CREATE", "FROM"]
+                    ):
                         code_found = True
                         break
-                
+
                 assert code_found or len(results) > 0, f"Should find code content for: {query}"
-    
+
     def test_faq_section_search(self, section_setup):
         """Test searching in FAQ-style sections."""
-        dispatcher = section_setup['dispatcher']
-        
+        dispatcher = section_setup["dispatcher"]
+
         # Search for FAQ content
         faq_queries = [
             "What is the Platform",
             "How much does it cost",
             "system requirements",
             "deployment failing",
-            "forgot API key"
+            "forgot API key",
         ]
-        
+
         for query in faq_queries:
             results = dispatcher.search(query)
-            
+
             # Should find FAQ content
             assert len(results) >= 0, f"Should handle FAQ query: {query}"
-            
+
             if len(results) > 0:
                 # FAQ results should be helpful
                 question_found = False
                 for result in results[:3]:
-                    content = result.get('snippet', '')
-                    if '?' in content or query.lower() in content.lower():
+                    content = result.get("snippet", "")
+                    if "?" in content or query.lower() in content.lower():
                         question_found = True
                         break
-                
+
                 assert question_found or len(results) > 0, f"Should find FAQ content: {query}"
-    
+
     def test_section_specific_content(self, section_setup):
         """Test finding content specific to certain sections."""
-        dispatcher = section_setup['dispatcher']
-        
+        dispatcher = section_setup["dispatcher"]
+
         # Search for section-specific terms
         specific_queries = [
             ("installation", ["curl", "wget", "install", "setup"]),
             ("configuration", ["yaml", "config", "environment", "settings"]),
             ("troubleshooting", ["error", "fix", "debug", "problem"]),
             ("security", ["authentication", "jwt", "oauth", "encryption"]),
-            ("api", ["endpoint", "request", "response", "rest"])
+            ("api", ["endpoint", "request", "response", "rest"]),
         ]
-        
+
         for section_term, expected_terms in specific_queries:
             results = dispatcher.search(section_term)
-            
+
             if len(results) > 0:
                 # Check if results contain expected section-specific terms
                 terms_found = set()
                 for result in results[:10]:
-                    content = result.get('snippet', '').lower()
+                    content = result.get("snippet", "").lower()
                     for term in expected_terms:
                         if term in content:
                             terms_found.add(term)
-                
+
                 # Should find some section-specific terms
                 assert len(terms_found) > 0, f"Should find {section_term} specific terms"
-    
+
     def test_cross_section_references(self, section_setup):
         """Test finding cross-references between sections."""
-        dispatcher = section_setup['dispatcher']
-        
+        dispatcher = section_setup["dispatcher"]
+
         # Search for cross-referenced content
         xref_queries = [
             "see installation guide",
             "configuration reference",
             "detailed instructions",
             "for more information",
-            "api documentation"
+            "api documentation",
         ]
-        
+
         for query in xref_queries:
             results = dispatcher.search(query)
-            
+
             # Should handle cross-reference queries
             assert isinstance(results, list), f"Should return results for: {query}"
-            
+
             if len(results) > 0:
                 # Check for reference indicators
                 ref_found = False
                 for result in results[:5]:
-                    content = result.get('snippet', '').lower()
-                    if any(ref in content for ref in ['see', 'refer', 'guide', 'documentation']):
+                    content = result.get("snippet", "").lower()
+                    if any(ref in content for ref in ["see", "refer", "guide", "documentation"]):
                         ref_found = True
                         break
-                
+
                 assert ref_found or len(results) > 0, f"Should find references: {query}"
-    
+
     def test_heading_hierarchy_search(self, section_setup):
         """Test understanding heading hierarchy (H1, H2, H3, etc.)."""
-        dispatcher = section_setup['dispatcher']
-        
+        dispatcher = section_setup["dispatcher"]
+
         # Search at different heading levels
         hierarchy_queries = [
             "# Complete Platform Guide",  # H1
             "## Configuration",  # H2
             "### Environment Variables",  # H3
             "#### Core Variables",  # H4
-            "##### Service Registration"  # H5
+            "##### Service Registration",  # H5
         ]
-        
+
         for query in hierarchy_queries:
             # Remove markdown heading syntax for search
-            clean_query = query.replace('#', '').strip()
+            clean_query = query.replace("#", "").strip()
             results = dispatcher.search(clean_query)
-            
+
             # Should find content at different levels
             assert len(results) >= 0, f"Should handle hierarchy query: {clean_query}"
-    
+
     def test_section_context_preservation(self, section_setup):
         """Test that section context is preserved in results."""
-        dispatcher = section_setup['dispatcher']
-        
+        dispatcher = section_setup["dispatcher"]
+
         # Search for terms that appear in multiple contexts
         context_queries = [
             "timeout",  # Appears in config, API, troubleshooting
             "deploy",  # Appears in features, API, FAQ
             "error",  # Appears in troubleshooting, API, code
-            "configuration"  # Appears everywhere
+            "configuration",  # Appears everywhere
         ]
-        
+
         for query in context_queries:
             results = dispatcher.search(query)
-            
+
             if len(results) > 0:
                 # Should find term in different contexts
                 contexts = set()
                 for result in results[:10]:
-                    content = result.get('snippet', '').lower()
-                    
+                    content = result.get("snippet", "").lower()
+
                     # Identify context
-                    if 'troubleshoot' in content:
-                        contexts.add('troubleshooting')
-                    elif 'api' in content or 'endpoint' in content:
-                        contexts.add('api')
-                    elif 'config' in content or 'yaml' in content:
-                        contexts.add('configuration')
-                    elif 'deploy' in content:
-                        contexts.add('deployment')
-                
+                    if "troubleshoot" in content:
+                        contexts.add("troubleshooting")
+                    elif "api" in content or "endpoint" in content:
+                        contexts.add("api")
+                    elif "config" in content or "yaml" in content:
+                        contexts.add("configuration")
+                    elif "deploy" in content:
+                        contexts.add("deployment")
+
                 # Should find multiple contexts for common terms
                 assert len(contexts) >= 1, f"Should find {query} in multiple contexts"
-    
+
     def test_section_boundary_search(self, section_setup):
         """Test searching across section boundaries."""
-        dispatcher = section_setup['dispatcher']
-        
+        dispatcher = section_setup["dispatcher"]
+
         # Search for content that spans sections
         boundary_queries = [
             "installation configuration",  # Adjacent sections
             "getting started troubleshooting",  # Related sections
             "api security implementation",  # Technical sections
-            "deployment monitoring"  # Operations sections
+            "deployment monitoring",  # Operations sections
         ]
-        
+
         for query in boundary_queries:
             results = dispatcher.search(query)
-            
+
             # Should find content from multiple sections
             assert len(results) >= 0, f"Should handle boundary query: {query}"
-            
+
             if len(results) > 0:
                 # Check if results span different sections
                 query_parts = query.split()
                 parts_found = defaultdict(int)
-                
+
                 for result in results[:10]:
-                    content = result.get('snippet', '').lower()
+                    content = result.get("snippet", "").lower()
                     for part in query_parts:
                         if part in content:
                             parts_found[part] += 1
-                
+
                 # Should find both parts of the query
                 assert len(parts_found) >= 1, f"Should find content spanning sections: {query}"
-    
+
     def test_section_navigation_queries(self, section_setup):
         """Test queries that simulate section navigation."""
-        dispatcher = section_setup['dispatcher']
-        
+        dispatcher = section_setup["dispatcher"]
+
         # Navigation-style queries
         nav_queries = [
             "how to configure after installation",
             "troubleshooting deployment errors",
             "api reference for authentication",
             "advanced features plugin system",
-            "getting started with configuration"
+            "getting started with configuration",
         ]
-        
+
         for query in nav_queries:
             results = dispatcher.search(query)
-            
+
             # Should provide navigation-friendly results
             assert len(results) >= 0, f"Should handle navigation query: {query}"
-            
+
             if len(results) > 0:
                 # Results should be helpful for navigation
                 helpful_results = 0
                 for result in results[:5]:
-                    content = result.get('snippet', '')
+                    content = result.get("snippet", "")
                     # Look for instructional content
-                    if any(indicator in content.lower() for indicator in 
-                           ['how to', 'step', 'guide', 'follow', 'configure', 'setup']):
+                    if any(
+                        indicator in content.lower()
+                        for indicator in ["how to", "step", "guide", "follow", "configure", "setup"]
+                    ):
                         helpful_results += 1
-                
-                assert helpful_results > 0 or len(results) > 0, \
-                    f"Should find helpful navigation content: {query}"
+
+                assert (
+                    helpful_results > 0 or len(results) > 0
+                ), f"Should find helpful navigation content: {query}"
 
 
 if __name__ == "__main__":

@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
 """Test MCP server multi-language indexing with ignore patterns."""
 
-import json
 import asyncio
-import subprocess
-import tempfile
-import shutil
-from pathlib import Path
-import sqlite3
 import os
+import shutil
+import sqlite3
+import subprocess
+from pathlib import Path
 
 
 def create_test_codebase(root: Path):
     """Create a test codebase with multiple languages and ignore patterns."""
-    
+
     # Create .gitignore
     gitignore = """
 .env
@@ -25,18 +23,21 @@ dist/
 *.log
 """
     (root / ".gitignore").write_text(gitignore)
-    
+
     # Python file (should index)
-    (root / "app.py").write_text("""
+    (root / "app.py").write_text(
+        """
 def main():
     print("Hello Python")
     
 class Application:
     pass
-""")
-    
+"""
+    )
+
     # JavaScript file (should index)
-    (root / "index.js").write_text("""
+    (root / "index.js").write_text(
+        """
 function main() {
     console.log("Hello JavaScript");
 }
@@ -44,10 +45,12 @@ function main() {
 class App {
     constructor() {}
 }
-""")
-    
+"""
+    )
+
     # Go file (should index)
-    (root / "main.go").write_text("""
+    (root / "main.go").write_text(
+        """
 package main
 
 import "fmt"
@@ -59,10 +62,12 @@ func main() {
 type Server struct {
     port int
 }
-""")
-    
+"""
+    )
+
     # Rust file (should index)
-    (root / "lib.rs").write_text("""
+    (root / "lib.rs").write_text(
+        """
 fn main() {
     println!("Hello Rust");
 }
@@ -70,19 +75,23 @@ fn main() {
 struct Calculator {
     value: i32,
 }
-""")
-    
+"""
+    )
+
     # Java file (should index)
-    (root / "Main.java").write_text("""
+    (root / "Main.java").write_text(
+        """
 public class Main {
     public static void main(String[] args) {
         System.out.println("Hello Java");
     }
 }
-""")
-    
+"""
+    )
+
     # TypeScript file (should index)
-    (root / "app.ts").write_text("""
+    (root / "app.ts").write_text(
+        """
 interface User {
     name: string;
     age: number;
@@ -91,10 +100,12 @@ interface User {
 function greet(user: User): void {
     console.log(`Hello ${user.name}`);
 }
-""")
-    
+"""
+    )
+
     # C++ file (should index)
-    (root / "main.cpp").write_text("""
+    (root / "main.cpp").write_text(
+        """
 #include <iostream>
 
 class Vector {
@@ -106,10 +117,12 @@ int main() {
     std::cout << "Hello C++" << std::endl;
     return 0;
 }
-""")
-    
+"""
+    )
+
     # Ruby file (should index)
-    (root / "app.rb").write_text("""
+    (root / "app.rb").write_text(
+        """
 class Application
   def initialize
     @name = "MyApp"
@@ -119,10 +132,12 @@ class Application
     puts "Hello Ruby"
   end
 end
-""")
-    
+"""
+    )
+
     # Markdown file (should index)
-    (root / "README.md").write_text("""
+    (root / "README.md").write_text(
+        """
 # Test Project
 
 This is a test project for multi-language indexing.
@@ -130,8 +145,9 @@ This is a test project for multi-language indexing.
 ## Features
 - Multiple languages
 - Ignore patterns
-""")
-    
+"""
+    )
+
     # Files that should be ignored
     (root / ".env").write_text("SECRET_KEY=12345")
     (root / "api.key").write_text("secret-api-key")
@@ -140,11 +156,20 @@ This is a test project for multi-language indexing.
     (root / "node_modules").mkdir(exist_ok=True)
     (root / "node_modules" / "lib.js").write_text("dependency")
     (root / "debug.log").write_text("log data")
-    
+
     return {
-        "should_index": ["app.py", "index.js", "main.go", "lib.rs", "Main.java", 
-                        "app.ts", "main.cpp", "app.rb", "README.md"],
-        "should_ignore": [".env", "api.key", "build/output.js", "node_modules/lib.js", "debug.log"]
+        "should_index": [
+            "app.py",
+            "index.js",
+            "main.go",
+            "lib.rs",
+            "Main.java",
+            "app.ts",
+            "main.cpp",
+            "app.rb",
+            "README.md",
+        ],
+        "should_ignore": [".env", "api.key", "build/output.js", "node_modules/lib.js", "debug.log"],
     }
 
 
@@ -152,24 +177,24 @@ async def test_mcp_indexing():
     """Test MCP server indexing with ignore patterns."""
     print("\n🧪 TESTING MCP MULTI-LANGUAGE INDEXING")
     print("=" * 60)
-    
+
     # Create test directory in current directory
     test_dir = Path("test_mcp_workspace")
     if test_dir.exists():
         shutil.rmtree(test_dir)
     test_dir.mkdir()
-    
+
     try:
         # Create test codebase
         print("\n📁 Creating test codebase...")
         file_info = create_test_codebase(test_dir)
         print(f"✅ Created {len(file_info['should_index'])} files to index")
         print(f"🚫 Created {len(file_info['should_ignore'])} files to ignore")
-        
+
         # Change to test directory
         original_dir = os.getcwd()
         os.chdir(test_dir)
-        
+
         # Create a simple script to call MCP tools
         test_script = """
 import asyncio
@@ -214,54 +239,53 @@ async def main():
 
 asyncio.run(main())
 """
-        
+
         with open("test_mcp.py", "w") as f:
             f.write(test_script)
-        
+
         # Run the test
         print("\n🚀 Running MCP indexing test...")
-        result = subprocess.run([sys.executable, "test_mcp.py"], 
-                              capture_output=True, text=True)
-        
+        result = subprocess.run([sys.executable, "test_mcp.py"], capture_output=True, text=True)
+
         print(result.stdout)
         if result.stderr:
             print("STDERR:", result.stderr)
-        
+
         # Check the database
         print("\n🔍 Checking database...")
         db_path = Path("code_index.db")
         if db_path.exists():
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
-            
+
             # Count indexed files
             cursor.execute("SELECT COUNT(*) FROM files")
             total_files = cursor.fetchone()[0]
             print(f"  Total files indexed: {total_files}")
-            
+
             # Check for ignored files
             ignored_found = []
-            for ignored in file_info['should_ignore']:
+            for ignored in file_info["should_ignore"]:
                 cursor.execute("SELECT 1 FROM files WHERE path LIKE ?", (f"%{ignored}%",))
                 if cursor.fetchone():
                     ignored_found.append(ignored)
-            
+
             if ignored_found:
                 print(f"  ❌ Found {len(ignored_found)} ignored files in index:")
                 for f in ignored_found:
                     print(f"     - {f}")
             else:
                 print("  ✅ No ignored files were indexed")
-            
+
             # Check languages
             cursor.execute("SELECT DISTINCT json_extract(metadata, '$.language') FROM symbols")
             languages = [row[0] for row in cursor.fetchall() if row[0]]
             print(f"  Languages found: {', '.join(sorted(set(languages)))}")
-            
+
             conn.close()
         else:
             print("  ❌ No database found!")
-        
+
     finally:
         # Cleanup
         os.chdir(original_dir)
@@ -272,4 +296,5 @@ asyncio.run(main())
 
 if __name__ == "__main__":
     import sys
+
     asyncio.run(test_mcp_indexing())
