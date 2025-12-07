@@ -388,7 +388,7 @@ class Plugin(SpecializedPluginBase):
             self._package_structure[package].add(path)
 
         # Also use base class indexing for text search
-        base_shard = super().indexFile(path, content)
+        _ = super().indexFile(path, content)
 
         return IndexShard(file=path, symbols=symbols, language="java")
 
@@ -680,7 +680,7 @@ class Plugin(SpecializedPluginBase):
         if "." in query:
             # Try as fully qualified class name
             if query in self.type_analyzer.type_registry:
-                type_info = self.type_analyzer.type_registry[query]
+                _ = self.type_analyzer.type_registry[query]
 
                 # Find file containing this type
                 for file_path, symbols in self._file_symbols.items():

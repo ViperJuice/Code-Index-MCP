@@ -12,8 +12,6 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from mcp_server.core.path_utils import PathUtils
-
 logger = logging.getLogger(__name__)
 
 
@@ -124,7 +122,7 @@ class IndexManager:
                 url = result.stdout.strip()
                 # Create hash from URL
                 return hashlib.sha256(url.encode()).hexdigest()[:12]
-        except:
+        except Exception:
             pass
 
         # Fall back to directory name hash

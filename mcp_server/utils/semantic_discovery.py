@@ -5,13 +5,11 @@ Automatically discovers and maps semantic collections to codebases.
 
 import hashlib
 import logging
-import os
 import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
 from qdrant_client import QdrantClient
-from qdrant_client.http.exceptions import ResponseHandlingException
 
 logger = logging.getLogger(__name__)
 
@@ -188,7 +186,7 @@ class SemanticDatabaseDiscovery:
                 # Extract repo name from URL
                 repo_name = remote_url.split("/")[-1].replace(".git", "").lower()
                 patterns.add(repo_name)
-        except:
+        except Exception:
             pass
 
         return patterns
@@ -277,7 +275,7 @@ class SemanticDatabaseDiscovery:
                         f"Using fallback collection 'code-embeddings' with {info.points_count} points"
                     )
                     return (qdrant_path, "code-embeddings")
-            except:
+            except Exception:
                 continue
 
         return None

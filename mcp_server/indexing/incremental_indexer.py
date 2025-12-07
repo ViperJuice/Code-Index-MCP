@@ -6,16 +6,15 @@ files that have changed between commits.
 
 import hashlib
 import logging
-import os
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 
 from ..core.path_resolver import PathResolver
 from ..dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from ..storage.sqlite_store import SQLiteStore
-from .change_detector import ChangeDetector, FileChange
+from .change_detector import FileChange
 
 logger = logging.getLogger(__name__)
 
@@ -318,7 +317,7 @@ class IncrementalIndexer:
             )
             remote_url = result.stdout.strip()
             return hashlib.sha256(remote_url.encode()).hexdigest()[:12]
-        except:
+        except Exception:
             # Fallback to path-based ID
             return hashlib.sha256(str(self.repo_path).encode()).hexdigest()[:12]
 

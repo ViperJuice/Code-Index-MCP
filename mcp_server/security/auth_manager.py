@@ -1,16 +1,11 @@
 """Authentication and authorization manager."""
 
 import fnmatch
-import hashlib
-import hmac
-import re
-import secrets
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 import jwt
 from passlib.context import CryptContext
-from passlib.hash import bcrypt
 
 from .models import (
     DEFAULT_ACCESS_RULES,
@@ -34,19 +29,13 @@ from .models import (
 class AuthenticationError(Exception):
     """Authentication related errors."""
 
-    pass
-
 
 class AuthorizationError(Exception):
     """Authorization related errors."""
 
-    pass
-
 
 class SecurityError(Exception):
     """General security related errors."""
-
-    pass
 
 
 class IAuthenticator:

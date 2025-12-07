@@ -4,7 +4,7 @@ import logging
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Dict
 from unittest.mock import MagicMock, Mock
 
 import pytest
@@ -12,7 +12,6 @@ import pytest
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
 from mcp_server.plugins.plaintext_plugin.plugin import PlainTextPlugin
-from mcp_server.plugins.plugin_factory import PluginFactory
 from mcp_server.storage.sqlite_store import SQLiteStore
 
 logger = logging.getLogger(__name__)

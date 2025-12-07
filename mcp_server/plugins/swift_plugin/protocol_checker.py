@@ -4,8 +4,7 @@ import logging
 import re
 from dataclasses import dataclass
 from enum import Enum
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -343,7 +342,7 @@ class SwiftProtocolChecker:
         for pattern in patterns:
             match = re.match(pattern, line)
             if match:
-                type_keyword = match.group(1)
+                _ = match.group(1)
                 type_name = match.group(2)
                 conformance_list = match.group(3).strip()
 

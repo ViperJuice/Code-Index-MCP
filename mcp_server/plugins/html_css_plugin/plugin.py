@@ -278,13 +278,13 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
                 tree = self._html_parser.parse(content.encode("utf-8"))
                 if tree.root_node.has_error:
                     return Result.success_result(False)
-            except:
+            except Exception:
                 # If HTML parsing fails, try CSS
                 try:
                     tree = self._css_parser.parse(content.encode("utf-8"))
                     if tree.root_node.has_error:
                         return Result.success_result(False)
-                except:
+                except Exception:
                     return Result.success_result(False)
 
             return Result.success_result(True)

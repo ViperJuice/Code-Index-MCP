@@ -4,13 +4,10 @@ Real-world repository indexing tests for Code-Index-MCP.
 Tests indexing performance and accuracy on actual GitHub repositories.
 """
 
-import asyncio
 import os
 import subprocess
 import tempfile
-import time
 from pathlib import Path
-from typing import Any, Dict, List
 
 import pytest
 

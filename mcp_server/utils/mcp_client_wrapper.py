@@ -6,11 +6,10 @@ This module provides a wrapper around the actual MCP server functionality
 to enable real performance comparisons instead of simulations.
 """
 
-import asyncio
 import json
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Tuple
 
 import httpx
 

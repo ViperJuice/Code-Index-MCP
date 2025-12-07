@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Simple test for handling of malformed documents."""
 
-import tempfile
 from pathlib import Path
 
 from mcp_server.plugins.markdown_plugin import MarkdownPlugin

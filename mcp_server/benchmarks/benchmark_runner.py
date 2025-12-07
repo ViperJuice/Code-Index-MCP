@@ -10,21 +10,18 @@ This module provides:
 
 import json
 import logging
-import statistics
 import tempfile
 import time
-from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-import pytest_benchmark
 from jinja2 import Template
 
 from ..interfaces.indexing_interfaces import IBenchmarkRunner
 from ..interfaces.shared_interfaces import Error, Result
 from ..plugin_base import IPlugin
-from .benchmark_suite import BenchmarkResult, BenchmarkSuite, PerformanceMetrics
+from .benchmark_suite import BenchmarkResult, BenchmarkSuite
 
 logger = logging.getLogger(__name__)
 
@@ -633,7 +630,7 @@ class BenchmarkRunner(IBenchmarkRunner):
         """Generate text summary report."""
         lines = []
         lines.append("=" * 70)
-        lines.append(f"MCP Server Performance Benchmark Report")
+        lines.append("MCP Server Performance Benchmark Report")
         lines.append("=" * 70)
         lines.append(f"Suite: {result.suite_name}")
         lines.append(f"Date: {result.start_time}")

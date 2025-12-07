@@ -6,13 +6,12 @@ import hashlib
 import logging
 import os
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from mcp_server.document_processing import (
     ChunkMetadata,
     ChunkType,
     DocumentChunk,
-    Section,
 )
 from mcp_server.document_processing.chunk_optimizer import TokenEstimator
 
@@ -110,7 +109,7 @@ class MarkdownChunkStrategy:
         """Create chunks based on semantic boundaries."""
         chunks = []
         content_lines = content.split("\n")
-        total_chunks = 0  # Will be updated after creating all chunks
+        _ = 0  # Will be updated after creating all chunks
 
         # Flatten sections for processing
         from mcp_server.plugins.markdown_plugin.section_extractor import (
@@ -465,7 +464,7 @@ class MarkdownChunkStrategy:
     def _create_sliding_window_chunks(self, content: str, file_path: str) -> List[DocumentChunk]:
         """Create chunks using a sliding window approach."""
         chunks = []
-        content_lines = content.split("\n")
+        _ = content.split("\n")
 
         # Token-based sliding window
         start = 0

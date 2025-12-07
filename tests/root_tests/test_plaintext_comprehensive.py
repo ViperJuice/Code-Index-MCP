@@ -13,19 +13,14 @@ import re
 
 # Import the PlainText plugin and related classes
 import sys
-import tempfile
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Dict, List, Tuple
-from unittest.mock import Mock, patch
 
 import pytest
 
 sys.path.insert(0, "/app")
 
-from mcp_server.document_processing import DocumentChunk, DocumentMetadata, DocumentStructure
-from mcp_server.plugins.plaintext_plugin.nlp_processor import NLPProcessor, TextAnalysis, TextType
-from mcp_server.plugins.plaintext_plugin.paragraph_detector import Paragraph, ParagraphDetector
+from mcp_server.document_processing import DocumentChunk
+from mcp_server.plugins.plaintext_plugin.nlp_processor import NLPProcessor, TextType
+from mcp_server.plugins.plaintext_plugin.paragraph_detector import ParagraphDetector
 from mcp_server.plugins.plaintext_plugin.plugin import PlainTextPlugin
 from mcp_server.plugins.plaintext_plugin.sentence_splitter import SentenceSplitter
 from mcp_server.plugins.plaintext_plugin.topic_extractor import TopicExtractor

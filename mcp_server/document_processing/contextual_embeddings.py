@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 try:
-    import anthropic
     from anthropic import AsyncAnthropic
 
     ANTHROPIC_AVAILABLE = True
@@ -20,7 +19,7 @@ except ImportError:
     ANTHROPIC_AVAILABLE = False
     AsyncAnthropic = None
 
-from .document_interfaces import ChunkType, DocumentChunk, DocumentStructure
+from .document_interfaces import ChunkType, DocumentChunk
 
 logger = logging.getLogger(__name__)
 

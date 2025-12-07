@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Test script for the Kotlin plugin implementation."""
 
-import os
 import sys
 from pathlib import Path
 
@@ -176,7 +175,7 @@ def test_kotlin_plugin():
     # Test null safety analysis
     try:
         null_safety_result = plugin.null_safety_analyzer.analyze(None, test_content)
-        print(f"✓ Null safety analysis completed")
+        print("✓ Null safety analysis completed")
         print(f"  - Nullable usages: {len(null_safety_result.get('nullable_usages', []))}")
         print(f"  - Safe call chains: {len(null_safety_result.get('safe_call_chains', []))}")
         print(f"  - Not-null assertions: {len(null_safety_result.get('not_null_assertions', []))}")
@@ -191,7 +190,7 @@ def test_kotlin_plugin():
     # Test coroutines analysis
     try:
         coroutines_result = plugin.coroutines_analyzer.analyze(None, test_content)
-        print(f"✓ Coroutines analysis completed")
+        print("✓ Coroutines analysis completed")
         print(f"  - Suspend functions: {len(coroutines_result.get('suspend_functions', []))}")
         print(f"  - Coroutine builders: {len(coroutines_result.get('coroutine_builders', []))}")
         print(f"  - Flow operations: {len(coroutines_result.get('flow_operations', []))}")
@@ -206,7 +205,7 @@ def test_kotlin_plugin():
     # Test Java interop analysis
     try:
         java_interop_result = plugin.java_interop_analyzer.analyze(None, test_content)
-        print(f"✓ Java interop analysis completed")
+        print("✓ Java interop analysis completed")
         print(f"  - JVM annotations: {len(java_interop_result.get('jvm_annotations', []))}")
         print(f"  - Java imports: {len(java_interop_result.get('java_imports', []))}")
         print(f"  - Collection interop: {len(java_interop_result.get('collection_interop', []))}")

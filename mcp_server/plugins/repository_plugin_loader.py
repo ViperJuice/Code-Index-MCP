@@ -5,7 +5,6 @@ This module implements intelligent plugin loading based on repository content,
 reducing memory usage by loading only required language plugins.
 """
 
-import json
 import logging
 import os
 import sqlite3
@@ -13,7 +12,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional
 
 from mcp_server.plugin_system.plugin_discovery import PluginDiscovery
 from mcp_server.plugins.memory_aware_manager import get_memory_aware_manager
@@ -262,7 +261,7 @@ class RepositoryPluginLoader:
             )
             url = result.stdout.strip()
             return hashlib.sha256(url.encode()).hexdigest()[:12]
-        except:
+        except Exception:
             # Fall back to path hash
             return hashlib.sha256(str(repository_path.absolute()).encode()).hexdigest()[:12]
 

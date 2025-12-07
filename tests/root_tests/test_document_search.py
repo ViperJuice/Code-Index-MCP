@@ -9,20 +9,11 @@ This test suite covers:
 - Semantic search integration
 """
 
-import json
-
 # Import the document processing components
 import sys
-import tempfile
-import time
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Dict, List, Tuple
 from unittest.mock import Mock, patch
 
 import pytest
-
-from mcp_server.core.path_utils import PathUtils
 
 sys.path.insert(0, "/app")
 
@@ -30,7 +21,6 @@ from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
 from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
 from mcp_server.plugins.plaintext_plugin.plugin import PlainTextPlugin
 from mcp_server.storage.sqlite_store import SQLiteStore
-from mcp_server.utils.semantic_indexer import SemanticIndexer
 
 
 class TestNaturalLanguageQueries:

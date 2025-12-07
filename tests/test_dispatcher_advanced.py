@@ -2,28 +2,20 @@
 
 import time
 from pathlib import Path
-from typing import Dict, List
-from unittest.mock import MagicMock, Mock
+from typing import List
 
 import pytest
 
 from mcp_server.dispatcher import (
-    AggregatedResult,
-    AggregationStats,
-    FileTypeInfo,
     FileTypeMatcher,
-    IFileTypeMatcher,
-    IPluginRouter,
-    IResultAggregator,
     PluginCapability,
     PluginRouter,
     RankingCriteria,
     ResultAggregator,
-    RouteResult,
     SimpleAggregationStrategy,
     SmartAggregationStrategy,
 )
-from mcp_server.plugin_base import IPlugin, Reference, SearchResult, SymbolDef
+from mcp_server.plugin_base import IPlugin, Reference
 
 
 class MockPlugin(IPlugin):

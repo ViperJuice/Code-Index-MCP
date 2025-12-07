@@ -5,7 +5,6 @@ import tempfile
 from pathlib import Path
 
 from mcp_server.plugins.swift_plugin.plugin import Plugin
-from mcp_server.storage.sqlite_store import SQLiteStore
 
 
 def test_swift_plugin_basic():
@@ -221,7 +220,6 @@ let package = Package(
 """
 
     # Create a temporary Package.swift file
-    import os
     import tempfile
 
     temp_dir = tempfile.mkdtemp()

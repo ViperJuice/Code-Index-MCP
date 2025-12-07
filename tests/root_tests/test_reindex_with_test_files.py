@@ -43,7 +43,7 @@ for file_path in test_dir.glob("*"):
                 supported = True
                 break
         if not supported:
-            print(f"  ✗ NOT SUPPORTED by any plugin")
+            print("  ✗ NOT SUPPORTED by any plugin")
 
 # Simulate reindex on test_files directory
 print("\n\nSimulating reindex on test_files directory:")

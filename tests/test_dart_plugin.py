@@ -15,13 +15,9 @@ Tests cover:
 - Performance benchmarks
 """
 
-import json
-from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
-from unittest.mock import Mock, patch
-
-import pytest
+from unittest.mock import patch
 
 from mcp_server.interfaces.plugin_interfaces import (
     IndexedFile,
@@ -29,7 +25,6 @@ from mcp_server.interfaces.plugin_interfaces import (
     SymbolReference,
 )
 from mcp_server.interfaces.shared_interfaces import Result
-from mcp_server.plugin_base import SearchResult, SymbolDef
 from mcp_server.plugins.dart_plugin.plugin import Plugin as DartPlugin
 
 

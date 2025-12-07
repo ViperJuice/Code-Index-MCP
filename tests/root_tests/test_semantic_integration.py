@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Test script for semantic search integration."""
 
-import asyncio
 import os
 import sys
 import time
@@ -16,7 +15,6 @@ os.environ["QDRANT_HOST"] = "localhost"
 os.environ["QDRANT_PORT"] = "6333"
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams
 
 from mcp_server.config.settings import Settings
 from mcp_server.plugins.python_plugin import Plugin as PythonPlugin
@@ -250,7 +248,7 @@ def test_semantic_search(plugin, test_dir):
             print(f"  Error in semantic search: {e}")
 
         # Compare with traditional search
-        print(f"\n  Traditional search for comparison:")
+        print("\n  Traditional search for comparison:")
         try:
             results = list(plugin.search(query, {"semantic": False, "limit": 3}))
             if results:

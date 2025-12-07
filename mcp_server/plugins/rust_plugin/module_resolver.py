@@ -57,7 +57,7 @@ class RustModuleResolver:
         # Handle super:: prefix
         if parts[0] == "super":
             parent_module = from_file.parent
-            remaining_parts = parts[1:]
+            _ = parts[1:]
             while parts and parts[0] == "super":
                 parent_module = parent_module.parent
                 parts = parts[1:]
@@ -138,7 +138,7 @@ class RustModuleResolver:
             # Match both "mod" and "pub mod"
             if (
                 stripped.startswith("mod ") or stripped.startswith("pub mod ")
-            ) and not "mod tests" in stripped:
+            ) and "mod tests" not in stripped:
                 # Extract module name
                 parts = stripped.split()
                 # Find the position of "mod" keyword

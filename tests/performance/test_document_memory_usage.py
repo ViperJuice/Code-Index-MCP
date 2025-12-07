@@ -7,8 +7,7 @@ import statistics
 import time
 import tracemalloc
 import weakref
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 import psutil
 import pytest
@@ -19,7 +18,6 @@ from tests.test_utils import (
     create_test_markdown,
     create_test_plaintext,
     generate_large_content,
-    memory_monitor,
 )
 
 
@@ -428,7 +426,7 @@ class TestDocumentMemoryUsage(BaseDocumentTest):
             time_overhead = ((gc_enabled_avg - gc_disabled_avg) / gc_disabled_avg) * 100
             memory_saved = gc_disabled_memory - gc_enabled_memory
 
-            print(f"\nGC Impact:")
+            print("\nGC Impact:")
             print(f"  Time overhead: {time_overhead:.1f}%")
             print(f"  Memory saved: {memory_saved:.1f}MB")
 

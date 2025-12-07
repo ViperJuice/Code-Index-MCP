@@ -10,24 +10,19 @@ Tests cover:
 - Performance under load
 """
 
-import shutil
-import tempfile
 import threading
 import time
 from pathlib import Path
-from unittest.mock import Mock, call, patch
 
 import pytest
 from watchdog.events import (
     DirCreatedEvent,
     DirModifiedEvent,
     FileCreatedEvent,
-    FileDeletedEvent,
     FileModifiedEvent,
     FileMovedEvent,
 )
 
-from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
 from mcp_server.watcher import FileWatcher, _Handler
 
 
@@ -368,7 +363,7 @@ class TestEdgeCases:
             # This might fail due to permissions, which is expected
             try:
                 test_file.touch()
-            except:
+            except Exception:
                 pass
 
             time.sleep(0.5)

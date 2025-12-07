@@ -1,6 +1,5 @@
 """Semantic chunker for document processing with context-aware chunking."""
 
-import hashlib
 import re
 import uuid
 from dataclasses import dataclass, field

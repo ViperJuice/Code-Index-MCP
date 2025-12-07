@@ -7,11 +7,9 @@ plugin loading, eviction, and memory limits.
 
 import gc
 import os
-import time
 from datetime import datetime
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
-import psutil
 import pytest
 
 from mcp_server.plugin_system.models import LoadedPlugin

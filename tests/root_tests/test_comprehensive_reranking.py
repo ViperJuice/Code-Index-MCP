@@ -13,14 +13,13 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 # Import MCP server components
-from mcp_server.config.settings import RerankingSettings, Settings
+from mcp_server.config.settings import RerankingSettings
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from mcp_server.indexer.bm25_indexer import BM25Indexer
 from mcp_server.indexer.hybrid_search import HybridSearch, HybridSearchConfig
-from mcp_server.indexer.reranker import RerankerFactory
 from mcp_server.plugin_system.plugin_registry import PluginRegistry
 from mcp_server.storage.sqlite_store import SQLiteStore
 from mcp_server.utils.fuzzy_indexer import FuzzyIndexer

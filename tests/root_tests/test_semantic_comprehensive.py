@@ -676,13 +676,13 @@ if (typeof module !== 'undefined' && module.exports) {
         dispatcher = mcp_server_cli.dispatcher
 
         # Index all files
-        print(f"\nIndexing files...")
+        print("\nIndexing files...")
         for filename in test_files.keys():
             dispatcher.index_file(Path(filename))
             print(f"  ✓ Indexed {filename}")
 
         # Test 1: Exact Symbol Search
-        print(f"\n1. Testing Exact Symbol Search...")
+        print("\n1. Testing Exact Symbol Search...")
         exact_searches = {
             "User": "Should find User class/struct across languages",
             "create_user": "Should find exact function name",
@@ -704,7 +704,7 @@ if (typeof module !== 'undefined' && module.exports) {
                 print(f"     → Found in {file_name}:{first_result.get('line', 'N/A')}")
 
         # Test 2: Fuzzy/Partial Search
-        print(f"\n2. Testing Fuzzy/Partial Search...")
+        print("\n2. Testing Fuzzy/Partial Search...")
         fuzzy_searches = {
             "auth": "Should find authentication-related items",
             "process": "Should find processing-related functions",
@@ -730,7 +730,7 @@ if (typeof module !== 'undefined' && module.exports) {
                 print(f"     → Found in: {', '.join(sorted(languages))}")
 
         # Test 3: Semantic Search (AI-powered)
-        print(f"\n3. Testing Semantic Search...")
+        print("\n3. Testing Semantic Search...")
         semantic_queries = {
             "user authentication and login": "Should find auth-related code",
             "data validation and error checking": "Should find validation code",
@@ -756,13 +756,13 @@ if (typeof module !== 'undefined' && module.exports) {
                         snippet = result.get("snippet", "")[:50] + "..."
                         print(f"     {i+1}. {file_name}: {snippet}")
                 else:
-                    print(f"     → No semantic matches found")
+                    print("     → No semantic matches found")
             except Exception as e:
                 print(f"   '{query}': Error - {e}")
                 semantic_results[query] = 0
 
         # Test 4: Symbol Definition Lookup
-        print(f"\n4. Testing Symbol Definition Lookup...")
+        print("\n4. Testing Symbol Definition Lookup...")
         definition_tests = [
             "User",
             "AuthenticationService",
@@ -785,7 +785,7 @@ if (typeof module !== 'undefined' && module.exports) {
                 print(f"   ✗ {symbol}: not found")
 
         # Test 5: Cross-Language Concept Search
-        print(f"\n5. Testing Cross-Language Concept Search...")
+        print("\n5. Testing Cross-Language Concept Search...")
         concept_searches = {
             "email validation": "Email validation across all languages",
             "user management": "User-related operations",
@@ -802,7 +802,7 @@ if (typeof module !== 'undefined' && module.exports) {
                 semantic_results_for_concept = list(
                     dispatcher.search(concept, semantic=True, limit=5)
                 )
-            except:
+            except Exception:
                 semantic_results_for_concept = []
 
             # Count languages found
@@ -825,14 +825,14 @@ if (typeof module !== 'undefined' && module.exports) {
             )
 
         # Summary and Analysis
-        print(f"\n=== Comprehensive Retrieval Analysis ===")
+        print("\n=== Comprehensive Retrieval Analysis ===")
 
         total_exact = sum(exact_results.values())
         total_fuzzy = sum(fuzzy_results.values())
         total_semantic = sum(semantic_results.values())
         total_definitions = sum(1 for found in definition_results.values() if found)
 
-        print(f"\nRetrieval Method Performance:")
+        print("\nRetrieval Method Performance:")
         print(f"  ✓ Exact symbol search: {total_exact} results across {len(exact_results)} queries")
         print(
             f"  ✓ Fuzzy/partial search: {total_fuzzy} results across {len(fuzzy_results)} queries"
@@ -842,18 +842,18 @@ if (typeof module !== 'undefined' && module.exports) {
         )
         print(f"  ✓ Symbol definitions: {total_definitions}/{len(definition_results)} found")
 
-        print(f"\nCross-Language Capabilities:")
+        print("\nCross-Language Capabilities:")
         concept_langs = sum(r["languages"] for r in concept_results.values())
         print(f"  ✓ Cross-language concepts: {concept_langs} language combinations")
 
         # Check semantic search functionality
         semantic_working = total_semantic > 0
         if semantic_working:
-            print(f"  ✓ Semantic search: OPERATIONAL")
+            print("  ✓ Semantic search: OPERATIONAL")
         else:
-            print(f"  ⚠ Semantic search: Limited results (may need configuration)")
+            print("  ⚠ Semantic search: Limited results (may need configuration)")
 
-        print(f"\nDetailed Results:")
+        print("\nDetailed Results:")
         print(f"  Best exact matches: {max(exact_results.items(), key=lambda x: x[1])}")
         print(f"  Best fuzzy matches: {max(fuzzy_results.items(), key=lambda x: x[1])}")
         if semantic_working:
@@ -882,7 +882,7 @@ if (typeof module !== 'undefined' && module.exports) {
         import shutil
 
         shutil.rmtree(temp_dir)
-        print(f"\n✓ Cleaned up test directory")
+        print("\n✓ Cleaned up test directory")
 
 
 async def main():
@@ -891,15 +891,15 @@ async def main():
         success, results = await test_comprehensive_retrieval()
 
         if success:
-            print(f"\n🎉 Comprehensive Retrieval: EXCELLENT!")
-            print(f"All retrieval methods are working effectively!")
+            print("\n🎉 Comprehensive Retrieval: EXCELLENT!")
+            print("All retrieval methods are working effectively!")
 
             if results["semantic_working"]:
-                print(f"🧠 Semantic search is operational and finding relevant results!")
+                print("🧠 Semantic search is operational and finding relevant results!")
             else:
-                print(f"⚠️ Semantic search needs configuration (Voyage AI / Qdrant setup)")
+                print("⚠️ Semantic search needs configuration (Voyage AI / Qdrant setup)")
         else:
-            print(f"\n⚠️ Some retrieval methods need optimization")
+            print("\n⚠️ Some retrieval methods need optimization")
 
         return success
 

@@ -3,7 +3,6 @@
 Test script for MCP server functionality without Docker
 This creates a minimal test environment to verify the MCP server works
 """
-import json
 import os
 import sys
 
@@ -36,7 +35,7 @@ def test_mcp_components():
         if config_path.exists():
             load_result = plugin_manager.load_plugins_safe(config_path)
             if load_result.success:
-                print(f"✓ Plugin manager loaded successfully")
+                print("✓ Plugin manager loaded successfully")
                 print(f"  Metadata: {load_result.metadata}")
             else:
                 print(f"✗ Plugin loading failed: {load_result.error.message}")

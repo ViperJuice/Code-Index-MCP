@@ -1,14 +1,10 @@
 """NuGet package integration for C# project analysis."""
 
-import hashlib
-import json
 import logging
-import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
-from urllib.parse import urljoin
 
 logger = logging.getLogger(__name__)
 

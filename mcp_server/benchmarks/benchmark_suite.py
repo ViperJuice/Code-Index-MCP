@@ -10,7 +10,6 @@ This module defines benchmarks for:
 - Interface compliance with IIndexPerformanceMonitor and IPerformanceMonitor
 """
 
-import hashlib
 import logging
 import os
 import tempfile
@@ -27,7 +26,7 @@ from ..dispatcher import EnhancedDispatcher as Dispatcher
 from ..interfaces.indexing_interfaces import IIndexPerformanceMonitor
 from ..interfaces.metrics_interfaces import IPerformanceMonitor
 from ..interfaces.shared_interfaces import Error, Result
-from ..plugin_base import IPlugin, SearchResult, SymbolDef
+from ..plugin_base import IPlugin
 from ..storage.sqlite_store import SQLiteStore
 
 logger = logging.getLogger(__name__)

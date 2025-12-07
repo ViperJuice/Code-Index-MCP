@@ -4,14 +4,12 @@ Real-world developer workflow tests for Code-Index-MCP.
 Tests realistic developer search and navigation patterns.
 """
 
-import asyncio
 import os
 import re
 import subprocess
 import tempfile
-import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Dict, List
 
 import pytest
 

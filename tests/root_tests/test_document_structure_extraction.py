@@ -6,25 +6,17 @@ structure including headings, sections, code blocks, and metadata. Users should
 be able to search within specific sections or find content based on structure.
 """
 
-import json
-
 # Import system components
 import sys
-import tempfile
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Dict, List
+from typing import Dict, List
 
 import pytest
-
-from mcp_server.core.path_utils import PathUtils
 
 sys.path.insert(0, "/app")
 
 from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
-from mcp_server.plugins.markdown_plugin.document_parser import DocumentParser
 from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
-from mcp_server.plugins.markdown_plugin.section_extractor import SectionExtractor
 from mcp_server.storage.sqlite_store import SQLiteStore
 from tests.base_test import BaseDocumentTest
 

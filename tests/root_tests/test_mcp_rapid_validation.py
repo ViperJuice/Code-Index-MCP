@@ -5,14 +5,13 @@ Tests all 7 specialized language plugins in under 60 seconds.
 """
 
 import asyncio
-import concurrent.futures
 import json
 import logging
 import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -308,7 +307,7 @@ class UserService: ObservableObject {
 
 extension UserService: Drawable {
     func draw() -> String {
-        return "UserService with \(users.count) users"
+        return "UserService with \\(users.count) users"
     }
 }
 """,
@@ -583,7 +582,7 @@ class RapidMCPTester:
         summary = self.results["summary"]
 
         print(f"\n{'='*50}")
-        print(f"RAPID MCP VALIDATION RESULTS")
+        print("RAPID MCP VALIDATION RESULTS")
         print(f"{'='*50}")
         print(f"Session: {self.test_session_id}")
         print(f"Total Time: {self.results['total_time']}s")
@@ -591,7 +590,7 @@ class RapidMCPTester:
         print(f"Plugins Working: {summary['successful_plugins']}/{summary['total_languages']}")
         print(f"Symbols Extracted: {summary['total_symbols_extracted']}")
 
-        print(f"\n📋 PLUGIN RESULTS:")
+        print("\n📋 PLUGIN RESULTS:")
         for language, result in self.results["results"].items():
             status = "✅" if result.get("plugin_loaded", False) else "❌"
             symbols = result.get("symbols_found", 0)
@@ -630,7 +629,7 @@ async def main():
         # Print results
         tester.print_results()
 
-        print(f"\n⚡ PERFORMANCE COMPARISON:")
+        print("\n⚡ PERFORMANCE COMPARISON:")
         print(f"  Sequential: {sequential_time:.3f}s")
         print(f"  Parallel:   {parallel_time:.3f}s")
         print(f"  Speedup:    {sequential_time/parallel_time:.1f}x")

@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import logging
-import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 from tree_sitter import Node
 
@@ -616,7 +615,7 @@ class DeclarationHandler:
         is_readonly = self._has_modifier(node, content, "readonly")
         is_private = self._has_modifier(node, content, "private")
         is_protected = self._has_modifier(node, content, "protected")
-        is_public = self._has_modifier(node, content, "public")
+        _ = self._has_modifier(node, content, "public")
 
         visibility = "public"
         if is_private:
@@ -662,7 +661,7 @@ class DeclarationHandler:
         is_async = self._has_modifier(node, content, "async")
         is_private = self._has_modifier(node, content, "private")
         is_protected = self._has_modifier(node, content, "protected")
-        is_public = self._has_modifier(node, content, "public")
+        _ = self._has_modifier(node, content, "public")
 
         visibility = "public"
         if is_private:

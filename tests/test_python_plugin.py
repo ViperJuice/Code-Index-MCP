@@ -11,15 +11,11 @@ Tests cover:
 - Performance benchmarks
 """
 
-import ast
-import json
 from pathlib import Path
 from textwrap import dedent
-from unittest.mock import Mock, patch
 
 import pytest
 
-from mcp_server.plugin_base import SearchResult, SymbolDef
 from mcp_server.plugins.python_plugin.plugin import Plugin as PythonPlugin
 
 

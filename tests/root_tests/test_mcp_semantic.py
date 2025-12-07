@@ -2,7 +2,6 @@
 """End-to-end test of semantic search through MCP interface."""
 
 import asyncio
-import json
 import os
 import sys
 from pathlib import Path
@@ -18,11 +17,9 @@ os.environ["QDRANT_HOST"] = ":memory:"
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-import mcp.types as types
 
 from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
 from mcp_server.plugin_system import PluginManager
-from mcp_server.storage.sqlite_store import SQLiteStore
 
 
 async def test_mcp_semantic():

@@ -1,28 +1,16 @@
 """Integration tests for plugin system with document processing."""
 
 import logging
-import shutil
-import tempfile
-import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
-from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
-from mcp_server.document_processing.document_interfaces import (
-    ChunkMetadata,
-    ChunkType,
-    DocumentChunk,
-    ProcessedDocument,
-)
 from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
 from mcp_server.plugins.plaintext_plugin.plugin import PlainTextPlugin
 from mcp_server.plugins.plugin_factory import PluginFactory
 from mcp_server.plugins.python_plugin.plugin_semantic import PythonPluginSemantic
-from mcp_server.storage.sqlite_store import SQLiteStore
 from tests.base_test import BaseDocumentTest
 
 logger = logging.getLogger(__name__)
@@ -285,7 +273,7 @@ class TestClass:
         another_md.write_text("# Another Document")
         reused_plugin = plugin_factory.get_plugin(str(another_md))
         # Should be same type as other markdown plugins
-        assert type(reused_plugin) == type(created_plugins[0])
+        assert type(reused_plugin) is type(created_plugins[0])
 
     def test_concurrent_plugin_operations(self, plugin_factory):
         """Test concurrent operations across multiple plugins."""

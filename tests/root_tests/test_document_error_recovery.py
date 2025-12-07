@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 """Test error recovery in document processing."""
 
-import os
 import tempfile
 import threading
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from mcp_server.document_processing import ChunkMetadata, ChunkType, DocumentChunk
 from mcp_server.plugins.markdown_plugin import MarkdownPlugin
 from mcp_server.plugins.plaintext_plugin import PlainTextPlugin
 from mcp_server.plugins.python_plugin.plugin import Plugin as PythonPlugin
@@ -458,7 +456,7 @@ Just text here."""
             try:
                 result = plugin.indexFile("degraded.md", content)
                 # Might return empty or basic result
-            except:
+            except Exception:
                 # Should not raise unhandled exception
                 pass
 

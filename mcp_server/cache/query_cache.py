@@ -5,14 +5,13 @@ Query result caching with invalidation strategies and performance optimization.
 import hashlib
 import json
 import logging
-import time
-from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta
+from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Set, Union
+from typing import Any, Awaitable, Callable, Dict, Optional, Set
 
 from ..plugin_base import SearchResult, SymbolDef
-from .cache_manager import CacheManager, ICacheManager
+from .cache_manager import ICacheManager
 
 logger = logging.getLogger(__name__)
 

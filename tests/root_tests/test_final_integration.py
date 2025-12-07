@@ -312,7 +312,7 @@ public class InventoryManager implements Searchable<Product> {
         print(f"✅ System status: {health.get('status', 'unknown')}")
 
         # Show detailed language breakdown
-        print(f"\nDetailed language breakdown:")
+        print("\nDetailed language breakdown:")
         for lang in sorted(stats["loaded_languages"]):
             lang_info = stats["by_language"].get(lang, {})
             print(f"  - {lang}: {lang_info.get('class', 'Unknown')} plugin")

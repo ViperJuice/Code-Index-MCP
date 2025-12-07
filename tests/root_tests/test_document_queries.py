@@ -2,10 +2,8 @@
 """Test the enhanced dispatcher's document query functionality."""
 
 import logging
-from pathlib import Path
 
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
-from mcp_server.storage.sqlite_store import SQLiteStore
 
 # Setup logging
 logging.basicConfig(

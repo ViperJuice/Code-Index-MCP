@@ -7,10 +7,8 @@ Requires Redis server running and REDIS_URL environment variable set.
 
 import asyncio
 import os
-import tempfile
 import time
-from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import pytest
 

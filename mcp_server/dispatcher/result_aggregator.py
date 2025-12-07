@@ -15,9 +15,8 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
-from functools import lru_cache
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from ..plugin_base import IPlugin, Reference, SearchResult, SymbolDef
 
@@ -101,7 +100,6 @@ class IAggregationStrategy(ABC):
         Returns:
             List of aggregated results
         """
-        pass
 
 
 # Score normalization helper functions
@@ -249,7 +247,6 @@ class IResultAggregator(ABC):
         Returns:
             Tuple of (aggregated results, aggregation statistics)
         """
-        pass
 
     @abstractmethod
     def aggregate_symbol_definitions(
@@ -263,7 +260,6 @@ class IResultAggregator(ABC):
         Returns:
             Best symbol definition or None
         """
-        pass
 
     @abstractmethod
     def aggregate_references(
@@ -277,7 +273,6 @@ class IResultAggregator(ABC):
         Returns:
             Deduplicated and ranked list of references
         """
-        pass
 
 
 class SimpleAggregationStrategy(IAggregationStrategy):

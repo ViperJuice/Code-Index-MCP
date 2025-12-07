@@ -8,10 +8,8 @@ import gc
 import os
 import subprocess
 import tempfile
-import threading
-import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict
 
 import psutil
 import pytest
@@ -21,7 +19,6 @@ from mcp_server.dispatcher.dispatcher import Dispatcher
 from mcp_server.interfaces.shared_interfaces import Result
 from mcp_server.plugin_system.plugin_manager import PluginManager
 from mcp_server.storage.sqlite_store import SQLiteStore
-from mcp_server.utils.fuzzy_indexer import FuzzyIndexer
 
 
 class TestMemoryUsage:
@@ -211,7 +208,7 @@ class TestMemoryUsage:
         memory_increase = final_memory["rss_mb"] - initial_memory["rss_mb"]
         peak_increase = peak_memory - initial_memory["rss_mb"]
 
-        print(f"\nMemory Usage Results:")
+        print("\nMemory Usage Results:")
         print(f"  Files indexed: {indexed_count}")
         print(f"  Initial memory: {initial_memory['rss_mb']:.1f}MB")
         print(f"  Final memory: {final_memory['rss_mb']:.1f}MB")
@@ -337,7 +334,7 @@ class TestMemoryUsage:
         cycle_increases = [s["cycle_increase_mb"] for s in memory_samples]
         total_increases = [s["total_increase_mb"] for s in memory_samples]
 
-        print(f"\nMemory Leak Analysis:")
+        print("\nMemory Leak Analysis:")
         for sample in memory_samples:
             print(
                 f"  Cycle {sample['cycle']}: +{sample['cycle_increase_mb']:.1f}MB "
@@ -480,7 +477,7 @@ class TestMemoryUsage:
                 except OSError:
                     pass
 
-        print(f"\nMemory Efficiency by Language:")
+        print("\nMemory Efficiency by Language:")
         for language, result in language_results.items():
             print(
                 f"  {language:10s}: {result['memory_increase_mb']:5.1f}MB total, "
@@ -574,7 +571,7 @@ class TestMemoryUsage:
         avg_memory = sum(mem_usage) / len(mem_usage)
         memory_range = max_memory - min_memory
 
-        print(f"\nMemory Profile Analysis:")
+        print("\nMemory Profile Analysis:")
         print(f"  Minimum memory: {min_memory:.1f}MB")
         print(f"  Maximum memory: {max_memory:.1f}MB")
         print(f"  Average memory: {avg_memory:.1f}MB")
@@ -682,7 +679,7 @@ class TestMemoryUsage:
         max_memory = max(mem_usage)
         memory_range = max_memory - min_memory
 
-        print(f"\nConcurrent Memory Usage:")
+        print("\nConcurrent Memory Usage:")
         print(f"  Memory range: {memory_range:.1f}MB")
         print(f"  Peak memory: {max_memory:.1f}MB")
         print(f"  Baseline memory: {min_memory:.1f}MB")

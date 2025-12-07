@@ -2,7 +2,6 @@
 """
 Post-migration test to verify MCP functionality still works correctly.
 """
-import json
 import os
 import subprocess
 import sys
@@ -120,7 +119,7 @@ def test_code_search():
 
         if response.status_code == 200:
             results = response.json()
-            print(f"✅ Code search working - found results")
+            print("✅ Code search working - found results")
             return True
         else:
             print(f"❌ Code search failed: {response.status_code}")

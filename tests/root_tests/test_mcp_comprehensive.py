@@ -2,14 +2,13 @@
 """Comprehensive MCP server testing with public repositories."""
 
 import json
-import os
 import shutil
 import subprocess
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 # Ensure we can import MCP modules
 sys.path.insert(0, str(Path(__file__).parent))

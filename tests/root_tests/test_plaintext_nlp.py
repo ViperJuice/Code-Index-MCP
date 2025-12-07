@@ -12,16 +12,12 @@ Tests the NLP processing capabilities including:
 - Text type detection
 """
 
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List
-from unittest.mock import Mock, patch
 
 import pytest
 
-from mcp_server.document_processing import DocumentMetadata, DocumentStructure
-from mcp_server.plugins.plaintext_plugin.nlp_processor import NLPProcessor, TextAnalysis, TextType
-from mcp_server.plugins.plaintext_plugin.paragraph_detector import Paragraph, ParagraphDetector
+from mcp_server.plugins.plaintext_plugin.nlp_processor import NLPProcessor, TextType
+from mcp_server.plugins.plaintext_plugin.paragraph_detector import ParagraphDetector
 from mcp_server.plugins.plaintext_plugin.plugin import PlainTextPlugin
 from mcp_server.plugins.plaintext_plugin.sentence_splitter import SentenceSplitter
 from mcp_server.plugins.plaintext_plugin.topic_extractor import Topic, TopicExtractor

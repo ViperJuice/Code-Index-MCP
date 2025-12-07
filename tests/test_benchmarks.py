@@ -9,13 +9,10 @@ This module provides:
 - Automated performance baseline generation
 """
 
-import os
 import tempfile
 import time
 from pathlib import Path
-from unittest.mock import Mock, patch
 
-import psutil
 import pytest
 
 from mcp_server.benchmarks import (
@@ -23,7 +20,6 @@ from mcp_server.benchmarks import (
     BenchmarkRunner,
     BenchmarkSuite,
     PerformanceMetrics,
-    run_pytest_benchmarks,
 )
 from mcp_server.interfaces.indexing_interfaces import IBenchmarkRunner
 from mcp_server.interfaces.metrics_interfaces import IPerformanceMonitor

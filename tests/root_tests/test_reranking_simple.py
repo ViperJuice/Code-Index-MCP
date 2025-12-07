@@ -5,11 +5,8 @@ Simple test to demonstrate reranking functionality.
 
 import asyncio
 import logging
-from typing import Dict, List
 
-import numpy as np
-
-from mcp_server.indexer.reranker import RerankerFactory, RerankResult
+from mcp_server.indexer.reranker import RerankerFactory
 from mcp_server.interfaces.plugin_interfaces import SearchResult
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -92,7 +89,7 @@ async def test_tfidf_reranker():
     rerank_result = await reranker.rerank(query, search_results, top_k=5)
 
     if rerank_result.is_success:
-        logger.info(f"\nReranked results:")
+        logger.info("\nReranked results:")
         for i, rr in enumerate(rerank_result.data):
             old_rank = (
                 next(
@@ -196,7 +193,7 @@ async def test_reranking_quality():
             + 1
         )
 
-        logger.info(f"\nQuality improvement:")
+        logger.info("\nQuality improvement:")
         logger.info(
             f"'user_authentication_flow.py' moved from #{auth_flow_original} to #{auth_flow_reranked}"
         )

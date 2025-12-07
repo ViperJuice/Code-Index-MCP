@@ -329,7 +329,7 @@ docker-compose up -d
         print(f"✓ Dispatcher supports {len(dispatcher.supported_languages)} languages")
 
         # Test 1: Index files across different languages
-        print(f"\n1. Testing Cross-Language File Indexing...")
+        print("\n1. Testing Cross-Language File Indexing...")
 
         languages_found = set()
         indexed_files = 0
@@ -362,7 +362,7 @@ docker-compose up -d
         print(f"   Languages detected: {', '.join(sorted(languages_found))}")
 
         # Test 2: Cross-language symbol search
-        print(f"\n2. Testing Cross-Language Symbol Search...")
+        print("\n2. Testing Cross-Language Symbol Search...")
 
         # Search for common concepts that appear in multiple languages
         cross_lang_symbols = {
@@ -393,7 +393,7 @@ docker-compose up -d
             print(f"   '{symbol}': {len(results)} results in {len(files_found)} files")
 
         # Test 3: Cross-language semantic search
-        print(f"\n3. Testing Cross-Language Semantic Search...")
+        print("\n3. Testing Cross-Language Semantic Search...")
 
         semantic_queries = [
             "user authentication",
@@ -427,7 +427,7 @@ docker-compose up -d
                 semantic_results[query] = {"results": 0, "languages": 0}
 
         # Test 4: Project structure analysis
-        print(f"\n4. Testing Project Structure Analysis...")
+        print("\n4. Testing Project Structure Analysis...")
 
         stats = dispatcher.get_statistics()
         loaded_languages = stats.get("loaded_languages", [])
@@ -438,7 +438,7 @@ docker-compose up -d
         print(f"   ✓ Index operations: {stats.get('operations', {}).get('indexings', 0)}")
 
         # Test 5: Symbol lookup across languages
-        print(f"\n5. Testing Cross-Language Symbol Lookup...")
+        print("\n5. Testing Cross-Language Symbol Lookup...")
 
         symbol_lookup_tests = ["User", "Logger", "AuthService", "create_user"]
         found_symbols = 0
@@ -454,12 +454,12 @@ docker-compose up -d
                 print(f"   ✗ {symbol}: not found")
 
         # Summary and assessment
-        print(f"\n=== Multi-Language Codebase Assessment ===")
+        print("\n=== Multi-Language Codebase Assessment ===")
 
         total_symbol_results = sum(r["total_results"] for r in search_results.values())
         total_semantic_results = sum(r["results"] for r in semantic_results.values())
 
-        print(f"\nCapabilities Demonstrated:")
+        print("\nCapabilities Demonstrated:")
         print(f"  ✓ Languages indexed: {len(languages_found)}")
         print(f"  ✓ Files processed: {indexed_files}")
         print(f"  ✓ Cross-language symbol search: {total_symbol_results} results")
@@ -468,7 +468,7 @@ docker-compose up -d
         print(f"  ✓ Active language plugins: {len(loaded_languages)}")
 
         # Multi-language specific features
-        print(f"\nMulti-Language Features:")
+        print("\nMulti-Language Features:")
 
         # Check for cross-references
         user_results = search_results.get("User", {})
@@ -480,11 +480,11 @@ docker-compose up -d
         # Check for shared concepts
         create_results = search_results.get("create", {})
         if create_results.get("total_results", 0) > 0:
-            print(f"  ✓ Shared functionality patterns: 'create' operations across languages")
+            print("  ✓ Shared functionality patterns: 'create' operations across languages")
 
         # Check for service communication
         if total_semantic_results > 0:
-            print(f"  ✓ Semantic understanding: AI can find related concepts across languages")
+            print("  ✓ Semantic understanding: AI can find related concepts across languages")
 
         success_criteria = (
             len(languages_found) >= 4  # At least 4 different languages
@@ -508,7 +508,7 @@ docker-compose up -d
         import shutil
 
         shutil.rmtree(temp_dir)
-        print(f"\n✓ Cleaned up test directory")
+        print("\n✓ Cleaned up test directory")
 
 
 async def main():
@@ -517,12 +517,12 @@ async def main():
         success, results = await test_multi_language_codebase()
 
         if success:
-            print(f"\n🎉 Multi-Language Codebase Support: EXCELLENT!")
-            print(f"The MCP server successfully handles complex multi-language projects")
-            print(f"with cross-language search, symbol lookup, and semantic understanding!")
+            print("\n🎉 Multi-Language Codebase Support: EXCELLENT!")
+            print("The MCP server successfully handles complex multi-language projects")
+            print("with cross-language search, symbol lookup, and semantic understanding!")
         else:
-            print(f"\n⚠️ Multi-Language Support needs improvement")
-            print(f"Some cross-language features may need enhancement")
+            print("\n⚠️ Multi-Language Support needs improvement")
+            print("Some cross-language features may need enhancement")
 
         return success
 

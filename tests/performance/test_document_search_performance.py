@@ -5,8 +5,7 @@ import asyncio
 import concurrent.futures
 import statistics
 import time
-from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict
 
 import pytest
 
@@ -14,10 +13,6 @@ from tests.base_test import BaseDocumentTest
 from tests.test_utils import (
     assert_performance,
     create_mock_search_results,
-    create_test_markdown,
-    create_test_plaintext,
-    memory_monitor,
-    timer,
 )
 
 
@@ -425,7 +420,7 @@ optimal results.
         cache_speedup = avg_cold / avg_warm if avg_warm > 0 else 1.0
         cache_reduction = ((avg_cold - avg_warm) / avg_cold) * 100
 
-        print(f"\nCache Performance:")
+        print("\nCache Performance:")
         print(f"  Avg cold: {avg_cold:.1f}ms")
         print(f"  Avg warm: {avg_warm:.1f}ms")
         print(f"  Speedup: {cache_speedup:.1f}x")

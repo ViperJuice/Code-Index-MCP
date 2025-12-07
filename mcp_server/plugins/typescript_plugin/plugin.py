@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import ctypes
-import json
 import logging
-import re
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
@@ -845,7 +843,7 @@ class Plugin(IPlugin):
         is_async = self._has_modifier(node, content, "async")
         is_private = self._has_modifier(node, content, "private")
         is_protected = self._has_modifier(node, content, "protected")
-        is_public = self._has_modifier(node, content, "public")
+        _ = self._has_modifier(node, content, "public")
         is_getter = self._has_modifier(node, content, "get")
         is_setter = self._has_modifier(node, content, "set")
 
@@ -1411,7 +1409,6 @@ class Plugin(IPlugin):
             return
 
         # TODO: Implement enhanced import/export storage with type information
-        pass
 
     def _walk_tree(self, node: Node) -> List[Node]:
         """Walk the tree and yield all nodes."""

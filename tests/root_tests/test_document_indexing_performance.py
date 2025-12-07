@@ -9,7 +9,6 @@ tests_dir = Path(__file__).parent / "tests"
 sys.path.insert(0, str(tests_dir))
 
 # Import and run the actual test
-from performance.test_document_indexing_performance import *
 
 if __name__ == "__main__":
     import pytest

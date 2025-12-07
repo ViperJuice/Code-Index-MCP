@@ -5,12 +5,10 @@ This module provides extensive testing coverage for the IndexEngine,
 QueryOptimizer, and related components.
 """
 
-import asyncio
 import os
 import tempfile
 from datetime import datetime, timedelta
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import Mock
 
 import pytest
 

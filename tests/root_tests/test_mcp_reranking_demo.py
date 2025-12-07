@@ -6,13 +6,11 @@ with reranking enabled.
 """
 
 import asyncio
-import json
 
 # Add the project root to Python path
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -115,13 +113,13 @@ class RerankerDemo:
                 print(f"     Preview: {preview}...")
 
         # Performance metrics
-        print(f"\n3. Performance Metrics:")
+        print("\n3. Performance Metrics:")
         print(f"   - Initial search time: {search_time:.3f}s")
         print(f"   - Reranked search time: {rerank_time:.3f}s")
         print(f"   - Reranking overhead: {rerank_time - search_time:.3f}s")
 
         # Compare result ordering
-        print(f"\n4. Result Order Changes:")
+        print("\n4. Result Order Changes:")
         initial_files = [r["file_path"] for r in results_no_rerank[:5]]
         reranked_files = [r["file_path"] for r in results_reranked[:5]]
 
@@ -243,7 +241,7 @@ async def main():
         print("=" * 80)
         stats = await demo.get_index_stats()
         print(f"Total indexed files: {stats['total_files']}")
-        print(f"\nLanguage breakdown:")
+        print("\nLanguage breakdown:")
         for ext, count in sorted(
             stats["language_breakdown"].items(), key=lambda x: x[1], reverse=True
         ):

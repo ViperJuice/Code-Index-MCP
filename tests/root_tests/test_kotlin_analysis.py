@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Comprehensive test of Kotlin plugin with real Kotlin code analysis."""
 
-import os
 import sys
 from pathlib import Path
 
@@ -102,7 +101,7 @@ def analyze_kotlin_file():
         # Get recommendations
         recommendations = plugin.null_safety_analyzer.get_null_safety_recommendations(null_result)
         if recommendations:
-            print(f"\nNull Safety Recommendations:")
+            print("\nNull Safety Recommendations:")
             for i, rec in enumerate(recommendations):
                 print(f"  {i+1}. {rec}")
 
@@ -156,7 +155,7 @@ def analyze_kotlin_file():
             coroutines_result
         )
         if recommendations:
-            print(f"\nCoroutines Recommendations:")
+            print("\nCoroutines Recommendations:")
             for i, rec in enumerate(recommendations):
                 print(f"  {i+1}. {rec}")
 
@@ -212,7 +211,7 @@ def analyze_kotlin_file():
         # Get recommendations
         recommendations = plugin.java_interop_analyzer.get_interop_recommendations(interop_result)
         if recommendations:
-            print(f"\nJava Interop Recommendations:")
+            print("\nJava Interop Recommendations:")
             for i, rec in enumerate(recommendations):
                 print(f"  {i+1}. {rec}")
 

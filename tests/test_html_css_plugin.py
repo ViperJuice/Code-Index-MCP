@@ -1,7 +1,6 @@
 """Tests for the HTML/CSS plugin."""
 
 from pathlib import Path
-from unittest.mock import Mock
 
 import pytest
 

@@ -9,11 +9,9 @@ This script tests:
 4. Performance and accuracy
 """
 
-import asyncio
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List
 
 import pytest
 

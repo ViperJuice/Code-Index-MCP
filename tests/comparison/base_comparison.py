@@ -10,13 +10,12 @@ import asyncio
 import threading
 import time
 import tracemalloc
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import wraps
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar
 
 import psutil
 
@@ -228,7 +227,6 @@ class BaseComparison(abc.ABC):
         This method should prepare any necessary resources,
         initialize connections, load models, etc.
         """
-        pass
 
     @abc.abstractmethod
     def teardown(self) -> None:
@@ -237,7 +235,6 @@ class BaseComparison(abc.ABC):
         This method should release resources, close connections,
         save results, etc.
         """
-        pass
 
     @abc.abstractmethod
     def run_comparison(self, input_data: Any) -> ComparisonResult:
@@ -249,7 +246,6 @@ class BaseComparison(abc.ABC):
         Returns:
             ComparisonResult with metrics and scores
         """
-        pass
 
     @abc.abstractmethod
     def validate_input(self, input_data: Any) -> bool:
@@ -261,7 +257,6 @@ class BaseComparison(abc.ABC):
         Returns:
             True if input is valid, False otherwise
         """
-        pass
 
     @abc.abstractmethod
     def calculate_quality_scores(self, result: Any, expected: Any) -> Dict[str, float]:
@@ -274,7 +269,6 @@ class BaseComparison(abc.ABC):
         Returns:
             Dictionary of quality metrics
         """
-        pass
 
     def execute(self, input_data: Any, expected: Any = None) -> ComparisonResult:
         """Execute comparison with full metric collection.
@@ -436,17 +430,14 @@ class AsyncBaseComparison(BaseComparison):
     @abc.abstractmethod
     async def setup_async(self, **kwargs) -> None:
         """Async setup for comparison environment."""
-        pass
 
     @abc.abstractmethod
     async def teardown_async(self) -> None:
         """Async cleanup for comparison environment."""
-        pass
 
     @abc.abstractmethod
     async def run_comparison_async(self, input_data: Any) -> ComparisonResult:
         """Run the actual comparison asynchronously."""
-        pass
 
     async def execute_async(self, input_data: Any, expected: Any = None) -> ComparisonResult:
         """Execute comparison asynchronously with full metric collection."""

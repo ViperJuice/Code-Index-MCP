@@ -4,8 +4,6 @@ Comprehensive tests for the cache system.
 
 import asyncio
 import time
-from typing import Any, Dict, Set
-from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -15,7 +13,6 @@ from mcp_server.cache import (
     CacheEntry,
     CacheManager,
     CacheManagerFactory,
-    InvalidationStrategy,
     MemoryCacheBackend,
     QueryCacheConfig,
     QueryResultCache,

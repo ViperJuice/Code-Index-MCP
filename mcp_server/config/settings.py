@@ -2,15 +2,11 @@
 Comprehensive settings management for production deployments.
 """
 
-import os
 import secrets
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import List, Optional
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, model_validator, validator
-
-from mcp_server.core.path_utils import PathUtils
 
 from .environment import Environment, get_env_var, get_environment, is_production
 

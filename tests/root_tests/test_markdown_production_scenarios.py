@@ -6,7 +6,6 @@ Tests real-world markdown patterns and edge cases.
 
 import os
 import tempfile
-from pathlib import Path
 
 import pytest
 

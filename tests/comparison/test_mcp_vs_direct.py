@@ -9,7 +9,6 @@ This module measures and compares:
 - Resource usage (memory/CPU)
 """
 
-import asyncio
 import json
 import os
 import re
@@ -21,7 +20,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import psutil
 
@@ -162,7 +161,7 @@ class TokenCounter:
         if TIKTOKEN_AVAILABLE:
             try:
                 self.encoder = tiktoken.get_encoding("cl100k_base")
-            except:
+            except Exception:
                 self.encoder = None
 
     def count_tokens(self, text: str) -> int:
@@ -743,7 +742,7 @@ class MCPComparison:
         print("COMPARISON SUMMARY")
         print("=" * 60)
         print(f"Total tests run: {report['summary']['total_tests']}")
-        print(f"\nPerformance:")
+        print("\nPerformance:")
         print(f"  Average MCP latency: {report['summary']['avg_mcp_latency_ms']:.2f}ms")
         print(f"  Average Direct latency: {report['summary']['avg_direct_latency_ms']:.2f}ms")
         if report["summary"]["avg_direct_latency_ms"] > 0:
@@ -754,18 +753,18 @@ class MCPComparison:
                 f"  Overall speedup: {speedup:.2f}x {'(MCP faster)' if speedup > 1 else '(Direct faster)'}"
             )
 
-        print(f"\nToken Usage:")
+        print("\nToken Usage:")
         print(f"  Total MCP tokens: {report['summary']['total_mcp_tokens']:,}")
         print(f"  Total Direct tokens: {report['summary']['total_direct_tokens']:,}")
         if report["summary"]["total_direct_tokens"] > 0:
             ratio = report["summary"]["total_mcp_tokens"] / report["summary"]["total_direct_tokens"]
             print(f"  Token ratio: {ratio:.2f}x")
 
-        print(f"\nEstimated Costs:")
+        print("\nEstimated Costs:")
         print(f"  MCP: ${report['summary']['estimated_costs']['mcp_cost_usd']:.4f}")
         print(f"  Direct: ${report['summary']['estimated_costs']['direct_cost_usd']:.4f}")
 
-        print(f"\nWin/Loss:")
+        print("\nWin/Loss:")
         print(f"  MCP faster: {report['summary']['mcp_wins']} times")
         print(f"  Direct faster: {report['summary']['direct_wins']} times")
 
@@ -971,7 +970,7 @@ def main():
         # Cleanup
         if test_repo.exists():
             shutil.rmtree(test_repo)
-            print(f"\nCleaned up test repository")
+            print("\nCleaned up test repository")
 
 
 if __name__ == "__main__":

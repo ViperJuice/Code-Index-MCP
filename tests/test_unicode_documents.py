@@ -3,11 +3,9 @@
 import codecs
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch
 
 import pytest
 
-from mcp_server.document_processing.base_document_plugin import BaseDocumentPlugin
 from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
 from mcp_server.plugins.plaintext_plugin.plugin import PlaintextPlugin
 from mcp_server.storage.sqlite_store import SQLiteStore

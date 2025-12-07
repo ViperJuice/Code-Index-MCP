@@ -8,7 +8,6 @@ import json
 import logging
 import tempfile
 from pathlib import Path
-from typing import Any, Dict
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -163,7 +162,7 @@ def test_function():
 
         # Print summary
         print(f"\n{'='*60}")
-        print(f"MCP CLI INTEGRATION TEST SUMMARY")
+        print("MCP CLI INTEGRATION TEST SUMMARY")
         print(f"{'='*60}")
 
         successful_tools = sum(
@@ -198,10 +197,10 @@ async def main():
         success = await test_mcp_cli_integration()
 
         if success:
-            print(f"\n🎉 MCP CLI integration test completed successfully!")
+            print("\n🎉 MCP CLI integration test completed successfully!")
             return 0
         else:
-            print(f"\n⚠️  MCP CLI integration test completed with issues")
+            print("\n⚠️  MCP CLI integration test completed with issues")
             return 1
 
     except Exception as e:

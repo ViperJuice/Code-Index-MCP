@@ -5,7 +5,6 @@ MCP Database Efficiency Test
 Tests and demonstrates efficient database management strategies for MCP server.
 """
 
-import os
 import sqlite3
 import sys
 import tempfile
@@ -16,7 +15,6 @@ from typing import Any, Dict, List
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from mcp_server.plugins.plugin_factory import PluginFactory
 from mcp_server.storage.sqlite_store import SQLiteStore
 
 

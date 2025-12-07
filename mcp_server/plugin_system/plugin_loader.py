@@ -5,8 +5,7 @@ import importlib.util
 import logging
 import sys
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, Optional, Type
+from typing import Any, Dict, Type
 
 from ..interfaces.shared_interfaces import Error, Result
 from ..plugin_base import IPlugin

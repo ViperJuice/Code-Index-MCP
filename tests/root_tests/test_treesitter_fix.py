@@ -90,14 +90,14 @@ def transform_data(input_list):
                 print(f"✗ Missing expected symbols: {', '.join(missing)}")
                 results[lang] = False
             else:
-                print(f"✓ All expected symbols found!")
+                print("✓ All expected symbols found!")
                 results[lang] = True
 
             # Check if parser is working (not just fallback)
             if hasattr(plugin, "parser") and plugin.parser is not None:
-                print(f"✓ Tree-sitter parser is active")
+                print("✓ Tree-sitter parser is active")
             else:
-                print(f"✗ Using fallback parsing (no tree-sitter)")
+                print("✗ Using fallback parsing (no tree-sitter)")
 
             # Cleanup
             test_file.unlink(missing_ok=True)

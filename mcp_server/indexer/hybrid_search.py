@@ -10,16 +10,14 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Set, Tuple
-
-import numpy as np
+from typing import Any, Dict, List, Optional
 
 # Import only what we need to avoid circular dependencies
 from ..config.settings import RerankingSettings
 from ..storage.sqlite_store import SQLiteStore
 from ..utils.semantic_indexer import SemanticIndexer
 from .bm25_indexer import BM25Indexer
-from .query_optimizer import Query, QueryType
+from .query_optimizer import QueryType
 from .reranker import IReranker, RerankerFactory
 
 logger = logging.getLogger(__name__)

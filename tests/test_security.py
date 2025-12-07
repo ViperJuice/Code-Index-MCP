@@ -2,7 +2,6 @@
 
 import asyncio
 from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock
 
 import jwt
 import pytest
@@ -16,21 +15,14 @@ from mcp_server.security import (
     AuthCredentials,
     AuthenticationError,
     AuthManager,
-    AuthorizationError,
     PasswordManager,
     Permission,
     RateLimiter,
     SecurityConfig,
     SecurityError,
-    SecurityMiddlewareStack,
-    TokenData,
-    User,
     UserRole,
 )
 from mcp_server.security.security_middleware import (
-    AuthenticationMiddleware,
-    AuthorizationMiddleware,
-    RateLimitMiddleware,
     RequestValidationMiddleware,
     SecurityHeadersMiddleware,
 )

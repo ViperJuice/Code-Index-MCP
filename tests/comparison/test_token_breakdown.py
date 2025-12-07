@@ -16,7 +16,6 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from typing import Any, Dict
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
@@ -158,12 +157,12 @@ def process_data(data):
         self.assertGreater(reduction, 0.8, f"MCP should reduce tokens by >80%, got {reduction:.1%}")
 
         # Print detailed breakdown
-        print(f"\nSymbol Search Token Breakdown:")
-        print(f"  MCP:")
+        print("\nSymbol Search Token Breakdown:")
+        print("  MCP:")
         print(f"    Input: {mcp_input_tokens} tokens ('{mcp_query}')")
         print(f"    Output: {mcp_output_tokens} tokens (structured JSON)")
         print(f"    Total: {total_mcp} tokens")
-        print(f"  Direct:")
+        print("  Direct:")
         print(f"    Input: {direct_input_tokens} tokens (grep command)")
         print(f"    Output: {direct_output_tokens} tokens (entire file)")
         print(f"    Total: {total_direct} tokens")
@@ -218,12 +217,12 @@ def process_data(data):
             total_mcp, total_direct, "MCP should use fewer total tokens for pattern search"
         )
 
-        print(f"\nPattern Search Token Breakdown:")
-        print(f"  MCP:")
+        print("\nPattern Search Token Breakdown:")
+        print("  MCP:")
         print(f"    Input: {mcp_input_tokens} tokens")
         print(f"    Output: {mcp_output_tokens} tokens (JSON with snippets)")
         print(f"    Total: {total_mcp} tokens")
-        print(f"  Direct:")
+        print("  Direct:")
         print(f"    Input: {direct_input_tokens} tokens")
         print(f"    Output: {direct_output_tokens} tokens (grep output)")
         print(f"    Total: {total_direct} tokens")
@@ -271,12 +270,12 @@ def process_data(data):
             reduction, 0.9, f"Semantic search should reduce tokens by >90%, got {reduction:.1%}"
         )
 
-        print(f"\nSemantic Search Token Comparison:")
-        print(f"  MCP:")
+        print("\nSemantic Search Token Comparison:")
+        print("  MCP:")
         print(f"    Input: {mcp_input_tokens} tokens")
         print(f"    Output: {mcp_output_tokens} tokens")
         print(f"    Total: {total_mcp} tokens")
-        print(f"  Direct (hypothetical):")
+        print("  Direct (hypothetical):")
         print(f"    Would need to read entire codebase: {total_codebase_tokens} tokens")
         print(f"  Reduction: {reduction:.1%}")
 
@@ -348,7 +347,7 @@ class TestTokenReductionScenarios(unittest.TestCase):
 
         reduction = 1 - (mcp_total / direct_total)
 
-        print(f"\nMulti-file Symbol Search:")
+        print("\nMulti-file Symbol Search:")
         print(f"  MCP: {mcp_total:,} tokens")
         print(f"  Direct: {direct_total:,} tokens")
         print(f"  Reduction: {reduction:.1%}")
@@ -381,7 +380,7 @@ class TestTokenReductionScenarios(unittest.TestCase):
 
         reduction = 1 - (mcp_total / direct_total)
 
-        print(f"\nRefactoring Scenario (20 files):")
+        print("\nRefactoring Scenario (20 files):")
         print(f"  MCP: {mcp_total:,} tokens")
         print(f"  Direct: {direct_total:,} tokens")
         print(f"  Reduction: {reduction:.1%}")

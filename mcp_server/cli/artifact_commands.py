@@ -5,7 +5,6 @@ This module provides commands for uploading, downloading, and managing
 index artifacts using GitHub Actions Artifacts storage.
 """
 
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -21,7 +20,6 @@ sys.path.insert(0, str(project_root))
 @click.group()
 def artifact():
     """Manage index artifacts in GitHub Actions."""
-    pass
 
 
 @artifact.command()
@@ -192,7 +190,7 @@ def sync():
                 click.echo(f"   Files: {file_count}")
                 click.echo(f"   Symbols: {symbol_count}")
 
-            except:
+            except Exception:
                 pass
             finally:
                 conn.close()

@@ -9,12 +9,8 @@ This test suite covers:
 - Integration with semantic search
 """
 
-import json
-
 # Import the Markdown plugin and related classes
 import sys
-import tempfile
-from pathlib import Path
 from typing import Any, Dict, List
 from unittest.mock import Mock, patch
 
@@ -22,7 +18,6 @@ import pytest
 
 sys.path.insert(0, "/app")
 
-from mcp_server.document_processing import DocumentChunk, DocumentMetadata, DocumentStructure
 from mcp_server.plugins.markdown_plugin.chunk_strategies import MarkdownChunkStrategy
 from mcp_server.plugins.markdown_plugin.document_parser import MarkdownParser
 from mcp_server.plugins.markdown_plugin.frontmatter_parser import FrontmatterParser

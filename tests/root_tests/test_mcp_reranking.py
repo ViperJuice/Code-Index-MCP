@@ -4,21 +4,18 @@ Test reranking using MCP server search directly.
 """
 
 import asyncio
-import json
 import logging
 
 # Import the MCP server CLI components
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Dict, List
 
 sys.path.insert(0, "/app")
 
-from mcp_server.config.settings import RerankingSettings, Settings
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from mcp_server.indexer.reranker import RerankerFactory
-from mcp_server.plugin_system.plugin_registry import PluginRegistry
 from mcp_server.storage.sqlite_store import SQLiteStore
 
 logging.basicConfig(

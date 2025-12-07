@@ -124,22 +124,18 @@ class _Handler(FileSystemEventHandler):
     def on_modified(self, event):
         """Handle file modification events."""
         # Let on_any_event handle this
-        pass
 
     def on_deleted(self, event):
         """Handle file deletion events."""
         # Let on_any_event handle this
-        pass
 
     def on_moved(self, event):
         """Handle file move events."""
         # Let on_any_event handle this
-        pass
 
     def on_created(self, event):
         """Handle file creation events."""
         # Let on_any_event handle this
-        pass
 
 
 class FileWatcher:

@@ -4,7 +4,7 @@
 import tempfile
 from pathlib import Path
 
-from mcp_server.utils.semantic_indexer import DocumentSection, SemanticIndexer
+from mcp_server.utils.semantic_indexer import SemanticIndexer
 
 
 def create_test_documents(temp_dir: Path) -> None:

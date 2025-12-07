@@ -26,7 +26,6 @@ logger = logging.getLogger(__name__)
 @click.group()
 def cli():
     """MCP Server Plugin Management CLI"""
-    pass
 
 
 @cli.command()
@@ -82,12 +81,12 @@ def info(language: str):
     if "manifest" in plugin_info:
         manifest = plugin_info["manifest"]
         if "features" in manifest:
-            click.echo(f"\nFeatures:")
+            click.echo("\nFeatures:")
             for feature in manifest["features"]:
                 click.echo(f"  - {feature}")
 
         if "dependencies" in manifest:
-            click.echo(f"\nDependencies:")
+            click.echo("\nDependencies:")
             for dep in manifest["dependencies"]:
                 click.echo(f"  - {dep}")
 
@@ -213,7 +212,7 @@ def set_config(language: str, key: str, value: str):
     # Try to parse value as JSON first
     try:
         parsed_value = json.loads(value)
-    except:
+    except Exception:
         # If not JSON, treat as string
         parsed_value = value
 
@@ -310,7 +309,7 @@ def test(language: str):
 
     try:
         result = plugin.extract_symbols(sample_code, f"test.{language}")
-        click.echo(f"✅ Plugin test successful!")
+        click.echo("✅ Plugin test successful!")
         click.echo(f"Extracted {len(result.symbols)} symbols")
 
         if result.symbols:

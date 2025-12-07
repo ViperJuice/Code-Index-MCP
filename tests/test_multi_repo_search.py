@@ -1,11 +1,8 @@
 """Test multi-repository search functionality."""
 
 import asyncio
-import json
 import os
 import sys
-from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -293,7 +290,7 @@ class TestMultiRepoSearch:
         concurrent_results = asyncio.run(concurrent_search())
         conc_time = perf.end_timing("concurrent")
 
-        print(f"\nConcurrency Performance:")
+        print("\nConcurrency Performance:")
         print(f"  Sequential: {seq_time:.3f}s")
         print(f"  Concurrent: {conc_time:.3f}s")
         print(f"  Speedup: {seq_time/conc_time:.2f}x")
@@ -390,7 +387,7 @@ class TestMultiRepoSearch:
         # Check that not all indexes are loaded
         assert len(manager.loaded_indexes) <= manager.max_concurrent_repos
 
-        print(f"\nMemory Management:")
+        print("\nMemory Management:")
         print(f"  Total repos: {len(repo_ids)}")
         print(f"  Loaded indexes: {len(manager.loaded_indexes)}")
         print(f"  Search results: {len(results)}")

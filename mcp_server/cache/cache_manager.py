@@ -4,17 +4,15 @@ Cache manager implementation with multiple backend support and performance monit
 
 import asyncio
 import hashlib
-import json
 import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Set, Union
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
 
 from .backends import (
     CacheBackend,
-    CacheEntry,
     HybridCacheBackend,
     MemoryCacheBackend,
     RedisCacheBackend,
@@ -71,34 +69,28 @@ class ICacheManager(ABC):
     @abstractmethod
     async def get(self, key: str, default: Any = None) -> Any:
         """Get value from cache."""
-        pass
 
     @abstractmethod
     async def set(
         self, key: str, value: Any, ttl: Optional[int] = None, tags: Optional[Set[str]] = None
     ) -> bool:
         """Set value in cache."""
-        pass
 
     @abstractmethod
     async def delete(self, key: str) -> bool:
         """Delete value from cache."""
-        pass
 
     @abstractmethod
     async def exists(self, key: str) -> bool:
         """Check if key exists in cache."""
-        pass
 
     @abstractmethod
     async def clear(self) -> int:
         """Clear all cache entries."""
-        pass
 
     @abstractmethod
     async def invalidate_by_tags(self, tags: Set[str]) -> int:
         """Invalidate entries by tags."""
-        pass
 
     @abstractmethod
     async def get_or_set(
@@ -109,34 +101,28 @@ class ICacheManager(ABC):
         tags: Optional[Set[str]] = None,
     ) -> Any:
         """Get value or set if not exists using factory function."""
-        pass
 
     @abstractmethod
     async def mget(self, keys: List[str]) -> Dict[str, Any]:
         """Get multiple values."""
-        pass
 
     @abstractmethod
     async def mset(
         self, mapping: Dict[str, Any], ttl: Optional[int] = None, tags: Optional[Set[str]] = None
     ) -> int:
         """Set multiple values."""
-        pass
 
     @abstractmethod
     async def get_metrics(self) -> CacheMetrics:
         """Get cache performance metrics."""
-        pass
 
     @abstractmethod
     async def warm_cache(self, keys: List[str], factory: Callable[[str], Awaitable[Any]]) -> int:
         """Warm cache with predefined keys."""
-        pass
 
     @abstractmethod
     async def cleanup(self) -> int:
         """Clean up expired entries."""
-        pass
 
 
 class CacheManager(ICacheManager):

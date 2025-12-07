@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import ast
 import logging
-import os
 from pathlib import Path
 from typing import Iterable, Optional
 
@@ -162,7 +160,7 @@ class PythonPluginSemantic(PluginWithSemanticSearch):
                 # Clean up multiline signatures
                 signature = " ".join(signature.split())
                 return signature
-        except:
+        except Exception:
             pass
 
         # Fallback to simple signature
@@ -193,7 +191,7 @@ class PythonPluginSemantic(PluginWithSemanticSearch):
                         elif doc_text.startswith('"') or doc_text.startswith("'"):
                             doc_text = doc_text[1:-1]
                         return doc_text.strip()
-        except:
+        except Exception:
             pass
         return None
 

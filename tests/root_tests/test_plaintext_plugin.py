@@ -8,7 +8,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from mcp_server.plugins.plaintext_plugin import PlainTextPlugin
-from mcp_server.storage.sqlite_store import SQLiteStore
 
 
 def test_plaintext_plugin():

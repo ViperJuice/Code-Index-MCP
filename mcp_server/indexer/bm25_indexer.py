@@ -6,16 +6,13 @@ extension, which includes built-in BM25 ranking algorithms.
 """
 
 import hashlib
-import json
 import logging
 import sqlite3
 
 # Interface definition inline for now
 from abc import ABC, abstractmethod
-from contextlib import contextmanager
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from ..storage.sqlite_store import SQLiteStore
 

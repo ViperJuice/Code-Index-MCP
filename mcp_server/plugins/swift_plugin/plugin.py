@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
-from ...plugin_base import IndexShard, Reference, SearchOpts, SearchResult, SymbolDef
+from ...plugin_base import IndexShard, SearchOpts, SearchResult
 from ...storage.sqlite_store import SQLiteStore
 from ..specialized_plugin_base import (
     BuildDependency,
@@ -571,7 +571,7 @@ class SwiftCrossFileAnalyzer(ICrossFileAnalyzer):
 
     def _determine_reference_type(self, line: str, symbol: str) -> str:
         """Determine the type of reference in a line."""
-        line_stripped = line.strip()
+        _ = line.strip()
 
         if f"{symbol}(" in line:
             return "call"
@@ -579,9 +579,9 @@ class SwiftCrossFileAnalyzer(ICrossFileAnalyzer):
             return "import"
         elif f": {symbol}" in line or f"<{symbol}>" in line:
             return "type_usage"
-        elif f"class " in line and f": {symbol}" in line:
+        elif "class " in line and f": {symbol}" in line:
             return "inherit"
-        elif f"extension " in line and f": {symbol}" in line:
+        elif "extension " in line and f": {symbol}" in line:
             return "conform"
         else:
             return "reference"
@@ -798,8 +798,8 @@ class Plugin(SpecializedPluginBase):
                 self._build_files = [package_swift]
 
             # Also look for Xcode project files
-            xcodeproj_files = list(self._project_root.glob("*.xcodeproj"))
-            xcworkspace_files = list(self._project_root.glob("*.xcworkspace"))
+            _ = list(self._project_root.glob("*.xcodeproj"))
+            _ = list(self._project_root.glob("*.xcworkspace"))
 
             # Note: We don't parse Xcode files yet, but we could extend this
 

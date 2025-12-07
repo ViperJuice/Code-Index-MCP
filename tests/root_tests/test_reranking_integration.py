@@ -5,15 +5,10 @@ Integration test showing how reranking improves search results in practice.
 
 import asyncio
 import logging
-from pathlib import Path
-from typing import List
 
-from mcp_server.config.settings import RerankingSettings, Settings
-from mcp_server.indexer.bm25_indexer import BM25Indexer
+from mcp_server.config.settings import RerankingSettings
 from mcp_server.indexer.hybrid_search import HybridSearch, HybridSearchConfig
 from mcp_server.storage.sqlite_store import SQLiteStore
-from mcp_server.utils.fuzzy_indexer import FuzzyIndexer
-from mcp_server.utils.semantic_indexer import SemanticIndexer
 
 # Configure logging
 logging.basicConfig(

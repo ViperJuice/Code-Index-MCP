@@ -2,10 +2,9 @@
 
 import re
 import uuid
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from .document_interfaces import (
     ChunkMetadata,

@@ -12,13 +12,11 @@ import logging
 import os
 import time
 import uuid
-from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Union
 
-from ..core.errors import PluginError
 from ..core.ignore_patterns import get_ignore_manager
 from ..plugin_system.interfaces import IPluginManager
 from ..storage.sqlite_store import SQLiteStore
@@ -248,7 +246,7 @@ class IndexEngine:
             # Generate semantic embeddings if requested
             if self.semantic_indexer:
                 try:
-                    semantic_result = self.semantic_indexer.index_file(path_obj)
+                    _ = self.semantic_indexer.index_file(path_obj)
                     logger.debug(f"Generated semantic embeddings for {file_path}")
                 except Exception as e:
                     logger.warning(f"Failed to generate semantic embeddings for {file_path}: {e}")
@@ -531,7 +529,7 @@ class IndexEngine:
 
             # Store symbols
             for symbol in parse_result.get("symbols", []):
-                symbol_id = self.storage.store_symbol(
+                _ = self.storage.store_symbol(
                     file_id=file_id,
                     name=symbol["name"],
                     kind=symbol["kind"],

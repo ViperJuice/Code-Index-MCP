@@ -6,17 +6,15 @@ cross-repository code search operations.
 """
 
 import hashlib
-import json
 import logging
 import os
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional
 
-from mcp_server.core.path_resolver import PathResolver
 from mcp_server.storage.repository_registry import RepositoryRegistry
 from mcp_server.storage.sqlite_store import SQLiteStore
 from mcp_server.utils.index_discovery import IndexDiscovery
@@ -171,7 +169,7 @@ class MultiRepositoryManager:
             )
             url = result.stdout.strip()
             return hashlib.sha256(url.encode()).hexdigest()[:16]
-        except:
+        except Exception:
             # Fall back to path hash
             path_str = str(repository_path.absolute())
             return hashlib.sha256(path_str.encode()).hexdigest()[:16]

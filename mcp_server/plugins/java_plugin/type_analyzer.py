@@ -95,7 +95,6 @@ class JavaTypeAnalyzer(ITypeAnalyzer):
 
     def _analyze_class(self, class_node, package: str, file_path: str):
         """Analyze a class declaration."""
-        import javalang
 
         full_name = f"{package}.{class_node.name}" if package else class_node.name
 

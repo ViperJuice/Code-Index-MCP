@@ -4,10 +4,7 @@ This module provides index management that's synchronized with git commits,
 supporting incremental updates and artifact management.
 """
 
-import json
 import logging
-import os
-import shutil
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime
@@ -16,9 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from ..artifacts.commit_artifacts import CommitArtifactManager
 from ..dispatcher.dispatcher_enhanced import EnhancedDispatcher
-from .multi_repo_manager import RepositoryInfo
 from .repository_registry import RepositoryRegistry
-from .sqlite_store import SQLiteStore
 
 logger = logging.getLogger(__name__)
 
@@ -342,7 +337,7 @@ class GitAwareIndexManager:
             return None
 
         # Create artifact with commit in name
-        artifact_name = f"{repo_id}-{commit[:8]}-index.tar.gz"
+        _ = f"{repo_id}-{commit[:8]}-index.tar.gz"
 
         # This would create the actual artifact
         # For now, return None

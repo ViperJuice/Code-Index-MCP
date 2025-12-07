@@ -1,9 +1,7 @@
 """Test repository registration and management functionality."""
 
-import json
 import os
 import sys
-from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -12,7 +10,7 @@ import pytest
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from mcp_server.storage.repository_registry import RepositoryInfo, RepositoryRegistry
+from mcp_server.storage.repository_registry import RepositoryRegistry
 from tests.test_utilities import (
     PerformanceTracker,
     TestRepositoryBuilder,

@@ -8,10 +8,9 @@ fixing the issue where test repositories couldn't find their indexes.
 import json
 import os
 import sqlite3
-import subprocess
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 

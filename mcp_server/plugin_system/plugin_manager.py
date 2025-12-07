@@ -3,7 +3,7 @@
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional
 
 import yaml
 
@@ -13,7 +13,6 @@ from ..storage.sqlite_store import SQLiteStore
 from .interfaces import ILifecycleManager, IPluginManager
 from .models import (
     PluginConfig,
-    PluginInfo,
     PluginInitError,
     PluginInstance,
     PluginLoadResult,

@@ -5,18 +5,15 @@ These tests verify that the Claude Index CLI tool correctly manages
 indexes across different environments.
 """
 
-import asyncio
 import json
 import os
 import sqlite3
-import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
 from mcp_server.cli.index_commands import (
-    CommandResult,
     CreateIndexCommand,
     ListIndexesCommand,
     MigrateIndexCommand,

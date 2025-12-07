@@ -7,9 +7,8 @@ following the architecture defined in level3_mcp_components.dsl.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Type
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type
 
 from ..interfaces.shared_interfaces import Result
 from ..plugin_base import IPlugin
@@ -31,7 +30,6 @@ class IPluginDiscovery(ABC):
         Returns:
             List of discovered plugin information
         """
-        pass
 
     @abstractmethod
     def validate_plugin(self, plugin_path: Path) -> bool:
@@ -43,15 +41,12 @@ class IPluginDiscovery(ABC):
         Returns:
             True if valid plugin, False otherwise
         """
-        pass
 
     def discover_plugins_safe(self, plugin_dirs: List[Path]) -> Result[List["PluginInfo"]]:
         """Discover plugins using Result pattern for error handling."""
-        pass
 
     def validate_plugin_safe(self, plugin_path: Path) -> Result[bool]:
         """Validate a plugin using Result pattern for error handling."""
-        pass
 
 
 class IPluginLoader(ABC):
@@ -70,7 +65,6 @@ class IPluginLoader(ABC):
         Raises:
             PluginLoadError: If the plugin cannot be loaded
         """
-        pass
 
     @abstractmethod
     def unload_plugin(self, plugin_name: str) -> None:
@@ -79,15 +73,12 @@ class IPluginLoader(ABC):
         Args:
             plugin_name: Name of the plugin to unload
         """
-        pass
 
     def load_plugin_safe(self, plugin_info: "PluginInfo") -> Result[Type[IPlugin]]:
         """Load a plugin using Result pattern for error handling."""
-        pass
 
     def unload_plugin_safe(self, plugin_name: str) -> Result[None]:
         """Unload a plugin using Result pattern for error handling."""
-        pass
 
 
 class IPluginRegistry(ABC):
@@ -101,7 +92,6 @@ class IPluginRegistry(ABC):
             plugin_info: Plugin metadata
             plugin_class: The plugin class
         """
-        pass
 
     @abstractmethod
     def unregister_plugin(self, plugin_name: str) -> None:
@@ -110,7 +100,6 @@ class IPluginRegistry(ABC):
         Args:
             plugin_name: Name of the plugin to unregister
         """
-        pass
 
     @abstractmethod
     def get_plugin(self, plugin_name: str) -> Optional[Type[IPlugin]]:
@@ -122,7 +111,6 @@ class IPluginRegistry(ABC):
         Returns:
             Plugin class if found, None otherwise
         """
-        pass
 
     @abstractmethod
     def get_all_plugins(self) -> Dict[str, Type[IPlugin]]:
@@ -131,7 +119,6 @@ class IPluginRegistry(ABC):
         Returns:
             Dictionary mapping plugin names to plugin classes
         """
-        pass
 
     @abstractmethod
     def get_plugin_info(self, plugin_name: str) -> Optional["PluginInfo"]:
@@ -143,7 +130,6 @@ class IPluginRegistry(ABC):
         Returns:
             Plugin metadata if found, None otherwise
         """
-        pass
 
     @abstractmethod
     def list_plugins(self) -> List["PluginInfo"]:
@@ -152,17 +138,14 @@ class IPluginRegistry(ABC):
         Returns:
             List of plugin information
         """
-        pass
 
     def register_plugin_safe(
         self, plugin_info: "PluginInfo", plugin_class: Type[IPlugin]
     ) -> Result[None]:
         """Register a plugin using Result pattern for error handling."""
-        pass
 
     def unregister_plugin_safe(self, plugin_name: str) -> Result[None]:
         """Unregister a plugin using Result pattern for error handling."""
-        pass
 
 
 class ILifecycleManager(ABC):
@@ -183,7 +166,6 @@ class ILifecycleManager(ABC):
             PluginNotFoundError: If plugin not found
             PluginInitError: If initialization fails
         """
-        pass
 
     @abstractmethod
     def start_plugin(self, plugin_name: str) -> None:
@@ -192,7 +174,6 @@ class ILifecycleManager(ABC):
         Args:
             plugin_name: Name of the plugin to start
         """
-        pass
 
     @abstractmethod
     def stop_plugin(self, plugin_name: str) -> None:
@@ -201,7 +182,6 @@ class ILifecycleManager(ABC):
         Args:
             plugin_name: Name of the plugin to stop
         """
-        pass
 
     @abstractmethod
     def destroy_plugin(self, plugin_name: str) -> None:
@@ -210,7 +190,6 @@ class ILifecycleManager(ABC):
         Args:
             plugin_name: Name of the plugin to destroy
         """
-        pass
 
     @abstractmethod
     def get_plugin_instance(self, plugin_name: str) -> Optional[IPlugin]:
@@ -222,7 +201,6 @@ class ILifecycleManager(ABC):
         Returns:
             Plugin instance if active, None otherwise
         """
-        pass
 
     @abstractmethod
     def get_active_plugins(self) -> Dict[str, IPlugin]:
@@ -231,7 +209,6 @@ class ILifecycleManager(ABC):
         Returns:
             Dictionary mapping plugin names to instances
         """
-        pass
 
 
 class IPluginManager(ABC):
@@ -244,7 +221,6 @@ class IPluginManager(ABC):
         Args:
             config_path: Optional path to plugin configuration file
         """
-        pass
 
     @abstractmethod
     def reload_plugin(self, plugin_name: str) -> None:
@@ -253,7 +229,6 @@ class IPluginManager(ABC):
         Args:
             plugin_name: Name of the plugin to reload
         """
-        pass
 
     @abstractmethod
     def enable_plugin(self, plugin_name: str) -> None:
@@ -262,7 +237,6 @@ class IPluginManager(ABC):
         Args:
             plugin_name: Name of the plugin to enable
         """
-        pass
 
     @abstractmethod
     def disable_plugin(self, plugin_name: str) -> None:
@@ -271,7 +245,6 @@ class IPluginManager(ABC):
         Args:
             plugin_name: Name of the plugin to disable
         """
-        pass
 
     @abstractmethod
     def get_plugin_by_language(self, language: str) -> Optional[IPlugin]:
@@ -283,7 +256,6 @@ class IPluginManager(ABC):
         Returns:
             Plugin instance if found, None otherwise
         """
-        pass
 
     @abstractmethod
     def get_plugin_for_file(self, file_path: Path) -> Optional[IPlugin]:
@@ -295,12 +267,10 @@ class IPluginManager(ABC):
         Returns:
             Plugin instance if found, None otherwise
         """
-        pass
 
     @abstractmethod
     def shutdown(self) -> None:
         """Shutdown all plugins and cleanup resources."""
-        pass
 
 
 # Hook interfaces for extensibility
@@ -310,7 +280,6 @@ class IPluginHook(ABC):
     @abstractmethod
     def execute(self, *args, **kwargs) -> Any:
         """Execute the hook."""
-        pass
 
 
 class IPreLoadHook(IPluginHook):
@@ -323,7 +292,6 @@ class IPreLoadHook(IPluginHook):
         Args:
             plugin_info: Information about the plugin to be loaded
         """
-        pass
 
 
 class IPostLoadHook(IPluginHook):
@@ -337,7 +305,6 @@ class IPostLoadHook(IPluginHook):
             plugin_info: Information about the loaded plugin
             plugin_class: The loaded plugin class
         """
-        pass
 
 
 class IPluginValidator(ABC):
@@ -353,7 +320,6 @@ class IPluginValidator(ABC):
         Returns:
             True if valid, False otherwise
         """
-        pass
 
     @abstractmethod
     def validate_metadata(self, plugin_info: "PluginInfo") -> bool:
@@ -365,4 +331,3 @@ class IPluginValidator(ABC):
         Returns:
             True if valid, False otherwise
         """
-        pass

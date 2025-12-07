@@ -15,10 +15,9 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from ..plugin_base import IPlugin
-from ..plugin_system.models import PluginConfig, PluginInfo, PluginInstance
 from ..plugins.language_registry import get_language_by_extension
 
 logger = logging.getLogger(__name__)
@@ -71,7 +70,6 @@ class IFileTypeMatcher(ABC):
         Returns:
             FileTypeInfo containing details about the file type
         """
-        pass
 
     @abstractmethod
     def is_supported(self, path: Path) -> bool:
@@ -83,7 +81,6 @@ class IFileTypeMatcher(ABC):
         Returns:
             True if file type is supported
         """
-        pass
 
     @abstractmethod
     def get_language(self, path: Path) -> Optional[str]:
@@ -95,7 +92,6 @@ class IFileTypeMatcher(ABC):
         Returns:
             Programming language name or None if not detected
         """
-        pass
 
 
 class IPluginRouter(ABC):
@@ -111,7 +107,6 @@ class IPluginRouter(ABC):
         Returns:
             List of RouteResults ordered by confidence/priority
         """
-        pass
 
     @abstractmethod
     def route_by_capability(self, capability: str, **kwargs) -> List[RouteResult]:
@@ -124,7 +119,6 @@ class IPluginRouter(ABC):
         Returns:
             List of RouteResults for plugins with the capability
         """
-        pass
 
     @abstractmethod
     def route_by_language(self, language: str) -> List[RouteResult]:
@@ -136,7 +130,6 @@ class IPluginRouter(ABC):
         Returns:
             List of RouteResults for plugins supporting the language
         """
-        pass
 
     @abstractmethod
     def get_best_plugin(self, path: Path) -> Optional[RouteResult]:
@@ -148,7 +141,6 @@ class IPluginRouter(ABC):
         Returns:
             Best RouteResult or None if no suitable plugin found
         """
-        pass
 
 
 class FileTypeMatcher(IFileTypeMatcher):

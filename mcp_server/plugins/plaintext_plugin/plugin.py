@@ -2,9 +2,8 @@
 
 import logging
 import re
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from mcp_server.document_processing.base_document_plugin import (
     BaseDocumentPlugin,
@@ -12,7 +11,7 @@ from mcp_server.document_processing.base_document_plugin import (
     DocumentMetadata,
     DocumentStructure,
 )
-from mcp_server.plugin_base import IndexShard, Reference, SearchResult, SymbolDef
+from mcp_server.plugin_base import SearchResult
 from mcp_server.storage.sqlite_store import SQLiteStore
 
 from .nlp_processor import NLPProcessor, TextAnalysis, TextType

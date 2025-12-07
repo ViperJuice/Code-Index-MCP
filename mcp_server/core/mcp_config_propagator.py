@@ -12,8 +12,6 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from mcp_server.core.path_utils import PathUtils
-
 logger = logging.getLogger(__name__)
 
 

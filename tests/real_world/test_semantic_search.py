@@ -5,11 +5,9 @@ Tests semantic search capabilities with real codebases to validate dormant featu
 Requires SEMANTIC_SEARCH_ENABLED=true and proper Voyage AI + Qdrant configuration.
 """
 
-import asyncio
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List
 
 import pytest
 
@@ -43,7 +41,7 @@ class TestSemanticSearch:
         try:
             if hasattr(indexer, "qdrant") and indexer.qdrant:
                 indexer.qdrant.delete_collection("test-semantic")
-        except:
+        except Exception:
             pass
 
     def test_semantic_code_similarity(self, setup_semantic_indexer):
@@ -166,7 +164,7 @@ class SessionManager:
         for temp_path in indexed_files:
             try:
                 temp_path.unlink()
-            except:
+            except Exception:
                 pass
 
     @pytest.mark.performance
@@ -536,7 +534,7 @@ class TestSemanticSearchScaling:
         # Cleanup
         try:
             indexer.qdrant.delete_collection("test-large-semantic")
-        except:
+        except Exception:
             pass
 
     def test_semantic_search_accuracy_with_scale(self, setup_large_semantic_index):

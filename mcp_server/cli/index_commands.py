@@ -9,7 +9,6 @@ import asyncio
 import hashlib
 import json
 import logging
-import os
 import shutil
 import sqlite3
 import subprocess
@@ -18,7 +17,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from mcp_server.config.index_paths import IndexPathConfig
-from mcp_server.core.preflight_validator import PreFlightValidator
 from mcp_server.utils.index_discovery import IndexDiscovery
 
 logger = logging.getLogger(__name__)
@@ -58,7 +56,7 @@ class BaseIndexCommand:
             )
             url = result.stdout.strip()
             return hashlib.sha256(url.encode()).hexdigest()[:12]
-        except:
+        except Exception:
             # Fall back to path hash
             return hashlib.sha256(str(repo_path.absolute()).encode()).hexdigest()[:12]
 
@@ -296,7 +294,7 @@ class ValidateIndexCommand(BaseIndexCommand):
                     conn.close()
 
                     fixed.append("Ran database VACUUM")
-                except:
+                except Exception:
                     pass
 
         return fixed
@@ -591,17 +589,17 @@ class SyncIndexCommand(BaseIndexCommand):
                 if "added" in line:
                     try:
                         sync_stats["files_added"] = int(line.split()[0])
-                    except:
+                    except Exception:
                         pass
                 elif "updated" in line:
                     try:
                         sync_stats["files_updated"] = int(line.split()[0])
-                    except:
+                    except Exception:
                         pass
                 elif "removed" in line:
                     try:
                         sync_stats["files_removed"] = int(line.split()[0])
-                    except:
+                    except Exception:
                         pass
 
             sync_stats["duration_seconds"] = (datetime.now() - start_time).total_seconds()

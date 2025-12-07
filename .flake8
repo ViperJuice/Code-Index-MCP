@@ -1,37 +1,11 @@
 [flake8]
 max-line-length = 100
 extend-ignore =
-    # Ignore line too long (handled by black)
+    # Black compatibility - these are handled by black formatter
     E501,
-    # Ignore whitespace in blank lines (handled by black)
     W293,
     W291,
-    # Ignore module level import not at top of file (common in test fixtures)
-    E402,
-    # Ignore import but unused (some are kept for re-exports)
-    F401,
-    # Ignore whitespace before ':' (black compatibility)
     E203,
-    # Ignore f-string without placeholders (often intentional for future use)
-    F541,
-    # Ignore bare except (common in tests and error handling)
-    E722,
-    # Ignore comparison style (common patterns)
-    E712,
-    # Ignore 'not in' vs 'not x in' (style preference)
-    E713,
-    # Ignore type comparison warning (common in type dispatch code)
-    E721,
-    # Ignore invalid escape sequence (common in regex patterns)
-    W605,
-    # Ignore unused local variables (common in test setup/teardown)
-    F841,
-    # Ignore unused global declarations (common in async code)
-    F824,
-    # Ignore star imports (used in test aggregation)
-    F403,
-    # Ignore variable shadowing from import (common pattern)
-    F402,
 exclude =
     .git,
     __pycache__,
@@ -44,7 +18,12 @@ exclude =
     data,
     logs,
 per-file-ignores =
-    # Test files can have more relaxed rules (fixtures, imports from conftest, etc.)
-    tests/*:F811,F841,F821
-    # Init files often have unused imports for re-export
+    # Init files legitimately have unused imports for re-export
     */__init__.py:F401
+    # Test files have relaxed rules for:
+    # - F811: redefining fixtures
+    # - F821: undefined names (fixtures, conftest imports)
+    # - F841: unused variables (setup/teardown artifacts)
+    # - E402: imports after sys.path modification
+    # - W605: false positives on regex raw strings (pycodestyle bug)
+    tests/*:F811,F821,F841,E402,W605

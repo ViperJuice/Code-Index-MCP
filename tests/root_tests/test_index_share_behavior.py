@@ -5,7 +5,6 @@ import os
 import shutil
 import sqlite3
 import sys
-import tempfile
 from pathlib import Path
 
 # Test in a subdirectory of /app
@@ -96,7 +95,7 @@ class Application:
     print("\n📊 Indexing directory...")
     stats = dispatcher.index_directory(Path("."), recursive=True)
 
-    print(f"\nIndexing results:")
+    print("\nIndexing results:")
     print(f"  Total files: {stats['total_files']}")
     print(f"  Indexed files: {stats['indexed_files']}")
 
@@ -127,7 +126,7 @@ class Application:
     key_indexed = any("private.key" in f for f in indexed_files)
     node_indexed = any("node_modules" in f for f in indexed_files)
 
-    print(f"\n🔍 Local search capabilities:")
+    print("\n🔍 Local search capabilities:")
     print(f"   Can search .env files: {'✅ YES' if env_indexed else '❌ NO'}")
     print(f"   Can search .key files: {'✅ YES' if key_indexed else '❌ NO'}")
     print(f"   Can search node_modules: {'✅ YES' if node_indexed else '❌ NO'}")
@@ -141,7 +140,7 @@ class Application:
         print("   3. Keep filtering in secure_index_export.py")
 
     # Test export filtering
-    print(f"\n🔒 Testing secure export (simulation)...")
+    print("\n🔒 Testing secure export (simulation)...")
     exporter = SecureIndexExporter()
 
     # Simulate what would be excluded
@@ -157,14 +156,14 @@ class Application:
     # Also check files that WOULD be indexed if we indexed everything
     all_possible_files = [".env", "private.key", "app.py", "README.md", "node_modules/lodash.js"]
 
-    print(f"\n📦 Export simulation (if all files were indexed):")
+    print("\n📦 Export simulation (if all files were indexed):")
     for filename in all_possible_files:
         test_path = str(Path.cwd() / filename)
         would_exclude = exporter._should_exclude(test_path)
         status = "❌ EXCLUDE" if would_exclude else "✅ INCLUDE"
         print(f"   {status} {filename}")
 
-    print(f"\n🎯 Desired Behavior:")
+    print("\n🎯 Desired Behavior:")
     print("   1. ALL files indexed locally (including .env, secrets)")
     print("   2. Sensitive files filtered ONLY during export")
     print("   3. Developers can search everything locally")

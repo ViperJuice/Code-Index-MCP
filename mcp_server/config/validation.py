@@ -3,13 +3,10 @@ Configuration validation for production deployments.
 """
 
 import os
-import re
 import secrets
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 from urllib.parse import urlparse
-
-from mcp_server.core.path_utils import PathUtils
 
 from .environment import Environment, get_environment, is_production
 from .settings import Settings
@@ -18,13 +15,9 @@ from .settings import Settings
 class ConfigurationError(Exception):
     """Base configuration error."""
 
-    pass
-
 
 class SecurityConfigurationError(ConfigurationError):
     """Security-specific configuration error."""
-
-    pass
 
 
 def validate_security_config(settings: Settings) -> List[str]:
@@ -289,7 +282,7 @@ def validate_production_config(
 
     if total_issues > 0 and is_production():
         # Log summary for production
-        print(f"\n🔍 Configuration Validation Summary:")
+        print("\n🔍 Configuration Validation Summary:")
         print(f"Total issues found: {total_issues}")
 
         for category, issues in results.items():

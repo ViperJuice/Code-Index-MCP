@@ -1,13 +1,5 @@
 """Test cases for cross-document search functionality."""
 
-import json
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
-
-import pytest
-
-from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
-from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
 from tests.base_test import BaseDocumentTest
 
 

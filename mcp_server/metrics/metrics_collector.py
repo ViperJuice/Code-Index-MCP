@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Deque, Dict, List, Optional
 
-from . import IMetricsCollector, MetricPoint, MetricType
+from . import IMetricsCollector
 
 logger = logging.getLogger(__name__)
 

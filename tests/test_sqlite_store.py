@@ -18,8 +18,6 @@ import json
 import sqlite3
 import time
 from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Dict, List
 
 import pytest
 
@@ -665,7 +663,6 @@ class TestConcurrency:
     def test_concurrent_writes(self, sqlite_store):
         """Test concurrent write operations."""
         import concurrent.futures
-        import threading
 
         repo_id = sqlite_store.create_repository("/repo", "test")
 
@@ -726,16 +723,16 @@ class TestSQLiteStoreHealthCheck:
         health = store.health_check()
 
         assert health["status"] == "healthy"
-        assert health["fts5"] == True
-        assert health["wal"] == True
+        assert health["fts5"] is True
+        assert health["wal"] is True
         assert health["version"] >= 1
         assert health["error"] is None
         # Check all required tables exist
-        assert health["tables"]["file_moves"] == True
-        assert health["tables"]["files"] == True
-        assert health["tables"]["symbols"] == True
-        assert health["tables"]["repositories"] == True
-        assert health["tables"]["schema_version"] == True
+        assert health["tables"]["file_moves"] is True
+        assert health["tables"]["files"] is True
+        assert health["tables"]["symbols"] is True
+        assert health["tables"]["repositories"] is True
+        assert health["tables"]["schema_version"] is True
 
     def test_health_check_missing_tables(self, tmp_path):
         """Verify health check detects missing tables."""
@@ -760,7 +757,7 @@ class TestSQLiteStoreHealthCheck:
 
         health = store.health_check()
 
-        assert health["tables"]["file_moves"] == True
+        assert health["tables"]["file_moves"] is True
 
     def test_check_column_exists(self, tmp_path):
         """Test _check_column_exists helper."""
@@ -771,12 +768,12 @@ class TestSQLiteStoreHealthCheck:
         conn = sqlite3.connect(str(db_path))
 
         # Should return True for existing columns
-        assert store._check_column_exists(conn, "files", "path") == True
-        assert store._check_column_exists(conn, "files", "language") == True
-        assert store._check_column_exists(conn, "files", "relative_path") == True
+        assert store._check_column_exists(conn, "files", "path") is True
+        assert store._check_column_exists(conn, "files", "language") is True
+        assert store._check_column_exists(conn, "files", "relative_path") is True
 
         # Should return False for non-existing columns
-        assert store._check_column_exists(conn, "files", "nonexistent_column") == False
+        assert store._check_column_exists(conn, "files", "nonexistent_column") is False
 
         conn.close()
 
@@ -808,7 +805,7 @@ class TestSQLiteStoreHealthCheck:
 
         for table in core_tables:
             assert table in health["tables"], f"Table {table} not checked in health_check"
-            assert health["tables"][table] == True, f"Table {table} should exist in fresh database"
+            assert health["tables"][table] is True, f"Table {table} should exist in fresh database"
 
     def test_health_check_fts5_support(self, tmp_path):
         """Verify health check reports FTS5 support."""
@@ -818,7 +815,7 @@ class TestSQLiteStoreHealthCheck:
         health = store.health_check()
 
         # FTS5 should be available in modern SQLite
-        assert health["fts5"] == True
+        assert health["fts5"] is True
 
     def test_health_check_wal_mode(self, tmp_path):
         """Verify health check reports WAL mode."""
@@ -828,7 +825,7 @@ class TestSQLiteStoreHealthCheck:
         health = store.health_check()
 
         # WAL mode should be enabled by _init_database
-        assert health["wal"] == True
+        assert health["wal"] is True
 
     def test_health_check_schema_version(self, tmp_path):
         """Verify health check returns schema version."""

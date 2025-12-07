@@ -2,12 +2,10 @@
 """Test MCP server multi-language indexing with ignore patterns."""
 
 import asyncio
-import json
 import os
 import shutil
 import sqlite3
 import subprocess
-import tempfile
 from pathlib import Path
 
 

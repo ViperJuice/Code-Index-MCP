@@ -4,8 +4,7 @@ Provides detailed metrics for monitoring and alerting.
 """
 
 import logging
-import time
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict
 
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
@@ -14,10 +13,9 @@ from prometheus_client import (
     Gauge,
     Histogram,
     Info,
-    Summary,
     generate_latest,
 )
-from prometheus_client.core import CounterMetricFamily, GaugeMetricFamily
+from prometheus_client.core import GaugeMetricFamily
 
 logger = logging.getLogger(__name__)
 

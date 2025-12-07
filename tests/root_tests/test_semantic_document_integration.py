@@ -3,25 +3,19 @@
 import hashlib
 import logging
 import os
-import shutil
-import tempfile
 import time
-from pathlib import Path
-from typing import Any, Dict, List
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 
-from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from mcp_server.document_processing.document_interfaces import (
     ChunkMetadata,
     ChunkType,
     DocumentChunk,
 )
 from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
-from mcp_server.storage.sqlite_store import SQLiteStore
-from mcp_server.utils.semantic_indexer import DocumentSection, SemanticIndexer
+from mcp_server.utils.semantic_indexer import SemanticIndexer
 from tests.base_test import BaseDocumentTest
 
 logger = logging.getLogger(__name__)

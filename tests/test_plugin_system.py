@@ -1,14 +1,11 @@
 """Tests for the plugin system."""
 
 import json
-import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import patch
 
 import pytest
-import yaml
 
-from mcp_server.interfaces.shared_interfaces import Error, Result
 from mcp_server.plugin_base import IPlugin
 from mcp_server.plugin_system import (
     PluginConfig,
@@ -202,12 +199,12 @@ class Plugin:
 
         result = discovery.validate_plugin_safe(plugin_dir)
         assert result.success
-        assert result.value == True
+        assert result.value is True
 
         # Invalid plugin
         result = discovery.validate_plugin_safe(tmp_path / "nonexistent")
         assert result.success  # Validation succeeds, but result is False
-        assert result.value == False
+        assert result.value is False
 
 
 class TestPluginLoader:
@@ -406,7 +403,7 @@ class TestPluginRegistry:
         assert status["symbol"] == "Test Plugin"
         assert status["version"] == "1.0.0"
         assert status["description"] == "Test Plugin Description"
-        assert status["is_registered"] == True
+        assert status["is_registered"] is True
 
         all_statuses = registry.get_all_plugin_statuses()
         assert "Test Plugin" in all_statuses
@@ -761,10 +758,10 @@ environments:
 
         assert plugin_status["basic_info"]["name"] == "Test Plugin"
         assert plugin_status["runtime_info"]["state"] == "started"
-        assert plugin_status["runtime_info"]["is_healthy"] == True
+        assert plugin_status["runtime_info"]["is_healthy"] is True
         assert plugin_status["runtime_info"]["load_time"] == 0.5
         assert plugin_status["config"]["dependencies"] == ["dep1"]
-        assert plugin_status["config"]["health_check"]["enabled"] == True
+        assert plugin_status["config"]["health_check"]["enabled"] is True
 
     def test_plugin_queries_by_attributes(self):
         """Test querying plugins by various attributes."""

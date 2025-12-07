@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import logging
-import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 from tree_sitter import Node
 
@@ -650,7 +649,6 @@ class TypeAnnotationExtractor:
 
     def __init__(self):
         """Initialize the type annotation extractor."""
-        pass
 
     def extract_type_annotation(self, node: Node, content: str) -> Optional[str]:
         """Extract type annotation from a node."""

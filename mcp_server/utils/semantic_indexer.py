@@ -89,7 +89,7 @@ class SemanticIndexer:
             # Let voyageai.Client() look for VOYAGE_API_KEY environment variable
             try:
                 self.voyage = voyageai.Client()
-            except Exception as e:
+            except Exception:
                 raise RuntimeError(
                     "Semantic search requires Voyage AI API key. "
                     "Configure it using one of these methods:\n"
@@ -308,7 +308,7 @@ class SemanticIndexer:
         try:
             with open(self.metadata_file, "w") as f:
                 json.dump(metadata, f, indent=2)
-        except Exception as e:
+        except Exception:
             # Don't fail if metadata can't be written
             pass
 

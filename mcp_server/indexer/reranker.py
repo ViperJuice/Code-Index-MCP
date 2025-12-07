@@ -11,11 +11,8 @@ import os
 
 # Define interfaces inline for now
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from dataclasses import dataclass as dc
-from typing import Any, Dict, List, Optional, Protocol, Tuple
-
-import numpy as np
+from typing import Any, Dict, List, Optional
 
 
 # Define SearchResult inline
@@ -71,8 +68,6 @@ class IRerankerFactory(ABC):
 
 class MCPError(Exception):
     """Base exception for MCP errors."""
-
-    pass
 
 
 # Simple Result class for this module

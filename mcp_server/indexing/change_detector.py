@@ -5,11 +5,10 @@ and determining what needs to be reindexed.
 """
 
 import logging
-import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Set, Tuple
+from typing import List, Optional, Set
 
 from ..plugins.language_registry import get_all_extensions
 

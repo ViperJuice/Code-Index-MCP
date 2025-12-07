@@ -6,7 +6,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-import shutil
 import tempfile
 
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
@@ -84,25 +83,25 @@ def test_multi_language_indexing():
         stats = dispatcher.index_directory(test_dir, recursive=True)
 
         # Display results
-        print(f"\nIndexing Results:")
+        print("\nIndexing Results:")
         print(f"  Total files found: {stats['total_files']}")
         print(f"  Files indexed: {stats['indexed_files']}")
         print(f"  Files ignored: {stats['ignored_files']}")
         print(f"  Failed files: {stats['failed_files']}")
 
-        print(f"\nLanguage Breakdown:")
+        print("\nLanguage Breakdown:")
         for lang, count in sorted(stats["by_language"].items()):
             print(f"  {lang}: {count} files")
 
         # Verify sensitive files were ignored
-        print(f"\n✅ Security Check:")
+        print("\n✅ Security Check:")
         if stats["ignored_files"] >= 3:  # .env, secrets.txt, __pycache__/test.pyc
             print(f"  Sensitive files properly ignored: {stats['ignored_files']} files")
         else:
             print(f"  ❌ Warning: Expected at least 3 ignored files, got {stats['ignored_files']}")
 
         # Verify multi-language support
-        print(f"\n✅ Language Support Check:")
+        print("\n✅ Language Support Check:")
         expected_languages = {
             "python",
             "javascript",
@@ -136,7 +135,7 @@ def test_multi_language_indexing():
         from mcp_server.plugins.language_registry import get_all_extensions
 
         all_extensions = get_all_extensions()
-        print(f"\n✅ Extension Support:")
+        print("\n✅ Extension Support:")
         print(f"  Total supported extensions: {len(all_extensions)}")
         print(f"  Sample extensions: {list(all_extensions)[:10]}...")
 

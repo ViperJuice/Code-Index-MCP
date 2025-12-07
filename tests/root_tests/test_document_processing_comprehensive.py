@@ -140,7 +140,7 @@ For more information, visit our [developer portal](https://developers.example.co
         plugin = PluginFactory.create_plugin("markdown")
         result = plugin.indexFile(temp_path, test_content)
 
-        print(f"✓ Indexed Markdown file successfully")
+        print("✓ Indexed Markdown file successfully")
         print(f"  - Symbols found: {len(result.get('symbols', []))}")
         print(f"  - Language: {result.get('language', 'N/A')}")
 
@@ -221,14 +221,14 @@ This architecture provides a robust foundation for our services. Regular reviews
         plugin = PluginFactory.create_plugin("plaintext")
         result = plugin.indexFile(temp_path, test_content)
 
-        print(f"✓ Indexed Plain Text file successfully")
+        print("✓ Indexed Plain Text file successfully")
         print(f"  - Symbols found: {len(result.get('symbols', []))}")
         print(f"  - Language: {result.get('language', 'N/A')}")
 
         # Check if content was processed
         if result.get("symbols"):
             symbol = result["symbols"][0]
-            print(f"\n  Document Summary:")
+            print("\n  Document Summary:")
             print(f"    Title: {symbol.get('symbol', 'N/A')}")
             print(f"    Type: {symbol.get('kind', 'N/A')}")
 

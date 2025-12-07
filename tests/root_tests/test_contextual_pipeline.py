@@ -6,9 +6,7 @@ Tests the complete flow from adaptive chunking through reranking.
 
 import asyncio
 import os
-import time
 from pathlib import Path
-from typing import Any, Dict, List
 
 # Set test environment
 os.environ["VOYAGE_AI_API_KEY"] = "test-key"
@@ -237,7 +235,7 @@ async def test_contextual_pipeline():
     print("\n6. Performance Metrics:")
     print(f"  Chunks generated: {len(chunks)}")
     print(f"  BM25 documents: {bm25_indexer.get_stats()['document_count']}")
-    print(f"  Search modes available: auto, hybrid, bm25, semantic, fuzzy")
+    print("  Search modes available: auto, hybrid, bm25, semantic, fuzzy")
     print(f"  Reranking enabled: {settings.reranking.enabled}")
 
     print("\n✓ All pipeline components working correctly!")

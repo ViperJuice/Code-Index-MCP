@@ -5,13 +5,11 @@ and synchronize with git commits.
 """
 
 import logging
-import os
 import subprocess
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, Optional
 
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
@@ -19,9 +17,8 @@ from watchdog.observers import Observer
 from .artifacts.commit_artifacts import CommitArtifactManager
 from .dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from .storage.git_index_manager import GitAwareIndexManager
-from .storage.multi_repo_manager import RepositoryInfo
 from .storage.repository_registry import RepositoryRegistry
-from .watcher import FileWatcher, _Handler
+from .watcher import _Handler
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +99,7 @@ class GitMonitor:
                 check=True,
             )
             return result.stdout.strip()
-        except:
+        except Exception:
             return None
 
 
@@ -271,7 +268,7 @@ class MultiRepositoryWatcher:
         self.changed_repos.discard(repo_id)
 
         # Submit index sync task
-        future = self.executor.submit(self._sync_repository, repo_id, commit)
+        _ = self.executor.submit(self._sync_repository, repo_id, commit)
 
     def _sync_repository(self, repo_id: str, commit: str):
         """Sync repository index with new commit.

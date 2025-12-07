@@ -3,7 +3,7 @@
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set
 
 from mcp_server.plugins.specialized_plugin_base import IImportResolver, ImportInfo
 
@@ -46,7 +46,7 @@ class JavaImportResolver(IImportResolver):
         """Recursively scan directory for Java files."""
         for java_file in directory.rglob("*.java"):
             relative_path = java_file.relative_to(src_root)
-            package_parts = list(relative_path.parts[:-1])
+            _ = list(relative_path.parts[:-1])
 
             # Extract package from file
             try:
@@ -73,7 +73,7 @@ class JavaImportResolver(IImportResolver):
             tree = javalang.parse.parse(content)
             if tree.package:
                 return tree.package.name
-        except:
+        except Exception:
             # Fallback to regex
             import re
 
@@ -95,7 +95,7 @@ class JavaImportResolver(IImportResolver):
                 classes.append(node.name)
             for _, node in tree.filter(javalang.tree.EnumDeclaration):
                 classes.append(node.name)
-        except:
+        except Exception:
             # Fallback to regex
             import re
 

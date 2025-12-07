@@ -1,6 +1,5 @@
 """Tests for the C++ language plugin."""
 
-import shutil
 import tempfile
 from pathlib import Path
 

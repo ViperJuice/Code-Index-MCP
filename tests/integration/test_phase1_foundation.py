@@ -2,7 +2,6 @@
 
 import sqlite3
 import time
-from pathlib import Path
 
 import pytest
 
@@ -20,11 +19,11 @@ class TestPhase1Foundation:
         health = store.health_check()
 
         assert health["status"] == "healthy"
-        assert health["tables"]["file_moves"] == True
-        assert health["tables"]["files"] == True
-        assert health["tables"]["symbols"] == True
-        assert health["fts5"] == True
-        assert health["wal"] == True
+        assert health["tables"]["file_moves"] is True
+        assert health["tables"]["files"] is True
+        assert health["tables"]["symbols"] is True
+        assert health["fts5"] is True
+        assert health["wal"] is True
 
     def test_bm25_fallback_multiple_schemas(self, tmp_path):
         """Verify BM25 works with different table schemas."""

@@ -3,8 +3,6 @@
 Summary of the implemented contextual embeddings pipeline.
 """
 
-import os
-
 
 def print_summary():
     """Print a comprehensive summary of what was implemented."""

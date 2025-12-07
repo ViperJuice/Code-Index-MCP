@@ -175,7 +175,7 @@ class TokenCounter:
             return "No tokens counted yet."
 
         lines = [
-            f"Token Usage Summary:",
+            "Token Usage Summary:",
             f"  Input tokens: {self.input_tokens:,}",
             f"  Output tokens: {self.output_tokens:,}",
             f"  Total tokens: {self.input_tokens + self.output_tokens:,}",

@@ -1,18 +1,17 @@
 """Tests for multi-repository support and smart plugin loading."""
 
 import asyncio
-import hashlib
 import os
 import sqlite3
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
 from mcp_server.plugins.memory_aware_manager import MemoryAwarePluginManager, PluginInfo
 from mcp_server.plugins.repository_plugin_loader import RepositoryAwarePluginLoader
-from mcp_server.storage.multi_repo_manager import MultiRepoIndexManager, RepositoryInfo
+from mcp_server.storage.multi_repo_manager import MultiRepoIndexManager
 from mcp_server.storage.sqlite_store import SQLiteStore
 
 

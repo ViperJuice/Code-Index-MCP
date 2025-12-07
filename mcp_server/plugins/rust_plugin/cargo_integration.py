@@ -7,7 +7,6 @@ try:
 except ImportError:
     HAS_TOML = False
 
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
@@ -324,7 +323,7 @@ class CargoIntegration:
     def _parse_toml_basic(self, content: str) -> Dict[str, Any]:
         """Basic TOML parser fallback when toml library is not available."""
         data = {}
-        current_section = None
+        _ = None
         current_table = data
 
         for line in content.split("\n"):
@@ -353,7 +352,7 @@ class CargoIntegration:
                     if section_name not in data:
                         data[section_name] = {}
                     current_table = data[section_name]
-                current_section = section_name
+                _ = section_name
                 continue
 
             # Handle key-value pairs

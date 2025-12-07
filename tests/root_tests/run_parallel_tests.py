@@ -14,10 +14,9 @@ import os
 import subprocess
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 
 @dataclass
@@ -462,7 +461,7 @@ class ParallelTestRunner:
         )
         print(f"⚡ Parallel Efficiency: {summary['parallel_efficiency']:.2f}x speedup")
 
-        print(f"\n📈 Phase Results:")
+        print("\n📈 Phase Results:")
         for phase_name, phase_data in report["phases_summary"].items():
             status_emoji = "✅" if phase_data["failed_groups"] == 0 else "❌"
             print(
@@ -485,7 +484,7 @@ class ParallelTestRunner:
         else:
             print("  🔴 Significant issues detected. Address failures before proceeding.")
 
-        print(f"\n📄 Detailed results saved to: test_results/parallel_test_report.json")
+        print("\n📄 Detailed results saved to: test_results/parallel_test_report.json")
 
 
 def setup_test_environment():

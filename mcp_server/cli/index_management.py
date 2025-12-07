@@ -8,7 +8,6 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Optional
 
 import click
 
@@ -16,8 +15,8 @@ import click
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from mcp_server.storage.sqlite_store import SQLiteStore
-from mcp_server.utils import get_semantic_indexer
+from mcp_server.storage.sqlite_store import SQLiteStore  # noqa: E402
+from mcp_server.utils import get_semantic_indexer  # noqa: E402
 
 
 def _get_semantic_indexer_instance():
@@ -34,7 +33,6 @@ def _get_semantic_indexer_instance():
 @click.group()
 def index():
     """Index management commands."""
-    pass
 
 
 @index.command()
@@ -188,7 +186,7 @@ def rebuild(force: bool, sqlite_only: bool, vector_only: bool, sample_size: int)
                 os.remove("code_index.db")
 
             # Create new SQLite index
-            store = SQLiteStore("code_index.db")
+            _ = SQLiteStore("code_index.db")
             click.echo("✅ SQLite index schema created")
 
             # TODO: Add actual file indexing here when dispatcher is available
@@ -225,7 +223,7 @@ def status():
                 # Get database size
                 db_size = os.path.getsize(sqlite_path) / (1024 * 1024)  # MB
 
-                click.echo(f"SQLite Index:")
+                click.echo("SQLite Index:")
                 click.echo(f"  📁 Files indexed: {file_count:,}")
                 click.echo(f"  🔍 Symbols found: {symbol_count:,}")
                 click.echo(f"  💾 Database size: {db_size:.1f} MB")
@@ -253,18 +251,18 @@ def status():
                 try:
                     collections = indexer.qdrant.get_collections()
                     collection_count = len(collections.collections)
-                    click.echo(f"Vector Index:")
+                    click.echo("Vector Index:")
                     click.echo(f"  🧠 Collections: {collection_count}")
                     click.echo(f"  💾 Storage size: {vector_size:.1f} MB")
                 except Exception:
-                    click.echo(f"Vector Index:")
+                    click.echo("Vector Index:")
                     click.echo(f"  💾 Storage size: {vector_size:.1f} MB")
-                    click.echo(f"  ⚠️ Could not read collection info")
+                    click.echo("  ⚠️ Could not read collection info")
             else:
-                click.echo(f"Vector Index:")
+                click.echo("Vector Index:")
                 click.echo(f"  💾 Storage size: {vector_size:.1f} MB")
                 click.echo(
-                    f"  ⚠️ Semantic deps not installed - install with: pip install code-index-mcp[semantic]"
+                    "  ⚠️ Semantic deps not installed - install with: pip install code-index-mcp[semantic]"
                 )
 
         except Exception as e:
@@ -279,7 +277,7 @@ def status():
             with open(metadata_path, "r") as f:
                 metadata = json.load(f)
 
-            click.echo(f"Metadata:")
+            click.echo("Metadata:")
             click.echo(f"  🤖 Embedding model: {metadata.get('embedding_model', 'unknown')}")
             click.echo(f"  📅 Created: {metadata.get('created_at', 'unknown')}")
             click.echo(f"  🔗 Git commit: {metadata.get('git_commit', 'unknown')[:8]}...")
@@ -309,19 +307,19 @@ def backup(backup_dir: str):
     if os.path.exists("code_index.db"):
         shutil.copy2("code_index.db", f"{backup_dir}/code_index.db")
         files_backed_up += 1
-        click.echo(f"📦 Backed up SQLite index")
+        click.echo("📦 Backed up SQLite index")
 
     # Backup vector index
     if os.path.exists("vector_index.qdrant"):
         shutil.copytree("vector_index.qdrant", f"{backup_dir}/vector_index.qdrant")
         files_backed_up += 1
-        click.echo(f"📦 Backed up vector index")
+        click.echo("📦 Backed up vector index")
 
     # Backup metadata
     if os.path.exists(".index_metadata.json"):
         shutil.copy2(".index_metadata.json", f"{backup_dir}/.index_metadata.json")
         files_backed_up += 1
-        click.echo(f"📦 Backed up metadata")
+        click.echo("📦 Backed up metadata")
 
     if files_backed_up > 0:
         click.echo(f"✅ Backup completed: {backup_dir} ({files_backed_up} items)")
@@ -402,7 +400,7 @@ def check_semantic():
     # Check .env file
     env_file = Path(".env")
     if env_file.exists():
-        click.echo(f"\n📄 .env file: ✅ Found")
+        click.echo("\n📄 .env file: ✅ Found")
         try:
             with open(env_file, "r") as f:
                 content = f.read()
@@ -413,14 +411,14 @@ def check_semantic():
         except Exception as e:
             click.echo(f"    ⚠️ Could not read .env file: {e}")
     else:
-        click.echo(f"\n📄 .env file: ❌ Not found")
+        click.echo("\n📄 .env file: ❌ Not found")
 
     # Check .mcp.json configurations
-    mcp_json = Path(".mcp.json")
+    _ = Path(".mcp.json")
     mcp_local_json = Path(".mcp.local.json")
 
     if mcp_local_json.exists():
-        click.echo(f"\n📄 .mcp.local.json: ✅ Found")
+        click.echo("\n📄 .mcp.local.json: ✅ Found")
         try:
             with open(mcp_local_json, "r") as f:
                 config = json.load(f)
@@ -444,7 +442,7 @@ def check_semantic():
             # Try a simple embedding
             result = client.embed(["test"], model="voyage-code-3", input_type="document")
             click.echo("  ✅ Successfully connected to Voyage AI")
-            click.echo(f"  ✅ Model: voyage-code-3")
+            click.echo("  ✅ Model: voyage-code-3")
             click.echo(f"  ✅ Embedding dimension: {len(result.embeddings[0])}")
         except ImportError:
             click.echo("  ❌ voyageai package not installed")

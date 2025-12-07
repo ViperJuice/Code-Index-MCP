@@ -1,13 +1,7 @@
 """Test cases for natural language query processing."""
 
-import json
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import patch
 
-import pytest
-
-from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
-from mcp_server.document_processing.semantic_chunker import SemanticChunker
 from tests.base_test import BaseDocumentTest
 
 

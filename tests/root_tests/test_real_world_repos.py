@@ -9,7 +9,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -164,7 +164,7 @@ async def test_repository_indexing(repo_info: Dict, repo_path: Path) -> Dict:
         indexing_time = time.time() - start_time
 
         # Test symbol search
-        print(f"   Testing symbol search...")
+        print("   Testing symbol search...")
         search_results = {}
 
         for symbol in repo_info["expected_symbols"]:
@@ -176,7 +176,7 @@ async def test_repository_indexing(repo_info: Dict, repo_path: Path) -> Dict:
                 print(f"     ✗ '{symbol}': no results")
 
         # Test semantic search
-        print(f"   Testing semantic search...")
+        print("   Testing semantic search...")
         semantic_queries = [
             "data processing",
             "error handling",
@@ -218,7 +218,7 @@ async def test_repository_indexing(repo_info: Dict, repo_path: Path) -> Dict:
 
 async def test_cross_language_search(repo_paths: Dict[str, Path]) -> Dict:
     """Test search across multiple languages."""
-    print(f"\n--- Testing Cross-Language Search ---")
+    print("\n--- Testing Cross-Language Search ---")
 
     dispatcher = mcp_server_cli.dispatcher
     if not dispatcher:
@@ -293,20 +293,20 @@ async def run_comprehensive_test():
         total_files_indexed = sum(r.get("files_indexed", 0) for r in repo_results.values())
         total_indexing_time = sum(r.get("indexing_time", 0) for r in repo_results.values())
 
-        print(f"\nRepository Testing:")
+        print("\nRepository Testing:")
         print(f"  ✓ Repositories tested: {successful_repos}/{len(TEST_REPOSITORIES)}")
         print(f"  ✓ Total files indexed: {total_files_indexed}")
         print(f"  ✓ Total indexing time: {total_indexing_time:.2f}s")
         print(f"  ✓ Average time per file: {total_indexing_time/max(total_files_indexed,1):.3f}s")
 
-        print(f"\nLanguage Coverage:")
+        print("\nLanguage Coverage:")
         all_languages = set()
         for result in repo_results.values():
             all_languages.update(result.get("languages", []))
         print(f"  ✓ Languages active: {len(all_languages)}")
         print(f"  ✓ Languages: {', '.join(sorted(all_languages))}")
 
-        print(f"\nSearch Performance:")
+        print("\nSearch Performance:")
         total_symbol_results = 0
         total_semantic_results = 0
 
@@ -321,7 +321,7 @@ async def run_comprehensive_test():
         print(f"  ✓ Cross-language search results: {cross_lang_total}")
 
         # Detailed results
-        print(f"\nDetailed Results by Repository:")
+        print("\nDetailed Results by Repository:")
         for lang, result in repo_results.items():
             if result.get("success"):
                 print(f"  {lang.upper()}:")
@@ -354,7 +354,7 @@ async def run_comprehensive_test():
 
     finally:
         # Cleanup
-        print(f"\n4. Cleaning up...")
+        print("\n4. Cleaning up...")
         if temp_dir.exists():
             shutil.rmtree(temp_dir)
             print(f"   ✓ Removed {temp_dir}")
@@ -366,12 +366,12 @@ async def main():
         success, results = await run_comprehensive_test()
 
         if success:
-            print(f"\n🎉 Comprehensive test PASSED!")
-            print(f"The MCP server successfully handles real-world repositories")
-            print(f"with 48-language support, embedding generation, and semantic search!")
+            print("\n🎉 Comprehensive test PASSED!")
+            print("The MCP server successfully handles real-world repositories")
+            print("with 48-language support, embedding generation, and semantic search!")
         else:
-            print(f"\n⚠️ Comprehensive test needs attention")
-            print(f"Some features may need optimization for production use")
+            print("\n⚠️ Comprehensive test needs attention")
+            print("Some features may need optimization for production use")
 
         # Save detailed results
         results_file = Path("test_results.json")

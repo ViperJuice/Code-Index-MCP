@@ -1,14 +1,11 @@
 """Test cases for document error recovery and graceful degradation."""
 
-import os
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from mcp_server.core.errors import MCPError
-from mcp_server.document_processing.base_document_plugin import BaseDocumentPlugin
 from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
 from mcp_server.plugins.plaintext_plugin.plugin import PlainTextPlugin
 from mcp_server.storage.sqlite_store import SQLiteStore
@@ -288,7 +285,6 @@ Content continues...
     def test_plugin_fallback_mechanism(self, tmp_path):
         """Test fallback to generic processing when specific plugin fails."""
         from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
-        from mcp_server.plugins.plugin_factory import PluginFactory
 
         # Create a file that might cause plugin issues
         problem_file = tmp_path / "problem.xyz"  # Unknown extension

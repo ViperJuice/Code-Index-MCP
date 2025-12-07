@@ -4,7 +4,7 @@ Section extractor for hierarchical document structure extraction.
 
 import logging
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +132,7 @@ class SectionExtractor:
 
     def get_section_path(self, sections: List[Dict[str, Any]], target_id: str) -> List[str]:
         """Get the path to a section (list of parent section titles)."""
-        path = []
+        _ = []
 
         def find_path(
             section_list: List[Dict[str, Any]], current_path: List[str]

@@ -5,22 +5,17 @@ This module provides unified search capabilities across multiple repositories,
 with intelligent result aggregation, deduplication, and ranking.
 """
 
-import asyncio
 import hashlib
 import logging
-import os
 import time
-from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set
 
 # Temporarily remove dependencies until imports are fixed
 # from mcp_server.plugins.memory_aware_manager import get_memory_aware_manager
 # from mcp_server.plugins.repository_plugin_loader import RepositoryPluginLoader
-from mcp_server.core.errors import MCPError
 from mcp_server.storage.multi_repo_manager import (
     CrossRepoSearchResult,
     MultiRepositoryManager,
@@ -219,7 +214,7 @@ class CrossRepositorySearchCoordinator:
         self, symbol: str, repositories: List[RepositoryInfo], scope: SearchScope
     ) -> List[CrossRepoSearchResult]:
         """Execute symbol searches across repositories in parallel."""
-        search_tasks = []
+        _ = []
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = []

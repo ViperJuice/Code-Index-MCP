@@ -12,9 +12,7 @@ Designed to run in under 5 minutes for rapid feedback.
 
 import asyncio
 import json
-import os
 import subprocess
-import sys
 import time
 from collections import defaultdict
 from datetime import datetime
@@ -239,13 +237,13 @@ class QuickBenchmark:
 
         # Indexing summary
         if "indexing" in self.results:
-            print(f"\nIndexing:")
+            print("\nIndexing:")
             print(f"  Files indexed: {self.results['indexing'].get('files_indexed', 0)}")
             print(f"  Index time: {self.results['indexing'].get('index_time', 0):.2f}s")
 
         # Symbol search summary
         if "symbol_search" in self.results:
-            print(f"\nSymbol Search Performance:")
+            print("\nSymbol Search Performance:")
             total_mcp_time = sum(r["mcp_time"] for r in self.results["symbol_search"])
             total_rg_time = sum(r["rg_time"] for r in self.results["symbol_search"])
             total_tokens = sum(r["mcp_tokens"] for r in self.results["symbol_search"])
@@ -257,7 +255,7 @@ class QuickBenchmark:
 
         # Pattern search summary
         if "pattern_search" in self.results:
-            print(f"\nPattern Search Performance:")
+            print("\nPattern Search Performance:")
             total_mcp_time = sum(r["mcp_time"] for r in self.results["pattern_search"])
             total_rg_time = sum(r["rg_time"] for r in self.results["pattern_search"])
             total_grep_time = sum(r["grep_time"] for r in self.results["pattern_search"])

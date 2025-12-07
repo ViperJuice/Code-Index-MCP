@@ -5,7 +5,6 @@ import json
 import os
 import shutil
 import sys
-import tempfile
 from pathlib import Path
 
 # Work in app directory
@@ -171,7 +170,7 @@ node_modules/
     export_db = "export_index.db"
     included, excluded = exporter.create_filtered_database("local_index.db", export_db)
 
-    print(f"\n📦 Export statistics:")
+    print("\n📦 Export statistics:")
     print(f"   Files included: {included}")
     print(f"   Files excluded: {excluded}")
 
@@ -179,7 +178,7 @@ node_modules/
     audit_path = Path("export_audit.json")
     audit = exporter.create_audit_log("local_index.db", str(audit_path))
 
-    print(f"\n📋 Security audit:")
+    print("\n📋 Security audit:")
     print(f"   Total files analyzed: {audit['total_files']}")
     print(f"   Excluded patterns used: {len(audit['patterns_used'])}")
     print(f"   Sensitive files excluded: {len(audit['excluded_files'])}")
@@ -223,7 +222,7 @@ node_modules/
     print(
         f"✅ Export safety: {'Passed - no secrets leaked' if all_safe else 'FAILED - secrets found!'}"
     )
-    print(f"✅ Behavior: Index everything locally, filter on share")
+    print("✅ Behavior: Index everything locally, filter on share")
 
     # Cleanup
     os.chdir("/app")

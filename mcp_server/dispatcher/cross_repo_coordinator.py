@@ -5,18 +5,14 @@ This module coordinates search operations across multiple repositories,
 providing intelligent result ranking, deduplication, and aggregation.
 """
 
-import asyncio
 import hashlib
 import logging
-import os
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-from mcp_server.indexer.bm25_indexer import BM25Indexer
 from mcp_server.indexer.reranker import Reranker
 from mcp_server.plugins.repository_plugin_loader import get_repository_plugin_loader
 from mcp_server.storage.multi_repo_manager import (

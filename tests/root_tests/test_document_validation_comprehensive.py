@@ -7,8 +7,6 @@ Tests both Markdown and PlainText plugins for production readiness.
 import os
 import tempfile
 import time
-from pathlib import Path
-from typing import Any, Dict, List
 
 import psutil
 import pytest

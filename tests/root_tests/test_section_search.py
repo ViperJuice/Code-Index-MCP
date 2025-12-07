@@ -8,10 +8,7 @@ that understand document structure context.
 
 # Import system components
 import sys
-import tempfile
 from collections import defaultdict
-from pathlib import Path
-from typing import Dict, List, Tuple
 
 import pytest
 
@@ -19,7 +16,6 @@ sys.path.insert(0, "/app")
 
 from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
 from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
-from mcp_server.plugins.markdown_plugin.section_extractor import SectionExtractor
 from mcp_server.storage.sqlite_store import SQLiteStore
 from tests.base_test import BaseDocumentTest
 

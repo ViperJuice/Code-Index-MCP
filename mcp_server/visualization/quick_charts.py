@@ -1,7 +1,6 @@
 """Quick chart generation for MCP server metrics visualization."""
 
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -314,8 +313,8 @@ class QuickCharts:
         width = 0.6
 
         # Create stacked bars
-        p1 = plt.bar(x, input_tokens, width, label="Input Tokens", color="#4ECDC4")
-        p2 = plt.bar(
+        _ = plt.bar(x, input_tokens, width, label="Input Tokens", color="#4ECDC4")
+        _ = plt.bar(
             x, output_tokens, width, bottom=input_tokens, label="Output Tokens", color="#FF6B6B"
         )
 

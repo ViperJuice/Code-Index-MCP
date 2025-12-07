@@ -5,12 +5,11 @@ This test suite ensures that all metadata (file paths, line numbers, columns, sn
 match types, and context) is preserved correctly during reranking operations.
 """
 
-import asyncio
 import os
 
 # Import the reranker module and its classes
 import sys
-from typing import Any, Dict, List
+from typing import List
 from unittest.mock import AsyncMock, Mock, patch
 
 import numpy as np

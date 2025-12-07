@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Test that ALL files are indexed locally but filtered on export."""
 
-import shutil
 import sqlite3
 import tempfile
 from pathlib import Path
@@ -87,7 +86,7 @@ class Application:
         print("\n📊 Indexing directory...")
         stats = dispatcher.index_directory(root, recursive=True)
 
-        print(f"\nIndexing results:")
+        print("\nIndexing results:")
         print(f"  Total files: {stats['total_files']}")
         print(f"  Indexed files: {stats['indexed_files']}")
         print(f"  Ignored files: {stats['ignored_files']}")  # Should be 0 now!
@@ -99,7 +98,7 @@ class Application:
         cursor.execute("SELECT path FROM files ORDER BY path")
         indexed_files = [row[0] for row in cursor.fetchall()]
 
-        print(f"\n📋 Files in local index:")
+        print("\n📋 Files in local index:")
         for f in indexed_files:
             relative_path = Path(f).relative_to(root)
             is_sensitive = any(
@@ -113,13 +112,13 @@ class Application:
         key_indexed = any("private.key" in f for f in indexed_files)
         node_indexed = any("node_modules" in f for f in indexed_files)
 
-        print(f"\n🔍 Local search capabilities:")
+        print("\n🔍 Local search capabilities:")
         print(f"   Can search .env files: {'✅ YES' if env_indexed else '❌ NO'}")
         print(f"   Can search .key files: {'✅ YES' if key_indexed else '❌ NO'}")
         print(f"   Can search node_modules: {'✅ YES' if node_indexed else '❌ NO'}")
 
         # Test searching for secrets
-        print(f"\n🔎 Testing local search for secrets...")
+        print("\n🔎 Testing local search for secrets...")
         results = list(dispatcher.search("API_KEY", limit=10))
         if results:
             print(f"   ✅ Found {len(results)} results for 'API_KEY'")
@@ -129,7 +128,7 @@ class Application:
             print("   ❌ No results for 'API_KEY' (should find it!)")
 
         # Now test export filtering
-        print(f"\n🔒 Testing secure export...")
+        print("\n🔒 Testing secure export...")
 
         # Create export
         export_db = root / "export_index.db"
@@ -145,7 +144,7 @@ class Application:
         # Create filtered export
         included, excluded = exporter.create_filtered_database(str(db_path), str(export_db))
 
-        print(f"\n📦 Export results:")
+        print("\n📦 Export results:")
         print(f"   Files included: {included}")
         print(f"   Files excluded: {excluded}")
 
@@ -156,7 +155,7 @@ class Application:
         export_cursor.execute("SELECT path FROM files ORDER BY path")
         exported_files = [row[0] for row in export_cursor.fetchall()]
 
-        print(f"\n📋 Files in exported index:")
+        print("\n📋 Files in exported index:")
         for f in exported_files:
             relative_path = Path(f).relative_to(root)
             print(f"   ✅ {relative_path}")
@@ -166,13 +165,13 @@ class Application:
         key_exported = any("private.key" in f for f in exported_files)
         node_exported = any("node_modules" in f for f in exported_files)
 
-        print(f"\n🔐 Security verification:")
+        print("\n🔐 Security verification:")
         print(f"   .env in export: {'❌ FAIL' if env_exported else '✅ NO (correct)'}")
         print(f"   .key in export: {'❌ FAIL' if key_exported else '✅ NO (correct)'}")
         print(f"   node_modules in export: {'❌ FAIL' if node_exported else '✅ NO (correct)'}")
 
         # Summary
-        print(f"\n" + "=" * 60)
+        print("\n" + "=" * 60)
         print("SUMMARY:")
 
         all_indexed = env_indexed and key_indexed and node_indexed

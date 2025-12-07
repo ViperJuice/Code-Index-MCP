@@ -192,7 +192,7 @@ def test_go_plugin():
             for dep in module_info["dependencies"]:
                 print(f"     - {dep['module']} {dep['version']}")
             if module_info["replacements"]:
-                print(f"   Replacements:")
+                print("   Replacements:")
                 for old, new in module_info["replacements"].items():
                     print(f"     - {old} => {new}")
 

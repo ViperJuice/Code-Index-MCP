@@ -10,12 +10,10 @@ This test validates:
 5. End-to-end document processing workflow
 """
 
-import os
 import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict, List
 
 # Add the project root to the path
 project_root = Path(__file__).parent
@@ -447,7 +445,7 @@ This project is licensed under the MIT License.
                 semantic_search_enabled=True,
             )
 
-            print(f"✓ Created enhanced dispatcher")
+            print("✓ Created enhanced dispatcher")
 
             # Check supported languages
             supported = self.dispatcher.supported_languages
@@ -494,7 +492,7 @@ This project is licensed under the MIT License.
 
             # Get statistics
             stats = self.dispatcher.get_statistics()
-            print(f"✓ Dispatcher statistics:")
+            print("✓ Dispatcher statistics:")
             print(f"  Total plugins: {stats['total_plugins']}")
             print(f"  Loaded languages: {stats['loaded_languages']}")
             print(f"  Indexing operations: {stats['operations']['indexings']}")

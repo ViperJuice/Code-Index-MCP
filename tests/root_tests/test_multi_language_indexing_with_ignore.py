@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 """Comprehensive test for multi-language indexing with ignore patterns."""
 
-import json
-import shutil
 import tempfile
 from pathlib import Path
 
-from mcp_server.core.ignore_patterns import IgnorePatternManager
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from mcp_server.storage.sqlite_store import SQLiteStore
 

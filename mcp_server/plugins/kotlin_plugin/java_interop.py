@@ -2,7 +2,7 @@
 
 import logging
 import re
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List
 
 import tree_sitter
 
@@ -394,17 +394,17 @@ class JavaInteropAnalyzer:
             )
 
         elif pattern_name == "data_class_java_interop":
-            class_name = match.group(1) if match.groups() else "unknown"
+            _ = match.group(1) if match.groups() else "unknown"
             metadata["java_bean_compatible"] = True
             metadata["generates_methods"] = ["equals", "hashCode", "toString", "copy"]
 
         elif pattern_name == "object_java_singleton":
-            object_name = match.group(1) if match.groups() else "unknown"
+            _ = match.group(1) if match.groups() else "unknown"
             metadata["java_singleton_pattern"] = True
             metadata["thread_safe"] = True
 
         elif pattern_name == "extension_functions_java":
-            function_signature = match.group(1) if match.groups() else "unknown"
+            _ = match.group(1) if match.groups() else "unknown"
             metadata["java_accessible"] = (
                 False  # Extension functions not directly accessible from Java
             )

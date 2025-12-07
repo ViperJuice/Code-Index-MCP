@@ -4,15 +4,14 @@ import hashlib
 import logging
 import mimetypes
 import re
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from mcp_server.plugin_base import IndexShard, Reference, SearchResult, SymbolDef
 from mcp_server.plugins.specialized_plugin_base import SpecializedPluginBase
 from mcp_server.storage.sqlite_store import SQLiteStore
-from mcp_server.utils.semantic_indexer import SemanticIndexer
 
 logger = logging.getLogger(__name__)
 
@@ -91,22 +90,18 @@ class BaseDocumentPlugin(SpecializedPluginBase):
     @abstractmethod
     def _get_supported_extensions(self) -> List[str]:
         """Get list of supported file extensions."""
-        pass
 
     @abstractmethod
     def extract_structure(self, content: str, file_path: Path) -> DocumentStructure:
         """Extract document structure (headings, sections, etc)."""
-        pass
 
     @abstractmethod
     def extract_metadata(self, content: str, file_path: Path) -> DocumentMetadata:
         """Extract document metadata."""
-        pass
 
     @abstractmethod
     def parse_content(self, content: str, file_path: Path) -> str:
         """Parse raw content to plain text."""
-        pass
 
     # Document chunking methods
 

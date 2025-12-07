@@ -5,11 +5,10 @@ import logging
 import os
 import re
 import time
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
-from ..plugin_base import IPlugin, Reference, SearchResult, SymbolDef
+from ..plugin_base import IPlugin, SearchResult, SymbolDef
 from ..plugins.language_registry import get_all_extensions, get_language_by_extension
 from ..plugins.memory_aware_manager import MemoryAwarePluginManager
 from ..plugins.plugin_factory import PluginFactory
@@ -21,7 +20,6 @@ from ..utils.semantic_indexer import SemanticIndexer
 from .plugin_router import FileTypeMatcher, PluginCapability, PluginRouter
 from .result_aggregator import (
     AggregatedResult,
-    AggregationStats,
     RankingCriteria,
     ResultAggregator,
 )
@@ -123,9 +121,9 @@ class EnhancedDispatcher:
                     check=True,
                 )
                 remote_url = result.stdout.strip()
-                repo_id = hashlib.sha256(remote_url.encode()).hexdigest()[:12]
-            except:
-                repo_id = hashlib.sha256(str(Path.cwd()).encode()).hexdigest()[:12]
+                _ = hashlib.sha256(remote_url.encode()).hexdigest()[:12]
+            except Exception:
+                _ = hashlib.sha256(str(Path.cwd()).encode()).hexdigest()[:12]
 
             storage_path = os.getenv("MCP_INDEX_STORAGE_PATH", ".indexes")
             # Use the correct registry path
@@ -278,7 +276,7 @@ class EnhancedDispatcher:
 
                                     # Check if we're already in an async context
                                     try:
-                                        loop = asyncio.get_running_loop()
+                                        _ = asyncio.get_running_loop()
                                         # We're in an async context, can't use asyncio.run
                                         logger.warning(
                                             f"Cannot use async memory manager from sync context for {lang}, using direct creation"

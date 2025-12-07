@@ -11,13 +11,11 @@ Tests the Markdown parsing capabilities including:
 - Edge cases and error handling
 """
 
-import re
 from pathlib import Path
-from unittest.mock import Mock, patch
 
 import pytest
 
-from mcp_server.document_processing import ChunkType, DocumentChunk, DocumentMetadata
+from mcp_server.document_processing import ChunkType, DocumentChunk
 from mcp_server.plugins.markdown_plugin.document_parser import MarkdownParser
 from mcp_server.plugins.markdown_plugin.frontmatter_parser import FrontmatterParser
 from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin

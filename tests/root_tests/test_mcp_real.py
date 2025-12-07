@@ -237,7 +237,7 @@ module.exports = TestServer;""",
         total_tests += 1
 
         # Final summary
-        print(f"\n=== Test Summary ===")
+        print("\n=== Test Summary ===")
         print(f"Passed: {success_count}/{total_tests} tests")
 
         if success_count == total_tests:

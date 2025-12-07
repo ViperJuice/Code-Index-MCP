@@ -10,7 +10,6 @@ import json
 import logging
 import os
 from functools import wraps
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -50,7 +49,7 @@ class SubAgentMCPHelper:
                     if config_key == "args":
                         try:
                             config["servers"][server_name][config_key] = json.loads(value)
-                        except:
+                        except Exception:
                             config["servers"][server_name][config_key] = value
                     else:
                         config["servers"][server_name][config_key] = value
@@ -142,7 +141,7 @@ class SubAgentMCPHelper:
             # Try to parse as JSON if it's a string
             try:
                 args = json.loads(args)
-            except:
+            except Exception:
                 args = [args]
 
         command.extend(args)

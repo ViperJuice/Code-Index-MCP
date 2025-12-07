@@ -6,10 +6,8 @@ Test script for verifying reranking functionality with both Cohere and local mod
 import asyncio
 import logging
 import os
-from pathlib import Path
-from typing import Any, Dict, List
+from typing import List
 
-from mcp_server.config.settings import RerankingSettings, Settings
 from mcp_server.indexer.reranker import (
     CohereReranker,
     HybridReranker,

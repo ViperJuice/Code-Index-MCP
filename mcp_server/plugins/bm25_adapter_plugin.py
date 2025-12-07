@@ -8,7 +8,7 @@ by implementing the IPlugin interface and querying the BM25 FTS5 tables.
 import logging
 import sqlite3
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Iterable, Optional
 
 from ..plugin_base import (
     IndexShard,

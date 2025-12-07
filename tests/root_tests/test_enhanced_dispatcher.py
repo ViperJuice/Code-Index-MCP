@@ -223,7 +223,7 @@ def test_enhanced_dispatcher():
                 pass
 
             loaded = language in dispatcher._loaded_languages
-            print(f"  ✓ File indexed")
+            print("  ✓ File indexed")
             print(f"  ✓ Plugin for '{language}' loaded: {loaded}")
             print(f"  ✓ Total plugins loaded: {len(dispatcher._plugins)}")
 
@@ -256,7 +256,7 @@ def test_enhanced_dispatcher():
     stats = dispatcher.get_statistics()
     print(f"Total plugins loaded: {stats['total_plugins']}")
     print(f"Languages loaded: {', '.join(sorted(stats['loaded_languages']))}")
-    print(f"Operations performed:")
+    print("Operations performed:")
     for op, count in stats["operations"].items():
         if count > 0:
             print(f"  - {op}: {count}")
@@ -265,7 +265,7 @@ def test_enhanced_dispatcher():
     print("\n=== Health Check ===")
     health = dispatcher.health_check()
     print(f"Overall status: {health['status']}")
-    print(f"Dispatcher config:")
+    print("Dispatcher config:")
     for key, value in health["components"]["dispatcher"].items():
         print(f"  - {key}: {value}")
 

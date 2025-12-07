@@ -7,7 +7,6 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
@@ -100,7 +99,7 @@ async def test_tfidf_reranking():
 
     if rerank_result.is_success:
         logger.info(f"\n✓ Reranking completed in {elapsed:.2f}ms")
-        logger.info(f"Reranked results:")
+        logger.info("Reranked results:")
 
         # The result should contain a list of reranked items
         reranked_data = rerank_result.data

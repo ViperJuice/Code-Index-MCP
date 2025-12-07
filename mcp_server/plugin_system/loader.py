@@ -7,11 +7,10 @@ import asyncio
 import gc
 import importlib
 import logging
-import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, Optional, Type
 
 from ..interfaces.plugin_interfaces import IPlugin
 from ..storage.sqlite_store import SQLiteStore

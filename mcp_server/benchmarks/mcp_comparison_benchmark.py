@@ -350,19 +350,19 @@ class MCPComparisonBenchmark(BenchmarkSuite):
         print("COMPARISON SUMMARY")
         print("=" * 60)
         print(f"Total comparisons: {summary['total_comparisons']}")
-        print(f"\nPerformance:")
+        print("\nPerformance:")
         print(f"  Average MCP latency: {summary['avg_mcp_latency']:.2f}ms")
         print(f"  Average Direct latency: {summary['avg_direct_latency']:.2f}ms")
         print(f"  Average speedup: {summary['avg_speedup']:.2f}x")
         print(f"  MCP faster: {summary['mcp_faster_count']} times")
         print(f"  Direct faster: {summary['direct_faster_count']} times")
 
-        print(f"\nToken Usage:")
+        print("\nToken Usage:")
         print(f"  Total MCP tokens: {summary['total_mcp_tokens']:,}")
         print(f"  Total Direct tokens: {summary['total_direct_tokens']:,}")
         print(f"  Average token efficiency: {summary['avg_token_efficiency']:.2f}x")
 
-        print(f"\nEstimated Costs:")
+        print("\nEstimated Costs:")
         print(f"  MCP cost: ${summary['mcp_total_cost']:.4f}")
         print(f"  Direct cost: ${summary['direct_total_cost']:.4f}")
         print(

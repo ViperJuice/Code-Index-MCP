@@ -159,7 +159,7 @@ def test_direct_plugin_functionality():
             else:
                 print(f"  Indexing completed in {elapsed:.3f}s")
         else:
-            print(f"  ❌ Large test file not found")
+            print("  ❌ Large test file not found")
     except Exception as e:
         print(f"  ❌ Error: {e}")
 

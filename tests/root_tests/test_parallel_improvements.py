@@ -199,9 +199,9 @@ if __name__ == "__main__":
             print(f"     Symbols found: {len(shard1['symbols'])}")
             print(f"     First run: {first_run_time:.4f}s, Second run: {second_run_time:.4f}s")
             if second_run_time < first_run_time * 0.8:  # Should be faster due to caching
-                print(f"     ✓ Query caching improved performance")
+                print("     ✓ Query caching improved performance")
             else:
-                print(f"     ? Query caching effect unclear")
+                print("     ? Query caching effect unclear")
 
             # Show symbol types found
             symbol_types = set(s["kind"] for s in shard1["symbols"])
@@ -231,7 +231,7 @@ if __name__ == "__main__":
             dispatcher.index_file(Path(filename))
 
         # Test search across languages
-        print(f"\n   Cross-language search results:")
+        print("\n   Cross-language search results:")
         search_terms = ["User", "main", "create", "connect"]
 
         for term in search_terms:
@@ -239,7 +239,7 @@ if __name__ == "__main__":
             print(f"     '{term}': {len(search_results)} results")
 
         # Test symbol lookup
-        print(f"\n   Symbol lookup results:")
+        print("\n   Symbol lookup results:")
         symbols_to_find = ["User", "main", "NewConnection", "create_user"]
         found_count = 0
 
@@ -281,7 +281,7 @@ if __name__ == "__main__":
     )
     print(f"✅ Integration: {'Working' if integration_success else 'Needs attention'}")
 
-    print(f"\nDetailed results:")
+    print("\nDetailed results:")
     for lang, result in results.items():
         if "error" not in result:
             print(

@@ -7,18 +7,14 @@ operations, and plugin functionality.
 """
 
 import asyncio
-import json
 import os
-import shutil
-import tempfile
 from pathlib import Path
-from typing import Any, Dict, Generator, List
-from unittest.mock import Mock, patch
+from typing import Dict, List
+from unittest.mock import Mock
 
 import pytest
 from fastapi.testclient import TestClient
 
-from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher as Dispatcher
 
 # Import our modules
@@ -267,7 +263,7 @@ def file_watcher(temp_code_directory: Path, dispatcher_with_plugins: Dispatcher)
     # Ensure watcher is stopped
     try:
         watcher.stop()
-    except:
+    except Exception:
         pass
 
 

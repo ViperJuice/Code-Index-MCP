@@ -1,28 +1,20 @@
 """FastAPI security middleware for authentication and authorization."""
 
 import logging
-import time
-from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
-from urllib.parse import urlparse
+from typing import Dict, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import JSONResponse
 
 from .auth_manager import (
-    AuthenticationError,
     AuthManager,
-    AuthorizationError,
-    SecurityError,
 )
 from .models import (
     AccessRequest,
     Permission,
     SecurityConfig,
-    SecurityEvent,
     TokenData,
     User,
     UserRole,
@@ -467,19 +459,16 @@ class SecurityMiddlewareStack:
         async def login(credentials: dict):
             """Login endpoint."""
             # This would be implemented in the gateway
-            pass
 
         @self.app.post("/api/v1/auth/logout")
         async def logout(current_user: User = Depends(get_current_active_user)):
             """Logout endpoint."""
             # This would be implemented in the gateway
-            pass
 
         @self.app.post("/api/v1/auth/refresh")
         async def refresh_token(refresh_token: str):
             """Refresh token endpoint."""
             # This would be implemented in the gateway
-            pass
 
         @self.app.get("/api/v1/auth/me")
         async def get_current_user_info(

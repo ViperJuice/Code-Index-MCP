@@ -5,18 +5,13 @@ import sqlite3
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
 from mcp_server.metrics import (
     HealthCheckResult,
     HealthStatus,
-    IHealthCheck,
-    IMetricsCollector,
-    MetricPoint,
-    MetricType,
 )
 from mcp_server.metrics.health_check import (
     ComponentHealthChecker,
@@ -24,9 +19,6 @@ from mcp_server.metrics.health_check import (
     set_health_checker,
 )
 from mcp_server.metrics.metrics_collector import (
-    CounterMetric,
-    GaugeMetric,
-    HistogramMetric,
     PrometheusMetricsCollector,
     get_metrics_collector,
     set_metrics_collector,
@@ -660,9 +652,6 @@ class TestMetricsIntegration:
         # Clear globals for clean testing
         import mcp_server.metrics.metrics_collector as mc
         import mcp_server.metrics.middleware as mw
-        from mcp_server.metrics.health_check import _health_checker
-        from mcp_server.metrics.metrics_collector import _metrics_collector
-        from mcp_server.metrics.middleware import _business_metrics
 
         mc._metrics_collector = None
         hc._health_checker = None

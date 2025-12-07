@@ -162,7 +162,7 @@ class PluginDiscovery:
                 # Create temporary instance
                 temp = plugin_class(None)
                 return temp.get_language()
-            except:
+            except Exception:
                 pass
 
         # Extract from path/name

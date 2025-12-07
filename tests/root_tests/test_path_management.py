@@ -13,8 +13,6 @@ sys.path.insert(0, str(Path(__file__).parent))
 from mcp_server.core.path_resolver import PathResolver
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from mcp_server.storage.sqlite_store import SQLiteStore
-from mcp_server.utils.semantic_indexer import SemanticIndexer
-from mcp_server.watcher import FileWatcher
 
 
 def test_path_resolver():

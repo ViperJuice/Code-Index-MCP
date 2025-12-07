@@ -10,14 +10,11 @@ Tests cover:
 - Performance benchmarks
 """
 
-import ctypes
 from pathlib import Path
 from textwrap import dedent
-from unittest.mock import Mock, patch
 
 import pytest
 
-from mcp_server.plugin_base import SearchResult, SymbolDef
 from mcp_server.plugins.c_plugin.plugin import Plugin as CPlugin
 
 

@@ -5,10 +5,9 @@ Tests cross-language symbol resolution and multi-language project capabilities.
 Validates symbol discovery, reference tracking, and integration across different programming languages.
 """
 
-import os
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Set, Tuple
+from typing import Dict
 
 import pytest
 
@@ -49,7 +48,7 @@ class TestCrossLanguageResolution:
             self._cleanup_test_files(test_files)
             try:
                 Path(db_file.name).unlink()
-            except:
+            except Exception:
                 pass
 
     def _create_multi_language_files(self) -> Dict[str, Path]:
@@ -478,7 +477,7 @@ database:
         for file_path in test_files.values():
             try:
                 file_path.unlink()
-            except:
+            except Exception:
                 pass
 
     def test_multi_language_project_indexing(self, setup_multi_language_project):
@@ -1072,7 +1071,7 @@ database:
                 assert total_files >= 5, f"Should index multiple files: {total_files}"
                 assert total_symbols >= 10, f"Should extract symbols: {total_symbols}"
 
-                print(f"Real-world multi-language indexing:")
+                print("Real-world multi-language indexing:")
                 for lang in successful_languages:
                     print(
                         f"  {lang}: {indexed_by_language[lang]} files, {symbols_by_language[lang]} symbols"
@@ -1082,7 +1081,7 @@ database:
                 # Cleanup
                 try:
                     Path(db_file.name).unlink()
-                except:
+                except Exception:
                     pass
 
 

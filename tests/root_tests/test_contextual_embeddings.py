@@ -275,7 +275,7 @@ Troubleshooting:
             print(f"  Metadata keys: {list(chunk.metadata.keys())}")
 
             if chunk.metadata.get("contextual_text"):
-                print(f"\nContextual Text Structure:")
+                print("\nContextual Text Structure:")
                 context_lines = chunk.metadata["contextual_text"].split("\n\n")
                 for line in context_lines[:5]:  # Show first 5 lines
                     if line.strip():

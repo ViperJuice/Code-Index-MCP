@@ -4,10 +4,7 @@ MCP Verification Test Suite
 Tests and verifies that Claude Code uses MCP tools first for all searches
 """
 
-import json
-import time
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 
@@ -105,7 +102,7 @@ class MCPVerificationTester:
         report = [
             "# MCP Verification Report",
             f"\nGenerated: {datetime.now().isoformat()}",
-            f"\n## Summary",
+            "\n## Summary",
             f"- Total Tests: {total_tests}",
             f"- Passed: {passed_tests}",
             f"- Failed: {total_tests - passed_tests}",

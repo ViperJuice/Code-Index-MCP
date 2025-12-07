@@ -24,14 +24,13 @@ import asyncio
 import logging
 import sys
 import tempfile
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import List
 
 # Import MCP Server components
 from ..plugin_base import IPlugin
 from .benchmark_runner import BenchmarkRunner
-from .benchmark_suite import BenchmarkResult, BenchmarkSuite
+from .benchmark_suite import BenchmarkResult
 
 
 def setup_logging(verbose: bool = False):
@@ -1019,7 +1018,7 @@ async def run_comprehensive_benchmarks(
         file_paths = [str(f) for f in test_files]
 
         logging.info(f"Running indexing benchmark on {len(file_paths)} files...")
-        indexing_result = await runner.run_indexing_benchmark(file_paths)
+        _ = await runner.run_indexing_benchmark(file_paths)
 
         logging.info("Running search benchmark...")
         search_queries = [
@@ -1041,10 +1040,10 @@ async def run_comprehensive_benchmarks(
             "performance",
             "benchmark",
         ]
-        search_result = await runner.run_search_benchmark(search_queries)
+        _ = await runner.run_search_benchmark(search_queries)
 
         logging.info("Running memory benchmark...")
-        memory_result = await runner.run_memory_benchmark(min(file_count, 5000))
+        _ = await runner.run_memory_benchmark(min(file_count, 5000))
 
     # Run full benchmark suite
     logging.info("Running full benchmark suite...")
@@ -1071,7 +1070,7 @@ async def run_comprehensive_benchmarks(
         passed = sum(1 for v in full_result.validations.values() if v)
         total = len(full_result.validations)
 
-        print(f"\nSLO VALIDATION RESULTS:")
+        print("\nSLO VALIDATION RESULTS:")
         print(f"Overall: {passed}/{total} SLOs passed")
 
         for slo_name, status in full_result.validations.items():

@@ -452,7 +452,7 @@ fun User.isValid(): Boolean =
     print(f"❌ Failed: {len(failed)}/{len(results)} plugins")
 
     if successful:
-        print(f"\nSuccessful plugins:")
+        print("\nSuccessful plugins:")
         for lang in successful:
             result = results[lang]
             print(
@@ -460,7 +460,7 @@ fun User.isValid(): Boolean =
             )
 
     if failed:
-        print(f"\nFailed plugins:")
+        print("\nFailed plugins:")
         for lang in failed:
             result = results[lang]
             print(f"  {lang}: {result.get('error', 'Unknown error')}")

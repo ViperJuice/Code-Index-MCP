@@ -2,10 +2,8 @@
 Test suite for MCP vs Direct Search comparison functionality.
 """
 
-import json
 import os
 import sys
-from pathlib import Path
 
 import pytest
 
@@ -13,7 +11,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from mcp_server.utils.direct_searcher import DirectSearcher
-from mcp_server.utils.token_counter import TokenCounter, quick_estimate
+from mcp_server.utils.token_counter import TokenCounter
 from mcp_server.visualization.quick_charts import QuickCharts
 from tests.comparison.base_comparison import ComparisonResult, PerformanceMetrics
 

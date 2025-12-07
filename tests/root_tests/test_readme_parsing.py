@@ -10,15 +10,8 @@ This test suite covers:
 - Cross-reference link handling
 """
 
-import re
-
 # Import the document processing components
 import sys
-import tempfile
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Dict, List, Tuple
-from unittest.mock import Mock, patch
 
 import pytest
 

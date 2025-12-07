@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List
 
 import pytest
 
@@ -554,7 +554,7 @@ class TestSymbolSearch:
             fuzzy_precision = fuzzy_score / len(fuzzy_results)
             assert exact_precision >= fuzzy_precision, "Exact search should have higher precision"
 
-        print(f"Search quality test:")
+        print("Search quality test:")
         print(f"  Exact matches: {len(exact_results)}")
         print(f"  Fuzzy matches: {len(fuzzy_results)}")
         print(f"  Case insensitive: {len(case_results)}")

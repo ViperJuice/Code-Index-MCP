@@ -4,8 +4,7 @@ import logging
 import shlex
 import subprocess
 import time
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +112,7 @@ class DirectSearcher:
     def _run_grep_string(self, string: str, path: str) -> Dict[str, Any]:
         """Run grep with literal string."""
         # Escape special characters for grep
-        escaped_string = shlex.quote(string)
+        _ = shlex.quote(string)
         cmd = [self.grep_cmd, "-r", "-n", "-F", string, path]
         return self._execute_command(cmd, "grep")
 
@@ -149,7 +148,7 @@ class DirectSearcher:
         except subprocess.TimeoutExpired:
             elapsed_time = time.time() - start_time
             return self._error_result(
-                f"Command timed out after 30 seconds", tool_name, cmd, elapsed_time
+                "Command timed out after 30 seconds", tool_name, cmd, elapsed_time
             )
         except Exception as e:
             elapsed_time = time.time() - start_time

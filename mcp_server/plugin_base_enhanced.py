@@ -2,20 +2,16 @@
 
 import logging
 import os
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from abc import abstractmethod
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
 from typing_extensions import TypedDict
 
 from .plugin_base import (
-    IndexShard,
     IPlugin,
-    Reference,
     SearchOpts,
     SearchResult,
-    SymbolDef,
 )
 from .storage.sqlite_store import SQLiteStore
 from .utils.semantic_indexer import SemanticIndexer
@@ -211,4 +207,3 @@ class PluginWithSemanticSearch(IPlugin):
         self, query: str, opts: SearchOpts | None = None
     ) -> Iterable[SearchResult]:
         """Traditional search implementation (must be overridden by subclasses)."""
-        pass

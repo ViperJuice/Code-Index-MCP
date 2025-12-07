@@ -7,7 +7,6 @@ import sys
 from pathlib import Path
 
 from mcp_server.plugins.c_plugin.plugin import Plugin as CPlugin
-from mcp_server.storage.sqlite_store import SQLiteStore
 
 
 def main():
@@ -64,14 +63,14 @@ int main(int argc, char* argv[]) {
         print("✓ Plugin created successfully")
 
         # Test file support
-        assert plugin.supports("test.c") == True
-        assert plugin.supports("test.h") == True
-        assert plugin.supports("test.py") == False
+        assert plugin.supports("test.c") is True
+        assert plugin.supports("test.h") is True
+        assert plugin.supports("test.py") is False
         print("✓ File support detection working")
 
         # Test indexing
         result = plugin.indexFile(Path("test.c"), test_code)
-        print(f"✓ File indexed successfully")
+        print("✓ File indexed successfully")
 
         # Check symbols
         symbols = result["symbols"]
@@ -117,7 +116,7 @@ int main(int argc, char* argv[]) {
         if missing:
             print(f"\n⚠ Missing symbols: {missing}")
         else:
-            print(f"\n✓ All expected symbols found")
+            print("\n✓ All expected symbols found")
 
         # Test search
         print("\nTesting search...")

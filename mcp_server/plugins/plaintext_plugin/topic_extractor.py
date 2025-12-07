@@ -4,7 +4,7 @@ import math
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from typing import Dict, List, Set, Tuple
+from typing import List, Tuple
 
 
 @dataclass
@@ -199,7 +199,7 @@ class TopicExtractor:
         # Build co-occurrence matrix
         cooccurrence = defaultdict(lambda: defaultdict(int))
         keywords = [kw for kw, _ in self.extract_keywords(text, max_keywords=50)]
-        keyword_set = set(keywords)
+        _ = set(keywords)
 
         for sentence in sentences:
             sentence_lower = sentence.lower()

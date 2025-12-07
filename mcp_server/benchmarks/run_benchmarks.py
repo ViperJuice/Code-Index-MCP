@@ -114,7 +114,7 @@ def main():
         if hasattr(result, "regression_report") and result.regression_report:
             report = result.regression_report
             if report["status"] == "checked" and report["regressions"]:
-                print(f"\n⚠️  Performance Regressions Detected:")
+                print("\n⚠️  Performance Regressions Detected:")
                 for reg in report["regressions"]:
                     print(
                         f"  - {reg['metric']}: "

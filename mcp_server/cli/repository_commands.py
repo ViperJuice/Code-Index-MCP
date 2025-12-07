@@ -4,12 +4,10 @@ This module provides commands for managing the repository registry,
 tracking repositories, and syncing indexes with git.
 """
 
-import json
 import os
 import sys
-from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 import click
 
@@ -17,18 +15,17 @@ import click
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from mcp_server.artifacts.commit_artifacts import CommitArtifactManager
-from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
-from mcp_server.storage.git_index_manager import GitAwareIndexManager
-from mcp_server.storage.repository_registry import RepositoryRegistry
-from mcp_server.storage.sqlite_store import SQLiteStore
-from mcp_server.watcher_multi_repo import MultiRepositoryWatcher
+from mcp_server.artifacts.commit_artifacts import CommitArtifactManager  # noqa: E402
+from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher  # noqa: E402
+from mcp_server.storage.git_index_manager import GitAwareIndexManager  # noqa: E402
+from mcp_server.storage.repository_registry import RepositoryRegistry  # noqa: E402
+from mcp_server.storage.sqlite_store import SQLiteStore  # noqa: E402
+from mcp_server.watcher_multi_repo import MultiRepositoryWatcher  # noqa: E402
 
 
 @click.group()
 def repository():
     """Repository management commands."""
-    pass
 
 
 @repository.command()
@@ -143,7 +140,7 @@ def unregister(repo_id: str):
         if registry.unregister_repository(repo_id):
             click.echo(click.style(f"✓ Unregistered repository: {repo_info.name}", fg="green"))
         else:
-            click.echo(click.style(f"✗ Failed to unregister repository", fg="red"), err=True)
+            click.echo(click.style("✗ Failed to unregister repository", fg="red"), err=True)
             sys.exit(1)
 
     except Exception as e:

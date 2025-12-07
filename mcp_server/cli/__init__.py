@@ -17,7 +17,6 @@ from .repository_commands import repository
 @click.version_option(version=__version__, prog_name="code-index-mcp")
 def cli():
     """MCP Server CLI utilities."""
-    pass
 
 
 # Register command groups

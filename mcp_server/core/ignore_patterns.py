@@ -5,7 +5,7 @@ Utility module for handling ignore patterns from .gitignore and .mcp-index-ignor
 import fnmatch
 import logging
 from pathlib import Path
-from typing import List, Optional, Set
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 

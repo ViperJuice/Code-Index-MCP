@@ -5,7 +5,6 @@ Simple test of the contextual embeddings pipeline components.
 
 import os
 import sys
-from pathlib import Path
 
 # Configure for testing
 os.environ["MARKDOWN_MAX_CHUNK_TOKENS"] = "500"

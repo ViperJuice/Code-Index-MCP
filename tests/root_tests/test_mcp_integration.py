@@ -2,7 +2,6 @@
 """Test MCP server integration with enhanced dispatcher."""
 
 import asyncio
-import json
 import sys
 from pathlib import Path
 
@@ -95,7 +94,7 @@ func main() {
         print("\nLooking up symbol 'fibonacci'...")
         definition = dispatcher.lookup("fibonacci")
         if definition:
-            print(f"✓ Found definition:")
+            print("✓ Found definition:")
             print(f"  - Kind: {definition.get('kind', 'N/A')}")
             print(f"  - File: {definition.get('defined_in', 'N/A')}")
             print(f"  - Line: {definition.get('line', 'N/A')}")
@@ -107,7 +106,7 @@ func main() {
         final_stats = dispatcher.get_statistics()
         print(f"Total plugins loaded: {final_stats.get('total_plugins', 0)}")
         print(f"Languages loaded: {', '.join(sorted(final_stats.get('loaded_languages', [])))}")
-        print(f"Operations performed:")
+        print("Operations performed:")
         for op, count in final_stats.get("operations", {}).items():
             if count > 0:
                 print(f"  - {op}: {count}")

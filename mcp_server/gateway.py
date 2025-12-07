@@ -5,12 +5,10 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Response, status
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi import Depends, FastAPI, HTTPException, Response
+from fastapi.responses import PlainTextResponse
 
 from .cache import (
-    CacheBackendType,
-    CacheConfig,
     CacheManagerFactory,
     QueryCacheConfig,
     QueryResultCache,
@@ -20,11 +18,11 @@ from .core.logging import setup_logging
 from .dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from .indexer.bm25_indexer import BM25Indexer
 from .indexer.hybrid_search import HybridSearch, HybridSearchConfig
-from .metrics import HealthStatus, get_health_checker, get_metrics_collector
+from .metrics import get_health_checker, get_metrics_collector
 from .metrics.middleware import get_business_metrics, setup_metrics_middleware
 from .metrics.prometheus_exporter import get_prometheus_exporter
 from .plugin_base import SearchResult, SymbolDef
-from .plugin_system import PluginManager, PluginSystemConfig
+from .plugin_system import PluginManager
 from .security import (
     AuthCredentials,
     AuthManager,
@@ -34,7 +32,6 @@ from .security import (
     User,
     UserRole,
     get_current_active_user,
-    get_current_user,
     require_permission,
     require_role,
 )
@@ -398,7 +395,7 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """Clean up resources on shutdown."""
-    global file_watcher, plugin_manager, cache_manager
+    # These globals are only read, not assigned, so no 'global' declaration needed
 
     if file_watcher:
         try:
@@ -676,7 +673,7 @@ def get_prometheus_metrics() -> Response:
 
         # Update plugin metrics
         if plugin_loader:
-            stats = plugin_loader.get_statistics()
+            _ = plugin_loader.get_statistics()
             for lang, plugin in plugin_loader.get_active_plugins().items():
                 prometheus_exporter.plugin_status.labels(
                     plugin=plugin.__class__.__name__, language=lang
@@ -1768,7 +1765,7 @@ async def rebuild_search_indexes(
 
         return {
             "status": "success",
-            "message": f"Search indexes rebuilt successfully",
+            "message": "Search indexes rebuilt successfully",
             "index_type": index_type,
             "results": results,
         }

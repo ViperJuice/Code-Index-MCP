@@ -677,7 +677,6 @@ class TestJavaScriptPlugin:
         """Test that minified files are skipped during pre-indexing."""
         # This test would need to mock the _preindex method
         # or test it indirectly through initialization
-        pass
 
     def test_indexed_count(self, plugin):
         """Test getting count of indexed files."""

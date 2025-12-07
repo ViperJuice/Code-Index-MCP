@@ -4,7 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from mcp_server.plugins.generic_treesitter_plugin import GenericTreeSitterPlugin
 from mcp_server.storage.sqlite_store import SQLiteStore
@@ -64,17 +64,14 @@ class IImportResolver(ABC):
     @abstractmethod
     def resolve_import(self, import_info: ImportInfo, current_file: Path) -> Optional[Path]:
         """Resolve an import to its actual file path."""
-        pass
 
     @abstractmethod
     def get_import_graph(self) -> Dict[str, Set[str]]:
         """Get the complete import dependency graph."""
-        pass
 
     @abstractmethod
     def find_circular_dependencies(self) -> List[List[str]]:
         """Find circular dependencies in the import graph."""
-        pass
 
 
 class ITypeAnalyzer(ABC):
@@ -83,17 +80,14 @@ class ITypeAnalyzer(ABC):
     @abstractmethod
     def get_type_info(self, symbol: str, file_path: str) -> Optional[TypeInfo]:
         """Get type information for a symbol."""
-        pass
 
     @abstractmethod
     def find_implementations(self, interface_name: str) -> List[Tuple[str, str]]:
         """Find all implementations of an interface. Returns (class_name, file_path) tuples."""
-        pass
 
     @abstractmethod
     def resolve_generic_type(self, type_expr: str, context: Dict[str, str]) -> str:
         """Resolve a generic type expression in the given context."""
-        pass
 
 
 class IBuildSystemIntegration(ABC):
@@ -102,17 +96,14 @@ class IBuildSystemIntegration(ABC):
     @abstractmethod
     def parse_build_file(self, build_file_path: Path) -> List[BuildDependency]:
         """Parse build configuration and extract dependencies."""
-        pass
 
     @abstractmethod
     def resolve_external_import(self, import_path: str) -> Optional[str]:
         """Resolve an import from external dependencies."""
-        pass
 
     @abstractmethod
     def get_project_structure(self) -> Dict[str, Any]:
         """Get the project structure from build configuration."""
-        pass
 
 
 class ICrossFileAnalyzer(ABC):
@@ -121,17 +112,14 @@ class ICrossFileAnalyzer(ABC):
     @abstractmethod
     def find_all_references(self, symbol: str, definition_file: str) -> List[CrossFileReference]:
         """Find all references to a symbol across files."""
-        pass
 
     @abstractmethod
     def get_call_graph(self, function_name: str) -> Dict[str, Set[str]]:
         """Get the call graph for a function."""
-        pass
 
     @abstractmethod
     def analyze_impact(self, file_path: str) -> Dict[str, List[str]]:
         """Analyze impact of changes to a file."""
-        pass
 
 
 class SpecializedPluginBase(GenericTreeSitterPlugin):
@@ -166,22 +154,18 @@ class SpecializedPluginBase(GenericTreeSitterPlugin):
     @abstractmethod
     def _create_import_resolver(self) -> IImportResolver:
         """Create language-specific import resolver."""
-        pass
 
     @abstractmethod
     def _create_type_analyzer(self) -> ITypeAnalyzer:
         """Create language-specific type analyzer."""
-        pass
 
     @abstractmethod
     def _create_build_system(self) -> IBuildSystemIntegration:
         """Create language-specific build system integration."""
-        pass
 
     @abstractmethod
     def _create_cross_file_analyzer(self) -> ICrossFileAnalyzer:
         """Create language-specific cross-file analyzer."""
-        pass
 
     # Lazy loading properties
 
@@ -293,7 +277,6 @@ class SpecializedPluginBase(GenericTreeSitterPlugin):
     def _discover_build_files(self):
         """Discover build files in the project."""
         # To be overridden by subclasses
-        pass
 
     def _is_imported_symbol(self, symbol: str) -> bool:
         """Check if a symbol is imported."""

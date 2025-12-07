@@ -183,7 +183,7 @@ class IndexDiscovery:
             )
             if result.returncode == 0 and result.stdout.strip():
                 return result.stdout.strip()
-        except:
+        except Exception:
             pass
 
         # Fall back to directory name

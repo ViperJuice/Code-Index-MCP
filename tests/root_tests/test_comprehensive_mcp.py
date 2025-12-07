@@ -5,17 +5,14 @@ Tests all 7 specialized language plugins with efficient database management.
 """
 
 import asyncio
-import hashlib
 import json
 import logging
-import os
 import shutil
 import subprocess
-import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -498,7 +495,7 @@ class MCPTestOrchestrator:
         print(f"MCP COMPREHENSIVE TEST RESULTS - {self.test_session_id}")
         print(f"{'='*60}")
 
-        print(f"\n📊 OVERALL STATISTICS:")
+        print("\n📊 OVERALL STATISTICS:")
         print(f"   Languages Tested: {stats.get('total_languages', 0)}")
         print(f"   Successful Plugins: {stats.get('successful_plugins', 0)}")
         print(f"   Plugin Success Rate: {stats.get('plugin_success_rate', 0)}%")
@@ -507,7 +504,7 @@ class MCPTestOrchestrator:
         print(f"   Symbol Lookup Success: {stats.get('symbol_lookup_success_rate', 0)}%")
         print(f"   Search Success Rate: {stats.get('search_success_rate', 0)}%")
 
-        print(f"\n🔌 PLUGIN RESULTS:")
+        print("\n🔌 PLUGIN RESULTS:")
         for language, results in self.test_results.get("plugins_tested", {}).items():
             status = "✅" if results.get("plugin_loaded", False) else "❌"
             symbols = results.get("symbols_found", 0)
@@ -541,11 +538,11 @@ async def main():
         success_rate = stats.get("plugin_success_rate", 0)
 
         if success_rate >= 80:
-            print(f"\n🎉 TESTING COMPLETED SUCCESSFULLY!")
+            print("\n🎉 TESTING COMPLETED SUCCESSFULLY!")
             print(f"   Results saved in: {orchestrator.results_dir}")
             return 0
         else:
-            print(f"\n⚠️  TESTING COMPLETED WITH ISSUES")
+            print("\n⚠️  TESTING COMPLETED WITH ISSUES")
             print(f"   Plugin success rate: {success_rate}% (target: 80%+)")
             return 1
 

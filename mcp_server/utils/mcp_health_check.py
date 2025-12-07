@@ -8,12 +8,9 @@ import asyncio
 import json
 import logging
 import os
-import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
-
-from mcp_server.core.path_utils import PathUtils
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +86,7 @@ class MCPDiagnostics:
                     registry = json.loads(os.environ["MCP_TOOL_REGISTRY"])
                     tool_names = list(registry.get("tools", {}).keys())
                     result["details"]["registered_tools"] = tool_names
-                except:
+                except Exception:
                     result["issues"].append("Tool registry JSON is invalid")
 
             # Check for MCP server commands

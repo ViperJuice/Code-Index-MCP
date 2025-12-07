@@ -1,9 +1,7 @@
 """Test git integration functionality."""
 
-import json
 import os
 import sys
-from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -14,7 +12,6 @@ sys.path.insert(0, str(project_root))
 
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from mcp_server.indexing.change_detector import ChangeDetector
-from mcp_server.indexing.incremental_indexer import IncrementalIndexer
 from mcp_server.storage.git_index_manager import GitAwareIndexManager
 from mcp_server.storage.repository_registry import RepositoryRegistry
 from mcp_server.storage.sqlite_store import SQLiteStore
@@ -102,7 +99,7 @@ class TestGitIntegration:
         new_path = repo.path / "src/user_services.py"
         old_path.rename(new_path)
 
-        TestRepositoryBuilder.run_git_command(f"git add -A", repo.path)
+        TestRepositoryBuilder.run_git_command("git add -A", repo.path)
         TestRepositoryBuilder.run_git_command(
             "git commit -m 'Rename services to user_services'", repo.path
         )

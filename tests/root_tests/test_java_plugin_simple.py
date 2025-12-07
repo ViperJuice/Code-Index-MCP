@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Simple test for Java plugin."""
 
-import tempfile
-from pathlib import Path
 
 from mcp_server.plugins.java_plugin import Plugin
 

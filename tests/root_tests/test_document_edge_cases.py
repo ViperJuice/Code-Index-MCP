@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """Test various edge cases in document processing."""
 
-import os
 import tempfile
 from pathlib import Path
 
 import pytest
 
-from mcp_server.document_processing import ChunkType, DocumentChunk
+from mcp_server.document_processing import ChunkType
 from mcp_server.plugins.markdown_plugin import MarkdownPlugin
 from mcp_server.plugins.plaintext_plugin import PlainTextPlugin
 from mcp_server.plugins.python_plugin.plugin import Plugin as PythonPlugin

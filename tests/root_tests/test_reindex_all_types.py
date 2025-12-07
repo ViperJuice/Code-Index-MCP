@@ -52,7 +52,7 @@ for file_type, pattern in file_patterns.items():
                     supported = True
                     break
             if not supported:
-                print(f"    -> NOT SUPPORTED by any plugin!")
+                print("    -> NOT SUPPORTED by any plugin!")
 
 # Test the actual reindex logic from gateway.py
 print("\n\nSimulating actual reindex logic:")

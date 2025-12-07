@@ -175,7 +175,7 @@ class MarkdownParser:
 
         if ordered_match or unordered_match:
             ordered = bool(ordered_match)
-            marker = ordered_match.group(1) if ordered else unordered_match.group(1)
+            _ = ordered_match.group(1) if ordered else unordered_match.group(1)
 
             list_node = {
                 "type": "list",
@@ -185,7 +185,7 @@ class MarkdownParser:
             }
 
             i = start
-            current_indent = 0
+            _ = 0
 
             while i < len(lines):
                 line = lines[i]

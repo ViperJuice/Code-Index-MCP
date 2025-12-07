@@ -197,7 +197,7 @@ class GoPackageAnalyzer:
         type_match = re.match(r"type\s+(\w+)\s+(\w+)", line)
         if type_match and "struct" not in line and "interface" not in line:
             type_name = type_match.group(1)
-            base_type = type_match.group(2)
+            _ = type_match.group(2)
             type_info = TypeInfo(name=type_name, kind="alias", file=file_path, line=start_line + 1)
             package_info.types[type_name] = type_info
             return
@@ -308,7 +308,7 @@ class GoPackageAnalyzer:
             returns2 = func_match.group(5) or ""
 
             # Build signature
-            signature = f"func "
+            signature = "func "
             if receiver:
                 signature += f"({receiver}) "
             signature += f"{func_name}({params})"

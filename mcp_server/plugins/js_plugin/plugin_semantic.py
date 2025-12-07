@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Dict, Iterable, List, Optional
 
-import tree_sitter_languages
-from tree_sitter import Language, Node, Parser
+from tree_sitter import Node
 
 from ...plugin_base import (
     IndexShard,

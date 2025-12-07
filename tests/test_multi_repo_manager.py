@@ -5,18 +5,16 @@ These tests verify the functionality of the multi-repository search system
 including registration, cross-repository search, and health monitoring.
 """
 
-import asyncio
 import shutil
 import sqlite3
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
 from mcp_server.storage.multi_repo_manager import (
-    CrossRepoSearchResult,
     MultiRepositoryManager,
     RepositoryInfo,
     get_multi_repo_manager,

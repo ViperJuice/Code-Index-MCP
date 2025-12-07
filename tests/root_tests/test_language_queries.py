@@ -196,7 +196,7 @@ enum VehicleType {
             if hasattr(plugin, "query_string") and plugin.query_string:
                 print(f"✓ Query available: {len(plugin.query_string)} chars")
             else:
-                print(f"✗ No query string found")
+                print("✗ No query string found")
 
             # Create test file
             ext_map = {
@@ -221,7 +221,7 @@ enum VehicleType {
                     symbols_by_kind[kind] = []
                 symbols_by_kind[kind].append(symbol["symbol"])
 
-            print(f"\nExtracted symbols by kind:")
+            print("\nExtracted symbols by kind:")
             for kind, symbols in sorted(symbols_by_kind.items()):
                 print(f"  {kind}: {', '.join(symbols)}")
 
@@ -238,9 +238,9 @@ enum VehicleType {
 
             # Check for query vs traversal
             if hasattr(plugin, "parser") and plugin.parser is not None:
-                print(f"✓ Using tree-sitter parser")
+                print("✓ Using tree-sitter parser")
             else:
-                print(f"✗ Parser not available")
+                print("✗ Parser not available")
 
             results[lang] = all_found
 

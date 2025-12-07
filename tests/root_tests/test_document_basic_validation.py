@@ -8,7 +8,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
-from mcp_server.plugins.plugin_factory import PluginFactory
 from mcp_server.storage.sqlite_store import SQLiteStore
 
 

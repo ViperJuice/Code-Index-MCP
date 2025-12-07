@@ -8,20 +8,17 @@ including LRU caching, configurable memory limits, and transparent reloading.
 import gc
 import logging
 import os
-import sys
 import threading
 import time
 import weakref
 from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional
 
 import psutil
 
 # from mcp_server.plugin_system.models import LoadedPlugin
-from mcp_server.plugin_system.plugin_loader import PluginLoader
 from mcp_server.plugins.plugin_factory import PluginFactory
 
 logger = logging.getLogger(__name__)

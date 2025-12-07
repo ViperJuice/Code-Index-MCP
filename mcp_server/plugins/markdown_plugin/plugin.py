@@ -5,12 +5,10 @@ Markdown plugin implementation for comprehensive Markdown document processing.
 import logging
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional
 
 from mcp_server.document_processing import (
     BaseDocumentPlugin,
-    ChunkMetadata,
-    ChunkType,
     DocumentChunk,
 )
 from mcp_server.document_processing import DocumentMetadata as BaseDocumentMetadata
@@ -18,7 +16,7 @@ from mcp_server.document_processing import (
     DocumentStructure,
     Section,
 )
-from mcp_server.plugin_base import IndexShard, Reference, SearchResult, SymbolDef
+from mcp_server.plugin_base import IndexShard
 
 from .chunk_strategies import MarkdownChunkStrategy
 from .document_parser import MarkdownParser
@@ -158,7 +156,7 @@ class MarkdownPlugin(BaseDocumentPlugin):
             sections.append(section)
 
         # Extract headings and metadata
-        structure_info = self._extract_structure(ast)
+        _ = self._extract_structure(ast)
 
         # Build document structure
         structure = DocumentStructure(

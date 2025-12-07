@@ -9,13 +9,10 @@ This module tests all API endpoints including:
 - Reindexing operations
 """
 
-import json
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
-from fastapi import status
-from fastapi.testclient import TestClient
 
 from mcp_server.plugin_base import SearchResult, SymbolDef
 

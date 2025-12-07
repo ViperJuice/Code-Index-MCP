@@ -5,14 +5,11 @@ Cache backends implementation supporting memory, Redis, and hybrid storage.
 import asyncio
 import json
 import logging
-import threading
 import time
-import weakref
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Set
 
 try:
     import redis.asyncio as aioredis
@@ -82,49 +79,40 @@ class CacheBackend(ABC):
     @abstractmethod
     async def get(self, key: str) -> Optional[CacheEntry]:
         """Get a cache entry by key."""
-        pass
 
     @abstractmethod
     async def set(
         self, key: str, value: Any, ttl: Optional[int] = None, tags: Optional[Set[str]] = None
     ) -> bool:
         """Set a cache entry with optional TTL and tags."""
-        pass
 
     @abstractmethod
     async def delete(self, key: str) -> bool:
         """Delete a cache entry."""
-        pass
 
     @abstractmethod
     async def exists(self, key: str) -> bool:
         """Check if a key exists."""
-        pass
 
     @abstractmethod
     async def clear(self) -> int:
         """Clear all cache entries. Returns number of cleared entries."""
-        pass
 
     @abstractmethod
     async def keys(self, pattern: str = "*") -> List[str]:
         """Get all keys matching pattern."""
-        pass
 
     @abstractmethod
     async def invalidate_by_tags(self, tags: Set[str]) -> int:
         """Invalidate entries by tags. Returns number of invalidated entries."""
-        pass
 
     @abstractmethod
     async def get_stats(self) -> Dict[str, Any]:
         """Get cache statistics."""
-        pass
 
     @abstractmethod
     async def cleanup_expired(self) -> int:
         """Clean up expired entries. Returns number of cleaned entries."""
-        pass
 
 
 class MemoryCacheBackend(CacheBackend):
@@ -349,7 +337,7 @@ class MemoryCacheBackend(CacheBackend):
 
     async def cleanup_expired(self) -> int:
         async with self._lock:
-            now = time.time()
+            _ = time.time()
             expired_keys = []
 
             for key, entry in self._cache.items():

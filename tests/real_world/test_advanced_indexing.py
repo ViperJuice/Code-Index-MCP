@@ -9,9 +9,7 @@ import asyncio
 import os
 import tempfile
 import time
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Dict, List
 
 import pytest
 
@@ -24,7 +22,7 @@ class TestAdvancedIndexing:
     def setup_advanced_indexer(self):
         """Setup advanced indexer with test configuration."""
         try:
-            from mcp_server.indexer.index_engine import IndexEngine, IndexOptions
+            from mcp_server.indexer.index_engine import IndexEngine
             from mcp_server.plugin_system import PluginManager
             from mcp_server.storage.sqlite_store import SQLiteStore
         except ImportError:
@@ -47,7 +45,7 @@ class TestAdvancedIndexing:
             # Cleanup
             try:
                 Path(db_file.name).unlink()
-            except:
+            except Exception:
                 pass
 
     def test_parallel_indexing_performance(self, setup_advanced_indexer, benchmark):
@@ -293,7 +291,7 @@ class UserManager:
             for file_path in test_files:
                 try:
                     file_path.unlink()
-                except:
+                except Exception:
                     pass
 
     def test_embedding_generation_integration(self, setup_advanced_indexer):
@@ -535,7 +533,7 @@ CONSTANT_{i} = {i}
             for file_path in test_files:
                 try:
                     file_path.unlink()
-                except:
+                except Exception:
                     pass
 
     def test_indexing_options_configuration(self, setup_advanced_indexer):
@@ -777,7 +775,7 @@ def decorator_function(func):
             for temp_path in temp_files:
                 try:
                     temp_path.unlink()
-                except:
+                except Exception:
                     pass
 
     def test_memory_usage_during_indexing(self, setup_advanced_indexer):
@@ -952,7 +950,7 @@ def async_operation_{func_num}(data: Dict[str, Any]) -> Dict[str, Any]:
             for temp_path in test_files:
                 try:
                     temp_path.unlink()
-                except:
+                except Exception:
                     pass
 
 
@@ -1062,5 +1060,5 @@ class TestAdvancedIndexingIntegration:
                 # Cleanup
                 try:
                     Path(db_file.name).unlink()
-                except:
+                except Exception:
                     pass

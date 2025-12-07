@@ -1,7 +1,6 @@
 """Simple dispatcher that bypasses plugin system for direct BM25 search."""
 
 import logging
-from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
 
 from ..plugin_base import SearchResult
@@ -102,9 +101,9 @@ class SimpleDispatcher:
             health["sqlite_store"] = True
             try:
                 # Test search
-                results = list(self.search("test", limit=1))
+                _ = list(self.search("test", limit=1))
                 health["search_available"] = True
-            except:
+            except Exception:
                 health["status"] = "degraded"
         else:
             health["status"] = "unhealthy"

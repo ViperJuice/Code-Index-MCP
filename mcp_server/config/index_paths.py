@@ -10,8 +10,6 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from mcp_server.core.path_utils import PathUtils
-
 logger = logging.getLogger(__name__)
 
 
@@ -172,7 +170,7 @@ class IndexPathConfig:
 
             # Simple hash for demo - in production, this would match the actual repo hash logic
             return hashlib.sha256(repo_identifier.encode()).hexdigest()[:12]
-        except:
+        except Exception:
             return None
 
     def _get_repo_name(self, repo_identifier: Optional[str]) -> Optional[str]:

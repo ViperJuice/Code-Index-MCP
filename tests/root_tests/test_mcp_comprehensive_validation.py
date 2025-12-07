@@ -20,16 +20,11 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from mcp_server.config.settings import get_settings
 from mcp_server.core.logging import get_logger
-from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
-from mcp_server.plugin_system.plugin_loader import PluginLoader
-from mcp_server.plugin_system.plugin_manager import PluginManager
-from mcp_server.plugin_system.plugin_registry import PluginRegistry
 from mcp_server.storage.sqlite_store import SQLiteStore
 
 logger = get_logger(__name__)
@@ -876,13 +871,13 @@ class UserService {
         print("📊 TEST SUMMARY REPORT")
         print("=" * 80)
 
-        print(f"\n📈 Overall Results:")
+        print("\n📈 Overall Results:")
         print(f"   Total Tests: {report['summary']['total_tests']}")
         print(f"   Passed: {report['summary']['passed']} ✅")
         print(f"   Failed: {report['summary']['failed']} ❌")
         print(f"   Success Rate: {report['summary']['success_rate']:.1f}%")
 
-        print(f"\n📋 Language Results:")
+        print("\n📋 Language Results:")
         for language, summary in report["languages"].items():
             status = (
                 "✅"

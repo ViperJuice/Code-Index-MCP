@@ -11,7 +11,7 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import psutil
 import pytest
@@ -489,7 +489,7 @@ class TestPerformanceScaling:
             perf_data["files_per_second"] >= 5
         ), f"Throughput too low: {perf_data['files_per_second']:.1f} files/s"
 
-        print(f"\nLarge Codebase Performance:")
+        print("\nLarge Codebase Performance:")
         print(
             f"  Files indexed: {perf_data['indexed_files']} ({perf_data['success_rate']:.1%} success)"
         )

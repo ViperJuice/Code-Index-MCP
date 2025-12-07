@@ -4,7 +4,7 @@ import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 
 from ..specialized_plugin_base import ImportInfo
 
@@ -283,7 +283,7 @@ class SwiftModuleAnalyzer:
         # Look for @available attributes
         available_patterns = [
             r"@available\(([^)]+)\)",
-            rf"if\s+#available\(([^)]+)\)",
+            r"if\s+#available\(([^)]+)\)",
         ]
 
         availability_info = []

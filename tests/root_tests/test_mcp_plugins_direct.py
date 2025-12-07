@@ -4,14 +4,13 @@ Direct MCP Plugin Testing - Test plugins directly without dispatcher complexity.
 Focuses on core plugin functionality and symbol extraction.
 """
 
-import asyncio
 import json
 import logging
 import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -559,7 +558,7 @@ class DirectPluginTester:
         summary = self.results["summary"]
 
         print(f"\n{'='*60}")
-        print(f"DIRECT MCP PLUGIN TESTING RESULTS")
+        print("DIRECT MCP PLUGIN TESTING RESULTS")
         print(f"{'='*60}")
         print(f"Total Time: {self.results['total_time']}s")
         print(f"Plugin Success Rate: {summary['plugin_success_rate']}%")
@@ -567,7 +566,7 @@ class DirectPluginTester:
         print(f"Total Symbols: {summary['total_symbols_extracted']}")
         print(f"Avg Symbols/Language: {summary['avg_symbols_per_language']}")
 
-        print(f"\n📋 DETAILED RESULTS:")
+        print("\n📋 DETAILED RESULTS:")
         for language, result in self.results["results"].items():
             plugin_status = "✅" if result.get("plugin_loaded", False) else "❌"
             index_status = "✅" if result.get("indexing_success", False) else "❌"

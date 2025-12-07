@@ -43,7 +43,7 @@ try:
 
     print(f"Captures is a dict: {isinstance(captures_dict, dict)}")
     print(f"Dict keys: {list(captures_dict.keys())}")
-    print(f"Dict items:")
+    print("Dict items:")
 
     for key, value in captures_dict.items():
         print(f"\n  Key: {key} (type: {type(key)})")

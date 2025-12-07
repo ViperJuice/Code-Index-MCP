@@ -1,6 +1,5 @@
 """Build system integration for Maven and Gradle."""
 
-import json
 import logging
 import re
 import xml.etree.ElementTree as ET

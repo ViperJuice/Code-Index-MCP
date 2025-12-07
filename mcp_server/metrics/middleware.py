@@ -8,7 +8,7 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
-from ..metrics import get_health_checker, get_metrics_collector
+from ..metrics import get_metrics_collector
 
 logger = logging.getLogger(__name__)
 
@@ -371,6 +371,6 @@ def setup_metrics_middleware(app, enable_detailed_metrics: bool = True) -> None:
         app: FastAPI application instance
         enable_detailed_metrics: Whether to enable detailed per-endpoint metrics
     """
-    middleware = MetricsMiddleware(app, enable_detailed_metrics)
+    _ = MetricsMiddleware(app, enable_detailed_metrics)
     app.add_middleware(MetricsMiddleware, enable_detailed_metrics=enable_detailed_metrics)
     logger.info("Added metrics middleware to FastAPI application")

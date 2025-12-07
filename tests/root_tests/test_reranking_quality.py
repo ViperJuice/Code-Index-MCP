@@ -154,7 +154,7 @@ class RerankingQualityTester:
             ((reranked_score - original_score) / original_score * 100) if original_score > 0 else 0
         )
 
-        logger.info(f"\nRelevance scores:")
+        logger.info("\nRelevance scores:")
         logger.info(f"  Original: {original_score:.3f}")
         logger.info(f"  Reranked: {reranked_score:.3f}")
         logger.info(f"  Improvement: {improvement:+.1f}%")
@@ -238,11 +238,11 @@ class RerankingQualityTester:
 
         if rerank_result.is_success:
             logger.info("Reranking successful!")
-            logger.info(f"Original order:")
+            logger.info("Original order:")
             for i, r in enumerate(search_results[:5]):
                 logger.info(f"  {i+1}. {Path(r.file_path).name} (score: {r.score:.4f})")
 
-            logger.info(f"\nReranked order:")
+            logger.info("\nReranked order:")
             for rr in rerank_result.data[:5]:
                 orig_idx = rr.original_rank
                 new_idx = rr.new_rank

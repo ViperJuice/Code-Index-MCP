@@ -5,7 +5,6 @@ This module provides functionality to extract metadata from various document typ
 including title detection, author information, timestamps, keywords, and summaries.
 """
 
-import os
 import re
 
 import yaml
@@ -18,11 +17,10 @@ except ImportError:
     except ImportError:
         tomllib = None
 import logging
-import math
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -237,7 +235,7 @@ class MetadataExtractor:
                 and not line.lower().startswith(
                     ("author:", "date:", "by:", "written by:", "copyright:")
                 )
-                and not line in ('"""', "'''", "*/")
+                and line not in ('"""', "'''", "*/")
                 and len(line) > 3
                 and len(line) < 100
             ):

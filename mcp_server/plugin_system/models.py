@@ -268,34 +268,22 @@ class PluginEvent:
 class PluginError(Exception):
     """Base exception for plugin system errors."""
 
-    pass
-
 
 class PluginNotFoundError(PluginError):
     """Plugin not found."""
-
-    pass
 
 
 class PluginLoadError(PluginError):
     """Error loading plugin."""
 
-    pass
-
 
 class PluginInitError(PluginError):
     """Error initializing plugin."""
-
-    pass
 
 
 class PluginValidationError(PluginError):
     """Plugin validation failed."""
 
-    pass
-
 
 class PluginConfigError(PluginError):
     """Plugin configuration error."""
-
-    pass

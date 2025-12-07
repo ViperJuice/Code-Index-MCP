@@ -14,12 +14,9 @@ Tests the metadata extractor including:
 
 import os
 import tempfile
-from datetime import datetime
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-import yaml
 
 from mcp_server.document_processing.metadata_extractor import MetadataExtractor
 

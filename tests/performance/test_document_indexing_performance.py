@@ -2,13 +2,11 @@
 """Performance tests for document indexing speed and efficiency."""
 
 import concurrent.futures
-import os
 import statistics
-import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import List
 
 import pytest
 
@@ -381,7 +379,7 @@ class TestDocumentIndexingPerformance(BaseDocumentTest):
             else max(update_times)
         )
 
-        print(f"\nIncremental Update Summary:")
+        print("\nIncremental Update Summary:")
         print(f"  Average: {avg_update:.1f}ms")
         print(f"  P95: {p95_update:.1f}ms")
 

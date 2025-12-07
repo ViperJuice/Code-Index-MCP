@@ -1,7 +1,7 @@
 """Security data models for authentication and authorization."""
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 

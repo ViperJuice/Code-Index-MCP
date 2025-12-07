@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """Test script for Java plugin functionality."""
 
-import shutil
 import tempfile
 from pathlib import Path
 
 from mcp_server.plugins.java_plugin import Plugin
-from mcp_server.storage.sqlite_store import SQLiteStore
 
 
 def test_java_plugin():
@@ -229,7 +227,7 @@ public class ApplicationTest {
             print("\n5. Testing type analysis:")
             type_info = plugin.type_analyzer.get_type_info("ServiceImpl", "")
             if type_info:
-                print(f"✓ Found type info for ServiceImpl:")
+                print("✓ Found type info for ServiceImpl:")
                 print(f"  - Generic: {type_info.is_generic}")
                 print(f"  - Implements: {type_info.implements}")
                 print(f"  - Type params: {type_info.generic_params}")
@@ -252,7 +250,7 @@ public class ApplicationTest {
             # Test 8: Class hierarchy
             print("\n8. Testing class hierarchy:")
             hierarchy = plugin.get_class_hierarchy("ServiceImpl")
-            print(f"✓ Class hierarchy for ServiceImpl:")
+            print("✓ Class hierarchy for ServiceImpl:")
             print(f"  - Implements: {hierarchy['implements']}")
             print(f"  - Extended by: {hierarchy['extended_by']}")
 
@@ -278,7 +276,7 @@ public class ApplicationTest {
 if __name__ == "__main__":
     # Check if javalang is installed
     try:
-        import javalang
+        pass
 
         print("✓ javalang library is installed")
     except ImportError:

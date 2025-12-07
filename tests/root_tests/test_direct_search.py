@@ -46,7 +46,7 @@ func main() {
             print(f"  - {symbol['kind']}: {symbol['symbol']} (line {symbol['line']})")
 
         # Test search
-        print(f"\nTesting search for 'hello'...")
+        print("\nTesting search for 'hello'...")
         search_results = list(plugin.search("hello", {"limit": 10}))
         print(f"Search results: {len(search_results)}")
         for result in search_results:
@@ -55,10 +55,10 @@ func main() {
             )
 
         # Test definition lookup
-        print(f"\nTesting definition lookup for 'hello'...")
+        print("\nTesting definition lookup for 'hello'...")
         definition = plugin.getDefinition("hello")
         if definition:
-            print(f"Found definition:")
+            print("Found definition:")
             print(f"  - Kind: {definition.get('kind', 'N/A')}")
             print(f"  - File: {definition.get('defined_in', 'N/A')}")
             print(f"  - Line: {definition.get('line', 'N/A')}")

@@ -5,13 +5,10 @@ These tests verify that the pre-flight validation correctly identifies
 MCP configuration issues before operations begin.
 """
 
-import asyncio
 import json
 import os
 import sqlite3
-import tempfile
-from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 

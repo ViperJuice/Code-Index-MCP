@@ -1,23 +1,15 @@
 """Integration tests for dispatcher document routing functionality."""
 
 import logging
-import shutil
-import tempfile
-import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Dict, List
-from unittest.mock import MagicMock, Mock, patch
+from typing import Dict
 
 import pytest
 
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
-from mcp_server.dispatcher.plugin_router import FileTypeMatcher, PluginCapability, PluginRouter
-from mcp_server.dispatcher.result_aggregator import RankingCriteria, ResultAggregator
-from mcp_server.plugin_base import SearchResult
-from mcp_server.plugins.plugin_factory import PluginFactory
-from mcp_server.storage.sqlite_store import SQLiteStore
+from mcp_server.dispatcher.plugin_router import PluginCapability
 from tests.base_test import BaseDocumentTest
 
 logger = logging.getLogger(__name__)

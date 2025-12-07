@@ -1,16 +1,12 @@
 """Test utilities for git-integrated repository tracking tests."""
 
-import json
-import os
 import shutil
 import subprocess
-import sys
 import tempfile
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 # Language file templates for creating diverse test repositories
 TEST_FILE_TEMPLATES = {

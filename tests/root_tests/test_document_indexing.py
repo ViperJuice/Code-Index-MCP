@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Test document-specific indexing functionality."""
 
-import shutil
 import tempfile
 from pathlib import Path
 

@@ -2,15 +2,9 @@
 
 import json
 import logging
-import shutil
 import sqlite3
-import tempfile
-import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
 
 import pytest
 
@@ -20,12 +14,9 @@ from mcp_server.document_processing.document_interfaces import (
     ChunkType,
     DocumentChunk,
     DocumentStructure,
-    ProcessedDocument,
     Section,
 )
 from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
-from mcp_server.plugins.plaintext_plugin.plugin import PlainTextPlugin
-from mcp_server.storage.sqlite_store import SQLiteStore
 from tests.base_test import BaseDocumentTest
 
 logger = logging.getLogger(__name__)
@@ -484,7 +475,6 @@ def function_{i}():
     def test_storage_concurrent_access(self, sqlite_store, temp_workspace):
         """Test that storage handles concurrent access correctly."""
         import threading
-        import time
 
         # Create test documents
         for i in range(20):

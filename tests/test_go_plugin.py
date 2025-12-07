@@ -155,7 +155,7 @@ func IntPtr(i int) *int {
         result = plugin.check_interface_implementation("Server", "Runnable")
 
         assert result is not None
-        assert result["satisfied"] == True
+        assert result["satisfied"] is True
         assert "Run" in result["implemented_methods"]
         assert "Stop" in result["implemented_methods"]
         assert len(result["missing_methods"]) == 0

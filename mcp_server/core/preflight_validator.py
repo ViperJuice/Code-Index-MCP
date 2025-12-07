@@ -10,12 +10,9 @@ import json
 import logging
 import os
 import sqlite3
-import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-
-from mcp_server.core.path_utils import PathUtils
 
 logger = logging.getLogger(__name__)
 
@@ -114,11 +111,11 @@ class PreFlightValidator:
                 try:
                     registry_data = json.loads(tool_registry)
                     result["details"]["registry_tool_count"] = len(registry_data.get("tools", {}))
-                except:
+                except Exception:
                     result["issues"].append("Tool registry JSON is invalid")
 
             # Validate common MCP tools
-            common_tools = [
+            _ = [
                 "mcp__code-index-mcp__symbol_lookup",
                 "mcp__code-index-mcp__search_code",
                 "mcp__code-index-mcp__get_status",
@@ -241,7 +238,7 @@ class PreFlightValidator:
                     with open(index_config) as f:
                         idx_config = json.load(f)
                         result["details"]["index_enabled"] = idx_config.get("enabled", True)
-                except:
+                except Exception:
                     result["issues"].append("Invalid .mcp-index.json")
             else:
                 result["details"]["has_index_config"] = False
@@ -500,7 +497,7 @@ class MCPHealthCheck:
                     data = json.loads(tool_registry)
                     tool_count = len(data.get("tools", {}))
                     return True, f"MCP tools available ({tool_count} tools in registry)"
-                except:
+                except Exception:
                     return False, "MCP tool registry is corrupted"
 
             # Check for MCP server configs
