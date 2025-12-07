@@ -1,0 +1,37 @@
+# Semantic search dependencies (optional)
+# Install with: pip install -r requirements-semantic.txt
+
+# Core dependencies
+-r requirements-core.txt
+
+# Embeddings
+voyageai>=0.2.0
+sentence-transformers>=2.0.0
+
+# Vector database
+qdrant-client>=1.7.0
+
+# Reranking
+cohere>=4.0.0
+
+# AI/LLM
+anthropic>=0.18.0
+
+# Caching (optional)
+redis>=4.5.0
+
+# Security (for API auth)
+pyjwt>=2.8.0
+passlib[bcrypt]>=1.7.4
+python-multipart>=0.0.6
+cryptography>=41.0.4
+
+# Metrics and monitoring
+psutil>=5.9.0
+prometheus-client>=0.17.0
+numpy>=1.24.0
+jinja2>=3.1.2
+
+# Language-specific parsing libraries
+javalang>=0.13.0
+
