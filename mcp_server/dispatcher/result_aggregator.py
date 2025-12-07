@@ -66,6 +66,22 @@ class RankingCriteria:
     penalize_long_files: bool = False
     boost_common_extensions: bool = True
 
+    # Score normalization parameters for different search backends
+    # BM25 scores are logarithmic and can range from ~0.1 to 20+
+    bm25_score_max: float = 15.0  # Typical max BM25 score for normalization
+    bm25_score_min: float = 0.0   # Min BM25 score
+
+    # Semantic scores are cosine similarity (0-1)
+    semantic_score_max: float = 1.0
+    semantic_score_min: float = 0.0
+
+    # Fuzzy scores are match ratios (0-1)
+    fuzzy_score_max: float = 1.0
+    fuzzy_score_min: float = 0.0
+
+    # Default score when score is missing
+    default_score: float = 0.5
+
 
 class IAggregationStrategy(ABC):
     """Interface for different result aggregation strategies."""
@@ -86,6 +102,151 @@ class IAggregationStrategy(ABC):
             List of aggregated results
         """
         pass
+
+
+# Score normalization helper functions
+def _normalize_score(score: float, min_val: float, max_val: float) -> float:
+    """Normalize a score to 0-1 range using min-max normalization.
+
+    Args:
+        score: Raw score to normalize
+        min_val: Minimum expected score value
+        max_val: Maximum expected score value
+
+    Returns:
+        Normalized score in 0-1 range
+    """
+    if max_val <= min_val:
+        return 0.5  # Fallback if range is invalid
+
+    # Clamp score to valid range
+    clamped_score = max(min_val, min(max_val, score))
+
+    # Min-max normalization
+    normalized = (clamped_score - min_val) / (max_val - min_val)
+    return max(0.0, min(1.0, normalized))
+
+
+def _detect_score_source(result: SearchResult, plugin: IPlugin) -> str:
+    """Detect the source type of a search result score.
+
+    Args:
+        result: Search result with potential metadata
+        plugin: Plugin that generated the result
+
+    Returns:
+        Source type: 'bm25', 'semantic', 'fuzzy', or 'unknown'
+    """
+    # Check plugin type/name
+    plugin_lang = getattr(plugin, 'lang', '').lower()
+    plugin_name = type(plugin).__name__.lower()
+
+    # BM25 adapter or FTS5-based results
+    if 'bm25' in plugin_name or plugin_lang == 'all':
+        return 'bm25'
+
+    # Semantic search results (usually have 'semantic' in class name or metadata)
+    if 'semantic' in plugin_name or result.get('semantic'):
+        return 'semantic'
+
+    # Check result metadata for hints
+    metadata = result.get('metadata', {})
+    if isinstance(metadata, dict):
+        if 'bm25' in str(metadata).lower():
+            return 'bm25'
+        if 'semantic' in str(metadata).lower() or 'embedding' in str(metadata).lower():
+            return 'semantic'
+        if 'fuzzy' in str(metadata).lower() or 'trigram' in str(metadata).lower():
+            return 'fuzzy'
+
+    # Check score magnitude to infer type
+    score = result.get('score')
+    if score is not None:
+        # BM25 scores are typically > 1.0
+        if score > 1.5:
+            return 'bm25'
+        # Semantic/fuzzy scores are typically 0-1
+        elif 0 <= score <= 1.0:
+            # Can't distinguish between semantic and fuzzy without more context
+            return 'semantic'  # Default to semantic for 0-1 range
+
+    return 'unknown'
+
+
+def _normalize_result_score(
+    result: SearchResult,
+    plugin: IPlugin,
+    criteria: RankingCriteria
+) -> Tuple[float, str, Dict[str, Any]]:
+    """Normalize a result's score based on its source type.
+
+    Args:
+        result: Search result with score
+        plugin: Plugin that generated the result
+        criteria: Ranking criteria with normalization parameters
+
+    Returns:
+        Tuple of (normalized_score, source_type, normalization_metadata)
+    """
+    raw_score = result.get('score')
+
+    # Handle missing scores
+    if raw_score is None:
+        return (
+            criteria.default_score,
+            'unknown',
+            {'normalized': True, 'reason': 'missing_score', 'default': True}
+        )
+
+    # Detect source type
+    source_type = _detect_score_source(result, plugin)
+
+    # Normalize based on source type
+    if source_type == 'bm25':
+        normalized = _normalize_score(
+            raw_score,
+            criteria.bm25_score_min,
+            criteria.bm25_score_max
+        )
+    elif source_type == 'semantic':
+        normalized = _normalize_score(
+            raw_score,
+            criteria.semantic_score_min,
+            criteria.semantic_score_max
+        )
+    elif source_type == 'fuzzy':
+        normalized = _normalize_score(
+            raw_score,
+            criteria.fuzzy_score_min,
+            criteria.fuzzy_score_max
+        )
+    else:
+        # Unknown source - try to normalize assuming 0-1 range
+        # If score is > 1, assume it's BM25-like
+        if raw_score > 1.5:
+            normalized = _normalize_score(
+                raw_score,
+                criteria.bm25_score_min,
+                criteria.bm25_score_max
+            )
+            source_type = 'bm25_inferred'
+        else:
+            normalized = _normalize_score(
+                raw_score,
+                0.0,
+                1.0
+            )
+            source_type = 'semantic_inferred'
+
+    metadata = {
+        'normalized': True,
+        'raw_score': raw_score,
+        'normalized_score': normalized,
+        'source_type': source_type,
+        'default': False
+    }
+
+    return normalized, source_type, metadata
 
 
 class IResultAggregator(ABC):
@@ -171,6 +332,9 @@ class SimpleAggregationStrategy(IAggregationStrategy):
             # Calculate rank score
             rank_score = self._calculate_rank_score(group, criteria)
 
+            # Extract ranking metadata from primary result if available
+            ranking_metadata = primary_result.get('ranking_metadata', {})
+
             aggregated_result = AggregatedResult(
                 primary_result=primary_result,
                 sources=sources,
@@ -181,6 +345,7 @@ class SimpleAggregationStrategy(IAggregationStrategy):
                     "key": key,
                     "source_count": len(sources),
                     "all_results": [result for _, result in group],
+                    "ranking": ranking_metadata,  # Include ranking explanation
                 },
             )
             aggregated.append(aggregated_result)
@@ -193,17 +358,17 @@ class SimpleAggregationStrategy(IAggregationStrategy):
     def _calculate_rank_score(
         self, group: List[Tuple[IPlugin, SearchResult]], criteria: RankingCriteria
     ) -> float:
-        """Calculate rank score for a group of results."""
+        """Calculate rank score for a group of results with score normalization."""
         if not group:
             return 0.0
 
-        # Get primary result
-        _, primary_result = group[0]
+        # Get primary result and plugin
+        primary_plugin, primary_result = group[0]
 
-        # Base relevance score (0-1)
-        relevance_score = 0.5  # Default if no score provided
-        if "score" in primary_result and primary_result["score"] is not None:
-            relevance_score = min(1.0, max(0.0, float(primary_result["score"])))
+        # Normalize the relevance score based on source type
+        relevance_score, source_type, norm_metadata = _normalize_result_score(
+            primary_result, primary_plugin, criteria
+        )
 
         # Confidence based on number of sources (0-1)
         confidence_score = min(1.0, len(group) / 3.0)
@@ -212,7 +377,7 @@ class SimpleAggregationStrategy(IAggregationStrategy):
         frequency_score = min(1.0, len(group) / 5.0)
 
         # Recency score (simplified - would need file stats)
-        recency_score = 0.5  # Default
+        recency_score = criteria.default_score  # Use configurable default
 
         # Calculate weighted score
         rank_score = (
@@ -223,8 +388,38 @@ class SimpleAggregationStrategy(IAggregationStrategy):
         )
 
         # Apply boosts
+        boost_factor = 1.0
+        boost_reasons = []
+
         if criteria.boost_multiple_sources and len(group) > 1:
-            rank_score *= 1.1
+            boost_factor *= 1.1
+            boost_reasons.append('multiple_sources')
+
+        # Boost exact matches from BM25
+        if source_type == 'bm25' and criteria.prefer_exact_matches:
+            raw_score = primary_result.get('score', 0)
+            if raw_score > 10.0:  # High BM25 score indicates strong match
+                boost_factor *= 1.05
+                boost_reasons.append('high_bm25_score')
+
+        rank_score *= boost_factor
+
+        # Store ranking metadata in primary result for debugging
+        ranking_metadata = {
+            'relevance_score': relevance_score,
+            'confidence_score': confidence_score,
+            'frequency_score': frequency_score,
+            'recency_score': recency_score,
+            'boost_factor': boost_factor,
+            'boost_reasons': boost_reasons,
+            'source_type': source_type,
+            'normalization': norm_metadata,
+            'final_rank_score': min(1.0, rank_score)
+        }
+
+        # Store metadata back in result
+        if 'ranking_metadata' not in primary_result:
+            primary_result['ranking_metadata'] = ranking_metadata
 
         return min(1.0, rank_score)
 
@@ -284,6 +479,9 @@ class SmartAggregationStrategy(IAggregationStrategy):
             # Merge context from similar results
             context_lines = self._merge_context(group)
 
+            # Extract ranking metadata from primary result if available
+            ranking_metadata = primary_result.get('ranking_metadata', {})
+
             aggregated_result = AggregatedResult(
                 primary_result=primary_result,
                 sources=sources,
@@ -296,6 +494,7 @@ class SmartAggregationStrategy(IAggregationStrategy):
                     "source_count": len(sources),
                     "unique_files": len(set(result["file"] for _, result in group)),
                     "avg_similarity": self._calculate_avg_similarity(group),
+                    "ranking": ranking_metadata,  # Include ranking explanation
                 },
             )
             aggregated.append(aggregated_result)
@@ -414,17 +613,17 @@ class SmartAggregationStrategy(IAggregationStrategy):
     def _calculate_enhanced_rank_score(
         self, group: List[Tuple[IPlugin, SearchResult]], criteria: RankingCriteria
     ) -> float:
-        """Calculate enhanced rank score with additional factors."""
+        """Calculate enhanced rank score with normalization and additional factors."""
         if not group:
             return 0.0
 
-        # Get primary result
-        _, primary_result = group[0]
+        # Get primary result and plugin
+        primary_plugin, primary_result = group[0]
 
-        # Base relevance score
-        relevance_score = 0.5
-        if "score" in primary_result and primary_result["score"] is not None:
-            relevance_score = min(1.0, max(0.0, float(primary_result["score"])))
+        # Normalize the relevance score based on source type
+        relevance_score, source_type, norm_metadata = _normalize_result_score(
+            primary_result, primary_plugin, criteria
+        )
 
         # Enhanced confidence with similarity consideration
         base_confidence = min(1.0, len(group) / 3.0)
@@ -434,11 +633,24 @@ class SmartAggregationStrategy(IAggregationStrategy):
         # Frequency score with file diversity bonus
         unique_files = len(set(result["file"] for _, result in group))
         frequency_score = min(1.0, len(group) / 5.0)
+        diversity_bonus = 1.0
         if unique_files > 1:
-            frequency_score *= 1.2  # Boost for cross-file matches
+            diversity_bonus = 1.2  # Boost for cross-file matches
+            frequency_score *= diversity_bonus
 
         # Recency score (simplified)
-        recency_score = 0.5
+        recency_score = criteria.default_score
+
+        # Calculate line proximity score for grouped results
+        proximity_score = 1.0
+        if len(group) > 1 and unique_files == 1:
+            # Check if results are close together in the same file
+            lines = [result["line"] for _, result in group]
+            line_span = max(lines) - min(lines)
+            if line_span <= 5:
+                proximity_score = 1.1  # Boost for results close together
+            elif line_span <= 10:
+                proximity_score = 1.05
 
         # Calculate weighted score
         rank_score = (
@@ -449,15 +661,62 @@ class SmartAggregationStrategy(IAggregationStrategy):
         )
 
         # Apply additional boosts
-        if criteria.boost_multiple_sources and len(group) > 1:
-            rank_score *= 1.1
+        boost_factor = 1.0
+        boost_reasons = []
 
+        if criteria.boost_multiple_sources and len(group) > 1:
+            boost_factor *= 1.1
+            boost_reasons.append('multiple_sources')
+
+        # Apply proximity boost
+        if proximity_score > 1.0:
+            boost_factor *= proximity_score
+            boost_reasons.append(f'proximity_boost_{proximity_score:.2f}')
+
+        # Boost exact matches
         if criteria.prefer_exact_matches:
-            # Check if any result seems like exact match (simplified)
+            # Check for short, single-line results (likely exact matches)
             for _, result in group:
                 if len(result["snippet"]) < 100 and "\n" not in result["snippet"]:
-                    rank_score *= 1.05
+                    boost_factor *= 1.05
+                    boost_reasons.append('exact_match_snippet')
                     break
+
+            # Additional boost for high-scoring BM25 results
+            if source_type == 'bm25':
+                raw_score = primary_result.get('score', 0)
+                if raw_score > 10.0:
+                    boost_factor *= 1.05
+                    boost_reasons.append('high_bm25_exact')
+
+        # Source-specific adjustments
+        if source_type == 'semantic' and relevance_score > 0.9:
+            # High semantic similarity indicates very relevant result
+            boost_factor *= 1.03
+            boost_reasons.append('high_semantic_similarity')
+
+        rank_score *= boost_factor
+
+        # Store comprehensive ranking metadata
+        ranking_metadata = {
+            'relevance_score': relevance_score,
+            'confidence_score': confidence_score,
+            'frequency_score': frequency_score,
+            'recency_score': recency_score,
+            'boost_factor': boost_factor,
+            'boost_reasons': boost_reasons,
+            'source_type': source_type,
+            'normalization': norm_metadata,
+            'unique_files': unique_files,
+            'diversity_bonus': diversity_bonus,
+            'proximity_score': proximity_score,
+            'group_size': len(group),
+            'final_rank_score': min(1.0, rank_score)
+        }
+
+        # Store metadata back in result
+        if 'ranking_metadata' not in primary_result:
+            primary_result['ranking_metadata'] = ranking_metadata
 
         return min(1.0, rank_score)
 
