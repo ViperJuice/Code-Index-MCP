@@ -15,8 +15,19 @@ from typing import Optional
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from mcp_server.utils.semantic_indexer import SemanticIndexer
 from mcp_server.storage.sqlite_store import SQLiteStore
+from mcp_server.utils import get_semantic_indexer
+
+
+def _get_semantic_indexer_instance():
+    """Get SemanticIndexer instance if available."""
+    SemanticIndexer = get_semantic_indexer()
+    if SemanticIndexer is None:
+        return None
+    try:
+        return SemanticIndexer()
+    except Exception:
+        return None
 
 
 @click.group()
@@ -33,8 +44,9 @@ def check_compatibility(detailed: bool):
     """Check if current configuration is compatible with existing indexes."""
     try:
         # Check vector index
-        indexer = SemanticIndexer()
-        vector_compatible = indexer.check_compatibility()
+        indexer = _get_semantic_indexer_instance()
+        vector_compatible = indexer.check_compatibility() if indexer else False
+        vector_available = indexer is not None
 
         # Check SQLite index
         sqlite_exists = os.path.exists("code_index.db")
@@ -68,9 +80,12 @@ def check_compatibility(detailed: bool):
         click.echo(
             f"  SQLite index: {'✅ Compatible' if sqlite_compatible else '❌ Incompatible'}"
         )
-        click.echo(
-            f"  Vector index: {'✅ Compatible' if vector_compatible else '❌ Incompatible'}"
-        )
+        if not vector_available:
+            click.echo("  Vector index: ⚠️ Not available (semantic deps not installed)")
+        else:
+            click.echo(
+                f"  Vector index: {'✅ Compatible' if vector_compatible else '❌ Incompatible'}"
+            )
         click.echo(f"  Metadata: {'✅ Present' if metadata_exists else '❌ Missing'}")
 
         if sqlite_exists:
@@ -84,7 +99,10 @@ def check_compatibility(detailed: bool):
             click.echo(f"  Created: {metadata.get('created_at', 'unknown')}")
             click.echo(f"  Git commit: {metadata.get('git_commit', 'unknown')}")
 
-        overall_compatible = sqlite_compatible and vector_compatible and metadata_exists
+        # Overall compatible if SQLite works (vector is optional)
+        overall_compatible = sqlite_compatible and metadata_exists
+        if vector_available:
+            overall_compatible = overall_compatible and vector_compatible
         click.echo(
             f"\nOverall: {'✅ All compatible' if overall_compatible else '❌ Issues found'}"
         )
@@ -109,65 +127,68 @@ def rebuild(force: bool, sqlite_only: bool, vector_only: bool, sample_size: int)
     if not force:
         # Check if rebuild is needed
         try:
-            indexer = SemanticIndexer()
-            compatible = indexer.check_compatibility()
-            if compatible and os.path.exists("code_index.db"):
-                click.echo("Indexes appear compatible. Use --force to rebuild anyway.")
-                return
+            indexer = _get_semantic_indexer_instance()
+            if indexer:
+                compatible = indexer.check_compatibility()
+                if compatible and os.path.exists("code_index.db"):
+                    click.echo("Indexes appear compatible. Use --force to rebuild anyway.")
+                    return
         except Exception:
             pass  # Proceed with rebuild if check fails
 
     click.echo("Starting index rebuild...")
 
     if not sqlite_only:
-        click.echo("Rebuilding vector index...")
-        try:
-            # Remove old vector index
-            vector_path = "vector_index.qdrant"
-            if os.path.exists(vector_path):
-                import shutil
+        indexer = _get_semantic_indexer_instance()
+        if indexer is None:
+            click.echo("⚠️ Skipping vector index (semantic dependencies not installed)")
+            click.echo("   Install with: pip install code-index-mcp[semantic]")
+        else:
+            click.echo("Rebuilding vector index...")
+            try:
+                # Remove old vector index
+                vector_path = "vector_index.qdrant"
+                if os.path.exists(vector_path):
+                    import shutil
 
-                shutil.rmtree(vector_path)
+                    shutil.rmtree(vector_path)
 
-            # Create new vector index
-            indexer = SemanticIndexer()
+                # Find Python files to index
+                import glob
 
-            # Find Python files to index
-            import glob
+                python_files = glob.glob("**/*.py", recursive=True)
+                python_files = [
+                    f
+                    for f in python_files
+                    if not any(
+                        exclude in f
+                        for exclude in ["test_repos", ".git", "__pycache__", ".venv"]
+                    )
+                ]
 
-            python_files = glob.glob("**/*.py", recursive=True)
-            python_files = [
-                f
-                for f in python_files
-                if not any(
-                    exclude in f
-                    for exclude in ["test_repos", ".git", "__pycache__", ".venv"]
-                )
-            ]
+                if sample_size > 0:
+                    python_files = python_files[:sample_size]
 
-            if sample_size > 0:
-                python_files = python_files[:sample_size]
+                indexed_count = 0
+                with click.progressbar(python_files, label="Indexing files") as files:
+                    for file_path in files:
+                        try:
+                            result = indexer.index_file(Path(file_path))
+                            if result:
+                                indexed_count += 1
+                        except Exception as e:
+                            if force:
+                                continue  # Skip errors in force mode
+                            else:
+                                click.echo(f"\nError indexing {file_path}: {e}", err=True)
+                                return
 
-            indexed_count = 0
-            with click.progressbar(python_files, label="Indexing files") as files:
-                for file_path in files:
-                    try:
-                        result = indexer.index_file(Path(file_path))
-                        if result:
-                            indexed_count += 1
-                    except Exception as e:
-                        if force:
-                            continue  # Skip errors in force mode
-                        else:
-                            click.echo(f"\nError indexing {file_path}: {e}", err=True)
-                            return
+                click.echo(f"✅ Vector index rebuilt with {indexed_count} files")
 
-            click.echo(f"✅ Vector index rebuilt with {indexed_count} files")
-
-        except Exception as e:
-            click.echo(f"❌ Vector index rebuild failed: {e}", err=True)
-            if not force:
-                return
+            except Exception as e:
+                click.echo(f"❌ Vector index rebuild failed: {e}", err=True)
+                if not force:
+                    return
 
     if not vector_only:
         click.echo("Rebuilding SQLite index...")
@@ -239,22 +260,27 @@ def status():
             vector_size = total_size / (1024 * 1024)  # MB
 
             # Try to get collection info
-            indexer = SemanticIndexer()
-            try:
-                collections = indexer.qdrant.get_collections()
-                collection_count = len(collections.collections)
+            indexer = _get_semantic_indexer_instance()
+            if indexer:
+                try:
+                    collections = indexer.qdrant.get_collections()
+                    collection_count = len(collections.collections)
+                    click.echo(f"Vector Index:")
+                    click.echo(f"  🧠 Collections: {collection_count}")
+                    click.echo(f"  💾 Storage size: {vector_size:.1f} MB")
+                except Exception:
+                    click.echo(f"Vector Index:")
+                    click.echo(f"  💾 Storage size: {vector_size:.1f} MB")
+                    click.echo(f"  ⚠️ Could not read collection info")
+            else:
                 click.echo(f"Vector Index:")
-                click.echo(f"  🧠 Collections: {collection_count}")
                 click.echo(f"  💾 Storage size: {vector_size:.1f} MB")
-            except Exception:
-                click.echo(f"Vector Index:")
-                click.echo(f"  💾 Storage size: {vector_size:.1f} MB")
-                click.echo(f"  ⚠️ Could not read collection info")
+                click.echo(f"  ⚠️ Semantic deps not installed - install with: pip install code-index-mcp[semantic]")
 
         except Exception as e:
             click.echo(f"Vector Index: ❌ Error reading ({e})")
     else:
-        click.echo("Vector Index: ❌ Not found")
+        click.echo("Vector Index: ❌ Not found (optional - requires semantic deps)")
 
     # Metadata
     metadata_path = ".index_metadata.json"
@@ -440,6 +466,9 @@ def check_semantic():
             click.echo("  ✅ Successfully connected to Voyage AI")
             click.echo(f"  ✅ Model: voyage-code-3")
             click.echo(f"  ✅ Embedding dimension: {len(result.embeddings[0])}")
+        except ImportError:
+            click.echo("  ❌ voyageai package not installed")
+            click.echo("     Install with: pip install code-index-mcp[semantic]")
         except Exception as e:
             click.echo(f"  ❌ Failed to connect: {e}")
     else:

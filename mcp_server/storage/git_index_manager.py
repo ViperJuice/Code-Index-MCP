@@ -14,7 +14,8 @@ from datetime import datetime
 from typing import List, Dict, Optional, Tuple, Any
 from dataclasses import dataclass
 
-from .repository_registry import RepositoryRegistry, RepositoryInfo
+from .repository_registry import RepositoryRegistry
+from .multi_repo_manager import RepositoryInfo
 from .sqlite_store import SQLiteStore
 from ..dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from ..artifacts.commit_artifacts import CommitArtifactManager
