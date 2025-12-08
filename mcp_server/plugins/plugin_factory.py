@@ -11,6 +11,8 @@ The factory will use specialized plugins when available, falling back to generic
 tree-sitter based plugins for languages without specific implementations.
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
 from typing import Callable, Dict, Optional, Type, Union

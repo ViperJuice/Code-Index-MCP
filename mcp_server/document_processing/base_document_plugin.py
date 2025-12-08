@@ -1,5 +1,7 @@
 """Base class for document processing plugins with semantic capabilities."""
 
+from __future__ import annotations
+
 import hashlib
 import logging
 import mimetypes

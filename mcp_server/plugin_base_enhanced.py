@@ -1,5 +1,7 @@
 """Enhanced plugin base with semantic search support."""
 
+from __future__ import annotations
+
 import logging
 import os
 from abc import abstractmethod

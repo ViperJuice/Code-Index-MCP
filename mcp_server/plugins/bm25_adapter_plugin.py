@@ -5,6 +5,8 @@ This adapter allows the existing plugin system to work with BM25 indexes
 by implementing the IPlugin interface and querying the BM25 FTS5 tables.
 """
 
+from __future__ import annotations
+
 import logging
 import sqlite3
 from pathlib import Path

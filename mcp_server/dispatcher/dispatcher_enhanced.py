@@ -1,5 +1,7 @@
 """Enhanced dispatcher with dynamic plugin loading via PluginFactory."""
 
+from __future__ import annotations
+
 import hashlib
 import logging
 import os
