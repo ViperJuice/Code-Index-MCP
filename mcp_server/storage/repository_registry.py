@@ -7,11 +7,13 @@ registration information for cross-repository search.
 
 import json
 import logging
+import os
+import subprocess
 import threading
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -27,14 +29,14 @@ class RepositoryRegistry:
     - Active/inactive status tracking
     """
 
-    def __init__(self, registry_path: Path):
+    def __init__(self, registry_path: Optional[Path] = None):
         """
         Initialize the repository registry.
 
         Args:
-            registry_path: Path to registry JSON file
+            registry_path: Path to registry JSON file. Defaults to ~/.mcp/repository_registry.json
         """
-        self.registry_path = registry_path
+        self.registry_path = registry_path or self._get_default_registry_path()
         self._lock = threading.RLock()
         self._registry: Dict[str, Dict[str, Any]] = {}
 
@@ -45,6 +47,15 @@ class RepositoryRegistry:
         self._load()
 
         logger.info(f"Repository registry initialized at {registry_path}")
+
+    def _get_default_registry_path(self) -> Path:
+        """Return the default registry path under the user home directory."""
+        env_path = os.environ.get("MCP_REPO_REGISTRY")
+        if env_path:
+            return Path(env_path)
+
+        home = Path.home()
+        return home / ".mcp" / "repository_registry.json"
 
     def _load(self):
         """Load registry from disk."""
@@ -65,6 +76,8 @@ class RepositoryRegistry:
                 # Convert datetime
                 if "indexed_at" in repo_data:
                     repo_data["indexed_at"] = datetime.fromisoformat(repo_data["indexed_at"])
+                if "last_indexed" in repo_data and repo_data["last_indexed"]:
+                    repo_data["last_indexed"] = datetime.fromisoformat(repo_data["last_indexed"])
 
                 self._registry[repo_id] = repo_data
 
@@ -91,6 +104,13 @@ class RepositoryRegistry:
                     # Convert datetime to ISO format
                     if "indexed_at" in repo_data and hasattr(repo_data["indexed_at"], "isoformat"):
                         repo_data["indexed_at"] = repo_data["indexed_at"].isoformat()
+                    if "last_indexed" in repo_data and hasattr(
+                        repo_data["last_indexed"], "isoformat"
+                    ):
+                        repo_data["last_indexed"] = repo_data["last_indexed"].isoformat()
+
+                    if "index_location" in repo_data:
+                        repo_data["index_location"] = str(repo_data["index_location"])
 
                     data[repo_id] = repo_data
 
@@ -159,6 +179,18 @@ class RepositoryRegistry:
                 return self._dict_to_repo_info(repo_data.copy())
             return None
 
+    def get_repository(self, repository_id: str) -> Optional[Any]:
+        """
+        Get repository information (alias for get).
+
+        Args:
+            repository_id: Repository identifier.
+
+        Returns:
+            RepositoryInfo or None.
+        """
+        return self.get(repository_id)
+
     def list_all(self) -> List[Any]:
         """
         List all registered repositories.
@@ -186,6 +218,8 @@ class RepositoryRegistry:
         # Ensure datetime is parsed
         if isinstance(repo_dict.get("indexed_at"), str):
             repo_dict["indexed_at"] = datetime.fromisoformat(repo_dict["indexed_at"])
+        if isinstance(repo_dict.get("last_indexed"), str):
+            repo_dict["last_indexed"] = datetime.fromisoformat(repo_dict["last_indexed"])
 
         return RepositoryInfo(**repo_dict)
 
@@ -249,6 +283,87 @@ class RepositoryRegistry:
                 logger.info(f"Updated statistics for repository {repository_id}")
             else:
                 logger.warning(f"Repository {repository_id} not found in registry")
+
+    def update_current_commit(self, repository_id: str) -> Optional[str]:
+        """
+        Refresh the current commit for a repository by reading its git HEAD.
+
+        Args:
+            repository_id: Repository identifier.
+
+        Returns:
+            The commit SHA if updated, otherwise None.
+        """
+        with self._lock:
+            repo = self._registry.get(repository_id)
+            if not repo:
+                logger.warning(f"Repository {repository_id} not found in registry")
+                return None
+
+            repo_path = Path(repo["path"])
+
+        commit = self._get_git_commit(repo_path)
+        if commit:
+            with self._lock:
+                self._registry[repository_id]["current_commit"] = commit
+                self.save()
+            return commit
+
+        return None
+
+    def update_indexed_commit(self, repository_id: str, commit: str) -> Optional[str]:
+        """
+        Persist the last indexed commit for a repository.
+
+        Args:
+            repository_id: Repository identifier.
+            commit: Commit SHA that was indexed.
+
+        Returns:
+            The stored commit SHA, or None if the repository was not found.
+        """
+        with self._lock:
+            repo = self._registry.get(repository_id)
+            if not repo:
+                logger.warning(f"Repository {repository_id} not found in registry")
+                return None
+
+            repo["last_indexed_commit"] = commit
+            repo["last_indexed"] = datetime.now()
+            self.save()
+            return commit
+
+    def get_repositories_needing_update(self) -> List[Tuple[str, Any]]:
+        """
+        Return repositories where the current commit differs from the last indexed commit.
+
+        Returns:
+            List of tuples containing repository ID and RepositoryInfo.
+        """
+        stale: List[Tuple[str, Any]] = []
+        with self._lock:
+            for repo_id, repo_data in self._registry.items():
+                repo_info = self._dict_to_repo_info(repo_data.copy())
+                if repo_info.needs_update():
+                    stale.append((repo_id, repo_info))
+        return stale
+
+    def _get_git_commit(self, repo_path: Path) -> Optional[str]:
+        """Return the HEAD commit SHA for a repository path."""
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return result.stdout.strip()
+        except subprocess.CalledProcessError as exc:
+            logger.error(f"Failed to read git commit for {repo_path}: {exc}")
+        except FileNotFoundError:
+            logger.error("Git is not installed or not available in PATH")
+        return None
 
     def find_by_path(self, path: Path) -> Optional[str]:
         """

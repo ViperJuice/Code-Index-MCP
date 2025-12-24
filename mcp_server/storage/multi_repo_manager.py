@@ -34,8 +34,38 @@ class RepositoryInfo:
     total_files: int
     total_symbols: int
     indexed_at: datetime
+    current_commit: Optional[str] = None
+    last_indexed_commit: Optional[str] = None
+    last_indexed: Optional[datetime] = None
+    current_branch: Optional[str] = None
+    url: Optional[str] = None
+    auto_sync: bool = True
+    artifact_enabled: bool = False
     active: bool = True
     priority: int = 0  # Higher priority repos searched first
+    index_location: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        """Normalize paths and derived fields."""
+        if isinstance(self.path, str):
+            self.path = Path(self.path)
+
+        if isinstance(self.index_path, str):
+            self.index_path = Path(self.index_path)
+
+        if self.index_location is None:
+            # If index_path points to a file, use its parent directory as index location.
+            index_base = self.index_path.parent if self.index_path.suffix else self.index_path
+            self.index_location = str(index_base)
+
+    @property
+    def repo_id(self) -> str:
+        """Alias for repository_id to match legacy callers."""
+        return self.repository_id
+
+    def needs_update(self) -> bool:
+        """Return True if the current commit differs from the last indexed commit."""
+        return bool(self.current_commit and self.current_commit != self.last_indexed_commit)
 
 
 @dataclass
