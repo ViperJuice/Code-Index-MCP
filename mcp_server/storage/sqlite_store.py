@@ -9,6 +9,7 @@ import json
 import logging
 import sqlite3
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -35,14 +36,8 @@ class SQLiteStore:
         self.db_path = db_path
         self.path_resolver = path_resolver or PathResolver()
 
-        # Check if database already exists
-        db_exists = Path(db_path).exists()
-
         self._init_database()
-
-        # Only run migrations on new databases
-        if not db_exists:
-            self._run_migrations()
+        self._run_migrations()
 
     def _init_database(self):
         """Initialize database and create schema if needed."""
@@ -201,15 +196,21 @@ class SQLiteStore:
                 language TEXT,
                 size INTEGER,
                 hash TEXT,
+                content_hash TEXT,
                 last_modified TIMESTAMP,
                 indexed_at TIMESTAMP,
+                is_deleted BOOLEAN DEFAULT FALSE,
+                deleted_at TIMESTAMP,
                 metadata JSON,
                 FOREIGN KEY (repository_id) REFERENCES repositories(id),
-                UNIQUE(repository_id, path)
+                UNIQUE(repository_id, relative_path)
             );
             
             CREATE INDEX IF NOT EXISTS idx_files_language ON files(language);
             CREATE INDEX IF NOT EXISTS idx_files_hash ON files(hash);
+            CREATE INDEX IF NOT EXISTS idx_files_content_hash ON files(content_hash);
+            CREATE INDEX IF NOT EXISTS idx_files_deleted ON files(is_deleted);
+            CREATE INDEX IF NOT EXISTS idx_files_relative_path ON files(relative_path);
             
             -- Symbols
             CREATE TABLE IF NOT EXISTS symbols (
@@ -367,7 +368,7 @@ class SQLiteStore:
 
             -- Insert initial schema version
             INSERT INTO schema_version (version, description)
-            VALUES (1, 'Initial schema creation');
+            VALUES (2, 'Initial schema creation with content tracking and soft delete support');
         """
         )
 
@@ -427,31 +428,84 @@ class SQLiteStore:
     def store_file(
         self,
         repository_id: int,
-        file_path: Union[str, Path],
+        path: Optional[Union[str, Path]] = None,
+        relative_path: Optional[Union[str, Path]] = None,
         language: Optional[str] = None,
         size: Optional[int] = None,
+        hash: Optional[str] = None,
+        content_hash: Optional[str] = None,
         metadata: Optional[Dict] = None,
+        is_deleted: bool = False,
+        deleted_at: Optional[Union[str, datetime]] = None,
+        **kwargs: Any,
     ) -> int:
         """Store file information using relative paths and content hashes."""
-        # Convert to Path object and normalize
-        path = Path(file_path)
+        file_path_arg = kwargs.pop("file_path", None)
+        resolved_path = Path(path or file_path_arg) if path or file_path_arg else None
 
-        # Compute relative path
-        relative_path = self.path_resolver.normalize_path(path)
+        if not resolved_path and not relative_path:
+            raise ValueError("Either 'path' or 'relative_path' must be provided to store_file")
 
-        # Compute content hash
-        content_hash = self.path_resolver.compute_content_hash(path)
+        relative_path_str: Optional[str] = None
+        if relative_path is not None:
+            relative_path_str = str(relative_path).replace("\\", "/")
+        elif resolved_path:
+            try:
+                relative_path_str = self.path_resolver.normalize_path(resolved_path)
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning(f"Could not normalize path {resolved_path}: {exc}")
+                relative_path_str = str(resolved_path).replace("\\", "/")
+
+        if not relative_path_str:
+            raise ValueError("Relative path could not be determined for file storage")
+
+        # Normalize stored path string
+        stored_path = str(resolved_path) if resolved_path else relative_path_str
+
+        # Determine filesystem metadata when available
+        path_exists = resolved_path.exists() if resolved_path else False
+        file_size = size
+        if file_size is None and path_exists:
+            try:
+                file_size = resolved_path.stat().st_size
+            except OSError as exc:  # pragma: no cover - defensive
+                logger.warning(f"Could not read size for {resolved_path}: {exc}")
+
+        file_hash = hash
+        if file_hash is None and path_exists:
+            try:
+                file_hash = self.path_resolver.compute_file_hash(resolved_path)
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning(f"Failed to compute file hash for {resolved_path}: {exc}")
+
+        content_hash_value = content_hash
+        if content_hash_value is None and path_exists:
+            try:
+                content_hash_value = self.path_resolver.compute_content_hash(resolved_path)
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning(f"Failed to compute content hash for {resolved_path}: {exc}")
+
+        last_modified_value = (
+            datetime.fromtimestamp(resolved_path.stat().st_mtime, tz=timezone.utc)
+            if path_exists
+            else datetime.now(timezone.utc)
+        )
+        indexed_at_value = datetime.now(timezone.utc)
 
         with self._get_connection() as conn:
             # Check if file already exists with same content hash
-            existing = self.get_file_by_content_hash(content_hash, repository_id)
-            if existing and existing["relative_path"] != relative_path:
+            existing = (
+                self.get_file_by_content_hash(content_hash_value, repository_id)
+                if content_hash_value
+                else None
+            )
+            if existing and existing["relative_path"] != relative_path_str:
                 # File moved - record the move
                 self.move_file(
                     existing["relative_path"],
-                    relative_path,
+                    relative_path_str,
                     repository_id,
-                    content_hash,
+                    content_hash_value or "",
                 )
                 return existing["id"]
 
@@ -459,28 +513,32 @@ class SQLiteStore:
             cursor = conn.execute(
                 """INSERT INTO files 
                    (repository_id, path, relative_path, language, size, hash, content_hash,
-                    last_modified, indexed_at, metadata, is_deleted)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, FALSE)
+                    last_modified, indexed_at, metadata, is_deleted, deleted_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT(repository_id, relative_path) DO UPDATE SET
                    path=excluded.path,
                    language=excluded.language,
                    size=excluded.size,
                    hash=excluded.hash,
                    content_hash=excluded.content_hash,
-                   last_modified=CURRENT_TIMESTAMP,
-                   indexed_at=CURRENT_TIMESTAMP,
+                   last_modified=excluded.last_modified,
+                   indexed_at=excluded.indexed_at,
                    metadata=excluded.metadata,
-                   is_deleted=FALSE,
-                   deleted_at=NULL""",
+                   is_deleted=excluded.is_deleted,
+                   deleted_at=excluded.deleted_at""",
                 (
                     repository_id,
-                    str(path),
-                    relative_path,
+                    stored_path,
+                    relative_path_str,
                     language,
-                    size,
-                    self.path_resolver.compute_file_hash(path),
-                    content_hash,
+                    file_size,
+                    file_hash,
+                    content_hash_value,
+                    last_modified_value,
+                    indexed_at_value,
                     json.dumps(metadata or {}),
+                    bool(is_deleted),
+                    deleted_at,
                 ),
             )
             if cursor.lastrowid:

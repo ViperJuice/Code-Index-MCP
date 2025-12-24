@@ -16,7 +16,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-import psutil
+try:
+    import psutil
+except ImportError:  # pragma: no cover - optional dependency
+    psutil = None
 
 # from mcp_server.plugin_system.models import LoadedPlugin
 from mcp_server.plugins.plugin_factory import PluginFactory
@@ -84,8 +87,13 @@ class MemoryAwarePluginManager:
         self._factory = PluginFactory()
 
         # Memory monitoring
-        self._process = psutil.Process()
-        self._base_memory = self._get_current_memory()
+        if psutil is None:
+            self._process = None
+            self._base_memory = 0
+            logger.warning("psutil is not available; memory tracking is disabled")
+        else:
+            self._process = psutil.Process()
+            self._base_memory = self._get_current_memory()
 
         logger.info(f"Memory-aware plugin manager initialized with {max_memory_mb}MB limit")
 
@@ -245,6 +253,8 @@ class MemoryAwarePluginManager:
 
     def _get_current_memory(self) -> int:
         """Get current process memory usage in bytes."""
+        if not self._process:
+            return 0
         return self._process.memory_info().rss
 
     def _get_plugin_memory_usage(self) -> int:

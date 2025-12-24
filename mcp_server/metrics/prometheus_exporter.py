@@ -6,16 +6,47 @@ Provides detailed metrics for monitoring and alerting.
 import logging
 from typing import Any, Callable, Dict
 
-from prometheus_client import (
-    CONTENT_TYPE_LATEST,
-    CollectorRegistry,
-    Counter,
-    Gauge,
-    Histogram,
-    Info,
-    generate_latest,
-)
-from prometheus_client.core import GaugeMetricFamily
+try:
+    from prometheus_client import (  # type: ignore
+        CONTENT_TYPE_LATEST,
+        CollectorRegistry,
+        Counter,
+        Gauge,
+        Histogram,
+        Info,
+        generate_latest,
+    )
+    from prometheus_client.core import GaugeMetricFamily  # type: ignore
+
+    PROMETHEUS_AVAILABLE = True
+except ImportError:  # pragma: no cover - optional dependency
+    PROMETHEUS_AVAILABLE = False
+
+    class _NoOpMetric:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def labels(self, *args: Any, **kwargs: Any) -> "._NoOpMetric":
+            return self
+
+        def observe(self, *args: Any, **kwargs: Any) -> None:
+            return None
+
+        def inc(self, *args: Any, **kwargs: Any) -> None:
+            return None
+
+        def set(self, *args: Any, **kwargs: Any) -> None:
+            return None
+
+    class CollectorRegistry:  # type: ignore[override]
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+    Counter = Gauge = Histogram = Info = GaugeMetricFamily = _NoOpMetric  # type: ignore
+    CONTENT_TYPE_LATEST = "text/plain"
+
+    def generate_latest(registry: CollectorRegistry | None = None) -> bytes:
+        return b""
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +62,8 @@ class PrometheusExporter:
             registry: Prometheus collector registry
         """
         self.registry = registry or CollectorRegistry()
+        if not PROMETHEUS_AVAILABLE:
+            logger.warning("prometheus_client is not available; exporting metrics as no-ops")
         self._initialize_metrics()
 
     def _initialize_metrics(self):
