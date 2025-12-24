@@ -239,11 +239,12 @@ class IncrementalIndexer:
             logger.error(f"Failed to index file {path}: {e}")
             return "error"
 
-    def _needs_reindex(self, file_path: Path) -> bool:
+    def _needs_reindex(self, file_path: Path, stored_file: Optional[Dict] = None) -> bool:
         """Check if a file needs to be reindexed.
 
         Args:
             file_path: Absolute file path
+            stored_file: Optional cached file record
 
         Returns:
             True if file needs reindexing
@@ -256,12 +257,12 @@ class IncrementalIndexer:
             relative_path = self.path_resolver.normalize_path(file_path)
             repo_id = self._get_repository_id()
 
-            stored_file = self.store.get_file_by_path(relative_path, repo_id)
+            stored_file = stored_file or self.store.get_file_by_path(relative_path, repo_id)
             if not stored_file:
                 # File not in index
                 return True
 
-            stored_hash = stored_file.get("content_hash")
+            stored_hash = stored_file.get("content_hash") or stored_file.get("hash")
             if not stored_hash:
                 # No hash stored, reindex
                 return True
@@ -344,7 +345,7 @@ class IncrementalIndexer:
 
             if not full_path.exists():
                 stats["files_missing"] += 1
-            elif self._needs_reindex(full_path):
+            elif self._needs_reindex(full_path, stored_file=file_info):
                 stats["files_changed"] += 1
             else:
                 stats["files_ok"] += 1

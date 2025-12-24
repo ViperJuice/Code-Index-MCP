@@ -518,6 +518,70 @@ class SQLiteStore:
             row = cursor.fetchone()
             return dict(row) if row else None
 
+    def get_file_by_path(
+        self, file_path: Union[str, Path], repository_id: Optional[int] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Get a file record by path, returning normalized paths and content hash."""
+        try:
+            relative_path = self.path_resolver.normalize_path(file_path)
+        except ValueError:
+            relative_path = str(file_path).replace("\\", "/")
+
+        with self._get_connection() as conn:
+            query = "SELECT * FROM files WHERE relative_path = ? AND is_deleted = FALSE"
+            params: Tuple[Union[str, int], ...]
+
+            if repository_id is not None:
+                query += " AND repository_id = ?"
+                params = (relative_path, repository_id)
+            else:
+                params = (relative_path,)
+
+            cursor = conn.execute(query, params)
+            row = cursor.fetchone()
+            return self._normalize_file_record(row) if row else None
+
+    def get_all_files(self, repository_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Get all non-deleted files with normalized paths and content hashes."""
+        with self._get_connection() as conn:
+            query = "SELECT * FROM files WHERE is_deleted = FALSE"
+            params: Tuple[Union[str, int], ...] = ()
+
+            if repository_id is not None:
+                query += " AND repository_id = ?"
+                params = (repository_id,)
+
+            cursor = conn.execute(query, params)
+            return [self._normalize_file_record(row) for row in cursor.fetchall()]
+
+    def _normalize_file_record(self, row: sqlite3.Row) -> Dict[str, Any]:
+        """Normalize file record paths and include content hash."""
+        record = dict(row)
+        original_path = record.get("path") or ""
+        relative_path = record.get("relative_path")
+
+        normalized_path: Optional[str] = None
+        if relative_path:
+            normalized_path = str(relative_path).replace("\\", "/")
+        elif original_path:
+            try:
+                normalized_path = self.path_resolver.normalize_path(original_path)
+            except Exception:
+                normalized_path = str(original_path).replace("\\", "/")
+
+        if normalized_path:
+            record["path"] = normalized_path
+            record["relative_path"] = normalized_path
+            try:
+                record["absolute_path"] = str(self.path_resolver.resolve_path(normalized_path))
+            except Exception:
+                record["absolute_path"] = original_path or normalized_path
+        else:
+            record["absolute_path"] = original_path
+
+        record["content_hash"] = record.get("content_hash") or record.get("hash")
+        return record
+
     # Symbol operations
     def store_symbol(
         self,
