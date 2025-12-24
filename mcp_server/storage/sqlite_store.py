@@ -695,6 +695,67 @@ class SQLiteStore:
             return [dict(row) for row in cursor.fetchall()]
 
     # Search operations
+    def search_symbols(
+        self,
+        query: Optional[str] = None,
+        where_clause: Optional[str] = None,
+        params: Optional[List[Any]] = None,
+        limit: int = 20,
+    ) -> List[Dict[str, Any]]:
+        """
+        Search for symbols with optional filtering.
+
+        Args:
+            query: Optional symbol name or pattern (uses LIKE)
+            where_clause: Optional WHERE clause fragment (without the WHERE keyword)
+            params: Parameters for the WHERE clause
+            limit: Maximum number of results
+
+        Returns:
+            List of matching symbols with normalized fields
+        """
+        if not where_clause and query is not None:
+            where_clause = "s.name LIKE ?"
+            params = [f"%{query}%"]
+
+        where_clause = where_clause or "1=1"
+        parameters: List[Any] = list(params or [])
+
+        sql = f"""
+            SELECT
+                s.name,
+                s.kind AS type,
+                f.language,
+                COALESCE(f.relative_path, f.path) AS file_path,
+                s.line_start AS line,
+                s.line_end,
+                s.column_start,
+                s.column_end,
+                s.signature,
+                s.documentation
+            FROM symbols s
+            JOIN files f ON s.file_id = f.id
+            WHERE {where_clause}
+            ORDER BY s.name
+            LIMIT ?
+        """
+
+        parameters.append(limit)
+
+        with self._get_connection() as conn:
+            cursor = conn.execute(sql, parameters)
+            results = [dict(row) for row in cursor.fetchall()]
+
+        for result in results:
+            if "type" not in result and "kind" in result:
+                result["type"] = result["kind"]
+            if "file_path" not in result:
+                result["file_path"] = result.get("path") or result.get("relative_path")
+            if "line" not in result:
+                result["line"] = result.get("line_start") or result.get("line_number")
+
+        return results
+
     def search_symbols_fuzzy(self, query: str, limit: int = 20) -> List[Dict]:
         """
         Fuzzy search for symbols using trigrams.
