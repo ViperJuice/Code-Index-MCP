@@ -273,6 +273,26 @@ class MultiRepositoryManager:
             logger.error(f"Failed to connect to repository {repository_id}: {e}")
             return None
 
+    def _normalize_symbol_result(self, result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Normalize symbol search result fields for aggregation."""
+        symbol_name = result.get("symbol") or result.get("name")
+        if not symbol_name:
+            return None
+
+        file_path = result.get("file_path") or result.get("file") or result.get("path")
+        if not file_path and result.get("relative_path"):
+            file_path = result["relative_path"]
+
+        line_number = result.get("line") or result.get("line_start") or result.get("line_number")
+
+        return {
+            "symbol": symbol_name,
+            "type": result.get("type") or result.get("kind"),
+            "language": result.get("language"),
+            "file": file_path,
+            "line": line_number,
+        }
+
     async def search_symbol(
         self,
         query: str,
@@ -372,32 +392,29 @@ class MultiRepositoryManager:
 
         try:
             # Build search query
-            conditions = ["name LIKE ?"]
+            conditions = ["s.name LIKE ?"]
             params = [f"%{query}%"]
 
             if language:
-                conditions.append("language = ?")
+                conditions.append("f.language = ?")
                 params.append(language)
 
             where_clause = " AND ".join(conditions)
 
             # Execute search
-            results = store.search_symbols(where_clause=where_clause, params=params, limit=limit)
+            results = store.search_symbols(
+                query=query, where_clause=where_clause, params=params, limit=limit
+            )
 
-            # Convert results
+            # Convert and normalize results
             formatted_results = []
             for result in results:
-                formatted_results.append(
-                    {
-                        "symbol": result["name"],
-                        "type": result["type"],
-                        "language": result["language"],
-                        "file": result["file_path"],
-                        "line": result["line"],
-                        "repository": repo_info.name,
-                        "repository_id": repository_id,
-                    }
-                )
+                normalized = self._normalize_symbol_result(result)
+                if not normalized:
+                    continue
+                normalized["repository"] = repo_info.name
+                normalized["repository_id"] = repository_id
+                formatted_results.append(normalized)
 
             search_time = (datetime.now() - start_time).total_seconds()
 

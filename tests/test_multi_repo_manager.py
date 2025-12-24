@@ -20,6 +20,7 @@ from mcp_server.storage.multi_repo_manager import (
     get_multi_repo_manager,
 )
 from mcp_server.storage.repository_registry import RepositoryRegistry
+from mcp_server.storage.sqlite_store import SQLiteStore
 
 
 class TestMultiRepositoryManager:
@@ -52,6 +53,69 @@ class TestMultiRepositoryManager:
             indexed_at=datetime.now(),
             active=True,
             priority=1,
+        )
+
+    @staticmethod
+    def _create_test_index(
+        repo_dir: Path, repository_id: str, language: str, symbol_name: str, priority: int = 0
+    ) -> RepositoryInfo:
+        """Create a minimal SQLite index for testing."""
+        index_dir = repo_dir / ".mcp-index"
+        index_dir.mkdir(parents=True, exist_ok=True)
+        index_path = index_dir / "index.db"
+
+        store = SQLiteStore(str(index_path))
+
+        with store._get_connection() as conn:
+            repo_row_id = conn.execute(
+                "INSERT INTO repositories (path, name, metadata) VALUES (?, ?, ?)",
+                (str(repo_dir), repo_dir.name, "{}"),
+            ).lastrowid
+
+            file_name = f"{symbol_name}.{'py' if language == 'python' else 'js'}"
+            file_path = repo_dir / file_name
+
+            file_cursor = conn.execute(
+                """
+                INSERT INTO files
+                    (repository_id, path, relative_path, language, size, hash, content_hash,
+                     last_modified, indexed_at, metadata, is_deleted)
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, FALSE)
+                """,
+                (
+                    repo_row_id,
+                    str(file_path),
+                    file_name,
+                    language,
+                    0,
+                    f"{symbol_name}_hash",
+                    f"{symbol_name}_content",
+                    "{}",
+                ),
+            )
+            file_id = file_cursor.lastrowid
+
+            conn.execute(
+                """
+                INSERT INTO symbols
+                    (file_id, name, kind, line_start, line_end, column_start, column_end,
+                     signature, documentation, metadata)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (file_id, symbol_name, "function", 5, 5, 0, 0, "", "", "{}"),
+            )
+
+        return RepositoryInfo(
+            repository_id=repository_id,
+            name=repo_dir.name,
+            path=repo_dir,
+            index_path=index_path,
+            language_stats={language: 1},
+            total_files=1,
+            total_symbols=1,
+            indexed_at=datetime.now(),
+            active=True,
+            priority=priority,
         )
 
     def test_initialization(self, manager, temp_registry):
@@ -183,6 +247,43 @@ class TestMultiRepositoryManager:
         assert len(result.results) == 1
         assert result.results[0]["symbol"] == "test_function"
         assert result.error is None
+
+    @pytest.mark.asyncio
+    async def test_symbol_search_with_registered_indexes(self, manager):
+        """Search across multiple real indexes and normalize results."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base_dir = Path(temp_dir)
+            repo_a = base_dir / "repo_a"
+            repo_b = base_dir / "repo_b"
+
+            repo_a_info = self._create_test_index(
+                repo_a, "repo_a", "python", "alpha_func", priority=0
+            )
+            repo_b_info = self._create_test_index(
+                repo_b, "repo_b", "javascript", "beta_func", priority=1
+            )
+
+            manager.registry.register(repo_a_info)
+            manager.registry.register(repo_b_info)
+
+            results = await manager.search_symbol(query="func", limit=5)
+
+        assert len(results) == 2
+        # Higher priority repo_b should appear first
+        assert results[0].repository_id == "repo_b"
+        assert results[1].repository_id == "repo_a"
+
+        repo_b_result = results[0].results[0]
+        repo_a_result = results[1].results[0]
+
+        assert repo_b_result["symbol"] == "beta_func"
+        assert repo_b_result["file"].endswith("beta_func.js")
+        assert repo_b_result["type"] == "function"
+        assert repo_b_result["line"] == 5
+
+        assert repo_a_result["symbol"] == "alpha_func"
+        assert repo_a_result["language"] == "python"
+        assert repo_a_result["file"].endswith("alpha_func.py")
 
     @pytest.mark.asyncio
     async def test_parallel_search(self, manager):
