@@ -592,6 +592,91 @@ class SQLiteStore:
                 )
             return [dict(row) for row in cursor.fetchall()]
 
+    def find_symbol_definition(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """
+        Find a symbol definition by name, prioritizing exact matches.
+        
+        Args:
+            symbol: The name of the symbol to find.
+            
+        Returns:
+            Dictionary with symbol details or None if not found.
+        """
+        with self._get_connection() as conn:
+            # First try symbols table for exact matches
+            cursor = conn.execute("""
+                SELECT s.name, s.kind, s.line_start, s.signature, s.documentation, f.path
+                FROM symbols s
+                JOIN files f ON s.file_id = f.id
+                WHERE s.name = ? OR s.name LIKE ?
+                ORDER BY CASE WHEN s.name = ? THEN 0 ELSE 1 END
+                LIMIT 1
+            """, (symbol, f'%{symbol}%', symbol))
+            
+            row = cursor.fetchone()
+            if row:
+                return {
+                    'symbol': row['name'],
+                    'kind': row['kind'],
+                    'language': 'unknown',  # Language inferred by caller or joined
+                    'signature': row['signature'] or f"{row['kind']} {row['name']}",
+                    'doc': row['documentation'],
+                    'defined_in': row['path'],
+                    'line': row['line_start'] or 1,
+                    'span': (0, len(row['name']))
+                }
+            return None
+
+    def search_bm25_symbol(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """
+        Fallback search for a symbol using BM25 index.
+        """
+        with self._get_connection() as conn:
+            # Check if BM25 table exists
+            cursor = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='bm25_content'"
+            )
+            if not cursor.fetchone():
+                return None
+
+            patterns = [
+                f'class {symbol}',
+                f'def {symbol}', 
+                f'function {symbol}',
+                symbol
+            ]
+            
+            for pattern in patterns:
+                cursor = conn.execute("""
+                    SELECT filepath, snippet(bm25_content, -1, '', '', '...', 20) as snippet, language
+                    FROM bm25_content
+                    WHERE bm25_content MATCH ?
+                    ORDER BY rank
+                    LIMIT 1
+                """, (pattern,))
+                
+                row = cursor.fetchone()
+                if row:
+                    filepath, snippet, language = row
+                    pattern_lower = pattern.lower()
+                    kind = 'symbol'
+                    if 'class' in pattern_lower:
+                        kind = 'class'
+                    elif 'def' in pattern_lower or 'function' in pattern_lower:
+                        kind = 'function'
+                    
+                    return {
+                        'symbol': symbol,
+                        'kind': kind,
+                        'language': language or 'unknown',
+                        'signature': snippet,
+                        'doc': None,
+                        'defined_in': filepath,
+                        'line': 1,
+                        'span': (0, len(symbol))
+                    }
+            return None
+
     # Reference operations
     def store_reference(
         self,

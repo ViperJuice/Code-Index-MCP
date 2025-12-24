@@ -20,8 +20,8 @@ on:
       retention_days:
         description: 'Retention days for promoted artifacts'
         required: false
-        default: '30'
-        type: string
+        default: 30
+        type: number
   
   workflow_call:
     inputs:
@@ -37,7 +37,7 @@ on:
       retention_days:
         description: 'Days to retain artifact'
         required: false
-        default: '7'
+        default: 7
         type: number
     secrets:
       GITHUB_TOKEN:

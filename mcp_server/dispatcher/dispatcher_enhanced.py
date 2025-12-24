@@ -232,95 +232,69 @@ class EnhancedDispatcher:
         )
 
     def _load_all_plugins(self):
-        """Load all available plugins using PluginFactory with timeout protection."""
-        logger.info("Loading all available plugins with timeout...")
-        
-        import signal
-        from contextlib import contextmanager
-        
-        @contextmanager
-        def timeout(seconds):
-            def timeout_handler(signum, frame):
-                raise TimeoutError(f"Plugin loading timed out after {seconds}s")
-            
-            # Only use alarm on Unix-like systems
-            if hasattr(signal, 'SIGALRM'):
-                old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-                signal.alarm(seconds)
-                try:
-                    yield
-                finally:
-                    signal.alarm(0)
-                    signal.signal(signal.SIGALRM, old_handler)
-            else:
-                # On Windows, just yield without timeout
-                yield
+        """Load all available plugins using PluginFactory."""
+        logger.info("Loading all available plugins...")
         
         try:
-            with timeout(5):  # 5 second timeout
-                # Use repository-aware loading if available
-                if self._repo_plugin_loader and self._memory_aware:
-                    # Get languages to load based on repository content
-                    languages_to_load = self._repo_plugin_loader.get_required_plugins()
-                    priority_order = self._repo_plugin_loader.get_priority_languages()
-                    
-                    # Log loading plan
-                    self._repo_plugin_loader.log_loading_plan()
-                    
-                    # Load plugins in priority order
-                    for lang in priority_order:
-                        if lang in languages_to_load:
-                            try:
-                                # Use memory manager if available
-                                if self._memory_manager:
-                                    import asyncio
-                                    # Check if we're already in an async context
-                                    try:
-                                        loop = asyncio.get_running_loop()
-                                        # We're in an async context, can't use asyncio.run
-                                        logger.warning(f"Cannot use async memory manager from sync context for {lang}, using direct creation")
-                                        plugin = PluginFactory.create_plugin(
-                                            lang, self._sqlite_store, self._semantic_enabled
-                                        )
-                                    except RuntimeError:
-                                        # No running loop, safe to use asyncio.run
-                                        plugin = asyncio.run(self._memory_manager.get_plugin(lang))
-                                else:
+            # Use repository-aware loading if available
+            if self._repo_plugin_loader and self._memory_aware:
+                # Get languages to load based on repository content
+                languages_to_load = self._repo_plugin_loader.get_required_plugins()
+                priority_order = self._repo_plugin_loader.get_priority_languages()
+                
+                # Log loading plan
+                self._repo_plugin_loader.log_loading_plan()
+                
+                # Load plugins in priority order
+                for lang in priority_order:
+                    if lang in languages_to_load:
+                        try:
+                            # Use memory manager if available
+                            if self._memory_manager:
+                                import asyncio
+                                # Check if we're already in an async context
+                                try:
+                                    loop = asyncio.get_running_loop()
+                                    # We're in an async context, can't use asyncio.run
+                                    logger.warning(f"Cannot use async memory manager from sync context for {lang}, using direct creation")
                                     plugin = PluginFactory.create_plugin(
                                         lang, self._sqlite_store, self._semantic_enabled
                                     )
-                                
-                                if plugin:
-                                    self._plugins.append(plugin)
-                                    self._by_lang[lang] = plugin
-                                    self._loaded_languages.add(lang)
-                                    self._operation_stats["plugins_loaded"] += 1
-                                    self._repo_plugin_loader.mark_loaded(lang)
-                            except Exception as e:
-                                logger.error(f"Failed to load {lang} plugin: {e}")
-                else:
-                    # Fall back to loading all plugins
-                    all_plugins = PluginFactory.create_all_plugins(
-                        sqlite_store=self._sqlite_store, enable_semantic=self._semantic_enabled
-                    )
-
-                    for lang, plugin in all_plugins.items():
-                        self._plugins.append(plugin)
-                        self._by_lang[lang] = plugin
-                        self._loaded_languages.add(lang)
-                        self._operation_stats["plugins_loaded"] += 1
-
-                if self._enable_advanced:
-                    self._register_plugins_with_router()
-
-                logger.info(
-                    f"Loaded {len(self._plugins)} plugins: {', '.join(sorted(self._loaded_languages))}"
+                                except RuntimeError:
+                                    # No running loop, safe to use asyncio.run
+                                    plugin = asyncio.run(self._memory_manager.get_plugin(lang))
+                            else:
+                                plugin = PluginFactory.create_plugin(
+                                    lang, self._sqlite_store, self._semantic_enabled
+                                )
+                            
+                            if plugin:
+                                self._plugins.append(plugin)
+                                self._by_lang[lang] = plugin
+                                self._loaded_languages.add(lang)
+                                self._operation_stats["plugins_loaded"] += 1
+                                self._repo_plugin_loader.mark_loaded(lang)
+                        except Exception as e:
+                            logger.error(f"Failed to load {lang} plugin: {e}")
+            else:
+                # Fall back to loading all plugins
+                all_plugins = PluginFactory.create_all_plugins(
+                    sqlite_store=self._sqlite_store, enable_semantic=self._semantic_enabled
                 )
+
+                for lang, plugin in all_plugins.items():
+                    self._plugins.append(plugin)
+                    self._by_lang[lang] = plugin
+                    self._loaded_languages.add(lang)
+                    self._operation_stats["plugins_loaded"] += 1
+
+            if self._enable_advanced:
+                self._register_plugins_with_router()
+
+            logger.info(
+                f"Loaded {len(self._plugins)} plugins: {', '.join(sorted(self._loaded_languages))}"
+            )
         
-        except TimeoutError as e:
-            logger.warning(f"Plugin loading timeout: {e}")
-            self._plugins = []  # Ensure empty list on timeout
-            self._loaded_languages = set()
         except Exception as e:
             logger.error(f"Plugin loading failed: {e}")
             self._plugins = []  # Ensure empty list on failure
@@ -570,90 +544,21 @@ class EnhancedDispatcher:
         start_time = time.time()
 
         try:
-            # For symbol lookup, prefer BM25 direct lookup to avoid plugin loading delays
-            # Only load plugins if explicitly needed and BM25 fails
+            # For symbol lookup, prefer Store lookup to avoid plugin loading delays
+            # Only load plugins if explicitly needed and Store lookup fails
             if self._sqlite_store:
-                logger.debug("Using BM25 lookup directly for better performance")
+                logger.debug("Using SQLite Store lookup directly for better performance")
                 try:
-                    import sqlite3
-                    conn = sqlite3.connect(self._sqlite_store.db_path)
-                    cursor = conn.cursor()
-                    
-                    # First try symbols table for exact matches
-                    cursor.execute("""
-                        SELECT s.name, s.kind, s.line_start, s.signature, s.documentation, f.path
-                        FROM symbols s
-                        JOIN files f ON s.file_id = f.id
-                        WHERE s.name = ? OR s.name LIKE ?
-                        ORDER BY CASE WHEN s.name = ? THEN 0 ELSE 1 END
-                        LIMIT 1
-                    """, (symbol, f'%{symbol}%', symbol))
-                    
-                    row = cursor.fetchone()
-                    if row:
-                        name, kind, line, signature, doc, filepath = row
-                        conn.close()
-                        
-                        # Return proper SymbolDef dict
-                        return {
-                            'symbol': name,
-                            'kind': kind,
-                            'language': 'unknown',  # Not stored in symbols table
-                            'signature': signature or f'{kind} {name}',
-                            'doc': doc,
-                            'defined_in': filepath,
-                            'line': line or 1,
-                            'span': (0, len(name))
-                        }
+                    # Try structured symbol table first
+                    result = self._sqlite_store.find_symbol_definition(symbol)
+                    if result:
+                        return result
                     
                     # Fallback to BM25 if available
-                    try:
-                        patterns = [
-                            f'class {symbol}',
-                            f'def {symbol}', 
-                            f'function {symbol}',
-                            symbol  # Try exact symbol match as fallback
-                        ]
-                        
-                        for pattern in patterns:
-                            cursor.execute("""
-                                SELECT filepath, snippet(bm25_content, -1, '', '', '...', 20), language
-                                FROM bm25_content
-                                WHERE bm25_content MATCH ?
-                                ORDER BY rank
-                                LIMIT 1
-                            """, (pattern,))
-                            
-                            row = cursor.fetchone()
-                            if row:
-                                filepath, snippet, language = row
-                                
-                                # Determine kind from pattern
-                                pattern_lower = pattern.lower()
-                                if 'class' in pattern_lower:
-                                    kind = 'class'
-                                elif 'def' in pattern_lower or 'function' in pattern_lower:
-                                    kind = 'function'
-                                else:
-                                    kind = 'symbol'
-                                
-                                conn.close()
-                                
-                                return {
-                                    'symbol': symbol,
-                                    'kind': kind,
-                                    'language': language or 'unknown',
-                                    'signature': snippet,
-                                    'doc': None,
-                                    'defined_in': filepath,
-                                    'line': 1,
-                                    'span': (0, len(symbol))
-                                }
-                    except sqlite3.OperationalError:
-                        # BM25 table doesn't exist, that's fine
-                        pass
-                    
-                    conn.close()
+                    result = self._sqlite_store.search_bm25_symbol(symbol)
+                    if result:
+                        return result
+
                 except Exception as e:
                     logger.error(f"Error in direct symbol lookup: {e}")
 
