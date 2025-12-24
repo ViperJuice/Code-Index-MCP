@@ -5,12 +5,11 @@ Tests semantic search capabilities with real codebases to validate dormant featu
 Requires SEMANTIC_SEARCH_ENABLED=true and proper Voyage AI + Qdrant configuration.
 """
 
-import pytest
 import os
 import tempfile
-import asyncio
 from pathlib import Path
-from typing import List, Dict, Any
+
+import pytest
 
 # Skip all tests if semantic search is not enabled
 pytestmark = pytest.mark.skipif(
@@ -42,7 +41,7 @@ class TestSemanticSearch:
         try:
             if hasattr(indexer, "qdrant") and indexer.qdrant:
                 indexer.qdrant.delete_collection("test-semantic")
-        except:
+        except Exception:
             pass
 
     def test_semantic_code_similarity(self, setup_semantic_indexer):
@@ -149,16 +148,12 @@ class SessionManager:
                 best_score >= test_case["min_score"]
             ), f"Best semantic score {best_score:.3f} should be >= {test_case['min_score']} for '{query}'"
 
-            print(
-                f"Query: '{query}' -> {len(results)} results, best score: {best_score:.3f}"
-            )
+            print(f"Query: '{query}' -> {len(results)} results, best score: {best_score:.3f}")
 
             # Verify we found at least some expected matches
             result_content = " ".join(str(r.get("content", "")) for r in results)
             found_matches = [
-                match
-                for match in test_case["expected_matches"]
-                if match in result_content
+                match for match in test_case["expected_matches"] if match in result_content
             ]
 
             assert (
@@ -169,7 +164,7 @@ class SessionManager:
         for temp_path in indexed_files:
             try:
                 temp_path.unlink()
-            except:
+            except Exception:
                 pass
 
     @pytest.mark.performance
@@ -248,19 +243,13 @@ def calculate_statistics(data_points):
 
         # Performance assertions
         assert len(results) > 0, "Should find semantic results"
-        assert (
-            benchmark.stats.mean < 3.0
-        ), f"Semantic search too slow: {benchmark.stats.mean:.2f}s"
+        assert benchmark.stats.mean < 3.0, f"Semantic search too slow: {benchmark.stats.mean:.2f}s"
 
         # Verify result quality
         avg_score = sum(r.get("score", 0) for r in results) / len(results)
-        assert (
-            avg_score > 0.5
-        ), f"Average semantic score {avg_score:.3f} should be > 0.5"
+        assert avg_score > 0.5, f"Average semantic score {avg_score:.3f} should be > 0.5"
 
-        print(
-            f"Semantic search: {len(results)} results in {benchmark.stats.mean:.3f}s average"
-        )
+        print(f"Semantic search: {len(results)} results in {benchmark.stats.mean:.3f}s average")
         print(f"Average semantic score: {avg_score:.3f}")
 
     def test_semantic_vs_keyword_search_quality(self, setup_semantic_indexer):
@@ -320,9 +309,7 @@ def parse_server_response(api_result):
             print(
                 f"Semantic query '{query}' found target '{test_case['should_find']}': {found_target}"
             )
-            print(
-                f"Results contain: {[r.get('content', '')[:50] + '...' for r in results[:2]]}"
-            )
+            print(f"Results contain: {[r.get('content', '')[:50] + '...' for r in results[:2]]}")
 
             # Semantic search should find conceptually similar code even with different keywords
             assert (
@@ -376,9 +363,7 @@ def parse_server_response(api_result):
                 ), f"Domain query '{query}' should have reasonable semantic match"
 
     @pytest.mark.integration
-    def test_semantic_indexer_integration_with_plugin_system(
-        self, setup_semantic_indexer
-    ):
+    def test_semantic_indexer_integration_with_plugin_system(self, setup_semantic_indexer):
         """Test semantic indexer integration with the plugin system."""
         semantic_indexer = setup_semantic_indexer
 
@@ -428,9 +413,7 @@ class APIClient:
                     plugin_name,
                     plugin_instance,
                 ) in plugin_manager.get_active_plugins().items():
-                    if hasattr(
-                        plugin_instance, "supports"
-                    ) and plugin_instance.supports(temp_path):
+                    if hasattr(plugin_instance, "supports") and plugin_instance.supports(temp_path):
                         python_plugin = plugin_instance
                         break
 
@@ -443,14 +426,10 @@ class APIClient:
                     semantic_results = list(
                         semantic_indexer.query("API authentication method", limit=3)
                     )
-                    assert (
-                        len(semantic_results) > 0
-                    ), "Semantic search should find results"
+                    assert len(semantic_results) > 0, "Semantic search should find results"
 
                     # Both indexing methods should work together
-                    print(
-                        f"Plugin indexed: {len(plugin_result.get('symbols', []))} symbols"
-                    )
+                    print(f"Plugin indexed: {len(plugin_result.get('symbols', []))} symbols")
                     print(f"Semantic search found: {len(semantic_results)} results")
 
                 # Cleanup
@@ -501,9 +480,7 @@ class TestSemanticSearchScaling:
         except ImportError:
             pytest.skip("Semantic indexer dependencies not available")
 
-        indexer = SemanticIndexer(
-            collection="test-large-semantic", qdrant_path=":memory:"
-        )
+        indexer = SemanticIndexer(collection="test-large-semantic", qdrant_path=":memory:")
 
         # Index multiple code samples
         code_samples = [
@@ -557,7 +534,7 @@ class TestSemanticSearchScaling:
         # Cleanup
         try:
             indexer.qdrant.delete_collection("test-large-semantic")
-        except:
+        except Exception:
             pass
 
     def test_semantic_search_accuracy_with_scale(self, setup_large_semantic_index):
@@ -593,9 +570,7 @@ class TestSemanticSearchScaling:
                 avg_score > 0.4
             ), f"Average score {avg_score:.3f} should be reasonable for '{query}'"
 
-    def test_semantic_search_performance_scaling(
-        self, setup_large_semantic_index, benchmark
-    ):
+    def test_semantic_search_performance_scaling(self, setup_large_semantic_index, benchmark):
         """Test how semantic search performance scales with queries."""
         semantic_indexer = setup_large_semantic_index
 
@@ -620,10 +595,6 @@ class TestSemanticSearchScaling:
             benchmark.stats.mean < 5.0
         ), f"Multiple semantic queries too slow: {benchmark.stats.mean:.2f}s"
 
-        assert (
-            len(results) >= 10
-        ), f"Should find multiple results across queries: {len(results)}"
+        assert len(results) >= 10, f"Should find multiple results across queries: {len(results)}"
 
-        print(
-            f"Semantic scaling test: {len(results)} total results in {benchmark.stats.mean:.3f}s"
-        )
+        print(f"Semantic scaling test: {len(results)} total results in {benchmark.stats.mean:.3f}s")

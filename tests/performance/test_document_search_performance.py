@@ -1,22 +1,18 @@
 #!/usr/bin/env python3
 """Performance tests for document search operations."""
 
-import pytest
-import time
-import statistics
-import concurrent.futures
 import asyncio
-from pathlib import Path
-from typing import Dict, List, Any, Tuple
+import concurrent.futures
+import statistics
+import time
+from typing import Any, Dict
+
+import pytest
 
 from tests.base_test import BaseDocumentTest
 from tests.test_utils import (
-    timer,
-    memory_monitor,
-    create_test_markdown,
-    create_test_plaintext,
-    create_mock_search_results,
     assert_performance,
+    create_mock_search_results,
 )
 
 
@@ -71,9 +67,7 @@ class TestDocumentSearchPerformance(BaseDocumentTest):
                     content = self._create_topic_plaintext(topic, doc_idx)
 
                 doc_path = self.create_test_file(filename, content)
-                created_docs.append(
-                    {"path": doc_path, "topic": topic, "index": doc_idx}
-                )
+                created_docs.append({"path": doc_path, "topic": topic, "index": doc_idx})
 
         # Index all documents
         print(f"Indexing {len(created_docs)} documents...")
@@ -426,16 +420,14 @@ optimal results.
         cache_speedup = avg_cold / avg_warm if avg_warm > 0 else 1.0
         cache_reduction = ((avg_cold - avg_warm) / avg_cold) * 100
 
-        print(f"\nCache Performance:")
+        print("\nCache Performance:")
         print(f"  Avg cold: {avg_cold:.1f}ms")
         print(f"  Avg warm: {avg_warm:.1f}ms")
         print(f"  Speedup: {cache_speedup:.1f}x")
         print(f"  Latency reduction: {cache_reduction:.1f}%")
 
         # Cache should provide significant speedup
-        assert (
-            cache_speedup >= 5.0
-        ), f"Cache speedup too low: {cache_speedup:.1f}x (expected >= 5x)"
+        assert cache_speedup >= 5.0, f"Cache speedup too low: {cache_speedup:.1f}x (expected >= 5x)"
 
     @pytest.mark.performance
     def test_pagination_performance(self):
@@ -531,9 +523,7 @@ optimal results.
             print(f"\nTesting {num_concurrent} concurrent searches:")
 
             # Prepare query workload
-            query_workload = queries * (
-                num_concurrent * 2
-            )  # Each "user" does multiple queries
+            query_workload = queries * (num_concurrent * 2)  # Each "user" does multiple queries
 
             def perform_search(query):
                 """Perform a single search."""
@@ -545,13 +535,9 @@ optimal results.
             # Execute concurrent searches
             start_time = time.perf_counter()
 
-            with concurrent.futures.ThreadPoolExecutor(
-                max_workers=num_concurrent
-            ) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=num_concurrent) as executor:
                 futures = [executor.submit(perform_search, q) for q in query_workload]
-                search_results = [
-                    f.result() for f in concurrent.futures.as_completed(futures)
-                ]
+                search_results = [f.result() for f in concurrent.futures.as_completed(futures)]
 
             end_time = time.perf_counter()
 

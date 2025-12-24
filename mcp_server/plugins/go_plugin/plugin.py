@@ -2,28 +2,25 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Optional, Iterable, Dict, List, Any
 import logging
 import subprocess
-import json
-import os
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional
 
 from ...plugin_base import (
     IndexShard,
-    SymbolDef,
     Reference,
-    SearchResult,
     SearchOpts,
+    SearchResult,
+    SymbolDef,
 )
 from ...plugin_base_enhanced import PluginWithSemanticSearch
-from ...utils.fuzzy_indexer import FuzzyIndexer
 from ...storage.sqlite_store import SQLiteStore
+from ...utils.fuzzy_indexer import FuzzyIndexer
 from ..generic_treesitter_plugin import GenericTreeSitterPlugin
-
+from .interface_checker import GoInterfaceChecker
 from .module_resolver import GoModuleResolver
 from .package_analyzer import GoPackageAnalyzer
-from .interface_checker import GoInterfaceChecker
 
 logger = logging.getLogger(__name__)
 
@@ -205,9 +202,7 @@ class Plugin(PluginWithSemanticSearch):
 
         return IndexShard(file=str(path), symbols=symbols, language=self.lang)
 
-    def _enhance_symbols(
-        self, path: Path, content: str, symbols: List[Dict]
-    ) -> List[Dict]:
+    def _enhance_symbols(self, path: Path, content: str, symbols: List[Dict]) -> List[Dict]:
         """Enhance symbols with Go-specific information."""
         enhanced = []
 
@@ -231,9 +226,7 @@ class Plugin(PluginWithSemanticSearch):
                             type_info, [package_info]
                         )
                         if interfaces:
-                            enhanced_symbol["metadata"]["implements"] = [
-                                i.name for i in interfaces
-                            ]
+                            enhanced_symbol["metadata"]["implements"] = [i.name for i in interfaces]
 
             enhanced.append(enhanced_symbol)
 
@@ -251,9 +244,7 @@ class Plugin(PluginWithSemanticSearch):
             if line.startswith("func "):
                 import re
 
-                func_match = re.match(
-                    r"func\s+(?:\(([^)]+)\)\s+)?(\w+)\s*\(([^)]*)\)", line
-                )
+                func_match = re.match(r"func\s+(?:\(([^)]+)\)\s+)?(\w+)\s*\(([^)]*)\)", line)
                 if func_match:
                     receiver = func_match.group(1)
                     func_name = func_match.group(2)
@@ -438,8 +429,7 @@ class Plugin(PluginWithSemanticSearch):
                 "name": module.name,
                 "version": module.version,
                 "dependencies": [
-                    {"module": d.module_path, "version": d.version}
-                    for d in module.dependencies
+                    {"module": d.module_path, "version": d.version} for d in module.dependencies
                 ],
                 "replacements": module.replacements,
             }
@@ -479,9 +469,7 @@ class Plugin(PluginWithSemanticSearch):
                 interface_info = package_info.interfaces[interface_name]
 
         if type_info and interface_info:
-            result = self.interface_checker.check_interface_satisfaction(
-                type_info, interface_info
-            )
+            result = self.interface_checker.check_interface_satisfaction(type_info, interface_info)
             return {
                 "type": result.type_name,
                 "interface": result.interface_name,

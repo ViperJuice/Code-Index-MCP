@@ -1,11 +1,11 @@
 """Objective-C interoperability analysis for Swift code."""
 
-import re
 import logging
-from pathlib import Path
-from typing import Dict, List, Set, Optional, Tuple, Any
+import re
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -141,9 +141,7 @@ class ObjectiveCBridge:
             logger.warning(f"Failed to analyze bridging header {header_path}: {e}")
             return ObjCBridgingHeader(str(header_path), [], [], [], [])
 
-    def find_objc_exposures(
-        self, content: str, file_path: str = ""
-    ) -> List[ObjCExposure]:
+    def find_objc_exposures(self, content: str, file_path: str = "") -> List[ObjCExposure]:
         """Find Swift symbols exposed to Objective-C."""
         exposures = []
         lines = content.split("\n")
@@ -191,9 +189,7 @@ class ObjectiveCBridge:
         self.exposures.extend(exposures)
         return exposures
 
-    def validate_objc_compatibility(
-        self, content: str, file_path: str = ""
-    ) -> Dict[str, Any]:
+    def validate_objc_compatibility(self, content: str, file_path: str = "") -> Dict[str, Any]:
         """Validate Objective-C compatibility of Swift code."""
         validation = {
             "compatible": True,
@@ -234,9 +230,7 @@ class ObjectiveCBridge:
 
         return validation
 
-    def _find_objc_attributes(
-        self, content: str, file_path: str
-    ) -> List[Dict[str, Any]]:
+    def _find_objc_attributes(self, content: str, file_path: str) -> List[Dict[str, Any]]:
         """Find @objc and related attributes."""
         attributes = []
 
@@ -260,9 +254,7 @@ class ObjectiveCBridge:
                 attributes.append(
                     {
                         "attribute": match.group(0),
-                        "custom_name": (
-                            match.group(1) if len(match.groups()) > 0 else None
-                        ),
+                        "custom_name": (match.group(1) if len(match.groups()) > 0 else None),
                         "line": line_num,
                         "file": file_path,
                     }
@@ -270,9 +262,7 @@ class ObjectiveCBridge:
 
         return attributes
 
-    def _find_bridging_casts(
-        self, content: str, file_path: str
-    ) -> List[Dict[str, Any]]:
+    def _find_bridging_casts(self, content: str, file_path: str) -> List[Dict[str, Any]]:
         """Find bridging casts between Swift and Objective-C types."""
         casts = []
 
@@ -306,9 +296,7 @@ class ObjectiveCBridge:
 
         return casts
 
-    def _find_selector_usage(
-        self, content: str, file_path: str
-    ) -> List[Dict[str, Any]]:
+    def _find_selector_usage(self, content: str, file_path: str) -> List[Dict[str, Any]]:
         """Find Objective-C selector usage."""
         selectors = []
 
@@ -341,9 +329,7 @@ class ObjectiveCBridge:
 
         return selectors
 
-    def _find_objc_runtime_usage(
-        self, content: str, file_path: str
-    ) -> List[Dict[str, Any]]:
+    def _find_objc_runtime_usage(self, content: str, file_path: str) -> List[Dict[str, Any]]:
         """Find Objective-C runtime API usage."""
         runtime_usage = []
 
@@ -375,9 +361,7 @@ class ObjectiveCBridge:
 
         return runtime_usage
 
-    def _find_foundation_usage(
-        self, content: str, file_path: str
-    ) -> List[Dict[str, Any]]:
+    def _find_foundation_usage(self, content: str, file_path: str) -> List[Dict[str, Any]]:
         """Find Foundation framework usage that might involve bridging."""
         foundation_usage = []
 
@@ -423,9 +407,7 @@ class ObjectiveCBridge:
 
         return foundation_usage
 
-    def _find_toll_free_bridging(
-        self, content: str, file_path: str
-    ) -> List[Dict[str, Any]]:
+    def _find_toll_free_bridging(self, content: str, file_path: str) -> List[Dict[str, Any]]:
         """Find toll-free bridging usage."""
         toll_free_usage = []
 
@@ -456,9 +438,7 @@ class ObjectiveCBridge:
 
         return toll_free_usage
 
-    def _find_unsafe_interop(
-        self, content: str, file_path: str
-    ) -> List[Dict[str, Any]]:
+    def _find_unsafe_interop(self, content: str, file_path: str) -> List[Dict[str, Any]]:
         """Find unsafe interoperability patterns."""
         unsafe_patterns = []
 
@@ -490,9 +470,7 @@ class ObjectiveCBridge:
 
         return unsafe_patterns
 
-    def _find_objc_exception_handling(
-        self, content: str, file_path: str
-    ) -> List[Dict[str, Any]]:
+    def _find_objc_exception_handling(self, content: str, file_path: str) -> List[Dict[str, Any]]:
         """Find Objective-C exception handling patterns."""
         exception_patterns = []
 
@@ -616,12 +594,7 @@ class ObjectiveCBridge:
         issues = []
 
         # Patterns that might need @objc
-        if (
-            "IBAction" in line
-            or "IBOutlet" in line
-            or "target:" in line
-            and "action:" in line
-        ):
+        if "IBAction" in line or "IBOutlet" in line or "target:" in line and "action:" in line:
 
             if "@objc" not in line:
                 issues.append(

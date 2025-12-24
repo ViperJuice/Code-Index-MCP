@@ -3,13 +3,14 @@ Plugin configuration management.
 Handles loading, validation, and management of plugin configurations.
 """
 
-import os
-import yaml
 import json
 import logging
-from pathlib import Path
-from typing import Dict, Any, Optional, List
+import os
 from dataclasses import asdict
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import yaml
 
 from .models import PluginConfig, PluginSystemConfig
 
@@ -65,9 +66,7 @@ class PluginConfigManager:
             environment = os.getenv("ENVIRONMENT", "development")
             self.system_config.apply_environment_overrides(environment)
 
-            logger.info(
-                f"System config loaded successfully for environment: {environment}"
-            )
+            logger.info(f"System config loaded successfully for environment: {environment}")
             return self.system_config
 
         except Exception as e:
@@ -176,9 +175,7 @@ class PluginConfigManager:
         config.settings.update(settings)
         self.save_plugin_config(plugin_name, config)
 
-    def get_plugin_setting(
-        self, plugin_name: str, key: str, default: Any = None
-    ) -> Any:
+    def get_plugin_setting(self, plugin_name: str, key: str, default: Any = None) -> Any:
         """
         Get a specific plugin setting.
 
@@ -209,9 +206,7 @@ class PluginConfigManager:
         # Simple validation - check required fields and types
         for field, spec in schema.items():
             if spec.get("required", False) and field not in config.settings:
-                logger.error(
-                    f"Missing required field '{field}' for plugin {plugin_name}"
-                )
+                logger.error(f"Missing required field '{field}' for plugin {plugin_name}")
                 return False
 
             if field in config.settings:
@@ -230,14 +225,10 @@ class PluginConfigManager:
 
                 # Check constraints
                 if "minimum" in spec and value < spec["minimum"]:
-                    logger.error(
-                        f"Value for '{field}' below minimum: {value} < {spec['minimum']}"
-                    )
+                    logger.error(f"Value for '{field}' below minimum: {value} < {spec['minimum']}")
                     return False
                 if "maximum" in spec and value > spec["maximum"]:
-                    logger.error(
-                        f"Value for '{field}' above maximum: {value} > {spec['maximum']}"
-                    )
+                    logger.error(f"Value for '{field}' above maximum: {value} > {spec['maximum']}")
                     return False
 
         return True

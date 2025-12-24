@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -239,9 +239,7 @@ class GoModuleResolver:
             return []
 
         # Get all .go files except test files
-        go_files = [
-            f for f in package_dir.glob("*.go") if not f.name.endswith("_test.go")
-        ]
+        go_files = [f for f in package_dir.glob("*.go") if not f.name.endswith("_test.go")]
         return go_files
 
 

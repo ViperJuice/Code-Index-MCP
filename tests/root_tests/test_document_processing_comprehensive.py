@@ -15,7 +15,7 @@ from mcp_server.storage.sqlite_store import SQLiteStore
 def test_markdown_processing():
     """Test Markdown document processing with various content types."""
     print("Testing Markdown Document Processing...")
-    
+
     # Complex markdown with various elements
     test_content = """---
 title: API Reference Guide
@@ -130,32 +130,33 @@ fetch('https://api.example.com/v1/users', {
 
 For more information, visit our [developer portal](https://developers.example.com).
 """
-    
+
     try:
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
             f.write(test_content)
             temp_path = f.name
-        
+
         # Create plugin and index
         plugin = PluginFactory.create_plugin("markdown")
         result = plugin.indexFile(temp_path, test_content)
-        
-        print(f"✓ Indexed Markdown file successfully")
+
+        print("✓ Indexed Markdown file successfully")
         print(f"  - Symbols found: {len(result.get('symbols', []))}")
         print(f"  - Language: {result.get('language', 'N/A')}")
-        
+
         # Display symbol hierarchy
         print("\n  Document Structure:")
-        for symbol in result.get('symbols', [])[:10]:
-            indent = "    " * (symbol.get('metadata', {}).get('level', 0))
+        for symbol in result.get("symbols", [])[:10]:
+            indent = "    " * (symbol.get("metadata", {}).get("level", 0))
             print(f"    {indent}- {symbol['symbol']} ({symbol['kind']})")
-        
+
         Path(temp_path).unlink()
         return True
-        
+
     except Exception as e:
         print(f"✗ Error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -163,7 +164,7 @@ For more information, visit our [developer portal](https://developers.example.co
 def test_plaintext_processing():
     """Test plain text document processing."""
     print("\nTesting Plain Text Document Processing...")
-    
+
     test_content = """Technical Documentation: System Architecture
 
 Introduction
@@ -210,33 +211,34 @@ Conclusion
 
 This architecture provides a robust foundation for our services. Regular reviews and updates ensure it continues to meet our scaling requirements.
 """
-    
+
     try:
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write(test_content)
             temp_path = f.name
-        
+
         # Create plugin and index
         plugin = PluginFactory.create_plugin("plaintext")
         result = plugin.indexFile(temp_path, test_content)
-        
-        print(f"✓ Indexed Plain Text file successfully")
+
+        print("✓ Indexed Plain Text file successfully")
         print(f"  - Symbols found: {len(result.get('symbols', []))}")
         print(f"  - Language: {result.get('language', 'N/A')}")
-        
+
         # Check if content was processed
-        if result.get('symbols'):
-            symbol = result['symbols'][0]
-            print(f"\n  Document Summary:")
+        if result.get("symbols"):
+            symbol = result["symbols"][0]
+            print("\n  Document Summary:")
             print(f"    Title: {symbol.get('symbol', 'N/A')}")
             print(f"    Type: {symbol.get('kind', 'N/A')}")
-        
+
         Path(temp_path).unlink()
         return True
-        
+
     except Exception as e:
         print(f"✗ Error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -244,14 +246,14 @@ This architecture provides a robust foundation for our services. Regular reviews
 def test_cross_document_search():
     """Test searching across different document types."""
     print("\nTesting Cross-Document Search...")
-    
+
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
         db_path = temp_path / "test_search.db"
-        
+
         # Create SQLite store
         sqlite_store = SQLiteStore(str(db_path))
-        
+
         # Create test documents
         docs = {
             "readme.md": """# Project README
@@ -318,43 +320,48 @@ from myproject import MyClass
 processor = MyClass()
 result = processor.process_data({"value": 42})
 ```
-"""
+""",
         }
-        
+
         try:
             # Index all documents
             for filename, content in docs.items():
                 file_path = temp_path / filename
                 file_path.write_text(content)
-                
-                plugin = PluginFactory.create_plugin_for_file(str(file_path), sqlite_store=sqlite_store)
+
+                plugin = PluginFactory.create_plugin_for_file(
+                    str(file_path), sqlite_store=sqlite_store
+                )
                 if plugin:
                     plugin.indexFile(str(file_path), content)
                     print(f"  ✓ Indexed {filename}")
-            
+
             # Search across documents
             print("\n  Cross-document searches:")
             queries = [
                 ("installation", "Find installation instructions"),
                 ("API", "Find API references"),
                 ("MyClass", "Find class documentation"),
-                ("pip install", "Find installation commands")
+                ("pip install", "Find installation commands"),
             ]
-            
+
             for query, description in queries:
                 results = sqlite_store.search_symbols_fuzzy(query, limit=3)
                 print(f"\n    Query '{query}' ({description}):")
                 print(f"      Found {len(results)} results")
-                
+
                 for i, result in enumerate(results[:2]):
-                    filename = Path(result['file_path']).name
-                    print(f"      {i+1}. {filename}: {result['symbol_name']} (score: {result['score']:.3f})")
-            
+                    filename = Path(result["file_path"]).name
+                    print(
+                        f"      {i+1}. {filename}: {result['symbol_name']} (score: {result['score']:.3f})"
+                    )
+
             return True
-            
+
         except Exception as e:
             print(f"✗ Error: {e}")
             import traceback
+
             traceback.print_exc()
             return False
 
@@ -362,7 +369,7 @@ result = processor.process_data({"value": 42})
 def test_document_metadata():
     """Test metadata extraction from documents."""
     print("\nTesting Document Metadata Extraction...")
-    
+
     # Markdown with frontmatter
     md_with_meta = """---
 title: Technical Specification
@@ -376,29 +383,29 @@ keywords: [spec, technical, api]
 
 This document outlines the technical requirements...
 """
-    
+
     try:
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
             f.write(md_with_meta)
             temp_path = f.name
-        
+
         plugin = PluginFactory.create_plugin("markdown")
         result = plugin.indexFile(temp_path, md_with_meta)
-        
+
         print("✓ Processed document with metadata")
-        
+
         # Check for metadata in symbols
-        doc_symbol = next((s for s in result.get('symbols', []) if s['kind'] == 'document'), None)
-        if doc_symbol and doc_symbol.get('metadata'):
+        doc_symbol = next((s for s in result.get("symbols", []) if s["kind"] == "document"), None)
+        if doc_symbol and doc_symbol.get("metadata"):
             print("\n  Extracted Metadata:")
-            meta = doc_symbol.get('metadata', {})
+            meta = doc_symbol.get("metadata", {})
             for key, value in meta.items():
-                if key not in ['level', 'parent']:  # Skip structural metadata
+                if key not in ["level", "parent"]:  # Skip structural metadata
                     print(f"    - {key}: {value}")
-        
+
         Path(temp_path).unlink()
         return True
-        
+
     except Exception as e:
         print(f"✗ Error: {e}")
         return False
@@ -407,25 +414,25 @@ This document outlines the technical requirements...
 def main():
     """Run all comprehensive tests."""
     print("=== Comprehensive Document Processing Tests ===\n")
-    
+
     tests = [
         test_markdown_processing,
         test_plaintext_processing,
         test_cross_document_search,
-        test_document_metadata
+        test_document_metadata,
     ]
-    
+
     results = []
     for test in tests:
         results.append(test())
         print("-" * 60)
-    
+
     # Summary
     print("\n=== Test Summary ===")
     passed = sum(results)
     total = len(results)
     print(f"Passed: {passed}/{total}")
-    
+
     if passed == total:
         print("\n✓ All comprehensive tests passed!")
         print("\nDocument Processing Capabilities Verified:")

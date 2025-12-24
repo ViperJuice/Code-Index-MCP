@@ -1,45 +1,44 @@
-from fastapi import FastAPI, HTTPException, Depends, status, Response
-from fastapi.responses import JSONResponse, PlainTextResponse
-from typing import Optional, Dict, Any, List
-from pathlib import Path
 import logging
 import os
-import time
 import threading
-from .dispatcher.dispatcher_enhanced import EnhancedDispatcher
-from .plugin_base import SymbolDef, SearchResult
-from .storage.sqlite_store import SQLiteStore
-from .watcher import FileWatcher
+import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from fastapi import Depends, FastAPI, HTTPException, Response
+from fastapi.responses import PlainTextResponse
+
+from .cache import (
+    CacheManagerFactory,
+    QueryCacheConfig,
+    QueryResultCache,
+    QueryType,
+)
 from .core.logging import setup_logging
-from .utils.index_discovery import IndexDiscovery
-from .plugin_system import PluginManager, PluginSystemConfig
+from .dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from .indexer.bm25_indexer import BM25Indexer
 from .indexer.hybrid_search import HybridSearch, HybridSearchConfig
-from .utils.fuzzy_indexer import FuzzyIndexer
+from .metrics import get_health_checker, get_metrics_collector
+from .metrics.middleware import get_business_metrics, setup_metrics_middleware
+from .metrics.prometheus_exporter import get_prometheus_exporter
+from .plugin_base import SearchResult, SymbolDef
+from .plugin_system import PluginManager
 from .security import (
-    SecurityConfig,
-    AuthManager,
-    SecurityMiddlewareStack,
     AuthCredentials,
+    AuthManager,
+    Permission,
+    SecurityConfig,
+    SecurityMiddlewareStack,
     User,
     UserRole,
-    Permission,
-    get_current_user,
     get_current_active_user,
     require_permission,
     require_role,
 )
-from .metrics import get_metrics_collector, get_health_checker, HealthStatus
-from .metrics.middleware import setup_metrics_middleware, get_business_metrics
-from .metrics.prometheus_exporter import get_prometheus_exporter
-from .cache import (
-    CacheManagerFactory,
-    CacheConfig,
-    CacheBackendType,
-    QueryResultCache,
-    QueryCacheConfig,
-    QueryType,
-)
+from .storage.sqlite_store import SQLiteStore
+from .utils.fuzzy_indexer import FuzzyIndexer
+from .utils.index_discovery import IndexDiscovery
+from .watcher import FileWatcher
 
 # Set up logging
 setup_logging(log_level="INFO")
@@ -74,7 +73,7 @@ setup_metrics_middleware(app, enable_detailed_metrics=True)
 @app.on_event("startup")
 async def startup_event():
     """Initialize the dispatcher and register plugins on startup."""
-    global dispatcher, sqlite_store, file_watcher, plugin_manager, plugin_loader, auth_manager, security_config, cache_manager, query_cache, bm25_indexer, hybrid_search, fuzzy_indexer
+    global dispatcher, sqlite_store, file_watcher, plugin_manager, plugin_loader, auth_manager, security_config, cache_manager, query_cache, bm25_indexer, hybrid_search, fuzzy_indexer, semantic_indexer
 
     try:
         # Initialize security configuration
@@ -85,9 +84,7 @@ async def startup_event():
                 "your-super-secret-jwt-key-change-in-production-min-32-chars",
             ),
             jwt_algorithm="HS256",
-            access_token_expire_minutes=int(
-                os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
-            ),
+            access_token_expire_minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")),
             refresh_token_expire_days=int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7")),
             password_min_length=int(os.getenv("PASSWORD_MIN_LENGTH", "8")),
             max_login_attempts=int(os.getenv("MAX_LOGIN_ATTEMPTS", "5")),
@@ -118,9 +115,7 @@ async def startup_event():
 
         # Set up security middleware
         logger.info("Setting up security middleware...")
-        security_middleware = SecurityMiddlewareStack(
-            app, security_config, auth_manager
-        )
+        security_middleware = SecurityMiddlewareStack(app, security_config, auth_manager)
         security_middleware.setup_middleware()
         logger.info("Security middleware configured successfully")
 
@@ -137,9 +132,7 @@ async def startup_event():
                 )
                 logger.info("Using Redis cache backend")
             except Exception as e:
-                logger.warning(
-                    f"Failed to initialize Redis cache, falling back to memory: {e}"
-                )
+                logger.warning(f"Failed to initialize Redis cache, falling back to memory: {e}")
                 cache_manager = CacheManagerFactory.create_memory_cache()
         elif cache_backend_type == "hybrid":
             try:
@@ -151,9 +144,7 @@ async def startup_event():
                 )
                 logger.info("Using hybrid cache backend")
             except Exception as e:
-                logger.warning(
-                    f"Failed to initialize hybrid cache, falling back to memory: {e}"
-                )
+                logger.warning(f"Failed to initialize hybrid cache, falling back to memory: {e}")
                 cache_manager = CacheManagerFactory.create_memory_cache()
         else:
             cache_manager = CacheManagerFactory.create_memory_cache(
@@ -235,9 +226,7 @@ async def startup_event():
             with open(config_path, "r") as f:
                 plugin_config = yaml.safe_load(f)
 
-            enabled_languages = plugin_config.get(
-                "enabled_languages", list(discovered.keys())
-            )
+            enabled_languages = plugin_config.get("enabled_languages", list(discovered.keys()))
             logger.info(f"Loading plugins for languages: {enabled_languages}")
         else:
             # Load all discovered plugins
@@ -272,9 +261,11 @@ async def startup_event():
         dispatcher = EnhancedDispatcher(
             sqlite_store=sqlite_store,
             semantic_search_enabled=os.getenv("SEMANTIC_SEARCH_ENABLED", "false").lower() == "true",
-            lazy_load=False
+            lazy_load=False,
         )
-        logger.info(f"EnhancedDispatcher created with semantic search enabled: {dispatcher.semantic_search_enabled}")
+        logger.info(
+            f"EnhancedDispatcher created with semantic search enabled: {dispatcher.semantic_search_enabled}"
+        )
 
         # Initialize BM25 indexer
         logger.info("Initializing BM25 indexer...")
@@ -295,10 +286,11 @@ async def startup_event():
                 # Use central Qdrant location
                 qdrant_path = os.getenv("QDRANT_PATH", ".indexes/qdrant/main.qdrant")
                 semantic_indexer = SemanticIndexer(
-                    collection="code-embeddings",
-                    qdrant_path=qdrant_path
+                    collection="code-embeddings", qdrant_path=qdrant_path
                 )
-                logger.info(f"Semantic indexer initialized successfully with Qdrant at {qdrant_path}")
+                logger.info(
+                    f"Semantic indexer initialized successfully with Qdrant at {qdrant_path}"
+                )
             except ImportError:
                 logger.warning("Semantic indexer not available (missing dependencies)")
             except Exception as e:
@@ -333,9 +325,7 @@ async def startup_event():
         logger.info("Starting file watcher...")
         file_watcher = FileWatcher(Path("."), dispatcher, query_cache)
         file_watcher.start()
-        logger.info(
-            "File watcher started for current directory with cache invalidation"
-        )
+        logger.info("File watcher started for current directory with cache invalidation")
 
         # Store in app.state for potential future use
         app.state.dispatcher = dispatcher
@@ -405,7 +395,7 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """Clean up resources on shutdown."""
-    global file_watcher, plugin_manager, cache_manager
+    # These globals are only read, not assigned, so no 'global' declaration needed
 
     if file_watcher:
         try:
@@ -420,9 +410,7 @@ async def shutdown_event():
             if shutdown_result.success:
                 logger.info("Plugin manager shutdown successfully")
             else:
-                logger.error(
-                    f"Plugin manager shutdown failed: {shutdown_result.error.message}"
-                )
+                logger.error(f"Plugin manager shutdown failed: {shutdown_result.error.message}")
                 logger.error(f"Shutdown error details: {shutdown_result.error.details}")
         except Exception as e:
             logger.error(f"Error shutting down plugin manager: {e}", exc_info=True)
@@ -526,9 +514,7 @@ async def get_current_user_info(
         "permissions": [p.value for p in current_user.permissions],
         "is_active": current_user.is_active,
         "created_at": current_user.created_at.isoformat(),
-        "last_login": (
-            current_user.last_login.isoformat() if current_user.last_login else None
-        ),
+        "last_login": (current_user.last_login.isoformat() if current_user.last_login else None),
     }
 
 
@@ -648,9 +634,7 @@ async def component_health_check(component: str) -> Dict[str, Any]:
             "details": result.details,
         }
     except Exception as e:
-        logger.error(
-            f"Component health check failed for {component}: {e}", exc_info=True
-        )
+        logger.error(f"Component health check failed for {component}: {e}", exc_info=True)
         raise HTTPException(500, f"Health check failed: {str(e)}")
 
 
@@ -689,7 +673,7 @@ def get_prometheus_metrics() -> Response:
 
         # Update plugin metrics
         if plugin_loader:
-            stats = plugin_loader.get_statistics()
+            _ = plugin_loader.get_statistics()
             for lang, plugin in plugin_loader.get_active_plugins().items():
                 prometheus_exporter.plugin_status.labels(
                     plugin=plugin.__class__.__name__, language=lang
@@ -703,9 +687,7 @@ def get_prometheus_metrics() -> Response:
 
         # Generate metrics
         metrics = prometheus_exporter.generate_metrics()
-        return Response(
-            content=metrics, media_type=prometheus_exporter.get_content_type()
-        )
+        return Response(content=metrics, media_type=prometheus_exporter.get_content_type())
     except Exception as e:
         logger.error(f"Failed to generate Prometheus metrics: {e}", exc_info=True)
         raise HTTPException(500, f"Failed to generate metrics: {str(e)}")
@@ -731,9 +713,7 @@ def get_metrics_json(
 
 
 @app.get("/symbol", response_model=SymbolDef | None)
-async def symbol(
-    symbol: str, current_user: User = Depends(require_permission(Permission.READ))
-):
+async def symbol(symbol: str, current_user: User = Depends(require_permission(Permission.READ))):
     if dispatcher is None:
         logger.error("Symbol lookup attempted but dispatcher not ready")
         raise HTTPException(503, "Dispatcher not ready")
@@ -763,9 +743,7 @@ async def symbol(
 
         # Cache the result if available
         if query_cache and query_cache.config.enabled and result:
-            await query_cache.cache_result(
-                QueryType.SYMBOL_LOOKUP, result, symbol=symbol
-            )
+            await query_cache.cache_result(QueryType.SYMBOL_LOOKUP, result, symbol=symbol)
 
         # Record business metrics
         duration = time.time() - start_time
@@ -847,18 +825,14 @@ async def search(
         cached_results = None
         if query_cache and query_cache.config.enabled:
             query_type = (
-                QueryType.SEMANTIC_SEARCH
-                if effective_mode == "semantic"
-                else QueryType.SEARCH
+                QueryType.SEMANTIC_SEARCH if effective_mode == "semantic" else QueryType.SEARCH
             )
             cached_results = await query_cache.get_cached_result(
                 query_type, q=q, semantic=(effective_mode == "semantic"), limit=limit
             )
 
         if cached_results is not None:
-            logger.debug(
-                f"Found cached search results for: '{q}' ({len(cached_results)} results)"
-            )
+            logger.debug(f"Found cached search results for: '{q}' ({len(cached_results)} results)")
             duration = time.time() - start_time
             business_metrics.record_search_performed(
                 query=q,
@@ -874,9 +848,7 @@ async def search(
         if effective_mode == "hybrid" and hybrid_search:
             # Use hybrid search
             with metrics_collector.time_function("search", labels={"mode": "hybrid"}):
-                hybrid_results = await hybrid_search.search(
-                    query=q, filters=filters, limit=limit
-                )
+                hybrid_results = await hybrid_search.search(query=q, filters=filters, limit=limit)
                 # Convert to SearchResult format
                 for r in hybrid_results:
                     results.append(
@@ -916,9 +888,7 @@ async def search(
         elif effective_mode == "semantic":
             # Use classic dispatcher with semantic=True
             if dispatcher:
-                with metrics_collector.time_function(
-                    "search", labels={"mode": "semantic"}
-                ):
+                with metrics_collector.time_function("search", labels={"mode": "semantic"}):
                     results = list(dispatcher.search(q, semantic=True, limit=limit))
             else:
                 raise HTTPException(
@@ -965,9 +935,7 @@ async def search(
         else:
             # Classic search through dispatcher
             if dispatcher:
-                with metrics_collector.time_function(
-                    "search", labels={"mode": "classic"}
-                ):
+                with metrics_collector.time_function("search", labels={"mode": "classic"}):
                     results = list(dispatcher.search(q, semantic=False, limit=limit))
             else:
                 raise HTTPException(503, "Classic search not available")
@@ -975,9 +943,7 @@ async def search(
         # Cache the results if available
         if query_cache and query_cache.config.enabled and results:
             query_type = (
-                QueryType.SEMANTIC_SEARCH
-                if effective_mode == "semantic"
-                else QueryType.SEARCH
+                QueryType.SEMANTIC_SEARCH if effective_mode == "semantic" else QueryType.SEARCH
             )
             await query_cache.cache_result(
                 query_type,
@@ -996,9 +962,7 @@ async def search(
             duration=duration,
         )
 
-        logger.debug(
-            f"Search returned {len(results)} results using {effective_mode} mode"
-        )
+        logger.debug(f"Search returned {len(results)} results using {effective_mode} mode")
         return results
     except Exception as e:
         duration = time.time() - start_time
@@ -1013,9 +977,7 @@ async def search(
 async def get_search_capabilities() -> Dict[str, Any]:
     """Get available search capabilities and configuration guidance."""
     voyage_key = os.environ.get("VOYAGE_API_KEY") or os.environ.get("VOYAGE_AI_API_KEY")
-    semantic_enabled = (
-        os.environ.get("SEMANTIC_SEARCH_ENABLED", "false").lower() == "true"
-    )
+    semantic_enabled = os.environ.get("SEMANTIC_SEARCH_ENABLED", "false").lower() == "true"
 
     return {
         "available_modes": {
@@ -1055,7 +1017,7 @@ async def get_search_capabilities() -> Dict[str, Any]:
 
 
 @app.get("/status")
-async def status(
+async def get_status(
     current_user: User = Depends(require_permission(Permission.READ)),
 ) -> Dict[str, Any]:
     """Returns server status including plugin information and statistics."""
@@ -1072,17 +1034,13 @@ async def status(
         # Try cache first if query cache is available
         cached_status = None
         if query_cache and query_cache.config.enabled:
-            cached_status = await query_cache.get_cached_result(
-                QueryType.PROJECT_STATUS
-            )
+            cached_status = await query_cache.get_cached_result(QueryType.PROJECT_STATUS)
 
         if cached_status is not None:
             return cached_status
 
         # Get plugin count
-        plugin_count = (
-            len(dispatcher._plugins) if hasattr(dispatcher, "_plugins") else 0
-        )
+        plugin_count = len(dispatcher._plugins) if hasattr(dispatcher, "_plugins") else 0
 
         # Get indexed files statistics
         indexed_stats = {"total": 0, "by_language": {}}
@@ -1094,9 +1052,7 @@ async def status(
                 if hasattr(plugin, "get_indexed_count"):
                     count = plugin.get_indexed_count()
                     indexed_stats["total"] += count
-                    lang = getattr(
-                        plugin, "language", getattr(plugin, "lang", "unknown")
-                    )
+                    lang = getattr(plugin, "language", getattr(plugin, "lang", "unknown"))
                     indexed_stats["by_language"][lang] = count
 
         # Add database statistics if available
@@ -1168,7 +1124,7 @@ def plugins(
         plugin_status = plugin_manager.get_plugin_status()
 
         for info in plugin_infos:
-            status = plugin_status.get(info.name, {})
+            plugin_state = plugin_status.get(info.name, {})
             plugin_data = {
                 "name": info.name,
                 "version": info.version,
@@ -1176,8 +1132,8 @@ def plugins(
                 "author": info.author,
                 "language": info.language,
                 "file_extensions": info.file_extensions,
-                "state": status.get("state", "unknown"),
-                "enabled": status.get("enabled", False),
+                "state": plugin_state.get("state", "unknown"),
+                "enabled": plugin_state.get("enabled", False),
             }
             plugin_list.append(plugin_data)
 
@@ -1257,9 +1213,7 @@ async def reindex(
 
                                 # Track by file type
                                 suffix = file_path.suffix.lower()
-                                indexed_by_type[suffix] = (
-                                    indexed_by_type.get(suffix, 0) + 1
-                                )
+                                indexed_by_type[suffix] = indexed_by_type.get(suffix, 0) + 1
                                 break
                     except Exception as e:
                         # Log but continue with other files
@@ -1329,7 +1283,7 @@ async def enable_plugin(
         # Recreate dispatcher with updated plugins
         active_plugins = plugin_manager.get_active_plugins()
         global dispatcher
-        dispatcher = Dispatcher(list(active_plugins.values()))
+        dispatcher = EnhancedDispatcher(list(active_plugins.values()))
 
         return {
             "status": "success",
@@ -1361,7 +1315,7 @@ async def disable_plugin(
         # Recreate dispatcher with updated plugins
         active_plugins = plugin_manager.get_active_plugins()
         global dispatcher
-        dispatcher = Dispatcher(list(active_plugins.values()))
+        dispatcher = EnhancedDispatcher(list(active_plugins.values()))
 
         return {
             "status": "success",
@@ -1422,9 +1376,7 @@ async def clear_cache(
 
     try:
         count = await cache_manager.clear()
-        logger.info(
-            f"Cache cleared by admin user {current_user.username}: {count} entries"
-        )
+        logger.info(f"Cache cleared by admin user {current_user.username}: {count} entries")
 
         return {
             "status": "success",
@@ -1530,9 +1482,7 @@ async def warm_cache(
             return f"warmed_value_for_{key}"
 
         count = await cache_manager.warm_cache(keys, factory)
-        logger.info(
-            f"Cache warmed by admin user {current_user.username}: {count} entries"
-        )
+        logger.info(f"Cache warmed by admin user {current_user.username}: {count} entries")
 
         return {
             "status": "success",
@@ -1806,10 +1756,7 @@ async def rebuild_search_indexes(
 
         if index_type in ["all", "semantic"]:
             # Semantic index rebuild would go here if available
-            if (
-                hasattr(hybrid_search, "semantic_indexer")
-                and hybrid_search.semantic_indexer
-            ):
+            if hasattr(hybrid_search, "semantic_indexer") and hybrid_search.semantic_indexer:
                 results["semantic"] = "rebuild_not_implemented"
             else:
                 results["semantic"] = "not_available"
@@ -1818,7 +1765,7 @@ async def rebuild_search_indexes(
 
         return {
             "status": "success",
-            "message": f"Search indexes rebuilt successfully",
+            "message": "Search indexes rebuilt successfully",
             "index_type": index_type,
             "results": results,
         }

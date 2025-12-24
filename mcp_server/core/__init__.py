@@ -1,7 +1,7 @@
 """Core infrastructure for MCP Server."""
 
-from .logging import setup_logging, get_logger
-from .errors import MCPError, PluginError, IndexError, ConfigError
+from .errors import ConfigError, IndexError, MCPError, PluginError
+from .logging import get_logger, setup_logging
 
 __all__ = [
     "setup_logging",

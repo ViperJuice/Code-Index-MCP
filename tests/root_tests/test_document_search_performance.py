@@ -9,8 +9,15 @@ tests_dir = Path(__file__).parent / "tests"
 sys.path.insert(0, str(tests_dir))
 
 # Import and run the actual test
-from performance.test_document_search_performance import *
 
 if __name__ == "__main__":
     import pytest
-    pytest.main([str(tests_dir / "performance" / "test_document_search_performance.py"), "-v", "-m", "performance"])
+
+    pytest.main(
+        [
+            str(tests_dir / "performance" / "test_document_search_performance.py"),
+            "-v",
+            "-m",
+            "performance",
+        ]
+    )

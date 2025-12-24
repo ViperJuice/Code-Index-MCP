@@ -10,15 +10,12 @@ Tests cover:
 - Performance benchmarks
 """
 
-import ctypes
 from pathlib import Path
-from unittest.mock import Mock, patch
 from textwrap import dedent
 
 import pytest
 
 from mcp_server.plugins.c_plugin.plugin import Plugin as CPlugin
-from mcp_server.plugin_base import SymbolDef, SearchResult
 
 
 class TestPluginInitialization:
@@ -611,15 +608,9 @@ class TestComplexCodeStructures:
         symbols = result["symbols"]
 
         # Should extract outer structures
-        assert any(
-            s["symbol"] == "OuterStruct" and s["kind"] == "struct" for s in symbols
-        )
-        assert any(
-            s["symbol"] == "InnerStruct" and s["kind"] == "struct" for s in symbols
-        )
-        assert any(
-            s["symbol"] == "Rectangle" and s["kind"] == "typedef" for s in symbols
-        )
+        assert any(s["symbol"] == "OuterStruct" and s["kind"] == "struct" for s in symbols)
+        assert any(s["symbol"] == "InnerStruct" and s["kind"] == "struct" for s in symbols)
+        assert any(s["symbol"] == "Rectangle" and s["kind"] == "typedef" for s in symbols)
 
     def test_function_pointers_and_callbacks(self):
         """Test function pointers and callback patterns."""
@@ -655,23 +646,13 @@ class TestComplexCodeStructures:
         symbols = result["symbols"]
 
         # Check symbols were extracted
+        assert any(s["symbol"] == "EventHandler" and s["kind"] == "typedef" for s in symbols)
+        assert any(s["symbol"] == "EventListener" and s["kind"] == "struct" for s in symbols)
+        assert any(s["symbol"] == "register_handler" and s["kind"] == "function" for s in symbols)
         assert any(
-            s["symbol"] == "EventHandler" and s["kind"] == "typedef" for s in symbols
+            s["symbol"] == "get_default_handler" and s["kind"] == "function" for s in symbols
         )
-        assert any(
-            s["symbol"] == "EventListener" and s["kind"] == "struct" for s in symbols
-        )
-        assert any(
-            s["symbol"] == "register_handler" and s["kind"] == "function"
-            for s in symbols
-        )
-        assert any(
-            s["symbol"] == "get_default_handler" and s["kind"] == "function"
-            for s in symbols
-        )
-        assert any(
-            s["symbol"] == "operations" and s["kind"] == "variable" for s in symbols
-        )
+        assert any(s["symbol"] == "operations" and s["kind"] == "variable" for s in symbols)
 
     def test_complex_preprocessor(self):
         """Test complex preprocessor directives."""
@@ -752,7 +733,8 @@ class TestSearchFunctionality:
 
         # Create repository and file in store
         repo_id = sqlite_store.create_repository("/test", "test")
-        file_id = sqlite_store.store_file(repository_id=repo_id, file_path="/test/file.c", language="c"
+        file_id = sqlite_store.store_file(
+            repository_id=repo_id, file_path="/test/file.c", language="c"
         )
 
         # Index the file
@@ -902,7 +884,8 @@ double calc_average(double* values, int count) {
         ]
 
         for filename, code in test_files:
-            file_id = sqlite_store.store_file(repository_id=repo_id, file_path=f"/test/{filename}", language="c"
+            file_id = sqlite_store.store_file(
+                repository_id=repo_id, file_path=f"/test/{filename}", language="c"
             )
             result = plugin.indexFile(Path(f"/test/{filename}"), code)
 
@@ -985,7 +968,8 @@ class TestPersistenceIntegration:
         )
 
         file_path = Path("/myproject/main.c")
-        file_id = sqlite_store.store_file(repository_id=repo_id, file_path=str(file_path), language="c", size=len(code)
+        file_id = sqlite_store.store_file(
+            repository_id=repo_id, file_path=str(file_path), language="c", size=len(code)
         )
 
         # Index the file
@@ -1053,9 +1037,7 @@ int function{i}(Struct{i}* s, int x) {{
         with measure_time("c_plugin_index_large", benchmark_results):
             for _ in range(10):
                 result = plugin.indexFile(Path("benchmark.c"), large_code)
-                assert (
-                    len(result["symbols"]) >= 400
-                )  # 100 structs + 100 functions + 200 macros
+                assert len(result["symbols"]) >= 400  # 100 structs + 100 functions + 200 macros
 
     @pytest.mark.benchmark
     def test_search_performance(self, populated_sqlite_store, benchmark_results):
@@ -1071,9 +1053,7 @@ int function{i}(Struct{i}* s, int x) {{
             populated_sqlite_store.store_symbol(
                 file_id, f"Struct_{i}", "struct", i * 20, i * 20 + 15
             )
-            populated_sqlite_store.store_symbol(
-                file_id, f"MACRO_{i}", "macro", i * 5, i * 5 + 1
-            )
+            populated_sqlite_store.store_symbol(file_id, f"MACRO_{i}", "macro", i * 5, i * 5 + 1)
 
         with measure_time("c_plugin_search", benchmark_results):
             for _ in range(100):

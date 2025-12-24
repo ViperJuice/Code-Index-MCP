@@ -1,16 +1,20 @@
 """Health check system for monitoring component status."""
 
 import asyncio
-import time
 import logging
-import psutil
 import sqlite3
-from pathlib import Path
-from typing import Dict, Any, List, Optional, Callable, Awaitable
-from concurrent.futures import ThreadPoolExecutor
 import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Awaitable, Callable, Dict, List, Optional
 
-from . import IHealthCheck, HealthStatus, HealthCheckResult
+try:
+    import psutil
+except ImportError:  # pragma: no cover - optional dependency
+    psutil = None
+
+from . import HealthCheckResult, HealthStatus, IHealthCheck
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +37,13 @@ class ComponentHealthChecker(IHealthCheck):
 
     def _register_default_checks(self) -> None:
         """Register default system health checks."""
+        if psutil is None:
+            self.register_health_check("system", lambda: self._psutil_unavailable_async("system"))
+            self.register_health_check("memory", lambda: self._psutil_unavailable_async("memory"))
+            self.register_health_check("disk", lambda: self._psutil_unavailable_async("disk"))
+            logger.warning("psutil is not available; system health metrics will be degraded")
+            return
+
         self.register_health_check("system", self._check_system_health)
         self.register_health_check("memory", self._check_memory_health)
         self.register_health_check("disk", self._check_disk_health)
@@ -61,9 +72,7 @@ class ComponentHealthChecker(IHealthCheck):
                 message="Health check timed out",
             )
         except Exception as e:
-            logger.error(
-                f"Health check for {component_name} failed: {e}", exc_info=True
-            )
+            logger.error(f"Health check for {component_name} failed: {e}", exc_info=True)
             return HealthCheckResult(
                 component=component_name,
                 status=HealthStatus.UNHEALTHY,
@@ -108,9 +117,7 @@ class ComponentHealthChecker(IHealthCheck):
         with self._lock:
             if component_name in self._checks:
                 del self._checks[component_name]
-                logger.info(
-                    f"Unregistered health check for component: {component_name}"
-                )
+                logger.info(f"Unregistered health check for component: {component_name}")
 
     async def get_overall_health(self) -> HealthCheckResult:
         """Get overall system health status."""
@@ -155,9 +162,18 @@ class ComponentHealthChecker(IHealthCheck):
         )
 
     # Default health check implementations
+    async def _psutil_unavailable_async(self, component: str) -> HealthCheckResult:
+        """Return a degraded health result when psutil is unavailable."""
+        return HealthCheckResult(
+            component=component,
+            status=HealthStatus.DEGRADED,
+            message="psutil is not available; system metrics are disabled",
+        )
 
     async def _check_system_health(self) -> HealthCheckResult:
         """Check basic system health metrics."""
+        if psutil is None:
+            return await self._psutil_unavailable_async("system")
         try:
             # CPU usage
             cpu_percent = psutil.cpu_percent(interval=1)
@@ -199,6 +215,8 @@ class ComponentHealthChecker(IHealthCheck):
 
     async def _check_memory_health(self) -> HealthCheckResult:
         """Check memory usage health."""
+        if psutil is None:
+            return await self._psutil_unavailable_async("memory")
         try:
             memory = psutil.virtual_memory()
             swap = psutil.swap_memory()
@@ -234,6 +252,8 @@ class ComponentHealthChecker(IHealthCheck):
 
     async def _check_disk_health(self) -> HealthCheckResult:
         """Check disk usage health."""
+        if psutil is None:
+            return await self._psutil_unavailable_async("disk")
         try:
             # Check current directory disk usage
             disk_usage = psutil.disk_usage(".")
@@ -241,9 +261,7 @@ class ComponentHealthChecker(IHealthCheck):
             details = {
                 "disk_total_gb": round(disk_usage.total / (1024**3), 2),
                 "disk_free_gb": round(disk_usage.free / (1024**3), 2),
-                "disk_used_percent": round(
-                    (disk_usage.used / disk_usage.total) * 100, 2
-                ),
+                "disk_used_percent": round((disk_usage.used / disk_usage.total) * 100, 2),
             }
 
             used_percent = (disk_usage.used / disk_usage.total) * 100

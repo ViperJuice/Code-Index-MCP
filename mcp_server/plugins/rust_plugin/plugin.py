@@ -1,22 +1,22 @@
 """Rust language plugin with advanced features."""
 
-from pathlib import Path
-from typing import Optional, List, Dict, Any, Iterable
 import logging
 import re
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional
 
 from ...plugin_base import (
     IndexShard,
-    SymbolDef,
     Reference,
-    SearchResult,
     SearchOpts,
+    SearchResult,
+    SymbolDef,
 )
-from ..generic_treesitter_plugin import GenericTreeSitterPlugin
 from ...storage.sqlite_store import SQLiteStore
+from ..generic_treesitter_plugin import GenericTreeSitterPlugin
+from .cargo_integration import CargoIntegration
 from .module_resolver import RustModuleResolver
 from .trait_analyzer import RustTraitAnalyzer
-from .cargo_integration import CargoIntegration
 
 logger = logging.getLogger(__name__)
 
@@ -221,9 +221,7 @@ class RustPlugin(SpecializedPluginBase):
             # Try to resolve the module path
             for ext in self.file_extensions:
                 for path in Path(".").rglob(f"*{ext}"):
-                    resolved = module_resolver.resolve_module_path(
-                        path, "::".join(parts[:-1])
-                    )
+                    resolved = module_resolver.resolve_module_path(path, "::".join(parts[:-1]))
                     if resolved and resolved.exists():
                         try:
                             content = resolved.read_text(encoding="utf-8")
@@ -273,9 +271,7 @@ class RustPlugin(SpecializedPluginBase):
 
         return refs
 
-    def search(
-        self, query: str, opts: SearchOpts | None = None
-    ) -> Iterable[SearchResult]:
+    def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:
         """Enhanced search with Rust-specific features."""
         # Get base results
         results = list(super().search(query, opts))
@@ -355,11 +351,7 @@ class RustPlugin(SpecializedPluginBase):
                                 SearchResult(
                                     file=str(path),
                                     line=i + 1,
-                                    column=(
-                                        line.index(macro_name)
-                                        if macro_name in line
-                                        else 0
-                                    ),
+                                    column=(line.index(macro_name) if macro_name in line else 0),
                                     text=line.strip(),
                                     score=0.9,
                                 )
@@ -416,11 +408,7 @@ class RustPlugin(SpecializedPluginBase):
             return file_path.parent.name
 
         # Check if this is a submodule
-        if (
-            file_path.stem != "mod"
-            and file_path.stem != "lib"
-            and file_path.stem != "main"
-        ):
+        if file_path.stem != "mod" and file_path.stem != "lib" and file_path.stem != "main":
             return None
 
         return None

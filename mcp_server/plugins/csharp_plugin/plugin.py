@@ -2,26 +2,24 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Optional, Iterable, Dict, List, Any
 import logging
 import re
-import json
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional
 
 from ...plugin_base import (
     IndexShard,
-    SymbolDef,
     Reference,
-    SearchResult,
     SearchOpts,
+    SearchResult,
+    SymbolDef,
 )
 from ...plugin_base_enhanced import PluginWithSemanticSearch
-from ...utils.fuzzy_indexer import FuzzyIndexer
 from ...storage.sqlite_store import SQLiteStore
-
+from ...utils.fuzzy_indexer import FuzzyIndexer
 from .namespace_resolver import NamespaceResolver
-from .type_analyzer import TypeAnalyzer
 from .nuget_integration import NuGetIntegration
+from .type_analyzer import TypeAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -117,9 +115,7 @@ class Plugin(PluginWithSemanticSearch):
 
         try:
             # Perform comprehensive analysis
-            namespace_analysis = self._namespace_resolver.analyze_file(
-                str(path), content
-            )
+            namespace_analysis = self._namespace_resolver.analyze_file(str(path), content)
             type_analysis = self._type_analyzer.analyze_types(content, str(path))
 
             # Cache analysis results
@@ -189,9 +185,7 @@ class Plugin(PluginWithSemanticSearch):
                                 },
                             )
                         except Exception as e:
-                            logger.error(
-                                f"Failed to store symbol {symbol['symbol']}: {e}"
-                            )
+                            logger.error(f"Failed to store symbol {symbol['symbol']}: {e}")
 
             # Create semantic embeddings if enabled
             if self._enable_semantic and symbols:
@@ -247,9 +241,7 @@ class Plugin(PluginWithSemanticSearch):
             return self._project_cache[project_path]
 
         # Analyze NuGet packages
-        package_analysis = self._nuget_integration.analyze_project_packages(
-            project_path
-        )
+        package_analysis = self._nuget_integration.analyze_project_packages(project_path)
 
         # Analyze namespace resolution within project
         namespace_analysis = self._namespace_resolver.analyze_project_file(project_path)
@@ -258,9 +250,7 @@ class Plugin(PluginWithSemanticSearch):
             "project_path": project_path,
             "target_framework": package_analysis.get("target_framework"),
             "packages": package_analysis.get("packages", []),
-            "package_namespaces": list(
-                package_analysis.get("package_namespaces", set())
-            ),
+            "package_namespaces": list(package_analysis.get("package_namespaces", set())),
             "project_references": namespace_analysis.get("project_references", []),
             "global_usings": namespace_analysis.get("global_usings", []),
         }
@@ -270,9 +260,7 @@ class Plugin(PluginWithSemanticSearch):
 
         return project_analysis
 
-    def _extract_type_symbols(
-        self, type_analysis: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+    def _extract_type_symbols(self, type_analysis: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Extract type symbols from type analysis."""
         symbols = []
 
@@ -289,9 +277,7 @@ class Plugin(PluginWithSemanticSearch):
 
         return symbols
 
-    def _extract_method_symbols(
-        self, type_analysis: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+    def _extract_method_symbols(self, type_analysis: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Extract method symbols from type analysis."""
         symbols = []
 
@@ -307,9 +293,7 @@ class Plugin(PluginWithSemanticSearch):
 
         return symbols
 
-    def _extract_property_symbols(
-        self, type_analysis: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+    def _extract_property_symbols(self, type_analysis: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Extract property symbols from type analysis."""
         symbols = []
 
@@ -325,9 +309,7 @@ class Plugin(PluginWithSemanticSearch):
 
         return symbols
 
-    def _extract_field_symbols(
-        self, type_analysis: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+    def _extract_field_symbols(self, type_analysis: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Extract field symbols from type analysis."""
         symbols = []
 
@@ -343,9 +325,7 @@ class Plugin(PluginWithSemanticSearch):
 
         return symbols
 
-    def _extract_event_symbols(
-        self, type_analysis: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+    def _extract_event_symbols(self, type_analysis: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Extract event symbols from type analysis."""
         symbols = []
 
@@ -386,9 +366,7 @@ class Plugin(PluginWithSemanticSearch):
             doc_parts.append(f"Inherits from: {type_info['base_type']}")
 
         if type_info.get("implemented_interfaces"):
-            doc_parts.append(
-                f"Implements: {', '.join(type_info['implemented_interfaces'])}"
-            )
+            doc_parts.append(f"Implements: {', '.join(type_info['implemented_interfaces'])}")
 
         if type_info.get("modifiers"):
             doc_parts.append(f"Modifiers: {', '.join(type_info['modifiers'])}")
@@ -405,9 +383,7 @@ class Plugin(PluginWithSemanticSearch):
         if method_info.get("parameters"):
             param_strs = []
             for param in method_info["parameters"]:
-                param_str = (
-                    f"{param.get('type', 'object')} {param.get('name', 'param')}"
-                )
+                param_str = f"{param.get('type', 'object')} {param.get('name', 'param')}"
                 if param.get("modifiers"):
                     param_str = f"{' '.join(param['modifiers'])} {param_str}"
                 if param.get("default_value"):

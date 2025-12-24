@@ -6,45 +6,41 @@ structure including headings, sections, code blocks, and metadata. Users should
 be able to search within specific sections or find content based on structure.
 """
 
-import pytest
-import tempfile
-import json
-from pathlib import Path
-from typing import Dict, List, Any
-from dataclasses import dataclass
-from mcp_server.core.path_utils import PathUtils
-
 # Import system components
 import sys
-sys.path.insert(0, '/app')
+from dataclasses import dataclass
+from typing import Dict, List
 
-from tests.base_test import BaseDocumentTest
-from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
-from mcp_server.plugins.markdown_plugin.section_extractor import SectionExtractor
-from mcp_server.plugins.markdown_plugin.document_parser import DocumentParser
+import pytest
+
+sys.path.insert(0, "/app")
+
 from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
+from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
 from mcp_server.storage.sqlite_store import SQLiteStore
+from tests.base_test import BaseDocumentTest
 
 
 @dataclass
 class DocumentSection:
     """Represents a section in a document."""
+
     title: str
     level: int
     content: str
-    subsections: List['DocumentSection']
+    subsections: List["DocumentSection"]
     code_blocks: List[Dict[str, str]]
-    
-    
+
+
 class TestDocumentStructureExtraction(BaseDocumentTest):
     """Test heading extraction, hierarchy, table of contents, and cross-references."""
-    
+
     @pytest.fixture
     def structured_docs(self, tmp_path):
         """Create documents with rich structure."""
         workspace = tmp_path / "structured"
         workspace.mkdir()
-        
+
         # Technical documentation with clear structure
         tech_doc = """---
 title: Technical Architecture Guide
@@ -385,7 +381,7 @@ This architecture provides a scalable, secure, and maintainable foundation for o
 Regular reviews and updates ensure it continues to meet our evolving needs.
 """
         (workspace / "architecture.md").write_text(tech_doc)
-        
+
         # API specification with structure
         api_spec = """---
 title: API Specification
@@ -585,7 +581,7 @@ def verify_webhook(payload: bytes, signature: str, secret: str) -> bool:
 ```
 """
         (workspace / "api-spec.md").write_text(api_spec)
-        
+
         # Tutorial with nested structure
         tutorial = """# Complete Tutorial
 
@@ -712,133 +708,129 @@ performance:
 ```
 """
         (workspace / "tutorial.md").write_text(tutorial)
-        
+
         return workspace
-    
+
     @pytest.fixture
     def structure_setup(self, structured_docs, tmp_path):
         """Set up search with structured documents."""
         db_path = tmp_path / "structure_test.db"
         store = SQLiteStore(str(db_path))
-        
+
         # Create plugin
         markdown_plugin = MarkdownPlugin(sqlite_store=store, enable_semantic=False)
-        
+
         # Create dispatcher
         dispatcher = Dispatcher([markdown_plugin])
-        
+
         # Index all documents
         for doc_file in structured_docs.glob("*.md"):
             content = doc_file.read_text()
             dispatcher.indexFile(str(doc_file), content)
-        
-        return {
-            'dispatcher': dispatcher,
-            'store': store,
-            'workspace': structured_docs
-        }
-    
+
+        return {"dispatcher": dispatcher, "store": store, "workspace": structured_docs}
+
     def test_heading_hierarchy_extraction(self, structure_setup):
         """Test extraction of document heading hierarchy."""
-        dispatcher = structure_setup['dispatcher']
-        
+        dispatcher = structure_setup["dispatcher"]
+
         # Search for top-level sections
         results = dispatcher.search("Technical Architecture Guide")
         assert len(results) > 0, "Should find document by title"
-        
+
         # Search for nested sections
         nested_queries = [
             "Core Components",
             "API Gateway",
             "Authentication Service",
             "Security Architecture",
-            "Deployment Configuration"
+            "Deployment Configuration",
         ]
-        
+
         for query in nested_queries:
             results = dispatcher.search(query)
             assert len(results) > 0, f"Should find section: {query}"
-            
+
             # Check that we get the section content
             top_result = results[0]
-            assert 'snippet' in top_result
-            assert len(top_result['snippet']) > 30
-    
+            assert "snippet" in top_result
+            assert len(top_result["snippet"]) > 30
+
     def test_code_block_extraction(self, structure_setup):
         """Test extraction of code blocks with language tags."""
-        dispatcher = structure_setup['dispatcher']
-        
+        dispatcher = structure_setup["dispatcher"]
+
         # Search for code examples
         code_queries = [
             "fastapi authentication example",
             "dockerfile configuration",
             "kubernetes deployment yaml",
             "python security code",
-            "sql database schema"
+            "sql database schema",
         ]
-        
+
         for query in code_queries:
             results = dispatcher.search(query)
-            
+
             if len(results) > 0:
                 # Check if we found code blocks
                 code_found = False
                 for result in results[:5]:
-                    snippet = result.get('snippet', '')
-                    if '```' in snippet or 'import' in snippet or 'CREATE TABLE' in snippet:
+                    snippet = result.get("snippet", "")
+                    if "```" in snippet or "import" in snippet or "CREATE TABLE" in snippet:
                         code_found = True
                         break
-                
+
                 assert code_found, f"Should find code for: {query}"
-    
+
     def test_metadata_extraction(self, structure_setup):
         """Test extraction of document metadata from frontmatter."""
-        dispatcher = structure_setup['dispatcher']
-        
+        dispatcher = structure_setup["dispatcher"]
+
         # Search using metadata fields
         metadata_queries = [
             "author:Engineering Team",
             "version:2.0",
             "tags:architecture",
-            "format:OpenAPI"
+            "format:OpenAPI",
         ]
-        
+
         for query in metadata_queries:
             # Note: Basic search might not support metadata syntax,
             # but we should at least find documents with these terms
-            simple_query = query.split(':')[1]
+            simple_query = query.split(":")[1]
             results = dispatcher.search(simple_query)
-            
+
             # Should find documents containing metadata values
             if "Engineering" in simple_query or "architecture" in simple_query:
                 assert len(results) > 0, f"Should find docs with metadata: {query}"
-    
+
     def test_table_extraction(self, structure_setup):
         """Test extraction of table content."""
-        dispatcher = structure_setup['dispatcher']
-        
+        dispatcher = structure_setup["dispatcher"]
+
         # Search for table content
         table_queries = [
             "page integer required description",  # API parameters table
             "load_data save_data",  # Function reference table
-            "HTTP Status Codes"  # Status codes section
+            "HTTP Status Codes",  # Status codes section
         ]
-        
+
         for query in table_queries:
             results = dispatcher.search(query)
-            
+
             if len(results) > 0:
                 # Should find table-related content
                 top_result = results[0]
-                snippet = top_result.get('snippet', '')
-                
+                snippet = top_result.get("snippet", "")
+
                 # Tables might appear as structured text
                 assert len(snippet) > 20, f"Should find table content for: {query}"
-    
+
     def test_section_depth_search(self, structure_setup):
         """Test finding content at different section depths."""
-        dispatcher = structure_setup['dispatcher']
-        
+        dispatcher = structure_setup["dispatcher"]
+
         # Test different depth levels
         depth_queries = [
             ("Chapter 1", 1),  # Top level
@@ -846,122 +838,126 @@ performance:
             ("Project Setup", 3),  # Third level
             ("Caching Strategy", 2),  # Subsection
         ]
-        
+
         for query, expected_depth in depth_queries:
             results = dispatcher.search(query)
-            
+
             if len(results) > 0:
                 # Found content at this depth
                 assert True, f"Found content at depth {expected_depth}"
-            
+
             # More specific queries should still work
             if "Project Setup" in query:
                 setup_results = dispatcher.search("mkdir my-project")
                 assert len(setup_results) > 0, "Should find commands in deep sections"
-    
+
     def test_list_content_extraction(self, structure_setup):
         """Test extraction of list items and bullet points."""
-        dispatcher = structure_setup['dispatcher']
-        
+        dispatcher = structure_setup["dispatcher"]
+
         # Search for list content
         list_queries = [
             "Scalability Resilience Maintainability",  # Key principles list
             "JWT token OAuth2 RBAC",  # Features list
             "Request routing load balancing",  # Responsibilities list
         ]
-        
+
         for query in list_queries:
             results = dispatcher.search(query)
-            
+
             if len(results) > 0:
                 # Should find list content
                 found_list_items = False
                 for result in results[:3]:
-                    snippet = result.get('snippet', '')
-                    if any(marker in snippet for marker in ['- ', '* ', '• ', '1.', '2.']):
+                    snippet = result.get("snippet", "")
+                    if any(marker in snippet for marker in ["- ", "* ", "• ", "1.", "2."]):
                         found_list_items = True
                         break
-                
+
                 # Lists are common in technical docs
-                assert found_list_items or len(results) > 0, f"Should find list content for: {query}"
-    
+                assert (
+                    found_list_items or len(results) > 0
+                ), f"Should find list content for: {query}"
+
     def test_cross_reference_extraction(self, structure_setup):
         """Test extraction of cross-references and links."""
-        dispatcher = structure_setup['dispatcher']
-        
+        dispatcher = structure_setup["dispatcher"]
+
         # Search for cross-referenced content
         ref_queries = [
             "Table of Contents",
             "System Overview section",
             "See Appendix",
-            "configuration reference"
+            "configuration reference",
         ]
-        
+
         for query in ref_queries:
             results = dispatcher.search(query)
-            
+
             if len(results) > 0:
                 # Should find reference content
                 top_result = results[0]
-                snippet = top_result.get('snippet', '')
-                
+                snippet = top_result.get("snippet", "")
+
                 # References often include section markers or links
-                ref_indicators = ['#', '](', 'see', 'refer', 'section', 'chapter']
+                ref_indicators = ["#", "](", "see", "refer", "section", "chapter"]
                 has_reference = any(indicator in snippet.lower() for indicator in ref_indicators)
-                
+
                 # Some queries should definitely have references
                 if "Table of Contents" in query:
                     assert has_reference or len(results) > 0, "Should find TOC with references"
-    
+
     def test_structured_search_queries(self, structure_setup):
         """Test queries that leverage document structure."""
-        dispatcher = structure_setup['dispatcher']
-        
+        dispatcher = structure_setup["dispatcher"]
+
         # Structure-aware queries
         structure_queries = [
             "security in deployment section",
             "python code examples in API",
             "configuration yaml examples",
             "error handling in chapter 2",
-            "kubernetes deployment configuration"
+            "kubernetes deployment configuration",
         ]
-        
+
         for query in structure_queries:
             results = dispatcher.search(query)
-            
+
             # Should find relevant structured content
             if len(results) > 0:
                 # Verify we found content in the right context
                 relevant_found = False
                 query_terms = query.lower().split()
-                
+
                 for result in results[:5]:
-                    snippet = result.get('snippet', '').lower()
+                    snippet = result.get("snippet", "").lower()
                     matching_terms = sum(1 for term in query_terms if term in snippet)
                     if matching_terms >= 2:  # At least 2 query terms found
                         relevant_found = True
                         break
-                
-                assert relevant_found or len(results) > 0, f"Should find structured content for: {query}"
-    
+
+                assert (
+                    relevant_found or len(results) > 0
+                ), f"Should find structured content for: {query}"
+
     def test_document_outline_generation(self, structure_setup):
         """Test ability to understand document outline/structure."""
-        dispatcher = structure_setup['dispatcher']
-        store = structure_setup['store']
-        
+        dispatcher = structure_setup["dispatcher"]
+        store = structure_setup["store"]
+
         # Search for documents with clear structure
         outline_queries = [
             "architecture guide outline",
             "tutorial chapters",
-            "api specification sections"
+            "api specification sections",
         ]
-        
+
         for query in outline_queries:
             results = dispatcher.search(query)
-            
+
             # Documents with good structure should be findable
             assert len(results) >= 0, f"Should handle outline query: {query}"
-            
+
             # If we found the architecture guide
             if "architecture" in query and len(results) > 0:
                 # Should be able to find its major sections

@@ -1,7 +1,7 @@
 """Query optimizer for search queries."""
 
-from enum import Enum
 from dataclasses import dataclass
+from enum import Enum
 from typing import List, Optional
 
 

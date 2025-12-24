@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Any, Dict, List, Optional
 
 
 class ChunkType(Enum):
@@ -125,17 +125,14 @@ class IDocumentProcessor(ABC):
     @abstractmethod
     def process_document(self, content: str) -> "ProcessedDocument":
         """Process a document and extract structured information."""
-        pass
 
     @abstractmethod
     def extract_metadata(self, content: str) -> Dict[str, Any]:
         """Extract metadata from document content."""
-        pass
 
     @abstractmethod
     def create_searchable_chunks(self, content: str) -> List[DocumentChunk]:
         """Create searchable chunks from document content."""
-        pass
 
 
 class IChunkStrategy(ABC):
@@ -144,17 +141,14 @@ class IChunkStrategy(ABC):
     @abstractmethod
     def chunk(self, content: str, structure: DocumentStructure) -> List[DocumentChunk]:
         """Chunk document content based on structure."""
-        pass
 
     @abstractmethod
     def validate_chunk(self, chunk: DocumentChunk) -> bool:
         """Validate that a chunk meets quality criteria."""
-        pass
 
     @abstractmethod
     def merge_small_chunks(self, chunks: List[DocumentChunk]) -> List[DocumentChunk]:
         """Merge chunks that are too small."""
-        pass
 
 
 class IStructureExtractor(ABC):
@@ -163,17 +157,14 @@ class IStructureExtractor(ABC):
     @abstractmethod
     def extract_structure(self, content: str) -> DocumentStructure:
         """Extract the hierarchical structure of a document."""
-        pass
 
     @abstractmethod
     def find_sections(self, content: str) -> List[Section]:
         """Find all sections in the document."""
-        pass
 
     @abstractmethod
     def build_hierarchy(self, sections: List[Section]) -> Optional[Section]:
         """Build a hierarchical tree from flat sections."""
-        pass
 
 
 @dataclass

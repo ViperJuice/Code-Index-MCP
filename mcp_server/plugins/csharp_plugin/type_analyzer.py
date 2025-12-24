@@ -1,9 +1,9 @@
 """Type system analysis for C# code with generics support."""
 
-from typing import Dict, List, Set, Optional, Tuple, Any
-import re
 import logging
+import re
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -155,9 +155,7 @@ class TypeAnalyzer:
 
             modifiers = []
             if match.group("modifiers"):
-                modifiers = [
-                    m.strip() for m in match.group("modifiers").split() if m.strip()
-                ]
+                modifiers = [m.strip() for m in match.group("modifiers").split() if m.strip()]
 
             generic_params = []
             if match.group("generics"):
@@ -239,9 +237,7 @@ class TypeAnalyzer:
 
         return parameters
 
-    def _parse_constraints(
-        self, param_name: str, constraints_str: str
-    ) -> List[Dict[str, Any]]:
+    def _parse_constraints(self, param_name: str, constraints_str: str) -> List[Dict[str, Any]]:
         """Parse where constraints for a generic parameter."""
         constraints = []
 
@@ -311,9 +307,7 @@ class TypeAnalyzer:
 
             modifiers = []
             if match.group("modifiers"):
-                modifiers = [
-                    m.strip() for m in match.group("modifiers").split() if m.strip()
-                ]
+                modifiers = [m.strip() for m in match.group("modifiers").split() if m.strip()]
 
             is_async = "async" in modifiers
             return_type = match.group("return_type").strip()
@@ -435,16 +429,12 @@ class TypeAnalyzer:
 
             modifiers = []
             if match.group("modifiers"):
-                modifiers = [
-                    m.strip() for m in match.group("modifiers").split() if m.strip()
-                ]
+                modifiers = [m.strip() for m in match.group("modifiers").split() if m.strip()]
 
             accessors = match.group("accessors")
             has_getter = "get" in accessors or "=>" in accessors
             has_setter = "set" in accessors
-            is_auto_property = "{" in accessors and (
-                "get;" in accessors or "set;" in accessors
-            )
+            is_auto_property = "{" in accessors and ("get;" in accessors or "set;" in accessors)
 
             property_info = {
                 "name": match.group("name"),
@@ -478,9 +468,7 @@ class TypeAnalyzer:
 
             modifiers = []
             if match.group("modifiers"):
-                modifiers = [
-                    m.strip() for m in match.group("modifiers").split() if m.strip()
-                ]
+                modifiers = [m.strip() for m in match.group("modifiers").split() if m.strip()]
 
             # Handle multiple field names
             field_names = [name.strip() for name in match.group("names").split(",")]
@@ -517,9 +505,7 @@ class TypeAnalyzer:
 
             modifiers = []
             if match.group("modifiers"):
-                modifiers = [
-                    m.strip() for m in match.group("modifiers").split() if m.strip()
-                ]
+                modifiers = [m.strip() for m in match.group("modifiers").split() if m.strip()]
 
             event_info = {
                 "name": match.group("name"),

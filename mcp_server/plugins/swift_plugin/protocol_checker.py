@@ -1,11 +1,10 @@
 """Swift protocol conformance checking and analysis."""
 
-import re
 import logging
-from pathlib import Path
-from typing import Dict, List, Set, Optional, Tuple, Any
+import re
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -108,9 +107,7 @@ class SwiftProtocolChecker:
         # Known system protocols
         self.system_protocols = self._init_system_protocols()
 
-    def find_conformances(
-        self, content: str, file_path: str = ""
-    ) -> Dict[str, List[str]]:
+    def find_conformances(self, content: str, file_path: str = "") -> Dict[str, List[str]]:
         """Find all protocol conformances in Swift code."""
         conformances = {}
         lines = content.split("\n")
@@ -123,18 +120,14 @@ class SwiftProtocolChecker:
                 continue
 
             # Find direct conformances in type declarations
-            direct_conformances = self._find_direct_conformances(
-                line, file_path, line_num
-            )
+            direct_conformances = self._find_direct_conformances(line, file_path, line_num)
             for conformance in direct_conformances:
                 if conformance.type_name not in conformances:
                     conformances[conformance.type_name] = []
                 conformances[conformance.type_name].append(conformance.protocol_name)
 
             # Find extension conformances
-            extension_conformances = self._find_extension_conformances(
-                line, file_path, line_num
-            )
+            extension_conformances = self._find_extension_conformances(line, file_path, line_num)
             for conformance in extension_conformances:
                 if conformance.type_name not in conformances:
                     conformances[conformance.type_name] = []
@@ -142,9 +135,7 @@ class SwiftProtocolChecker:
 
         return conformances
 
-    def analyze_protocols(
-        self, content: str, file_path: str = ""
-    ) -> List[ProtocolDefinition]:
+    def analyze_protocols(self, content: str, file_path: str = "") -> List[ProtocolDefinition]:
         """Analyze protocol definitions in Swift code."""
         protocols = []
         lines = content.split("\n")
@@ -154,9 +145,7 @@ class SwiftProtocolChecker:
             line = lines[i].strip()
 
             # Look for protocol declarations
-            protocol_match = re.match(
-                r"protocol\s+(\w+)(?:\s*:\s*([^{]+))?\s*\{?", line
-            )
+            protocol_match = re.match(r"protocol\s+(\w+)(?:\s*:\s*([^{]+))?\s*\{?", line)
             if protocol_match:
                 protocol_name = protocol_match.group(1)
                 inherited_str = protocol_match.group(2) or ""
@@ -187,9 +176,7 @@ class SwiftProtocolChecker:
 
         return protocols
 
-    def analyze_property_wrappers(
-        self, content: str, file_path: str = ""
-    ) -> List[PropertyWrapper]:
+    def analyze_property_wrappers(self, content: str, file_path: str = "") -> List[PropertyWrapper]:
         """Analyze property wrapper definitions and usage."""
         property_wrappers = []
         lines = content.split("\n")
@@ -233,9 +220,7 @@ class SwiftProtocolChecker:
 
         return property_wrappers
 
-    def analyze_result_builders(
-        self, content: str, file_path: str = ""
-    ) -> List[ResultBuilder]:
+    def analyze_result_builders(self, content: str, file_path: str = "") -> List[ResultBuilder]:
         """Analyze result builder definitions and usage."""
         result_builders = []
         lines = content.split("\n")
@@ -250,9 +235,7 @@ class SwiftProtocolChecker:
                 j = i
                 while j < len(lines):
                     next_line = lines[j].strip()
-                    struct_match = re.search(
-                        r"(?:struct|class|enum)\s+(\w+)", next_line
-                    )
+                    struct_match = re.search(r"(?:struct|class|enum)\s+(\w+)", next_line)
                     if struct_match:
                         builder_name = struct_match.group(1)
                         builder_def = ResultBuilder(
@@ -313,9 +296,7 @@ class SwiftProtocolChecker:
 
         return validation_result
 
-    def find_protocol_extensions(
-        self, content: str, file_path: str = ""
-    ) -> List[Dict[str, Any]]:
+    def find_protocol_extensions(self, content: str, file_path: str = "") -> List[Dict[str, Any]]:
         """Find protocol extensions and their default implementations."""
         extensions = []
         lines = content.split("\n")
@@ -324,23 +305,16 @@ class SwiftProtocolChecker:
             line = line.strip()
 
             # Look for protocol extensions
-            extension_match = re.match(
-                r"extension\s+(\w+)(?:\s+where\s+([^{]+))?\s*\{?", line
-            )
+            extension_match = re.match(r"extension\s+(\w+)(?:\s+where\s+([^{]+))?\s*\{?", line)
             if extension_match:
                 protocol_name = extension_match.group(1)
                 where_clause = extension_match.group(2)
 
                 # Check if it's extending a known protocol
-                if (
-                    protocol_name in self.protocols
-                    or protocol_name in self.system_protocols
-                ):
+                if protocol_name in self.protocols or protocol_name in self.system_protocols:
 
                     # Parse extension body for default implementations
-                    implementations = self._parse_extension_body(
-                        lines, line_num, file_path
-                    )
+                    implementations = self._parse_extension_body(lines, line_num, file_path)
 
                     extensions.append(
                         {
@@ -368,7 +342,7 @@ class SwiftProtocolChecker:
         for pattern in patterns:
             match = re.match(pattern, line)
             if match:
-                type_keyword = match.group(1)
+                _ = match.group(1)
                 type_name = match.group(2)
                 conformance_list = match.group(3).strip()
 
@@ -457,9 +431,7 @@ class SwiftProtocolChecker:
         # Also check if the line contains @propertyWrapper and the next content might be on the same line
         if "@propertyWrapper" in line:
             # Look for struct/class on the same line after the attribute
-            struct_match = re.search(
-                r"@propertyWrapper.*?(?:struct|class)\s+(\w+)", line
-            )
+            struct_match = re.search(r"@propertyWrapper.*?(?:struct|class)\s+(\w+)", line)
             if struct_match:
                 wrapper_name = struct_match.group(1)
 
@@ -480,17 +452,14 @@ class SwiftProtocolChecker:
         wrappers = []
 
         # Look for @WrapperName property declarations
-        wrapper_usage_match = re.search(
-            r"@(\w+)(?:\([^)]*\))?\s+(?:var|let)\s+(\w+)", line
-        )
+        wrapper_usage_match = re.search(r"@(\w+)(?:\([^)]*\))?\s+(?:var|let)\s+(\w+)", line)
         if wrapper_usage_match:
             wrapper_name = wrapper_usage_match.group(1)
             property_name = wrapper_usage_match.group(2)
 
             # Check if it's a known property wrapper or follows naming convention
-            if (
-                wrapper_name in self.property_wrappers
-                or self._looks_like_property_wrapper(wrapper_name)
+            if wrapper_name in self.property_wrappers or self._looks_like_property_wrapper(
+                wrapper_name
             ):
 
                 wrapper = PropertyWrapper(
@@ -510,9 +479,7 @@ class SwiftProtocolChecker:
         """Find result builder definitions."""
         # Look for @resultBuilder attribute
         if "@resultBuilder" in line:
-            builder_match = re.search(
-                r"@resultBuilder\s+(?:struct|class|enum)\s+(\w+)", line
-            )
+            builder_match = re.search(r"@resultBuilder\s+(?:struct|class|enum)\s+(\w+)", line)
             if builder_match:
                 builder_name = builder_match.group(1)
 
@@ -525,9 +492,7 @@ class SwiftProtocolChecker:
 
         return None
 
-    def _find_result_builder_usage(
-        self, line: str, file_path: str, line_num: int
-    ) -> List[str]:
+    def _find_result_builder_usage(self, line: str, file_path: str, line_num: int) -> List[str]:
         """Find result builder usage in function definitions."""
         builders = []
 
@@ -586,9 +551,7 @@ class SwiftProtocolChecker:
 
         return requirements, associated_types, default_implementations
 
-    def _parse_extension_body(
-        self, lines: List[str], start_line: int, file_path: str
-    ) -> List[str]:
+    def _parse_extension_body(self, lines: List[str], start_line: int, file_path: str) -> List[str]:
         """Parse extension body for implementations."""
         implementations = []
 
@@ -662,9 +625,7 @@ class SwiftProtocolChecker:
             and not line.endswith("}")
         )
 
-    def _is_requirement_satisfied(
-        self, requirement: str, implementations: List[str]
-    ) -> bool:
+    def _is_requirement_satisfied(self, requirement: str, implementations: List[str]) -> bool:
         """Check if a protocol requirement is satisfied by implementations."""
         # Extract method/property signature from requirement
         req_signature = self._extract_signature(requirement)

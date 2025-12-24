@@ -6,35 +6,37 @@ QueryOptimizer, and related components.
 """
 
 import asyncio
-import pytest
-import tempfile
 import os
-from pathlib import Path
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
+import tempfile
 from datetime import datetime, timedelta
+from typing import Any, Dict
+from unittest.mock import Mock
+
+import pytest
 
 from mcp_server.indexer.index_engine import (
-    IndexEngine,
-    IndexResult,
     BatchIndexResult,
+    IndexEngine,
     IndexOptions,
     IndexProgress,
+    IndexResult,
     IndexTask,
 )
 from mcp_server.indexer.query_optimizer import (
-    QueryOptimizer,
-    Query,
-    QueryType,
-    QueryCost,
-    OptimizedQuery,
-    SearchPlan,
     IndexSuggestion,
-    PerformanceReport,
     IndexType,
+    OptimizedQuery,
+    PerformanceReport,
+    Query,
+    QueryCost,
+    QueryOptimizer,
+    QueryType,
+    SearchPlan,
 )
+from mcp_server.core.path_resolver import PathResolver
+from mcp_server.plugin_system.interfaces import IPluginManager
 from mcp_server.storage.sqlite_store import SQLiteStore
 from mcp_server.utils.fuzzy_indexer import FuzzyIndexer
-from mcp_server.plugin_system.interfaces import IPluginManager
 
 
 class TestIndexEngine:
@@ -402,9 +404,7 @@ class TestQueryOptimizer:
         queries = [
             Query(QueryType.SYMBOL_SEARCH, "func", {"kind": "function"}),
             Query(QueryType.SYMBOL_SEARCH, "class", {"kind": "class"}),
-            Query(
-                QueryType.SYMBOL_SEARCH, "var", {"kind": "function"}
-            ),  # kind used again
+            Query(QueryType.SYMBOL_SEARCH, "var", {"kind": "function"}),  # kind used again
         ]
 
         suggestions = optimizer.suggest_indexes(queries)
@@ -547,12 +547,8 @@ class TestQueryOptimizer:
 
     def test_estimate_base_rows(self, optimizer):
         """Test base row estimation for different query types."""
-        symbol_rows = optimizer._estimate_base_rows(
-            Query(QueryType.SYMBOL_SEARCH, "test")
-        )
-        semantic_rows = optimizer._estimate_base_rows(
-            Query(QueryType.SEMANTIC_SEARCH, "test")
-        )
+        symbol_rows = optimizer._estimate_base_rows(Query(QueryType.SYMBOL_SEARCH, "test"))
+        semantic_rows = optimizer._estimate_base_rows(Query(QueryType.SEMANTIC_SEARCH, "test"))
 
         # Symbol search should estimate more rows than semantic
         assert symbol_rows > semantic_rows
@@ -605,29 +601,58 @@ class TestIndexEngineIntegration:
     """Integration tests for IndexEngine with real components."""
 
     @pytest.fixture
-    def real_storage(self):
+    def real_storage(self, tmp_path):
         """Create a real SQLite storage for integration testing."""
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
-            db_path = f.name
-
-        storage = SQLiteStore(db_path)
+        db_path = tmp_path / "integration.db"
+        storage = SQLiteStore(str(db_path), path_resolver=PathResolver(repository_root=tmp_path))
         yield storage
-
-        # Cleanup
-        try:
-            os.unlink(db_path)
-        except OSError:
-            pass
 
     @pytest.fixture
     def real_fuzzy_indexer(self, real_storage):
         """Create a real FuzzyIndexer for integration testing."""
         return FuzzyIndexer(real_storage)
 
-    @pytest.mark.asyncio
-    async def test_full_indexing_workflow(
-        self, real_storage, real_fuzzy_indexer, tmp_path
-    ):
+    @pytest.fixture
+    def indexed_sample_file(self, real_storage, real_fuzzy_indexer, tmp_path):
+        """Index a sample file end-to-end for reuse across integration tests."""
+        mock_plugin_manager = Mock(spec=IPluginManager)
+        mock_plugin = Mock()
+        mock_plugin.parse_file.return_value = {
+            "language": "python",
+            "symbols": [
+                {
+                    "name": "indexed_function",
+                    "kind": "function",
+                    "line_start": 1,
+                    "line_end": 2,
+                    "signature": "def indexed_function():",
+                }
+            ],
+            "references": [],
+            "metadata": {},
+        }
+        mock_plugin_manager.get_plugin_for_file.return_value = mock_plugin
+
+        engine = IndexEngine(
+            plugin_manager=mock_plugin_manager,
+            storage=real_storage,
+            fuzzy_indexer=real_fuzzy_indexer,
+            repository_path=str(tmp_path),
+        )
+
+        test_file = tmp_path / "indexed_sample.py"
+        test_file.write_text("def indexed_function():\n    return 1\n")
+
+        result = asyncio.run(engine.index_file(str(test_file)))
+
+        return {
+            "storage": real_storage,
+            "file_path": str(test_file),
+            "repository_id": engine._repository_id,
+            "result": result,
+        }
+
+    def test_full_indexing_workflow(self, real_storage, real_fuzzy_indexer, tmp_path):
         """Test complete indexing workflow with real components."""
         # Create mock plugin manager
         mock_plugin_manager = Mock(spec=IPluginManager)
@@ -662,7 +687,7 @@ class TestIndexEngineIntegration:
         test_file.write_text("def test_function():\n    return 42\n")
 
         # Index the file
-        result = await engine.index_file(str(test_file))
+        result = asyncio.run(engine.index_file(str(test_file)))
 
         # Verify results
         assert result.success is True
@@ -676,6 +701,24 @@ class TestIndexEngineIntegration:
         # Test fuzzy search
         fuzzy_results = real_fuzzy_indexer.search_symbols("test")
         assert len(fuzzy_results) > 0
+
+    def test_indexed_file_has_hashes_and_flags(
+        self, indexed_sample_file: Dict[str, Any], real_storage: SQLiteStore
+    ):
+        """Verify stored files include hashes and soft-delete defaults."""
+        result = indexed_sample_file["result"]
+        repository_id = indexed_sample_file["repository_id"]
+        file_path = indexed_sample_file["file_path"]
+
+        assert result.success is True
+
+        record = real_storage.get_file(file_path, repository_id)
+        assert record is not None
+        assert record["hash"]
+        assert record["content_hash"]
+        assert record["relative_path"].endswith("indexed_sample.py")
+        assert record["is_deleted"] in (False, 0)
+        assert record["deleted_at"] is None
 
 
 if __name__ == "__main__":

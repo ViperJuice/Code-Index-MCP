@@ -2,24 +2,24 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Optional, Iterable, Dict, List, Any
-import logging
-
-from tree_sitter import Language, Parser, Node
-import tree_sitter_languages
 import ctypes
+import logging
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional
+
+import tree_sitter_languages
+from tree_sitter import Language, Node, Parser
 
 from ..plugin_base import (
     IndexShard,
-    SymbolDef,
     Reference,
-    SearchResult,
     SearchOpts,
+    SearchResult,
+    SymbolDef,
 )
 from ..plugin_base_enhanced import PluginWithSemanticSearch
-from ..utils.fuzzy_indexer import FuzzyIndexer
 from ..storage.sqlite_store import SQLiteStore
+from ..utils.fuzzy_indexer import FuzzyIndexer
 
 logger = logging.getLogger(__name__)
 
@@ -81,9 +81,7 @@ class GenericTreeSitterPlugin(PluginWithSemanticSearch):
             else:
                 raise AttributeError(f"No tree-sitter function found for {self.lang}")
         except Exception as e:
-            logger.warning(
-                f"Could not load tree-sitter grammar for {self.language_name}: {e}"
-            )
+            logger.warning(f"Could not load tree-sitter grammar for {self.language_name}: {e}")
             # Fallback - parser will work with basic extraction
             self.parser = None
             self.language = None
@@ -225,9 +223,7 @@ class GenericTreeSitterPlugin(PluginWithSemanticSearch):
                             }
                         )
 
-                logger.debug(
-                    f"Query extracted {len(symbols)} symbols for {self.language_name}"
-                )
+                logger.debug(f"Query extracted {len(symbols)} symbols for {self.language_name}")
             except Exception as e:
                 logger.warning(f"Query execution failed for {self.language_name}: {e}")
                 # Fallback to traversal
@@ -308,9 +304,7 @@ class GenericTreeSitterPlugin(PluginWithSemanticSearch):
                     # Extract symbol name (basic approach)
                     parts = line.strip().split()
                     if len(parts) > 1:
-                        symbol_name = (
-                            parts[1].split("(")[0] if "(" in parts[1] else parts[1]
-                        )
+                        symbol_name = parts[1].split("(")[0] if "(" in parts[1] else parts[1]
                         symbols.append(
                             {
                                 "symbol": symbol_name,

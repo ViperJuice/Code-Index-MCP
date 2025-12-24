@@ -28,15 +28,21 @@ CREATE TABLE IF NOT EXISTS files (
     language TEXT,
     size INTEGER,
     hash TEXT,
+    content_hash TEXT,
     last_modified TIMESTAMP,
     indexed_at TIMESTAMP,
+    is_deleted BOOLEAN DEFAULT FALSE,
+    deleted_at TIMESTAMP,
     metadata JSON,
     FOREIGN KEY (repository_id) REFERENCES repositories(id),
-    UNIQUE(repository_id, path)
+    UNIQUE(repository_id, relative_path)
 );
 
 CREATE INDEX IF NOT EXISTS idx_files_language ON files(language);
 CREATE INDEX IF NOT EXISTS idx_files_hash ON files(hash);
+CREATE INDEX IF NOT EXISTS idx_files_content_hash ON files(content_hash);
+CREATE INDEX IF NOT EXISTS idx_files_deleted ON files(is_deleted);
+CREATE INDEX IF NOT EXISTS idx_files_relative_path ON files(relative_path);
 
 -- Symbols
 CREATE TABLE IF NOT EXISTS symbols (

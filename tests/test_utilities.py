@@ -1,16 +1,12 @@
 """Test utilities for git-integrated repository tracking tests."""
 
-import os
-import sys
-import json
-import time
 import shutil
-import tempfile
 import subprocess
-from pathlib import Path
-from datetime import datetime
-from typing import Dict, List, Optional, Tuple, Any
+import tempfile
+import time
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
 
 # Language file templates for creating diverse test repositories
 TEST_FILE_TEMPLATES = {
@@ -125,7 +121,7 @@ def test_create_post():
     post = service.create_post("Test Post", "Content", 1)
     assert post.title == "Test Post"
     assert post.author_id == 1
-"""
+""",
     },
     "javascript": {
         "index.js": """// Main application entry point
@@ -220,7 +216,7 @@ export class Database {
         return post;
     }
 }
-"""
+""",
     },
     "go": {
         "main.go": """package main
@@ -315,43 +311,39 @@ func (s *UserService) GetAllUsers() []*models.User {
     copy(result, s.users)
     return result
 }
-"""
-    }
+""",
+    },
 }
 
 
 @dataclass
 class GitCommit:
     """Represents a git commit."""
+
     message: str
     files: Dict[str, str]  # filename -> action (add, modify, delete)
-    
-    
+
+
 @dataclass
 class TestRepository:
     """Test repository information."""
+
     path: Path
     name: str
     language: str
     commit_history: List[str] = field(default_factory=list)
     remote_url: Optional[str] = None
-    
+
 
 class TestRepositoryBuilder:
     """Builder for creating test repositories with git history."""
-    
+
     @staticmethod
     def run_git_command(cmd: str, cwd: Path) -> Tuple[int, str, str]:
         """Run a git command and return (returncode, stdout, stderr)."""
-        result = subprocess.run(
-            cmd, 
-            shell=True, 
-            cwd=cwd, 
-            capture_output=True, 
-            text=True
-        )
+        result = subprocess.run(cmd, shell=True, cwd=cwd, capture_output=True, text=True)
         return result.returncode, result.stdout, result.stderr
-    
+
     @classmethod
     def create_repository(
         cls,
@@ -359,31 +351,27 @@ class TestRepositoryBuilder:
         name: str,
         language: str = "python",
         init_git: bool = True,
-        commits: Optional[List[GitCommit]] = None
+        commits: Optional[List[GitCommit]] = None,
     ) -> TestRepository:
         """Create a test repository with optional git history."""
         repo_path = base_dir / name
         repo_path.mkdir(parents=True, exist_ok=True)
-        
-        repo = TestRepository(
-            path=repo_path,
-            name=name,
-            language=language
-        )
-        
+
+        repo = TestRepository(path=repo_path, name=name, language=language)
+
         if init_git:
             # Initialize git
             cls.run_git_command("git init", repo_path)
             cls.run_git_command("git config user.name 'Test User'", repo_path)
             cls.run_git_command("git config user.email 'test@example.com'", repo_path)
-        
+
         # Create initial files based on language
         if language in TEST_FILE_TEMPLATES:
             for file_path, content in TEST_FILE_TEMPLATES[language].items():
                 full_path = repo_path / file_path
                 full_path.parent.mkdir(parents=True, exist_ok=True)
                 full_path.write_text(content)
-        
+
         if init_git:
             # Initial commit
             cls.run_git_command("git add .", repo_path)
@@ -393,37 +381,37 @@ class TestRepositoryBuilder:
             if returncode == 0:
                 commit_hash = cls.run_git_command("git rev-parse HEAD", repo_path)[1].strip()
                 repo.commit_history.append(commit_hash)
-        
+
         # Apply additional commits if provided
         if commits and init_git:
             for commit in commits:
                 cls.apply_commit(repo, commit)
-        
+
         return repo
-    
+
     @classmethod
     def apply_commit(cls, repo: TestRepository, commit: GitCommit):
         """Apply a commit to the repository."""
         for file_path, action in commit.files.items():
             full_path = repo.path / file_path
-            
+
             if action == "add":
                 full_path.parent.mkdir(parents=True, exist_ok=True)
                 content = f"# New file: {file_path}\n# Added in commit: {commit.message}\n"
                 full_path.write_text(content)
                 cls.run_git_command(f"git add {file_path}", repo.path)
-                
+
             elif action == "modify":
                 if full_path.exists():
                     content = full_path.read_text()
                     content += f"\n# Modified in commit: {commit.message}\n"
                     full_path.write_text(content)
                     cls.run_git_command(f"git add {file_path}", repo.path)
-                    
+
             elif action == "delete":
                 if full_path.exists():
                     cls.run_git_command(f"git rm {file_path}", repo.path)
-        
+
         # Commit changes
         returncode, stdout, stderr = cls.run_git_command(
             f'git commit -m "{commit.message}"', repo.path
@@ -431,69 +419,69 @@ class TestRepositoryBuilder:
         if returncode == 0:
             commit_hash = cls.run_git_command("git rev-parse HEAD", repo.path)[1].strip()
             repo.commit_history.append(commit_hash)
-    
+
     @classmethod
     def create_multi_language_repo(
         cls, base_dir: Path, name: str = "multi_lang_project"
     ) -> TestRepository:
         """Create a repository with multiple programming languages."""
         repo = cls.create_repository(base_dir, name, language="python", init_git=True)
-        
+
         # Add JavaScript files
         js_files = TEST_FILE_TEMPLATES.get("javascript", {})
         for file_path, content in js_files.items():
             full_path = repo.path / "frontend" / file_path
             full_path.parent.mkdir(parents=True, exist_ok=True)
             full_path.write_text(content)
-        
+
         # Add Go files
         go_files = TEST_FILE_TEMPLATES.get("go", {})
         for file_path, content in go_files.items():
             full_path = repo.path / "backend" / file_path
             full_path.parent.mkdir(parents=True, exist_ok=True)
             full_path.write_text(content)
-        
+
         # Commit the additions
         cls.run_git_command("git add .", repo.path)
         cls.run_git_command("git commit -m 'Add frontend and backend code'", repo.path)
-        
+
         commit_hash = cls.run_git_command("git rev-parse HEAD", repo.path)[1].strip()
         repo.commit_history.append(commit_hash)
-        
+
         return repo
 
 
 class PerformanceTracker:
     """Track performance metrics for tests."""
-    
+
     def __init__(self):
         self.metrics: Dict[str, List[float]] = {}
         self.start_times: Dict[str, float] = {}
-    
+
     def start_timing(self, operation: str):
         """Start timing an operation."""
         self.start_times[operation] = time.time()
-    
+
     def end_timing(self, operation: str) -> float:
         """End timing and record the duration."""
         if operation not in self.start_times:
             return 0.0
-        
+
         duration = time.time() - self.start_times[operation]
-        
+
         if operation not in self.metrics:
             self.metrics[operation] = []
         self.metrics[operation].append(duration)
-        
+
         del self.start_times[operation]
         return duration
-    
+
     def get_average(self, operation: str) -> float:
         """Get average duration for an operation."""
         if operation not in self.metrics or not self.metrics[operation]:
             return 0.0
         return sum(self.metrics[operation]) / len(self.metrics[operation])
-    
+
     def get_summary(self) -> Dict[str, Dict[str, float]]:
         """Get summary statistics for all operations."""
         summary = {}
@@ -504,7 +492,7 @@ class PerformanceTracker:
                     "total": sum(durations),
                     "average": sum(durations) / len(durations),
                     "min": min(durations),
-                    "max": max(durations)
+                    "max": max(durations),
                 }
         return summary
 

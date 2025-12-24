@@ -15,22 +15,17 @@ Tests cover:
 - Performance benchmarks
 """
 
-import json
 from pathlib import Path
-from unittest.mock import Mock, patch
 from textwrap import dedent
-from datetime import datetime
+from unittest.mock import patch
 
-import pytest
-
-from mcp_server.plugins.dart_plugin.plugin import Plugin as DartPlugin
-from mcp_server.plugin_base import SymbolDef, SearchResult
 from mcp_server.interfaces.plugin_interfaces import (
+    IndexedFile,
     SymbolDefinition,
     SymbolReference,
-    IndexedFile,
 )
 from mcp_server.interfaces.shared_interfaces import Result
+from mcp_server.plugins.dart_plugin.plugin import Plugin as DartPlugin
 
 
 class TestPluginInitialization:
@@ -565,9 +560,7 @@ class TestSymbolExtraction:
         result = plugin.indexFile(Path("test.dart"), code)
         symbols = result["symbols"]
 
-        function_symbols = [
-            s for s in symbols if s["kind"] in ["function", "main_function"]
-        ]
+        function_symbols = [s for s in symbols if s["kind"] in ["function", "main_function"]]
         assert len(function_symbols) == 4
 
         # Check main function
@@ -823,7 +816,8 @@ class TestSearchFunctionality:
 
         # Create repository and file in store
         repo_id = sqlite_store.create_repository("/test", "test")
-        file_id = sqlite_store.store_file(repository_id=repo_id, file_path="/test/file.dart", language="dart"
+        file_id = sqlite_store.store_file(
+            repository_id=repo_id, file_path="/test/file.dart", language="dart"
         )
 
         # Index the file
@@ -895,7 +889,8 @@ void calculateProduct(int a, int b) {
         ]
 
         for filename, code in test_files:
-            file_id = sqlite_store.store_file(repository_id=repo_id, file_path=f"/test/{filename}", language="dart"
+            file_id = sqlite_store.store_file(
+                repository_id=repo_id, file_path=f"/test/{filename}", language="dart"
             )
             result = plugin.indexFile(Path(f"/test/{filename}"), code)
 
@@ -1106,7 +1101,8 @@ class TestPersistenceIntegration:
         )
 
         file_path = Path("/myproject/main.dart")
-        file_id = sqlite_store.store_file(repository_id=repo_id, file_path=str(file_path), language="dart", size=len(code)
+        file_id = sqlite_store.store_file(
+            repository_id=repo_id, file_path=str(file_path), language="dart", size=len(code)
         )
 
         # Index the file

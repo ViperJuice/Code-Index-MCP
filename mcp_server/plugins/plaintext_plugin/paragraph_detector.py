@@ -1,8 +1,8 @@
 """Intelligent paragraph detection for plain text documents."""
 
 import re
-from typing import List, Tuple, Optional
 from dataclasses import dataclass
+from typing import List
 
 
 @dataclass
@@ -66,9 +66,7 @@ class ParagraphDetector:
                                     start_line=start_line,
                                     end_line=i - 1,
                                     indent_level=current_indent,
-                                    is_list_item=self._is_list_item(
-                                        current_para_lines[0]
-                                    ),
+                                    is_list_item=self._is_list_item(current_para_lines[0]),
                                     is_code_block=False,
                                 )
                             )
@@ -197,8 +195,7 @@ class ParagraphDetector:
                     end_line=len(lines) - 1,
                     indent_level=current_indent,
                     is_list_item=self._is_list_item(current_para_lines[0]),
-                    is_code_block=self._is_indented_code(current_para_lines)
-                    or in_code_block,
+                    is_code_block=self._is_indented_code(current_para_lines) or in_code_block,
                 )
             )
 
@@ -229,9 +226,9 @@ class ParagraphDetector:
         # Check underlined headings
         if line_num + 1 < len(all_lines):
             next_line = all_lines[line_num + 1]
-            if self.heading_patterns[2].match(next_line) or self.heading_patterns[
-                3
-            ].match(next_line):
+            if self.heading_patterns[2].match(next_line) or self.heading_patterns[3].match(
+                next_line
+            ):
                 return True
 
         return False
@@ -288,9 +285,7 @@ class ParagraphDetector:
             current = paragraphs[i]
 
             # Don't merge code blocks or headings
-            if current.is_code_block or self._is_heading(
-                current.text, 0, [current.text]
-            ):
+            if current.is_code_block or self._is_heading(current.text, 0, [current.text]):
                 merged.append(current)
                 i += 1
                 continue

@@ -5,25 +5,24 @@ from __future__ import annotations
 import logging
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Any, Iterable, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
+from ...plugin_base import IndexShard, SearchOpts, SearchResult
+from ...storage.sqlite_store import SQLiteStore
 from ..specialized_plugin_base import (
-    SpecializedPluginBase,
-    IImportResolver,
-    ITypeAnalyzer,
-    IBuildSystemIntegration,
-    ICrossFileAnalyzer,
-    ImportInfo,
-    TypeInfo,
     BuildDependency,
     CrossFileReference,
+    IBuildSystemIntegration,
+    ICrossFileAnalyzer,
+    IImportResolver,
+    ImportInfo,
+    ITypeAnalyzer,
+    SpecializedPluginBase,
+    TypeInfo,
 )
-from ...storage.sqlite_store import SQLiteStore
-from ...plugin_base import SymbolDef, Reference, SearchResult, SearchOpts, IndexShard
-
 from .module_analyzer import SwiftModuleAnalyzer
-from .protocol_checker import SwiftProtocolChecker
 from .objc_bridge import ObjectiveCBridge
+from .protocol_checker import SwiftProtocolChecker
 
 logger = logging.getLogger(__name__)
 
@@ -153,9 +152,7 @@ class SwiftImportResolver(IImportResolver):
         self.import_graph: Dict[str, Set[str]] = {}
         self.module_cache: Dict[str, Path] = {}
 
-    def resolve_import(
-        self, import_info: ImportInfo, current_file: Path
-    ) -> Optional[Path]:
+    def resolve_import(self, import_info: ImportInfo, current_file: Path) -> Optional[Path]:
         """Resolve Swift import to file path."""
         module_path = import_info.module_path
 
@@ -231,9 +228,7 @@ class SwiftImportResolver(IImportResolver):
         }
         return module_name in system_frameworks
 
-    def _resolve_local_module(
-        self, module_name: str, current_file: Path
-    ) -> Optional[Path]:
+    def _resolve_local_module(self, module_name: str, current_file: Path) -> Optional[Path]:
         """Resolve local module to file path."""
         # Look for Swift files with matching name
         search_dirs = [
@@ -464,9 +459,7 @@ class SwiftBuildSystem(IBuildSystemIntegration):
             for dep_match in dep_matches:
                 dep_name = dep_match.group(1)
                 dependencies.append(
-                    BuildDependency(
-                        name=dep_name, version="latest", registry="local_target"
-                    )
+                    BuildDependency(name=dep_name, version="latest", registry="local_target")
                 )
 
         return dependencies
@@ -481,9 +474,7 @@ class SwiftBuildSystem(IBuildSystemIntegration):
 
         for match in matches:
             target_name = match.group(1)
-            targets.append(
-                {"name": target_name, "type": "library"}  # Default assumption
-            )
+            targets.append({"name": target_name, "type": "library"})  # Default assumption
 
         return targets
 
@@ -495,9 +486,7 @@ class SwiftCrossFileAnalyzer(ICrossFileAnalyzer):
         self.project_root = project_root
         self.file_cache: Dict[str, str] = {}
 
-    def find_all_references(
-        self, symbol: str, definition_file: str
-    ) -> List[CrossFileReference]:
+    def find_all_references(self, symbol: str, definition_file: str) -> List[CrossFileReference]:
         """Find all references to a symbol across Swift files."""
         references = []
 
@@ -582,7 +571,7 @@ class SwiftCrossFileAnalyzer(ICrossFileAnalyzer):
 
     def _determine_reference_type(self, line: str, symbol: str) -> str:
         """Determine the type of reference in a line."""
-        line_stripped = line.strip()
+        _ = line.strip()
 
         if f"{symbol}(" in line:
             return "call"
@@ -590,9 +579,9 @@ class SwiftCrossFileAnalyzer(ICrossFileAnalyzer):
             return "import"
         elif f": {symbol}" in line or f"<{symbol}>" in line:
             return "type_usage"
-        elif f"class " in line and f": {symbol}" in line:
+        elif "class " in line and f": {symbol}" in line:
             return "inherit"
-        elif f"extension " in line and f": {symbol}" in line:
+        elif "extension " in line and f": {symbol}" in line:
             return "conform"
         else:
             return "reference"
@@ -603,9 +592,7 @@ class Plugin(SpecializedPluginBase):
 
     lang = "swift"
 
-    def __init__(
-        self, sqlite_store: Optional[SQLiteStore] = None, enable_semantic: bool = True
-    ):
+    def __init__(self, sqlite_store: Optional[SQLiteStore] = None, enable_semantic: bool = True):
         """Initialize Swift plugin."""
         super().__init__(SWIFT_CONFIG, sqlite_store, enable_semantic)
 
@@ -668,8 +655,7 @@ class Plugin(SpecializedPluginBase):
                 "imports": [imp.__dict__ for imp in imports],
                 "protocol_conformances": conformances,
                 "objc_interop": objc_info,
-                "has_property_wrappers": "@" in content
-                and "propertyWrapper" in content,
+                "has_property_wrappers": "@" in content and "propertyWrapper" in content,
                 "has_result_builders": "@" in content and "resultBuilder" in content,
                 "has_actors": "actor " in content,
                 "has_async_await": "async " in content or "await " in content,
@@ -680,9 +666,7 @@ class Plugin(SpecializedPluginBase):
 
         return base_index
 
-    def search(
-        self, query: str, opts: SearchOpts | None = None
-    ) -> Iterable[SearchResult]:
+    def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:
         """Enhanced search with Swift-specific features."""
         # Base search
         for result in super().search(query, opts):
@@ -704,9 +688,7 @@ class Plugin(SpecializedPluginBase):
                 module_name = query[7:]
                 yield from self._search_module_usage(module_name)
 
-    def _extract_swift_symbols(
-        self, content: str, file_path: str
-    ) -> List[Dict[str, Any]]:
+    def _extract_swift_symbols(self, content: str, file_path: str) -> List[Dict[str, Any]]:
         """Extract Swift-specific symbols."""
         symbols = []
 
@@ -745,9 +727,7 @@ class Plugin(SpecializedPluginBase):
 
         return symbols
 
-    def _search_protocol_conformances(
-        self, protocol_name: str
-    ) -> Iterable[SearchResult]:
+    def _search_protocol_conformances(self, protocol_name: str) -> Iterable[SearchResult]:
         """Search for protocol conformances."""
         implementations = self.type_analyzer.find_implementations(protocol_name)
 
@@ -759,9 +739,7 @@ class Plugin(SpecializedPluginBase):
 
                     for line_num, line in enumerate(lines, 1):
                         if protocol_name in line and ":" in line:
-                            yield SearchResult(
-                                file=file_path, line=line_num, snippet=line.strip()
-                            )
+                            yield SearchResult(file=file_path, line=line_num, snippet=line.strip())
                 except Exception as e:
                     logger.warning(f"Failed to search conformances in {file_path}: {e}")
 
@@ -780,9 +758,7 @@ class Plugin(SpecializedPluginBase):
                             file=str(swift_file), line=line_num, snippet=line.strip()
                         )
             except Exception as e:
-                logger.warning(
-                    f"Failed to search property wrappers in {swift_file}: {e}"
-                )
+                logger.warning(f"Failed to search property wrappers in {swift_file}: {e}")
 
     def _search_module_usage(self, module_name: str) -> Iterable[SearchResult]:
         """Search for module import and usage."""
@@ -822,8 +798,8 @@ class Plugin(SpecializedPluginBase):
                 self._build_files = [package_swift]
 
             # Also look for Xcode project files
-            xcodeproj_files = list(self._project_root.glob("*.xcodeproj"))
-            xcworkspace_files = list(self._project_root.glob("*.xcworkspace"))
+            _ = list(self._project_root.glob("*.xcodeproj"))
+            _ = list(self._project_root.glob("*.xcworkspace"))
 
             # Note: We don't parse Xcode files yet, but we could extend this
 
@@ -842,9 +818,7 @@ class Plugin(SpecializedPluginBase):
             content = Path(file_path).read_text()
             return self.protocol_checker.find_conformances(content)
         except Exception as e:
-            logger.warning(
-                f"Failed to analyze protocol conformances in {file_path}: {e}"
-            )
+            logger.warning(f"Failed to analyze protocol conformances in {file_path}: {e}")
             return {}
 
     def get_objc_bridging_info(self, file_path: str) -> Dict[str, Any]:

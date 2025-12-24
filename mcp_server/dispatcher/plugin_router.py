@@ -7,18 +7,17 @@ This module provides advanced plugin routing capabilities including:
 - Caching for performance optimization
 """
 
-import mimetypes
 import logging
+import mimetypes
+import time
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Dict, List, Optional, Set, Any, Tuple, Callable
-import time
 from functools import lru_cache
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from ..plugin_base import IPlugin
-from ..plugin_system.models import PluginInfo, PluginInstance, PluginConfig
 from ..plugins.language_registry import get_language_by_extension
 
 logger = logging.getLogger(__name__)
@@ -71,7 +70,6 @@ class IFileTypeMatcher(ABC):
         Returns:
             FileTypeInfo containing details about the file type
         """
-        pass
 
     @abstractmethod
     def is_supported(self, path: Path) -> bool:
@@ -83,7 +81,6 @@ class IFileTypeMatcher(ABC):
         Returns:
             True if file type is supported
         """
-        pass
 
     @abstractmethod
     def get_language(self, path: Path) -> Optional[str]:
@@ -95,7 +92,6 @@ class IFileTypeMatcher(ABC):
         Returns:
             Programming language name or None if not detected
         """
-        pass
 
 
 class IPluginRouter(ABC):
@@ -111,7 +107,6 @@ class IPluginRouter(ABC):
         Returns:
             List of RouteResults ordered by confidence/priority
         """
-        pass
 
     @abstractmethod
     def route_by_capability(self, capability: str, **kwargs) -> List[RouteResult]:
@@ -124,7 +119,6 @@ class IPluginRouter(ABC):
         Returns:
             List of RouteResults for plugins with the capability
         """
-        pass
 
     @abstractmethod
     def route_by_language(self, language: str) -> List[RouteResult]:
@@ -136,7 +130,6 @@ class IPluginRouter(ABC):
         Returns:
             List of RouteResults for plugins supporting the language
         """
-        pass
 
     @abstractmethod
     def get_best_plugin(self, path: Path) -> Optional[RouteResult]:
@@ -148,7 +141,6 @@ class IPluginRouter(ABC):
         Returns:
             Best RouteResult or None if no suitable plugin found
         """
-        pass
 
 
 class FileTypeMatcher(IFileTypeMatcher):
@@ -544,9 +536,7 @@ class PluginRouter(IPluginRouter):
         # Evaluate each candidate plugin
         for plugin in candidate_plugins:
             if plugin.supports(path):
-                confidence, reasons = self._calculate_confidence(
-                    plugin, path, file_info
-                )
+                confidence, reasons = self._calculate_confidence(plugin, path, file_info)
                 capabilities = self._plugin_capabilities.get(plugin, [])
 
                 result = RouteResult(
@@ -682,9 +672,7 @@ class PluginRouter(IPluginRouter):
             if plugin.lang == file_info.language:
                 confidence += 0.5
                 reasons.append(f"Language match: {plugin.lang}")
-            elif (
-                file_info.language and plugin.lang.lower() in file_info.language.lower()
-            ):
+            elif file_info.language and plugin.lang.lower() in file_info.language.lower():
                 confidence += 0.3
                 reasons.append(f"Partial language match: {plugin.lang}")
 

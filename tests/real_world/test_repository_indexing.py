@@ -4,19 +4,17 @@ Real-world repository indexing tests for Code-Index-MCP.
 Tests indexing performance and accuracy on actual GitHub repositories.
 """
 
-import pytest
-import time
-import asyncio
-from pathlib import Path
-from typing import Dict, List, Any
+import os
 import subprocess
 import tempfile
-import os
+from pathlib import Path
 
-from mcp_server.storage.sqlite_store import SQLiteStore
+import pytest
+
 from mcp_server.dispatcher.dispatcher import Dispatcher
-from mcp_server.plugin_system.plugin_manager import PluginManager
 from mcp_server.interfaces.shared_interfaces import Result
+from mcp_server.plugin_system.plugin_manager import PluginManager
+from mcp_server.storage.sqlite_store import SQLiteStore
 
 
 class TestRepositoryIndexing:
@@ -60,9 +58,7 @@ class TestRepositoryIndexing:
 
         return dispatcher
 
-    def ensure_repository_exists(
-        self, workspace_dir: Path, repo_name: str, repo_url: str
-    ) -> Path:
+    def ensure_repository_exists(self, workspace_dir: Path, repo_name: str, repo_url: str) -> Path:
         """Ensure repository exists in workspace, download if needed."""
         repo_path = workspace_dir / repo_name
 
@@ -114,9 +110,7 @@ class TestRepositoryIndexing:
             result = plugin.indexFile(file_path, content)
 
             return (
-                Result.success(result)
-                if result
-                else Result.error("Plugin returned empty result")
+                Result.success(result) if result else Result.error("Plugin returned empty result")
             )
 
         except Exception as e:
@@ -145,9 +139,7 @@ class TestRepositoryIndexing:
         repo_path = self.ensure_repository_exists(workspace_dir, repo_name, repo_url)
 
         def index_repository():
-            repo_id = test_db.create_repository(
-                str(repo_path), repo_name, {"type": "test"}
-            )
+            repo_id = test_db.create_repository(str(repo_path), repo_name, {"type": "test"})
 
             indexed_files = 0
             total_symbols = 0
@@ -169,9 +161,7 @@ class TestRepositoryIndexing:
                         if len(content.strip()) == 0:
                             continue
 
-                        result = self.index_file_with_plugin(
-                            str(file_path), content, dispatcher
-                        )
+                        result = self.index_file_with_plugin(str(file_path), content, dispatcher)
                         if result.success:
                             indexed_files += 1
                             symbols = result.value.get("symbols", [])
@@ -216,36 +206,24 @@ class TestRepositoryIndexing:
         assert (
             total_symbols >= expected_symbols * 0.6
         ), f"Expected at least {expected_symbols * 0.6} symbols, got {total_symbols}"
-        assert (
-            error_count < indexed_files * 0.2
-        ), f"Too many errors: {error_count}/{indexed_files}"
+        assert error_count < indexed_files * 0.2, f"Too many errors: {error_count}/{indexed_files}"
 
         # Performance assertions
-        assert (
-            benchmark.stats.mean < 60.0
-        ), f"Indexing took too long: {benchmark.stats.mean:.2f}s"
+        assert benchmark.stats.mean < 60.0, f"Indexing took too long: {benchmark.stats.mean:.2f}s"
 
-        print(
-            f"Indexed {indexed_files} files with {total_symbols} symbols, {error_count} errors"
-        )
-        print(
-            f"Success rate: {(indexed_files / (indexed_files + error_count)) * 100:.1f}%"
-        )
+        print(f"Indexed {indexed_files} files with {total_symbols} symbols, {error_count} errors")
+        print(f"Success rate: {(indexed_files / (indexed_files + error_count)) * 100:.1f}%")
 
     @pytest.mark.performance
     @pytest.mark.slow
-    def test_large_repository_indexing(
-        self, workspace_dir, test_db, dispatcher, benchmark
-    ):
+    def test_large_repository_indexing(self, workspace_dir, test_db, dispatcher, benchmark):
         """Test indexing performance on Django (large Python codebase)."""
         repo_path = self.ensure_repository_exists(
             workspace_dir, "django", "https://github.com/django/django.git"
         )
 
         def index_django():
-            repo_id = test_db.create_repository(
-                str(repo_path), "django", {"type": "large_test"}
-            )
+            repo_id = test_db.create_repository(str(repo_path), "django", {"type": "large_test"})
 
             indexed_files = 0
             total_symbols = 0
@@ -268,9 +246,7 @@ class TestRepositoryIndexing:
                     if len(content.strip()) == 0:
                         continue
 
-                    result = self.index_file_with_plugin(
-                        str(file_path), content, dispatcher
-                    )
+                    result = self.index_file_with_plugin(str(file_path), content, dispatcher)
                     if result.success:
                         indexed_files += 1
                         symbols = result.value.get("symbols", [])
@@ -287,18 +263,12 @@ class TestRepositoryIndexing:
         indexed_files, total_symbols, error_count = result
 
         # Performance and quality assertions
-        assert (
-            indexed_files >= 800
-        ), f"Should index most files successfully, got {indexed_files}"
-        assert (
-            total_symbols >= 10000
-        ), f"Django should have many symbols, got {total_symbols}"
+        assert indexed_files >= 800, f"Should index most files successfully, got {indexed_files}"
+        assert total_symbols >= 10000, f"Django should have many symbols, got {total_symbols}"
         assert (
             error_count < indexed_files * 0.1
         ), f"Error rate too high: {error_count}/{indexed_files}"
-        assert (
-            benchmark.stats.mean < 180.0
-        ), f"Indexing took too long: {benchmark.stats.mean:.2f}s"
+        assert benchmark.stats.mean < 180.0, f"Indexing took too long: {benchmark.stats.mean:.2f}s"
 
         print(
             f"Django indexing: {indexed_files} files, {total_symbols} symbols, {error_count} errors"
@@ -331,9 +301,7 @@ class TestRepositoryIndexing:
         for language, extensions in language_extensions.items():
             language_files = []
             for ext in extensions:
-                language_files.extend(
-                    list(repo_path.rglob(f"*{ext}"))[:100]
-                )  # Limit per language
+                language_files.extend(list(repo_path.rglob(f"*{ext}"))[:100])  # Limit per language
 
             indexed_count = 0
             symbol_count = 0
@@ -347,9 +315,7 @@ class TestRepositoryIndexing:
                     if len(content.strip()) == 0:
                         continue
 
-                    result = self.index_file_with_plugin(
-                        str(file_path), content, dispatcher
-                    )
+                    result = self.index_file_with_plugin(str(file_path), content, dispatcher)
                     if result.success:
                         indexed_count += 1
                         symbols = result.value.get("symbols", [])
@@ -372,9 +338,7 @@ class TestRepositoryIndexing:
         assert (
             len(languages_with_results) >= 2
         ), f"Should support multiple languages, got: {languages_with_results}"
-        assert (
-            total_indexed >= 50
-        ), f"Should index reasonable number of files, got {total_indexed}"
+        assert total_indexed >= 50, f"Should index reasonable number of files, got {total_indexed}"
 
         for language, stats in language_stats.items():
             if stats["files"] > 0:
@@ -386,8 +350,9 @@ class TestRepositoryIndexing:
     @pytest.mark.performance
     def test_indexing_memory_efficiency(self, workspace_dir, test_db, dispatcher):
         """Test memory efficiency during large repository indexing."""
-        import psutil
         import os
+
+        import psutil
 
         repo_path = self.ensure_repository_exists(
             workspace_dir, "requests", "https://github.com/psf/requests.git"
@@ -408,9 +373,7 @@ class TestRepositoryIndexing:
         for i, file_path in enumerate(python_files):
             try:
                 content = file_path.read_text(encoding="utf-8", errors="ignore")
-                result = self.index_file_with_plugin(
-                    str(file_path), content, dispatcher
-                )
+                result = self.index_file_with_plugin(str(file_path), content, dispatcher)
                 if result.success:
                     indexed_files += 1
 
@@ -427,15 +390,9 @@ class TestRepositoryIndexing:
         max_memory = max(memory_samples)
 
         # Memory efficiency assertions
-        assert (
-            memory_increase < 100
-        ), f"Memory increase too high: {memory_increase:.1f}MB"
-        assert (
-            max_memory < initial_memory + 150
-        ), f"Peak memory too high: {max_memory:.1f}MB"
-        assert (
-            indexed_files >= 20
-        ), f"Should index reasonable number of files: {indexed_files}"
+        assert memory_increase < 100, f"Memory increase too high: {memory_increase:.1f}MB"
+        assert max_memory < initial_memory + 150, f"Peak memory too high: {max_memory:.1f}MB"
+        assert indexed_files >= 20, f"Should index reasonable number of files: {indexed_files}"
 
         print(
             f"Memory test: {indexed_files} files, {memory_increase:.1f}MB increase, {max_memory:.1f}MB peak"
@@ -444,9 +401,7 @@ class TestRepositoryIndexing:
         # Check for memory leaks
         if len(memory_samples) > 2:
             memory_trend = memory_samples[-1] - memory_samples[1]
-            assert (
-                memory_trend < 50
-            ), f"Possible memory leak detected: {memory_trend:.1f}MB trend"
+            assert memory_trend < 50, f"Possible memory leak detected: {memory_trend:.1f}MB trend"
 
 
 if __name__ == "__main__":

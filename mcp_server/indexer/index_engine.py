@@ -12,13 +12,11 @@ import logging
 import os
 import time
 import uuid
-from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Any, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Union
 
-from ..core.errors import PluginError
 from ..core.ignore_patterns import get_ignore_manager
 from ..plugin_system.interfaces import IPluginManager
 from ..storage.sqlite_store import SQLiteStore
@@ -226,9 +224,7 @@ class IndexEngine:
                 )
 
             # Store in database
-            await self._store_parse_result(
-                file_path, parse_result, file_hash, file_size
-            )
+            await self._store_parse_result(file_path, parse_result, file_hash, file_size)
 
             # Update fuzzy index
             if self.fuzzy_indexer:
@@ -250,12 +246,10 @@ class IndexEngine:
             # Generate semantic embeddings if requested
             if self.semantic_indexer:
                 try:
-                    semantic_result = self.semantic_indexer.index_file(path_obj)
+                    _ = self.semantic_indexer.index_file(path_obj)
                     logger.debug(f"Generated semantic embeddings for {file_path}")
                 except Exception as e:
-                    logger.warning(
-                        f"Failed to generate semantic embeddings for {file_path}: {e}"
-                    )
+                    logger.warning(f"Failed to generate semantic embeddings for {file_path}: {e}")
 
             symbols_count = len(parse_result.get("symbols", []))
             references_count = len(parse_result.get("references", []))
@@ -473,17 +467,13 @@ class IndexEngine:
 
             # Calculate throughput
             if elapsed.total_seconds() > 0:
-                self._progress.throughput = (
-                    self._progress.completed / elapsed.total_seconds()
-                )
+                self._progress.throughput = self._progress.completed / elapsed.total_seconds()
 
             # Estimate remaining time
             if self._progress.throughput > 0 and self._progress.total > 0:
                 remaining_files = self._progress.total - self._progress.completed
                 remaining_seconds = remaining_files / self._progress.throughput
-                self._progress.estimated_remaining = timedelta(
-                    seconds=remaining_seconds
-                )
+                self._progress.estimated_remaining = timedelta(seconds=remaining_seconds)
 
         return self._progress
 
@@ -491,16 +481,12 @@ class IndexEngine:
     # Private Helper Methods
     # ========================================
 
-    async def _parse_file_async(
-        self, plugin: Any, file_path: str
-    ) -> Optional[Dict[str, Any]]:
+    async def _parse_file_async(self, plugin: Any, file_path: str) -> Optional[Dict[str, Any]]:
         """Parse a file using the appropriate plugin asynchronously."""
         try:
             # Run plugin parsing in thread pool to avoid blocking
             loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None, self._parse_file_sync, plugin, file_path
-            )
+            result = await loop.run_in_executor(None, self._parse_file_sync, plugin, file_path)
             return result
         except Exception as e:
             logger.error(f"Error parsing {file_path}: {e}")
@@ -543,7 +529,7 @@ class IndexEngine:
 
             # Store symbols
             for symbol in parse_result.get("symbols", []):
-                symbol_id = self.storage.store_symbol(
+                _ = self.storage.store_symbol(
                     file_id=file_id,
                     name=symbol["name"],
                     kind=symbol["kind"],
@@ -605,9 +591,7 @@ class IndexEngine:
             logger.error(f"Error calculating hash for {file_path}: {e}")
             return ""
 
-    def _collect_files(
-        self, directory: str, recursive: bool, options: IndexOptions
-    ) -> List[str]:
+    def _collect_files(self, directory: str, recursive: bool, options: IndexOptions) -> List[str]:
         """Collect files to index from a directory."""
         files = []
         dir_path = Path(directory)
@@ -663,9 +647,7 @@ class IndexEngine:
 
         return files
 
-    async def _index_files_batch(
-        self, files: List[str], options: IndexOptions
-    ) -> BatchIndexResult:
+    async def _index_files_batch(self, files: List[str], options: IndexOptions) -> BatchIndexResult:
         """Index a batch of files with progress tracking."""
         total_files = len(files)
         start_time = datetime.now()

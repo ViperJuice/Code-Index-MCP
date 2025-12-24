@@ -1,0 +1,29 @@
+[flake8]
+max-line-length = 100
+extend-ignore =
+    # Black compatibility - these are handled by black formatter
+    E501,
+    W293,
+    W291,
+    E203,
+exclude =
+    .git,
+    __pycache__,
+    build,
+    dist,
+    .eggs,
+    .venv,
+    venv,
+    node_modules,
+    data,
+    logs,
+per-file-ignores =
+    # Init files legitimately have unused imports for re-export
+    */__init__.py:F401
+    # Test files have relaxed rules for:
+    # - F811: redefining fixtures
+    # - F821: undefined names (fixtures, conftest imports)
+    # - F841: unused variables (setup/teardown artifacts)
+    # - E402: imports after sys.path modification
+    # - W605: false positives on regex raw strings (pycodestyle bug)
+    tests/*:F811,F821,F841,E402,W605

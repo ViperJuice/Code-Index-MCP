@@ -5,13 +5,13 @@ This module provides a local storage implementation using SQLite with FTS5
 for efficient full-text search capabilities.
 """
 
-import sqlite3
 import json
 import logging
-from typing import List, Dict, Any, Optional, Tuple, Union
-from datetime import datetime
-from pathlib import Path
+import sqlite3
 from contextlib import contextmanager
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ..core.path_resolver import PathResolver
 
@@ -35,15 +35,9 @@ class SQLiteStore:
         """
         self.db_path = db_path
         self.path_resolver = path_resolver or PathResolver()
-        
-        # Check if database already exists
-        db_exists = Path(db_path).exists()
-        
+
         self._init_database()
-        
-        # Only run migrations on new databases
-        if not db_exists:
-            self._run_migrations()
+        self._run_migrations()
 
     def _init_database(self):
         """Initialize database and create schema if needed."""
@@ -78,11 +72,17 @@ class SQLiteStore:
 
                 # Check for missing columns that may need migration
                 if not self._check_column_exists(conn, "files", "content_hash"):
-                    logger.warning("Column 'content_hash' missing from 'files' table - migration may be needed")
+                    logger.warning(
+                        "Column 'content_hash' missing from 'files' table - migration may be needed"
+                    )
                 if not self._check_column_exists(conn, "files", "is_deleted"):
-                    logger.warning("Column 'is_deleted' missing from 'files' table - migration may be needed")
+                    logger.warning(
+                        "Column 'is_deleted' missing from 'files' table - migration may be needed"
+                    )
                 if not self._check_column_exists(conn, "files", "deleted_at"):
-                    logger.warning("Column 'deleted_at' missing from 'files' table - migration may be needed")
+                    logger.warning(
+                        "Column 'deleted_at' missing from 'files' table - migration may be needed"
+                    )
 
     def _run_migrations(self):
         """Run any pending database migrations."""
@@ -91,12 +91,15 @@ class SQLiteStore:
             cursor = conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='bm25_content'"
             )
-            if cursor.fetchone() and not conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'"
-            ).fetchone():
+            if (
+                cursor.fetchone()
+                and not conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'"
+                ).fetchone()
+            ):
                 logger.debug("Skipping migrations for BM25-only database")
                 return
-        
+
         migrations_dir = Path(__file__).parent / "migrations"
         if not migrations_dir.exists():
             return
@@ -193,15 +196,21 @@ class SQLiteStore:
                 language TEXT,
                 size INTEGER,
                 hash TEXT,
+                content_hash TEXT,
                 last_modified TIMESTAMP,
                 indexed_at TIMESTAMP,
+                is_deleted BOOLEAN DEFAULT FALSE,
+                deleted_at TIMESTAMP,
                 metadata JSON,
                 FOREIGN KEY (repository_id) REFERENCES repositories(id),
-                UNIQUE(repository_id, path)
+                UNIQUE(repository_id, relative_path)
             );
             
             CREATE INDEX IF NOT EXISTS idx_files_language ON files(language);
             CREATE INDEX IF NOT EXISTS idx_files_hash ON files(hash);
+            CREATE INDEX IF NOT EXISTS idx_files_content_hash ON files(content_hash);
+            CREATE INDEX IF NOT EXISTS idx_files_deleted ON files(is_deleted);
+            CREATE INDEX IF NOT EXISTS idx_files_relative_path ON files(relative_path);
             
             -- Symbols
             CREATE TABLE IF NOT EXISTS symbols (
@@ -359,7 +368,7 @@ class SQLiteStore:
 
             -- Insert initial schema version
             INSERT INTO schema_version (version, description)
-            VALUES (1, 'Initial schema creation');
+            VALUES (2, 'Initial schema creation with content tracking and soft delete support');
         """
         )
 
@@ -388,9 +397,7 @@ class SQLiteStore:
         )
 
     # Repository operations
-    def create_repository(
-        self, path: str, name: str, metadata: Optional[Dict] = None
-    ) -> int:
+    def create_repository(self, path: str, name: str, metadata: Optional[Dict] = None) -> int:
         """Create a new repository entry."""
         with self._get_connection() as conn:
             cursor = conn.execute(
@@ -407,9 +414,7 @@ class SQLiteStore:
             else:
                 # If lastrowid is None, it means we updated an existing row
                 # Get the id of the existing repository
-                cursor = conn.execute(
-                    "SELECT id FROM repositories WHERE path = ?", (path,)
-                )
+                cursor = conn.execute("SELECT id FROM repositories WHERE path = ?", (path,))
                 return cursor.fetchone()[0]
 
     def get_repository(self, path: str) -> Optional[Dict]:
@@ -423,31 +428,84 @@ class SQLiteStore:
     def store_file(
         self,
         repository_id: int,
-        file_path: Union[str, Path],
+        path: Optional[Union[str, Path]] = None,
+        relative_path: Optional[Union[str, Path]] = None,
         language: Optional[str] = None,
         size: Optional[int] = None,
+        hash: Optional[str] = None,
+        content_hash: Optional[str] = None,
         metadata: Optional[Dict] = None,
+        is_deleted: bool = False,
+        deleted_at: Optional[Union[str, datetime]] = None,
+        **kwargs: Any,
     ) -> int:
         """Store file information using relative paths and content hashes."""
-        # Convert to Path object and normalize
-        path = Path(file_path)
+        file_path_arg = kwargs.pop("file_path", None)
+        resolved_path = Path(path or file_path_arg) if path or file_path_arg else None
 
-        # Compute relative path
-        relative_path = self.path_resolver.normalize_path(path)
+        if not resolved_path and not relative_path:
+            raise ValueError("Either 'path' or 'relative_path' must be provided to store_file")
 
-        # Compute content hash
-        content_hash = self.path_resolver.compute_content_hash(path)
+        relative_path_str: Optional[str] = None
+        if relative_path is not None:
+            relative_path_str = str(relative_path).replace("\\", "/")
+        elif resolved_path:
+            try:
+                relative_path_str = self.path_resolver.normalize_path(resolved_path)
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning(f"Could not normalize path {resolved_path}: {exc}")
+                relative_path_str = str(resolved_path).replace("\\", "/")
+
+        if not relative_path_str:
+            raise ValueError("Relative path could not be determined for file storage")
+
+        # Normalize stored path string
+        stored_path = str(resolved_path) if resolved_path else relative_path_str
+
+        # Determine filesystem metadata when available
+        path_exists = resolved_path.exists() if resolved_path else False
+        file_size = size
+        if file_size is None and path_exists:
+            try:
+                file_size = resolved_path.stat().st_size
+            except OSError as exc:  # pragma: no cover - defensive
+                logger.warning(f"Could not read size for {resolved_path}: {exc}")
+
+        file_hash = hash
+        if file_hash is None and path_exists:
+            try:
+                file_hash = self.path_resolver.compute_file_hash(resolved_path)
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning(f"Failed to compute file hash for {resolved_path}: {exc}")
+
+        content_hash_value = content_hash
+        if content_hash_value is None and path_exists:
+            try:
+                content_hash_value = self.path_resolver.compute_content_hash(resolved_path)
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning(f"Failed to compute content hash for {resolved_path}: {exc}")
+
+        last_modified_value = (
+            datetime.fromtimestamp(resolved_path.stat().st_mtime, tz=timezone.utc)
+            if path_exists
+            else datetime.now(timezone.utc)
+        )
+        indexed_at_value = datetime.now(timezone.utc)
 
         with self._get_connection() as conn:
             # Check if file already exists with same content hash
-            existing = self.get_file_by_content_hash(content_hash, repository_id)
-            if existing and existing["relative_path"] != relative_path:
+            existing = (
+                self.get_file_by_content_hash(content_hash_value, repository_id)
+                if content_hash_value
+                else None
+            )
+            if existing and existing["relative_path"] != relative_path_str:
                 # File moved - record the move
                 self.move_file(
                     existing["relative_path"],
-                    relative_path,
+                    relative_path_str,
                     repository_id,
-                    content_hash,
+                    content_hash_value or "",
                 )
                 return existing["id"]
 
@@ -455,28 +513,32 @@ class SQLiteStore:
             cursor = conn.execute(
                 """INSERT INTO files 
                    (repository_id, path, relative_path, language, size, hash, content_hash,
-                    last_modified, indexed_at, metadata, is_deleted)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, FALSE)
+                    last_modified, indexed_at, metadata, is_deleted, deleted_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT(repository_id, relative_path) DO UPDATE SET
                    path=excluded.path,
                    language=excluded.language,
                    size=excluded.size,
                    hash=excluded.hash,
                    content_hash=excluded.content_hash,
-                   last_modified=CURRENT_TIMESTAMP,
-                   indexed_at=CURRENT_TIMESTAMP,
+                   last_modified=excluded.last_modified,
+                   indexed_at=excluded.indexed_at,
                    metadata=excluded.metadata,
-                   is_deleted=FALSE,
-                   deleted_at=NULL""",
+                   is_deleted=excluded.is_deleted,
+                   deleted_at=excluded.deleted_at""",
                 (
                     repository_id,
-                    str(path),
-                    relative_path,
+                    stored_path,
+                    relative_path_str,
                     language,
-                    size,
-                    self.path_resolver.compute_file_hash(path),
-                    content_hash,
+                    file_size,
+                    file_hash,
+                    content_hash_value,
+                    last_modified_value,
+                    indexed_at_value,
                     json.dumps(metadata or {}),
+                    bool(is_deleted),
+                    deleted_at,
                 ),
             )
             if cursor.lastrowid:
@@ -513,6 +575,70 @@ class SQLiteStore:
                 )
             row = cursor.fetchone()
             return dict(row) if row else None
+
+    def get_file_by_path(
+        self, file_path: Union[str, Path], repository_id: Optional[int] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Get a file record by path, returning normalized paths and content hash."""
+        try:
+            relative_path = self.path_resolver.normalize_path(file_path)
+        except ValueError:
+            relative_path = str(file_path).replace("\\", "/")
+
+        with self._get_connection() as conn:
+            query = "SELECT * FROM files WHERE relative_path = ? AND is_deleted = FALSE"
+            params: Tuple[Union[str, int], ...]
+
+            if repository_id is not None:
+                query += " AND repository_id = ?"
+                params = (relative_path, repository_id)
+            else:
+                params = (relative_path,)
+
+            cursor = conn.execute(query, params)
+            row = cursor.fetchone()
+            return self._normalize_file_record(row) if row else None
+
+    def get_all_files(self, repository_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Get all non-deleted files with normalized paths and content hashes."""
+        with self._get_connection() as conn:
+            query = "SELECT * FROM files WHERE is_deleted = FALSE"
+            params: Tuple[Union[str, int], ...] = ()
+
+            if repository_id is not None:
+                query += " AND repository_id = ?"
+                params = (repository_id,)
+
+            cursor = conn.execute(query, params)
+            return [self._normalize_file_record(row) for row in cursor.fetchall()]
+
+    def _normalize_file_record(self, row: sqlite3.Row) -> Dict[str, Any]:
+        """Normalize file record paths and include content hash."""
+        record = dict(row)
+        original_path = record.get("path") or ""
+        relative_path = record.get("relative_path")
+
+        normalized_path: Optional[str] = None
+        if relative_path:
+            normalized_path = str(relative_path).replace("\\", "/")
+        elif original_path:
+            try:
+                normalized_path = self.path_resolver.normalize_path(original_path)
+            except Exception:
+                normalized_path = str(original_path).replace("\\", "/")
+
+        if normalized_path:
+            record["path"] = normalized_path
+            record["relative_path"] = normalized_path
+            try:
+                record["absolute_path"] = str(self.path_resolver.resolve_path(normalized_path))
+            except Exception:
+                record["absolute_path"] = original_path or normalized_path
+        else:
+            record["absolute_path"] = original_path
+
+        record["content_hash"] = record.get("content_hash") or record.get("hash")
+        return record
 
     # Symbol operations
     def store_symbol(
@@ -592,91 +718,6 @@ class SQLiteStore:
                 )
             return [dict(row) for row in cursor.fetchall()]
 
-    def find_symbol_definition(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """
-        Find a symbol definition by name, prioritizing exact matches.
-        
-        Args:
-            symbol: The name of the symbol to find.
-            
-        Returns:
-            Dictionary with symbol details or None if not found.
-        """
-        with self._get_connection() as conn:
-            # First try symbols table for exact matches
-            cursor = conn.execute("""
-                SELECT s.name, s.kind, s.line_start, s.signature, s.documentation, f.path
-                FROM symbols s
-                JOIN files f ON s.file_id = f.id
-                WHERE s.name = ? OR s.name LIKE ?
-                ORDER BY CASE WHEN s.name = ? THEN 0 ELSE 1 END
-                LIMIT 1
-            """, (symbol, f'%{symbol}%', symbol))
-            
-            row = cursor.fetchone()
-            if row:
-                return {
-                    'symbol': row['name'],
-                    'kind': row['kind'],
-                    'language': 'unknown',  # Language inferred by caller or joined
-                    'signature': row['signature'] or f"{row['kind']} {row['name']}",
-                    'doc': row['documentation'],
-                    'defined_in': row['path'],
-                    'line': row['line_start'] or 1,
-                    'span': (0, len(row['name']))
-                }
-            return None
-
-    def search_bm25_symbol(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """
-        Fallback search for a symbol using BM25 index.
-        """
-        with self._get_connection() as conn:
-            # Check if BM25 table exists
-            cursor = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='bm25_content'"
-            )
-            if not cursor.fetchone():
-                return None
-
-            patterns = [
-                f'class {symbol}',
-                f'def {symbol}', 
-                f'function {symbol}',
-                symbol
-            ]
-            
-            for pattern in patterns:
-                cursor = conn.execute("""
-                    SELECT filepath, snippet(bm25_content, -1, '', '', '...', 20) as snippet, language
-                    FROM bm25_content
-                    WHERE bm25_content MATCH ?
-                    ORDER BY rank
-                    LIMIT 1
-                """, (pattern,))
-                
-                row = cursor.fetchone()
-                if row:
-                    filepath, snippet, language = row
-                    pattern_lower = pattern.lower()
-                    kind = 'symbol'
-                    if 'class' in pattern_lower:
-                        kind = 'class'
-                    elif 'def' in pattern_lower or 'function' in pattern_lower:
-                        kind = 'function'
-                    
-                    return {
-                        'symbol': symbol,
-                        'kind': kind,
-                        'language': language or 'unknown',
-                        'signature': snippet,
-                        'doc': None,
-                        'defined_in': filepath,
-                        'line': 1,
-                        'span': (0, len(symbol))
-                    }
-            return None
-
     # Reference operations
     def store_reference(
         self,
@@ -718,6 +759,67 @@ class SQLiteStore:
             return [dict(row) for row in cursor.fetchall()]
 
     # Search operations
+    def search_symbols(
+        self,
+        query: Optional[str] = None,
+        where_clause: Optional[str] = None,
+        params: Optional[List[Any]] = None,
+        limit: int = 20,
+    ) -> List[Dict[str, Any]]:
+        """
+        Search for symbols with optional filtering.
+
+        Args:
+            query: Optional symbol name or pattern (uses LIKE)
+            where_clause: Optional WHERE clause fragment (without the WHERE keyword)
+            params: Parameters for the WHERE clause
+            limit: Maximum number of results
+
+        Returns:
+            List of matching symbols with normalized fields
+        """
+        if not where_clause and query is not None:
+            where_clause = "s.name LIKE ?"
+            params = [f"%{query}%"]
+
+        where_clause = where_clause or "1=1"
+        parameters: List[Any] = list(params or [])
+
+        sql = f"""
+            SELECT
+                s.name,
+                s.kind AS type,
+                f.language,
+                COALESCE(f.relative_path, f.path) AS file_path,
+                s.line_start AS line,
+                s.line_end,
+                s.column_start,
+                s.column_end,
+                s.signature,
+                s.documentation
+            FROM symbols s
+            JOIN files f ON s.file_id = f.id
+            WHERE {where_clause}
+            ORDER BY s.name
+            LIMIT ?
+        """
+
+        parameters.append(limit)
+
+        with self._get_connection() as conn:
+            cursor = conn.execute(sql, parameters)
+            results = [dict(row) for row in cursor.fetchall()]
+
+        for result in results:
+            if "type" not in result and "kind" in result:
+                result["type"] = result["kind"]
+            if "file_path" not in result:
+                result["file_path"] = result.get("path") or result.get("relative_path")
+            if "line" not in result:
+                result["line"] = result.get("line_start") or result.get("line_number")
+
+        return results
+
     def search_symbols_fuzzy(self, query: str, limit: int = 20) -> List[Dict]:
         """
         Fuzzy search for symbols using trigrams.
@@ -904,7 +1006,7 @@ class SQLiteStore:
             "fts5": False,
             "wal": False,
             "version": 0,
-            "error": None
+            "error": None,
         }
 
         try:
@@ -925,13 +1027,12 @@ class SQLiteStore:
                     "parse_cache",
                     "migrations",
                     "index_config",
-                    "file_moves"
+                    "file_moves",
                 ]
 
                 for table in required_tables:
                     cursor = conn.execute(
-                        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-                        (table,)
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
                     )
                     result["tables"][table] = cursor.fetchone() is not None
 
@@ -957,7 +1058,9 @@ class SQLiteStore:
                 if missing_tables:
                     if len(missing_tables) > 5:
                         result["status"] = "unhealthy"
-                        result["error"] = f"Critical tables missing: {', '.join(missing_tables[:5])} and {len(missing_tables) - 5} more"
+                        result["error"] = (
+                            f"Critical tables missing: {', '.join(missing_tables[:5])} and {len(missing_tables) - 5} more"
+                        )
                     else:
                         result["status"] = "degraded"
                         result["error"] = f"Some tables missing: {', '.join(missing_tables)}"
@@ -1001,17 +1104,16 @@ class SQLiteStore:
         with self._get_connection() as conn:
             # Check if this is a simple BM25 table (like bm25_content) or structured FTS
             cursor = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-                (table,)
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
             )
             if not cursor.fetchone():
                 # Table doesn't exist
                 return []
-                
+
             # Check table structure
             cursor = conn.execute(f"PRAGMA table_info({table})")
             table_columns = {row[1] for row in cursor.fetchall()}
-            
+
             if table == "fts_code" and "file_id" in table_columns:
                 # Modern schema with file_id references - join with files table
                 cursor = conn.execute(
@@ -1154,9 +1256,7 @@ class SQLiteStore:
 
             return results
 
-    def get_bm25_term_statistics(
-        self, term: str, table: str = "fts_code"
-    ) -> Dict[str, Any]:
+    def get_bm25_term_statistics(self, term: str, table: str = "fts_code") -> Dict[str, Any]:
         """
         Get term statistics for BM25 tuning.
 
@@ -1247,9 +1347,7 @@ class SQLiteStore:
                     logger.warning(f"Could not rebuild {table}: {e}")
 
     # New file operation methods for path management
-    def get_file_by_content_hash(
-        self, content_hash: str, repository_id: int
-    ) -> Optional[Dict]:
+    def get_file_by_content_hash(self, content_hash: str, repository_id: int) -> Optional[Dict]:
         """Get file by content hash."""
         with self._get_connection() as conn:
             cursor = conn.execute(
@@ -1297,9 +1395,7 @@ class SQLiteStore:
 
             logger.info(f"Removed file and all associated data: {relative_path}")
 
-    def move_file(
-        self, old_path: str, new_path: str, repository_id: int, content_hash: str
-    ):
+    def move_file(self, old_path: str, new_path: str, repository_id: int, content_hash: str):
         """Record a file move operation."""
         with self._get_connection() as conn:
             # Update the file path
@@ -1345,6 +1441,4 @@ class SQLiteStore:
                     # Use remove_file for thorough cleanup
                     self.remove_file(path, repository_id=None)
 
-                logger.info(
-                    f"Cleaned up {count} deleted files older than {days_old} days"
-                )
+                logger.info(f"Cleaned up {count} deleted files older than {days_old} days")

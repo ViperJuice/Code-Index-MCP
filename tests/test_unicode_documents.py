@@ -1,12 +1,11 @@
 """Test cases for handling Unicode and various text encodings."""
 
-import pytest
-from pathlib import Path
-import tempfile
 import codecs
-from unittest.mock import Mock, patch
+import tempfile
+from pathlib import Path
 
-from mcp_server.document_processing.base_document_plugin import BaseDocumentPlugin
+import pytest
+
 from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
 from mcp_server.plugins.plaintext_plugin.plugin import PlaintextPlugin
 from mcp_server.storage.sqlite_store import SQLiteStore
@@ -204,9 +203,7 @@ Alpha: α, Beta: β, Gamma: γ, Delta: δ, Epsilon: ε"""
 
         result_utf16 = plaintext_plugin.indexFile(str(utf16_file))
         assert result_utf16 is not None
-        assert "Hello 世界" in " ".join(
-            chunk["content"] for chunk in result_utf16["chunks"]
-        )
+        assert "Hello 世界" in " ".join(chunk["content"] for chunk in result_utf16["chunks"])
 
         # Latin-1 file
         latin1_content = "Latin-1: café, naïve, résumé"
@@ -251,9 +248,7 @@ Alpha: α, Beta: β, Gamma: γ, Delta: δ, Epsilon: ε"""
 
         result = plaintext_plugin.indexFile(str(utf16_bom_file))
         assert result is not None
-        assert "UTF-16 LE with BOM" in " ".join(
-            chunk["content"] for chunk in result["chunks"]
-        )
+        assert "UTF-16 LE with BOM" in " ".join(chunk["content"] for chunk in result["chunks"])
 
     def test_control_characters(self, plaintext_plugin, tmp_path):
         """Test handling of control characters and special Unicode."""

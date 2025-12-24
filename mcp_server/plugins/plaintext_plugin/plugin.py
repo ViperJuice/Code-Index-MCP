@@ -1,22 +1,21 @@
 """Plain Text Plugin for natural language document processing."""
 
-from pathlib import Path
-from typing import Dict, List, Optional, Any, Tuple
 import logging
 import re
-from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from mcp_server.document_processing.base_document_plugin import (
     BaseDocumentPlugin,
-    DocumentStructure,
-    DocumentMetadata,
     DocumentChunk,
+    DocumentMetadata,
+    DocumentStructure,
 )
-from mcp_server.plugin_base import IndexShard, SymbolDef, SearchResult, Reference
+from mcp_server.plugin_base import SearchResult
 from mcp_server.storage.sqlite_store import SQLiteStore
 
 from .nlp_processor import NLPProcessor, TextAnalysis, TextType
-from .paragraph_detector import ParagraphDetector, Paragraph
+from .paragraph_detector import Paragraph, ParagraphDetector
 from .sentence_splitter import SentenceSplitter
 from .topic_extractor import TopicExtractor
 
@@ -35,9 +34,7 @@ class PlainTextPlugin(BaseDocumentPlugin):
         chunk_overlap: int = BaseDocumentPlugin.DEFAULT_CHUNK_OVERLAP,
     ):
         """Initialize plain text plugin with NLP processors."""
-        super().__init__(
-            language_config, sqlite_store, enable_semantic, chunk_size, chunk_overlap
-        )
+        super().__init__(language_config, sqlite_store, enable_semantic, chunk_size, chunk_overlap)
 
         # Initialize NLP components
         self.nlp_processor = NLPProcessor()
@@ -152,10 +149,7 @@ class PlainTextPlugin(BaseDocumentPlugin):
         language = self._detect_language(content)
 
         # Extract keywords as tags
-        keywords = [
-            kw
-            for kw, _ in self.topic_extractor.extract_keywords(content, max_keywords=10)
-        ]
+        keywords = [kw for kw, _ in self.topic_extractor.extract_keywords(content, max_keywords=10)]
 
         return DocumentMetadata(
             title=title or file_path.stem,
@@ -169,10 +163,7 @@ class PlainTextPlugin(BaseDocumentPlugin):
                 "readability_score": analysis.readability_score,
                 "avg_sentence_length": analysis.avg_sentence_length,
                 "vocabulary_richness": analysis.vocabulary_richness,
-                "topics": [
-                    {"keywords": t.keywords, "score": t.score}
-                    for t in analysis.topics[:3]
-                ],
+                "topics": [{"keywords": t.keywords, "score": t.score} for t in analysis.topics[:3]],
             },
         )
 
@@ -195,9 +186,7 @@ class PlainTextPlugin(BaseDocumentPlugin):
 
         return content.strip()
 
-    def _intelligent_chunk(
-        self, text: str, structure: DocumentStructure
-    ) -> List[DocumentChunk]:
+    def _intelligent_chunk(self, text: str, structure: DocumentStructure) -> List[DocumentChunk]:
         """Perform NLP-aware intelligent chunking."""
         chunks = []
 
@@ -234,17 +223,15 @@ class PlainTextPlugin(BaseDocumentPlugin):
 
             # Find which section this chunk belongs to
             for section in structure.sections:
-                if chunk_start >= section.get(
-                    "start_pos", 0
-                ) and chunk_end <= section.get("end_pos", len(text)):
+                if chunk_start >= section.get("start_pos", 0) and chunk_end <= section.get(
+                    "end_pos", len(text)
+                ):
                     chunk_metadata["section"] = section.get("title", "")
                     chunk_metadata["section_level"] = section.get("level", 0)
                     break
 
             # Create optimized embedding text
-            embedding_text = self._create_embedding_text(
-                chunk_text, chunk_metadata, analysis
-            )
+            embedding_text = self._create_embedding_text(chunk_text, chunk_metadata, analysis)
 
             chunks.append(
                 DocumentChunk(
@@ -546,9 +533,7 @@ class PlainTextPlugin(BaseDocumentPlugin):
 
         return " ".join(expanded_parts)
 
-    def _calculate_relevance(
-        self, query: str, content: str, query_keywords: List[str]
-    ) -> float:
+    def _calculate_relevance(self, query: str, content: str, query_keywords: List[str]) -> float:
         """Calculate relevance score for search result."""
         score = 0.0
         content_lower = content.lower()
@@ -582,9 +567,7 @@ class PlainTextPlugin(BaseDocumentPlugin):
 
         return min(score, 2.0)  # Cap at 2.0
 
-    def _create_contextual_snippet(
-        self, content: str, query: str, max_length: int = 200
-    ) -> str:
+    def _create_contextual_snippet(self, content: str, query: str, max_length: int = 200) -> str:
         """Create a contextual snippet highlighting query terms."""
         query_lower = query.lower()
         content_lower = content.lower()
@@ -601,9 +584,7 @@ class PlainTextPlugin(BaseDocumentPlugin):
 
         if pos == -1:
             # Just return beginning
-            return (
-                content[:max_length] + "..." if len(content) > max_length else content
-            )
+            return content[:max_length] + "..." if len(content) > max_length else content
 
         # Extract context around match
         start = max(0, pos - max_length // 2)
@@ -635,17 +616,13 @@ class PlainTextPlugin(BaseDocumentPlugin):
                     kw.lower() in content_lower for kw in keywords
                 ):
                     # Calculate relevance
-                    relevance = self._calculate_relevance(
-                        query, chunk.content, keywords
-                    )
+                    relevance = self._calculate_relevance(query, chunk.content, keywords)
 
                     results.append(
                         {
                             "file": file_path,
                             "line": chunk.chunk_index,
-                            "snippet": self._create_contextual_snippet(
-                                chunk.content, query
-                            ),
+                            "snippet": self._create_contextual_snippet(chunk.content, query),
                             "relevance": relevance,
                             "metadata": chunk.metadata,
                         }
@@ -658,9 +635,7 @@ class PlainTextPlugin(BaseDocumentPlugin):
 
     # Text type specific processors
 
-    def _process_technical_text(
-        self, text: str, analysis: TextAnalysis
-    ) -> Dict[str, Any]:
+    def _process_technical_text(self, text: str, analysis: TextAnalysis) -> Dict[str, Any]:
         """Special processing for technical documents."""
         return {
             "code_snippets": self._extract_code_snippets(text),
@@ -668,18 +643,14 @@ class PlainTextPlugin(BaseDocumentPlugin):
             "formulas": self._extract_formulas(text),
         }
 
-    def _process_narrative_text(
-        self, text: str, analysis: TextAnalysis
-    ) -> Dict[str, Any]:
+    def _process_narrative_text(self, text: str, analysis: TextAnalysis) -> Dict[str, Any]:
         """Special processing for narrative text."""
         return {
             "summary": " ".join(analysis.summary_sentences),
             "key_phrases": analysis.key_phrases,
         }
 
-    def _process_instructional_text(
-        self, text: str, analysis: TextAnalysis
-    ) -> Dict[str, Any]:
+    def _process_instructional_text(self, text: str, analysis: TextAnalysis) -> Dict[str, Any]:
         """Special processing for instructional text."""
         structured = self.nlp_processor.extract_structured_content(text)
         return {
@@ -688,9 +659,7 @@ class PlainTextPlugin(BaseDocumentPlugin):
             "tips": self._extract_tips(text),
         }
 
-    def _process_conversational_text(
-        self, text: str, analysis: TextAnalysis
-    ) -> Dict[str, Any]:
+    def _process_conversational_text(self, text: str, analysis: TextAnalysis) -> Dict[str, Any]:
         """Special processing for conversational text."""
         return {
             "questions": self._extract_questions(text),
@@ -744,9 +713,7 @@ class PlainTextPlugin(BaseDocumentPlugin):
     def _extract_tips(self, text: str) -> List[str]:
         """Extract tips and hints."""
         tips = []
-        tip_pattern = re.compile(
-            r"(?:tip|hint|pro tip|suggestion):\s*(.+?)(?:\n|$)", re.IGNORECASE
-        )
+        tip_pattern = re.compile(r"(?:tip|hint|pro tip|suggestion):\s*(.+?)(?:\n|$)", re.IGNORECASE)
 
         for match in tip_pattern.finditer(text):
             tips.append(match.group(1).strip())
@@ -791,9 +758,7 @@ class PlainTextPlugin(BaseDocumentPlugin):
                     "type": section_type,
                     "start_line": para.start_line,
                     "end_line": para.end_line,
-                    "preview": (
-                        para.text[:100] + "..." if len(para.text) > 100 else para.text
-                    ),
+                    "preview": (para.text[:100] + "..." if len(para.text) > 100 else para.text),
                 }
             )
 

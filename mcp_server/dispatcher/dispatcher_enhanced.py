@@ -1,30 +1,28 @@
 """Enhanced dispatcher with dynamic plugin loading via PluginFactory."""
 
-from pathlib import Path
-from typing import Iterable, Dict, List, Optional, Tuple, Any, Union
-import logging
 import hashlib
-import time
-import re
-from datetime import datetime
+import logging
 import os
+import re
+import time
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
-from ..plugin_base import IPlugin, SymbolDef, SearchResult, Reference
-from ..plugins.plugin_factory import PluginFactory
-from ..plugins.language_registry import get_language_by_extension, get_all_extensions
-from ..storage.sqlite_store import SQLiteStore
-from ..storage.multi_repo_manager import MultiRepositoryManager
-from ..storage.cross_repo_coordinator import CrossRepositorySearchCoordinator, SearchScope
-from ..plugins.repository_plugin_loader import RepositoryPluginLoader
+from ..plugin_base import IPlugin, SearchResult, SymbolDef
+from ..plugins.language_registry import get_all_extensions, get_language_by_extension
 from ..plugins.memory_aware_manager import MemoryAwarePluginManager
-from .plugin_router import PluginRouter, FileTypeMatcher, PluginCapability
-from .result_aggregator import (
-    ResultAggregator,
-    AggregatedResult,
-    AggregationStats,
-    RankingCriteria,
-)
+from ..plugins.plugin_factory import PluginFactory
+from ..plugins.repository_plugin_loader import RepositoryPluginLoader
+from ..storage.cross_repo_coordinator import CrossRepositorySearchCoordinator, SearchScope
+from ..storage.multi_repo_manager import MultiRepositoryManager
+from ..storage.sqlite_store import SQLiteStore
 from ..utils.semantic_indexer import SemanticIndexer
+from .plugin_router import FileTypeMatcher, PluginCapability, PluginRouter
+from .result_aggregator import (
+    AggregatedResult,
+    RankingCriteria,
+    ResultAggregator,
+)
 
 # Note: We've removed ignore pattern checks to allow indexing ALL files
 # Filtering happens only during export via SecureIndexExporter
@@ -98,7 +96,7 @@ class EnhancedDispatcher:
         self._sqlite_store = sqlite_store
         self._memory_aware = memory_aware
         self._multi_repo_enabled = multi_repo_enabled
-        
+
         # Initialize repository-aware components if enabled
         if self._memory_aware and sqlite_store:
             self._repo_plugin_loader = RepositoryPluginLoader()
@@ -106,31 +104,34 @@ class EnhancedDispatcher:
         else:
             self._repo_plugin_loader = None
             self._memory_manager = None
-            
+
         # Initialize multi-repo manager if enabled
         if multi_repo_enabled is None:
             multi_repo_enabled = os.getenv("MCP_ENABLE_MULTI_REPO", "false").lower() == "true"
-        
+
         if multi_repo_enabled and sqlite_store:
             # Get current repo ID
             try:
                 import subprocess
+
                 result = subprocess.run(
                     ["git", "remote", "get-url", "origin"],
                     capture_output=True,
                     text=True,
-                    check=True
+                    check=True,
                 )
                 remote_url = result.stdout.strip()
-                repo_id = hashlib.sha256(remote_url.encode()).hexdigest()[:12]
-            except:
-                repo_id = hashlib.sha256(str(Path.cwd()).encode()).hexdigest()[:12]
-                
+                _ = hashlib.sha256(remote_url.encode()).hexdigest()[:12]
+            except Exception:
+                _ = hashlib.sha256(str(Path.cwd()).encode()).hexdigest()[:12]
+
             storage_path = os.getenv("MCP_INDEX_STORAGE_PATH", ".indexes")
             # Use the correct registry path
             registry_path = Path(storage_path) / "repository_registry.json"
             self._multi_repo_manager = MultiRepositoryManager(central_index_path=registry_path)
-            self._cross_repo_coordinator = CrossRepositorySearchCoordinator(self._multi_repo_manager)
+            self._cross_repo_coordinator = CrossRepositorySearchCoordinator(
+                self._multi_repo_manager
+            )
         else:
             self._multi_repo_manager = None
             self._cross_repo_coordinator = None
@@ -161,30 +162,33 @@ class EnhancedDispatcher:
             "total_time": 0.0,
             "plugins_loaded": 0,
         }
-        
+
         # Initialize semantic indexer if enabled with auto-discovery
         self._semantic_indexer = None
         if self._semantic_enabled and self._sqlite_store:
             try:
                 from ..utils.semantic_discovery import SemanticDatabaseDiscovery
-                
+
                 # Auto-discover the correct semantic collection for this codebase
                 discovery = SemanticDatabaseDiscovery(Path.cwd())
                 best_collection = discovery.get_best_collection()
-                
+
                 if best_collection:
                     qdrant_path, collection_name = best_collection
-                    logger.info(f"Auto-discovered semantic collection: {collection_name} at {qdrant_path}")
+                    logger.info(
+                        f"Auto-discovered semantic collection: {collection_name} at {qdrant_path}"
+                    )
                 else:
                     # No existing collection found, use default configuration
                     qdrant_path, collection_name = discovery.get_default_collection_config()
-                    logger.info(f"No existing collection found, using default: {collection_name} at {qdrant_path}")
-                
+                    logger.info(
+                        f"No existing collection found, using default: {collection_name} at {qdrant_path}"
+                    )
+
                 # Only initialize if the Qdrant path exists
                 if Path(qdrant_path).exists():
                     self._semantic_indexer = SemanticIndexer(
-                        qdrant_path=qdrant_path,
-                        collection=collection_name
+                        qdrant_path=qdrant_path, collection=collection_name
                     )
                     logger.info(f"Semantic search initialized: {collection_name} at {qdrant_path}")
                 else:
@@ -196,8 +200,7 @@ class EnhancedDispatcher:
                     qdrant_path = Path(".indexes/qdrant/main.qdrant")
                     if qdrant_path.exists():
                         self._semantic_indexer = SemanticIndexer(
-                            qdrant_path=str(qdrant_path),
-                            collection="code-embeddings"
+                            qdrant_path=str(qdrant_path), collection="code-embeddings"
                         )
                         logger.info("Semantic search initialized with legacy fallback")
                 except Exception as e2:
@@ -219,82 +222,107 @@ class EnhancedDispatcher:
 
         # Compile document query patterns for performance
         self._compiled_doc_patterns = [
-            re.compile(pattern, re.IGNORECASE)
-            for pattern in self.DOCUMENT_QUERY_PATTERNS
+            re.compile(pattern, re.IGNORECASE) for pattern in self.DOCUMENT_QUERY_PATTERNS
         ]
         self._compiled_file_patterns = [
-            re.compile(pattern, re.IGNORECASE)
-            for pattern in self.DOCUMENTATION_FILE_PATTERNS
+            re.compile(pattern, re.IGNORECASE) for pattern in self.DOCUMENTATION_FILE_PATTERNS
         ]
 
-        logger.info(
-            f"Enhanced dispatcher initialized with {len(self._plugins)} plugins"
-        )
+        logger.info(f"Enhanced dispatcher initialized with {len(self._plugins)} plugins")
 
     def _load_all_plugins(self):
-        """Load all available plugins using PluginFactory."""
-        logger.info("Loading all available plugins...")
-        
+        """Load all available plugins using PluginFactory with timeout protection."""
+        logger.info("Loading all available plugins with timeout...")
+
+        import signal
+        from contextlib import contextmanager
+
+        @contextmanager
+        def timeout(seconds):
+            def timeout_handler(signum, frame):
+                raise TimeoutError(f"Plugin loading timed out after {seconds}s")
+
+            # Only use alarm on Unix-like systems
+            if hasattr(signal, "SIGALRM"):
+                old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(seconds)
+                try:
+                    yield
+                finally:
+                    signal.alarm(0)
+                    signal.signal(signal.SIGALRM, old_handler)
+            else:
+                # On Windows, just yield without timeout
+                yield
+
         try:
-            # Use repository-aware loading if available
-            if self._repo_plugin_loader and self._memory_aware:
-                # Get languages to load based on repository content
-                languages_to_load = self._repo_plugin_loader.get_required_plugins()
-                priority_order = self._repo_plugin_loader.get_priority_languages()
-                
-                # Log loading plan
-                self._repo_plugin_loader.log_loading_plan()
-                
-                # Load plugins in priority order
-                for lang in priority_order:
-                    if lang in languages_to_load:
-                        try:
-                            # Use memory manager if available
-                            if self._memory_manager:
-                                import asyncio
-                                # Check if we're already in an async context
-                                try:
-                                    loop = asyncio.get_running_loop()
-                                    # We're in an async context, can't use asyncio.run
-                                    logger.warning(f"Cannot use async memory manager from sync context for {lang}, using direct creation")
+            with timeout(5):  # 5 second timeout
+                # Use repository-aware loading if available
+                if self._repo_plugin_loader and self._memory_aware:
+                    # Get languages to load based on repository content
+                    languages_to_load = self._repo_plugin_loader.get_required_plugins()
+                    priority_order = self._repo_plugin_loader.get_priority_languages()
+
+                    # Log loading plan
+                    self._repo_plugin_loader.log_loading_plan()
+
+                    # Load plugins in priority order
+                    for lang in priority_order:
+                        if lang in languages_to_load:
+                            try:
+                                # Use memory manager if available
+                                if self._memory_manager:
+                                    import asyncio
+
+                                    # Check if we're already in an async context
+                                    try:
+                                        _ = asyncio.get_running_loop()
+                                        # We're in an async context, can't use asyncio.run
+                                        logger.warning(
+                                            f"Cannot use async memory manager from sync context for {lang}, using direct creation"
+                                        )
+                                        plugin = PluginFactory.create_plugin(
+                                            lang, self._sqlite_store, self._semantic_enabled
+                                        )
+                                    except RuntimeError:
+                                        # No running loop, safe to use asyncio.run
+                                        plugin = asyncio.run(self._memory_manager.get_plugin(lang))
+                                else:
                                     plugin = PluginFactory.create_plugin(
                                         lang, self._sqlite_store, self._semantic_enabled
                                     )
-                                except RuntimeError:
-                                    # No running loop, safe to use asyncio.run
-                                    plugin = asyncio.run(self._memory_manager.get_plugin(lang))
-                            else:
-                                plugin = PluginFactory.create_plugin(
-                                    lang, self._sqlite_store, self._semantic_enabled
-                                )
-                            
-                            if plugin:
-                                self._plugins.append(plugin)
-                                self._by_lang[lang] = plugin
-                                self._loaded_languages.add(lang)
-                                self._operation_stats["plugins_loaded"] += 1
-                                self._repo_plugin_loader.mark_loaded(lang)
-                        except Exception as e:
-                            logger.error(f"Failed to load {lang} plugin: {e}")
-            else:
-                # Fall back to loading all plugins
-                all_plugins = PluginFactory.create_all_plugins(
-                    sqlite_store=self._sqlite_store, enable_semantic=self._semantic_enabled
+
+                                if plugin:
+                                    self._plugins.append(plugin)
+                                    self._by_lang[lang] = plugin
+                                    self._loaded_languages.add(lang)
+                                    self._operation_stats["plugins_loaded"] += 1
+                                    self._repo_plugin_loader.mark_loaded(lang)
+                            except Exception as e:
+                                logger.error(f"Failed to load {lang} plugin: {e}")
+                else:
+                    # Fall back to loading all plugins
+                    all_plugins = PluginFactory.create_all_plugins(
+                        sqlite_store=self._sqlite_store, enable_semantic=self._semantic_enabled
+                    )
+
+                    for lang, plugin in all_plugins.items():
+                        self._plugins.append(plugin)
+                        self._by_lang[lang] = plugin
+                        self._loaded_languages.add(lang)
+                        self._operation_stats["plugins_loaded"] += 1
+
+                if self._enable_advanced:
+                    self._register_plugins_with_router()
+
+                logger.info(
+                    f"Loaded {len(self._plugins)} plugins: {', '.join(sorted(self._loaded_languages))}"
                 )
 
-                for lang, plugin in all_plugins.items():
-                    self._plugins.append(plugin)
-                    self._by_lang[lang] = plugin
-                    self._loaded_languages.add(lang)
-                    self._operation_stats["plugins_loaded"] += 1
-
-            if self._enable_advanced:
-                self._register_plugins_with_router()
-
-            logger.info(
-                f"Loaded {len(self._plugins)} plugins: {', '.join(sorted(self._loaded_languages))}"
-            )
-        
+        except TimeoutError as e:
+            logger.warning(f"Plugin loading timeout: {e}")
+            self._plugins = []  # Ensure empty list on timeout
+            self._loaded_languages = set()
         except Exception as e:
             logger.error(f"Plugin loading failed: {e}")
             self._plugins = []  # Ensure empty list on failure
@@ -424,48 +452,30 @@ class EnhancedDispatcher:
         if lang == "python":
             capabilities.extend(
                 [
-                    PluginCapability(
-                        "refactoring", "1.0", "Python refactoring support", 75
-                    ),
-                    PluginCapability(
-                        "type_analysis", "1.0", "Python type analysis", 85
-                    ),
+                    PluginCapability("refactoring", "1.0", "Python refactoring support", 75),
+                    PluginCapability("type_analysis", "1.0", "Python type analysis", 85),
                 ]
             )
         elif lang in ["javascript", "typescript"]:
             capabilities.extend(
                 [
-                    PluginCapability(
-                        "linting", "1.0", "JavaScript/TypeScript linting", 85
-                    ),
-                    PluginCapability(
-                        "bundling_analysis", "1.0", "Module bundling analysis", 70
-                    ),
-                    PluginCapability(
-                        "framework_support", "1.0", "Framework-specific support", 75
-                    ),
+                    PluginCapability("linting", "1.0", "JavaScript/TypeScript linting", 85),
+                    PluginCapability("bundling_analysis", "1.0", "Module bundling analysis", 70),
+                    PluginCapability("framework_support", "1.0", "Framework-specific support", 75),
                 ]
             )
         elif lang in ["c", "cpp"]:
             capabilities.extend(
                 [
-                    PluginCapability(
-                        "compilation_analysis", "1.0", "Compilation analysis", 80
-                    ),
-                    PluginCapability(
-                        "memory_analysis", "1.0", "Memory usage analysis", 70
-                    ),
-                    PluginCapability(
-                        "performance_profiling", "1.0", "Performance profiling", 75
-                    ),
+                    PluginCapability("compilation_analysis", "1.0", "Compilation analysis", 80),
+                    PluginCapability("memory_analysis", "1.0", "Memory usage analysis", 70),
+                    PluginCapability("performance_profiling", "1.0", "Performance profiling", 75),
                 ]
             )
         elif lang in ["go", "rust"]:
             capabilities.extend(
                 [
-                    PluginCapability(
-                        "package_analysis", "1.0", f"{lang} package analysis", 80
-                    ),
+                    PluginCapability("package_analysis", "1.0", f"{lang} package analysis", 80),
                     PluginCapability(
                         "concurrency_analysis",
                         "1.0",
@@ -477,12 +487,8 @@ class EnhancedDispatcher:
         elif lang in ["java", "kotlin", "scala"]:
             capabilities.extend(
                 [
-                    PluginCapability(
-                        "jvm_analysis", "1.0", "JVM bytecode analysis", 75
-                    ),
-                    PluginCapability(
-                        "build_tool_integration", "1.0", "Build tool integration", 70
-                    ),
+                    PluginCapability("jvm_analysis", "1.0", "JVM bytecode analysis", 75),
+                    PluginCapability("build_tool_integration", "1.0", "Build tool integration", 70),
                 ]
             )
 
@@ -544,21 +550,97 @@ class EnhancedDispatcher:
         start_time = time.time()
 
         try:
-            # For symbol lookup, prefer Store lookup to avoid plugin loading delays
-            # Only load plugins if explicitly needed and Store lookup fails
+            # For symbol lookup, prefer BM25 direct lookup to avoid plugin loading delays
+            # Only load plugins if explicitly needed and BM25 fails
             if self._sqlite_store:
-                logger.debug("Using SQLite Store lookup directly for better performance")
+                logger.debug("Using BM25 lookup directly for better performance")
                 try:
-                    # Try structured symbol table first
-                    result = self._sqlite_store.find_symbol_definition(symbol)
-                    if result:
-                        return result
-                    
-                    # Fallback to BM25 if available
-                    result = self._sqlite_store.search_bm25_symbol(symbol)
-                    if result:
-                        return result
+                    import sqlite3
 
+                    conn = sqlite3.connect(self._sqlite_store.db_path)
+                    cursor = conn.cursor()
+
+                    # First try symbols table for exact matches
+                    cursor.execute(
+                        """
+                        SELECT s.name, s.kind, s.line_start, s.signature, s.documentation, f.path
+                        FROM symbols s
+                        JOIN files f ON s.file_id = f.id
+                        WHERE s.name = ? OR s.name LIKE ?
+                        ORDER BY CASE WHEN s.name = ? THEN 0 ELSE 1 END
+                        LIMIT 1
+                    """,
+                        (symbol, f"%{symbol}%", symbol),
+                    )
+
+                    row = cursor.fetchone()
+                    if row:
+                        name, kind, line, signature, doc, filepath = row
+                        conn.close()
+
+                        # Return proper SymbolDef dict
+                        return {
+                            "symbol": name,
+                            "kind": kind,
+                            "language": "unknown",  # Not stored in symbols table
+                            "signature": signature or f"{kind} {name}",
+                            "doc": doc,
+                            "defined_in": filepath,
+                            "line": line or 1,
+                            "span": (0, len(name)),
+                        }
+
+                    # Fallback to BM25 if available
+                    try:
+                        patterns = [
+                            f"class {symbol}",
+                            f"def {symbol}",
+                            f"function {symbol}",
+                            symbol,  # Try exact symbol match as fallback
+                        ]
+
+                        for pattern in patterns:
+                            cursor.execute(
+                                """
+                                SELECT filepath, snippet(bm25_content, -1, '', '', '...', 20), language
+                                FROM bm25_content
+                                WHERE bm25_content MATCH ?
+                                ORDER BY rank
+                                LIMIT 1
+                            """,
+                                (pattern,),
+                            )
+
+                            row = cursor.fetchone()
+                            if row:
+                                filepath, snippet, language = row
+
+                                # Determine kind from pattern
+                                pattern_lower = pattern.lower()
+                                if "class" in pattern_lower:
+                                    kind = "class"
+                                elif "def" in pattern_lower or "function" in pattern_lower:
+                                    kind = "function"
+                                else:
+                                    kind = "symbol"
+
+                                conn.close()
+
+                                return {
+                                    "symbol": symbol,
+                                    "kind": kind,
+                                    "language": language or "unknown",
+                                    "signature": snippet,
+                                    "doc": None,
+                                    "defined_in": filepath,
+                                    "line": 1,
+                                    "span": (0, len(symbol)),
+                                }
+                    except sqlite3.OperationalError:
+                        # BM25 table doesn't exist, that's fine
+                        pass
+
+                    conn.close()
                 except Exception as e:
                     logger.error(f"Error in direct symbol lookup: {e}")
 
@@ -575,9 +657,7 @@ class EnhancedDispatcher:
                         )
                         definitions_by_plugin[plugin] = None
 
-                result = self._aggregator.aggregate_symbol_definitions(
-                    definitions_by_plugin
-                )
+                result = self._aggregator.aggregate_symbol_definitions(definitions_by_plugin)
 
                 self._operation_stats["lookups"] += 1
                 self._operation_stats["total_time"] += time.time() - start_time
@@ -775,33 +855,37 @@ class EnhancedDispatcher:
 
         try:
             # Quick BM25 bypass for non-semantic searches when plugins aren't loaded
-            if (self._sqlite_store and 
-                not semantic and 
-                not self._semantic_enabled and
-                (not self._plugins or len(self._plugins) == 0)):
+            if (
+                self._sqlite_store
+                and not semantic
+                and not self._semantic_enabled
+                and (not self._plugins or len(self._plugins) == 0)
+            ):
                 logger.info(f"Using direct BM25 search bypass for query: {query}")
                 try:
                     # Try different table names based on index schema
                     tables_to_try = ["bm25_content", "fts_code"]
-                    
+
                     for table in tables_to_try:
                         try:
-                            results = self._sqlite_store.search_bm25(query, table=table, limit=limit)
+                            results = self._sqlite_store.search_bm25(
+                                query, table=table, limit=limit
+                            )
                             if results:
                                 for result in results:
                                     # Handle different result formats
-                                    if 'filepath' in result:
-                                        file_path = result['filepath']
+                                    if "filepath" in result:
+                                        file_path = result["filepath"]
                                     else:
-                                        file_path = result.get('file_path', '')
-                                    
+                                        file_path = result.get("file_path", "")
+
                                     yield SearchResult(
                                         file_path=file_path,
-                                        line=result.get('line', 0),
-                                        column=result.get('column', 0),
-                                        snippet=result.get('snippet', ''),
-                                        score=result.get('score', 0.0),
-                                        metadata=result.get('metadata', {})
+                                        line=result.get("line", 0),
+                                        column=result.get("column", 0),
+                                        snippet=result.get("snippet", ""),
+                                        score=result.get("score", 0.0),
+                                        metadata=result.get("metadata", {}),
                                     )
                                 self._operation_stats["searches"] += 1
                                 self._operation_stats["total_time"] += time.time() - start_time
@@ -809,15 +893,15 @@ class EnhancedDispatcher:
                         except Exception as e:
                             logger.debug(f"BM25 search in table '{table}' failed: {e}")
                             continue
-                            
+
                 except Exception as e:
                     logger.warning(f"Direct BM25 bypass failed: {e}")
-            
+
             # For search, we may need to search across all languages
             # Load all plugins if using lazy loading
             if self._lazy_load and self._use_factory and len(self._plugins) == 0:
                 self._load_all_plugins()
-            
+
             # If still no plugins, try hybrid or BM25 search directly
             if len(self._plugins) == 0 and self._sqlite_store:
                 # Use semantic search if available and requested
@@ -825,48 +909,47 @@ class EnhancedDispatcher:
                     logger.info("No plugins loaded, using semantic search")
                     try:
                         # Search using semantic indexer
-                        semantic_results = self._semantic_indexer.search(
-                            query=query,
-                            limit=limit
-                        )
-                        
+                        semantic_results = self._semantic_indexer.search(query=query, limit=limit)
+
                         for result in semantic_results:
                             # Extract file content for snippet
-                            snippet = result.get('snippet', '')
-                            if not snippet and 'code' in result:
+                            snippet = result.get("snippet", "")
+                            if not snippet and "code" in result:
                                 # Take first few lines of code as snippet
-                                lines = result['code'].split('\n')
-                                snippet = '\n'.join(lines[:5])
-                            
+                                lines = result["code"].split("\n")
+                                snippet = "\n".join(lines[:5])
+
                             yield {
-                                'file': result.get('file_path', result.get('filepath', '')),
-                                'line': result.get('line', 1),
-                                'snippet': snippet,
-                                'score': result.get('score', 0.0),
-                                'language': result.get('metadata', {}).get('language', 'unknown')
+                                "file": result.get("file_path", result.get("filepath", "")),
+                                "line": result.get("line", 1),
+                                "snippet": snippet,
+                                "score": result.get("score", 0.0),
+                                "language": result.get("metadata", {}).get("language", "unknown"),
                             }
-                        
+
                         self._operation_stats["searches"] += 1
                         self._operation_stats["total_time"] += time.time() - start_time
                         return
                     except Exception as e:
                         logger.error(f"Error in semantic search: {e}")
                         # Fall back to BM25
-                
+
                 # Fall back to BM25-only search
                 logger.info("Using BM25 search directly")
                 try:
                     import sqlite3
+
                     conn = sqlite3.connect(self._sqlite_store.db_path)
                     cursor = conn.cursor()
-                    
+
                     # Check if this is a BM25 index
                     cursor.execute(
                         "SELECT name FROM sqlite_master WHERE type='table' AND name='bm25_content'"
                     )
                     if cursor.fetchone():
                         # Use BM25 search
-                        cursor.execute("""
+                        cursor.execute(
+                            """
                             SELECT 
                                 filepath,
                                 filename,
@@ -877,23 +960,25 @@ class EnhancedDispatcher:
                             WHERE bm25_content MATCH ?
                             ORDER BY rank
                             LIMIT ?
-                        """, (query, limit))
-                        
+                        """,
+                            (query, limit),
+                        )
+
                         for row in cursor.fetchall():
                             filepath, filename, snippet, language, rank = row
                             yield {
-                                'file': filepath,
-                                'line': 1,
-                                'snippet': snippet,
-                                'score': abs(rank),
-                                'language': language or 'unknown'
+                                "file": filepath,
+                                "line": 1,
+                                "snippet": snippet,
+                                "score": abs(rank),
+                                "language": language or "unknown",
                             }
-                        
+
                         conn.close()
                         self._operation_stats["searches"] += 1
                         self._operation_stats["total_time"] += time.time() - start_time
                         return
-                    
+
                     conn.close()
                 except Exception as e:
                     logger.error(f"Error in direct BM25 search: {e}")
@@ -905,9 +990,7 @@ class EnhancedDispatcher:
             queries = [query]
             if is_doc_query:
                 queries = self._expand_document_query(query)
-                logger.info(
-                    f"Expanded document query '{query}' to {len(queries)} variations"
-                )
+                logger.info(f"Expanded document query '{query}' to {len(queries)} variations")
                 # Force semantic search for natural language queries
                 semantic = True
 
@@ -1019,9 +1102,7 @@ class EnhancedDispatcher:
                         unique_results.append(result)
 
                 # Sort by score if available
-                unique_results.sort(
-                    key=lambda r: r.get("score", 0.5) or 0.5, reverse=True
-                )
+                unique_results.sort(key=lambda r: r.get("score", 0.5) or 0.5, reverse=True)
 
                 # Prioritize documentation files for document queries
                 if is_doc_query:
@@ -1113,9 +1194,7 @@ class EnhancedDispatcher:
 
         return stats
 
-    def index_directory(
-        self, directory: Path, recursive: bool = True
-    ) -> Dict[str, int]:
+    def index_directory(self, directory: Path, recursive: bool = True) -> Dict[str, int]:
         """
         Index all files in a directory, respecting ignore patterns.
 
@@ -1186,9 +1265,7 @@ class EnhancedDispatcher:
                 # Track by language
                 language = get_language_by_extension(path.suffix)
                 if language:
-                    stats["by_language"][language] = (
-                        stats["by_language"].get(language, 0) + 1
-                    )
+                    stats["by_language"][language] = stats["by_language"].get(language, 0) + 1
 
             except Exception as e:
                 logger.error(f"Failed to index {path}: {e}")
@@ -1229,9 +1306,7 @@ class EnhancedDispatcher:
         # Build search queries for different document types
         queries = []
         for doc_type in doc_types:
-            queries.extend(
-                [f"{doc_type} {topic}", f"{topic} {doc_type}", f"{topic} in {doc_type}"]
-            )
+            queries.extend([f"{doc_type} {topic}", f"{topic} {doc_type}", f"{topic} in {doc_type}"])
 
         # Also search for the topic in common doc filenames
         queries.extend(
@@ -1246,9 +1321,7 @@ class EnhancedDispatcher:
         # Deduplicate queries
         queries = list(dict.fromkeys(queries))
 
-        logger.info(
-            f"Cross-document search for '{topic}' with {len(queries)} query variations"
-        )
+        logger.info(f"Cross-document search for '{topic}' with {len(queries)} query variations")
 
         # Use the enhanced search with document-specific handling
         all_results = []
@@ -1345,9 +1418,7 @@ class EnhancedDispatcher:
                 logger.warning(f"Error removing from semantic index: {e}")
 
             # Update statistics
-            self._operation_stats["deletions"] = (
-                self._operation_stats.get("deletions", 0) + 1
-            )
+            self._operation_stats["deletions"] = self._operation_stats.get("deletions", 0) + 1
 
         except Exception as e:
             logger.error(f"Error removing file {path}: {e}", exc_info=True)
@@ -1402,40 +1473,42 @@ class EnhancedDispatcher:
             self._operation_stats["moves"] = self._operation_stats.get("moves", 0) + 1
 
         except Exception as e:
-            logger.error(
-                f"Error moving file {old_path} -> {new_path}: {e}", exc_info=True
-            )
-    
-    async def cross_repo_symbol_search(self, 
-                                     symbol: str,
-                                     repositories: Optional[List[str]] = None,
-                                     languages: Optional[List[str]] = None,
-                                     max_repositories: int = 10) -> Dict[str, Any]:
+            logger.error(f"Error moving file {old_path} -> {new_path}: {e}", exc_info=True)
+
+    async def cross_repo_symbol_search(
+        self,
+        symbol: str,
+        repositories: Optional[List[str]] = None,
+        languages: Optional[List[str]] = None,
+        max_repositories: int = 10,
+    ) -> Dict[str, Any]:
         """
         Search for a symbol across multiple repositories.
-        
+
         Args:
             symbol: Symbol name to search for
             repositories: Optional list of specific repository IDs
             languages: Optional list of languages to filter by
             max_repositories: Maximum number of repositories to search
-            
+
         Returns:
             Dictionary containing aggregated search results
         """
         if not self._cross_repo_coordinator:
-            raise RuntimeError("Cross-repository search not enabled. Set MCP_ENABLE_MULTI_REPO=true")
-        
+            raise RuntimeError(
+                "Cross-repository search not enabled. Set MCP_ENABLE_MULTI_REPO=true"
+            )
+
         scope = SearchScope(
             repositories=repositories,
             languages=languages,
             max_repositories=max_repositories,
-            priority_order=True
+            priority_order=True,
         )
-        
+
         try:
             result = await self._cross_repo_coordinator.search_symbol(symbol, scope)
-            
+
             # Convert to dictionary format for MCP tools
             return {
                 "query": result.query,
@@ -1444,7 +1517,7 @@ class EnhancedDispatcher:
                 "search_time": result.search_time,
                 "results": result.results,
                 "repository_stats": result.repository_stats,
-                "deduplication_stats": result.deduplication_stats
+                "deduplication_stats": result.deduplication_stats,
             }
         except Exception as e:
             logger.error(f"Cross-repository symbol search failed: {e}")
@@ -1456,20 +1529,22 @@ class EnhancedDispatcher:
                 "results": [],
                 "repository_stats": {},
                 "deduplication_stats": {},
-                "error": str(e)
+                "error": str(e),
             }
-    
-    async def cross_repo_code_search(self, 
-                                   query: str,
-                                   repositories: Optional[List[str]] = None,
-                                   languages: Optional[List[str]] = None,
-                                   file_types: Optional[List[str]] = None,
-                                   semantic: bool = False,
-                                   limit: int = 50,
-                                   max_repositories: int = 10) -> Dict[str, Any]:
+
+    async def cross_repo_code_search(
+        self,
+        query: str,
+        repositories: Optional[List[str]] = None,
+        languages: Optional[List[str]] = None,
+        file_types: Optional[List[str]] = None,
+        semantic: bool = False,
+        limit: int = 50,
+        max_repositories: int = 10,
+    ) -> Dict[str, Any]:
         """
         Search for code patterns across multiple repositories.
-        
+
         Args:
             query: Search query/pattern
             repositories: Optional list of specific repository IDs
@@ -1478,26 +1553,26 @@ class EnhancedDispatcher:
             semantic: Whether to use semantic search
             limit: Maximum number of results to return
             max_repositories: Maximum number of repositories to search
-            
+
         Returns:
             Dictionary containing aggregated search results
         """
         if not self._cross_repo_coordinator:
-            raise RuntimeError("Cross-repository search not enabled. Set MCP_ENABLE_MULTI_REPO=true")
-        
+            raise RuntimeError(
+                "Cross-repository search not enabled. Set MCP_ENABLE_MULTI_REPO=true"
+            )
+
         scope = SearchScope(
             repositories=repositories,
             languages=languages,
             file_types=file_types,
             max_repositories=max_repositories,
-            priority_order=True
+            priority_order=True,
         )
-        
+
         try:
-            result = await self._cross_repo_coordinator.search_code(
-                query, scope, semantic, limit
-            )
-            
+            result = await self._cross_repo_coordinator.search_code(query, scope, semantic, limit)
+
             # Convert to dictionary format for MCP tools
             return {
                 "query": result.query,
@@ -1506,7 +1581,7 @@ class EnhancedDispatcher:
                 "search_time": result.search_time,
                 "results": result.results,
                 "repository_stats": result.repository_stats,
-                "deduplication_stats": result.deduplication_stats
+                "deduplication_stats": result.deduplication_stats,
             }
         except Exception as e:
             logger.error(f"Cross-repository code search failed: {e}")
@@ -1518,22 +1593,22 @@ class EnhancedDispatcher:
                 "results": [],
                 "repository_stats": {},
                 "deduplication_stats": {},
-                "error": str(e)
+                "error": str(e),
             }
-    
+
     async def get_cross_repo_statistics(self) -> Dict[str, Any]:
         """
         Get statistics about cross-repository search capabilities.
-        
+
         Returns:
             Dictionary containing repository statistics
         """
         if not self._cross_repo_coordinator:
             return {
                 "enabled": False,
-                "message": "Cross-repository search not enabled. Set MCP_ENABLE_MULTI_REPO=true"
+                "message": "Cross-repository search not enabled. Set MCP_ENABLE_MULTI_REPO=true",
             }
-        
+
         try:
             stats = await self._cross_repo_coordinator.get_search_statistics()
             stats["enabled"] = True
@@ -1547,5 +1622,5 @@ class EnhancedDispatcher:
                 "total_files": 0,
                 "total_symbols": 0,
                 "languages": [],
-                "repository_details": []
+                "repository_details": [],
             }

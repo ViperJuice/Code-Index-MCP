@@ -15,10 +15,10 @@ from mcp_server.storage.sqlite_store import SQLiteStore
 def test_parallel_improvements():
     """Test integration fixes, query caching, and enhanced queries."""
     print("=== Testing Parallel Improvements ===\n")
-    
+
     # Test files with enhanced patterns
     test_files = {
-        "enhanced.rs": '''use std::collections::HashMap;
+        "enhanced.rs": """use std::collections::HashMap;
 
 const MAX_SIZE: usize = 1024;
 static mut COUNTER: i32 = 0;
@@ -61,9 +61,8 @@ macro_rules! create_user {
 
 fn main() {
     let user = create_user!(1, "Alice");
-}''',
-        
-        "enhanced.go": '''package main
+}""",
+        "enhanced.go": """package main
 
 import (
     "fmt"
@@ -106,8 +105,7 @@ func GetActiveConnections() int {
 func main() {
     db := NewConnection("localhost", 5432)
     fmt.Printf("Connected to %s:%d\\n", db.host, db.port)
-}''',
-        
+}""",
         "enhanced.py": '''#!/usr/bin/env python3
 """Enhanced Python module with comprehensive patterns."""
 
@@ -160,135 +158,138 @@ def _get_all_users() -> List[User]:
 if __name__ == "__main__":
     repo = UserRepository()
     user = create_user("alice", "alice@example.com")
-    repo.save(user)'''
+    repo.save(user)''',
     }
-    
+
     # Create store and dispatcher
     store = SQLiteStore(":memory:")
     dispatcher = EnhancedDispatcher(
-        plugins=None,
-        sqlite_store=store,
-        use_plugin_factory=True,
-        lazy_load=True
+        plugins=None, sqlite_store=store, use_plugin_factory=True, lazy_load=True
     )
-    
+
     print("1. Testing Enhanced Query Patterns...")
-    
+
     results = {}
     for filename, content in test_files.items():
-        extension = '.' + filename.split('.')[1]
-        
+        extension = "." + filename.split(".")[1]
+
         # Map extensions to language codes
-        lang_map = {'.rs': 'rust', '.go': 'go', '.py': 'python'}
+        lang_map = {".rs": "rust", ".go": "go", ".py": "python"}
         lang = lang_map.get(extension, extension[1:])
-        
+
         print(f"\n   Testing {lang.upper()}:")
-        
+
         # Create and index file
         test_file = Path(filename)
         test_file.write_text(content)
-        
+
         try:
             # Test direct plugin functionality
             plugin = PluginFactory.create_plugin(lang, store, enable_semantic=False)
-            
+
             # Test query caching (multiple runs)
             start_time = time.time()
             shard1 = plugin.indexFile(test_file, content)
             first_run_time = time.time() - start_time
-            
+
             start_time = time.time()
             shard2 = plugin.indexFile(test_file, content)
             second_run_time = time.time() - start_time
-            
+
             print(f"     Symbols found: {len(shard1['symbols'])}")
             print(f"     First run: {first_run_time:.4f}s, Second run: {second_run_time:.4f}s")
             if second_run_time < first_run_time * 0.8:  # Should be faster due to caching
-                print(f"     ✓ Query caching improved performance")
+                print("     ✓ Query caching improved performance")
             else:
-                print(f"     ? Query caching effect unclear")
-            
+                print("     ? Query caching effect unclear")
+
             # Show symbol types found
-            symbol_types = set(s['kind'] for s in shard1['symbols'])
+            symbol_types = set(s["kind"] for s in shard1["symbols"])
             print(f"     Symbol types: {', '.join(sorted(symbol_types))}")
-            
+
             results[lang] = {
-                'symbols': len(shard1['symbols']),
-                'types': len(symbol_types),
-                'caching': second_run_time < first_run_time * 0.8
+                "symbols": len(shard1["symbols"]),
+                "types": len(symbol_types),
+                "caching": second_run_time < first_run_time * 0.8,
             }
-            
+
         except Exception as e:
             print(f"     ✗ Error: {e}")
-            results[lang] = {'error': str(e)}
+            results[lang] = {"error": str(e)}
         finally:
             test_file.unlink(missing_ok=True)
-    
+
     print("\n2. Testing Dispatcher Integration...")
-    
+
     # Create test files for dispatcher
     for filename, content in test_files.items():
         Path(filename).write_text(content)
-    
+
     try:
         # Index all files
         for filename in test_files.keys():
             dispatcher.index_file(Path(filename))
-        
+
         # Test search across languages
-        print(f"\n   Cross-language search results:")
+        print("\n   Cross-language search results:")
         search_terms = ["User", "main", "create", "connect"]
-        
+
         for term in search_terms:
             search_results = list(dispatcher.search(term, limit=10))
             print(f"     '{term}': {len(search_results)} results")
-        
+
         # Test symbol lookup
-        print(f"\n   Symbol lookup results:")
+        print("\n   Symbol lookup results:")
         symbols_to_find = ["User", "main", "NewConnection", "create_user"]
         found_count = 0
-        
+
         for symbol in symbols_to_find:
             definition = dispatcher.lookup(symbol)
             if definition:
-                file_name = Path(definition.get('defined_in', '')).name
+                file_name = Path(definition.get("defined_in", "")).name
                 print(f"     ✓ {symbol}: {definition.get('kind', 'unknown')} in {file_name}")
                 found_count += 1
             else:
                 print(f"     ✗ {symbol}: not found")
-        
+
         integration_success = found_count > 0
-        
+
     finally:
         # Cleanup
         for filename in test_files.keys():
             Path(filename).unlink(missing_ok=True)
-    
+
     print("\n3. Performance and Cache Analysis...")
-    
+
     # Show statistics
     stats = dispatcher.get_statistics()
     print(f"   Plugins loaded: {stats['total_plugins']}")
     print(f"   Languages: {', '.join(sorted(stats['loaded_languages']))}")
-    print(f"   Operations: {stats['operations']['indexings']} indexings, {stats['operations']['searches']} searches")
-    
+    print(
+        f"   Operations: {stats['operations']['indexings']} indexings, {stats['operations']['searches']} searches"
+    )
+
     # Summary
     print("\n=== Summary of Improvements ===")
-    
-    successful_langs = [lang for lang, result in results.items() if 'error' not in result]
-    cached_langs = [lang for lang, result in results.items() if result.get('caching', False)]
-    
+
+    successful_langs = [lang for lang, result in results.items() if "error" not in result]
+    cached_langs = [lang for lang, result in results.items() if result.get("caching", False)]
+
     print(f"✅ Enhanced Queries: {len(successful_langs)}/{len(results)} languages working")
-    print(f"✅ Query Caching: {len(cached_langs)}/{len(successful_langs)} languages show performance improvement")
+    print(
+        f"✅ Query Caching: {len(cached_langs)}/{len(successful_langs)} languages show performance improvement"
+    )
     print(f"✅ Integration: {'Working' if integration_success else 'Needs attention'}")
-    
-    print(f"\nDetailed results:")
+
+    print("\nDetailed results:")
     for lang, result in results.items():
-        if 'error' not in result:
-            print(f"  {lang}: {result['symbols']} symbols, {result['types']} types, caching: {result['caching']}")
+        if "error" not in result:
+            print(
+                f"  {lang}: {result['symbols']} symbols, {result['types']} types, caching: {result['caching']}"
+            )
         else:
             print(f"  {lang}: ERROR - {result['error']}")
-    
+
     return len(successful_langs) == len(results) and integration_success
 
 

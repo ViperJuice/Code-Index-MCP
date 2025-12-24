@@ -3,12 +3,13 @@ Plugin discovery system for dynamic plugin loading.
 Automatically discovers and registers available plugins.
 """
 
-import os
 import importlib
 import inspect
 import logging
+import os
 from pathlib import Path
-from typing import Dict, List, Type, Optional, Any
+from typing import Any, Dict, List, Optional, Type
+
 import yaml
 
 from ..interfaces.plugin_interfaces import IPlugin
@@ -27,9 +28,7 @@ class PluginDiscovery:
         Args:
             plugin_dirs: List of directories to search for plugins
         """
-        self.plugin_dirs = plugin_dirs or [
-            os.path.join(os.path.dirname(__file__), "..", "plugins")
-        ]
+        self.plugin_dirs = plugin_dirs or [os.path.join(os.path.dirname(__file__), "..", "plugins")]
         self.discovered_plugins: Dict[str, Dict[str, Any]] = {}
         self._plugin_cache: Dict[str, Type[IPlugin]] = {}
 
@@ -148,9 +147,7 @@ class PluginDiscovery:
                     }
 
                     self.discovered_plugins[language.lower()] = plugin_info
-                    logger.info(
-                        f"Auto-discovered plugin for {language}: {plugin_class.__name__}"
-                    )
+                    logger.info(f"Auto-discovered plugin for {language}: {plugin_class.__name__}")
 
         except Exception as e:
             logger.debug(f"Failed to auto-discover plugin at {plugin_path}: {e}")
@@ -165,7 +162,7 @@ class PluginDiscovery:
                 # Create temporary instance
                 temp = plugin_class(None)
                 return temp.get_language()
-            except:
+            except Exception:
                 pass
 
         # Extract from path/name

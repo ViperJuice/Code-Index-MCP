@@ -2,26 +2,26 @@
 Markdown plugin implementation for comprehensive Markdown document processing.
 """
 
+import logging
 import re
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Set, Tuple
-import logging
+from typing import Any, Dict, List, Optional
 
 from mcp_server.document_processing import (
     BaseDocumentPlugin,
-    DocumentMetadata as BaseDocumentMetadata,
-    DocumentStructure,
     DocumentChunk,
-    Section,
-    ChunkType,
-    ChunkMetadata,
 )
-from mcp_server.plugin_base import IndexShard, SymbolDef, SearchResult, Reference
+from mcp_server.document_processing import DocumentMetadata as BaseDocumentMetadata
+from mcp_server.document_processing import (
+    DocumentStructure,
+    Section,
+)
+from mcp_server.plugin_base import IndexShard
 
-from .document_parser import MarkdownParser
-from .section_extractor import SectionExtractor
-from .frontmatter_parser import FrontmatterParser
 from .chunk_strategies import MarkdownChunkStrategy
+from .document_parser import MarkdownParser
+from .frontmatter_parser import FrontmatterParser
+from .section_extractor import SectionExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +54,7 @@ class MarkdownPlugin(BaseDocumentPlugin):
     def chunk_document(self, content: str, file_path: Path) -> List[DocumentChunk]:
         """Override to use Markdown-specific chunking."""
         # Parse frontmatter
-        frontmatter, content_without_frontmatter = self.frontmatter_parser.parse(
-            content
-        )
+        frontmatter, content_without_frontmatter = self.frontmatter_parser.parse(content)
 
         # Parse Markdown AST
         ast = self.parser.parse(content_without_frontmatter)
@@ -135,9 +133,7 @@ class MarkdownPlugin(BaseDocumentPlugin):
     def extract_structure(self, content: str, file_path: Path) -> DocumentStructure:
         """Extract document structure (headings, sections, etc)."""
         # Parse frontmatter
-        frontmatter, content_without_frontmatter = self.frontmatter_parser.parse(
-            content
-        )
+        frontmatter, content_without_frontmatter = self.frontmatter_parser.parse(content)
 
         # Parse Markdown AST
         ast = self.parser.parse(content_without_frontmatter)
@@ -160,7 +156,7 @@ class MarkdownPlugin(BaseDocumentPlugin):
             sections.append(section)
 
         # Extract headings and metadata
-        structure_info = self._extract_structure(ast)
+        _ = self._extract_structure(ast)
 
         # Build document structure
         structure = DocumentStructure(
@@ -307,9 +303,7 @@ class MarkdownPlugin(BaseDocumentPlugin):
                     }
                 )
             elif node_type == "table":
-                structure["tables"].append(
-                    {"rows": len(node.get("children", [])), "depth": depth}
-                )
+                structure["tables"].append({"rows": len(node.get("children", [])), "depth": depth})
             elif node_type == "link":
                 structure["links"].append(
                     {
@@ -334,9 +328,7 @@ class MarkdownPlugin(BaseDocumentPlugin):
         traverse(ast)
         return structure
 
-    def _extract_symbols(
-        self, ast: Dict[str, Any], file_path: str
-    ) -> List[Dict[str, Any]]:
+    def _extract_symbols(self, ast: Dict[str, Any], file_path: str) -> List[Dict[str, Any]]:
         """Extract symbols from Markdown AST."""
         symbols = []
 

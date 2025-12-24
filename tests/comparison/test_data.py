@@ -4,17 +4,17 @@ Generates synthetic codebases and test queries for benchmarking different
 indexing approaches.
 """
 
-import os
-import random
 import json
+import random
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
-from dataclasses import dataclass, asdict
+from typing import Dict, List, Optional
 
 
 @dataclass
 class TestQuery:
     """Represents a test query with expected results."""
+
     query: str
     query_type: str  # 'symbol', 'semantic', 'pattern'
     expected_files: List[str]
@@ -25,6 +25,7 @@ class TestQuery:
 @dataclass
 class CodebaseSpec:
     """Specification for a generated codebase."""
+
     name: str
     size: str  # 'small', 'medium', 'large'
     file_count: int
@@ -34,7 +35,7 @@ class CodebaseSpec:
 
 class TestDataGenerator:
     """Generates synthetic codebases and test queries."""
-    
+
     # Code templates for different languages
     PYTHON_TEMPLATES = [
         '''"""Module for {purpose}."""
@@ -132,9 +133,9 @@ class {ServiceName}Service:
         return False
 ''',
     ]
-    
+
     JAVASCRIPT_TEMPLATES = [
-        '''// {purpose} module implementation
+        """// {purpose} module implementation
 
 const {{ {import1}, {import2} }} = require('./utils');
 
@@ -187,8 +188,8 @@ class {ClassName} {{
 }}
 
 module.exports = {{ {ClassName} }};
-''',
-        '''// {purpose} controller with Express
+""",
+        """// {purpose} controller with Express
 
 const express = require('express');
 const {{ {ServiceName} }} = require('../services/{purpose}Service');
@@ -258,11 +259,11 @@ class {ControllerName}Controller {{
 }}
 
 module.exports = {ControllerName}Controller;
-''',
+""",
     ]
-    
+
     JAVA_TEMPLATES = [
-        '''package com.example.{package};
+        """package com.example.{package};
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -328,8 +329,8 @@ public class {ClassName} {{
         return data.toUpperCase().replaceAll("{pattern}", "{replacement}");
     }}
 }}
-''',
-        '''package com.example.{package}.service;
+""",
+        """package com.example.{package}.service;
 
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -408,217 +409,251 @@ public class {ServiceName}Service {{
         repository.deleteById(id);
     }}
 }}
-''',
+""",
     ]
-    
+
     # Common programming concepts for realistic code
     PURPOSES = [
-        'authentication', 'authorization', 'validation', 'transformation',
-        'serialization', 'caching', 'logging', 'monitoring', 'notification',
-        'scheduling', 'routing', 'filtering', 'sorting', 'pagination',
-        'encryption', 'compression', 'parsing', 'formatting', 'indexing',
-        'queuing', 'batching', 'streaming', 'synchronization', 'migration'
+        "authentication",
+        "authorization",
+        "validation",
+        "transformation",
+        "serialization",
+        "caching",
+        "logging",
+        "monitoring",
+        "notification",
+        "scheduling",
+        "routing",
+        "filtering",
+        "sorting",
+        "pagination",
+        "encryption",
+        "compression",
+        "parsing",
+        "formatting",
+        "indexing",
+        "queuing",
+        "batching",
+        "streaming",
+        "synchronization",
+        "migration",
     ]
-    
+
     IMPORTS = {
-        'python': ['os', 'sys', 'json', 'datetime', 'asyncio', 'requests', 'pathlib', 'collections'],
-        'javascript': ['fs', 'path', 'http', 'crypto', 'events', 'stream', 'util', 'querystring'],
-        'java': ['util', 'io', 'nio', 'net', 'security', 'concurrent', 'annotation', 'reflection']
+        "python": [
+            "os",
+            "sys",
+            "json",
+            "datetime",
+            "asyncio",
+            "requests",
+            "pathlib",
+            "collections",
+        ],
+        "javascript": ["fs", "path", "http", "crypto", "events", "stream", "util", "querystring"],
+        "java": ["util", "io", "nio", "net", "security", "concurrent", "annotation", "reflection"],
     }
-    
+
     def __init__(self, base_path: str = "test_codebases"):
         self.base_path = Path(base_path)
         self.base_path.mkdir(exist_ok=True)
-    
+
     def generate_codebase(self, spec: CodebaseSpec) -> str:
         """Generate a synthetic codebase based on specification."""
         random.seed(spec.seed)
-        
+
         codebase_path = self.base_path / spec.name
         codebase_path.mkdir(exist_ok=True)
-        
+
         # Calculate files per language
         files_per_language = spec.file_count // len(spec.languages)
         extra_files = spec.file_count % len(spec.languages)
-        
+
         generated_files = []
-        
+
         for i, language in enumerate(spec.languages):
             count = files_per_language + (1 if i < extra_files else 0)
             files = self._generate_language_files(codebase_path, language, count)
             generated_files.extend(files)
-        
+
         # Generate metadata file
         metadata = {
-            'spec': asdict(spec),
-            'generated_files': generated_files,
-            'timestamp': str(Path(codebase_path).stat().st_mtime)
+            "spec": asdict(spec),
+            "generated_files": generated_files,
+            "timestamp": str(Path(codebase_path).stat().st_mtime),
         }
-        
-        with open(codebase_path / 'metadata.json', 'w') as f:
+
+        with open(codebase_path / "metadata.json", "w") as f:
             json.dump(metadata, f, indent=2)
-        
+
         return str(codebase_path)
-    
+
     def _generate_language_files(self, base_path: Path, language: str, count: int) -> List[str]:
         """Generate files for a specific language."""
         generated = []
-        
-        if language == 'python':
+
+        if language == "python":
             templates = self.PYTHON_TEMPLATES
-            extension = '.py'
-            subdir = 'src'
-        elif language == 'javascript':
+            extension = ".py"
+            subdir = "src"
+        elif language == "javascript":
             templates = self.JAVASCRIPT_TEMPLATES
-            extension = '.js'
-            subdir = 'lib'
-        elif language == 'java':
+            extension = ".js"
+            subdir = "lib"
+        elif language == "java":
             templates = self.JAVA_TEMPLATES
-            extension = '.java'
-            subdir = 'src/main/java/com/example'
+            extension = ".java"
+            subdir = "src/main/java/com/example"
         else:
             raise ValueError(f"Unsupported language: {language}")
-        
+
         # Create language-specific directory structure
         lang_path = base_path / subdir
         lang_path.mkdir(parents=True, exist_ok=True)
-        
+
         for i in range(count):
             purpose = random.choice(self.PURPOSES)
             template = random.choice(templates)
-            
+
             # Generate file name
-            if language == 'python':
+            if language == "python":
                 filename = f"{purpose}_handler_{i}{extension}"
-            elif language == 'javascript':
+            elif language == "javascript":
                 filename = f"{purpose}Module{i}{extension}"
             else:  # java
                 filename = f"{purpose.title()}Manager{i}{extension}"
-            
+
             # Fill template with random values
             content = self._fill_template(template, language, purpose, i)
-            
+
             # Write file
             file_path = lang_path / filename
-            with open(file_path, 'w') as f:
+            with open(file_path, "w") as f:
                 f.write(content)
-            
+
             generated.append(str(file_path.relative_to(base_path)))
-        
+
         return generated
-    
+
     def _fill_template(self, template: str, language: str, purpose: str, index: int) -> str:
         """Fill template with contextual values."""
         replacements = {
-            '{purpose}': purpose,
-            '{Purpose}': purpose.title(),
-            '{PURPOSE}': purpose.upper(),
-            '{ClassName}': f"{purpose.title()}Handler",
-            '{ServiceName}': f"{purpose.title()}",
-            '{ControllerName}': f"{purpose.title()}",
-            '{DataClassName}': f"{purpose.title()}Data",
-            '{EnumName}': f"{purpose.title()}Status",
-            '{method1}': f"process_{purpose}",
-            '{function1}': f"handle_{purpose}_batch",
-            '{import1}': random.choice(self.IMPORTS.get(language, ['module'])),
-            '{import2}': random.choice(self.IMPORTS.get(language, ['another_module'])),
-            '{package}': purpose.lower(),
-            '{DataType}': f"{purpose.title()}Data",
-            '{ResultType}': f"{purpose.title()}Result",
-            '{ConfigType}': f"{purpose.title()}Config",
-            '{RepositoryName}': f"{purpose.title()}",
-            '{MapperName}': f"{purpose.title()}",
-            '{DtoName}': f"{purpose.title()}",
-            '{EntityName}': f"{purpose.title()}Entity",
-            '{prefix}': purpose[:3].upper(),
-            '{old}': 'OLD',
-            '{new}': 'NEW',
-            '{status}': 'ACTIVE',
-            '{pattern}': '[0-9]+',
-            '{replacement}': 'X'
+            "{purpose}": purpose,
+            "{Purpose}": purpose.title(),
+            "{PURPOSE}": purpose.upper(),
+            "{ClassName}": f"{purpose.title()}Handler",
+            "{ServiceName}": f"{purpose.title()}",
+            "{ControllerName}": f"{purpose.title()}",
+            "{DataClassName}": f"{purpose.title()}Data",
+            "{EnumName}": f"{purpose.title()}Status",
+            "{method1}": f"process_{purpose}",
+            "{function1}": f"handle_{purpose}_batch",
+            "{import1}": random.choice(self.IMPORTS.get(language, ["module"])),
+            "{import2}": random.choice(self.IMPORTS.get(language, ["another_module"])),
+            "{package}": purpose.lower(),
+            "{DataType}": f"{purpose.title()}Data",
+            "{ResultType}": f"{purpose.title()}Result",
+            "{ConfigType}": f"{purpose.title()}Config",
+            "{RepositoryName}": f"{purpose.title()}",
+            "{MapperName}": f"{purpose.title()}",
+            "{DtoName}": f"{purpose.title()}",
+            "{EntityName}": f"{purpose.title()}Entity",
+            "{prefix}": purpose[:3].upper(),
+            "{old}": "OLD",
+            "{new}": "NEW",
+            "{status}": "ACTIVE",
+            "{pattern}": "[0-9]+",
+            "{replacement}": "X",
         }
-        
+
         result = template
         for key, value in replacements.items():
             result = result.replace(key, value)
-        
+
         return result
-    
+
     def generate_test_queries(self, codebase_path: str) -> List[TestQuery]:
         """Generate test queries for a codebase."""
         queries = []
-        
+
         # Symbol search queries
-        queries.extend([
-            TestQuery(
-                query="Handler",
-                query_type="symbol",
-                expected_files=["src/*.py"],
-                expected_symbols=["*Handler", "handle_*"],
-                description="Find all handler classes and functions"
-            ),
-            TestQuery(
-                query="process_",
-                query_type="symbol",
-                expected_files=["src/*.py", "lib/*.js"],
-                expected_symbols=["process_*"],
-                description="Find all processing methods"
-            ),
-            TestQuery(
-                query="Service",
-                query_type="symbol",
-                expected_files=["src/main/java/**/*.java", "lib/*.js"],
-                expected_symbols=["*Service", "*ServiceImpl"],
-                description="Find all service classes"
-            ),
-        ])
-        
+        queries.extend(
+            [
+                TestQuery(
+                    query="Handler",
+                    query_type="symbol",
+                    expected_files=["src/*.py"],
+                    expected_symbols=["*Handler", "handle_*"],
+                    description="Find all handler classes and functions",
+                ),
+                TestQuery(
+                    query="process_",
+                    query_type="symbol",
+                    expected_files=["src/*.py", "lib/*.js"],
+                    expected_symbols=["process_*"],
+                    description="Find all processing methods",
+                ),
+                TestQuery(
+                    query="Service",
+                    query_type="symbol",
+                    expected_files=["src/main/java/**/*.java", "lib/*.js"],
+                    expected_symbols=["*Service", "*ServiceImpl"],
+                    description="Find all service classes",
+                ),
+            ]
+        )
+
         # Semantic search queries
-        queries.extend([
-            TestQuery(
-                query="authentication and validation logic",
-                query_type="semantic",
-                expected_files=["*authentication*", "*validation*"],
-                description="Find code related to authentication and validation"
-            ),
-            TestQuery(
-                query="error handling and logging",
-                query_type="semantic",
-                expected_files=["*.py", "*.js", "*.java"],
-                description="Find error handling patterns"
-            ),
-            TestQuery(
-                query="data transformation and processing",
-                query_type="semantic",
-                expected_files=["*transform*", "*process*"],
-                description="Find data transformation code"
-            ),
-        ])
-        
+        queries.extend(
+            [
+                TestQuery(
+                    query="authentication and validation logic",
+                    query_type="semantic",
+                    expected_files=["*authentication*", "*validation*"],
+                    description="Find code related to authentication and validation",
+                ),
+                TestQuery(
+                    query="error handling and logging",
+                    query_type="semantic",
+                    expected_files=["*.py", "*.js", "*.java"],
+                    description="Find error handling patterns",
+                ),
+                TestQuery(
+                    query="data transformation and processing",
+                    query_type="semantic",
+                    expected_files=["*transform*", "*process*"],
+                    description="Find data transformation code",
+                ),
+            ]
+        )
+
         # Pattern search queries
-        queries.extend([
-            TestQuery(
-                query=r"async\s+def\s+\w+",
-                query_type="pattern",
-                expected_files=["src/*.py"],
-                description="Find async Python functions"
-            ),
-            TestQuery(
-                query=r"@(Service|Component|Repository)",
-                query_type="pattern",
-                expected_files=["src/main/java/**/*.java"],
-                description="Find Spring annotations"
-            ),
-            TestQuery(
-                query=r"class\s+\w+\s*{",
-                query_type="pattern",
-                expected_files=["*.js", "*.java"],
-                description="Find class definitions"
-            ),
-        ])
-        
+        queries.extend(
+            [
+                TestQuery(
+                    query=r"async\s+def\s+\w+",
+                    query_type="pattern",
+                    expected_files=["src/*.py"],
+                    description="Find async Python functions",
+                ),
+                TestQuery(
+                    query=r"@(Service|Component|Repository)",
+                    query_type="pattern",
+                    expected_files=["src/main/java/**/*.java"],
+                    description="Find Spring annotations",
+                ),
+                TestQuery(
+                    query=r"class\s+\w+\s*{",
+                    query_type="pattern",
+                    expected_files=["*.js", "*.java"],
+                    description="Find class definitions",
+                ),
+            ]
+        )
+
         return queries
-    
+
     def generate_all_test_data(self) -> Dict[str, any]:
         """Generate complete test dataset."""
         specs = [
@@ -628,27 +663,21 @@ public class {ServiceName}Service {{
             CodebaseSpec("python_only_medium", "medium", 100, ["python"], 42),
             CodebaseSpec("polyglot_small", "small", 15, ["python", "javascript", "java"], 42),
         ]
-        
-        test_data = {
-            'codebases': {},
-            'queries': {}
-        }
-        
+
+        test_data = {"codebases": {}, "queries": {}}
+
         for spec in specs:
             print(f"Generating {spec.name} codebase ({spec.file_count} files)...")
             codebase_path = self.generate_codebase(spec)
             queries = self.generate_test_queries(codebase_path)
-            
-            test_data['codebases'][spec.name] = {
-                'path': codebase_path,
-                'spec': asdict(spec)
-            }
-            test_data['queries'][spec.name] = [asdict(q) for q in queries]
-        
+
+            test_data["codebases"][spec.name] = {"path": codebase_path, "spec": asdict(spec)}
+            test_data["queries"][spec.name] = [asdict(q) for q in queries]
+
         # Save test data manifest
-        with open(self.base_path / 'test_data.json', 'w') as f:
+        with open(self.base_path / "test_data.json", "w") as f:
             json.dump(test_data, f, indent=2)
-        
+
         return test_data
 
 
@@ -656,11 +685,11 @@ def main():
     """Generate test data for comparison benchmarks."""
     generator = TestDataGenerator()
     test_data = generator.generate_all_test_data()
-    
+
     print("\nGenerated test data:")
-    for codebase_name, info in test_data['codebases'].items():
+    for codebase_name, info in test_data["codebases"].items():
         print(f"  - {codebase_name}: {info['spec']['file_count']} files at {info['path']}")
-    
+
     print(f"\nTotal queries generated: {sum(len(q) for q in test_data['queries'].values())}")
     print(f"Test data saved to: {generator.base_path}")
 

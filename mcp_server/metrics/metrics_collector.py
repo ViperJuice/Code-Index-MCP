@@ -1,14 +1,14 @@
 """Prometheus-compatible metrics collector implementation."""
 
-import time
+import logging
 import threading
+import time
 from collections import defaultdict, deque
 from contextlib import contextmanager
-from typing import Dict, Any, List, Optional, Deque
 from dataclasses import dataclass, field
-import logging
+from typing import Any, Deque, Dict, List, Optional
 
-from . import IMetricsCollector, MetricType, MetricPoint
+from . import IMetricsCollector
 
 logger = logging.getLogger(__name__)
 
@@ -119,9 +119,7 @@ class PrometheusMetricsCollector(IMetricsCollector):
     def _initialize_default_metrics(self) -> None:
         """Initialize default system metrics."""
         # HTTP request metrics
-        self.increment_counter(
-            "http_requests_total", 0, {"method": "GET", "endpoint": "/health"}
-        )
+        self.increment_counter("http_requests_total", 0, {"method": "GET", "endpoint": "/health"})
         self.set_gauge("http_request_duration_seconds", 0)
 
         # Plugin metrics
@@ -141,9 +139,7 @@ class PrometheusMetricsCollector(IMetricsCollector):
         self.set_gauge("memory_usage_bytes", 0)
         self.set_gauge("cpu_usage_percent", 0)
 
-    def _get_metric_key(
-        self, name: str, labels: Optional[Dict[str, str]] = None
-    ) -> str:
+    def _get_metric_key(self, name: str, labels: Optional[Dict[str, str]] = None) -> str:
         """Generate a unique key for a metric with labels."""
         if labels:
             label_str = ",".join(f"{k}={v}" for k, v in sorted(labels.items()))
@@ -165,9 +161,7 @@ class PrometheusMetricsCollector(IMetricsCollector):
                 self._counters[key] = CounterMetric(full_name, 0.0, labels or {})
             self._counters[key].increment(value)
 
-    def set_gauge(
-        self, name: str, value: float, labels: Optional[Dict[str, str]] = None
-    ) -> None:
+    def set_gauge(self, name: str, value: float, labels: Optional[Dict[str, str]] = None) -> None:
         """Set a gauge metric value."""
         full_name = f"{self.namespace}_{name}"
         key = self._get_metric_key(full_name, labels)
@@ -211,9 +205,7 @@ class PrometheusMetricsCollector(IMetricsCollector):
                 lines.extend([help_line, type_line])
 
                 if counter.labels:
-                    label_str = ",".join(
-                        f'{k}="{v}"' for k, v in counter.labels.items()
-                    )
+                    label_str = ",".join(f'{k}="{v}"' for k, v in counter.labels.items())
                     metric_line = f"{counter.name}{{{label_str}}} {counter.value}"
                 else:
                     metric_line = f"{counter.name} {counter.value}"
@@ -244,27 +236,19 @@ class PrometheusMetricsCollector(IMetricsCollector):
                 for bucket in sorted(histogram.buckets) + [float("inf")]:
                     bucket_count = histogram.bucket_counts.get(bucket, 0)
                     if histogram.labels:
-                        label_str = ",".join(
-                            f'{k}="{v}"' for k, v in histogram.labels.items()
-                        )
-                        bucket_line = f'{histogram.name}_bucket{{le="{bucket}",{label_str}}} {bucket_count}'
-                    else:
+                        label_str = ",".join(f'{k}="{v}"' for k, v in histogram.labels.items())
                         bucket_line = (
-                            f'{histogram.name}_bucket{{le="{bucket}"}} {bucket_count}'
+                            f'{histogram.name}_bucket{{le="{bucket}",{label_str}}} {bucket_count}'
                         )
+                    else:
+                        bucket_line = f'{histogram.name}_bucket{{le="{bucket}"}} {bucket_count}'
                     lines.append(bucket_line)
 
                 # Export count and sum
                 if histogram.labels:
-                    label_str = ",".join(
-                        f'{k}="{v}"' for k, v in histogram.labels.items()
-                    )
-                    count_line = (
-                        f"{histogram.name}_count{{{label_str}}} {histogram.total_count}"
-                    )
-                    sum_line = (
-                        f"{histogram.name}_sum{{{label_str}}} {histogram.total_sum}"
-                    )
+                    label_str = ",".join(f'{k}="{v}"' for k, v in histogram.labels.items())
+                    count_line = f"{histogram.name}_count{{{label_str}}} {histogram.total_count}"
+                    sum_line = f"{histogram.name}_sum{{{label_str}}} {histogram.total_sum}"
                 else:
                     count_line = f"{histogram.name}_count {histogram.total_count}"
                     sum_line = f"{histogram.name}_sum {histogram.total_sum}"
@@ -369,9 +353,7 @@ class PrometheusMetricsCollector(IMetricsCollector):
                 "counters": len(self._counters),
                 "gauges": len(self._gauges),
                 "histograms": len(self._histograms),
-                "total": len(self._counters)
-                + len(self._gauges)
-                + len(self._histograms),
+                "total": len(self._counters) + len(self._gauges) + len(self._histograms),
             }
 
 

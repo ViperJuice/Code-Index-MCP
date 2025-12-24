@@ -4,23 +4,21 @@ Real-world memory usage tests for Code-Index-MCP.
 Tests memory efficiency and leak detection during indexing operations.
 """
 
-import pytest
-import time
 import gc
 import os
-from pathlib import Path
-from typing import Dict, List, Any, Optional
 import subprocess
 import tempfile
-import threading
+from pathlib import Path
+from typing import Dict
+
 import psutil
+import pytest
 from memory_profiler import memory_usage
 
-from mcp_server.storage.sqlite_store import SQLiteStore
 from mcp_server.dispatcher.dispatcher import Dispatcher
-from mcp_server.plugin_system.plugin_manager import PluginManager
-from mcp_server.utils.fuzzy_indexer import FuzzyIndexer
 from mcp_server.interfaces.shared_interfaces import Result
+from mcp_server.plugin_system.plugin_manager import PluginManager
+from mcp_server.storage.sqlite_store import SQLiteStore
 
 
 class TestMemoryUsage:
@@ -64,9 +62,7 @@ class TestMemoryUsage:
 
         return dispatcher
 
-    def ensure_repository_exists(
-        self, workspace_dir: Path, repo_name: str, repo_url: str
-    ) -> Path:
+    def ensure_repository_exists(self, workspace_dir: Path, repo_name: str, repo_url: str) -> Path:
         """Ensure repository exists in workspace, download if needed."""
         repo_path = workspace_dir / repo_name
 
@@ -117,9 +113,7 @@ class TestMemoryUsage:
             result = plugin.indexFile(file_path, content)
 
             return (
-                Result.success(result)
-                if result
-                else Result.error("Plugin returned empty result")
+                Result.success(result) if result else Result.error("Plugin returned empty result")
             )
 
         except Exception as e:
@@ -170,9 +164,7 @@ class TestMemoryUsage:
                 if len(content.strip()) == 0:
                     continue
 
-                result = self.index_file_with_plugin(
-                    str(file_path), content, dispatcher
-                )
+                result = self.index_file_with_plugin(str(file_path), content, dispatcher)
                 if result.success:
                     symbols = result.value.get("symbols", [])
 
@@ -216,7 +208,7 @@ class TestMemoryUsage:
         memory_increase = final_memory["rss_mb"] - initial_memory["rss_mb"]
         peak_increase = peak_memory - initial_memory["rss_mb"]
 
-        print(f"\nMemory Usage Results:")
+        print("\nMemory Usage Results:")
         print(f"  Files indexed: {indexed_count}")
         print(f"  Initial memory: {initial_memory['rss_mb']:.1f}MB")
         print(f"  Final memory: {final_memory['rss_mb']:.1f}MB")
@@ -230,12 +222,8 @@ class TestMemoryUsage:
         )
 
         # Memory usage assertions
-        assert (
-            memory_increase < 1000
-        ), f"Memory increase too high: {memory_increase:.1f}MB"
-        assert (
-            peak_increase < 1500
-        ), f"Peak memory usage too high: {peak_increase:.1f}MB"
+        assert memory_increase < 1000, f"Memory increase too high: {memory_increase:.1f}MB"
+        assert peak_increase < 1500, f"Peak memory usage too high: {peak_increase:.1f}MB"
         assert (
             indexed_count >= len(c_files) * 0.7
         ), f"Should index most files: {indexed_count}/{len(c_files)}"
@@ -268,9 +256,7 @@ class TestMemoryUsage:
         # Perform repeated indexing cycles
         for cycle in range(5):
             cycle_start_memory = self.get_memory_info()
-            print(
-                f"\nCycle {cycle + 1}: Starting with {cycle_start_memory['rss_mb']:.1f}MB"
-            )
+            print(f"\nCycle {cycle + 1}: Starting with {cycle_start_memory['rss_mb']:.1f}MB")
 
             repo_id = test_db.create_repository(
                 str(repo_path), f"leak_test_cycle_{cycle}", {"type": "leak_test"}
@@ -283,9 +269,7 @@ class TestMemoryUsage:
                     if len(content.strip()) == 0:
                         continue
 
-                    result = self.index_file_with_plugin(
-                        str(file_path), content, dispatcher
-                    )
+                    result = self.index_file_with_plugin(str(file_path), content, dispatcher)
                     if result.success:
                         symbols = result.value.get("symbols", [])
 
@@ -350,7 +334,7 @@ class TestMemoryUsage:
         cycle_increases = [s["cycle_increase_mb"] for s in memory_samples]
         total_increases = [s["total_increase_mb"] for s in memory_samples]
 
-        print(f"\nMemory Leak Analysis:")
+        print("\nMemory Leak Analysis:")
         for sample in memory_samples:
             print(
                 f"  Cycle {sample['cycle']}: +{sample['cycle_increase_mb']:.1f}MB "
@@ -398,16 +382,12 @@ class TestMemoryUsage:
         for repo_name, repo_url, extensions, language in test_repos:
             print(f"\nTesting memory efficiency for {language}...")
 
-            repo_path = self.ensure_repository_exists(
-                workspace_dir, repo_name, repo_url
-            )
+            repo_path = self.ensure_repository_exists(workspace_dir, repo_name, repo_url)
 
             # Get files for this language
             files = []
             for ext in extensions:
-                files.extend(
-                    list(repo_path.rglob(f"*{ext}"))[:100]
-                )  # Limit per language
+                files.extend(list(repo_path.rglob(f"*{ext}"))[:100])  # Limit per language
 
             if not files:
                 print(f"No {language} files found, skipping")
@@ -441,9 +421,7 @@ class TestMemoryUsage:
                         if len(content.strip()) == 0:
                             continue
 
-                        result = self.index_file_with_plugin(
-                            str(file_path), content, dispatcher
-                        )
+                        result = self.index_file_with_plugin(str(file_path), content, dispatcher)
                         if result.success:
                             symbols = result.value.get("symbols", [])
 
@@ -483,19 +461,13 @@ class TestMemoryUsage:
                     "total_symbols": total_symbols,
                     "total_lines": total_lines,
                     "memory_per_file_kb": (
-                        (memory_increase * 1024) / indexed_count
-                        if indexed_count > 0
-                        else 0
+                        (memory_increase * 1024) / indexed_count if indexed_count > 0 else 0
                     ),
                     "memory_per_symbol_bytes": (
-                        (memory_increase * 1024 * 1024) / total_symbols
-                        if total_symbols > 0
-                        else 0
+                        (memory_increase * 1024 * 1024) / total_symbols if total_symbols > 0 else 0
                     ),
                     "memory_per_line_bytes": (
-                        (memory_increase * 1024 * 1024) / total_lines
-                        if total_lines > 0
-                        else 0
+                        (memory_increase * 1024 * 1024) / total_lines if total_lines > 0 else 0
                     ),
                 }
 
@@ -505,7 +477,7 @@ class TestMemoryUsage:
                 except OSError:
                     pass
 
-        print(f"\nMemory Efficiency by Language:")
+        print("\nMemory Efficiency by Language:")
         for language, result in language_results.items():
             print(
                 f"  {language:10s}: {result['memory_increase_mb']:5.1f}MB total, "
@@ -553,9 +525,7 @@ class TestMemoryUsage:
                         if len(content.strip()) == 0:
                             continue
 
-                        result = self.index_file_with_plugin(
-                            str(file_path), content, dispatcher
-                        )
+                        result = self.index_file_with_plugin(str(file_path), content, dispatcher)
                         if result.success:
                             symbols = result.value.get("symbols", [])
 
@@ -601,7 +571,7 @@ class TestMemoryUsage:
         avg_memory = sum(mem_usage) / len(mem_usage)
         memory_range = max_memory - min_memory
 
-        print(f"\nMemory Profile Analysis:")
+        print("\nMemory Profile Analysis:")
         print(f"  Minimum memory: {min_memory:.1f}MB")
         print(f"  Maximum memory: {max_memory:.1f}MB")
         print(f"  Average memory: {avg_memory:.1f}MB")
@@ -615,9 +585,7 @@ class TestMemoryUsage:
         ), f"Peak memory usage too high: {max_memory:.1f}MB vs {min_memory:.1f}MB baseline"
 
         # Check for memory spikes (rapid increases)
-        memory_deltas = [
-            mem_usage[i] - mem_usage[i - 1] for i in range(1, len(mem_usage))
-        ]
+        memory_deltas = [mem_usage[i] - mem_usage[i - 1] for i in range(1, len(mem_usage))]
         max_spike = max(memory_deltas) if memory_deltas else 0
         min_drop = min(memory_deltas) if memory_deltas else 0
 
@@ -638,8 +606,8 @@ class TestMemoryUsage:
 
         def index_files_concurrently():
             """Index files using multiple threads."""
-            import threading
             import queue
+            import threading
 
             file_queue = queue.Queue()
             for f in python_files:
@@ -667,9 +635,7 @@ class TestMemoryUsage:
                             break
 
                         try:
-                            content = file_path.read_text(
-                                encoding="utf-8", errors="ignore"
-                            )
+                            content = file_path.read_text(encoding="utf-8", errors="ignore")
                             if len(content.strip()) == 0:
                                 continue
 
@@ -713,18 +679,14 @@ class TestMemoryUsage:
         max_memory = max(mem_usage)
         memory_range = max_memory - min_memory
 
-        print(f"\nConcurrent Memory Usage:")
+        print("\nConcurrent Memory Usage:")
         print(f"  Memory range: {memory_range:.1f}MB")
         print(f"  Peak memory: {max_memory:.1f}MB")
         print(f"  Baseline memory: {min_memory:.1f}MB")
 
         # Concurrent memory assertions
-        assert (
-            memory_range < 150
-        ), f"Concurrent memory usage range too high: {memory_range:.1f}MB"
-        assert (
-            max_memory < min_memory + 120
-        ), f"Concurrent peak memory too high: {max_memory:.1f}MB"
+        assert memory_range < 150, f"Concurrent memory usage range too high: {memory_range:.1f}MB"
+        assert max_memory < min_memory + 120, f"Concurrent peak memory too high: {max_memory:.1f}MB"
 
         print("Concurrent memory usage test passed")
 

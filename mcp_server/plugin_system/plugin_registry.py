@@ -1,13 +1,13 @@
 """Plugin registry implementation."""
 
 import logging
-from typing import Dict, List, Optional, Type
 from datetime import datetime
+from typing import Dict, List, Optional, Type
 
+from ..interfaces.shared_interfaces import Error, Result
 from ..plugin_base import IPlugin
 from .interfaces import IPluginRegistry
 from .models import PluginInfo, PluginNotFoundError
-from ..interfaces.shared_interfaces import Result, Error
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +21,7 @@ class PluginRegistry(IPluginRegistry):
         self._language_map: Dict[str, List[str]] = {}  # language -> plugin names
         self._extension_map: Dict[str, List[str]] = {}  # extension -> plugin names
 
-    def register_plugin(
-        self, plugin_info: PluginInfo, plugin_class: Type[IPlugin]
-    ) -> None:
+    def register_plugin(self, plugin_info: PluginInfo, plugin_class: Type[IPlugin]) -> None:
         """Register a plugin with its metadata."""
         plugin_name = plugin_info.name
 

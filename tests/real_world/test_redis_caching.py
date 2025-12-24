@@ -5,13 +5,12 @@ Tests Redis caching system with real-world scenarios to validate dormant feature
 Requires Redis server running and REDIS_URL environment variable set.
 """
 
-import pytest
 import asyncio
 import os
 import time
-import tempfile
-from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any, Dict
+
+import pytest
 
 # Skip all tests if Redis is not configured
 pytestmark = pytest.mark.skipif(
@@ -56,7 +55,7 @@ class TestRedisCaching:
     async def query_cache(self, redis_cache_manager):
         """Setup query result cache with Redis backend."""
         try:
-            from mcp_server.cache import QueryResultCache, QueryCacheConfig
+            from mcp_server.cache import QueryCacheConfig, QueryResultCache
         except ImportError:
             pytest.skip("Query cache not available")
 
@@ -145,9 +144,7 @@ class TestRedisCaching:
 
         # Test search result caching
         search_query = "test function"
-        await query_cache.cache_result(
-            QueryType.SEARCH, search_results, q=search_query, limit=10
-        )
+        await query_cache.cache_result(QueryType.SEARCH, search_results, q=search_query, limit=10)
 
         cached_search = await query_cache.get_cached_result(
             QueryType.SEARCH, q=search_query, limit=10
@@ -231,9 +228,7 @@ class TestRedisCaching:
         cached_time = benchmark.stats.mean
 
         # Verify cache provides performance benefit
-        assert (
-            len(cached_results) == 10
-        ), "Should handle all cached and uncached queries"
+        assert len(cached_results) == 10, "Should handle all cached and uncached queries"
         assert len(uncached_results) == 5, "Should handle all uncached queries"
 
         # The cached run should include both cache misses and hits, but still be faster overall
@@ -350,9 +345,7 @@ class TestRedisCaching:
 
         retrieval_time = time.time() - start_time
 
-        assert (
-            retrieved_count >= 45
-        ), f"Should retrieve most entries, got {retrieved_count}"
+        assert retrieved_count >= 45, f"Should retrieve most entries, got {retrieved_count}"
         assert retrieval_time < 2.0, f"Bulk retrieval too slow: {retrieval_time:.3f}s"
 
         print(
@@ -416,9 +409,7 @@ class TestRedisCaching:
         for write_result in write_results:
             if isinstance(write_result, list):
                 total_writes += len(write_result)
-                successful_writes += sum(
-                    1 for op in write_result if len(op) == 3 and op[2]
-                )
+                successful_writes += sum(1 for op in write_result if len(op) == 3 and op[2])
 
         assert total_writes == 60, f"Should attempt 60 writes, attempted {total_writes}"
         assert (
@@ -433,9 +424,7 @@ class TestRedisCaching:
 
         assert total_reads == 120, f"Should attempt 120 reads, attempted {total_reads}"
 
-        print(
-            f"Concurrency test: {successful_writes}/{total_writes} writes, {total_reads} reads"
-        )
+        print(f"Concurrency test: {successful_writes}/{total_writes} writes, {total_reads} reads")
 
     async def test_cache_persistence_and_recovery(self, redis_cache_manager):
         """Test cache persistence across connections."""
@@ -468,9 +457,7 @@ class TestRedisCaching:
             pytest.skip("Cache manager not available")
 
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-        new_cache = CacheManagerFactory.create_redis_cache(
-            redis_url=redis_url, default_ttl=300
-        )
+        new_cache = CacheManagerFactory.create_redis_cache(redis_url=redis_url, default_ttl=300)
         await new_cache.initialize()
 
         try:
@@ -485,9 +472,7 @@ class TestRedisCaching:
             assert (
                 recovered_count >= 2
             ), f"Should recover most persistent data, recovered {recovered_count}"
-            print(
-                f"Persistence test: {recovered_count}/{len(test_data)} entries recovered"
-            )
+            print(f"Persistence test: {recovered_count}/{len(test_data)} entries recovered")
 
         finally:
             # Cleanup
@@ -530,9 +515,7 @@ class TestRedisCaching:
                         "file": f"{symbol.lower()}.py",
                         "line": 1,
                     }
-                    await query_cache.cache_result(
-                        QueryType.SYMBOL_LOOKUP, result, symbol=symbol
-                    )
+                    await query_cache.cache_result(QueryType.SYMBOL_LOOKUP, result, symbol=symbol)
 
             # Search queries - also should have increasing hit rate
             for query in common_queries:
@@ -553,9 +536,7 @@ class TestRedisCaching:
                             "snippet": query,
                         }
                     ]
-                    await query_cache.cache_result(
-                        QueryType.SEARCH, results, q=query, limit=10
-                    )
+                    await query_cache.cache_result(QueryType.SEARCH, results, q=query, limit=10)
 
         # Calculate hit rate
         hit_rate = cache_hits / total_requests if total_requests > 0 else 0
@@ -565,9 +546,7 @@ class TestRedisCaching:
             hit_rate >= 0.6
         ), f"Cache hit rate {hit_rate:.2f} should be >= 0.6 for repeated queries"
 
-        print(
-            f"Hit rate optimization: {cache_hits}/{total_requests} hits ({hit_rate:.2%})"
-        )
+        print(f"Hit rate optimization: {cache_hits}/{total_requests} hits ({hit_rate:.2%})")
 
         # Verify cache metrics
         cache_metrics = await redis_cache_manager.get_metrics()
@@ -587,8 +566,8 @@ class TestRedisCacheIntegration:
         try:
             from mcp_server.cache import (
                 CacheManagerFactory,
-                QueryResultCache,
                 QueryCacheConfig,
+                QueryResultCache,
             )
         except ImportError:
             pytest.skip("Cache system components not available")
@@ -624,9 +603,7 @@ class TestRedisCacheIntegration:
         test_file = "watched_file.py"
 
         # Cache some data related to the file
-        await cache_manager.set(
-            f"file:{test_file}:symbols", ["ClassA", "method_b"], ttl=600
-        )
+        await cache_manager.set(f"file:{test_file}:symbols", ["ClassA", "method_b"], ttl=600)
         await cache_manager.set(
             f"file:{test_file}:metadata",
             {"size": 1024, "modified": time.time()},
@@ -643,9 +620,7 @@ class TestRedisCacheIntegration:
         # Should handle case where file-specific queries exist
         assert invalidated_count >= 0, "Should handle file invalidation without errors"
 
-        print(
-            f"File watcher integration: invalidated {invalidated_count} queries for {test_file}"
-        )
+        print(f"File watcher integration: invalidated {invalidated_count} queries for {test_file}")
 
     async def test_cache_with_plugin_system_integration(self, integrated_cache_system):
         """Test cache integration with plugin system indexing."""
@@ -700,9 +675,7 @@ class TestRedisCacheIntegration:
 
         print(f"Plugin integration: cached symbols from {len(plugin_results)} plugins")
 
-    async def test_cache_performance_under_load(
-        self, integrated_cache_system, benchmark
-    ):
+    async def test_cache_performance_under_load(self, integrated_cache_system, benchmark):
         """Test cache performance under realistic load conditions."""
         cache_manager = integrated_cache_system["cache_manager"]
         query_cache = integrated_cache_system["query_cache"]
@@ -735,9 +708,7 @@ class TestRedisCacheIntegration:
                     )
                     if not cached:
                         results = [{"file": f"result{i}.py", "line": i, "score": 0.9}]
-                        await query_cache.cache_result(
-                            QueryType.SEARCH, results, q=query, limit=10
-                        )
+                        await query_cache.cache_result(QueryType.SEARCH, results, q=query, limit=10)
                     operations.append("search")
 
                 # Direct cache operations
@@ -763,9 +734,7 @@ class TestRedisCacheIntegration:
 
         # Performance assertions
         assert len(operations) == 50, "Should complete all operations"
-        assert (
-            benchmark.stats.mean < 2.0
-        ), f"Load test too slow: {benchmark.stats.mean:.2f}s"
+        assert benchmark.stats.mean < 2.0, f"Load test too slow: {benchmark.stats.mean:.2f}s"
 
         # Check cache metrics
         metrics = await cache_manager.get_metrics()

@@ -1,38 +1,31 @@
 """Comprehensive tests for the metrics collection system."""
 
-import pytest
 import asyncio
-import time
-import tempfile
 import sqlite3
+import tempfile
+import time
 from pathlib import Path
-from unittest.mock import Mock, patch, AsyncMock
-from typing import Dict, Any
+from unittest.mock import Mock
+
+import pytest
 
 from mcp_server.metrics import (
-    IMetricsCollector,
-    IHealthCheck,
-    HealthStatus,
     HealthCheckResult,
-    MetricType,
-    MetricPoint,
-)
-from mcp_server.metrics.metrics_collector import (
-    PrometheusMetricsCollector,
-    CounterMetric,
-    GaugeMetric,
-    HistogramMetric,
-    get_metrics_collector,
-    set_metrics_collector,
+    HealthStatus,
 )
 from mcp_server.metrics.health_check import (
     ComponentHealthChecker,
     get_health_checker,
     set_health_checker,
 )
+from mcp_server.metrics.metrics_collector import (
+    PrometheusMetricsCollector,
+    get_metrics_collector,
+    set_metrics_collector,
+)
 from mcp_server.metrics.middleware import (
-    MetricsMiddleware,
     BusinessMetricsCollector,
+    MetricsMiddleware,
     get_business_metrics,
 )
 
@@ -288,9 +281,7 @@ class TestComponentHealthChecker:
         async def failing_health_check():
             raise Exception("Simulated failure")
 
-        self.health_checker.register_health_check(
-            "failing_component", failing_health_check
-        )
+        self.health_checker.register_health_check("failing_component", failing_health_check)
 
         result = await self.health_checker.check_component("failing_component")
         assert result.component == "failing_component"
@@ -389,9 +380,7 @@ class TestComponentHealthChecker:
         mock_plugin_manager.get_active_plugins.return_value = {"plugin1": Mock()}
 
         # Create health check
-        plugin_check = self.health_checker.create_plugin_health_check(
-            mock_plugin_manager
-        )
+        plugin_check = self.health_checker.create_plugin_health_check(mock_plugin_manager)
 
         # Test the health check
         loop = asyncio.new_event_loop()
@@ -496,12 +485,8 @@ class TestBusinessMetricsCollector:
         # Check metrics
         assert self.metrics_collector.get_metric_value("plugins_active_total") == 3.0
         assert self.metrics_collector.get_metric_value("files_indexed_current") == 150.0
-        assert (
-            self.metrics_collector.get_metric_value("database_size_bytes") == 1024000.0
-        )
-        assert (
-            self.metrics_collector.get_metric_value("memory_usage_bytes") == 512000000.0
-        )
+        assert self.metrics_collector.get_metric_value("database_size_bytes") == 1024000.0
+        assert self.metrics_collector.get_metric_value("memory_usage_bytes") == 512000000.0
 
 
 class TestMetricsMiddleware:
@@ -596,10 +581,7 @@ class TestMetricsMiddleware:
 
         # Test ID-like path normalization
         assert middleware._normalize_path("/users/123/profile") == "/users/{id}/profile"
-        assert (
-            middleware._normalize_path("/api/v1/items/abc-123-def")
-            == "/api/v1/items/{id}"
-        )
+        assert middleware._normalize_path("/api/v1/items/abc-123-def") == "/api/v1/items/{id}"
         assert middleware._normalize_path("/files/deadbeef1234") == "/files/{id}"
 
         # Test regular paths
@@ -665,13 +647,10 @@ class TestMetricsIntegration:
     def setup_method(self):
         """Set up integration test fixtures."""
         # Reset global instances
-        from mcp_server.metrics.metrics_collector import _metrics_collector
-        from mcp_server.metrics.health_check import _health_checker
-        from mcp_server.metrics.middleware import _business_metrics
+        import mcp_server.metrics.health_check as hc
 
         # Clear globals for clean testing
         import mcp_server.metrics.metrics_collector as mc
-        import mcp_server.metrics.health_check as hc
         import mcp_server.metrics.middleware as mw
 
         mc._metrics_collector = None
@@ -702,9 +681,7 @@ class TestMetricsIntegration:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            overall_health = loop.run_until_complete(
-                health_checker.get_overall_health()
-            )
+            overall_health = loop.run_until_complete(health_checker.get_overall_health())
             assert overall_health.component == "system"
             assert overall_health.status in [
                 HealthStatus.HEALTHY,

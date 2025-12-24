@@ -4,10 +4,10 @@ Production scenario tests for Markdown plugin.
 Tests real-world markdown patterns and edge cases.
 """
 
-import pytest
-import tempfile
 import os
-from pathlib import Path
+import tempfile
+
+import pytest
 
 from mcp_server.plugins.plugin_factory import PluginFactory
 from mcp_server.storage.sqlite_store import SQLiteStore
@@ -15,25 +15,25 @@ from mcp_server.storage.sqlite_store import SQLiteStore
 
 class TestMarkdownProductionScenarios:
     """Test Markdown plugin with production scenarios."""
-    
+
     @pytest.fixture
     def sqlite_store(self):
         """Create a temporary SQLite store for testing."""
-        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
             db_path = tmp.name
-        
+
         store = SQLiteStore(db_path)
         yield store
-        
+
         # Cleanup
         store.close()
         os.unlink(db_path)
-    
+
     @pytest.fixture
     def markdown_plugin(self, sqlite_store):
         """Create Markdown plugin instance."""
-        return PluginFactory.create_plugin('markdown', sqlite_store)
-    
+        return PluginFactory.create_plugin("markdown", sqlite_store)
+
     def test_github_flavored_markdown(self, markdown_plugin):
         """Test GitHub Flavored Markdown features."""
         content = """
@@ -76,20 +76,21 @@ When $a \\ne 0$, there are two solutions to $(ax^2 + bx + c = 0)$:
 
 $$x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$
 """
-        
+
         result = markdown_plugin.extract_symbols(content, "github.md")
-        
+
         # Check task list parsing
         assert any("Completed task" in s.name for s in result.symbols)
-        
+
         # Check table detection
         tables = [s for s in result.symbols if s.symbol_type == "table"]
         assert len(tables) >= 1
-        
+
         # Check special blocks
-        assert any("NOTE" in str(s.metadata) or "WARNING" in str(s.metadata) 
-                  for s in result.symbols)
-    
+        assert any(
+            "NOTE" in str(s.metadata) or "WARNING" in str(s.metadata) for s in result.symbols
+        )
+
     def test_nested_lists_and_blockquotes(self, markdown_plugin):
         """Test complex nested structures."""
         content = """
@@ -127,16 +128,16 @@ $$x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$
        return "code in list"
    ```
 """
-        
+
         result = markdown_plugin.extract_symbols(content, "nested.md")
-        
+
         # Verify structure is preserved
         assert len(result.symbols) > 5
-        
+
         # Check nested content extraction
         assert any("Fourth level" in s.name for s in result.symbols)
         assert any("Level 3 quote" in s.name for s in result.symbols)
-    
+
     def test_wiki_style_links_and_footnotes(self, markdown_plugin):
         """Test wiki-style links and footnotes."""
         content = """
@@ -160,15 +161,15 @@ This one has multiple[^2][^3] footnotes.
 
 As shown in [Smith2022](@cite) and later confirmed by [Jones2023](@cite).
 """
-        
+
         result = markdown_plugin.extract_symbols(content, "wiki.md")
-        
+
         # Check internal link extraction
         assert any("Internal Link" in str(s.metadata) for s in result.symbols)
-        
+
         # Check footnote handling
         assert any("footnote" in s.name.lower() for s in result.symbols)
-    
+
     def test_multilingual_content(self, markdown_plugin):
         """Test markdown with multiple languages and scripts."""
         content = """
@@ -208,17 +209,17 @@ function 打招呼(名字) {
 - 日本語アイテム
 - Emoji item 🎉
 """
-        
+
         result = markdown_plugin.extract_symbols(content, "multilingual.md")
-        
+
         # Check Unicode handling
         assert any("中文部分" in s.name for s in result.symbols)
         assert any("日本語セクション" in s.name for s in result.symbols)
-        
+
         # Verify code blocks with non-ASCII comments
         code_blocks = [s for s in result.symbols if s.symbol_type == "code_block"]
         assert len(code_blocks) >= 2
-    
+
     def test_scientific_documentation(self, markdown_plugin):
         """Test scientific/academic markdown patterns."""
         content = """
@@ -261,21 +262,22 @@ See Figure 1 and Table 2. Statistical significance (p < 0.05).
 
 Additional figures and tables...
 """
-        
+
         result = markdown_plugin.extract_symbols(content, "research.md")
-        
+
         # Check section numbering
         assert any("1. Introduction" in s.name for s in result.symbols)
         assert any("2.1 Experimental Setup" in s.name for s in result.symbols)
-        
+
         # Check citation patterns
-        assert any("@smith2022" in str(s.metadata) or "@jones2023" in str(s.metadata)
-                  for s in result.symbols)
-        
+        assert any(
+            "@smith2022" in str(s.metadata) or "@jones2023" in str(s.metadata)
+            for s in result.symbols
+        )
+
         # Check math expressions
-        assert any("equation" in s.symbol_type or "math" in s.symbol_type 
-                  for s in result.symbols)
-    
+        assert any("equation" in s.symbol_type or "math" in s.symbol_type for s in result.symbols)
+
     def test_configuration_documentation(self, markdown_plugin):
         """Test configuration and setup documentation patterns."""
         content = """
@@ -356,18 +358,18 @@ server {
 }
 ```
 """
-        
+
         result = markdown_plugin.extract_symbols(content, "config.md")
-        
+
         # Check different config format extraction
         config_blocks = [s for s in result.symbols if s.symbol_type == "code_block"]
-        
+
         # Verify language detection for configs
-        languages = [s.metadata.get('language', '') for s in config_blocks]
-        assert 'bash' in languages
-        assert 'yaml' in languages
-        assert 'nginx' in languages
-    
+        languages = [s.metadata.get("language", "") for s in config_blocks]
+        assert "bash" in languages
+        assert "yaml" in languages
+        assert "nginx" in languages
+
     def test_tutorial_documentation(self, markdown_plugin):
         """Test tutorial and how-to documentation."""
         content = """
@@ -475,19 +477,19 @@ source venv/bin/activate  # On macOS/Linux
 - [Installation Walkthrough](https://youtube.com/watch?v=xxx) (5 min)
 - [First Project](https://youtube.com/watch?v=yyy) (10 min)
 """
-        
+
         result = markdown_plugin.extract_symbols(content, "tutorial.md")
-        
+
         # Check step extraction
         steps = [s for s in result.symbols if "Step" in s.name]
         assert len(steps) >= 4
-        
+
         # Check collapsible sections
         assert any("<details>" in str(s.metadata) for s in result.symbols)
-        
+
         # Check tip/warning boxes
         assert any("Tip:" in s.name or "💡" in s.name for s in result.symbols)
-    
+
     def test_changelog_format(self, markdown_plugin):
         """Test changelog and release notes format."""
         content = """
@@ -540,18 +542,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.2.0]: https://github.com/ex/pro/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/ex/pro/releases/tag/v1.1.0
 """
-        
+
         result = markdown_plugin.extract_symbols(content, "CHANGELOG.md")
-        
+
         # Check version extraction
         versions = [s for s in result.symbols if "[1." in s.name or "[Unreleased]" in s.name]
         assert len(versions) >= 3
-        
+
         # Check change type sections
         change_types = ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"]
         for change_type in change_types:
             assert any(change_type in s.name for s in result.symbols)
-    
+
     def test_large_documentation_site(self, markdown_plugin, sqlite_store):
         """Test handling of large documentation site structure."""
         # Simulate multiple interconnected docs
@@ -587,26 +589,26 @@ See [authentication](../auth.md) for API key setup.
 
 - [Python Example](python.md)
 - [JavaScript Example](javascript.md)
-"""
+""",
         }
-        
+
         # Process all documents
         for filepath, content in docs.items():
             result = markdown_plugin.extract_symbols(content, filepath)
-            
+
             for symbol in result.symbols:
                 sqlite_store.add_symbol(
                     file_path=filepath,
                     symbol_name=symbol.name,
                     symbol_type=symbol.symbol_type,
                     line_number=symbol.line,
-                    metadata=symbol.metadata
+                    metadata=symbol.metadata,
                 )
-        
+
         # Verify cross-references work
         results = sqlite_store.search_symbols("Search API", limit=10)
         assert len(results) > 0
-        
+
         # Check hierarchical structure
         api_docs = [r for r in results if "api/" in r[0]]
         assert len(api_docs) > 0

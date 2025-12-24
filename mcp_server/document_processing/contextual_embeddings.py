@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 try:
-    import anthropic
     from anthropic import AsyncAnthropic
 
     ANTHROPIC_AVAILABLE = True
@@ -20,7 +19,7 @@ except ImportError:
     ANTHROPIC_AVAILABLE = False
     AsyncAnthropic = None
 
-from .document_interfaces import ChunkType, DocumentChunk, DocumentStructure
+from .document_interfaces import ChunkType, DocumentChunk
 
 logger = logging.getLogger(__name__)
 
@@ -67,9 +66,7 @@ class ContextPromptTemplate:
     user_prompt_template: str
     examples: List[Dict[str, str]] = field(default_factory=list)
 
-    def format_user_prompt(
-        self, chunk: DocumentChunk, document_context: Dict[str, Any]
-    ) -> str:
+    def format_user_prompt(self, chunk: DocumentChunk, document_context: Dict[str, Any]) -> str:
         """Format the user prompt with chunk and document context."""
         return self.user_prompt_template.format(
             content=chunk.content,
@@ -191,18 +188,14 @@ class ContextCache:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.memory_cache: Dict[str, str] = {}
 
-    def _get_cache_key(
-        self, chunk: DocumentChunk, template_category: DocumentCategory
-    ) -> str:
+    def _get_cache_key(self, chunk: DocumentChunk, template_category: DocumentCategory) -> str:
         """Generate cache key for a chunk."""
         content_hash = hashlib.sha256(
             f"{chunk.content}{chunk.metadata.document_path}{template_category.value}".encode()
         ).hexdigest()
         return content_hash[:16]
 
-    def get(
-        self, chunk: DocumentChunk, template_category: DocumentCategory
-    ) -> Optional[str]:
+    def get(self, chunk: DocumentChunk, template_category: DocumentCategory) -> Optional[str]:
         """Get cached context if available."""
         cache_key = self._get_cache_key(chunk, template_category)
 
@@ -224,9 +217,7 @@ class ContextCache:
 
         return None
 
-    def set(
-        self, chunk: DocumentChunk, template_category: DocumentCategory, context: str
-    ):
+    def set(self, chunk: DocumentChunk, template_category: DocumentCategory, context: str):
         """Cache generated context."""
         cache_key = self._get_cache_key(chunk, template_category)
 
@@ -273,9 +264,7 @@ class ContextualEmbeddingService:
             enable_prompt_caching: Whether to use Anthropic's prompt caching
         """
         if not ANTHROPIC_AVAILABLE:
-            logger.warning(
-                "Anthropic package not installed. Install with: pip install anthropic"
-            )
+            logger.warning("Anthropic package not installed. Install with: pip install anthropic")
             self.client = None
         else:
             self.client = AsyncAnthropic(api_key=api_key)
@@ -298,27 +287,18 @@ class ContextualEmbeddingService:
         path_lower = document_path.lower()
 
         # Check by file extension and common patterns (order matters)
-        if any(
-            ext in path_lower for ext in [".py", ".js", ".java", ".cpp", ".go", ".rs"]
-        ):
+        if any(ext in path_lower for ext in [".py", ".js", ".java", ".cpp", ".go", ".rs"]):
             return DocumentCategory.CODE
-        elif any(
-            ext in path_lower for ext in [".yaml", ".yml", ".json", ".toml", ".ini"]
-        ):
+        elif any(ext in path_lower for ext in [".yaml", ".yml", ".json", ".toml", ".ini"]):
             return DocumentCategory.CONFIGURATION
-        elif any(
-            name in path_lower for name in ["tutorial", "getting-started", "quickstart"]
-        ):
+        elif any(name in path_lower for name in ["tutorial", "getting-started", "quickstart"]):
             return DocumentCategory.TUTORIAL
         elif any(name in path_lower for name in ["api", "reference", "spec"]):
             return DocumentCategory.REFERENCE
         elif any(name in path_lower for name in ["readme", "guide"]):
             # Could be tutorial or documentation, check content
             content_lower = chunk.content.lower()
-            if any(
-                word in content_lower
-                for word in ["install", "setup", "getting started"]
-            ):
+            if any(word in content_lower for word in ["install", "setup", "getting started"]):
                 return DocumentCategory.TUTORIAL
             else:
                 return DocumentCategory.DOCUMENTATION
@@ -329,9 +309,7 @@ class ContextualEmbeddingService:
         content_lower = chunk.content.lower()
         if chunk.type == ChunkType.CODE_BLOCK:
             return DocumentCategory.CODE
-        elif any(
-            word in content_lower for word in ["install", "setup", "getting started"]
-        ):
+        elif any(word in content_lower for word in ["install", "setup", "getting started"]):
             return DocumentCategory.TUTORIAL
 
         return DocumentCategory.GENERAL
@@ -350,9 +328,7 @@ class ContextualEmbeddingService:
         """
         # Detect category if not provided
         if category is None:
-            category = self.detect_document_category(
-                chunk, chunk.metadata.document_path
-            )
+            category = self.detect_document_category(chunk, chunk.metadata.document_path)
 
         # Check cache first
         cached_context = self.cache.get(chunk, category)
@@ -466,9 +442,7 @@ class ContextualEmbeddingService:
         progress_callback: Optional[callable],
     ):
         """Process a single chunk and update progress."""
-        context, was_cached = await self.generate_context_for_chunk(
-            chunk, document_context
-        )
+        context, was_cached = await self.generate_context_for_chunk(chunk, document_context)
         contexts[chunk.id] = context
 
         self.current_metrics.processed_chunks += 1

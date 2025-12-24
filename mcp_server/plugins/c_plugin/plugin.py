@@ -1,23 +1,23 @@
 from __future__ import annotations
 
 import ctypes
-from pathlib import Path
-from typing import Optional, Iterable
 import logging
+from pathlib import Path
+from typing import Iterable, Optional
 
-from tree_sitter import Language, Parser
 import tree_sitter_languages
+from tree_sitter import Language, Parser
 
 from ...plugin_base import (
-    IPlugin,
     IndexShard,
-    SymbolDef,
+    IPlugin,
     Reference,
-    SearchResult,
     SearchOpts,
+    SearchResult,
+    SymbolDef,
 )
-from ...utils.fuzzy_indexer import FuzzyIndexer
 from ...storage.sqlite_store import SQLiteStore
+from ...utils.fuzzy_indexer import FuzzyIndexer
 
 logger = logging.getLogger(__name__)
 
@@ -283,17 +283,11 @@ class Plugin(IPlugin):
 
         # Extract return type
         type_node = node.child_by_field_name("type")
-        return_type = (
-            content[type_node.start_byte : type_node.end_byte] if type_node else "void"
-        )
+        return_type = content[type_node.start_byte : type_node.end_byte] if type_node else "void"
 
         # Extract parameters
         params_node = declarator.child_by_field_name("parameters")
-        params = (
-            content[params_node.start_byte : params_node.end_byte]
-            if params_node
-            else "()"
-        )
+        params = content[params_node.start_byte : params_node.end_byte] if params_node else "()"
 
         # Build signature
         signature = f"{return_type} {name}{params}"
@@ -414,9 +408,7 @@ class Plugin(IPlugin):
         declarators = self._find_nodes(node, "init_declarator")
         if not declarators:
             # Try direct declarators
-            declarators = [
-                child for child in node.children if child.type == "identifier"
-            ]
+            declarators = [child for child in node.children if child.type == "identifier"]
 
         type_node = node.child_by_field_name("type")
         if not type_node:
@@ -604,9 +596,7 @@ class Plugin(IPlugin):
 
         return refs
 
-    def search(
-        self, query: str, opts: SearchOpts | None = None
-    ) -> Iterable[SearchResult]:
+    def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:
         """Search for code snippets matching a query."""
         limit = 20
         if opts and "limit" in opts:

@@ -17,9 +17,7 @@ Tests cover:
 import json
 import sqlite3
 import time
-from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Dict, List
 
 import pytest
 
@@ -39,7 +37,7 @@ class TestDatabaseInitialization:
         with store._get_connection() as conn:
             cursor = conn.execute("SELECT version FROM schema_version")
             version = cursor.fetchone()
-            assert version["version"] == 1
+            assert version["version"] == 2
 
     def test_init_existing_database(self, temp_db_path):
         """Test initialization with existing database."""
@@ -96,6 +94,9 @@ class TestDatabaseInitialization:
         expected_indexes = [
             "idx_files_language",
             "idx_files_hash",
+            "idx_files_content_hash",
+            "idx_files_deleted",
+            "idx_files_relative_path",
             "idx_symbols_name",
             "idx_symbols_kind",
             "idx_symbols_file",
@@ -148,9 +149,7 @@ class TestRepositoryOperations:
         repo_id1 = sqlite_store.create_repository("/test/path", "repo1")
 
         # Create with same path
-        repo_id2 = sqlite_store.create_repository(
-            "/test/path", "repo2", {"updated": True}
-        )
+        repo_id2 = sqlite_store.create_repository("/test/path", "repo2", {"updated": True})
 
         assert repo_id1 == repo_id2  # Same ID
 
@@ -187,7 +186,10 @@ class TestFileOperations:
         """Test storing file information."""
         repo_id = sqlite_store.create_repository("/repo", "test-repo")
 
-        file_id = sqlite_store.store_file(repository_id=repo_id, file_path="/repo/src/main.py", language="python",
+        file_id = sqlite_store.store_file(
+            repository_id=repo_id,
+            file_path="/repo/src/main.py",
+            language="python",
             size=1024,
             hash="abc123def456",
             metadata={"encoding": "utf-8"},
@@ -248,9 +250,7 @@ class TestFileOperations:
             "complexity": 5.2,
         }
 
-        file_id = sqlite_store.store_file(
-            repo_id, "/repo/file.py", "file.py", metadata=metadata
-        )
+        file_id = sqlite_store.store_file(repo_id, "/repo/file.py", "file.py", metadata=metadata)
 
         file_info = sqlite_store.get_file("/repo/file.py")
         stored_metadata = json.loads(file_info["metadata"])
@@ -376,9 +376,7 @@ class TestReferenceOperations:
         use1_id = sqlite_store.store_file(repo_id, "/repo/use1.py", "use1.py")
         use2_id = sqlite_store.store_file(repo_id, "/repo/use2.py", "use2.py")
 
-        symbol_id = sqlite_store.store_symbol(
-            def_file_id, "SharedClass", "class", 10, 50
-        )
+        symbol_id = sqlite_store.store_symbol(def_file_id, "SharedClass", "class", 10, 50)
 
         # Store references
         sqlite_store.store_reference(symbol_id, use1_id, 15, 10, "import")
@@ -550,9 +548,7 @@ class TestFuzzyIndexPersistence:
         file_id = sqlite_store.store_file(repo_id, "/repo/file.py", "file.py")
 
         # Store symbol with trigrams
-        symbol_id = sqlite_store.store_symbol(
-            file_id, "example_func", "function", 1, 10
-        )
+        symbol_id = sqlite_store.store_symbol(file_id, "example_func", "function", 1, 10)
 
         # Load fuzzy index
         index_data = sqlite_store.load_fuzzy_index()
@@ -670,7 +666,6 @@ class TestConcurrency:
     def test_concurrent_writes(self, sqlite_store):
         """Test concurrent write operations."""
         import concurrent.futures
-        import threading
 
         repo_id = sqlite_store.create_repository("/repo", "test")
 
@@ -731,16 +726,16 @@ class TestSQLiteStoreHealthCheck:
         health = store.health_check()
 
         assert health["status"] == "healthy"
-        assert health["fts5"] == True
-        assert health["wal"] == True
+        assert health["fts5"] is True
+        assert health["wal"] is True
         assert health["version"] >= 1
         assert health["error"] is None
         # Check all required tables exist
-        assert health["tables"]["file_moves"] == True
-        assert health["tables"]["files"] == True
-        assert health["tables"]["symbols"] == True
-        assert health["tables"]["repositories"] == True
-        assert health["tables"]["schema_version"] == True
+        assert health["tables"]["file_moves"] is True
+        assert health["tables"]["files"] is True
+        assert health["tables"]["symbols"] is True
+        assert health["tables"]["repositories"] is True
+        assert health["tables"]["schema_version"] is True
 
     def test_health_check_missing_tables(self, tmp_path):
         """Verify health check detects missing tables."""
@@ -765,7 +760,7 @@ class TestSQLiteStoreHealthCheck:
 
         health = store.health_check()
 
-        assert health["tables"]["file_moves"] == True
+        assert health["tables"]["file_moves"] is True
 
     def test_check_column_exists(self, tmp_path):
         """Test _check_column_exists helper."""
@@ -776,12 +771,12 @@ class TestSQLiteStoreHealthCheck:
         conn = sqlite3.connect(str(db_path))
 
         # Should return True for existing columns
-        assert store._check_column_exists(conn, "files", "path") == True
-        assert store._check_column_exists(conn, "files", "language") == True
-        assert store._check_column_exists(conn, "files", "relative_path") == True
+        assert store._check_column_exists(conn, "files", "path") is True
+        assert store._check_column_exists(conn, "files", "language") is True
+        assert store._check_column_exists(conn, "files", "relative_path") is True
 
         # Should return False for non-existing columns
-        assert store._check_column_exists(conn, "files", "nonexistent_column") == False
+        assert store._check_column_exists(conn, "files", "nonexistent_column") is False
 
         conn.close()
 
@@ -794,15 +789,26 @@ class TestSQLiteStoreHealthCheck:
 
         # Verify all core tables are present in the check
         core_tables = [
-            "schema_version", "repositories", "files", "symbols",
-            "symbol_references", "imports", "fts_symbols", "fts_code",
-            "symbol_trigrams", "embeddings", "query_cache", "parse_cache",
-            "migrations", "index_config", "file_moves"
+            "schema_version",
+            "repositories",
+            "files",
+            "symbols",
+            "symbol_references",
+            "imports",
+            "fts_symbols",
+            "fts_code",
+            "symbol_trigrams",
+            "embeddings",
+            "query_cache",
+            "parse_cache",
+            "migrations",
+            "index_config",
+            "file_moves",
         ]
 
         for table in core_tables:
             assert table in health["tables"], f"Table {table} not checked in health_check"
-            assert health["tables"][table] == True, f"Table {table} should exist in fresh database"
+            assert health["tables"][table] is True, f"Table {table} should exist in fresh database"
 
     def test_health_check_fts5_support(self, tmp_path):
         """Verify health check reports FTS5 support."""
@@ -812,7 +818,7 @@ class TestSQLiteStoreHealthCheck:
         health = store.health_check()
 
         # FTS5 should be available in modern SQLite
-        assert health["fts5"] == True
+        assert health["fts5"] is True
 
     def test_health_check_wal_mode(self, tmp_path):
         """Verify health check reports WAL mode."""
@@ -822,7 +828,7 @@ class TestSQLiteStoreHealthCheck:
         health = store.health_check()
 
         # WAL mode should be enabled by _init_database
-        assert health["wal"] == True
+        assert health["wal"] is True
 
     def test_health_check_schema_version(self, tmp_path):
         """Verify health check returns schema version."""
@@ -832,7 +838,7 @@ class TestSQLiteStoreHealthCheck:
         health = store.health_check()
 
         # Fresh database should have version 1
-        assert health["version"] == 1
+        assert health["version"] == 2
 
 
 class TestPerformance:

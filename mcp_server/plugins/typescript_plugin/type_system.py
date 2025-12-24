@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Dict, List, Any, Optional, Set, Union, Tuple
-import re
 import logging
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 from tree_sitter import Node
 
@@ -100,9 +99,7 @@ class TypeInferenceEngine:
             }
         )
 
-    def infer_type(
-        self, node: Node, content: str, context: Dict[str, Any] = None
-    ) -> Optional[str]:
+    def infer_type(self, node: Node, content: str, context: Dict[str, Any] = None) -> Optional[str]:
         """Infer the type of a node based on its context and structure."""
         if context is None:
             context = {}
@@ -173,14 +170,8 @@ class TypeInferenceEngine:
             true_branch = node.child_by_field_name("consequence")
             false_branch = node.child_by_field_name("alternative")
 
-            true_type = (
-                self.infer_type(true_branch, content, context) if true_branch else "any"
-            )
-            false_type = (
-                self.infer_type(false_branch, content, context)
-                if false_branch
-                else "any"
-            )
+            true_type = self.infer_type(true_branch, content, context) if true_branch else "any"
+            false_type = self.infer_type(false_branch, content, context) if false_branch else "any"
 
             if true_type == false_type:
                 return true_type
@@ -189,9 +180,7 @@ class TypeInferenceEngine:
 
         return "any"
 
-    def _infer_object_literal_type(
-        self, node: Node, content: str, context: Dict[str, Any]
-    ) -> str:
+    def _infer_object_literal_type(self, node: Node, content: str, context: Dict[str, Any]) -> str:
         """Infer type for object literals."""
         properties = []
 
@@ -218,9 +207,7 @@ class TypeInferenceEngine:
             return "{ " + "; ".join(properties) + " }"
         return "{}"
 
-    def _infer_function_type(
-        self, node: Node, content: str, context: Dict[str, Any]
-    ) -> str:
+    def _infer_function_type(self, node: Node, content: str, context: Dict[str, Any]) -> str:
         """Infer type for functions."""
         # Extract parameters
         params_node = node.child_by_field_name("parameters")
@@ -233,9 +220,7 @@ class TypeInferenceEngine:
                     type_annotation = child.child_by_field_name("type")
 
                     if pattern_node:
-                        param_name = content[
-                            pattern_node.start_byte : pattern_node.end_byte
-                        ]
+                        param_name = content[pattern_node.start_byte : pattern_node.end_byte]
                         param_type = "any"
 
                         if type_annotation:
@@ -245,16 +230,10 @@ class TypeInferenceEngine:
                                 else None
                             )
                             if type_node:
-                                param_type = content[
-                                    type_node.start_byte : type_node.end_byte
-                                ]
+                                param_type = content[type_node.start_byte : type_node.end_byte]
 
-                        optional_suffix = (
-                            "?" if child.type == "optional_parameter" else ""
-                        )
-                        param_types.append(
-                            f"{param_name}{optional_suffix}: {param_type}"
-                        )
+                        optional_suffix = "?" if child.type == "optional_parameter" else ""
+                        param_types.append(f"{param_name}{optional_suffix}: {param_type}")
 
         # Extract return type
         return_type_node = node.child_by_field_name("return_type")
@@ -262,9 +241,7 @@ class TypeInferenceEngine:
 
         if return_type_node:
             type_node = (
-                return_type_node.named_children[0]
-                if return_type_node.named_children
-                else None
+                return_type_node.named_children[0] if return_type_node.named_children else None
             )
             if type_node:
                 return_type = content[type_node.start_byte : type_node.end_byte]
@@ -272,9 +249,7 @@ class TypeInferenceEngine:
             # Try to infer return type from body
             body_node = node.child_by_field_name("body")
             if body_node:
-                return_type = self._infer_return_type_from_body(
-                    body_node, content, context
-                )
+                return_type = self._infer_return_type_from_body(body_node, content, context)
 
         param_str = ", ".join(param_types)
         return f"({param_str}) => {return_type}"
@@ -308,9 +283,7 @@ class TypeInferenceEngine:
 
         return "any"
 
-    def _infer_call_expression_type(
-        self, node: Node, content: str, context: Dict[str, Any]
-    ) -> str:
+    def _infer_call_expression_type(self, node: Node, content: str, context: Dict[str, Any]) -> str:
         """Infer type for call expressions."""
         function_node = node.child_by_field_name("function")
 
@@ -359,9 +332,7 @@ class TypeInferenceEngine:
         right_node = node.child_by_field_name("right")
 
         left_type = self.infer_type(left_node, content, context) if left_node else "any"
-        right_type = (
-            self.infer_type(right_node, content, context) if right_node else "any"
-        )
+        right_type = self.infer_type(right_node, content, context) if right_node else "any"
 
         # Arithmetic operators
         if operator in ["+", "-", "*", "/", "%", "**"]:
@@ -452,9 +423,7 @@ class TypeInferenceEngine:
                 args_node = call_node.child_by_field_name("arguments")
                 if args_node and args_node.named_child_count > 0:
                     callback = args_node.named_children[0]
-                    callback_return = self._infer_function_return_type(
-                        callback, content, context
-                    )
+                    callback_return = self._infer_function_return_type(callback, content, context)
                     return f"{callback_return}[]"
                 return "any[]"
             elif method_name in ["filter", "slice"]:
@@ -476,9 +445,7 @@ class TypeInferenceEngine:
             return_type_node = func_node.child_by_field_name("return_type")
             if return_type_node:
                 type_node = (
-                    return_type_node.named_children[0]
-                    if return_type_node.named_children
-                    else None
+                    return_type_node.named_children[0] if return_type_node.named_children else None
                 )
                 if type_node:
                     return content[type_node.start_byte : type_node.end_byte]
@@ -514,9 +481,7 @@ class TypeInferenceEngine:
         """Check if a type string represents a generic type."""
         return "<" in type_str and ">" in type_str
 
-    def _resolve_generic_property_type(
-        self, generic_type: str, property_name: str
-    ) -> str:
+    def _resolve_generic_property_type(self, generic_type: str, property_name: str) -> str:
         """Resolve property type for generic types."""
         # Extract base type and type arguments
         base_type, type_args = self._parse_generic_type(generic_type)
@@ -584,17 +549,11 @@ class TypeInferenceEngine:
         # Union types
         if " | " in source_type:
             source_parts = [t.strip() for t in source_type.split(" | ")]
-            return all(
-                self.analyze_type_compatibility(part, target_type)
-                for part in source_parts
-            )
+            return all(self.analyze_type_compatibility(part, target_type) for part in source_parts)
 
         if " | " in target_type:
             target_parts = [t.strip() for t in target_type.split(" | ")]
-            return any(
-                self.analyze_type_compatibility(source_type, part)
-                for part in target_parts
-            )
+            return any(self.analyze_type_compatibility(source_type, part) for part in target_parts)
 
         # Array type compatibility
         if source_type.endswith("[]") and target_type.endswith("[]"):
@@ -616,9 +575,7 @@ class TypeInferenceEngine:
 
         return False
 
-    def _analyze_object_type_compatibility(
-        self, source_type: str, target_type: str
-    ) -> bool:
+    def _analyze_object_type_compatibility(self, source_type: str, target_type: str) -> bool:
         """Analyze compatibility between object types."""
         # Simplified object type compatibility
         source_props = self._parse_object_type(source_type)
@@ -633,17 +590,13 @@ class TypeInferenceEngine:
 
         return True
 
-    def _analyze_function_type_compatibility(
-        self, source_type: str, target_type: str
-    ) -> bool:
+    def _analyze_function_type_compatibility(self, source_type: str, target_type: str) -> bool:
         """Analyze compatibility between function types."""
         # Function type compatibility is complex in TypeScript
         # For now, do a simple signature comparison
         return source_type == target_type
 
-    def _analyze_primitive_compatibility(
-        self, source_type: str, target_type: str
-    ) -> bool:
+    def _analyze_primitive_compatibility(self, source_type: str, target_type: str) -> bool:
         """Analyze compatibility between primitive types."""
         # Exact match for primitives
         return source_type == target_type
@@ -672,16 +625,12 @@ class TypeInferenceEngine:
         file_key = str(file_path)
         return self._symbol_types.get(f"{file_key}:{symbol_name}")
 
-    def set_symbol_type(
-        self, symbol_name: str, symbol_type: str, file_path: Path
-    ) -> None:
+    def set_symbol_type(self, symbol_name: str, symbol_type: str, file_path: Path) -> None:
         """Set the type of a symbol."""
         file_key = str(file_path)
         self._symbol_types[f"{file_key}:{symbol_name}"] = symbol_type
 
-    def register_type_definition(
-        self, type_name: str, type_def: Dict[str, Any]
-    ) -> None:
+    def register_type_definition(self, type_name: str, type_def: Dict[str, Any]) -> None:
         """Register a new type definition."""
         self._type_definitions[type_name] = type_def
 
@@ -700,7 +649,6 @@ class TypeAnnotationExtractor:
 
     def __init__(self):
         """Initialize the type annotation extractor."""
-        pass
 
     def extract_type_annotation(self, node: Node, content: str) -> Optional[str]:
         """Extract type annotation from a node."""
@@ -709,9 +657,7 @@ class TypeAnnotationExtractor:
         if type_annotation:
             # Skip the ':' token
             type_node = (
-                type_annotation.named_children[0]
-                if type_annotation.named_children
-                else None
+                type_annotation.named_children[0] if type_annotation.named_children else None
             )
             if type_node:
                 return content[type_node.start_byte : type_node.end_byte]
@@ -726,18 +672,14 @@ class TypeAnnotationExtractor:
         if " | " in type_str:
             return {
                 "kind": "union",
-                "types": [
-                    self.parse_type_string(t.strip()) for t in type_str.split(" | ")
-                ],
+                "types": [self.parse_type_string(t.strip()) for t in type_str.split(" | ")],
             }
 
         # Intersection types
         if " & " in type_str:
             return {
                 "kind": "intersection",
-                "types": [
-                    self.parse_type_string(t.strip()) for t in type_str.split(" & ")
-                ],
+                "types": [self.parse_type_string(t.strip()) for t in type_str.split(" & ")],
             }
 
         # Array types
@@ -757,8 +699,7 @@ class TypeAnnotationExtractor:
             if type_args_str.strip():
                 # Simple parsing - doesn't handle nested generics perfectly
                 type_args = [
-                    self.parse_type_string(arg.strip())
-                    for arg in type_args_str.split(",")
+                    self.parse_type_string(arg.strip()) for arg in type_args_str.split(",")
                 ]
 
             return {
@@ -806,9 +747,7 @@ class TypeAnnotationExtractor:
                     prop_str = prop_str.strip()
                     if ":" in prop_str:
                         name, prop_type = prop_str.split(":", 1)
-                        properties[name.strip()] = self.parse_type_string(
-                            prop_type.strip()
-                        )
+                        properties[name.strip()] = self.parse_type_string(prop_type.strip())
 
             return {"kind": "object", "properties": properties}
 
@@ -818,9 +757,7 @@ class TypeAnnotationExtractor:
             element_types = []
 
             if inner:
-                element_types = [
-                    self.parse_type_string(t.strip()) for t in inner.split(",")
-                ]
+                element_types = [self.parse_type_string(t.strip()) for t in inner.split(",")]
 
             return {"kind": "tuple", "element_types": element_types}
 

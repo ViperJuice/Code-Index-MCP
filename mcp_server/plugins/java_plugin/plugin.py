@@ -3,32 +3,33 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from typing import Optional, Dict, List, Any, Iterable
-import javalang
 import re
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Set
 
-from mcp_server.plugins.specialized_plugin_base import (
-    SpecializedPluginBase,
-    IImportResolver,
-    ITypeAnalyzer,
-    IBuildSystemIntegration,
-    ICrossFileAnalyzer,
-    ImportInfo,
-    CrossFileReference,
-)
+import javalang
+
 from mcp_server.plugin_base import (
     IndexShard,
-    SymbolDef,
     Reference,
-    SearchResult,
     SearchOpts,
+    SearchResult,
+    SymbolDef,
+)
+from mcp_server.plugins.specialized_plugin_base import (
+    CrossFileReference,
+    IBuildSystemIntegration,
+    ICrossFileAnalyzer,
+    IImportResolver,
+    ImportInfo,
+    ITypeAnalyzer,
+    SpecializedPluginBase,
 )
 from mcp_server.storage.sqlite_store import SQLiteStore
 
-from .import_resolver import JavaImportResolver, JavaImportInfo
-from .type_analyzer import JavaTypeAnalyzer, JavaTypeInfo
 from .build_system import JavaBuildSystemIntegration
+from .import_resolver import JavaImportInfo, JavaImportResolver
+from .type_analyzer import JavaTypeAnalyzer, JavaTypeInfo
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +41,7 @@ class JavaCrossFileAnalyzer(ICrossFileAnalyzer):
         self.plugin = plugin
         self.reference_cache: Dict[str, List[CrossFileReference]] = {}
 
-    def find_all_references(
-        self, symbol: str, definition_file: str
-    ) -> List[CrossFileReference]:
+    def find_all_references(self, symbol: str, definition_file: str) -> List[CrossFileReference]:
         """Find all references to a symbol across files."""
         if symbol in self.reference_cache:
             return self.reference_cache[symbol]
@@ -371,9 +370,7 @@ class Plugin(SpecializedPluginBase):
             # Index fields
             for _, node in tree.filter(javalang.tree.FieldDeclaration):
                 for declarator in node.declarators:
-                    symbol = self._create_symbol_from_field(
-                        node, declarator, package, path
-                    )
+                    symbol = self._create_symbol_from_field(node, declarator, package, path)
                     symbols.append(symbol)
 
         except Exception as e:
@@ -391,7 +388,7 @@ class Plugin(SpecializedPluginBase):
             self._package_structure[package].add(path)
 
         # Also use base class indexing for text search
-        base_shard = super().indexFile(path, content)
+        _ = super().indexFile(path, content)
 
         return IndexShard(file=path, symbols=symbols, language="java")
 
@@ -433,9 +430,7 @@ class Plugin(SpecializedPluginBase):
             "doc": self._extract_javadoc(node),
             "defined_in": file_path,
             "line": node.position[0] if node.position else 0,
-            "span": (
-                (node.position[0], node.position[0] + 1) if node.position else (0, 1)
-            ),
+            "span": ((node.position[0], node.position[0] + 1) if node.position else (0, 1)),
         }
 
     def _create_symbol_from_interface(self, node, package: str, file_path: str) -> Dict:
@@ -466,9 +461,7 @@ class Plugin(SpecializedPluginBase):
             "doc": self._extract_javadoc(node),
             "defined_in": file_path,
             "line": node.position[0] if node.position else 0,
-            "span": (
-                (node.position[0], node.position[0] + 1) if node.position else (0, 1)
-            ),
+            "span": ((node.position[0], node.position[0] + 1) if node.position else (0, 1)),
         }
 
     def _create_symbol_from_method(self, node, package: str, file_path: str) -> Dict:
@@ -478,9 +471,7 @@ class Plugin(SpecializedPluginBase):
         class_name = parent_class.name if parent_class else ""
 
         full_name = (
-            f"{package}.{class_name}.{node.name}"
-            if package
-            else f"{class_name}.{node.name}"
+            f"{package}.{class_name}.{node.name}" if package else f"{class_name}.{node.name}"
         )
 
         # Build signature
@@ -520,15 +511,11 @@ class Plugin(SpecializedPluginBase):
             "doc": self._extract_javadoc(node),
             "defined_in": file_path,
             "line": node.position[0] if node.position else 0,
-            "span": (
-                (node.position[0], node.position[0] + 1) if node.position else (0, 1)
-            ),
+            "span": ((node.position[0], node.position[0] + 1) if node.position else (0, 1)),
             "full_name": full_name,
         }
 
-    def _create_symbol_from_field(
-        self, node, declarator, package: str, file_path: str
-    ) -> Dict:
+    def _create_symbol_from_field(self, node, declarator, package: str, file_path: str) -> Dict:
         """Create symbol definition from field declaration."""
         # Get containing class
         parent_class = self._find_parent_type(node)
@@ -557,9 +544,7 @@ class Plugin(SpecializedPluginBase):
             "doc": self._extract_javadoc(node),
             "defined_in": file_path,
             "line": node.position[0] if node.position else 0,
-            "span": (
-                (node.position[0], node.position[0] + 1) if node.position else (0, 1)
-            ),
+            "span": ((node.position[0], node.position[0] + 1) if node.position else (0, 1)),
             "full_name": full_name,
         }
 
@@ -654,9 +639,7 @@ class Plugin(SpecializedPluginBase):
 
         if definition:
             # Enhance with Java-specific info
-            type_info = self.type_analyzer.get_type_info(
-                symbol, definition.get("defined_in", "")
-            )
+            type_info = self.type_analyzer.get_type_info(symbol, definition.get("defined_in", ""))
 
             if type_info and isinstance(type_info, JavaTypeInfo):
                 definition["java_info"] = {
@@ -688,9 +671,7 @@ class Plugin(SpecializedPluginBase):
 
         return references
 
-    def search(
-        self, query: str, opts: SearchOpts | None = None
-    ) -> Iterable[SearchResult]:
+    def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:
         """Enhanced search with Java-aware features."""
         # First use base search
         results = list(super().search(query, opts))
@@ -699,7 +680,7 @@ class Plugin(SpecializedPluginBase):
         if "." in query:
             # Try as fully qualified class name
             if query in self.type_analyzer.type_registry:
-                type_info = self.type_analyzer.type_registry[query]
+                _ = self.type_analyzer.type_registry[query]
 
                 # Find file containing this type
                 for file_path, symbols in self._file_symbols.items():

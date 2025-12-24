@@ -6,11 +6,11 @@ for efficiently indexing and searching code repositories.
 """
 
 from .index_engine import (
-    IndexEngine,
-    IndexResult,
     BatchIndexResult,
+    IndexEngine,
     IndexOptions,
     IndexProgress,
+    IndexResult,
     IndexTask,
 )
 from .query_optimizer import Query, QueryType

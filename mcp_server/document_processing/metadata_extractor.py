@@ -6,7 +6,7 @@ including title detection, author information, timestamps, keywords, and summari
 """
 
 import re
-import os
+
 import yaml
 
 try:
@@ -16,12 +16,11 @@ except ImportError:
         import toml as tomllib
     except ImportError:
         tomllib = None
+import logging
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Tuple
-from collections import Counter
-import math
-import logging
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -78,9 +77,7 @@ class MetadataExtractor:
             "html": [r"<html", r"<body", r"<div", r"<head>"],
         }
 
-    def extract_metadata(
-        self, content: str, file_path: Optional[str] = None
-    ) -> Dict[str, Any]:
+    def extract_metadata(self, content: str, file_path: Optional[str] = None) -> Dict[str, Any]:
         """
         Extract metadata from document content.
 
@@ -190,9 +187,7 @@ class MetadataExtractor:
         content = re.sub(r"^\+\+\+\s*\n.*?\n\+\+\+\s*\n", "", content, flags=re.DOTALL)
         return content
 
-    def detect_title(
-        self, content: str, file_path: Optional[str] = None
-    ) -> Optional[str]:
+    def detect_title(self, content: str, file_path: Optional[str] = None) -> Optional[str]:
         """
         Detect document title using various heuristics.
 
@@ -214,27 +209,17 @@ class MetadataExtractor:
                 return title
 
         # Special handling for HTML title tag
-        html_title_match = re.search(
-            r"<title>(.+?)</title>", content, re.IGNORECASE | re.DOTALL
-        )
+        html_title_match = re.search(r"<title>(.+?)</title>", content, re.IGNORECASE | re.DOTALL)
         if html_title_match:
             return html_title_match.group(1).strip()
 
         # Look for Python/code docstring title
-        docstring_match = re.search(
-            r'(?:"""|\'\'\')(.*?)(?:"""|\'\'\')', content, re.DOTALL
-        )
-        if (
-            docstring_match
-            and file_path
-            and file_path.endswith((".py", ".js", ".java"))
-        ):
+        docstring_match = re.search(r'(?:"""|\'\'\')(.*?)(?:"""|\'\'\')', content, re.DOTALL)
+        if docstring_match and file_path and file_path.endswith((".py", ".js", ".java")):
             docstring_content = docstring_match.group(1).strip()
             # First line of docstring is often the title
             first_line = docstring_content.split("\n")[0].strip()
-            if first_line and not first_line.lower().startswith(
-                ("author:", "date:", "copyright:")
-            ):
+            if first_line and not first_line.lower().startswith(("author:", "date:", "copyright:")):
                 return first_line
 
         # Fallback: use first non-empty line
@@ -250,7 +235,7 @@ class MetadataExtractor:
                 and not line.lower().startswith(
                     ("author:", "date:", "by:", "written by:", "copyright:")
                 )
-                and not line in ('"""', "'''", "*/")
+                and line not in ('"""', "'''", "*/")
                 and len(line) > 3
                 and len(line) < 100
             ):
@@ -517,12 +502,8 @@ class MetadataExtractor:
                 metadata["file_name"] = path.name
                 metadata["file_path"] = str(path.absolute())
                 metadata["file_size"] = stat.st_size
-                metadata["created_at"] = datetime.fromtimestamp(
-                    stat.st_ctime
-                ).isoformat()
-                metadata["modified_at"] = datetime.fromtimestamp(
-                    stat.st_mtime
-                ).isoformat()
+                metadata["created_at"] = datetime.fromtimestamp(stat.st_ctime).isoformat()
+                metadata["modified_at"] = datetime.fromtimestamp(stat.st_mtime).isoformat()
                 metadata["file_extension"] = path.suffix.lower()
 
         except Exception as e:
@@ -545,9 +526,7 @@ class MetadataExtractor:
 
         # Extract imports/dependencies
         if language == "python":
-            imports = re.findall(
-                r"^(?:from\s+(\S+)\s+)?import\s+(.+)$", content, re.MULTILINE
-            )
+            imports = re.findall(r"^(?:from\s+(\S+)\s+)?import\s+(.+)$", content, re.MULTILINE)
             dependencies = []
             for from_module, import_names in imports:
                 if from_module:
@@ -565,9 +544,7 @@ class MetadataExtractor:
 
         elif language == "javascript":
             # Extract imports
-            imports = re.findall(
-                r'(?:import|require)\s*\(?[\'"]([^\'"]+)[\'"]\)?', content
-            )
+            imports = re.findall(r'(?:import|require)\s*\(?[\'"]([^\'"]+)[\'"]\)?', content)
             metadata["dependencies"] = list(set(imports))
 
             # Extract functions and classes

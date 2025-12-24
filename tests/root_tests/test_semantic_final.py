@@ -7,6 +7,7 @@ from pathlib import Path
 
 # Load environment
 from dotenv import load_dotenv
+
 load_dotenv()
 
 # Configure for in-memory testing
@@ -21,12 +22,12 @@ from mcp_server.utils.semantic_indexer import SemanticIndexer
 def main():
     """Demonstrate semantic search working end-to-end."""
     print("=== Semantic Search Integration Test ===\n")
-    
+
     # Initialize semantic indexer
     print("1. Initializing semantic indexer...")
     indexer = SemanticIndexer(collection="demo", qdrant_path=":memory:")
     print("   ✓ Initialized with in-memory Qdrant\n")
-    
+
     # Index some code samples
     print("2. Indexing code samples...")
     samples = [
@@ -41,10 +42,10 @@ def main():
     '''Calculate nth Fibonacci number using recursion'''
     if n <= 1:
         return n
-    return fibonacci(n-1) + fibonacci(n-2)"""
+    return fibonacci(n-1) + fibonacci(n-2)""",
         },
         {
-            "file": "api_client.py", 
+            "file": "api_client.py",
             "name": "APIClient",
             "kind": "class",
             "signature": "class APIClient:",
@@ -56,22 +57,22 @@ def main():
         self.base_url = base_url
         
     def authenticate(self, token):
-        self.token = token"""
+        self.token = token""",
         },
         {
             "file": "data_processor.py",
             "name": "parse_json",
-            "kind": "function", 
+            "kind": "function",
             "signature": "def parse_json(data: str) -> dict:",
             "line": 5,
             "doc": "Parse JSON string and return dictionary",
             "content": """def parse_json(data: str) -> dict:
     '''Parse JSON string and return dictionary'''
     import json
-    return json.loads(data)"""
-        }
+    return json.loads(data)""",
+        },
     ]
-    
+
     for sample in samples:
         indexer.index_symbol(
             file=sample["file"],
@@ -81,31 +82,31 @@ def main():
             line=sample["line"],
             span=(sample["line"], sample["line"] + 5),
             doc=sample["doc"],
-            content=sample["content"]
+            content=sample["content"],
         )
         print(f"   ✓ Indexed {sample['kind']} {sample['name']} from {sample['file']}")
-    
+
     print("\n3. Testing semantic search queries...")
     queries = [
         "recursive algorithm to calculate mathematical series",
         "class for making HTTP API calls with authentication",
-        "function to parse and process JSON data"
+        "function to parse and process JSON data",
     ]
-    
+
     for query in queries:
         print(f"\n   Query: '{query}'")
         results = indexer.search(query, limit=2)
-        
+
         if results:
             print("   Results:")
             for i, result in enumerate(results, 1):
                 print(f"     {i}. {result['symbol']} ({result['kind']}) in {result['file']}")
                 print(f"        Score: {result['score']:.3f}")
-                if result.get('doc'):
+                if result.get("doc"):
                     print(f"        Doc: {result['doc']}")
         else:
             print("   No results found")
-    
+
     print("\n✓ Semantic search is working correctly!")
     print("\nKey achievements:")
     print("- Voyage AI embeddings generated successfully")
