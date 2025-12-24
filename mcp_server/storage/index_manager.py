@@ -6,17 +6,54 @@ This is a minimal implementation to support IndexDiscovery operations.
 """
 
 import hashlib
+import json
 import logging
 import os
 import sqlite3
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class IndexManifest:
+    """Manifest metadata describing a SQLite index."""
+
+    schema_version: str
+    embedding_model: str
+    creation_commit: Optional[str]
+    content_hash: str
+    created_at: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize manifest to dictionary."""
+        return {
+            "schema_version": self.schema_version,
+            "embedding_model": self.embedding_model,
+            "creation_commit": self.creation_commit,
+            "content_hash": self.content_hash,
+            "created_at": self.created_at,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "IndexManifest":
+        """Create manifest from dictionary data."""
+        return cls(
+            schema_version=data.get("schema_version", ""),
+            embedding_model=data.get("embedding_model", ""),
+            creation_commit=data.get("creation_commit"),
+            content_hash=data.get("content_hash", ""),
+            created_at=data.get("created_at"),
+        )
+
+
 class IndexManager:
     """Manages index storage and retrieval for MCP operations."""
+
+    MANIFEST_SUFFIX = ".manifest.json"
 
     def __init__(self, storage_strategy: str = "inline"):
         """
@@ -182,3 +219,129 @@ class IndexManager:
         except Exception as e:
             logger.error(f"Failed to create symlink: {e}")
             return False
+
+    def compute_content_hash(self, index_path: Path) -> str:
+        """Compute SHA256 hash for a SQLite index file."""
+        sha256 = hashlib.sha256()
+        with open(index_path, "rb") as index_file:
+            for chunk in iter(lambda: index_file.read(1024 * 1024), b""):
+                sha256.update(chunk)
+        return sha256.hexdigest()
+
+    def _get_manifest_path(self, index_path: Path) -> Path:
+        """Return the manifest path that sits next to an index file."""
+        return index_path.with_name(f"{index_path.name}{self.MANIFEST_SUFFIX}")
+
+    def get_manifest_path(self, index_path: Path) -> Path:
+        """Public helper for determining manifest path for an index file."""
+        return self._get_manifest_path(index_path)
+
+    def write_index_manifest(
+        self,
+        index_path: Path,
+        schema_version: str,
+        embedding_model: str,
+        creation_commit: Optional[str] = None,
+        content_hash: Optional[str] = None,
+    ) -> Path:
+        """Write a manifest describing the given index file."""
+        manifest_path = self._get_manifest_path(index_path)
+        manifest = IndexManifest(
+            schema_version=schema_version,
+            embedding_model=embedding_model,
+            creation_commit=creation_commit,
+            content_hash=content_hash or self.compute_content_hash(index_path),
+            created_at=datetime.utcnow().isoformat() + "Z",
+        )
+        manifest_path.write_text(json.dumps(manifest.to_dict(), indent=2))
+        logger.info("Wrote index manifest to %s", manifest_path)
+        return manifest_path
+
+    def read_index_manifest(self, index_path: Path) -> Optional[IndexManifest]:
+        """Read manifest next to an index path if available."""
+        manifest_path = self._get_manifest_path(index_path)
+        if not manifest_path.exists():
+            return None
+
+        try:
+            raw = json.loads(manifest_path.read_text())
+            return IndexManifest.from_dict(raw)
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning("Failed to load manifest %s: %s", manifest_path, exc)
+            return None
+
+    def select_best_index(
+        self,
+        candidates: List[Dict[str, Any]],
+        requested_schema_version: Optional[str] = None,
+        requested_embedding_model: Optional[str] = None,
+    ) -> Optional[Path]:
+        """Select the best index candidate based on requested schema/model preferences."""
+        if not candidates:
+            return None
+
+        exact_matches: List[Dict[str, Any]] = []
+        schema_matches: List[Dict[str, Any]] = []
+        model_matches: List[Dict[str, Any]] = []
+        fallback: List[Dict[str, Any]] = []
+
+        for candidate in candidates:
+            manifest: Optional[IndexManifest] = candidate.get("manifest")
+            if manifest:
+                schema_ok = (
+                    requested_schema_version is None
+                    or manifest.schema_version == requested_schema_version
+                )
+                model_ok = (
+                    requested_embedding_model is None
+                    or manifest.embedding_model == requested_embedding_model
+                )
+
+                if schema_ok and model_ok:
+                    exact_matches.append(candidate)
+                    continue
+
+                if schema_ok:
+                    schema_matches.append(candidate)
+                    continue
+
+                if model_ok:
+                    model_matches.append(candidate)
+                    continue
+
+            fallback.append(candidate)
+
+        if exact_matches:
+            return exact_matches[0]["path"]
+
+        if schema_matches:
+            if requested_embedding_model:
+                logger.warning(
+                    "Using index with schema match but different embedding model: requested=%s, found=%s",
+                    requested_embedding_model,
+                    (
+                        schema_matches[0]["manifest"].embedding_model
+                        if schema_matches[0].get("manifest")
+                        else "unknown"
+                    ),
+                )
+            return schema_matches[0]["path"]
+
+        if model_matches:
+            if requested_schema_version:
+                logger.warning(
+                    "Using index with embedding model match but schema mismatch: requested=%s, found=%s",
+                    requested_schema_version,
+                    (
+                        model_matches[0]["manifest"].schema_version
+                        if model_matches[0].get("manifest")
+                        else "unknown"
+                    ),
+                )
+            return model_matches[0]["path"]
+
+        if fallback:
+            logger.warning("No manifest match found; falling back to first valid index candidate")
+            return fallback[0]["path"]
+
+        return None
