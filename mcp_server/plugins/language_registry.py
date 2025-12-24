@@ -1,5 +1,7 @@
 """Registry of all supported languages with their configurations."""
 
+from __future__ import annotations
+
 # Tree-sitter query strings for common symbol types
 COMMON_QUERIES = {
     "function": "(function_declaration name: (identifier) @function)",
