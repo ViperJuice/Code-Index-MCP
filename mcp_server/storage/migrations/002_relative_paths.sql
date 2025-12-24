@@ -2,9 +2,9 @@
 -- This migration updates the schema to use relative paths as primary identifiers
 
 -- Phase 1: Add new columns (non-breaking)
-ALTER TABLE files ADD COLUMN content_hash TEXT;
-ALTER TABLE files ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE;
-ALTER TABLE files ADD COLUMN deleted_at TIMESTAMP;
+ALTER TABLE files ADD COLUMN IF NOT EXISTS content_hash TEXT;
+ALTER TABLE files ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+ALTER TABLE files ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
 
 -- Phase 2: Add indexes for new columns
 CREATE INDEX IF NOT EXISTS idx_files_content_hash ON files(content_hash);

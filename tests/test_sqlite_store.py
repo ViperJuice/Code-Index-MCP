@@ -37,7 +37,7 @@ class TestDatabaseInitialization:
         with store._get_connection() as conn:
             cursor = conn.execute("SELECT version FROM schema_version")
             version = cursor.fetchone()
-            assert version["version"] == 1
+            assert version["version"] == 2
 
     def test_init_existing_database(self, temp_db_path):
         """Test initialization with existing database."""
@@ -94,6 +94,9 @@ class TestDatabaseInitialization:
         expected_indexes = [
             "idx_files_language",
             "idx_files_hash",
+            "idx_files_content_hash",
+            "idx_files_deleted",
+            "idx_files_relative_path",
             "idx_symbols_name",
             "idx_symbols_kind",
             "idx_symbols_file",
@@ -835,7 +838,7 @@ class TestSQLiteStoreHealthCheck:
         health = store.health_check()
 
         # Fresh database should have version 1
-        assert health["version"] == 1
+        assert health["version"] == 2
 
 
 class TestPerformance:

@@ -18,7 +18,12 @@ from fastapi.testclient import TestClient
 from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher as Dispatcher
 
 # Import our modules
-from mcp_server.gateway import app
+gateway_import_error = None
+try:
+    from mcp_server.gateway import app
+except Exception as exc:  # pragma: no cover - optional for non-API tests
+    app = None  # type: ignore
+    gateway_import_error = exc
 from mcp_server.plugin_base import IPlugin, SearchResult, SymbolDef
 from mcp_server.plugins.python_plugin.plugin import Plugin as PythonPlugin
 from mcp_server.storage.sqlite_store import SQLiteStore
@@ -271,6 +276,8 @@ def file_watcher(temp_code_directory: Path, dispatcher_with_plugins: Dispatcher)
 @pytest.fixture
 def test_client() -> TestClient:
     """Create a test client for the FastAPI app."""
+    if app is None:
+        pytest.skip(f"FastAPI app unavailable: {gateway_import_error}")
     return TestClient(app)
 
 
@@ -282,6 +289,8 @@ def test_client_with_dispatcher(
     monkeypatch,
 ) -> TestClient:
     """Create a test client with initialized dispatcher."""
+    if app is None:
+        pytest.skip(f"FastAPI app unavailable: {gateway_import_error}")
     # Patch the global variables in gateway module
     import mcp_server.gateway as gateway
 

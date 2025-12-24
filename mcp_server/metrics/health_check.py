@@ -9,7 +9,10 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Awaitable, Callable, Dict, List, Optional
 
-import psutil
+try:
+    import psutil
+except ImportError:  # pragma: no cover - optional dependency
+    psutil = None
 
 from . import HealthCheckResult, HealthStatus, IHealthCheck
 
@@ -34,6 +37,13 @@ class ComponentHealthChecker(IHealthCheck):
 
     def _register_default_checks(self) -> None:
         """Register default system health checks."""
+        if psutil is None:
+            self.register_health_check("system", lambda: self._psutil_unavailable_async("system"))
+            self.register_health_check("memory", lambda: self._psutil_unavailable_async("memory"))
+            self.register_health_check("disk", lambda: self._psutil_unavailable_async("disk"))
+            logger.warning("psutil is not available; system health metrics will be degraded")
+            return
+
         self.register_health_check("system", self._check_system_health)
         self.register_health_check("memory", self._check_memory_health)
         self.register_health_check("disk", self._check_disk_health)
@@ -152,9 +162,18 @@ class ComponentHealthChecker(IHealthCheck):
         )
 
     # Default health check implementations
+    async def _psutil_unavailable_async(self, component: str) -> HealthCheckResult:
+        """Return a degraded health result when psutil is unavailable."""
+        return HealthCheckResult(
+            component=component,
+            status=HealthStatus.DEGRADED,
+            message="psutil is not available; system metrics are disabled",
+        )
 
     async def _check_system_health(self) -> HealthCheckResult:
         """Check basic system health metrics."""
+        if psutil is None:
+            return await self._psutil_unavailable_async("system")
         try:
             # CPU usage
             cpu_percent = psutil.cpu_percent(interval=1)
@@ -196,6 +215,8 @@ class ComponentHealthChecker(IHealthCheck):
 
     async def _check_memory_health(self) -> HealthCheckResult:
         """Check memory usage health."""
+        if psutil is None:
+            return await self._psutil_unavailable_async("memory")
         try:
             memory = psutil.virtual_memory()
             swap = psutil.swap_memory()
@@ -231,6 +252,8 @@ class ComponentHealthChecker(IHealthCheck):
 
     async def _check_disk_health(self) -> HealthCheckResult:
         """Check disk usage health."""
+        if psutil is None:
+            return await self._psutil_unavailable_async("disk")
         try:
             # Check current directory disk usage
             disk_usage = psutil.disk_usage(".")
