@@ -8,6 +8,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 import click
 
@@ -33,6 +34,42 @@ def _get_semantic_indexer_instance():
 @click.group()
 def index():
     """Index management commands."""
+
+
+def _print_readiness_report(
+    health: Dict[str, Any],
+    applied: Optional[List[str]] = None,
+    manifest_result: Optional[Dict[str, bool]] = None,
+) -> None:
+    """Render a readable readiness report."""
+    click.echo("Index Migration Readiness")
+    click.echo("=" * 30)
+    click.echo(f"Status: {health['status']}")
+    click.echo(
+        f"Schema version: {health['version']} (latest: {health.get('latest_version', 'unknown')})"
+    )
+    pending = health.get("required_migrations", [])
+    click.echo(f"Pending migrations: {', '.join(map(str, pending)) if pending else 'none'}")
+    if applied is not None:
+        click.echo(f"Applied migrations: {', '.join(applied) if applied else 'none'}")
+
+    manifest = health.get("manifest", {})
+    click.echo(
+        f"Manifest: {'found' if manifest.get('found') else 'missing'}"
+        + (f" (v{manifest.get('version')})" if manifest.get("version") else "")
+    )
+
+    metadata = health.get("metadata", {})
+    click.echo(f"Metadata: {'found' if metadata.get('found') else 'missing'}")
+
+    if manifest_result:
+        if manifest_result.get("manifest_created"):
+            click.echo("Manifest created: .mcp-index.json")
+        if manifest_result.get("metadata_created"):
+            click.echo("Metadata created: .index_metadata.json")
+
+    if health.get("error"):
+        click.echo(f"Issues: {health['error']}")
 
 
 @index.command()
@@ -286,6 +323,44 @@ def status():
             click.echo(f"Metadata: ❌ Error reading ({e})")
     else:
         click.echo("Metadata: ❌ Not found")
+
+
+@index.command()
+@click.option("--db-path", default="code_index.db", help="Path to the SQLite index database")
+@click.option(
+    "--manifest-dir",
+    type=click.Path(file_okay=False, dir_okay=True, resolve_path=True),
+    help="Directory where manifest files should be created (defaults to database directory)",
+)
+@click.option(
+    "--check-only",
+    is_flag=True,
+    help="Only report readiness without applying migrations or creating manifests",
+)
+def migrate(db_path: str, manifest_dir: Optional[str], check_only: bool):
+    """Run database migrations and print a readiness report."""
+    db_path_obj = Path(db_path)
+    manifest_path = Path(manifest_dir) if manifest_dir else None
+
+    try:
+        store = SQLiteStore(str(db_path_obj))
+    except Exception as exc:  # pragma: no cover - handled in tests
+        click.echo(f"❌ Failed to open database: {exc}", err=True)
+        sys.exit(1)
+
+    if check_only:
+        health = store.health_check()
+        _print_readiness_report(health)
+        sys.exit(0 if health["status"] == "healthy" else 1)
+
+    applied = store.run_migrations()
+    manifest_result = store.ensure_index_manifests(manifest_path)
+    health = store.health_check()
+
+    _print_readiness_report(health, applied, manifest_result)
+
+    if health["status"] != "healthy":
+        sys.exit(1)
 
 
 @index.command()
