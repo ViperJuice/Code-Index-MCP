@@ -6,6 +6,7 @@ fixing the issue where test repositories couldn't find their indexes.
 """
 
 import json
+import logging
 import os
 import sqlite3
 import tempfile
@@ -219,6 +220,51 @@ class TestIndexDiscovery:
             index_path = discovery.get_local_index_path()
 
             assert index_path == current_db
+
+    def test_manifest_selection_prefers_requested_model(
+        self, temp_workspace, create_test_index, caplog
+    ):
+        """Test manifest-driven model preference across multiple indexes."""
+        config_file = temp_workspace / ".mcp-index.json"
+        config_file.write_text(json.dumps({"enabled": True}))
+
+        index_a = temp_workspace / "test_indexes" / temp_workspace.name / "code_index.db"
+        index_b = temp_workspace / "test_indexes" / f"{temp_workspace.name}_alt" / "code_index.db"
+        create_test_index(index_a)
+        create_test_index(index_b)
+
+        discovery = IndexDiscovery(temp_workspace)
+        discovery.write_index_manifest(
+            index_a,
+            schema_version="1.0",
+            embedding_model="text-embedding-a",
+            creation_commit="commit-a",
+        )
+        discovery.write_index_manifest(
+            index_b,
+            schema_version="1.0",
+            embedding_model="text-embedding-b",
+            creation_commit="commit-b",
+        )
+
+        with patch.object(IndexPathConfig, "get_search_paths") as mock_paths:
+            mock_paths.return_value = [index_a.parent, index_b.parent]
+
+            selected = discovery.get_local_index_path(
+                requested_schema_version="1.0",
+                requested_embedding_model="text-embedding-b",
+            )
+            assert selected == index_b
+
+            caplog.set_level(logging.WARNING)
+            caplog.clear()
+            fallback = discovery.get_local_index_path(
+                requested_schema_version="1.0",
+                requested_embedding_model="text-embedding-c",
+            )
+
+            assert fallback in (index_a, index_b)
+            assert any("embedding model" in message for message in caplog.messages)
 
     def test_validate_sqlite_index(self, temp_workspace, create_test_index):
         """Test SQLite index validation."""

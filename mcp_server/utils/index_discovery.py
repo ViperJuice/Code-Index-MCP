@@ -13,7 +13,10 @@ import subprocess
 import tarfile
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    from mcp_server.storage.index_manager import IndexManifest
 
 logger = logging.getLogger(__name__)
 
@@ -90,23 +93,60 @@ class IndexDiscovery:
             logger.error(f"Failed to load index metadata: {e}")
             return None
 
-    def get_local_index_path(self) -> Optional[Path]:
-        """Get path to local SQLite index if it exists"""
+    def read_index_manifest(self, index_path: Path) -> Optional["IndexManifest"]:
+        """Load manifest for a discovered index if it exists."""
+        return self.index_manager.read_index_manifest(index_path)
+
+    def write_index_manifest(
+        self,
+        index_path: Path,
+        schema_version: str,
+        embedding_model: str,
+        creation_commit: Optional[str] = None,
+    ) -> Path:
+        """Persist manifest metadata next to a SQLite index."""
+        commit = creation_commit or self._get_current_commit()
+        return self.index_manager.write_index_manifest(
+            index_path=index_path,
+            schema_version=schema_version,
+            embedding_model=embedding_model,
+            creation_commit=commit,
+        )
+
+    def get_local_index_path(
+        self,
+        requested_schema_version: Optional[str] = None,
+        requested_embedding_model: Optional[str] = None,
+    ) -> Optional[Path]:
+        """Get path to local SQLite index if it exists."""
         if not self.is_index_enabled():
             return None
+
+        require_selection = bool(
+            requested_schema_version is not None or requested_embedding_model is not None
+        )
+        candidates: List[Dict[str, Any]] = []
+        search_paths: List[Path] = []
+
+        def _record_candidate(db_path: Optional[Path]) -> Optional[Path]:
+            if not db_path or not db_path.exists():
+                return None
+
+            if not self._validate_sqlite_index(db_path):
+                return None
+
+            if require_selection:
+                candidates.append({"path": db_path, "manifest": self.read_index_manifest(db_path)})
+                return None
+
+            return db_path
 
         # Try centralized storage first if enabled
         if self.storage_strategy == "centralized":
             centralized_path = self.index_manager.get_current_index_path(self.workspace_root)
-            if centralized_path and centralized_path.exists():
-                try:
-                    # Validate it's a valid SQLite database
-                    conn = sqlite3.connect(str(centralized_path))
-                    conn.execute("SELECT 1 FROM sqlite_master LIMIT 1")
-                    conn.close()
-                    return centralized_path
-                except Exception as e:
-                    logger.warning(f"Invalid SQLite index at {centralized_path}: {e}")
+            candidate = _record_candidate(centralized_path)
+            if candidate:
+                return candidate
 
         # Use multi-path discovery if enabled
         if self.enable_multi_path and self.path_config:
@@ -125,16 +165,16 @@ class IndexDiscovery:
                 ]
 
                 for db_path in db_candidates:
-                    if db_path and db_path.exists():
-                        if self._validate_sqlite_index(db_path):
-                            logger.info(f"Found valid index at: {db_path}")
-                            return db_path
+                    candidate = _record_candidate(db_path)
+                    if candidate:
+                        logger.info(f"Found valid index at: {db_path}")
+                        return candidate
 
         # Fall back to legacy local storage
         db_path = self.index_dir / "code_index.db"
-        if db_path.exists():
-            if self._validate_sqlite_index(db_path):
-                return db_path
+        candidate = _record_candidate(db_path)
+        if candidate:
+            return candidate
 
         # Log detailed information about search failure
         if self.enable_multi_path:
@@ -143,6 +183,13 @@ class IndexDiscovery:
             existing_paths = [str(p) for p, exists in validation.items() if exists]
             if existing_paths:
                 logger.info(f"Existing search paths: {existing_paths}")
+
+        if require_selection and candidates:
+            return self.index_manager.select_best_index(
+                candidates,
+                requested_schema_version=requested_schema_version,
+                requested_embedding_model=requested_embedding_model,
+            )
 
         return None
 
@@ -188,6 +235,22 @@ class IndexDiscovery:
 
         # Fall back to directory name
         return self.workspace_root.name
+
+    def _get_current_commit(self) -> Optional[str]:
+        """Get the current git commit hash for the workspace."""
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                capture_output=True,
+                text=True,
+                cwd=str(self.workspace_root),
+                check=False,
+            )
+            if result.returncode == 0:
+                return result.stdout.strip()
+        except Exception:
+            logger.debug("Unable to resolve current git commit for manifest creation")
+        return None
 
     def get_vector_index_path(self) -> Optional[Path]:
         """Get path to local vector index if it exists"""
@@ -449,6 +512,7 @@ class IndexDiscovery:
             for pattern in ["code_index.db", "current.db", "*.db"]:
                 for db_path in search_path.glob(pattern):
                     if self._validate_sqlite_index(db_path):
+                        manifest = self.read_index_manifest(db_path)
                         found_indexes.append(
                             {
                                 "path": str(db_path),
@@ -456,6 +520,7 @@ class IndexDiscovery:
                                 "valid": True,
                                 "location_type": self._classify_location(search_path),
                                 "size_mb": db_path.stat().st_size / (1024 * 1024),
+                                "manifest": manifest.to_dict() if manifest else None,
                             }
                         )
 
