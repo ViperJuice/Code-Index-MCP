@@ -5,10 +5,16 @@ This module defines the search paths and priorities for finding MCP indexes
 across different environments (Docker, native, test, etc.).
 """
 
+import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+
+from mcp_server.core.path_utils import PathUtils
+
+if TYPE_CHECKING:
+    from mcp_server.storage.artifact_registry import ArtifactRecord, ArtifactRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +32,12 @@ class IndexPathConfig:
         "/tmp/mcp-indexes/{repo_hash}",  # Temporary indexes
     ]
 
-    def __init__(self, custom_paths: Optional[List[str]] = None):
+    def __init__(
+        self,
+        custom_paths: Optional[List[str]] = None,
+        artifact_registry: Optional["ArtifactRegistry"] = None,
+        cache_path: Optional[Path] = None,
+    ):
         """
         Initialize index path configuration.
 
@@ -35,6 +46,9 @@ class IndexPathConfig:
         """
         self.search_paths = self._parse_search_paths(custom_paths)
         self.environment = self._detect_environment()
+        self.cache_path = cache_path or PathUtils.get_index_storage_path() / "artifact_discovery_cache.json"
+        self.cache_path.parent.mkdir(parents=True, exist_ok=True)
+        self.artifact_registry = artifact_registry or self._create_artifact_registry()
 
     def _parse_search_paths(self, custom_paths: Optional[List[str]] = None) -> List[str]:
         """Parse search paths from environment or use defaults."""
@@ -224,3 +238,103 @@ class IndexPathConfig:
         for path in self.get_search_paths(repo_identifier):
             results[path] = path.exists()
         return results
+
+    def cache_discovery(
+        self,
+        repo_identifier: str,
+        path: Path,
+        commit: Optional[str] = None,
+        model: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Persist details about a discovered artifact for quick reuse."""
+        if not repo_identifier:
+            return
+
+        model_name = model or "default"
+        version = commit or "unknown"
+        try:
+            if self.artifact_registry:
+                self.artifact_registry.add_or_update(
+                    repo_identifier,
+                    model_name,
+                    version,
+                    path,
+                    commit=commit,
+                    metadata=metadata or {},
+                    source="discovery",
+                )
+        except Exception as e:
+            logger.debug(f"Failed to cache discovery for {repo_identifier}: {e}")
+
+        cache = self._load_cache()
+        cache[repo_identifier] = {
+            "path": str(path),
+            "commit": commit,
+            "model": model,
+            "version": version,
+            "cached_at": self._utcnow_iso(),
+        }
+        self._save_cache(cache)
+
+    def get_cached_artifact(
+        self, repo_identifier: str, model: Optional[str] = None
+    ) -> Optional[Tuple[Path, Optional[str], Optional[str]]]:
+        """Return cached artifact info if available."""
+        if not repo_identifier:
+            return None
+
+        if self.artifact_registry:
+            try:
+                record = self.artifact_registry.find_best_match(repo_identifier, model=model)
+                if record:
+                    return record.path, record.commit, record.model
+            except Exception as e:
+                logger.debug(f"Artifact registry lookup failed: {e}")
+
+        cache = self._load_cache()
+        cached = cache.get(repo_identifier)
+        if cached:
+            path = Path(cached["path"])
+            if path.exists():
+                if model and cached.get("model") and cached["model"] != model:
+                    return None
+                return path, cached.get("commit"), cached.get("model")
+        return None
+
+    def _load_cache(self) -> Dict[str, Dict[str, Any]]:
+        """Load discovery cache from disk."""
+        if self.cache_path.exists():
+            try:
+                with open(self.cache_path, "r") as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+        return {}
+
+    def _save_cache(self, cache: Dict[str, Dict[str, Any]]) -> None:
+        """Persist discovery cache to disk."""
+        try:
+            temp_path = self.cache_path.with_suffix(".tmp")
+            with open(temp_path, "w") as f:
+                json.dump(cache, f, indent=2)
+            temp_path.replace(self.cache_path)
+        except Exception as e:
+            logger.debug(f"Failed to write discovery cache: {e}")
+
+    def _create_artifact_registry(self) -> Optional["ArtifactRegistry"]:
+        """Lazy-create the artifact registry without introducing hard dependency failures."""
+        from mcp_server.storage.artifact_registry import ArtifactRegistry
+
+        try:
+            return ArtifactRegistry()
+        except Exception as e:
+            logger.debug(f"Artifact registry unavailable: {e}")
+            return None
+
+    @staticmethod
+    def _utcnow_iso() -> str:
+        """Get current UTC time in ISO format."""
+        from datetime import datetime, timezone
+
+        return datetime.now(timezone.utc).isoformat()

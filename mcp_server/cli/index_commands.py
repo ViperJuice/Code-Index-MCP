@@ -17,6 +17,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from mcp_server.config.index_paths import IndexPathConfig
+from mcp_server.core.path_utils import PathUtils
+from mcp_server.storage.artifact_registry import ArtifactRecord, ArtifactRegistry
 from mcp_server.utils.index_discovery import IndexDiscovery
 
 logger = logging.getLogger(__name__)
@@ -35,9 +37,9 @@ class CommandResult:
 class BaseIndexCommand:
     """Base class for all index commands."""
 
-    def __init__(self):
+    def __init__(self, path_config: Optional[IndexPathConfig] = None):
         """Initialize base command."""
-        self.path_config = IndexPathConfig()
+        self.path_config = path_config or IndexPathConfig()
 
     async def execute(self, **kwargs) -> CommandResult:
         """Execute the command. To be implemented by subclasses."""
@@ -90,6 +92,29 @@ class BaseIndexCommand:
             logger.error(f"Error getting index stats: {e}")
 
         return stats
+
+    def _load_index_metadata(self, db_path: Path) -> Dict[str, Any]:
+        """Load metadata for an index if available."""
+        metadata: Dict[str, Any] = {}
+        for name in [".index_metadata.json", "metadata.json", "artifact-metadata.json"]:
+            candidate = db_path.parent / name
+            if candidate.exists():
+                try:
+                    with open(candidate) as f:
+                        metadata = json.load(f)
+                    break
+                except Exception as e:
+                    logger.debug(f"Failed to read metadata from {candidate}: {e}")
+
+        if metadata:
+            if "embedding_model" in metadata:
+                metadata.setdefault("model", metadata.get("embedding_model"))
+            if "compatible_with" in metadata and isinstance(metadata["compatible_with"], dict):
+                metadata.setdefault("model", metadata["compatible_with"].get("embedding_model"))
+            if "git_commit" in metadata:
+                metadata.setdefault("commit", metadata.get("git_commit"))
+
+        return metadata
 
 
 class CreateIndexCommand(BaseIndexCommand):
@@ -619,3 +644,199 @@ class SyncIndexCommand(BaseIndexCommand):
         except Exception as e:
             logger.error(f"Error syncing index: {e}")
             return CommandResult(False, error=str(e))
+
+
+class PublishArtifactCommand(BaseIndexCommand):
+    """Command to publish a built index into the artifact registry."""
+
+    def __init__(
+        self,
+        registry: Optional[ArtifactRegistry] = None,
+        artifact_store: Optional[Path] = None,
+        path_config: Optional[IndexPathConfig] = None,
+    ):
+        self.registry = registry or ArtifactRegistry()
+        effective_path_config = path_config or IndexPathConfig(artifact_registry=self.registry)
+        super().__init__(path_config=effective_path_config)
+        self.artifact_store = artifact_store or PathUtils.get_index_storage_path() / "artifacts"
+        self.artifact_store.mkdir(parents=True, exist_ok=True)
+
+    async def execute(
+        self,
+        repo: str,
+        index_path: Optional[str] = None,
+        model: Optional[str] = None,
+        version: Optional[str] = None,
+    ) -> CommandResult:
+        """Publish the current index to the local artifact registry."""
+        try:
+            if index_path:
+                db_path = Path(index_path)
+            else:
+                discovery = IndexDiscovery(Path.cwd(), path_config=self.path_config)
+                db_path = discovery.get_local_index_path()
+
+            if not db_path or not db_path.exists():
+                return CommandResult(False, error="No index found to publish")
+
+            metadata = self._load_index_metadata(db_path)
+            resolved_model = model or metadata.get("model") or "default"
+            resolved_version = version or metadata.get("commit") or "unversioned"
+
+            target_dir = self.artifact_store / repo / resolved_model / resolved_version
+            target_dir.mkdir(parents=True, exist_ok=True)
+
+            self._copy_index_payload(db_path, target_dir)
+
+            record = self.registry.add_or_update(
+                repo_id=repo,
+                model=resolved_model,
+                version=resolved_version,
+                path=target_dir,
+                commit=metadata.get("commit"),
+                metadata=metadata,
+                source="publish",
+            )
+
+            if self.path_config:
+                self.path_config.cache_discovery(
+                    repo_identifier=repo,
+                    path=target_dir / db_path.name,
+                    commit=record.commit,
+                    model=record.model,
+                    metadata=record.metadata,
+                )
+
+            manifest_path = target_dir / "artifact.json"
+            with open(manifest_path, "w") as f:
+                json.dump(record.to_dict(), f, indent=2)
+
+            return CommandResult(
+                True,
+                data={
+                    "artifact_path": str(target_dir),
+                    "record": record.to_dict(),
+                },
+            )
+
+        except Exception as e:
+            logger.error(f"Error publishing artifact: {e}")
+            return CommandResult(False, error=str(e))
+
+    def _copy_index_payload(self, source_db: Path, target_dir: Path) -> None:
+        """Copy index files and metadata into the artifact store."""
+        shutil.copy2(source_db, target_dir / source_db.name)
+
+        for name in [".index_metadata.json", "metadata.json", "artifact-metadata.json"]:
+            candidate = source_db.parent / name
+            if candidate.exists():
+                shutil.copy2(candidate, target_dir / candidate.name)
+
+        vector_dir = source_db.parent / "vector_index.qdrant"
+        if vector_dir.exists() and vector_dir.is_dir():
+            target_vector = target_dir / "vector_index.qdrant"
+            if target_vector.exists():
+                shutil.rmtree(target_vector)
+            shutil.copytree(vector_dir, target_vector)
+
+
+class ListArtifactCatalogCommand(BaseIndexCommand):
+    """Command to list artifacts from the registry."""
+
+    def __init__(
+        self,
+        registry: Optional[ArtifactRegistry] = None,
+        path_config: Optional[IndexPathConfig] = None,
+    ):
+        self.registry = registry or ArtifactRegistry()
+        super().__init__(path_config=path_config or IndexPathConfig(artifact_registry=self.registry))
+
+    async def execute(self, repo: Optional[str] = None, model: Optional[str] = None) -> CommandResult:
+        """List artifacts filtered by repo/model."""
+        try:
+            records = self.registry.list_records(repo_id=repo, model=model)
+            return CommandResult(
+                True,
+                data={
+                    "artifacts": [record.to_dict() for record in records],
+                    "count": len(records),
+                },
+            )
+        except Exception as e:
+            logger.error(f"Error listing artifacts: {e}")
+            return CommandResult(False, error=str(e))
+
+
+class DownloadArtifactCommand(BaseIndexCommand):
+    """Command to download the best matching artifact for a model."""
+
+    def __init__(
+        self,
+        registry: Optional[ArtifactRegistry] = None,
+        default_destination: Optional[Path] = None,
+        path_config: Optional[IndexPathConfig] = None,
+    ):
+        self.registry = registry or ArtifactRegistry()
+        super().__init__(path_config=path_config or IndexPathConfig(artifact_registry=self.registry))
+        self.default_destination = default_destination or (Path.cwd() / ".mcp-index")
+
+    async def execute(
+        self, repo: str, model: Optional[str] = None, destination: Optional[str] = None
+    ) -> CommandResult:
+        """Download the best artifact match for the requested model."""
+        try:
+            record = self.registry.find_best_match(repo_id=repo, model=model)
+            if not record:
+                return CommandResult(False, error="No matching artifact found")
+
+            dest_root = Path(destination) if destination else self.default_destination
+            dest_root.mkdir(parents=True, exist_ok=True)
+
+            target_db = self._materialize_artifact(record, dest_root)
+
+            if self.path_config:
+                self.path_config.cache_discovery(
+                    repo_identifier=repo,
+                    path=target_db,
+                    commit=record.commit,
+                    model=record.model,
+                    metadata=record.metadata,
+                )
+
+            return CommandResult(
+                True,
+                data={
+                    "artifact": record.to_dict(),
+                    "destination": str(dest_root),
+                    "index_path": str(target_db),
+                },
+            )
+        except Exception as e:
+            logger.error(f"Error downloading artifact: {e}")
+            return CommandResult(False, error=str(e))
+
+    def _materialize_artifact(self, record: ArtifactRecord, destination: Path) -> Path:
+        """Copy artifact contents into the destination directory."""
+        source_path = record.path
+        if not source_path.exists():
+            raise FileNotFoundError(f"Artifact content missing at {source_path}")
+
+        if source_path.is_file():
+            target = destination / source_path.name
+            shutil.copy2(source_path, target)
+            return target
+
+        # Directory-based artifact
+        for item in source_path.iterdir():
+            dest = destination / item.name
+            if item.is_dir():
+                if dest.exists():
+                    shutil.rmtree(dest)
+                shutil.copytree(item, dest)
+            else:
+                shutil.copy2(item, dest)
+
+        target_db = destination / "code_index.db"
+        if not target_db.exists():
+            raise FileNotFoundError(f"Published artifact missing index database in {destination}")
+        return target_db

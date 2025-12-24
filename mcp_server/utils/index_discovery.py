@@ -13,7 +13,10 @@ import subprocess
 import tarfile
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from mcp_server.config.index_paths import IndexPathConfig
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +29,7 @@ class IndexDiscovery:
         workspace_root: Path,
         storage_strategy: Optional[str] = None,
         enable_multi_path: bool = True,
+        path_config: Optional["IndexPathConfig"] = None,
     ):
         self.workspace_root = Path(workspace_root)
         self.index_dir = self.workspace_root / ".mcp-index"
@@ -38,7 +42,7 @@ class IndexDiscovery:
         from mcp_server.storage.index_manager import IndexManager
 
         # Initialize multi-path configuration
-        self.path_config = IndexPathConfig() if enable_multi_path else None
+        self.path_config = path_config or (IndexPathConfig() if enable_multi_path else None)
 
         # Determine storage strategy
         if storage_strategy is None:
@@ -95,6 +99,8 @@ class IndexDiscovery:
         if not self.is_index_enabled():
             return None
 
+        search_paths: List[Path] = []
+
         # Try centralized storage first if enabled
         if self.storage_strategy == "centralized":
             centralized_path = self.index_manager.get_current_index_path(self.workspace_root)
@@ -108,10 +114,16 @@ class IndexDiscovery:
                 except Exception as e:
                     logger.warning(f"Invalid SQLite index at {centralized_path}: {e}")
 
+        repo_id = self._get_repository_identifier()
+
+        # Attempt to reuse cached artifacts first
+        cached_path = self._get_cached_artifact(repo_id)
+        if cached_path:
+            return cached_path
+
         # Use multi-path discovery if enabled
         if self.enable_multi_path and self.path_config:
             # Try to determine repository identifier
-            repo_id = self._get_repository_identifier()
             search_paths = self.path_config.get_search_paths(repo_id)
 
             logger.info(f"Searching for index in {len(search_paths)} locations")
@@ -128,12 +140,14 @@ class IndexDiscovery:
                     if db_path and db_path.exists():
                         if self._validate_sqlite_index(db_path):
                             logger.info(f"Found valid index at: {db_path}")
+                            self._record_discovery(repo_id, db_path)
                             return db_path
 
         # Fall back to legacy local storage
         db_path = self.index_dir / "code_index.db"
         if db_path.exists():
             if self._validate_sqlite_index(db_path):
+                self._record_discovery(repo_id, db_path)
                 return db_path
 
         # Log detailed information about search failure
@@ -188,6 +202,68 @@ class IndexDiscovery:
 
         # Fall back to directory name
         return self.workspace_root.name
+
+    def _extract_metadata(self, db_path: Path) -> Dict[str, Any]:
+        """Extract metadata from known files near the index."""
+        metadata: Dict[str, Any] = {}
+        for name in [".index_metadata.json", "artifact-metadata.json", "metadata.json"]:
+            candidate = db_path.parent / name
+            if candidate.exists():
+                try:
+                    with open(candidate) as f:
+                        metadata = json.load(f)
+                    break
+                except Exception as e:
+                    logger.debug(f"Failed to load metadata from {candidate}: {e}")
+
+        # Normalize common fields
+        if metadata:
+            if "embedding_model" in metadata:
+                metadata.setdefault("model", metadata.get("embedding_model"))
+            if "compatible_with" in metadata and isinstance(metadata["compatible_with"], dict):
+                metadata.setdefault("model", metadata["compatible_with"].get("embedding_model"))
+            if "git_commit" in metadata:
+                metadata.setdefault("commit", metadata.get("git_commit"))
+
+        return metadata
+
+    def _record_discovery(
+        self, repo_id: Optional[str], db_path: Path, metadata: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """Record discovered index details to the artifact cache/registry."""
+        if not repo_id or not self.path_config:
+            return
+
+        meta = metadata or self._extract_metadata(db_path)
+        commit = meta.get("commit") if isinstance(meta, dict) else None
+        model = None
+        if isinstance(meta, dict):
+            model = meta.get("model") or meta.get("embedding_model")
+            if not model and isinstance(meta.get("compatible_with"), dict):
+                model = meta["compatible_with"].get("embedding_model")
+
+        try:
+            self.path_config.cache_discovery(
+                repo_id, db_path, commit=commit, model=model, metadata=meta or {}
+            )
+        except Exception as e:
+            logger.debug(f"Failed to record discovery for {repo_id}: {e}")
+
+    def _get_cached_artifact(
+        self, repo_id: Optional[str], include_metadata: bool = False
+    ) -> Optional[Any]:
+        """Attempt to reuse a cached artifact path before searching."""
+        if not repo_id or not self.path_config:
+            return None
+
+        cached = self.path_config.get_cached_artifact(repo_id)
+        if cached:
+            path, commit, model = cached
+            if self._validate_sqlite_index(path):
+                if include_metadata:
+                    return {"path": str(path), "commit": commit, "model": model}
+                return path
+        return None
 
     def get_vector_index_path(self) -> Optional[Path]:
         """Get path to local vector index if it exists"""
@@ -401,6 +477,7 @@ class IndexDiscovery:
             "config": None,
             "search_paths": [],
             "found_at": None,
+            "cached_artifact": None,
         }
 
         if info["enabled"]:
@@ -421,6 +498,9 @@ class IndexDiscovery:
             if self.enable_multi_path and self.path_config:
                 repo_id = self._get_repository_identifier()
                 info["search_paths"] = [str(p) for p in self.path_config.get_search_paths(repo_id)]
+                cached = self._get_cached_artifact(repo_id, include_metadata=True)
+                if cached and isinstance(cached, dict):
+                    info["cached_artifact"] = cached
 
         return info
 
@@ -449,6 +529,7 @@ class IndexDiscovery:
             for pattern in ["code_index.db", "current.db", "*.db"]:
                 for db_path in search_path.glob(pattern):
                     if self._validate_sqlite_index(db_path):
+                        metadata = self._extract_metadata(db_path)
                         found_indexes.append(
                             {
                                 "path": str(db_path),
@@ -456,8 +537,11 @@ class IndexDiscovery:
                                 "valid": True,
                                 "location_type": self._classify_location(search_path),
                                 "size_mb": db_path.stat().st_size / (1024 * 1024),
+                                "commit": metadata.get("commit"),
+                                "model": metadata.get("model"),
                             }
                         )
+                        self._record_discovery(repo_id, db_path, metadata=metadata)
 
             # Look for vector indexes
             vector_path = search_path / "vector_index"

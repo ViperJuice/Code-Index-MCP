@@ -4,10 +4,12 @@ CLI commands for index management.
 Provides convenient commands for managing SQLite and vector indexes.
 """
 
+import asyncio
 import json
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 
 import click
 
@@ -17,6 +19,11 @@ sys.path.insert(0, str(project_root))
 
 from mcp_server.storage.sqlite_store import SQLiteStore  # noqa: E402
 from mcp_server.utils import get_semantic_indexer  # noqa: E402
+from mcp_server.cli.index_commands import (  # noqa: E402
+    DownloadArtifactCommand,
+    ListArtifactCatalogCommand,
+    PublishArtifactCommand,
+)
 
 
 def _get_semantic_indexer_instance():
@@ -379,6 +386,84 @@ def restore(backup_dir: str):
         click.echo(f"✅ Restore completed ({files_restored} items)")
     else:
         click.echo("❌ No backup files found to restore")
+
+
+@index.command("publish-artifact")
+@click.option("--repo", required=True, help="Repository identifier to publish under")
+@click.option(
+    "--index-path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Path to the index database (defaults to discovered index)",
+)
+@click.option("--model", help="Embedding model name to associate")
+@click.option("--version", help="Version or commit identifier")
+def publish_artifact(repo: str, index_path: Optional[Path], model: str, version: str):
+    """Publish a built index to the local artifact registry."""
+    command = PublishArtifactCommand()
+    result = asyncio.run(
+        command.execute(
+            repo=repo,
+            index_path=str(index_path) if index_path else None,
+            model=model,
+            version=version,
+        )
+    )
+
+    if not result.success:
+        click.echo(f"❌ {result.error}", err=True)
+        sys.exit(1)
+
+    click.echo(f"✅ Published artifact to {result.data['artifact_path']}")
+
+
+@index.command("list-artifacts")
+@click.option("--repo", help="Filter artifacts by repository")
+@click.option("--model", help="Filter artifacts by model")
+def list_artifacts(repo: Optional[str], model: Optional[str]):
+    """List artifacts available in the registry."""
+    command = ListArtifactCatalogCommand()
+    result = asyncio.run(command.execute(repo=repo, model=model))
+
+    if not result.success:
+        click.echo(f"❌ {result.error}", err=True)
+        sys.exit(1)
+
+    artifacts = result.data["artifacts"]
+    if not artifacts:
+        click.echo("No artifacts found")
+        return
+
+    click.echo("Available artifacts:")
+    for artifact in artifacts:
+        click.echo(
+            f"- {artifact['repo_id']} [{artifact['model']}] {artifact['version']} -> {artifact['path']}"
+        )
+
+
+@index.command("download-artifact")
+@click.option("--repo", required=True, help="Repository identifier to download")
+@click.option("--model", help="Preferred model to download")
+@click.option(
+    "--destination",
+    type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
+    help="Destination directory for the index",
+)
+def download_artifact(repo: str, model: Optional[str], destination: Optional[Path]):
+    """Download the best matching artifact for the requested model."""
+    command = DownloadArtifactCommand(default_destination=destination)
+    result = asyncio.run(
+        command.execute(
+            repo=repo,
+            model=model,
+            destination=str(destination) if destination else None,
+        )
+    )
+
+    if not result.success:
+        click.echo(f"❌ {result.error}", err=True)
+        sys.exit(1)
+
+    click.echo(f"✅ Downloaded artifact to {result.data['destination']}")
 
 
 @index.command()

@@ -13,10 +13,15 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
+from mcp_server.config.index_paths import IndexPathConfig
+from mcp_server.storage.artifact_registry import ArtifactRegistry
 from mcp_server.cli.index_commands import (
     CreateIndexCommand,
+    DownloadArtifactCommand,
     ListIndexesCommand,
+    ListArtifactCatalogCommand,
     MigrateIndexCommand,
+    PublishArtifactCommand,
     SyncIndexCommand,
     ValidateIndexCommand,
 )
@@ -507,3 +512,66 @@ class TestIntegration:
                 result = await list_cmd.execute()
                 assert result.success is True
                 assert result.data["count"] >= 1
+
+
+class TestArtifactCommands:
+    """Tests for artifact publish/list/download commands."""
+
+    def _create_index(self, index_dir: Path) -> Path:
+        """Helper to create a minimal index and metadata."""
+        index_dir.mkdir(parents=True, exist_ok=True)
+        db_path = index_dir / "code_index.db"
+
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("CREATE TABLE files (id INTEGER PRIMARY KEY, path TEXT)")
+        conn.execute("INSERT INTO files (path) VALUES ('test.py')")
+        conn.commit()
+        conn.close()
+
+        metadata = {"git_commit": "abc12345", "embedding_model": "test-model"}
+        (index_dir / ".index_metadata.json").write_text(json.dumps(metadata))
+        return db_path
+
+    @pytest.mark.asyncio
+    async def test_publish_list_and_download(self, tmp_path):
+        """Publish an index, list it, and download the best match."""
+        workspace = tmp_path / "repo"
+        index_dir = workspace / ".mcp-index"
+        db_path = self._create_index(index_dir)
+
+        registry = ArtifactRegistry(registry_path=tmp_path / "artifact_registry.json")
+        path_config = IndexPathConfig(
+            artifact_registry=registry,
+            cache_path=tmp_path / "cli_cache.json",
+            custom_paths=[str(index_dir)],
+        )
+
+        publish_cmd = PublishArtifactCommand(
+            registry=registry, artifact_store=tmp_path / "store", path_config=path_config
+        )
+        result = await publish_cmd.execute(repo="demo-repo", index_path=str(db_path))
+
+        assert result.success is True
+        assert (tmp_path / "store" / "demo-repo" / "test-model" / "abc12345").exists()
+
+        list_cmd = ListArtifactCatalogCommand(registry=registry, path_config=path_config)
+        list_result = await list_cmd.execute(repo="demo-repo")
+
+        assert list_result.success is True
+        assert list_result.data["count"] == 1
+        assert list_result.data["artifacts"][0]["model"] == "test-model"
+
+        download_cmd = DownloadArtifactCommand(
+            registry=registry, default_destination=tmp_path / "dest", path_config=path_config
+        )
+
+        download_result = await download_cmd.execute(repo="demo-repo", model="test-model")
+        assert download_result.success is True
+
+        downloaded_index = Path(download_result.data["index_path"])
+        assert downloaded_index.exists()
+
+        conn = sqlite3.connect(str(downloaded_index))
+        count = conn.execute("SELECT COUNT(*) FROM files").fetchone()[0]
+        conn.close()
+        assert count == 1

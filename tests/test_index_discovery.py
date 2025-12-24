@@ -15,6 +15,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from mcp_server.config.index_paths import IndexPathConfig
+from mcp_server.storage.artifact_registry import ArtifactRegistry
 from mcp_server.utils.index_discovery import IndexDiscovery
 
 
@@ -311,6 +312,7 @@ class TestIndexDiscovery:
         assert info["has_local_index"] is True
         assert info["found_at"] is not None
         assert len(info["search_paths"]) > 0
+        assert info["cached_artifact"] is None
 
     def test_multi_path_disabled(self, temp_workspace):
         """Test behavior when multi-path is disabled."""
@@ -322,6 +324,41 @@ class TestIndexDiscovery:
         # Should only check default locations
         info = discovery.get_index_info()
         assert "search_paths" not in info or len(info["search_paths"]) == 0
+
+    def test_discovery_records_artifact_cache(self, temp_workspace, create_test_index, tmp_path):
+        """Ensure discovered indexes are cached with commit/model metadata."""
+        config_file = temp_workspace / ".mcp-index.json"
+        config_file.write_text(json.dumps({"enabled": True}))
+
+        db_path = temp_workspace / ".mcp-index" / "code_index.db"
+        create_test_index(db_path)
+
+        metadata = {"git_commit": "abc12345", "embedding_model": "test-model"}
+        metadata_path = temp_workspace / ".mcp-index" / ".index_metadata.json"
+        metadata_path.write_text(json.dumps(metadata))
+
+        registry = ArtifactRegistry(registry_path=tmp_path / "artifact_registry.json")
+        path_config = IndexPathConfig(
+            artifact_registry=registry,
+            cache_path=tmp_path / "discovery_cache.json",
+            custom_paths=[str(temp_workspace / ".mcp-index")],
+        )
+
+        discovery = IndexDiscovery(temp_workspace, path_config=path_config)
+        index_path = discovery.get_local_index_path()
+
+        assert index_path == db_path
+
+        cached = path_config.get_cached_artifact(temp_workspace.name)
+        assert cached is not None
+        cached_path, commit, model = cached
+        assert cached_path == db_path
+        assert commit == "abc12345"
+        assert model == "test-model"
+
+        best = registry.find_best_match(temp_workspace.name, model="test-model")
+        assert best is not None
+        assert best.path == db_path
 
 
 class TestIntegration:
