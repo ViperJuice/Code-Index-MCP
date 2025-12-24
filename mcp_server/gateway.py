@@ -1016,6 +1016,204 @@ async def get_search_capabilities() -> Dict[str, Any]:
     }
 
 
+# ============================================================================
+# Relationship/Dependency Tracking Endpoints
+# ============================================================================
+
+
+@app.get("/api/v1/dependencies")
+async def get_code_dependencies(
+    entity_id: int,
+    depth: int = 1,
+    relationship_types: Optional[str] = None,
+    current_user: User = Depends(require_permission(Permission.READ)),
+) -> Dict[str, Any]:
+    """
+    Get dependencies of a code entity (what it depends on).
+
+    This endpoint returns entities that the specified entity depends on, such as:
+    - Functions that a function calls
+    - Classes that a class inherits from
+    - Modules that a module imports
+
+    Args:
+        entity_id: ID of the entity to query
+        depth: How many levels deep to traverse (default 1, max 10)
+        relationship_types: Optional comma-separated list of types to filter
+                           (e.g., "calls,inherits")
+        current_user: Authenticated user with READ permission
+
+    Returns:
+        Dictionary with entity_id, dependencies list, and depth
+
+    Example:
+        GET /api/v1/dependencies?entity_id=123&depth=2&relationship_types=calls
+    """
+    if sqlite_store is None:
+        raise HTTPException(503, "Storage not initialized")
+
+    # Validate depth
+    if depth < 1 or depth > 10:
+        raise HTTPException(400, "depth must be between 1 and 10")
+
+    try:
+        from mcp_server.storage.relationship_tracker import RelationshipTracker
+
+        tracker = RelationshipTracker(sqlite_store)
+
+        # Parse relationship types if provided
+        rel_types = None
+        if relationship_types:
+            rel_types = [t.strip() for t in relationship_types.split(",")]
+
+        # Get dependencies
+        dependencies = tracker.get_dependencies(entity_id, depth=depth, relationship_types=rel_types)
+
+        logger.info(f"Retrieved {len(dependencies)} dependencies for entity {entity_id}")
+
+        return {
+            "entity_id": entity_id,
+            "dependencies": dependencies,
+            "depth": depth,
+            "relationship_types": rel_types,
+            "count": len(dependencies),
+        }
+    except Exception as e:
+        logger.error(f"Error getting dependencies for entity {entity_id}: {e}", exc_info=True)
+        raise HTTPException(500, f"Error retrieving dependencies: {str(e)}")
+
+
+@app.get("/api/v1/dependents")
+async def get_code_dependents(
+    entity_id: int,
+    depth: int = 1,
+    relationship_types: Optional[str] = None,
+    current_user: User = Depends(require_permission(Permission.READ)),
+) -> Dict[str, Any]:
+    """
+    Get dependents of a code entity (what depends on it).
+
+    This endpoint returns entities that depend on the specified entity, such as:
+    - Functions that call this function
+    - Classes that inherit from this class
+    - Modules that import this module
+
+    Args:
+        entity_id: ID of the entity to query
+        depth: How many levels deep to traverse (default 1, max 10)
+        relationship_types: Optional comma-separated list of types to filter
+                           (e.g., "calls,inherits")
+        current_user: Authenticated user with READ permission
+
+    Returns:
+        Dictionary with entity_id, dependents list, and depth
+
+    Example:
+        GET /api/v1/dependents?entity_id=123&depth=2&relationship_types=calls
+    """
+    if sqlite_store is None:
+        raise HTTPException(503, "Storage not initialized")
+
+    # Validate depth
+    if depth < 1 or depth > 10:
+        raise HTTPException(400, "depth must be between 1 and 10")
+
+    try:
+        from mcp_server.storage.relationship_tracker import RelationshipTracker
+
+        tracker = RelationshipTracker(sqlite_store)
+
+        # Parse relationship types if provided
+        rel_types = None
+        if relationship_types:
+            rel_types = [t.strip() for t in relationship_types.split(",")]
+
+        # Get dependents
+        dependents = tracker.get_dependents(entity_id, depth=depth, relationship_types=rel_types)
+
+        logger.info(f"Retrieved {len(dependents)} dependents for entity {entity_id}")
+
+        return {
+            "entity_id": entity_id,
+            "dependents": dependents,
+            "depth": depth,
+            "relationship_types": rel_types,
+            "count": len(dependents),
+        }
+    except Exception as e:
+        logger.error(f"Error getting dependents for entity {entity_id}: {e}", exc_info=True)
+        raise HTTPException(500, f"Error retrieving dependents: {str(e)}")
+
+
+@app.get("/api/v1/dependency-path")
+async def find_dependency_path(
+    source_entity_id: int,
+    target_entity_id: int,
+    max_depth: int = 5,
+    relationship_types: Optional[str] = None,
+    current_user: User = Depends(require_permission(Permission.READ)),
+) -> Dict[str, Any]:
+    """
+    Find dependency paths between two code entities.
+
+    This endpoint finds all paths connecting the source entity to the target entity
+    through relationship chains (e.g., func1 calls func2 calls func3).
+
+    Args:
+        source_entity_id: ID of the starting entity
+        target_entity_id: ID of the target entity
+        max_depth: Maximum path length to search (default 5, max 10)
+        relationship_types: Optional comma-separated list of types to traverse
+                           (e.g., "calls,inherits")
+        current_user: Authenticated user with READ permission
+
+    Returns:
+        Dictionary with source, target, paths, and path count
+
+    Example:
+        GET /api/v1/dependency-path?source_entity_id=123&target_entity_id=456&max_depth=5
+    """
+    if sqlite_store is None:
+        raise HTTPException(503, "Storage not initialized")
+
+    # Validate max_depth
+    if max_depth < 1 or max_depth > 10:
+        raise HTTPException(400, "max_depth must be between 1 and 10")
+
+    try:
+        from mcp_server.storage.relationship_tracker import RelationshipTracker
+
+        tracker = RelationshipTracker(sqlite_store)
+
+        # Parse relationship types if provided
+        rel_types = None
+        if relationship_types:
+            rel_types = [t.strip() for t in relationship_types.split(",")]
+
+        # Find paths
+        paths = tracker.find_paths(
+            source_entity_id, target_entity_id, max_depth=max_depth, relationship_types=rel_types
+        )
+
+        logger.info(
+            f"Found {len(paths)} paths from entity {source_entity_id} to {target_entity_id}"
+        )
+
+        return {
+            "source_entity_id": source_entity_id,
+            "target_entity_id": target_entity_id,
+            "paths": paths,
+            "path_count": len(paths),
+            "max_depth": max_depth,
+            "relationship_types": rel_types,
+        }
+    except Exception as e:
+        logger.error(
+            f"Error finding path from {source_entity_id} to {target_entity_id}: {e}", exc_info=True
+        )
+        raise HTTPException(500, f"Error finding dependency path: {str(e)}")
+
+
 @app.get("/status")
 async def get_status(
     current_user: User = Depends(require_permission(Permission.READ)),
