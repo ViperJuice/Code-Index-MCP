@@ -124,11 +124,14 @@ CREATE TABLE IF NOT EXISTS embeddings (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     metadata JSON,
     FOREIGN KEY (file_id) REFERENCES files(id),
-    FOREIGN KEY (symbol_id) REFERENCES symbols(id)
+    FOREIGN KEY (symbol_id) REFERENCES symbols(id),
+    UNIQUE(file_id, model_version)
 );
 
 CREATE INDEX IF NOT EXISTS idx_embeddings_file ON embeddings(file_id);
 CREATE INDEX IF NOT EXISTS idx_embeddings_symbol ON embeddings(symbol_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_embeddings_file_model 
+    ON embeddings(file_id, model_version);
 
 -- Cache Tables
 CREATE TABLE IF NOT EXISTS query_cache (

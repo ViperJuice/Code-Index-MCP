@@ -188,7 +188,10 @@ class EnhancedDispatcher:
                 # Only initialize if the Qdrant path exists
                 if Path(qdrant_path).exists():
                     self._semantic_indexer = SemanticIndexer(
-                        qdrant_path=qdrant_path, collection=collection_name
+                        qdrant_path=qdrant_path,
+                        collection=collection_name,
+                        embedding_model=os.getenv("SEMANTIC_EMBEDDING_MODEL", "voyage-code-3"),
+                        sqlite_store=self._sqlite_store,
                     )
                     logger.info(f"Semantic search initialized: {collection_name} at {qdrant_path}")
                 else:
@@ -200,7 +203,10 @@ class EnhancedDispatcher:
                     qdrant_path = Path(".indexes/qdrant/main.qdrant")
                     if qdrant_path.exists():
                         self._semantic_indexer = SemanticIndexer(
-                            qdrant_path=str(qdrant_path), collection="code-embeddings"
+                            qdrant_path=str(qdrant_path),
+                            collection="code-embeddings",
+                            embedding_model=os.getenv("SEMANTIC_EMBEDDING_MODEL", "voyage-code-3"),
+                            sqlite_store=self._sqlite_store,
                         )
                         logger.info("Semantic search initialized with legacy fallback")
                 except Exception as e2:

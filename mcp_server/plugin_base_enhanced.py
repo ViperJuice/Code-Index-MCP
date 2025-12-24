@@ -67,7 +67,10 @@ class PluginWithSemanticSearch(IPlugin):
                     qdrant_path = f"http://{qdrant_host}:{qdrant_port}"
 
                 self._semantic_indexer = SemanticIndexer(
-                    collection=f"{collection_name}-{self.lang}", qdrant_path=qdrant_path
+                    collection=f"{collection_name}-{self.lang}",
+                    qdrant_path=qdrant_path,
+                    embedding_model=os.getenv("SEMANTIC_EMBEDDING_MODEL", "voyage-code-3"),
+                    sqlite_store=self._sqlite_store,
                 )
                 logger.info(f"Semantic search enabled for {self.lang} plugin")
             except ConnectionRefusedError:

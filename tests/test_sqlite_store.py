@@ -18,9 +18,11 @@ import json
 import sqlite3
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pytest
 
+from mcp_server.core.path_resolver import PathResolver
 from mcp_server.storage.sqlite_store import SQLiteStore
 
 
@@ -37,7 +39,7 @@ class TestDatabaseInitialization:
         with store._get_connection() as conn:
             cursor = conn.execute("SELECT version FROM schema_version")
             version = cursor.fetchone()
-            assert version["version"] == 1
+            assert version["version"] >= 2
 
     def test_init_existing_database(self, temp_db_path):
         """Test initialization with existing database."""
@@ -103,6 +105,7 @@ class TestDatabaseInitialization:
             "idx_references_file",
             "idx_trigrams",
             "idx_embeddings_file",
+            "idx_embeddings_file_model",
             "idx_embeddings_symbol",
             "idx_cache_expires",
         ]
@@ -834,8 +837,122 @@ class TestSQLiteStoreHealthCheck:
 
         health = store.health_check()
 
-        # Fresh database should have version 1
-        assert health["version"] == 1
+        # Fresh database should apply latest migrations
+        assert health["version"] >= 2
+
+
+class TestEmbeddingOperations:
+    """Test embedding storage helpers."""
+
+    def _create_store_with_file(self, tmp_path: Path):
+        repo_root = tmp_path / "repo"
+        repo_root.mkdir()
+        file_path = repo_root / "example.py"
+        file_path.write_text("print('hello world')\n")
+
+        path_resolver = PathResolver(repository_root=repo_root)
+        store = SQLiteStore(
+            str(tmp_path / "embeddings.db"),
+            path_resolver=path_resolver,
+        )
+        repo_id = store.create_repository(str(repo_root), "repo")
+        file_id = store.store_file(repo_id, file_path, language="python")
+        content_hash = path_resolver.compute_content_hash(file_path)
+        return store, file_id, file_path, content_hash
+
+    def test_embeddings_unique_per_model(self, tmp_path):
+        """Ensure embeddings are unique per file/model and can be updated."""
+        store, file_id, _, content_hash = self._create_store_with_file(tmp_path)
+
+        first_vector = [0.1, 0.2, 0.3]
+        second_vector = [0.4, 0.5, 0.6]
+
+        first_id = store.upsert_embedding_vector(
+            file_id=file_id,
+            model_version="model-a",
+            embedding=first_vector,
+            content_hash=content_hash,
+        )
+        second_id = store.upsert_embedding_vector(
+            file_id=file_id,
+            model_version="model-b",
+            embedding=second_vector,
+            content_hash=content_hash,
+        )
+
+        with store._get_connection() as conn:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM embeddings WHERE file_id = ?", (file_id,)
+            ).fetchone()[0]
+
+        assert count == 2
+        assert first_id != 0
+        assert second_id != 0
+
+        updated_vector = [0.9, 0.8, 0.7]
+        updated_id = store.upsert_embedding_vector(
+            file_id=file_id,
+            model_version="model-a",
+            embedding=updated_vector,
+            content_hash=content_hash,
+        )
+
+        record = store.get_embedding_for_model(file_id, "model-a", content_hash)
+        assert record is not None
+        assert record["embedding"] == updated_vector
+        assert updated_id == record["id"]
+
+        with store._get_connection() as conn:
+            count_after = conn.execute(
+                "SELECT COUNT(*) FROM embeddings WHERE file_id = ?", (file_id,)
+            ).fetchone()[0]
+
+        assert count_after == 2  # Update should not create duplicates
+
+    def test_get_or_create_embedding_reuses_cached_value(self, tmp_path):
+        """Verify helper reuses cached embeddings and evicts outdated ones."""
+        store, file_id, file_path, content_hash = self._create_store_with_file(tmp_path)
+        cached_vector = [0.05, 0.06, 0.07]
+
+        store.upsert_embedding_vector(
+            file_id=file_id,
+            model_version="model-c",
+            embedding=cached_vector,
+            content_hash=content_hash,
+            metadata={"source": "initial"},
+        )
+
+        factory_called = False
+
+        def factory():
+            nonlocal factory_called
+            factory_called = True
+            return [0.9, 0.1, 0.2]
+
+        record = store.get_or_create_embedding_vector(
+            file_id=file_id,
+            model_version="model-c",
+            content_hash=content_hash,
+            factory=factory,
+        )
+
+        assert record["embedding"] == cached_vector
+        assert factory_called is False
+
+        file_path.write_text("print('content changed')\n")
+        new_hash = store.path_resolver.compute_content_hash(file_path)
+
+        updated_record = store.get_or_create_embedding_vector(
+            file_id=file_id,
+            model_version="model-c",
+            content_hash=new_hash,
+            factory=factory,
+            metadata={"reason": "content-updated"},
+        )
+
+        assert factory_called is True
+        assert updated_record["embedding"] == [0.9, 0.1, 0.2]
+        assert updated_record["metadata"]["content_hash"] == new_hash
 
 
 class TestPerformance:

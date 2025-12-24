@@ -25,7 +25,7 @@ def _get_semantic_indexer_instance():
     if SemanticIndexer is None:
         return None
     try:
-        return SemanticIndexer()
+        return SemanticIndexer(embedding_model=os.getenv("SEMANTIC_EMBEDDING_MODEL", "voyage-code-3"))
     except Exception:
         return None
 
