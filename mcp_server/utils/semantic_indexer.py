@@ -68,12 +68,17 @@ class SemanticIndexer:
         collection: str = "code-index",
         qdrant_path: str = "./vector_index.qdrant",
         path_resolver: Optional[PathResolver] = None,
+        embedding_model: Optional[str] = None,
+        sqlite_store: Optional[Any] = None,
     ) -> None:
         self.collection = collection
         self.qdrant_path = qdrant_path
-        self.embedding_model = "voyage-code-3"
+        self.embedding_model = embedding_model or os.getenv(
+            "SEMANTIC_EMBEDDING_MODEL", "voyage-code-3"
+        )
         self.metadata_file = ".index_metadata.json"
         self.path_resolver = path_resolver or PathResolver()
+        self._sqlite_store = sqlite_store
 
         # Initialize Qdrant client with server mode preference
         self._qdrant_available = False
@@ -372,12 +377,79 @@ class SemanticIndexer:
         return int.from_bytes(h, "big", signed=False)
 
     # ------------------------------------------------------------------
-    def index_file(self, path: Path) -> dict[str, Any]:
+    def _resolve_file_id(self, path: Path, provided_id: Optional[int]) -> Optional[int]:
+        """Resolve file ID from storage if available."""
+        if provided_id:
+            return provided_id
+
+        if not self._sqlite_store:
+            return None
+
+        try:
+            record = self._sqlite_store.get_file(path)
+            return record.get("id") if record else None
+        except Exception as e:
+            logger.debug(f"Could not resolve file id for {path}: {e}")
+            return None
+
+    def _summarize_embeddings(self, embeddings: List[List[float]]) -> List[float]:
+        """Compute an aggregate vector to cache per-file embeddings."""
+        if not embeddings:
+            return []
+
+        length = len(embeddings[0])
+        accumulator = [0.0] * length
+
+        for vector in embeddings:
+            for idx, value in enumerate(vector):
+                accumulator[idx] += value
+
+        return [value / len(embeddings) for value in accumulator]
+
+    def _cache_embedding_record(
+        self,
+        file_id: Optional[int],
+        model_version: str,
+        embeddings: List[List[float]],
+        content_hash: str,
+        relative_path: str,
+    ) -> None:
+        """Store a lightweight cache entry for a file/model combination."""
+        if not self._sqlite_store or file_id is None:
+            return
+
+        try:
+            self._sqlite_store.upsert_embedding_vector(
+                file_id=file_id,
+                model_version=model_version,
+                embedding=self._summarize_embeddings(embeddings),
+                content_hash=content_hash,
+                metadata={"relative_path": relative_path, "embedding_count": len(embeddings)},
+            )
+        except Exception as e:
+            logger.debug(f"Failed to cache embedding metadata for {relative_path}: {e}")
+
+    def index_file(
+        self,
+        path: Path,
+        model_version: Optional[str] = None,
+        file_id: Optional[int] = None,
+        content_hash: Optional[str] = None,
+    ) -> dict[str, Any]:
         """Index a single Python file and return the shard info."""
 
+        active_model = model_version or self.embedding_model
+        self.embedding_model = active_model
+
         content = path.read_bytes()
+        content_hash = content_hash or hashlib.sha256(content).hexdigest()
         root = self.wrapper.parse(content)
         lines = content.decode("utf-8", "ignore").splitlines()
+
+        try:
+            relative_path = self.path_resolver.normalize_path(path)
+        except ValueError:
+            relative_path = str(path).replace("\\", "/")
 
         symbols: list[SymbolEntry] = []
 
@@ -404,12 +476,40 @@ class SemanticIndexer:
                 )
             )
 
+        resolved_file_id = self._resolve_file_id(path, file_id)
+        cached_embedding = None
+        if resolved_file_id and self._sqlite_store:
+            cached_embedding = self._sqlite_store.get_embedding_for_model(
+                resolved_file_id, active_model, content_hash
+            )
+
+        if cached_embedding:
+            logger.info(
+                f"Using cached embeddings for {relative_path} with model {active_model}"
+            )
+            return {
+                "file": str(path),
+                "symbols": [
+                    {
+                        "symbol": s.symbol,
+                        "kind": s.kind,
+                        "signature": s.signature,
+                        "line": s.line,
+                        "span": list(s.span),
+                    }
+                    for s in symbols
+                ],
+                "language": "python",
+                "model_version": active_model,
+                "cached": True,
+            }
+
         # Generate embeddings and upsert into Qdrant
         texts = ["\n".join(lines[s.line - 1 : s.span[1]]) for s in symbols]
         if texts:
             embeds = self.voyage.embed(
                 texts,
-                model="voyage-code-3",
+                model=self.embedding_model,
                 input_type="document",
                 output_dimension=1024,
                 output_dtype="float",
@@ -419,15 +519,12 @@ class SemanticIndexer:
             for sym, vec in zip(symbols, embeds):
                 # Compute content hash for this symbol
                 symbol_content = "\n".join(lines[sym.line - 1 : sym.span[1]])
-                content_hash = hashlib.sha256(symbol_content.encode()).hexdigest()
-
-                # Use relative path in payload
-                relative_path = self.path_resolver.normalize_path(path)
+                symbol_hash = hashlib.sha256(symbol_content.encode()).hexdigest()
 
                 payload = {
                     "file": str(path),  # Keep absolute for backward compatibility
                     "relative_path": relative_path,
-                    "content_hash": content_hash,
+                    "content_hash": symbol_hash,
                     "symbol": sym.symbol,
                     "kind": sym.kind,
                     "signature": sym.signature,
@@ -438,7 +535,7 @@ class SemanticIndexer:
                 }
                 points.append(
                     models.PointStruct(
-                        id=self._symbol_id(str(path), sym.symbol, sym.line, content_hash),
+                        id=self._symbol_id(str(path), sym.symbol, sym.line, symbol_hash),
                         vector=vec,
                         payload=payload,
                     )
@@ -450,6 +547,9 @@ class SemanticIndexer:
 
             try:
                 self.qdrant.upsert(collection_name=self.collection, points=points)
+                self._cache_embedding_record(
+                    resolved_file_id, active_model, embeds, content_hash, relative_path
+                )
             except Exception as e:
                 logger.error(
                     f"Failed to upsert {len(points)} points for file {path}: "
@@ -471,6 +571,7 @@ class SemanticIndexer:
                 for s in symbols
             ],
             "language": "python",
+            "model_version": active_model,
         }
 
     # ------------------------------------------------------------------
@@ -496,7 +597,7 @@ class SemanticIndexer:
         try:
             embedding = self.voyage.embed(
                 [text],
-                model="voyage-code-3",
+                model=self.embedding_model,
                 input_type="document",
                 output_dimension=1024,
                 output_dtype="float",
@@ -563,7 +664,7 @@ class SemanticIndexer:
         try:
             embedding = self.voyage.embed(
                 [embedding_text],
-                model="voyage-code-3",
+                model=self.embedding_model,
                 input_type="document",
                 output_dimension=1024,
                 output_dtype="float",
@@ -733,7 +834,7 @@ class SemanticIndexer:
         try:
             embedding = self.voyage.embed(
                 [embedding_text],
-                model="voyage-code-3",
+                model=self.embedding_model,
                 input_type=input_type,
                 output_dimension=1024,
                 output_dtype="float",
@@ -902,7 +1003,7 @@ class SemanticIndexer:
             # Generate query embedding
             embedding = self.voyage.embed(
                 [query],
-                model="voyage-code-3",
+                model=self.embedding_model,
                 input_type="query",  # Use query type for natural language
                 output_dimension=1024,
                 output_dtype="float",

@@ -11,7 +11,7 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from ..core.path_resolver import PathResolver
 
@@ -514,14 +514,15 @@ class SQLiteStore:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 metadata JSON,
                 FOREIGN KEY (file_id) REFERENCES files(id),
-                FOREIGN KEY (symbol_id) REFERENCES symbols(id)
+                FOREIGN KEY (symbol_id) REFERENCES symbols(id),
+                UNIQUE(file_id, model_version)
             );
             
             CREATE INDEX IF NOT EXISTS idx_embeddings_file ON embeddings(file_id);
             CREATE INDEX IF NOT EXISTS idx_embeddings_symbol ON embeddings(symbol_id);
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_embeddings_unique_scope 
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_embeddings_unique_scope
                 ON embeddings(file_id, symbol_id, chunk_start, chunk_end);
-            
+
             -- Cache Tables
             CREATE TABLE IF NOT EXISTS query_cache (
                 query_hash TEXT PRIMARY KEY,
@@ -976,6 +977,141 @@ class SQLiteStore:
                 (symbol_id,),
             )
             return [dict(row) for row in cursor.fetchall()]
+
+    # Embedding operations
+    def _serialize_embedding(self, embedding: List[float]) -> sqlite3.Binary:
+        """Serialize an embedding vector for storage."""
+        return sqlite3.Binary(json.dumps(embedding).encode("utf-8"))
+
+    def _deserialize_embedding(self, data: Union[bytes, str]) -> List[float]:
+        """Deserialize an embedding vector from storage."""
+        if data is None:
+            return []
+        if isinstance(data, memoryview):
+            data = data.tobytes()
+        if isinstance(data, bytes):
+            data = data.decode("utf-8")
+        return json.loads(data)
+
+    def get_embedding_for_model(
+        self, file_id: int, model_version: str, content_hash: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Get cached embedding for a file/model combination."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT id, file_id, symbol_id, chunk_start, chunk_end, embedding, 
+                       model_version, created_at, metadata
+                FROM embeddings
+                WHERE file_id = ? AND model_version = ?
+                """,
+                (file_id, model_version),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+
+            metadata = json.loads(row["metadata"]) if row["metadata"] else {}
+            if content_hash and metadata.get("content_hash") != content_hash:
+                return None
+
+            return {
+                "id": row["id"],
+                "file_id": row["file_id"],
+                "symbol_id": row["symbol_id"],
+                "chunk_start": row["chunk_start"],
+                "chunk_end": row["chunk_end"],
+                "embedding": self._deserialize_embedding(row["embedding"]),
+                "model_version": row["model_version"],
+                "created_at": row["created_at"],
+                "metadata": metadata,
+            }
+
+    def upsert_embedding_vector(
+        self,
+        file_id: int,
+        model_version: str,
+        embedding: List[float],
+        *,
+        content_hash: Optional[str] = None,
+        symbol_id: Optional[int] = None,
+        chunk_start: Optional[int] = None,
+        chunk_end: Optional[int] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> int:
+        """Upsert embedding vector ensuring uniqueness per file/model."""
+        payload = dict(metadata or {})
+        if content_hash:
+            payload["content_hash"] = content_hash
+
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO embeddings 
+                    (file_id, symbol_id, chunk_start, chunk_end, embedding, model_version, metadata)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(file_id, model_version) DO UPDATE SET
+                    symbol_id=excluded.symbol_id,
+                    chunk_start=excluded.chunk_start,
+                    chunk_end=excluded.chunk_end,
+                    embedding=excluded.embedding,
+                    metadata=excluded.metadata,
+                    created_at=CURRENT_TIMESTAMP
+                """,
+                (
+                    file_id,
+                    symbol_id,
+                    chunk_start,
+                    chunk_end,
+                    self._serialize_embedding(embedding),
+                    model_version,
+                    json.dumps(payload),
+                ),
+            )
+            if cursor.lastrowid:
+                return cursor.lastrowid
+
+            cursor = conn.execute(
+                "SELECT id FROM embeddings WHERE file_id = ? AND model_version = ?",
+                (file_id, model_version),
+            )
+            row = cursor.fetchone()
+            return row[0] if row else 0
+
+    def get_or_create_embedding_vector(
+        self,
+        file_id: int,
+        model_version: str,
+        content_hash: str,
+        factory: Callable[[], List[float]],
+        *,
+        symbol_id: Optional[int] = None,
+        chunk_start: Optional[int] = None,
+        chunk_end: Optional[int] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Get cached embedding or create it using provided factory."""
+        existing = self.get_embedding_for_model(file_id, model_version, content_hash)
+        if existing:
+            return existing
+
+        embedding = factory()
+        self.upsert_embedding_vector(
+            file_id=file_id,
+            model_version=model_version,
+            embedding=embedding,
+            content_hash=content_hash,
+            symbol_id=symbol_id,
+            chunk_start=chunk_start,
+            chunk_end=chunk_end,
+            metadata=metadata,
+        )
+        return self.get_embedding_for_model(file_id, model_version, content_hash) or {
+            "file_id": file_id,
+            "embedding": embedding,
+            "model_version": model_version,
+            "metadata": metadata or {},
+        }
 
     # Search operations
     def search_symbols(

@@ -77,7 +77,11 @@ class Plugin(IPlugin):
             import os
 
             if os.getenv("VOYAGE_API_KEY") or os.getenv("VOYAGE_API_KEY_PATH"):
-                self._semantic_indexer = SemanticIndexer(collection=f"typescript-{id(self)}")
+                self._semantic_indexer = SemanticIndexer(
+                    collection=f"typescript-{id(self)}",
+                    embedding_model=os.getenv("SEMANTIC_EMBEDDING_MODEL", "voyage-code-3"),
+                    sqlite_store=sqlite_store,
+                )
                 logger.info("Semantic indexing enabled for TypeScript plugin")
             else:
                 logger.info("Semantic indexing disabled (no Voyage API key)")

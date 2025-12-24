@@ -288,7 +288,10 @@ async def startup_event():
                 # Use central Qdrant location
                 qdrant_path = os.getenv("QDRANT_PATH", ".indexes/qdrant/main.qdrant")
                 semantic_indexer = SemanticIndexer(
-                    collection="code-embeddings", qdrant_path=qdrant_path
+                    collection="code-embeddings",
+                    qdrant_path=qdrant_path,
+                    embedding_model=os.getenv("SEMANTIC_EMBEDDING_MODEL", "voyage-code-3"),
+                    sqlite_store=sqlite_store,
                 )
                 logger.info(
                     f"Semantic indexer initialized successfully with Qdrant at {qdrant_path}"
