@@ -39,9 +39,6 @@ on:
         required: false
         default: '7'
         type: number
-    secrets:
-      GITHUB_TOKEN:
-        required: true
 
 env:
   COMPRESSION_LEVEL: '9'
