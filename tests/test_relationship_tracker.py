@@ -11,8 +11,8 @@ Tests cover:
 - NetworkX graph validation
 """
 
-import pytest
 import networkx as nx
+import pytest
 
 from mcp_server.storage.relationship_tracker import (
     Relationship,
@@ -103,9 +103,7 @@ class TestBatchOperations:
 
         func_ids = []
         for i in range(5):
-            func_id = sqlite_store.store_symbol(
-                file_id, f"func{i}", "function", i * 10, i * 10 + 5
-            )
+            func_id = sqlite_store.store_symbol(file_id, f"func{i}", "function", i * 10, i * 10 + 5)
             func_ids.append(func_id)
 
         # Create batch relationships
@@ -400,9 +398,7 @@ class TestNetworkXIntegration:
 
         func_ids = []
         for i in range(5):
-            func_id = sqlite_store.store_symbol(
-                file_id, f"func{i}", "function", i * 10, i * 10 + 5
-            )
+            func_id = sqlite_store.store_symbol(file_id, f"func{i}", "function", i * 10, i * 10 + 5)
             func_ids.append(func_id)
 
         # Create relationships
@@ -441,9 +437,7 @@ class TestNetworkXIntegration:
 
         func_ids = []
         for i in range(6):
-            func_id = sqlite_store.store_symbol(
-                file_id, f"func{i}", "function", i * 10, i * 10 + 5
-            )
+            func_id = sqlite_store.store_symbol(file_id, f"func{i}", "function", i * 10, i * 10 + 5)
             func_ids.append(func_id)
 
         # Create graph with long and short paths
@@ -482,9 +476,7 @@ class TestNetworkXIntegration:
 
         func_ids = []
         for i in range(3):
-            func_id = sqlite_store.store_symbol(
-                file_id, f"func{i}", "function", i * 10, i * 10 + 5
-            )
+            func_id = sqlite_store.store_symbol(file_id, f"func{i}", "function", i * 10, i * 10 + 5)
             func_ids.append(func_id)
 
         # Create cycle: 0 -> 1 -> 2 -> 0
@@ -523,9 +515,7 @@ class TestPerformance:
         # Create 100 entities
         func_ids = []
         for i in range(100):
-            func_id = sqlite_store.store_symbol(
-                file_id, f"func{i}", "function", i * 10, i * 10 + 5
-            )
+            func_id = sqlite_store.store_symbol(file_id, f"func{i}", "function", i * 10, i * 10 + 5)
             func_ids.append(func_id)
 
         # Create relationships
@@ -560,9 +550,7 @@ class TestPerformance:
         # Create 50 entities in a chain
         func_ids = []
         for i in range(50):
-            func_id = sqlite_store.store_symbol(
-                file_id, f"func{i}", "function", i * 10, i * 10 + 5
-            )
+            func_id = sqlite_store.store_symbol(file_id, f"func{i}", "function", i * 10, i * 10 + 5)
             func_ids.append(func_id)
 
         # Create chain

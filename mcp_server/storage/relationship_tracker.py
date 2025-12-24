@@ -159,7 +159,9 @@ class RelationshipTracker:
             )
 
         if not 0.0 <= confidence_score <= 1.0:
-            raise ValueError(f"confidence_score must be between 0.0 and 1.0, got {confidence_score}")
+            raise ValueError(
+                f"confidence_score must be between 0.0 and 1.0, got {confidence_score}"
+            )
 
         with self.store._get_connection() as conn:
             cursor = conn.execute(
@@ -373,9 +375,7 @@ class RelationshipTracker:
                         next_id, depth - 1, rel_types, visited, results, is_forward
                     )
 
-    def get_relationship_graph(
-        self, entity_id: int, depth: int = 2
-    ) -> Dict[str, Any]:
+    def get_relationship_graph(self, entity_id: int, depth: int = 2) -> Dict[str, Any]:
         """
         Get a graph of relationships around an entity.
 
