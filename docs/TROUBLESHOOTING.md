@@ -1,267 +1,254 @@
-# Code-Index-MCP Troubleshooting Guide
+# Troubleshooting Guide
 
-## Common Issues and Solutions
+This guide helps you resolve common issues with Code-Index-MCP.
 
-### 1. MCP Server Returns No Results
+## Table of Contents
+- [Installation Issues](#installation-issues)
+- [Server Startup Problems](#server-startup-problems)
+- [Plugin Errors](#plugin-errors)
+- [Performance Issues](#performance-issues)
+- [API Errors](#api-errors)
+- [File System Issues](#file-system-issues)
 
-**Symptoms:**
-- `mcp-index search` returns 0 results
-- Claude Code MCP tools return empty results
-- Direct SQL queries work but MCP doesn't
+## Installation Issues
 
-**Solutions:**
+### Python Version Mismatch
+**Problem**: `ERROR: This package requires Python 3.8+`
 
-#### A. Plugin Loading Timeout
-The dispatcher may be timing out while loading plugins. This is the most common issue.
-
-**Fix:**
+**Solution**:
 ```bash
-# Use simple dispatcher for BM25-only search (fastest)
-export MCP_USE_SIMPLE_DISPATCHER=true
+# Check Python version
+python --version
 
-# Or increase plugin timeout (default is 5 seconds)
-export MCP_PLUGIN_TIMEOUT=10
+# Use pyenv to install correct version
+pyenv install 3.8.10
+pyenv local 3.8.10
 ```
 
-#### B. Index Not Found
+### Missing Dependencies
+**Problem**: `ModuleNotFoundError: No module named 'fastapi'`
+
+**Solution**:
 ```bash
-# Check if index exists
-ls ~/.mcp/indexes/*/current.db
+# Ensure you're in virtual environment
+source venv/bin/activate  # Linux/Mac
+# or
+venv\Scripts\activate  # Windows
 
-# If missing, create index
-mcp-index index
-
-# Or move existing index to central location
-python scripts/move_indexes_to_central.py
+# Reinstall dependencies
+pip install -r requirements.txt
 ```
 
-### 2. Qdrant Lock Conflicts
+### Tree-sitter Build Errors
+**Problem**: `error: Microsoft Visual C++ 14.0 is required`
 
-**Symptoms:**
-- Error: "Storage folder already accessed by another instance"
-- Semantic search not working
-- Vector database initialization fails
+**Solution**:
+- Windows: Install Visual Studio Build Tools
+- Linux: `sudo apt-get install build-essential`
+- Mac: `xcode-select --install`
 
-**Solutions:**
+## Server Startup Problems
 
-#### A. Clean Up Lock Files
+### Port Already in Use
+**Problem**: `ERROR: [Errno 48] Address already in use`
+
+**Solution**:
 ```bash
-# Remove Qdrant lock files
-rm -f vector_index.qdrant/.lock
+# Find process using port 8000
+lsof -i :8000  # Linux/Mac
+netstat -ano | findstr :8000  # Windows
 
-# Or use server mode instead
-export QDRANT_USE_SERVER=true
-docker-compose -f docker-compose.qdrant.yml up -d
+# Kill the process or use different port
+uvicorn mcp_server.gateway:app --port 8001
 ```
 
-#### B. Use File Mode Fallback
+### Import Errors
+**Problem**: `ImportError: cannot import name 'app' from 'mcp_server.gateway'`
+
+**Solution**:
 ```bash
-# Force file mode
-export QDRANT_USE_SERVER=false
+# Ensure you're in project root
+pwd  # Should show /path/to/Code-Index-MCP
+
+# Add project to Python path
+export PYTHONPATH="${PYTHONPATH}:$(pwd)"
 ```
 
-### 3. Index Out of Sync with Repository
+## Plugin Errors
 
-**Symptoms:**
-- Search results show outdated code
-- Files that were deleted still appear in results
-- New files not being found
+### Plugin Not Found
+**Problem**: `Plugin 'python' not found`
 
-**Solutions:**
+**Solution**:
+1. Check plugin is registered in dispatcher.py
+2. Verify plugin file exists in correct location
+3. Check for import errors in plugin
 
-#### A. Sync Index with Git
-```bash
-# Sync all indexes with their repositories
-python sync_indexes_with_git.py
+### Tree-sitter Language Not Installed
+**Problem**: `Language 'python' not available`
 
-# Check sync status
-python scripts/check_index_status.py
+**Solution**:
+```python
+# Install language grammar
+from tree_sitter import Language
+
+Language.build_library(
+    'build/languages.so',
+    ['vendor/tree-sitter-python']
+)
 ```
 
-#### B. Reindex Changed Files
-```bash
-# Reindex current directory
-mcp-index reindex
+## Performance Issues
 
-# Or full reindex
-mcp-index index --force
+### Slow Indexing
+**Problem**: Indexing takes too long for large codebases
+
+**Solutions**:
+1. **Increase batch size**:
+   ```bash
+   export INDEX_BATCH_SIZE=1000
+   ```
+
+2. **Skip large files**:
+   ```bash
+   export MAX_FILE_SIZE=5242880  # 5MB
+   ```
+
+3. **Use faster storage**: Move index to SSD
+
+4. **Limit file types**:
+   ```python
+   # Only index specific extensions
+   ALLOWED_EXTENSIONS = ['.py', '.js', '.cpp']
+   ```
+
+### High Memory Usage
+**Problem**: Server using too much RAM
+
+**Solutions**:
+1. **Limit cache size**:
+   ```bash
+   export CACHE_SIZE_MB=512
+   ```
+
+2. **Enable garbage collection**:
+   ```python
+   import gc
+   gc.collect()  # Force garbage collection
+   ```
+
+3. **Process files in chunks**
+
+## API Errors
+
+### 400 Bad Request
+**Problem**: `{"detail": "Invalid file path"}`
+
+**Solution**: Ensure file paths are absolute and within project directory
+
+### 404 Not Found
+**Problem**: `{"detail": "Symbol not found"}`
+
+**Solution**: 
+- Verify file has been indexed
+- Check symbol name spelling
+- Ensure correct file extension
+
+### 500 Internal Server Error
+**Problem**: Server returns 500 error
+
+**Solution**:
+1. Check server logs for stack trace
+2. Enable debug mode: `export DEBUG=true`
+3. Common causes:
+   - Plugin crashes
+   - Database locked
+   - Out of memory
+
+## File System Issues
+
+### Permission Denied
+**Problem**: `PermissionError: [Errno 13] Permission denied`
+
+**Solution**:
+```bash
+# Check file permissions
+ls -la problem_file.py
+
+# Fix permissions
+chmod 644 problem_file.py
 ```
 
-### 4. Performance Issues
+### File Not Found
+**Problem**: `FileNotFoundError: [Errno 2] No such file or directory`
 
-**Symptoms:**
-- Searches take > 1 second
-- Indexing is very slow
-- High memory usage
+**Solution**:
+- Use absolute paths
+- Check working directory
+- Verify file exists: `ls -la /path/to/file`
 
-**Solutions:**
+### Symlink Issues
+**Problem**: Symbolic links not followed
 
-#### A. Use Simple Dispatcher
-```bash
-# For basic text search without semantic features
-export MCP_USE_SIMPLE_DISPATCHER=true
+**Solution**:
+```python
+# Enable symlink following
+FOLLOW_SYMLINKS = True
 ```
 
-#### B. Disable Semantic Search
+## Debug Mode
+
+Enable detailed logging:
 ```bash
-# In your search commands
-mcp-index search "query" --no-semantic
-```
+# Set log level
+export LOG_LEVEL=DEBUG
 
-#### C. Check Index Size
-```bash
-# Find large indexes
-du -sh ~/.mcp/indexes/*/*db | sort -h
+# Enable FastAPI debug mode
+export DEBUG=true
 
-# Consider excluding large generated files
-echo "node_modules/" >> .mcp-index-ignore
-echo "dist/" >> .mcp-index-ignore
-```
-
-### 5. Docker Issues
-
-**Symptoms:**
-- Can't connect to Qdrant server
-- MCP server not accessible
-- Container startup failures
-
-**Solutions:**
-
-#### A. Check Container Status
-```bash
-docker-compose ps
-docker-compose logs mcp-server
-docker-compose logs qdrant
-```
-
-#### B. Reset Containers
-```bash
-docker-compose down
-docker-compose up -d
-```
-
-#### C. Use Native Installation
-```bash
-# Install without Docker
-pip install -e .
-```
-
-### 6. Claude Code Integration Issues
-
-**Symptoms:**
-- Claude Code can't find MCP server
-- Tools not appearing in Claude Code
-- Connection timeouts
-
-**Solutions:**
-
-#### A. Check MCP Configuration
-```bash
-# Verify .mcp.json exists
-cat .mcp.json
-
-# Check server is running
-ps aux | grep mcp_server_cli
-```
-
-#### B. Restart Claude Code
-1. Close Claude Code completely
-2. Clear any cache/temp files
-3. Restart and wait for MCP discovery
-
-#### C. Use Debug Mode
-```bash
-# Enable debug logging
-export MCP_DEBUG=1
-```
-
-### 7. Missing Language Support
-
-**Symptoms:**
-- Files of certain types not being indexed
-- "No plugin found for extension" errors
-
-**Solutions:**
-
-#### A. Check Supported Languages
-```bash
-# List all supported languages
-mcp-index status | grep -A50 "Supported Languages"
-```
-
-#### B. Verify Tree-Sitter Parser
-```bash
-# Install missing parsers
-pip install tree-sitter-[language]
-```
-
-### 8. Git Integration Issues
-
-**Symptoms:**
-- Repository ID not found
-- Can't determine git remote
-- Index not linking to repository
-
-**Solutions:**
-
-#### A. Check Git Configuration
-```bash
-# Verify git remote exists
-git remote -v
-
-# Add remote if missing
-git remote add origin [url]
-```
-
-#### B. Use Path-Based ID
-```bash
-# The system will fall back to path-based hash
-# Check logs for the generated ID
-export MCP_DEBUG=1
-mcp-index index
-```
-
-## Environment Variables Reference
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MCP_USE_SIMPLE_DISPATCHER` | `false` | Use lightweight BM25-only dispatcher |
-| `MCP_PLUGIN_TIMEOUT` | `5` | Seconds before plugin loading timeout |
-| `MCP_DEBUG` | `0` | Enable debug logging (1 = enabled) |
-| `MCP_INDEX_STORAGE_PATH` | `~/.mcp/indexes` | Central index storage location |
-| `QDRANT_USE_SERVER` | `true` | Use Qdrant server mode vs file mode |
-| `QDRANT_URL` | `http://localhost:6333` | Qdrant server URL |
-| `VOYAGE_API_KEY` | None | API key for semantic embeddings |
-
-## Debug Commands
-
-```bash
-# Check index status
-python scripts/check_test_indexes.py
-
-# Verify dispatcher functionality
-python scripts/test_mcp_directly.py
-
-# Test search performance
-python scripts/test_mcp_performance.py
-
-# Validate all indexes
-python scripts/verify_all_indexes_parallel.py
+# Start server with reload
+uvicorn mcp_server.gateway:app --reload --log-level debug
 ```
 
 ## Getting Help
 
-1. **Check Logs**: Always check stderr output for detailed error messages
-2. **Enable Debug Mode**: `export MCP_DEBUG=1` for verbose logging
-3. **GitHub Issues**: Report bugs at https://github.com/[repo]/issues
-4. **Documentation**: See `/docs` directory for detailed guides
+If you're still having issues:
 
-## Quick Fixes Checklist
+1. **Check existing issues**: [GitHub Issues](https://github.com/yourusername/Code-Index-MCP/issues)
+2. **Ask in discussions**: [GitHub Discussions](https://github.com/yourusername/Code-Index-MCP/discussions)
+3. **Create a bug report** with:
+   - Error message and stack trace
+   - Steps to reproduce
+   - System information (OS, Python version)
+   - Relevant configuration
 
-- [ ] Is the index created? (`mcp-index index`)
-- [ ] Is the index in central location? (`ls ~/.mcp/indexes/`)
-- [ ] Are there any lock files? (`rm vector_index.qdrant/.lock`)
-- [ ] Is simple dispatcher faster? (`export MCP_USE_SIMPLE_DISPATCHER=true`)
-- [ ] Is the repository synced? (`python sync_indexes_with_git.py`)
-- [ ] Are large files excluded? (`.mcp-index-ignore`)
-- [ ] Is debug mode helpful? (`export MCP_DEBUG=1`)
+## Common Error Messages
+
+| Error | Likely Cause | Solution |
+|-------|--------------|----------|
+| `ConnectionRefusedError` | Server not running | Start server with `uvicorn` |
+| `JSONDecodeError` | Invalid request body | Check API request format |
+| `TimeoutError` | Large file or slow system | Increase timeout settings |
+| `MemoryError` | Out of RAM | Reduce batch size or file limits |
+| `KeyError: 'symbol_name'` | Missing required field | Check API documentation |
+
+## Performance Tuning
+
+### Recommended Settings for Large Codebases
+```bash
+# .env file
+INDEX_BATCH_SIZE=1000
+MAX_FILE_SIZE=10485760  # 10MB
+CACHE_SIZE_MB=1024
+WORKER_THREADS=4
+ENABLE_PROFILING=true
+```
+
+### Database Optimization
+```sql
+-- Optimize SQLite
+PRAGMA journal_mode = WAL;
+PRAGMA synchronous = NORMAL;
+PRAGMA cache_size = -64000;  -- 64MB
+PRAGMA temp_store = MEMORY;
+```
