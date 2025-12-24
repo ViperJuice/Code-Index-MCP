@@ -726,6 +726,8 @@ class TestSQLiteStoreHealthCheck:
         assert health["fts5"] is True
         assert health["wal"] is True
         assert health["version"] >= 1
+        assert health["version"] == health["latest_version"]
+        assert health["required_migrations"] == []
         assert health["error"] is None
         # Check all required tables exist
         assert health["tables"]["file_moves"] is True
@@ -834,8 +836,8 @@ class TestSQLiteStoreHealthCheck:
 
         health = store.health_check()
 
-        # Fresh database should have version 1
-        assert health["version"] == 1
+        # Fresh database should match the latest migration version
+        assert health["version"] == health["latest_version"]
 
 
 class TestPerformance:

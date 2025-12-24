@@ -185,8 +185,8 @@ class TestPhase1Foundation:
             )
             assert cursor.fetchone() is not None
 
-    def test_fresh_database_no_migrations_run(self, tmp_path):
-        """Verify fresh database doesn't run migrations."""
+    def test_fresh_database_records_migrations(self, tmp_path):
+        """Verify fresh database runs and records migrations."""
         db_path = tmp_path / "test.db"
 
         # Database doesn't exist yet
@@ -195,13 +195,13 @@ class TestPhase1Foundation:
         # Create store
         store = SQLiteStore(str(db_path))
 
-        # Check that migrations table is empty (no migrations run on fresh DB)
+        # Check that migrations table contains applied migrations
         with store._get_connection() as conn:
             cursor = conn.execute("SELECT COUNT(*) FROM migrations")
             count = cursor.fetchone()[0]
 
-            # Fresh database should have no migration records
-            assert count == 0
+            # Fresh database should record at least one migration
+            assert count >= 1
 
     def test_foreign_key_constraints_enabled(self, tmp_path):
         """Verify foreign key constraints are enabled."""

@@ -9,6 +9,7 @@ import json
 import logging
 import sqlite3
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -40,7 +41,7 @@ class SQLiteStore:
 
         self._init_database()
 
-        # Only run migrations on new databases
+        # Only run migrations on new databases automatically
         if not db_exists:
             self._run_migrations()
 
@@ -89,8 +90,17 @@ class SQLiteStore:
                         "Column 'deleted_at' missing from 'files' table - migration may be needed"
                     )
 
-    def _run_migrations(self):
-        """Run any pending database migrations."""
+    def _run_migrations(self, target_version: Optional[int] = None) -> List[str]:
+        """Run any pending database migrations.
+
+        Args:
+            target_version: Optional schema version to migrate up to.
+
+        Returns:
+            List of migration filenames that were applied.
+        """
+        applied_migrations: List[str] = []
+
         # Skip migrations for BM25-only databases
         with self._get_connection() as conn:
             cursor = conn.execute(
@@ -103,33 +113,61 @@ class SQLiteStore:
                 ).fetchone()
             ):
                 logger.debug("Skipping migrations for BM25-only database")
-                return
+                return applied_migrations
 
         migrations_dir = Path(__file__).parent / "migrations"
         if not migrations_dir.exists():
-            return
+            return applied_migrations
 
         with self._get_connection() as conn:
-            # Get current schema version
-            try:
-                cursor = conn.execute("SELECT MAX(version) FROM schema_version")
-                current_version = cursor.fetchone()[0] or 0
-            except sqlite3.OperationalError:
-                current_version = 0
+            current_version = self._get_current_schema_version(conn)
+            latest_version = self._get_latest_migration_version(migrations_dir)
+            if target_version is not None:
+                latest_version = min(latest_version, target_version)
 
-            # Run migrations
             for migration_file in sorted(migrations_dir.glob("*.sql")):
-                # Extract version from filename (e.g., "002_relative_paths.sql" -> 2)
+                previous_version = current_version
                 try:
                     version = int(migration_file.stem.split("_")[0])
                 except (ValueError, IndexError):
                     continue
 
-                if version > current_version:
-                    logger.info(f"Running migration {migration_file.name}")
-                    with open(migration_file, "r") as f:
-                        conn.executescript(f.read())
-                    logger.info(f"Completed migration to version {version}")
+                if version > latest_version:
+                    break
+
+                # Determine if migration is needed even if version looks current
+                needs_migration = self._migration_needed(conn, version)
+                if not needs_migration:
+                    if current_version < version:
+                        conn.execute(
+                            """
+                            INSERT OR REPLACE INTO schema_version (version, description)
+                            VALUES (?, ?)
+                            """,
+                            (version, f"Marked applied for {migration_file.name}"),
+                        )
+                        conn.execute(
+                            """
+                            INSERT INTO migrations (version_from, version_to, status)
+                            VALUES (?, ?, ?)
+                            """,
+                            (previous_version or 0, version, "skipped"),
+                        )
+                        current_version = version
+                    continue
+
+                logger.info(f"Running migration {migration_file.name}")
+                with open(migration_file, "r") as f:
+                    conn.executescript(f.read())
+                logger.info(f"Completed migration to version {version}")
+                applied_migrations.append(migration_file.name)
+                current_version = max(current_version, version)
+
+        return applied_migrations
+
+    def run_migrations(self, target_version: Optional[int] = None) -> List[str]:
+        """Public wrapper to execute database migrations."""
+        return self._run_migrations(target_version)
 
     @contextmanager
     def _get_connection(self):
@@ -170,6 +208,175 @@ class SQLiteStore:
             logger.warning(f"Could not check column {table}.{column}: {e}")
             return False
 
+    def _check_index_exists(self, conn: sqlite3.Connection, table: str, index: str) -> bool:
+        """Check if an index exists on a table."""
+        try:
+            cursor = conn.execute(f"PRAGMA index_list({table})")
+            indexes = {row[1] for row in cursor.fetchall()}
+            return index in indexes
+        except Exception as e:
+            logger.warning(f"Could not check index {index} on {table}: {e}")
+            return False
+
+    def _get_current_schema_version(self, conn: sqlite3.Connection) -> int:
+        """Return the current schema version recorded in the database."""
+        try:
+            cursor = conn.execute("SELECT MAX(version) FROM schema_version")
+            version = cursor.fetchone()[0]
+            return int(version) if version is not None else 0
+        except sqlite3.OperationalError:
+            return 0
+
+    def _get_latest_migration_version(self, migrations_dir: Optional[Path] = None) -> int:
+        """Determine the latest migration version available on disk."""
+        dir_path = migrations_dir or Path(__file__).parent / "migrations"
+        versions: List[int] = []
+        if not dir_path.exists():
+            return 0
+
+        for migration_file in dir_path.glob("*.sql"):
+            try:
+                versions.append(int(migration_file.stem.split("_")[0]))
+            except (ValueError, IndexError):
+                continue
+        return max(versions) if versions else 0
+
+    def _migration_needed(self, conn: sqlite3.Connection, version: int) -> bool:
+        """Determine if a specific migration version is required based on schema state."""
+        migration_checks = {
+            1: lambda: False,
+            2: lambda: any(
+                [
+                    not self._check_column_exists(conn, "files", "content_hash"),
+                    not self._check_column_exists(conn, "files", "is_deleted"),
+                    not self._check_column_exists(conn, "files", "deleted_at"),
+                    not self._check_index_exists(conn, "files", "files_repository_id_relative_path_key"),
+                    not self._check_column_exists(conn, "file_moves", "content_hash"),
+                ]
+            ),
+            3: lambda: any(
+                [
+                    not self._check_column_exists(conn, "files", "content_hash"),
+                    not self._check_column_exists(conn, "files", "is_deleted"),
+                    not self._check_index_exists(conn, "embeddings", "idx_embeddings_unique_scope"),
+                ]
+            ),
+        }
+
+        check_fn = migration_checks.get(version)
+        return check_fn() if check_fn else False
+
+    def _get_pending_migration_versions(self, conn: sqlite3.Connection, current_version: int) -> List[int]:
+        """List migration versions that still need to be applied."""
+        latest_version = self._get_latest_migration_version()
+        pending: List[int] = []
+
+        for version in range(1, latest_version + 1):
+            if version > current_version or self._migration_needed(conn, version):
+                pending.append(version)
+
+        return pending
+
+    def _locate_manifest_files(self, base_dir: Optional[Path] = None) -> Dict[str, Dict[str, Any]]:
+        """Locate manifest and metadata files near the database."""
+        search_base = base_dir or Path(self.db_path).parent
+        candidates = [search_base]
+        if search_base.name == ".mcp-index":
+            candidates.append(search_base.parent)
+
+        manifest_path = None
+        metadata_path = None
+        manifest_data: Optional[Dict[str, Any]] = None
+        metadata_data: Optional[Dict[str, Any]] = None
+
+        for candidate in candidates:
+            possible_manifest = candidate / ".mcp-index.json"
+            if possible_manifest.exists():
+                manifest_path = possible_manifest
+                try:
+                    manifest_data = json.loads(possible_manifest.read_text())
+                except Exception as exc:
+                    logger.warning(f"Failed to read manifest at {possible_manifest}: {exc}")
+                break
+
+        for candidate in candidates:
+            possible_metadata = candidate / ".index_metadata.json"
+            if possible_metadata.exists():
+                metadata_path = possible_metadata
+                try:
+                    metadata_data = json.loads(possible_metadata.read_text())
+                except Exception as exc:
+                    logger.warning(f"Failed to read metadata at {possible_metadata}: {exc}")
+                break
+
+        manifest_status = {
+            "found": manifest_path is not None,
+            "path": str(manifest_path) if manifest_path else None,
+            "version": manifest_data.get("version") if manifest_data else None,
+            "data": manifest_data or {},
+        }
+
+        metadata_status = {
+            "found": metadata_path is not None,
+            "path": str(metadata_path) if metadata_path else None,
+            "version": metadata_data.get("version") if metadata_data else None,
+            "data": metadata_data or {},
+        }
+
+        return {"manifest": manifest_status, "metadata": metadata_status}
+
+    def ensure_index_manifests(self, manifest_dir: Optional[Path] = None) -> Dict[str, bool]:
+        """Create default manifest and metadata files if they are missing.
+
+        Args:
+            manifest_dir: Optional directory to prefer for manifest placement.
+
+        Returns:
+            Dict indicating whether manifest or metadata files were created.
+        """
+        target_dir = manifest_dir or Path(self.db_path).parent
+        manifest_parent = target_dir.parent if target_dir.name == ".mcp-index" else target_dir
+        manifest_info = self._locate_manifest_files(target_dir)
+        created = {"manifest_created": False, "metadata_created": False}
+
+        try:
+            stats = self.get_statistics()
+        except Exception as exc:  # pragma: no cover - defensive fallback
+            logger.warning(f"Could not compute statistics for manifest backfill: {exc}")
+            stats = {}
+        latest_version = self._get_latest_migration_version()
+
+        if not manifest_info["manifest"]["found"]:
+            manifest_path = manifest_parent / ".mcp-index.json"
+            default_manifest = {
+                "version": "1.0",
+                "enabled": True,
+                "auto_download": False,
+                "auto_upload": False,
+                "artifact_retention_days": 30,
+                "languages": "auto",
+                "exclude_defaults": True,
+                "custom_excludes": [],
+                "github_artifacts": {"enabled": False, "compatibility_checking": True},
+            }
+            manifest_path.write_text(json.dumps(default_manifest, indent=2))
+            created["manifest_created"] = True
+
+        if not manifest_info["metadata"]["found"]:
+            metadata_path = manifest_parent / ".index_metadata.json"
+            metadata = {
+                "version": "1.0",
+                "created_at": datetime.utcnow().isoformat(),
+                "schema_version": latest_version,
+                "indexed_files": stats.get("files", 0),
+                "indexed_symbols": stats.get("symbols", 0),
+                "path": str(Path(self.db_path).resolve()),
+            }
+            metadata_path.write_text(json.dumps(metadata, indent=2))
+            created["metadata_created"] = True
+
+        return created
+
     def _init_schema(self, conn: sqlite3.Connection):
         """Initialize the database schema."""
         # Create core tables
@@ -201,15 +408,23 @@ class SQLiteStore:
                 language TEXT,
                 size INTEGER,
                 hash TEXT,
+                content_hash TEXT,
                 last_modified TIMESTAMP,
                 indexed_at TIMESTAMP,
                 metadata JSON,
+                is_deleted BOOLEAN DEFAULT FALSE,
+                deleted_at TIMESTAMP,
                 FOREIGN KEY (repository_id) REFERENCES repositories(id),
                 UNIQUE(repository_id, path)
             );
-            
+
             CREATE INDEX IF NOT EXISTS idx_files_language ON files(language);
             CREATE INDEX IF NOT EXISTS idx_files_hash ON files(hash);
+            CREATE INDEX IF NOT EXISTS idx_files_content_hash ON files(content_hash);
+            CREATE INDEX IF NOT EXISTS idx_files_deleted ON files(is_deleted);
+            CREATE INDEX IF NOT EXISTS idx_files_relative_path ON files(relative_path);
+            CREATE UNIQUE INDEX IF NOT EXISTS files_repository_id_relative_path_key 
+              ON files(repository_id, relative_path);
             
             -- Symbols
             CREATE TABLE IF NOT EXISTS symbols (
@@ -302,6 +517,8 @@ class SQLiteStore:
             
             CREATE INDEX IF NOT EXISTS idx_embeddings_file ON embeddings(file_id);
             CREATE INDEX IF NOT EXISTS idx_embeddings_symbol ON embeddings(symbol_id);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_embeddings_unique_scope 
+                ON embeddings(file_id, symbol_id, chunk_start, chunk_end);
             
             -- Cache Tables
             CREATE TABLE IF NOT EXISTS query_cache (
@@ -363,7 +580,8 @@ class SQLiteStore:
                 ('embedding_model', 'voyage-code-3', 'Current embedding model used for vector search'),
                 ('model_dimension', '1024', 'Embedding vector dimension'),
                 ('distance_metric', 'cosine', 'Distance metric for vector similarity'),
-                ('index_version', '1.0', 'Index schema version');
+                ('index_version', '1.0', 'Index schema version'),
+                ('manifest_version', '1.0', 'Index manifest compatibility version');
 
             -- Insert initial schema version
             INSERT INTO schema_version (version, description)
@@ -815,7 +1033,10 @@ class SQLiteStore:
             - fts5: bool - FTS5 availability
             - wal: bool - WAL mode status
             - version: int - schema version (0 if not available)
-            - error: Optional[str] - error message if unhealthy
+            - latest_version: int - highest available migration version
+            - required_migrations: List[int] - pending migration versions
+            - manifest/metadata: details about manifest files
+            - error: Optional[str] - aggregated error message if unhealthy/degraded
         """
         result = {
             "status": "healthy",
@@ -823,12 +1044,17 @@ class SQLiteStore:
             "fts5": False,
             "wal": False,
             "version": 0,
+            "latest_version": self._get_latest_migration_version(),
+            "required_migrations": [],
+            "manifest": {"found": False, "path": None, "version": None, "data": {}},
+            "metadata": {"found": False, "path": None, "version": None, "data": {}},
             "error": None,
         }
 
+        errors: List[str] = []
+
         try:
             with self._get_connection() as conn:
-                # Check required tables
                 required_tables = [
                     "schema_version",
                     "repositories",
@@ -853,45 +1079,77 @@ class SQLiteStore:
                     )
                     result["tables"][table] = cursor.fetchone() is not None
 
-                # Check FTS5 support
                 result["fts5"] = self._check_fts5_support(conn)
 
-                # Check WAL mode
                 cursor = conn.execute("PRAGMA journal_mode")
                 journal_mode = cursor.fetchone()[0].upper()
                 result["wal"] = journal_mode == "WAL"
 
-                # Get schema version
                 if result["tables"].get("schema_version", False):
-                    try:
-                        cursor = conn.execute("SELECT MAX(version) FROM schema_version")
-                        version_row = cursor.fetchone()
-                        result["version"] = version_row[0] if version_row and version_row[0] else 0
-                    except sqlite3.OperationalError:
-                        result["version"] = 0
+                    result["version"] = self._get_current_schema_version(conn)
 
-                # Determine health status
+                pending_migrations = self._get_pending_migration_versions(
+                    conn, result["version"]
+                )
+                result["required_migrations"] = pending_migrations
+
+                manifest_info = self._locate_manifest_files()
+                result["manifest"] = manifest_info["manifest"]
+                result["metadata"] = manifest_info["metadata"]
+
                 missing_tables = [table for table, exists in result["tables"].items() if not exists]
                 if missing_tables:
                     if len(missing_tables) > 5:
                         result["status"] = "unhealthy"
-                        result["error"] = (
+                        errors.append(
                             f"Critical tables missing: {', '.join(missing_tables[:5])} and {len(missing_tables) - 5} more"
                         )
                     else:
                         result["status"] = "degraded"
-                        result["error"] = f"Some tables missing: {', '.join(missing_tables)}"
-                elif not result["fts5"]:
+                        errors.append(f"Some tables missing: {', '.join(missing_tables)}")
+
+                if not result["fts5"]:
                     result["status"] = "degraded"
-                    result["error"] = "FTS5 support not available - search functionality limited"
-                elif not result["wal"]:
+                    errors.append("FTS5 support not available - search functionality limited")
+
+                if not result["wal"]:
                     result["status"] = "degraded"
-                    result["error"] = "WAL mode not enabled - concurrency may be affected"
+                    errors.append("WAL mode not enabled - concurrency may be affected")
+
+                if pending_migrations:
+                    if result["status"] == "healthy":
+                        result["status"] = "degraded"
+                    errors.append(
+                        f"Pending migrations detected: {', '.join(str(v) for v in pending_migrations)}"
+                    )
+
+                manifest_expected = any(
+                    parent.name in {".mcp-index", ".indexes"} for parent in Path(self.db_path).parents
+                )
+                if manifest_expected and not result["manifest"]["found"]:
+                    if result["status"] == "healthy":
+                        result["status"] = "degraded"
+                    errors.append("Index manifest (.mcp-index.json) is missing")
+
+                if (
+                    manifest_expected
+                    and result["manifest"]["found"]
+                    and result["manifest"]["version"]
+                    and result["manifest"]["version"] != "1.0"
+                ):
+                    if result["status"] == "healthy":
+                        result["status"] = "degraded"
+                    errors.append(
+                        f"Manifest version {result['manifest']['version']} incompatible with schema expectations"
+                    )
 
         except Exception as e:
             result["status"] = "unhealthy"
-            result["error"] = f"Database health check failed: {str(e)}"
+            errors.append(f"Database health check failed: {str(e)}")
             logger.error(f"Health check error: {e}")
+
+        if errors:
+            result["error"] = "; ".join(errors)
 
         return result
 
