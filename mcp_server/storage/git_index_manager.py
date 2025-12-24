@@ -93,6 +93,7 @@ class GitAwareIndexManager:
         if not current_commit:
             return IndexSyncResult(action="failed", commit="", error="Failed to get current commit")
 
+        repo_info.current_commit = current_commit
         last_indexed_commit = repo_info.last_indexed_commit
 
         # Check if already up to date
@@ -108,12 +109,13 @@ class GitAwareIndexManager:
             if self._has_remote_artifact(repo_id, current_commit):
                 # Download existing index for this commit
                 if self._download_commit_index(repo_id, current_commit):
-                    self.registry.update_indexed_commit(repo_id, current_commit)
-                    return IndexSyncResult(
-                        action="downloaded",
-                        commit=current_commit,
-                        duration_seconds=(datetime.now() - start_time).total_seconds(),
-                    )
+                    if self.registry.update_indexed_commit(repo_id, current_commit):
+                        repo_info.last_indexed_commit = current_commit
+                        return IndexSyncResult(
+                            action="downloaded",
+                            commit=current_commit,
+                            duration_seconds=(datetime.now() - start_time).total_seconds(),
+                        )
 
         # Determine what changed since last index
         if last_indexed_commit and not force_full:
@@ -124,20 +126,21 @@ class GitAwareIndexManager:
                 if not changed_files.is_empty():
                     # Incremental update - only reindex changed files
                     result = self._incremental_index_update(repo_id, changed_files)
-                    self.registry.update_indexed_commit(repo_id, current_commit)
-
-                    return IndexSyncResult(
-                        action="indexed",
-                        commit=current_commit,
-                        files_processed=result.indexed + result.deleted + result.moved,
-                        duration_seconds=(datetime.now() - start_time).total_seconds(),
-                    )
+                    if self.registry.update_indexed_commit(repo_id, current_commit):
+                        repo_info.last_indexed_commit = current_commit
+                        return IndexSyncResult(
+                            action="indexed",
+                            commit=current_commit,
+                            files_processed=result.indexed + result.deleted + result.moved,
+                            duration_seconds=(datetime.now() - start_time).total_seconds(),
+                        )
             except Exception as e:
                 logger.warning(f"Incremental update failed, falling back to full index: {e}")
 
         # Full index needed
         files_indexed = self._full_index(repo_id)
-        self.registry.update_indexed_commit(repo_id, current_commit)
+        if self.registry.update_indexed_commit(repo_id, current_commit):
+            repo_info.last_indexed_commit = current_commit
 
         return IndexSyncResult(
             action="indexed",
