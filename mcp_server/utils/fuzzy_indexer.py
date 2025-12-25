@@ -64,24 +64,15 @@ class FuzzyIndexer:
         lines = [(i + 1, line.rstrip()) for i, line in enumerate(content.splitlines())]
         self.index[path] = lines
 
-        # If using SQLite backend, also store in appropriate table
-        if self.sqlite_store:
-            try:
-                with self.sqlite_store._get_connection() as conn:
-                    if self._schema_type == "fts_code":
-                        # Clear existing entries for this file
-                        conn.execute("DELETE FROM fts_code WHERE file_id = ?", (path,))
-                        # Insert new content (store full content for FTS5)
-                        conn.execute(
-                            "INSERT INTO fts_code (content, file_id) VALUES (?, ?)",
-                            (content, path),
-                        )
-                    elif self._schema_type == "bm25_content":
-                        # For BM25 schema, we don't modify the table - it's already populated
-                        # Just log that we're adapting to existing BM25 content
-                        logger.debug(f"Adapting to existing BM25 content for {path}")
-            except Exception as e:
-                logger.error(f"Failed to update search index for {path}: {e}")
+        # Note: We do NOT update fts_code here because we don't have the correct integer file_id.
+        # The plugins (SimpleTextPlugin, GenericTreeSitterPlugin, etc.) are responsible for 
+        # calling SQLiteStore.update_file_content_fts with the correct file_id after storing the file.
+        #
+        # If we are in BM25 mode (legacy), we might log or do nothing.
+        if self.sqlite_store and self._schema_type == "bm25_content":
+             # For BM25 schema, we don't modify the table - it's already populated
+             # Just log that we're adapting to existing BM25 content
+             logger.debug(f"Adapting to existing BM25 content for {path}")
 
     # ------------------------------------------------------------------
     def search(self, query: str, limit: int = 20) -> List[Dict]:

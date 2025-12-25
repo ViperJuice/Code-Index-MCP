@@ -128,6 +128,10 @@ class SimpleTextPlugin(IPlugin):
                     hash=file_hash,
                 )
 
+                # Update FTS content
+                if hasattr(self._sqlite_store, "update_file_content_fts"):
+                     self._sqlite_store.update_file_content_fts(file_id, content)
+
                 # Store symbols
                 for symbol in shard["symbols"]:
                     self._sqlite_store.store_symbol(
@@ -153,17 +157,25 @@ class SimpleTextPlugin(IPlugin):
             return None
 
         try:
-            result = self._sqlite_store.get_definition(symbol, "plaintext")
-            if result:
+            # Use get_symbol or search_symbols
+            # get_symbol returns a list of dicts
+            results = self._sqlite_store.get_symbol(symbol)
+            if results:
+                # Prioritize exact match, take the first one
+                result = results[0]
                 return SymbolDef(
-                    name=result["symbol"],
+                    symbol=result["name"],
                     kind=result.get("kind", "variable"),
+                    language="plaintext",
                     signature=result.get("signature", symbol),
-                    doc=result.get("doc", ""),
-                    defined_in=result["defined_in"],
-                    line=result.get("line", 1),
-                    span=(result.get("line", 1), result.get("line", 1)),
+                    doc=result.get("documentation", ""),
+                    defined_in=result.get("file_path", ""),
+                    line=result.get("line_start", 1),
+                    span=(result.get("line_start", 1), result.get("line_end", 1)),
                 )
+        except AttributeError:
+             # Fallback if method doesn't exist (e.g. mock store)
+             pass
         except Exception as e:
             logger.error(f"Error getting definition for {symbol}: {e}")
 
@@ -178,15 +190,23 @@ class SimpleTextPlugin(IPlugin):
         limit = opts.get("limit", 20)
 
         try:
-            results = self._sqlite_store.search(query, "plaintext", limit)
+            # Use search_code_fts for text search
+            results = self._sqlite_store.search_code_fts(query, limit)
             for result in results:
+                # snippet function in FTS usually returns formatted string with markers
+                snippet = result.get("content", "")
+                if len(snippet) > 200:
+                    snippet = snippet[:200] + "..."
+                
                 yield SearchResult(
-                    file=result["file"],
-                    line=result["line"],
-                    snippet=result["snippet"],
-                    score=result.get("score", 0.5),
-                    kind=result.get("kind", "text"),
+                    file=result.get("file_path", ""),
+                    line=1, # FTS might not return line number easily without snippets logic
+                    snippet=snippet,
+                    score=result.get("rank", 0.0) if "rank" in result else 0.5,
+                    kind="text",
                 )
+        except AttributeError:
+             pass
         except Exception as e:
             logger.error(f"Error searching for {query}: {e}")
             return []
@@ -198,14 +218,15 @@ class SimpleTextPlugin(IPlugin):
             return []
 
         try:
-            results = self._sqlite_store.search(symbol, "plaintext", 50)
+            # Use search_code_fts to find occurrences
+            results = self._sqlite_store.search_code_fts(symbol, 50)
             for result in results:
                 yield Reference(
-                    file=result["file"],
-                    line=result["line"],
-                    span=(result["line"], result["line"]),
-                    kind="text",
+                    file=result.get("file_path", ""),
+                    line=1,
                 )
+        except AttributeError:
+             pass
         except Exception as e:
             logger.error(f"Error finding references for {symbol}: {e}")
             return []

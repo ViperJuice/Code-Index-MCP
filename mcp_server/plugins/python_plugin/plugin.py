@@ -72,6 +72,10 @@ class Plugin(IPlugin):
                 hash=file_hash,
             )
 
+            # Update FTS content
+            if hasattr(self._sqlite_store, "update_file_content_fts"):
+                 self._sqlite_store.update_file_content_fts(file_id, content)
+
         symbols: list[dict] = []
         for child in root.named_children:
             if child.type not in {"function_definition", "class_definition"}:

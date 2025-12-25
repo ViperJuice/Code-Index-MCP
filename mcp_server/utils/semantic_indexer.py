@@ -71,7 +71,7 @@ class SemanticIndexer:
     ) -> None:
         self.collection = collection
         self.qdrant_path = qdrant_path
-        self.embedding_model = "voyage-code-3"
+        self.embedding_model = os.environ.get("SEMANTIC_EMBEDDING_MODEL", "voyage-code-3")
         self.metadata_file = ".index_metadata.json"
         self.path_resolver = path_resolver or PathResolver()
 
@@ -409,7 +409,7 @@ class SemanticIndexer:
         if texts:
             embeds = self.voyage.embed(
                 texts,
-                model="voyage-code-3",
+                model=self.embedding_model,
                 input_type="document",
                 output_dimension=1024,
                 output_dtype="float",
@@ -496,8 +496,8 @@ class SemanticIndexer:
         try:
             embedding = self.voyage.embed(
                 [text],
-                model="voyage-code-3",
-                input_type="document",
+                model=self.embedding_model,
+                input_type="query",
                 output_dimension=1024,
                 output_dtype="float",
             ).embeddings[0]
@@ -505,11 +505,20 @@ class SemanticIndexer:
             raise RuntimeError(f"Failed to generate query embedding: {e}")
 
         try:
-            results = self.qdrant.search(
-                collection_name=self.collection,
-                query_vector=embedding,
-                limit=limit,
-            )
+            # Use query_points instead of search for newer qdrant-client
+            if hasattr(self.qdrant, "query_points"):
+                results = self.qdrant.query_points(
+                    collection_name=self.collection,
+                    query=embedding,
+                    limit=limit,
+                ).points
+            else:
+                # Fallback for older clients if needed
+                results = self.qdrant.search(
+                    collection_name=self.collection,
+                    query_vector=embedding,
+                    limit=limit,
+                )
 
             for res in results:
                 payload = res.payload or {}
@@ -563,7 +572,7 @@ class SemanticIndexer:
         try:
             embedding = self.voyage.embed(
                 [embedding_text],
-                model="voyage-code-3",
+                model=self.embedding_model,
                 input_type="document",
                 output_dimension=1024,
                 output_dtype="float",
@@ -733,7 +742,7 @@ class SemanticIndexer:
         try:
             embedding = self.voyage.embed(
                 [embedding_text],
-                model="voyage-code-3",
+                model=self.embedding_model,
                 input_type=input_type,
                 output_dimension=1024,
                 output_dtype="float",
@@ -902,7 +911,7 @@ class SemanticIndexer:
             # Generate query embedding
             embedding = self.voyage.embed(
                 [query],
-                model="voyage-code-3",
+                model=self.embedding_model,
                 input_type="query",  # Use query type for natural language
                 output_dimension=1024,
                 output_dtype="float",

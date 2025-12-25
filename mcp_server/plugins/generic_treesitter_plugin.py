@@ -149,6 +149,10 @@ class GenericTreeSitterPlugin(PluginWithSemanticSearch):
                 size=len(content),
                 hash=file_hash,
             )
+            
+            # Update FTS content
+            if hasattr(self._sqlite_store, "update_file_content_fts"):
+                 self._sqlite_store.update_file_content_fts(file_id, content)
 
             # Store symbols in SQLite
             for symbol in symbols:

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-from typing_extensions import TypedDict
+from typing import TypedDict
 
 
 class IndexShard(TypedDict):

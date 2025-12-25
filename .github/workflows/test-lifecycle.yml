@@ -1,0 +1,41 @@
+
+name: Test Artifact Lifecycle
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          
+      - name: Install dependencies
+        run: |
+          pip install uv
+          uv sync
+          
+      - name: Generate Index
+        env:
+          VOYAGE_AI_API_KEY: ${{ secrets.VOYAGE_AI_API_KEY }}
+          SEMANTIC_EMBEDDING_MODEL: voyage-code-3
+        run: |
+          uv run python scripts/generate_full_index.py
+          
+      - name: Compress Artifacts
+        run: |
+          tar -czf index-archive.tar.gz code_index.db vector_index.qdrant/ .index_metadata.json
+          
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-index-bundle
+          path: index-archive.tar.gz
+          retention-days: 1

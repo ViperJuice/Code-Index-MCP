@@ -6,7 +6,7 @@ from abc import abstractmethod
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
-from typing_extensions import TypedDict
+from typing import TypedDict
 
 from .plugin_base import (
     IPlugin,

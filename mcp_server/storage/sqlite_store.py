@@ -396,6 +396,26 @@ class SQLiteStore:
         """
         )
 
+    def update_file_content_fts(self, file_id: int, content: str):
+        """Update FTS index for file content."""
+        with self._get_connection() as conn:
+            # Check if entry exists
+            cursor = conn.execute("SELECT rowid FROM fts_code WHERE file_id = ?", (file_id,))
+            row = cursor.fetchone()
+            
+            if row:
+                # Update existing
+                conn.execute(
+                    "UPDATE fts_code SET content = ? WHERE file_id = ?",
+                    (content, file_id)
+                )
+            else:
+                # Insert new
+                conn.execute(
+                    "INSERT INTO fts_code (file_id, content) VALUES (?, ?)",
+                    (file_id, content)
+                )
+
     # Repository operations
     def create_repository(self, path: str, name: str, metadata: Optional[Dict] = None) -> int:
         """Create a new repository entry."""
