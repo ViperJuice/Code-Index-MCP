@@ -210,10 +210,28 @@ def _server_available(url: str) -> bool:
         return False
 
 
-def _wait_for_run(repo: str, sha: str, timeout_s: int = 1800) -> Dict[str, Any]:
+def _get_workflow_id(repo: str, workflow_path: str) -> int:
+    output = _run_cmd(["gh", "api", f"repos/{repo}/actions/workflows/{workflow_path}"])
+    data = json.loads(output)
+    workflow_id = data.get("id")
+    if not workflow_id:
+        raise RuntimeError(f"Could not resolve workflow ID for {workflow_path}")
+    return int(workflow_id)
+
+
+def _wait_for_run(
+    repo: str, sha: str, workflow_path: str, timeout_s: int = 1800
+) -> Dict[str, Any]:
     start = time.time()
+    workflow_id = _get_workflow_id(repo, workflow_path)
     while time.time() - start < timeout_s:
-        output = _run_cmd(["gh", "api", f"repos/{repo}/actions/runs?branch=main&per_page=20"])
+        output = _run_cmd(
+            [
+                "gh",
+                "api",
+                f"repos/{repo}/actions/workflows/{workflow_id}/runs?branch=main&per_page=20",
+            ]
+        )
         data = json.loads(output)
         for run in data.get("workflow_runs", []):
             if run.get("head_sha") == sha:
@@ -327,7 +345,9 @@ def _validate_artifact(extract_dir: Path, expected_commit: str) -> Dict[str, Any
     }
 
 
-def _artifact_versions_check(repo: str, versions: int, keep: bool) -> Dict[str, Any]:
+def _artifact_versions_check(
+    repo: str, versions: int, keep: bool, workflow_path: str
+) -> Dict[str, Any]:
     if versions < 1:
         return {"versions": 0}
 
@@ -357,7 +377,7 @@ def _artifact_versions_check(repo: str, versions: int, keep: bool) -> Dict[str, 
             sha = _run_cmd(["git", "rev-parse", "HEAD"], cwd=worktree_path)
             _run_cmd(["git", "push", "test-origin", "HEAD:main"], cwd=worktree_path)
 
-            run = _wait_for_run(repo, sha)
+            run = _wait_for_run(repo, sha, workflow_path)
             run_id = run["id"]
             completed = _wait_for_completion(repo, run_id)
             if completed.get("conclusion") != "success":
@@ -424,6 +444,9 @@ def main() -> int:
     artifact_keep = os.environ.get("CHECKLIST_KEEP_ARTIFACTS", "false").lower() == "true"
     artifact_repo = os.environ.get("CHECKLIST_ARTIFACT_REPO") or _get_remote_repo(
         "test-origin"
+    )
+    workflow_path = os.environ.get(
+        "CHECKLIST_WORKFLOW_PATH", ".github/workflows/test-lifecycle.yml"
     )
     skip_github = os.environ.get("CHECKLIST_SKIP_GITHUB", "false").lower() == "true"
 
@@ -521,7 +544,9 @@ def main() -> int:
         results.append(
             _run_step(
                 "artifact_lifecycle",
-                lambda: _artifact_versions_check(artifact_repo, artifact_versions, artifact_keep),
+                lambda: _artifact_versions_check(
+                    artifact_repo, artifact_versions, artifact_keep, workflow_path
+                ),
                 skip_reason=(
                     None
                     if shutil.which("gh") and _gh_authenticated()
@@ -534,6 +559,7 @@ def main() -> int:
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "repo_root": str(repo_root),
         "artifact_repo": artifact_repo,
+        "workflow_path": workflow_path,
         "results": [asdict(result) for result in results],
     }
 
