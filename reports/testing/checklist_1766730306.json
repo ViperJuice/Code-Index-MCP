@@ -1,0 +1,124 @@
+{
+  "timestamp": "2025-12-26T06:25:06Z",
+  "repo_root": "/home/jenner/code/Code-Index-MCP",
+  "artifact_repo": "ViperJuice/code-index-lifecycle-test",
+  "workflow_path": "test-lifecycle.yml",
+  "results": [
+    {
+      "name": "fts_retrieval",
+      "status": "PASS",
+      "duration_s": 0.0174100399017334,
+      "details": {
+        "EnhancedDispatcher": {
+          "count": 1,
+          "top_file": "/home/jenner/code/Code-Index-MCP/mcp_server/dispatcher/dispatcher_enhanced.py"
+        },
+        "SQLiteStore": {
+          "count": 2,
+          "top_file": "/home/jenner/code/Code-Index-MCP/mcp_server/dispatcher/dispatcher_enhanced.py"
+        },
+        "SemanticIndexer": {
+          "count": 2,
+          "top_file": "/home/jenner/code/Code-Index-MCP/mcp_server/dispatcher/dispatcher_enhanced.py"
+        }
+      }
+    },
+    {
+      "name": "symbol_lookup",
+      "status": "PASS",
+      "duration_s": 0.9771764278411865,
+      "details": {
+        "symbol": "EnhancedDispatcher",
+        "file": "/home/jenner/code/Code-Index-MCP/mcp_server/dispatcher/dispatcher_enhanced.py"
+      }
+    },
+    {
+      "name": "semantic_in_memory",
+      "status": "PASS",
+      "duration_s": 48.321293354034424,
+      "details": {
+        "qdrant_path": ":memory:",
+        "queries": {
+          "dispatcher routing logic": {
+            "count": 3,
+            "top_symbol": "EnhancedDispatcher",
+            "top_file": "mcp_server/dispatcher/dispatcher_enhanced.py"
+          },
+          "sqlite storage layer": {
+            "count": 3,
+            "top_symbol": "SQLiteStore",
+            "top_file": "mcp_server/storage/sqlite_store.py"
+          }
+        }
+      }
+    },
+    {
+      "name": "semantic_file_based",
+      "status": "PASS",
+      "duration_s": 56.446738719940186,
+      "details": {
+        "qdrant_path": "/tmp/checklist_semantic_0re87w3b/vector_index.qdrant",
+        "queries": {
+          "dispatcher routing logic": {
+            "count": 3,
+            "top_symbol": "EnhancedDispatcher",
+            "top_file": "mcp_server/dispatcher/dispatcher_enhanced.py"
+          },
+          "sqlite storage layer": {
+            "count": 3,
+            "top_symbol": "SQLiteStore",
+            "top_file": "mcp_server/storage/sqlite_store.py"
+          }
+        }
+      }
+    },
+    {
+      "name": "semantic_server",
+      "status": "PASS",
+      "duration_s": 14.41368317604065,
+      "details": {
+        "qdrant_path": "unused",
+        "queries": {
+          "dispatcher routing logic": {
+            "count": 3,
+            "top_symbol": "EnhancedDispatcher",
+            "top_file": "mcp_server/dispatcher/dispatcher_enhanced.py"
+          },
+          "sqlite storage layer": {
+            "count": 3,
+            "top_symbol": "SQLiteStore",
+            "top_file": "mcp_server/storage/sqlite_store.py"
+          }
+        }
+      }
+    },
+    {
+      "name": "artifact_lifecycle",
+      "status": "PASS",
+      "duration_s": 1756.061791419983,
+      "details": {
+        "versions": [
+          {
+            "sha": "99845592b0ec9ad35d12803f773fc48635c71a2b",
+            "run_id": 20517043931,
+            "validation": {
+              "fts_rows": 697,
+              "fts_query_matches": 200,
+              "qdrant_status": "collections=1"
+            }
+          },
+          {
+            "sha": "3883cbdac87b1d982488def035c7bfac7034a6cd",
+            "run_id": 20517273060,
+            "validation": {
+              "fts_rows": 697,
+              "fts_query_matches": 200,
+              "qdrant_status": "collections=1"
+            }
+          }
+        ],
+        "base_ref": "test-origin/main"
+      }
+    }
+  ]
+}
