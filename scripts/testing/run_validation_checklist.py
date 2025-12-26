@@ -358,9 +358,11 @@ def _artifact_versions_check(
     branch_name = f"checklist-artifacts-{int(time.time())}"
     worktree_path = temp_dir / "worktree"
 
-    _run_cmd(["git", "worktree", "add", "-b", branch_name, str(worktree_path), "HEAD"])
+    _run_cmd(["git", "fetch", "test-origin", "main"])
+    base_ref = "test-origin/main"
+    _run_cmd(["git", "worktree", "add", "-b", branch_name, str(worktree_path), base_ref])
 
-    results: Dict[str, Any] = {"versions": []}
+    results: Dict[str, Any] = {"versions": [], "base_ref": base_ref}
     try:
         for index in range(versions):
             _ensure_git_identity(worktree_path)
