@@ -211,7 +211,8 @@ def _server_available(url: str) -> bool:
 
 
 def _get_workflow_id(repo: str, workflow_path: str) -> int:
-    output = _run_cmd(["gh", "api", f"repos/{repo}/actions/workflows/{workflow_path}"])
+    workflow_name = Path(workflow_path).name
+    output = _run_cmd(["gh", "api", f"repos/{repo}/actions/workflows/{workflow_name}"])
     data = json.loads(output)
     workflow_id = data.get("id")
     if not workflow_id:
@@ -447,9 +448,7 @@ def main() -> int:
     artifact_repo = os.environ.get("CHECKLIST_ARTIFACT_REPO") or _get_remote_repo(
         "test-origin"
     )
-    workflow_path = os.environ.get(
-        "CHECKLIST_WORKFLOW_PATH", ".github/workflows/test-lifecycle.yml"
-    )
+    workflow_path = os.environ.get("CHECKLIST_WORKFLOW_PATH", "test-lifecycle.yml")
     skip_github = os.environ.get("CHECKLIST_SKIP_GITHUB", "false").lower() == "true"
 
     results: List[StepResult] = []
