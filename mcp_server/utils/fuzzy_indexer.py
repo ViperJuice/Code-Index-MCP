@@ -99,9 +99,10 @@ class FuzzyIndexer:
                     # Use FTS5 for search
                     cursor = conn.execute(
                         """
-                        SELECT file_id, snippet(fts_code, 0, '**', '**', '...', 64) as snippet,
+                        SELECT f.path, snippet(fts_code, 0, '**', '**', '...', 64) as snippet,
                                rank
-                        FROM fts_code
+                        FROM fts_code fts
+                        JOIN files f ON fts.file_id = f.id
                         WHERE fts_code MATCH ?
                         ORDER BY rank
                         LIMIT ?

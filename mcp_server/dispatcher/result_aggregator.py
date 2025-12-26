@@ -529,6 +529,11 @@ class SmartAggregationStrategy(IAggregationStrategy):
 
     def _is_documentation_file(self, file_path: str) -> bool:
         """Check if a file is a documentation file."""
+        if isinstance(file_path, Path):
+            file_path = str(file_path)
+        if not isinstance(file_path, str) or not file_path:
+            return False
+
         doc_extensions = {".md", ".rst", ".txt", ".adoc", ".textile"}
         doc_names = {
             "readme",
