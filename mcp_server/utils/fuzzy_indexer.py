@@ -100,11 +100,11 @@ class FuzzyIndexer:
                     cursor = conn.execute(
                         """
                         SELECT f.path, snippet(fts_code, 0, '**', '**', '...', 64) as snippet,
-                               rank
+                               bm25(fts_code) as score
                         FROM fts_code fts
                         JOIN files f ON fts.file_id = f.id
                         WHERE fts_code MATCH ?
-                        ORDER BY rank
+                        ORDER BY bm25(fts_code)
                         LIMIT ?
                     """,
                         (query, limit),
@@ -114,10 +114,10 @@ class FuzzyIndexer:
                     cursor = conn.execute(
                         """
                         SELECT filepath, snippet(bm25_content, -1, '**', '**', '...', 64) as snippet,
-                               rank
+                               bm25(bm25_content) as score
                         FROM bm25_content
                         WHERE bm25_content MATCH ?
-                        ORDER BY rank
+                        ORDER BY bm25(bm25_content)
                         LIMIT ?
                     """,
                         (query, limit),
