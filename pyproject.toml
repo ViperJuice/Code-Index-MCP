@@ -27,6 +27,9 @@ dependencies = [
     "fastapi>=0.100.0",
     "uvicorn>=0.23.0",
     "treesitter-chunker>=2.0.0",
+    # Legacy tree-sitter deps (for backward compatibility during migration)
+    "tree-sitter>=0.20.0",
+    "tree-sitter-languages>=1.7.0",
     "jedi>=0.19.0",
     "watchdog>=3.0.0",
     "click>=8.1.0",
