@@ -8,6 +8,14 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
+from ..graph import (
+    CHUNKER_AVAILABLE,
+    ContextSelector,
+    GraphAnalyzer,
+    GraphCutResult,
+    GraphNode,
+    XRefAdapter,
+)
 from ..plugin_base import IPlugin, SearchResult, SymbolDef
 from ..plugins.language_registry import get_all_extensions, get_language_by_extension
 from ..plugins.memory_aware_manager import MemoryAwarePluginManager
@@ -227,6 +235,13 @@ class EnhancedDispatcher:
         self._compiled_file_patterns = [
             re.compile(pattern, re.IGNORECASE) for pattern in self.DOCUMENTATION_FILE_PATTERNS
         ]
+
+        # Graph analysis components (lazy initialized)
+        self._graph_builder: Optional[XRefAdapter] = None
+        self._graph_analyzer: Optional[GraphAnalyzer] = None
+        self._context_selector: Optional[ContextSelector] = None
+        self._graph_nodes: List[GraphNode] = []
+        self._graph_edges = []
 
         logger.info(f"Enhanced dispatcher initialized with {len(self._plugins)} plugins")
 
@@ -1624,3 +1639,278 @@ class EnhancedDispatcher:
                 "languages": [],
                 "repository_details": [],
             }
+
+    def _ensure_graph_initialized(self, file_paths: Optional[List[str]] = None) -> bool:
+        """
+        Ensure graph components are initialized.
+
+        Args:
+            file_paths: Optional list of files to build graph from
+
+        Returns:
+            True if graph is initialized, False otherwise
+        """
+        if not CHUNKER_AVAILABLE:
+            logger.warning("Graph features not available: TreeSitter Chunker not installed")
+            return False
+
+        # If already initialized and no new files, return
+        if self._graph_analyzer is not None and file_paths is None:
+            return True
+
+        try:
+            # Initialize graph builder
+            if self._graph_builder is None:
+                self._graph_builder = XRefAdapter()
+
+            # Build graph from files
+            if file_paths:
+                nodes, edges = self._graph_builder.build_graph(file_paths)
+                self._graph_nodes = nodes
+                self._graph_edges = edges
+
+                # Initialize analyzer and selector
+                self._graph_analyzer = GraphAnalyzer(nodes, edges)
+                self._context_selector = ContextSelector(nodes, edges)
+
+                logger.info(
+                    f"Graph initialized: {len(nodes)} nodes, {len(edges)} edges"
+                )
+                return True
+            else:
+                # No files provided and not initialized
+                return False
+
+        except Exception as e:
+            logger.error(f"Failed to initialize graph: {e}", exc_info=True)
+            return False
+
+    def graph_search(
+        self,
+        query: str,
+        expansion_radius: int = 1,
+        max_context_nodes: int = 50,
+        semantic: bool = False,
+        limit: int = 20,
+    ) -> Iterable[SearchResult]:
+        """
+        Search with graph-based context expansion.
+
+        Args:
+            query: Search query
+            expansion_radius: How far to expand from search results
+            max_context_nodes: Maximum context nodes to add
+            semantic: Use semantic search
+            limit: Maximum search results
+
+        Returns:
+            Search results with expanded context
+        """
+        # First, perform regular search
+        search_results = list(self.search(query, semantic=semantic, limit=limit))
+
+        if not search_results:
+            return
+
+        # Try to expand with graph context
+        if self._context_selector:
+            try:
+                context_nodes = self._context_selector.expand_search_results(
+                    search_results, expansion_radius, max_context_nodes
+                )
+
+                # Add context nodes as additional results
+                for node in context_nodes:
+                    # Check if already in results
+                    already_included = any(
+                        r.get("file") == node.file_path for r in search_results
+                    )
+                    if not already_included:
+                        yield {
+                            "file": node.file_path,
+                            "line": node.line_start or 1,
+                            "snippet": f"Context: {node.symbol or node.kind}",
+                            "score": node.score,
+                            "language": node.language,
+                            "context": True,
+                        }
+            except Exception as e:
+                logger.error(f"Error expanding search with graph: {e}")
+
+        # Yield original results
+        for result in search_results:
+            yield result
+
+    def get_context_for_symbols(
+        self,
+        symbols: List[str],
+        radius: int = 2,
+        budget: int = 200,
+        weights: Optional[Dict[str, float]] = None,
+    ) -> Optional[GraphCutResult]:
+        """
+        Get optimal context for a list of symbols using graph cut.
+
+        Args:
+            symbols: Symbol names to find context for
+            radius: Maximum distance from symbols
+            budget: Maximum number of nodes in context
+            weights: Scoring weights
+
+        Returns:
+            GraphCutResult or None if graph not available
+        """
+        if not self._context_selector:
+            logger.warning("Context selector not initialized")
+            return None
+
+        try:
+            # Find nodes matching symbols
+            seed_nodes = []
+            for node in self._graph_nodes:
+                if node.symbol in symbols:
+                    seed_nodes.append(node.id)
+
+            if not seed_nodes:
+                logger.warning(f"No graph nodes found for symbols: {symbols}")
+                return None
+
+            # Select context
+            result = self._context_selector.select_context(
+                seeds=seed_nodes, radius=radius, budget=budget, weights=weights
+            )
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error getting context for symbols: {e}", exc_info=True)
+            return None
+
+    def find_symbol_dependencies(
+        self, symbol: str, max_depth: int = 3
+    ) -> List[Dict[str, Any]]:
+        """
+        Find dependencies of a symbol.
+
+        Args:
+            symbol: Symbol name
+            max_depth: Maximum depth to traverse
+
+        Returns:
+            List of dependent symbols with metadata
+        """
+        if not self._graph_analyzer:
+            logger.warning("Graph analyzer not initialized")
+            return []
+
+        try:
+            # Find node with this symbol
+            node_id = None
+            for node in self._graph_nodes:
+                if node.symbol == symbol:
+                    node_id = node.id
+                    break
+
+            if not node_id:
+                logger.warning(f"Symbol not found in graph: {symbol}")
+                return []
+
+            # Get dependencies
+            deps = self._graph_analyzer.find_dependencies(node_id, max_depth)
+
+            # Convert to dict format
+            return [
+                {
+                    "symbol": dep.symbol,
+                    "file": dep.file_path,
+                    "kind": dep.kind,
+                    "language": dep.language,
+                    "line": dep.line_start,
+                }
+                for dep in deps
+            ]
+
+        except Exception as e:
+            logger.error(f"Error finding dependencies for {symbol}: {e}")
+            return []
+
+    def find_symbol_dependents(
+        self, symbol: str, max_depth: int = 3
+    ) -> List[Dict[str, Any]]:
+        """
+        Find dependents of a symbol (what depends on it).
+
+        Args:
+            symbol: Symbol name
+            max_depth: Maximum depth to traverse
+
+        Returns:
+            List of dependent symbols with metadata
+        """
+        if not self._graph_analyzer:
+            logger.warning("Graph analyzer not initialized")
+            return []
+
+        try:
+            # Find node with this symbol
+            node_id = None
+            for node in self._graph_nodes:
+                if node.symbol == symbol:
+                    node_id = node.id
+                    break
+
+            if not node_id:
+                logger.warning(f"Symbol not found in graph: {symbol}")
+                return []
+
+            # Get dependents
+            dependents = self._graph_analyzer.find_dependents(node_id, max_depth)
+
+            # Convert to dict format
+            return [
+                {
+                    "symbol": dep.symbol,
+                    "file": dep.file_path,
+                    "kind": dep.kind,
+                    "language": dep.language,
+                    "line": dep.line_start,
+                }
+                for dep in dependents
+            ]
+
+        except Exception as e:
+            logger.error(f"Error finding dependents for {symbol}: {e}")
+            return []
+
+    def get_code_hotspots(self, top_n: int = 10) -> List[Dict[str, Any]]:
+        """
+        Get code hotspots (highly connected nodes).
+
+        Args:
+            top_n: Number of hotspots to return
+
+        Returns:
+            List of hotspot information
+        """
+        if not self._graph_analyzer:
+            logger.warning("Graph analyzer not initialized")
+            return []
+
+        try:
+            hotspots = self._graph_analyzer.get_hotspots(top_n)
+
+            return [
+                {
+                    "symbol": node.symbol,
+                    "file": node.file_path,
+                    "kind": node.kind,
+                    "language": node.language,
+                    "line": node.line_start,
+                    "score": node.score,
+                }
+                for node in hotspots
+            ]
+
+        except Exception as e:
+            logger.error(f"Error getting hotspots: {e}")
+            return []

@@ -1772,3 +1772,249 @@ async def rebuild_search_indexes(
     except Exception as e:
         logger.error(f"Failed to rebuild search indexes: {e}")
         raise HTTPException(500, f"Failed to rebuild indexes: {str(e)}")
+
+
+# Graph Analysis Endpoints
+
+
+@app.get("/graph/dependencies/{symbol}")
+async def get_symbol_dependencies(
+    symbol: str,
+    max_depth: int = 3,
+    current_user: User = Depends(require_permission(Permission.READ)),
+) -> Dict[str, Any]:
+    """Get dependencies of a symbol."""
+    if dispatcher is None:
+        raise HTTPException(503, "Dispatcher not ready")
+
+    try:
+        dependencies = dispatcher.find_symbol_dependencies(symbol, max_depth)
+
+        return {
+            "symbol": symbol,
+            "dependencies": dependencies,
+            "count": len(dependencies),
+            "max_depth": max_depth,
+        }
+    except Exception as e:
+        logger.error(f"Error getting dependencies for {symbol}: {e}")
+        raise HTTPException(500, f"Failed to get dependencies: {str(e)}")
+
+
+@app.get("/graph/dependents/{symbol}")
+async def get_symbol_dependents(
+    symbol: str,
+    max_depth: int = 3,
+    current_user: User = Depends(require_permission(Permission.READ)),
+) -> Dict[str, Any]:
+    """Get dependents of a symbol (what depends on it)."""
+    if dispatcher is None:
+        raise HTTPException(503, "Dispatcher not ready")
+
+    try:
+        dependents = dispatcher.find_symbol_dependents(symbol, max_depth)
+
+        return {
+            "symbol": symbol,
+            "dependents": dependents,
+            "count": len(dependents),
+            "max_depth": max_depth,
+        }
+    except Exception as e:
+        logger.error(f"Error getting dependents for {symbol}: {e}")
+        raise HTTPException(500, f"Failed to get dependents: {str(e)}")
+
+
+@app.get("/graph/hotspots")
+async def get_code_hotspots(
+    top_n: int = 10,
+    current_user: User = Depends(require_permission(Permission.READ)),
+) -> Dict[str, Any]:
+    """Get code hotspots (highly connected nodes)."""
+    if dispatcher is None:
+        raise HTTPException(503, "Dispatcher not ready")
+
+    try:
+        hotspots = dispatcher.get_code_hotspots(top_n)
+
+        return {
+            "hotspots": hotspots,
+            "count": len(hotspots),
+            "top_n": top_n,
+        }
+    except Exception as e:
+        logger.error(f"Error getting hotspots: {e}")
+        raise HTTPException(500, f"Failed to get hotspots: {str(e)}")
+
+
+@app.post("/graph/context")
+async def get_context_for_symbols(
+    symbols: List[str],
+    radius: int = 2,
+    budget: int = 200,
+    weights: Optional[Dict[str, float]] = None,
+    current_user: User = Depends(require_permission(Permission.READ)),
+) -> Dict[str, Any]:
+    """Get optimal context for symbols using graph cut."""
+    if dispatcher is None:
+        raise HTTPException(503, "Dispatcher not ready")
+
+    try:
+        result = dispatcher.get_context_for_symbols(symbols, radius, budget, weights)
+
+        if result is None:
+            return {
+                "available": False,
+                "message": "Graph features not available. Install treesitter-chunker.",
+            }
+
+        return {
+            "available": True,
+            "symbols": symbols,
+            "selected_nodes": [
+                {
+                    "id": node.id,
+                    "symbol": node.symbol,
+                    "file": node.file_path,
+                    "kind": node.kind,
+                    "language": node.language,
+                    "line": node.line_start,
+                    "score": node.score,
+                }
+                for node in result.selected_nodes
+            ],
+            "edges": [
+                {
+                    "source": edge.source_id,
+                    "target": edge.target_id,
+                    "type": edge.edge_type.value,
+                    "weight": edge.weight,
+                }
+                for edge in result.induced_edges
+            ],
+            "statistics": {
+                "selected_nodes": len(result.selected_nodes),
+                "induced_edges": len(result.induced_edges),
+                "seed_nodes": len(result.seed_nodes),
+                "radius": result.radius,
+                "budget": result.budget,
+                "total_candidates": result.total_candidates,
+                "execution_time_ms": result.execution_time_ms,
+            },
+        }
+    except Exception as e:
+        logger.error(f"Error getting context for symbols: {e}")
+        raise HTTPException(500, f"Failed to get context: {str(e)}")
+
+
+@app.get("/graph/search")
+async def graph_search(
+    q: str,
+    expansion_radius: int = 1,
+    max_context_nodes: int = 50,
+    semantic: bool = False,
+    limit: int = 20,
+    current_user: User = Depends(require_permission(Permission.READ)),
+) -> Dict[str, Any]:
+    """Search with graph-based context expansion."""
+    if dispatcher is None:
+        raise HTTPException(503, "Dispatcher not ready")
+
+    try:
+        results = list(
+            dispatcher.graph_search(
+                query=q,
+                expansion_radius=expansion_radius,
+                max_context_nodes=max_context_nodes,
+                semantic=semantic,
+                limit=limit,
+            )
+        )
+
+        # Separate context results from search results
+        search_results = [r for r in results if not r.get("context", False)]
+        context_results = [r for r in results if r.get("context", False)]
+
+        return {
+            "query": q,
+            "search_results": search_results,
+            "context_results": context_results,
+            "statistics": {
+                "total_results": len(results),
+                "search_results": len(search_results),
+                "context_results": len(context_results),
+                "expansion_radius": expansion_radius,
+                "max_context_nodes": max_context_nodes,
+            },
+        }
+    except Exception as e:
+        logger.error(f"Error in graph search: {e}")
+        raise HTTPException(500, f"Graph search failed: {str(e)}")
+
+
+@app.get("/graph/status")
+async def get_graph_status(
+    current_user: User = Depends(require_permission(Permission.READ)),
+) -> Dict[str, Any]:
+    """Get graph analysis system status."""
+    if dispatcher is None:
+        raise HTTPException(503, "Dispatcher not ready")
+
+    try:
+        from ..graph import CHUNKER_AVAILABLE
+
+        status = {
+            "available": CHUNKER_AVAILABLE,
+            "initialized": (
+                dispatcher._graph_analyzer is not None if hasattr(dispatcher, "_graph_analyzer") else False
+            ),
+        }
+
+        if hasattr(dispatcher, "_graph_nodes"):
+            status["nodes"] = len(dispatcher._graph_nodes)
+            status["edges"] = len(dispatcher._graph_edges)
+
+        if not CHUNKER_AVAILABLE:
+            status["message"] = "Install treesitter-chunker for graph features: pip install treesitter-chunker"
+
+        return status
+    except Exception as e:
+        logger.error(f"Error getting graph status: {e}")
+        raise HTTPException(500, f"Failed to get graph status: {str(e)}")
+
+
+@app.post("/graph/initialize")
+async def initialize_graph(
+    file_paths: Optional[List[str]] = None,
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
+) -> Dict[str, Any]:
+    """Initialize or rebuild the graph from files (admin only)."""
+    if dispatcher is None:
+        raise HTTPException(503, "Dispatcher not ready")
+
+    try:
+        # If no file paths provided, scan all indexed files
+        if file_paths is None:
+            if sqlite_store:
+                files = sqlite_store.get_all_files()
+                file_paths = [f["path"] for f in files]
+            else:
+                raise HTTPException(400, "No file paths provided and no store available")
+
+        success = dispatcher._ensure_graph_initialized(file_paths)
+
+        if not success:
+            return {
+                "status": "failed",
+                "message": "Graph initialization failed. Check that treesitter-chunker is installed.",
+            }
+
+        return {
+            "status": "success",
+            "message": f"Graph initialized from {len(file_paths)} files",
+            "nodes": len(dispatcher._graph_nodes) if hasattr(dispatcher, "_graph_nodes") else 0,
+            "edges": len(dispatcher._graph_edges) if hasattr(dispatcher, "_graph_edges") else 0,
+        }
+    except Exception as e:
+        logger.error(f"Error initializing graph: {e}")
+        raise HTTPException(500, f"Failed to initialize graph: {str(e)}")
