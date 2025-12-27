@@ -122,9 +122,18 @@ class SQLiteStore:
 
                 if version > current_version:
                     logger.info(f"Running migration {migration_file.name}")
-                    with open(migration_file, "r") as f:
-                        conn.executescript(f.read())
-                    logger.info(f"Completed migration to version {version}")
+                    try:
+                        with open(migration_file, "r") as f:
+                            conn.executescript(f.read())
+                        logger.info(f"Completed migration to version {version}")
+                    except sqlite3.OperationalError as e:
+                        # Handle duplicate column errors gracefully (for ALTER TABLE ADD COLUMN)
+                        if "duplicate column name" in str(e).lower():
+                            logger.warning(
+                                f"Migration {migration_file.name} encountered duplicate column (likely already applied), continuing..."
+                            )
+                        else:
+                            raise
 
     @contextmanager
     def _get_connection(self):
@@ -176,7 +185,7 @@ class SQLiteStore:
                 applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 description TEXT
             );
-            
+
             -- Repositories
             CREATE TABLE IF NOT EXISTS repositories (
                 id INTEGER PRIMARY KEY,
@@ -186,7 +195,7 @@ class SQLiteStore:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 metadata JSON
             );
-            
+
             -- Files
             CREATE TABLE IF NOT EXISTS files (
                 id INTEGER PRIMARY KEY,
@@ -205,13 +214,13 @@ class SQLiteStore:
                 FOREIGN KEY (repository_id) REFERENCES repositories(id),
                 UNIQUE(repository_id, relative_path)
             );
-            
+
             CREATE INDEX IF NOT EXISTS idx_files_language ON files(language);
             CREATE INDEX IF NOT EXISTS idx_files_hash ON files(hash);
             CREATE INDEX IF NOT EXISTS idx_files_content_hash ON files(content_hash);
             CREATE INDEX IF NOT EXISTS idx_files_deleted ON files(is_deleted);
             CREATE INDEX IF NOT EXISTS idx_files_relative_path ON files(relative_path);
-            
+
             -- Symbols
             CREATE TABLE IF NOT EXISTS symbols (
                 id INTEGER PRIMARY KEY,
@@ -224,13 +233,67 @@ class SQLiteStore:
                 column_end INTEGER,
                 signature TEXT,
                 documentation TEXT,
+                token_count INTEGER,
+                token_model TEXT DEFAULT 'cl100k_base',
                 metadata JSON,
                 FOREIGN KEY (file_id) REFERENCES files(id)
             );
-            
+
             CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name);
             CREATE INDEX IF NOT EXISTS idx_symbols_kind ON symbols(kind);
             CREATE INDEX IF NOT EXISTS idx_symbols_file ON symbols(file_id);
+            CREATE INDEX IF NOT EXISTS idx_symbols_token_count ON symbols(token_count);
+
+            -- Code Chunks (for TreeSitter integration)
+            CREATE TABLE IF NOT EXISTS code_chunks (
+                id INTEGER PRIMARY KEY,
+                file_id INTEGER NOT NULL,
+                symbol_id INTEGER,
+                content TEXT NOT NULL,
+                content_start INTEGER NOT NULL,
+                content_end INTEGER NOT NULL,
+                line_start INTEGER NOT NULL,
+                line_end INTEGER NOT NULL,
+
+                -- 5 Stable IDs from TreeSitter Chunker
+                chunk_id TEXT NOT NULL,
+                node_id TEXT NOT NULL,
+                treesitter_file_id TEXT NOT NULL,
+                symbol_hash TEXT,
+                definition_id TEXT,
+
+                -- Token counting
+                token_count INTEGER,
+                token_model TEXT DEFAULT 'cl100k_base',
+
+                -- Metadata
+                chunk_type TEXT NOT NULL DEFAULT 'code',
+                language TEXT,
+                node_type TEXT,
+                parent_chunk_id TEXT,
+                depth INTEGER DEFAULT 0,
+                chunk_index INTEGER NOT NULL DEFAULT 0,
+                metadata JSON,
+
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+                FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE,
+                FOREIGN KEY (symbol_id) REFERENCES symbols(id) ON DELETE SET NULL,
+                UNIQUE(file_id, chunk_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_chunks_file_id ON code_chunks(file_id);
+            CREATE INDEX IF NOT EXISTS idx_chunks_symbol_id ON code_chunks(symbol_id);
+            CREATE INDEX IF NOT EXISTS idx_chunks_chunk_id ON code_chunks(chunk_id);
+            CREATE INDEX IF NOT EXISTS idx_chunks_node_id ON code_chunks(node_id);
+            CREATE INDEX IF NOT EXISTS idx_chunks_treesitter_file_id ON code_chunks(treesitter_file_id);
+            CREATE INDEX IF NOT EXISTS idx_chunks_symbol_hash ON code_chunks(symbol_hash);
+            CREATE INDEX IF NOT EXISTS idx_chunks_definition_id ON code_chunks(definition_id);
+            CREATE INDEX IF NOT EXISTS idx_chunks_chunk_type ON code_chunks(chunk_type);
+            CREATE INDEX IF NOT EXISTS idx_chunks_language ON code_chunks(language);
+            CREATE INDEX IF NOT EXISTS idx_chunks_parent_chunk_id ON code_chunks(parent_chunk_id);
+            CREATE INDEX IF NOT EXISTS idx_chunks_token_count ON code_chunks(token_count);
             
             -- Imports
             CREATE TABLE IF NOT EXISTS imports (
@@ -653,14 +716,16 @@ class SQLiteStore:
         signature: Optional[str] = None,
         documentation: Optional[str] = None,
         metadata: Optional[Dict] = None,
+        token_count: Optional[int] = None,
+        token_model: Optional[str] = None,
     ) -> int:
-        """Store a symbol definition."""
+        """Store a symbol definition with optional token counting."""
         with self._get_connection() as conn:
             cursor = conn.execute(
-                """INSERT INTO symbols 
-                   (file_id, name, kind, line_start, line_end, column_start, 
-                    column_end, signature, documentation, metadata)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                """INSERT INTO symbols
+                   (file_id, name, kind, line_start, line_end, column_start,
+                    column_end, signature, documentation, metadata, token_count, token_model)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     file_id,
                     name,
@@ -672,6 +737,8 @@ class SQLiteStore:
                     signature,
                     documentation,
                     json.dumps(metadata or {}),
+                    token_count,
+                    token_model or "cl100k_base" if token_count is not None else None,
                 ),
             )
             symbol_id = cursor.lastrowid
@@ -702,7 +769,7 @@ class SQLiteStore:
         with self._get_connection() as conn:
             if kind:
                 cursor = conn.execute(
-                    """SELECT s.*, f.path as file_path 
+                    """SELECT s.*, f.path as file_path
                        FROM symbols s
                        JOIN files f ON s.file_id = f.id
                        WHERE s.name = ? AND s.kind = ?""",
@@ -710,13 +777,256 @@ class SQLiteStore:
                 )
             else:
                 cursor = conn.execute(
-                    """SELECT s.*, f.path as file_path 
+                    """SELECT s.*, f.path as file_path
                        FROM symbols s
                        JOIN files f ON s.file_id = f.id
                        WHERE s.name = ?""",
                     (name,),
                 )
             return [dict(row) for row in cursor.fetchall()]
+
+    # Code Chunk operations
+    def store_chunk(
+        self,
+        file_id: int,
+        content: str,
+        content_start: int,
+        content_end: int,
+        line_start: int,
+        line_end: int,
+        chunk_id: str,
+        node_id: str,
+        treesitter_file_id: str,
+        symbol_id: Optional[int] = None,
+        symbol_hash: Optional[str] = None,
+        definition_id: Optional[str] = None,
+        token_count: Optional[int] = None,
+        token_model: Optional[str] = None,
+        chunk_type: str = "code",
+        language: Optional[str] = None,
+        node_type: Optional[str] = None,
+        parent_chunk_id: Optional[str] = None,
+        depth: int = 0,
+        chunk_index: int = 0,
+        metadata: Optional[Dict] = None,
+    ) -> int:
+        """Store a code chunk with stable IDs and token counting."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """INSERT INTO code_chunks
+                   (file_id, symbol_id, content, content_start, content_end,
+                    line_start, line_end, chunk_id, node_id, treesitter_file_id,
+                    symbol_hash, definition_id, token_count, token_model,
+                    chunk_type, language, node_type, parent_chunk_id, depth,
+                    chunk_index, metadata)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(file_id, chunk_id) DO UPDATE SET
+                   symbol_id=excluded.symbol_id,
+                   content=excluded.content,
+                   content_start=excluded.content_start,
+                   content_end=excluded.content_end,
+                   line_start=excluded.line_start,
+                   line_end=excluded.line_end,
+                   node_id=excluded.node_id,
+                   treesitter_file_id=excluded.treesitter_file_id,
+                   symbol_hash=excluded.symbol_hash,
+                   definition_id=excluded.definition_id,
+                   token_count=excluded.token_count,
+                   token_model=excluded.token_model,
+                   chunk_type=excluded.chunk_type,
+                   language=excluded.language,
+                   node_type=excluded.node_type,
+                   parent_chunk_id=excluded.parent_chunk_id,
+                   depth=excluded.depth,
+                   chunk_index=excluded.chunk_index,
+                   metadata=excluded.metadata,
+                   updated_at=CURRENT_TIMESTAMP""",
+                (
+                    file_id,
+                    symbol_id,
+                    content,
+                    content_start,
+                    content_end,
+                    line_start,
+                    line_end,
+                    chunk_id,
+                    node_id,
+                    treesitter_file_id,
+                    symbol_hash,
+                    definition_id,
+                    token_count,
+                    token_model or "cl100k_base" if token_count is not None else None,
+                    chunk_type,
+                    language,
+                    node_type,
+                    parent_chunk_id,
+                    depth,
+                    chunk_index,
+                    json.dumps(metadata or {}),
+                ),
+            )
+            if cursor.lastrowid:
+                return cursor.lastrowid
+            else:
+                # Get the id of the updated chunk
+                cursor = conn.execute(
+                    "SELECT id FROM code_chunks WHERE file_id = ? AND chunk_id = ?",
+                    (file_id, chunk_id),
+                )
+                return cursor.fetchone()[0]
+
+    def get_chunk_by_chunk_id(
+        self, chunk_id: str, file_id: Optional[int] = None
+    ) -> Optional[Dict]:
+        """Get chunk by chunk_id, optionally filtered by file_id."""
+        with self._get_connection() as conn:
+            if file_id is not None:
+                cursor = conn.execute(
+                    "SELECT * FROM code_chunks WHERE chunk_id = ? AND file_id = ?",
+                    (chunk_id, file_id),
+                )
+            else:
+                cursor = conn.execute(
+                    "SELECT * FROM code_chunks WHERE chunk_id = ?", (chunk_id,)
+                )
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def get_chunk_by_node_id(
+        self, node_id: str, file_id: Optional[int] = None
+    ) -> Optional[Dict]:
+        """Get chunk by node_id, optionally filtered by file_id."""
+        with self._get_connection() as conn:
+            if file_id is not None:
+                cursor = conn.execute(
+                    "SELECT * FROM code_chunks WHERE node_id = ? AND file_id = ?",
+                    (node_id, file_id),
+                )
+            else:
+                cursor = conn.execute(
+                    "SELECT * FROM code_chunks WHERE node_id = ?", (node_id,)
+                )
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def get_chunk_by_definition_id(self, definition_id: str) -> List[Dict]:
+        """Get chunks by definition_id (may return multiple chunks)."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "SELECT * FROM code_chunks WHERE definition_id = ?", (definition_id,)
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_chunks_for_file(self, file_id: int) -> List[Dict]:
+        """Get all chunks for a file, ordered by chunk_index."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """SELECT * FROM code_chunks
+                   WHERE file_id = ?
+                   ORDER BY chunk_index, line_start""",
+                (file_id,),
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    def update_chunk_token_count(
+        self, chunk_id: str, token_count: int, token_model: str = "cl100k_base"
+    ) -> bool:
+        """Update token count for a chunk."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """UPDATE code_chunks
+                   SET token_count = ?, token_model = ?, updated_at = CURRENT_TIMESTAMP
+                   WHERE chunk_id = ?""",
+                (token_count, token_model, chunk_id),
+            )
+            return cursor.rowcount > 0
+
+    def delete_chunks_for_file(self, file_id: int) -> int:
+        """Delete all chunks for a file. Returns number of chunks deleted."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "DELETE FROM code_chunks WHERE file_id = ?", (file_id,)
+            )
+            return cursor.rowcount
+
+    def store_chunks_batch(self, chunks: List[Dict[str, Any]]) -> int:
+        """
+        Store multiple chunks in a batch operation for efficiency.
+
+        Args:
+            chunks: List of chunk dictionaries with required fields
+
+        Returns:
+            Number of chunks stored
+        """
+        if not chunks:
+            return 0
+
+        with self._get_connection() as conn:
+            count = 0
+            for chunk in chunks:
+                try:
+                    conn.execute(
+                        """INSERT INTO code_chunks
+                           (file_id, symbol_id, content, content_start, content_end,
+                            line_start, line_end, chunk_id, node_id, treesitter_file_id,
+                            symbol_hash, definition_id, token_count, token_model,
+                            chunk_type, language, node_type, parent_chunk_id, depth,
+                            chunk_index, metadata)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                           ON CONFLICT(file_id, chunk_id) DO UPDATE SET
+                           symbol_id=excluded.symbol_id,
+                           content=excluded.content,
+                           content_start=excluded.content_start,
+                           content_end=excluded.content_end,
+                           line_start=excluded.line_start,
+                           line_end=excluded.line_end,
+                           node_id=excluded.node_id,
+                           treesitter_file_id=excluded.treesitter_file_id,
+                           symbol_hash=excluded.symbol_hash,
+                           definition_id=excluded.definition_id,
+                           token_count=excluded.token_count,
+                           token_model=excluded.token_model,
+                           chunk_type=excluded.chunk_type,
+                           language=excluded.language,
+                           node_type=excluded.node_type,
+                           parent_chunk_id=excluded.parent_chunk_id,
+                           depth=excluded.depth,
+                           chunk_index=excluded.chunk_index,
+                           metadata=excluded.metadata,
+                           updated_at=CURRENT_TIMESTAMP""",
+                        (
+                            chunk["file_id"],
+                            chunk.get("symbol_id"),
+                            chunk["content"],
+                            chunk["content_start"],
+                            chunk["content_end"],
+                            chunk["line_start"],
+                            chunk["line_end"],
+                            chunk["chunk_id"],
+                            chunk["node_id"],
+                            chunk["treesitter_file_id"],
+                            chunk.get("symbol_hash"),
+                            chunk.get("definition_id"),
+                            chunk.get("token_count"),
+                            chunk.get("token_model") or "cl100k_base"
+                            if chunk.get("token_count") is not None
+                            else None,
+                            chunk.get("chunk_type", "code"),
+                            chunk.get("language"),
+                            chunk.get("node_type"),
+                            chunk.get("parent_chunk_id"),
+                            chunk.get("depth", 0),
+                            chunk.get("chunk_index", 0),
+                            json.dumps(chunk.get("metadata") or {}),
+                        ),
+                    )
+                    count += 1
+                except Exception as e:
+                    logger.warning(f"Failed to store chunk {chunk.get('chunk_id')}: {e}")
+                    continue
+
+            return count
 
     # Reference operations
     def store_reference(
@@ -1017,6 +1327,7 @@ class SQLiteStore:
                     "repositories",
                     "files",
                     "symbols",
+                    "code_chunks",
                     "symbol_references",
                     "imports",
                     "fts_symbols",

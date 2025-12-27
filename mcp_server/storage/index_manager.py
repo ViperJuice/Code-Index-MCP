@@ -27,6 +27,10 @@ class IndexManifest:
     creation_commit: Optional[str]
     content_hash: str
     created_at: Optional[str] = None
+    stable_id_version: Optional[str] = None
+    token_model: Optional[str] = None
+    total_chunks: Optional[int] = None
+    total_tokens: Optional[int] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize manifest to dictionary."""
@@ -36,6 +40,10 @@ class IndexManifest:
             "creation_commit": self.creation_commit,
             "content_hash": self.content_hash,
             "created_at": self.created_at,
+            "stable_id_version": self.stable_id_version,
+            "token_model": self.token_model,
+            "total_chunks": self.total_chunks,
+            "total_tokens": self.total_tokens,
         }
 
     @classmethod
@@ -47,6 +55,10 @@ class IndexManifest:
             creation_commit=data.get("creation_commit"),
             content_hash=data.get("content_hash", ""),
             created_at=data.get("created_at"),
+            stable_id_version=data.get("stable_id_version"),
+            token_model=data.get("token_model"),
+            total_chunks=data.get("total_chunks"),
+            total_tokens=data.get("total_tokens"),
         )
 
 
