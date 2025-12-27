@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import ctypes
 import logging
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
-import tree_sitter_languages
-from tree_sitter import Language, Node, Parser
+from chunker import chunk_text
 
 from ..plugin_base import (
     IndexShard,
@@ -19,6 +17,7 @@ from ..plugin_base import (
 )
 from ..plugin_base_enhanced import PluginWithSemanticSearch
 from ..storage.sqlite_store import SQLiteStore
+from ..utils.chunker_adapter import get_adapter
 from ..utils.fuzzy_indexer import FuzzyIndexer
 
 logger = logging.getLogger(__name__)
@@ -50,41 +49,13 @@ class GenericTreeSitterPlugin(PluginWithSemanticSearch):
         # Initialize enhanced base class (after setting lang)
         super().__init__(sqlite_store=sqlite_store, enable_semantic=enable_semantic)
         self.file_extensions = set(language_config["extensions"])
-        self.symbol_types = language_config.get("symbols", [])
-        self.query_string = language_config.get("query", "")
 
         # Initialize components
         self._indexer = FuzzyIndexer(sqlite_store=sqlite_store)
         self._repository_id = None
+        self._adapter = get_adapter()
 
-        # Query caching for performance
-        self._parsed_query = None
-        self._query_cache_key = None
-
-        # Initialize parser using ctypes approach (like working plugins)
-        try:
-            # Load the shared library
-            lib_path = Path(tree_sitter_languages.__path__[0]) / "languages.so"
-            self._lib = ctypes.CDLL(str(lib_path))
-
-            # Get the function name for this language
-            func_name = f"tree_sitter_{self.lang}"
-            if hasattr(self._lib, func_name):
-                # Configure return type
-                getattr(self._lib, func_name).restype = ctypes.c_void_p
-
-                # Create language and parser
-                self.language = Language(getattr(self._lib, func_name)())
-                self.parser = Parser()
-                self.parser.language = self.language
-                logger.info(f"Loaded tree-sitter grammar for {self.language_name}")
-            else:
-                raise AttributeError(f"No tree-sitter function found for {self.lang}")
-        except Exception as e:
-            logger.warning(f"Could not load tree-sitter grammar for {self.language_name}: {e}")
-            # Fallback - parser will work with basic extraction
-            self.parser = None
-            self.language = None
+        logger.info(f"Initialized generic plugin for {self.language_name}")
 
         # Create or get repository if SQLite is enabled
         if self._sqlite_store:
@@ -121,17 +92,14 @@ class GenericTreeSitterPlugin(PluginWithSemanticSearch):
         # Add to fuzzy indexer
         self._indexer.add_file(str(path), content)
 
-        # Parse with tree-sitter if available
+        # Parse with TreeSitter Chunker
         symbols = []
-        if self.parser and self.language:
-            try:
-                tree = self.parser.parse(content.encode("utf-8"))
-                symbols = self._extract_symbols(tree, content)
-            except Exception as e:
-                logger.error(f"Failed to parse {path}: {e}")
-                # Fallback to basic extraction
-                symbols = self._extract_symbols_basic(content)
-        else:
+        try:
+            chunks = chunk_text(content, self.lang)
+            symbols = [self._adapter.chunk_to_symbol_dict(chunk) for chunk in chunks]
+            logger.debug(f"Chunked {path}: extracted {len(symbols)} symbols")
+        except Exception as e:
+            logger.error(f"Failed to chunk {path}: {e}")
             # Fallback to basic extraction
             symbols = self._extract_symbols_basic(content)
 
@@ -170,125 +138,6 @@ class GenericTreeSitterPlugin(PluginWithSemanticSearch):
             self.index_with_embeddings(path, content, symbols)
 
         return IndexShard(file=str(path), symbols=symbols, language=self.lang)
-
-    def _extract_symbols(self, tree, content: str) -> List[Dict]:
-        """Extract symbols using tree-sitter queries."""
-        symbols = []
-
-        if self.query_string and self.language:
-            try:
-                # Use cached query for better performance
-                query = self._get_cached_query()
-                if query is None:
-                    # Fallback to traversal if query parsing failed
-                    self._traverse_tree(tree.root_node, content, symbols)
-                    return symbols
-
-                captures = query.captures(tree.root_node)
-
-                # Handle both dict format (newer) and list of tuples format (older)
-                if isinstance(captures, dict):
-                    # Dict format: keys are capture names, values are lists of nodes
-                    for capture_name, nodes in captures.items():
-                        for node in nodes:
-                            symbol_text = content[node.start_byte : node.end_byte]
-                            symbols.append(
-                                {
-                                    "symbol": symbol_text,
-                                    "kind": capture_name,
-                                    "line": node.start_point[0] + 1,
-                                    "end_line": node.end_point[0] + 1,
-                                    "span": [
-                                        node.start_point[0] + 1,
-                                        node.end_point[0] + 1,
-                                    ],
-                                    "signature": self._get_signature(node, content),
-                                }
-                            )
-                elif isinstance(captures, list):
-                    # List of tuples format: [(node, capture_name), ...]
-                    for node, capture_name in captures:
-                        symbol_text = content[node.start_byte : node.end_byte]
-                        symbols.append(
-                            {
-                                "symbol": symbol_text,
-                                "kind": capture_name,
-                                "line": node.start_point[0] + 1,
-                                "end_line": node.end_point[0] + 1,
-                                "span": [
-                                    node.start_point[0] + 1,
-                                    node.end_point[0] + 1,
-                                ],
-                                "signature": self._get_signature(node, content),
-                            }
-                        )
-
-                logger.debug(f"Query extracted {len(symbols)} symbols for {self.language_name}")
-            except Exception as e:
-                logger.warning(f"Query execution failed for {self.language_name}: {e}")
-                # Fallback to traversal
-                self._traverse_tree(tree.root_node, content, symbols)
-        else:
-            # No query provided, use traversal
-            self._traverse_tree(tree.root_node, content, symbols)
-
-        return symbols
-
-    def _get_cached_query(self):
-        """Get cached parsed query for better performance."""
-        if self.query_string and self.language:
-            # Check if query is already cached
-            cache_key = hash(self.query_string + self.lang)
-            if self._query_cache_key == cache_key and self._parsed_query is not None:
-                return self._parsed_query
-
-            # Parse and cache the query
-            try:
-                self._parsed_query = self.language.query(self.query_string)
-                self._query_cache_key = cache_key
-                logger.debug(f"Cached query for {self.language_name}")
-                return self._parsed_query
-            except Exception as e:
-                logger.warning(f"Failed to parse query for {self.language_name}: {e}")
-                return None
-        return None
-
-    def _traverse_tree(self, node: Node, content: str, symbols: List[Dict]) -> None:
-        """Traverse tree and extract symbols based on node types."""
-        # Check if this node type is in our symbol types
-        if node.type in self.symbol_types:
-            # Try to find the name node
-            name_node = None
-            for child in node.children:
-                if "name" in child.type or "identifier" in child.type:
-                    name_node = child
-                    break
-
-            if name_node:
-                symbol_name = content[name_node.start_byte : name_node.end_byte]
-                symbols.append(
-                    {
-                        "symbol": symbol_name,
-                        "kind": node.type,
-                        "line": node.start_point[0] + 1,
-                        "end_line": node.end_point[0] + 1,
-                        "span": [node.start_point[0] + 1, node.end_point[0] + 1],
-                        "signature": self._get_signature(node, content),
-                    }
-                )
-
-        # Recurse through children
-        for child in node.children:
-            self._traverse_tree(child, content, symbols)
-
-    def _get_signature(self, node: Node, content: str) -> str:
-        """Get a signature for the symbol."""
-        # Get the line containing the symbol
-        start_line = node.start_point[0]
-        lines = content.split("\n")
-        if start_line < len(lines):
-            return lines[start_line].strip()
-        return content[node.start_byte : node.end_byte]
 
     def _extract_symbols_basic(self, content: str) -> List[Dict]:
         """Basic symbol extraction without tree-sitter."""
@@ -365,25 +214,17 @@ class GenericTreeSitterPlugin(PluginWithSemanticSearch):
                 try:
                     content = path.read_text(encoding="utf-8")
                     if symbol in content:
-                        # Parse and search for exact definition
-                        if self.parser:
-                            tree = self.parser.parse(content.encode("utf-8"))
-                            symbols = self._extract_symbols(tree, content)
-                            for sym in symbols:
-                                if sym["symbol"] == symbol:
-                                    return SymbolDef(
-                                        symbol=symbol,
-                                        kind=sym["kind"],
-                                        language=self.lang,
-                                        signature=sym["signature"],
-                                        doc=None,
-                                        defined_in=str(path),
-                                        line=sym["line"],
-                                        span=(
-                                            sym["line"],
-                                            sym.get("end_line", sym["line"]),
-                                        ),
-                                    )
+                        # Parse with chunker and search for exact definition
+                        try:
+                            chunks = chunk_text(content, self.lang)
+                            for chunk in chunks:
+                                # Check if chunk contains this symbol
+                                symbol_name = chunk.metadata.get("name", chunk.node_type)
+                                if symbol_name == symbol:
+                                    return self._adapter.chunk_to_symbol_def(chunk)
+                        except Exception as e:
+                            logger.debug(f"Failed to chunk {path} for definition: {e}")
+                            continue
                 except Exception:
                     continue
         return None
