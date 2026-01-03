@@ -422,6 +422,25 @@ class SQLiteStore:
             CREATE INDEX IF NOT EXISTS idx_moves_old_path ON file_moves(old_relative_path);
             CREATE INDEX IF NOT EXISTS idx_moves_new_path ON file_moves(new_relative_path);
 
+            -- Relationships (Code Dependencies)
+            CREATE TABLE IF NOT EXISTS relationships (
+                id INTEGER PRIMARY KEY,
+                source_entity_id INTEGER NOT NULL,
+                target_entity_id INTEGER NOT NULL,
+                relationship_type TEXT NOT NULL,
+                confidence_score REAL DEFAULT 1.0,
+                metadata JSON,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (source_entity_id) REFERENCES symbols(id) ON DELETE CASCADE,
+                FOREIGN KEY (target_entity_id) REFERENCES symbols(id) ON DELETE CASCADE
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_rel_source ON relationships(source_entity_id);
+            CREATE INDEX IF NOT EXISTS idx_rel_target ON relationships(target_entity_id);
+            CREATE INDEX IF NOT EXISTS idx_rel_type ON relationships(relationship_type);
+            CREATE INDEX IF NOT EXISTS idx_rel_source_type ON relationships(source_entity_id, relationship_type);
+            CREATE INDEX IF NOT EXISTS idx_rel_target_type ON relationships(target_entity_id, relationship_type);
+
             -- Insert initial index configuration
             INSERT OR IGNORE INTO index_config (config_key, config_value, description) VALUES
                 ('embedding_model', 'voyage-code-3', 'Current embedding model used for vector search'),
