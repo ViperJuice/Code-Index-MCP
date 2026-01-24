@@ -1,18 +1,30 @@
 {
   "mcpServers": {
-    "code-index-mcp": {
-      "command": "uvicorn",
-      "args": ["mcp_server.gateway:app", "--host", "0.0.0.0", "--port", "8000"],
+    "gateway": {
+      "command": "uvx",
+      "args": ["pmcp", "-c", "/path/to/.pmcp.json"],
       "env": {
-        "VOYAGE_AI_API_KEY": "your-voyage-ai-api-key-here",
+        "GROQ_API_KEY": "gsk_your_groq_api_key_here"
+      }
+    },
+    "code-index-mcp": {
+      "command": "python3",
+      "args": [
+        "/workspaces/Code-Index-MCP/scripts/cli/mcp_server_cli.py"
+      ],
+      "cwd": "/workspaces/Code-Index-MCP",
+      "env": {
+        "PYTHONPATH": "/workspaces/Code-Index-MCP",
+        "MCP_WORKSPACE_ROOT": "/workspaces/Code-Index-MCP",
+        "MCP_INDEX_STORAGE_PATH": "/workspaces/Code-Index-MCP/.indexes",
+        "MCP_REPO_REGISTRY": "/workspaces/Code-Index-MCP/.indexes/repository_registry.json",
+        "MCP_ENABLE_MULTI_REPO": "true",
+        "MCP_ENABLE_MULTI_PATH": "true",
         "SEMANTIC_SEARCH_ENABLED": "true",
-        "SEMANTIC_EMBEDDING_MODEL": "voyage-code-3",
-        "SEMANTIC_COLLECTION_NAME": "code-embeddings",
-        "QDRANT_HOST": "localhost",
-        "QDRANT_PORT": "6333",
-        "QDRANT_GRPC_PORT": "6334",
-        "RERANKING_ENABLED": "true",
-        "RERANKER_TYPE": "hybrid"
+        "VOYAGE_AI_API_KEY": "",
+        "MCP_LOG_PATH": "/home/vscode/.mcp/logs",
+        "MCP_TEMP_PATH": "/tmp",
+        "MCP_DATA_PATH": "/workspaces/Code-Index-MCP/data"
       }
     }
   }

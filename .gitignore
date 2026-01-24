@@ -93,14 +93,15 @@ logs/
 # AI AGENT GUIDANCE AND DEVELOPER TOOLS - SHARED WITH TEAM
 # =============================================================================
 # These files help other developers understand and work with the project:
-# 
+#
 # CLAUDE.md                    - AI agent navigation stub
-# AGENTS.md                    - Primary AI agent configuration  
+# AGENTS.md                    - Primary AI agent configuration
 # .claude/commands/            - Custom Claude Code commands
 # .claude.json                 - Claude Desktop integration example
-# .mcp.json                    - MCP server tool definitions
-# 
+# .mcp.json.example            - MCP server config template (safe to share)
+#
 # DO NOT add these to .gitignore - they are valuable for team collaboration
+# NOTE: .mcp.json itself IS gitignored as it may contain API keys
 
 # =============================================================================
 # LOCAL AI SETTINGS - USER-SPECIFIC (DO IGNORE)
@@ -108,6 +109,8 @@ logs/
 .claude/settings.local.json
 .claude/user-*.json
 .mcp.local.json
+.mcp.json
+!.mcp.json.example
 
 # Personal IDE configuration (user-specific - DO IGNORE)
 .cursor/
