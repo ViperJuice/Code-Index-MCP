@@ -284,3 +284,44 @@ def info(artifact_id: int):
     except Exception as e:
         click.echo(f"❌ Error: {e}", err=True)
         sys.exit(1)
+
+
+@artifact.command()
+@click.option("--branch", help="Recover artifact for a branch")
+@click.option("--commit", help="Recover artifact for a commit SHA")
+@click.option("--no-backup", is_flag=True, help="Skip backup of existing indexes")
+def recover(branch: Optional[str], commit: Optional[str], no_backup: bool):
+    """Recover indexes from artifact matching branch/commit."""
+    try:
+        if not branch and not commit:
+            click.echo("❌ Specify at least one of --branch or --commit", err=True)
+            sys.exit(1)
+
+        cmd = [
+            sys.executable,
+            str(project_root / "scripts" / "index-artifact-download.py"),
+            "recover",
+        ]
+
+        if branch:
+            cmd.extend(["--branch", branch])
+        if commit:
+            cmd.extend(["--commit", commit])
+        if no_backup:
+            cmd.append("--no-backup")
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        if result.stdout:
+            click.echo(result.stdout)
+
+        if result.stderr:
+            click.echo(result.stderr, err=True)
+
+        if result.returncode != 0:
+            click.echo("❌ Recovery failed", err=True)
+            sys.exit(1)
+
+    except Exception as e:
+        click.echo(f"❌ Error: {e}", err=True)
+        sys.exit(1)

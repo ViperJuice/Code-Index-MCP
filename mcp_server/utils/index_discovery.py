@@ -460,8 +460,6 @@ class IndexDiscovery:
                     "-H",
                     "Accept: application/vnd.github+json",
                     f"/repos/{repo}/actions/artifacts",
-                    "--jq",
-                    '.artifacts[] | select(.name | startswith("mcp-index-")) | {id, name, created_at}',
                 ],
                 capture_output=True,
                 text=True,
@@ -471,11 +469,13 @@ class IndexDiscovery:
             if not result.stdout:
                 return None
 
-            # Parse artifacts and find the most recent
-            artifacts = []
-            for line in result.stdout.strip().split("\n"):
-                if line:
-                    artifacts.append(json.loads(line))
+            payload = json.loads(result.stdout)
+            raw_artifacts = payload.get("artifacts", [])
+            artifacts = [
+                artifact
+                for artifact in raw_artifacts
+                if artifact.get("name", "").startswith(("mcp-index-", "index-"))
+            ]
 
             if not artifacts:
                 return None
@@ -486,6 +486,104 @@ class IndexDiscovery:
 
         except (subprocess.CalledProcessError, json.JSONDecodeError):
             return None
+
+    def _find_recovery_artifact(
+        self,
+        repo: str,
+        branch: Optional[str],
+        commit: Optional[str],
+    ) -> Optional[Dict[str, Any]]:
+        """Find artifact by branch/commit criteria for recovery."""
+        try:
+            result = subprocess.run(
+                [
+                    "gh",
+                    "api",
+                    "-H",
+                    "Accept: application/vnd.github+json",
+                    f"/repos/{repo}/actions/artifacts",
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except subprocess.CalledProcessError:
+            return None
+
+        if not result.stdout:
+            return None
+
+        try:
+            payload = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            return None
+
+        artifacts = [
+            artifact
+            for artifact in payload.get("artifacts", [])
+            if artifact.get("name", "").startswith(("mcp-index-", "index-"))
+        ]
+
+        if branch:
+            artifacts = [a for a in artifacts if branch in a.get("name", "")]
+
+        if commit:
+            short_commit = commit[:8]
+            artifacts = [
+                a
+                for a in artifacts
+                if commit in a.get("name", "") or short_commit in a.get("name", "")
+            ]
+
+        if not artifacts:
+            return None
+
+        artifacts.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+        promoted = [a for a in artifacts if "-promoted" in a.get("name", "")]
+        if promoted:
+            return promoted[0]
+
+        return artifacts[0]
+
+    def download_recovery_index(
+        self,
+        branch: Optional[str] = None,
+        commit: Optional[str] = None,
+        requested_schema_version: Optional[str] = None,
+        requested_embedding_model: Optional[str] = None,
+        strict_compatibility: bool = True,
+    ) -> bool:
+        """Download and restore artifact matching branch/commit criteria."""
+        if not branch and not commit:
+            logger.error("Recovery download requires branch or commit")
+            return False
+
+        if not self._is_gh_cli_available():
+            logger.info("GitHub CLI not available, skipping recovery download")
+            return False
+
+        repo = self._get_repository_info()
+        if not repo:
+            return False
+
+        required_schema, required_model = self._load_required_compatibility(
+            requested_schema_version=requested_schema_version,
+            requested_embedding_model=requested_embedding_model,
+        )
+
+        artifact = self._find_recovery_artifact(repo, branch, commit)
+        if not artifact:
+            logger.error("No recovery artifact found for branch=%s commit=%s", branch, commit)
+            return False
+
+        logger.info("Recovering index from artifact: %s", artifact.get("name"))
+        return self._download_and_extract_artifact(
+            repo,
+            artifact["id"],
+            requested_schema_version=required_schema,
+            requested_embedding_model=required_model,
+            strict_compatibility=strict_compatibility,
+        )
 
     def _download_and_extract_artifact(
         self,

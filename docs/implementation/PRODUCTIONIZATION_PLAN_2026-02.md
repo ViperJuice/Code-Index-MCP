@@ -81,12 +81,12 @@ sequenceDiagram
 
 ### Priority 1
 
-- Add artifact retention policy automation:
-  - keep latest successful default-branch artifact,
-  - keep last N promoted releases,
-  - expire branch artifacts quickly.
-- Add disaster recovery command:
-  - `mcp_cli.py artifact recover --branch <name> --commit <sha>`.
+- [x] Add artifact retention policy automation:
+  - [x] keep latest successful default-branch artifact,
+  - [x] keep last N promoted releases,
+  - [x] expire branch artifacts quickly.
+- [x] Add disaster recovery command:
+  - [x] `mcp_cli.py artifact recover --branch <name> --commit <sha>`.
 
 ### Priority 2
 

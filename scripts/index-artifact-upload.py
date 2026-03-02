@@ -249,90 +249,15 @@ class IndexArtifactUploader:
 
     def trigger_workflow(self, archive_path: Path, metadata: Dict[str, Any]) -> None:
         """
-        Trigger GitHub Actions workflow to upload the artifact.
+        Trigger GitHub Actions workflow guidance for upload.
 
-        This uses gh CLI to trigger the workflow with the local files.
+        NOTE: Local files cannot be attached directly to a workflow_dispatch run.
+        This method avoids mutating git history and falls back to direct upload guidance.
         """
-        print("\n🚀 Triggering GitHub Actions workflow...")
-
-        # Save metadata
-        metadata_path = Path("artifact-metadata.json")
-        with open(metadata_path, "w") as f:
-            json.dump(metadata, f, indent=2)
-
-        # Check if gh CLI is available
-        try:
-            subprocess.run(["gh", "--version"], capture_output=True, check=True)
-        except:
-            print("❌ GitHub CLI (gh) not found. Please install it:")
-            print("   https://cli.github.com/")
-            sys.exit(1)
-
-        # Create a temporary workflow that uploads our local files
-        workflow_content = f"""
-name: Upload Local Index
-
-on:
-  workflow_dispatch:
-
-jobs:
-  upload:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Upload index artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: index-${{{{ github.sha }}}}-${{{{ github.run_number }}}}
-          path: |
-            {archive_path}
-            {metadata_path}
-          retention-days: 30
-          compression-level: 0  # Already compressed
-"""
-
-        # Save temporary workflow
-        temp_workflow = Path(".github/workflows/temp-upload-index.yml")
-        temp_workflow.parent.mkdir(parents=True, exist_ok=True)
-        temp_workflow.write_text(workflow_content)
-
-        try:
-            # Commit and push the workflow with our files
-            subprocess.run(
-                [
-                    "git",
-                    "add",
-                    str(archive_path),
-                    str(metadata_path),
-                    str(temp_workflow),
-                ],
-                check=True,
-            )
-            subprocess.run(["git", "commit", "-m", "chore: upload index artifacts"], check=True)
-            subprocess.run(["git", "push"], check=True)
-
-            # Trigger the workflow
-            result = subprocess.run(
-                ["gh", "workflow", "run", "temp-upload-index.yml"],
-                capture_output=True,
-                text=True,
-            )
-
-            if result.returncode == 0:
-                print("✅ Workflow triggered successfully!")
-                print("   Check progress at: https://github.com/{}/actions".format(self.repo))
-            else:
-                print(f"❌ Failed to trigger workflow: {result.stderr}")
-
-        finally:
-            # Clean up
-            temp_workflow.unlink(missing_ok=True)
-            archive_path.unlink(missing_ok=True)
-            metadata_path.unlink(missing_ok=True)
-
-            # Reset git changes
-            subprocess.run(["git", "reset", "--hard", "HEAD~1"], capture_output=True)
+        print("\n🚀 Workflow trigger mode selected")
+        print("⚠️  GitHub workflow_dispatch cannot upload local files directly.")
+        print("   Switching to safe direct-upload preparation mode.")
+        self.upload_direct(archive_path, metadata)
 
     def upload_direct(self, archive_path: Path, metadata: Dict[str, Any]) -> None:
         """

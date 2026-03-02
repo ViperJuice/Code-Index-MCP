@@ -620,3 +620,62 @@ class TestIntegration:
 
             assert index_path == last_index
             assert elapsed < 1.0  # Should complete within 1 second even with 20 paths
+
+    def test_find_latest_artifact_supports_both_name_prefixes(self, tmp_path):
+        """Latest artifact discovery should include both index naming schemes."""
+        discovery = IndexDiscovery(tmp_path)
+
+        payload = {
+            "artifacts": [
+                {
+                    "id": 1,
+                    "name": "index-aaaa1111-main-20260101",
+                    "created_at": "2026-01-01T00:00:00Z",
+                },
+                {
+                    "id": 2,
+                    "name": "mcp-index-bbbb2222",
+                    "created_at": "2026-01-02T00:00:00Z",
+                },
+            ]
+        }
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(returncode=0, stdout=json.dumps(payload))
+            artifact = discovery._find_latest_artifact("owner/repo")
+
+        assert artifact is not None
+        assert artifact["id"] == 2
+
+    def test_find_recovery_artifact_prefers_promoted_match(self, tmp_path):
+        """Recovery selection should prefer promoted artifacts among matches."""
+        discovery = IndexDiscovery(tmp_path)
+
+        payload = {
+            "artifacts": [
+                {
+                    "id": 11,
+                    "name": "index-1234abcd-main-20260101",
+                    "created_at": "2026-01-02T00:00:00Z",
+                },
+                {
+                    "id": 12,
+                    "name": "index-1234abcd-main-20260101-promoted",
+                    "created_at": "2026-01-01T00:00:00Z",
+                },
+            ]
+        }
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(returncode=0, stdout=json.dumps(payload))
+            artifact = discovery._find_recovery_artifact(
+                "owner/repo", branch="main", commit="1234abcd"
+            )
+
+        assert artifact is not None
+        assert artifact["id"] == 12
+
+    def test_download_recovery_index_requires_selector(self, tmp_path):
+        """Recovery download should fail when neither branch nor commit is provided."""
+        discovery = IndexDiscovery(tmp_path)
+        assert discovery.download_recovery_index(branch=None, commit=None) is False

@@ -162,6 +162,87 @@ class RepositoryRegistry:
             else:
                 logger.warning(f"Repository {repository_id} not found in registry")
 
+    def register_repository(
+        self,
+        repo_path: str,
+        auto_sync: bool = True,
+        artifact_enabled: bool = True,
+        priority: int = 0,
+    ) -> str:
+        """Register a repository by filesystem path and return its repository ID."""
+        path = Path(repo_path).resolve()
+        if not path.exists():
+            raise FileNotFoundError(f"Repository path does not exist: {repo_path}")
+
+        existing = self.find_by_path(path)
+        if existing:
+            return existing
+
+        # Import locally to avoid circular imports
+        from mcp_server.storage.multi_repo_manager import RepositoryInfo
+
+        repo_id = self._generate_repo_id(path)
+        index_base = path / ".mcp-index"
+        index_db = index_base / "current.db"
+
+        repo_info = RepositoryInfo(
+            repository_id=repo_id,
+            name=path.name,
+            path=path,
+            index_path=index_db,
+            language_stats={},
+            total_files=0,
+            total_symbols=0,
+            indexed_at=datetime.now(),
+            current_commit=self._get_git_commit(path),
+            last_indexed_commit=None,
+            last_indexed=None,
+            current_branch=self._get_preferred_branch(path),
+            url=self._get_git_remote(path),
+            auto_sync=auto_sync,
+            artifact_enabled=artifact_enabled,
+            active=True,
+            priority=priority,
+            index_location=str(index_base),
+        )
+
+        self.register(repo_info)
+        return repo_id
+
+    def unregister_repository(self, repository_id: str) -> bool:
+        """Unregister a repository and return whether it existed."""
+        with self._lock:
+            exists = repository_id in self._registry
+        if not exists:
+            return False
+        self.unregister(repository_id)
+        return True
+
+    def get_all_repositories(self) -> Dict[str, Any]:
+        """Return all repositories keyed by repository ID."""
+        with self._lock:
+            return {
+                repo_id: self._dict_to_repo_info(repo_data.copy())
+                for repo_id, repo_data in self._registry.items()
+            }
+
+    def get_repository_by_path(self, repo_path: str) -> Optional[Any]:
+        """Return repository info for a registered path."""
+        repo_id = self.find_by_path(Path(repo_path).resolve())
+        if not repo_id:
+            return None
+        return self.get(repo_id)
+
+    def set_artifact_enabled(self, repository_id: str, enabled: bool) -> bool:
+        """Enable or disable artifact support for a repository."""
+        with self._lock:
+            repo = self._registry.get(repository_id)
+            if not repo:
+                return False
+            repo["artifact_enabled"] = enabled
+            self.save()
+            return True
+
     def get(self, repository_id: str) -> Optional[Any]:
         """
         Get repository information.
@@ -306,12 +387,17 @@ class RepositoryRegistry:
         if commit:
             with self._lock:
                 self._registry[repository_id]["current_commit"] = commit
+                branch = self._get_git_branch(repo_path)
+                if branch:
+                    self._registry[repository_id]["current_branch"] = branch
                 self.save()
             return commit
 
         return None
 
-    def update_indexed_commit(self, repository_id: str, commit: str) -> Optional[str]:
+    def update_indexed_commit(
+        self, repository_id: str, commit: str, branch: Optional[str] = None
+    ) -> Optional[str]:
         """
         Persist the last indexed commit for a repository.
 
@@ -329,6 +415,10 @@ class RepositoryRegistry:
                 return None
 
             repo["last_indexed_commit"] = commit
+            if branch is None:
+                branch = repo.get("current_branch")
+            if branch:
+                repo["last_indexed_branch"] = branch
             repo["last_indexed"] = datetime.now()
             self.save()
             return commit
@@ -365,6 +455,104 @@ class RepositoryRegistry:
             logger.error("Git is not installed or not available in PATH")
         return None
 
+    def _get_git_branch(self, repo_path: Path) -> Optional[str]:
+        """Return the current branch name for a repository path."""
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return self._normalize_branch_name(result.stdout.strip())
+        except subprocess.CalledProcessError:
+            return None
+        except FileNotFoundError:
+            return None
+
+    def _normalize_branch_name(self, branch: str) -> str:
+        """Normalize branch naming for compatibility with main-first workflows."""
+        if branch == "master":
+            return "main"
+        return branch
+
+    def _get_git_remote(self, repo_path: Path) -> Optional[str]:
+        """Return origin remote URL for a repository path."""
+        try:
+            result = subprocess.run(
+                ["git", "remote", "get-url", "origin"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return result.stdout.strip()
+        except subprocess.CalledProcessError:
+            return None
+        except FileNotFoundError:
+            return None
+
+    def _list_git_branches(self, repo_path: Path) -> List[str]:
+        """Return local git branch names."""
+        try:
+            result = subprocess.run(
+                ["git", "branch", "--format=%(refname:short)"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        except Exception:
+            return []
+
+    def _get_preferred_branch(self, repo_path: Path) -> Optional[str]:
+        """Return preferred baseline branch when available."""
+        current = self._get_git_branch(repo_path)
+        if current in {"main", "master"}:
+            return current
+
+        branches = set(self._list_git_branches(repo_path))
+        if "main" in branches:
+            return "main"
+        if "master" in branches:
+            return "main"
+        return current
+
+    def _generate_repo_id(self, repo_path: Path) -> str:
+        """Generate stable repository ID for a path."""
+        import hashlib
+
+        digest = hashlib.sha1(str(repo_path).encode("utf-8")).hexdigest()[:12]
+        return f"{repo_path.name}-{digest}"
+
+    def update_git_state(self, repository_id: str) -> Optional[Dict[str, str]]:
+        """Refresh both current commit and branch for a repository."""
+        with self._lock:
+            repo = self._registry.get(repository_id)
+            if not repo:
+                return None
+            repo_path = Path(repo["path"])
+
+        commit = self._get_git_commit(repo_path)
+        branch = self._get_git_branch(repo_path)
+
+        if not commit and not branch:
+            return None
+
+        with self._lock:
+            if commit:
+                self._registry[repository_id]["current_commit"] = commit
+            if branch:
+                self._registry[repository_id]["current_branch"] = branch
+            self.save()
+
+        return {
+            "commit": commit or "",
+            "branch": branch or "",
+        }
+
     def find_by_path(self, path: Path) -> Optional[str]:
         """
         Find repository ID by path.
@@ -376,14 +564,16 @@ class RepositoryRegistry:
             Repository ID or None if not found
         """
         with self._lock:
-            path_str = str(path.absolute())
+            path_str = str(path.resolve())
 
             for repo_id, repo_data in self._registry.items():
                 repo_path = repo_data.get("path")
+                if repo_path is None:
+                    continue
                 if isinstance(repo_path, str):
                     repo_path = Path(repo_path)
 
-                if str(repo_path.absolute()) == path_str:
+                if str(Path(repo_path).resolve()) == path_str:
                     return repo_id
 
             return None

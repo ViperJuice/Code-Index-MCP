@@ -17,6 +17,8 @@ on:
         description: 'Artifact name (for promote/validate)'
         required: false
         type: string
+  schedule:
+    - cron: '15 3 * * *'
       retention_days:
         description: 'Retention days for promoted artifacts'
         required: false
@@ -243,38 +245,68 @@ jobs:
           repo = g.get_repo(os.environ['GITHUB_REPOSITORY'])
           
           # Configuration
-          MAX_AGE_DAYS = 30
-          KEEP_LATEST_COUNT = 5
+          DEFAULT_BRANCH = repo.default_branch or "main"
+          BRANCH_ARTIFACT_MAX_AGE_DAYS = 7
+          DEFAULT_ARTIFACT_MAX_AGE_DAYS = 30
+          KEEP_DEFAULT_BRANCH_LATEST = 1
+          KEEP_PROMOTED_COUNT = 5
           PROMOTED_SUFFIX = '-promoted'
-          
-          cutoff_date = datetime.now() - timedelta(days=MAX_AGE_DAYS)
-          
-          # Get all artifacts
+
+          now = datetime.now()
+          branch_cutoff = now - timedelta(days=BRANCH_ARTIFACT_MAX_AGE_DAYS)
+          default_cutoff = now - timedelta(days=DEFAULT_ARTIFACT_MAX_AGE_DAYS)
+
+          # Get all artifacts from both naming conventions
           artifacts = list(repo.get_artifacts())
-          index_artifacts = [a for a in artifacts if a.name.startswith('index-')]
-          
-          # Separate promoted and regular artifacts
+          index_artifacts = [
+              a for a in artifacts
+              if a.name.startswith('index-') or a.name.startswith('mcp-index-')
+          ]
+
           promoted = [a for a in index_artifacts if PROMOTED_SUFFIX in a.name]
-          regular = [a for a in index_artifacts if PROMOTED_SUFFIX not in a.name]
-          
+
+          # Default branch artifacts (long-lived baseline)
+          default_branch_artifacts = [
+              a for a in index_artifacts
+              if (
+                  a.name.startswith('mcp-index-')
+                  and not a.name.startswith('mcp-index-pr-')
+              ) or f"-{DEFAULT_BRANCH}-" in a.name
+          ]
+
+          # Branch/PR artifacts (short-lived)
+          branch_artifacts = [
+              a for a in index_artifacts
+              if a not in promoted and a not in default_branch_artifacts
+          ]
+
           # Sort by created date (newest first)
-          regular.sort(key=lambda x: x.created_at, reverse=True)
-          
-          # Keep latest N artifacts
+          promoted.sort(key=lambda x: x.created_at, reverse=True)
+          default_branch_artifacts.sort(key=lambda x: x.created_at, reverse=True)
+          branch_artifacts.sort(key=lambda x: x.created_at, reverse=True)
+
           to_delete = []
-          
-          # Delete old regular artifacts (keep latest N)
-          for i, artifact in enumerate(regular):
-              if i >= KEEP_LATEST_COUNT and artifact.created_at < cutoff_date:
+
+          # Keep newest promoted artifacts, clean old excess
+          for artifact in promoted[KEEP_PROMOTED_COUNT:]:
+              if artifact.created_at < default_cutoff:
                   to_delete.append(artifact)
-          
-          # Delete very old promoted artifacts
-          for artifact in promoted:
-              if artifact.created_at < cutoff_date:
+
+          # Keep latest default-branch baseline artifact(s)
+          for artifact in default_branch_artifacts[KEEP_DEFAULT_BRANCH_LATEST:]:
+              if artifact.created_at < default_cutoff:
+                  to_delete.append(artifact)
+
+          # Expire branch/pr artifacts quickly
+          for artifact in branch_artifacts:
+              if artifact.created_at < branch_cutoff:
                   to_delete.append(artifact)
           
           # Perform deletion
           print(f"Found {len(index_artifacts)} index artifacts")
+          print(f"  Promoted: {len(promoted)}")
+          print(f"  Default-branch: {len(default_branch_artifacts)}")
+          print(f"  Branch/PR: {len(branch_artifacts)}")
           print(f"Will delete {len(to_delete)} old artifacts")
           
           for artifact in to_delete:
@@ -311,7 +343,10 @@ jobs:
           
           # Get all index artifacts
           artifacts = list(repo.get_artifacts())
-          index_artifacts = [a for a in artifacts if a.name.startswith('index-')]
+          index_artifacts = [
+              a for a in artifacts
+              if a.name.startswith('index-') or a.name.startswith('mcp-index-')
+          ]
           
           # Sort by created date (newest first)
           index_artifacts.sort(key=lambda x: x.created_at, reverse=True)

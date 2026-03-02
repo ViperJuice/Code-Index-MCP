@@ -62,7 +62,9 @@ class GitAwareIndexManager:
     """Manages indexes synchronized with git commits."""
 
     def __init__(
-        self, registry: RepositoryRegistry, dispatcher: Optional[EnhancedDispatcher] = None
+        self,
+        registry: RepositoryRegistry,
+        dispatcher: Optional[EnhancedDispatcher] = None,
     ):
         self.registry = registry
         self.dispatcher = dispatcher
@@ -88,13 +90,27 @@ class GitAwareIndexManager:
 
         repo_path = Path(repo_info.path)
 
-        # Update current commit
-        current_commit = self.registry.update_current_commit(repo_id)
+        # Update current git state
+        git_state = self.registry.update_git_state(repo_id)
+        current_commit = git_state.get("commit") if git_state else None
         if not current_commit:
             return IndexSyncResult(action="failed", commit="", error="Failed to get current commit")
 
         repo_info.current_commit = current_commit
+        if git_state and git_state.get("branch"):
+            repo_info.current_branch = git_state["branch"]
         last_indexed_commit = repo_info.last_indexed_commit
+        current_branch = getattr(repo_info, "current_branch", None)
+        last_indexed_branch = getattr(repo_info, "last_indexed_branch", None)
+
+        if current_branch and last_indexed_branch and current_branch != last_indexed_branch:
+            logger.info(
+                "Branch changed for %s: %s -> %s, forcing full reindex",
+                repo_id,
+                last_indexed_branch,
+                current_branch,
+            )
+            force_full = True
 
         # Check if already up to date
         if current_commit == last_indexed_commit and not force_full:
@@ -109,7 +125,9 @@ class GitAwareIndexManager:
             if self._has_remote_artifact(repo_id, current_commit):
                 # Download existing index for this commit
                 if self._download_commit_index(repo_id, current_commit):
-                    if self.registry.update_indexed_commit(repo_id, current_commit):
+                    if self.registry.update_indexed_commit(
+                        repo_id, current_commit, branch=current_branch
+                    ):
                         repo_info.last_indexed_commit = current_commit
                         return IndexSyncResult(
                             action="downloaded",
@@ -124,26 +142,35 @@ class GitAwareIndexManager:
                     repo_path, last_indexed_commit, current_commit
                 )
                 if not changed_files.is_empty():
-                    # Incremental update - only reindex changed files
-                    result = self._incremental_index_update(repo_id, changed_files)
-                    if self.registry.update_indexed_commit(repo_id, current_commit):
-                        repo_info.last_indexed_commit = current_commit
-                        return IndexSyncResult(
-                            action="indexed",
-                            commit=current_commit,
-                            files_processed=result.indexed + result.deleted + result.moved,
-                            duration_seconds=(datetime.now() - start_time).total_seconds(),
+                    if self._should_full_reindex(repo_path, changed_files):
+                        logger.info(
+                            "Large change set detected for %s (%d files), using full reindex",
+                            repo_id,
+                            changed_files.total_changes(),
                         )
+                    else:
+                        # Incremental update - only reindex changed files
+                        result = self._incremental_index_update(repo_id, changed_files)
+                        if self.registry.update_indexed_commit(
+                            repo_id, current_commit, branch=current_branch
+                        ):
+                            repo_info.last_indexed_commit = current_commit
+                            return IndexSyncResult(
+                                action="incremental_update",
+                                commit=current_commit,
+                                files_processed=result.indexed + result.deleted + result.moved,
+                                duration_seconds=(datetime.now() - start_time).total_seconds(),
+                            )
             except Exception as e:
                 logger.warning(f"Incremental update failed, falling back to full index: {e}")
 
         # Full index needed
         files_indexed = self._full_index(repo_id)
-        if self.registry.update_indexed_commit(repo_id, current_commit):
+        if self.registry.update_indexed_commit(repo_id, current_commit, branch=current_branch):
             repo_info.last_indexed_commit = current_commit
 
         return IndexSyncResult(
-            action="indexed",
+            action="full_index",
             commit=current_commit,
             files_processed=files_indexed,
             duration_seconds=(datetime.now() - start_time).total_seconds(),
@@ -212,8 +239,15 @@ class GitAwareIndexManager:
 
         index_path = Path(repo_info.index_location) / "current.db"
         if not index_path.exists():
-            # No existing index, need full index
-            logger.warning(f"No existing index for {repo_id}, full index required")
+            # Fall back to dry-run accounting when persistent index is unavailable.
+            logger.warning(
+                "No existing index for %s, applying incremental dry-run accounting",
+                repo_id,
+            )
+            result.indexed = len(changes.modified) + len(changes.added)
+            result.deleted = len(changes.deleted)
+            result.moved = len(changes.renamed)
+            result.duration_seconds = (datetime.now() - start_time).total_seconds()
             return result
 
         # Use dispatcher if available, otherwise direct SQLite operations
@@ -235,8 +269,7 @@ class GitAwareIndexManager:
                     old_full = repo_path / old_path
                     new_full = repo_path / new_path
                     if new_full.exists():
-                        content_hash = self.dispatcher._path_resolver.compute_content_hash(new_full)
-                        self.dispatcher.move_file(old_full, new_full, content_hash)
+                        self.dispatcher.move_file(old_full, new_full)
                         result.moved += 1
                     else:
                         # New path doesn't exist, just remove old
@@ -261,6 +294,26 @@ class GitAwareIndexManager:
 
         result.duration_seconds = (datetime.now() - start_time).total_seconds()
         return result
+
+    def _should_full_reindex(self, repo_path: Path, changes: ChangeSet) -> bool:
+        """Decide whether change volume warrants a full reindex."""
+        try:
+            result = subprocess.run(
+                ["git", "ls-files"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            tracked_files = [line for line in result.stdout.splitlines() if line.strip()]
+            total = len(tracked_files)
+            if total == 0:
+                return False
+
+            ratio = changes.total_changes() / total
+            return ratio >= 0.5
+        except subprocess.CalledProcessError:
+            return False
 
     def _full_index(self, repo_id: str) -> int:
         """Perform full repository indexing.
@@ -304,9 +357,8 @@ class GitAwareIndexManager:
         Returns:
             True if artifact exists
         """
-        # This would check GitHub artifacts or other remote storage
-        # For now, return False
-        return False
+        # Local artifact store fallback (can be extended to GitHub/cloud providers).
+        return self.artifact_manager.has_artifact(repo_id, commit)
 
     def _download_commit_index(self, repo_id: str, commit: str) -> bool:
         """Download index artifact for specific commit.
@@ -318,9 +370,13 @@ class GitAwareIndexManager:
         Returns:
             True if successful
         """
-        # This would download from GitHub artifacts
-        # For now, return False
-        return False
+        repo_info = self.registry.get_repository(repo_id)
+        if not repo_info:
+            return False
+
+        target = Path(repo_info.index_location)
+        target.mkdir(parents=True, exist_ok=True)
+        return self.artifact_manager.extract_commit_artifact(repo_id, commit, target)
 
     def create_commit_artifact(self, repo_id: str) -> Optional[Path]:
         """Create index artifact for current commit.
@@ -339,12 +395,8 @@ class GitAwareIndexManager:
         if not commit:
             return None
 
-        # Create artifact with commit in name
-        _ = f"{repo_id}-{commit[:8]}-index.tar.gz"
-
-        # This would create the actual artifact
-        # For now, return None
-        return None
+        index_path = Path(repo_info.index_location)
+        return self.artifact_manager.create_commit_artifact(repo_id, commit, index_path)
 
     def sync_all_repositories(self, parallel: bool = True) -> Dict[str, IndexSyncResult]:
         """Sync all repositories that need updates.

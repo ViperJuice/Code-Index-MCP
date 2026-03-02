@@ -96,8 +96,8 @@ class IndexArtifactDownloader:
             for line in result.stdout.strip().split("\n"):
                 if line:
                     artifact = json.loads(line)
-                    # Filter for index artifacts
-                    if artifact["name"].startswith("index-"):
+                    # Filter for index artifacts produced by both workflows
+                    if artifact["name"].startswith(("index-", "mcp-index-")):
                         if not name_filter or name_filter in artifact["name"]:
                             artifacts.append(artifact)
 
@@ -272,11 +272,59 @@ class IndexArtifactDownloader:
         if promoted:
             return promoted[0]
 
+        # Prefer default-branch artifacts before PR/branch-scoped artifacts
+        default_branch = [
+            a
+            for a in artifacts
+            if a["name"].startswith("mcp-index-") and not a["name"].startswith("mcp-index-pr-")
+        ]
+        if default_branch:
+            return default_branch[0]
+
         # Otherwise, return the latest
         if artifacts:
             return artifacts[0]
 
         return None
+
+    def find_recovery_artifact(
+        self,
+        artifacts: List[Dict[str, Any]],
+        branch: Optional[str],
+        commit: Optional[str],
+    ) -> Optional[Dict[str, Any]]:
+        """Find the best artifact matching recovery criteria."""
+        if not artifacts:
+            return None
+
+        selected = artifacts
+
+        if branch:
+            selected = [
+                a
+                for a in selected
+                if branch in a.get("name", "")
+                or a.get("workflow_run", {}).get("head_branch") == branch
+            ]
+
+        if commit:
+            short_commit = commit[:8]
+            selected = [
+                a
+                for a in selected
+                if commit in a.get("name", "")
+                or short_commit in a.get("name", "")
+                or a.get("workflow_run", {}).get("head_sha", "") == commit
+            ]
+
+        if not selected:
+            return None
+
+        promoted = [a for a in selected if "-promoted" in a["name"]]
+        if promoted:
+            return promoted[0]
+
+        return selected[0]
 
     def _validate_metadata(self, metadata: Dict[str, Any]) -> Optional[str]:
         """Validate required artifact metadata fields."""
@@ -439,6 +487,18 @@ def main():
     info_parser = subparsers.add_parser("info", help="Show artifact information")
     info_parser.add_argument("artifact_id", type=int, help="Artifact ID")
 
+    # Recover command
+    recover_parser = subparsers.add_parser(
+        "recover",
+        help="Recover index from artifact matching branch/commit",
+    )
+    recover_parser.add_argument("--branch", help="Target branch name")
+    recover_parser.add_argument("--commit", help="Target commit SHA")
+    recover_parser.add_argument(
+        "--no-backup", action="store_true", help="Skip backup of existing indexes"
+    )
+    recover_parser.add_argument("--output-dir", default=".", help="Output directory")
+
     parser.add_argument("--repo", help="GitHub repository (owner/name)")
 
     args = parser.parse_args()
@@ -527,6 +587,36 @@ def main():
 
             # Try to get metadata
             # (Would need to download to get full metadata)
+
+        elif args.command == "recover":
+            if not args.branch and not args.commit:
+                print("❌ Specify at least one of --branch or --commit")
+                sys.exit(1)
+
+            artifacts = downloader.list_artifacts()
+            selected = downloader.find_recovery_artifact(
+                artifacts,
+                branch=args.branch,
+                commit=args.commit,
+            )
+
+            if not selected:
+                print("❌ No matching artifact found for recovery criteria")
+                if args.branch:
+                    print(f"   branch={args.branch}")
+                if args.commit:
+                    print(f"   commit={args.commit}")
+                sys.exit(1)
+
+            print(f"\n✅ Recovery artifact selected: {selected['name']}")
+
+            output_dir = Path(args.output_dir) / "artifact_recovery"
+            output_dir.mkdir(exist_ok=True)
+
+            extracted_dir = downloader.download_artifact(selected["id"], output_dir)
+            downloader.install_indexes(extracted_dir, backup=not args.no_backup)
+
+            shutil.rmtree(output_dir, ignore_errors=True)
 
     except Exception as e:
         print(f"\n❌ Error: {e}")
