@@ -1,6 +1,6 @@
 # Dockerfile.minimal - Zero Configuration MCP Server
 # Features: Full code indexing, BM25 search, no external dependencies
-FROM python:3.11-slim as builder
+FROM python:3.12-slim as builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -28,7 +28,7 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 RUN python -c "import tree_sitter_languages; tree_sitter_languages.get_parser('python')"
 
 # Final stage - minimal runtime
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # Install runtime dependencies only
 RUN apt-get update && apt-get install -y \
@@ -43,7 +43,7 @@ RUN useradd -m -s /bin/bash -u 1000 mcp
 WORKDIR /app
 
 # Copy from builder
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code

@@ -20,7 +20,7 @@ on:
           - production
 
 env:
-  PYTHON_VERSION: '3.11'
+  PYTHON_VERSION: '3.12'
   NODE_VERSION: '18'
   DOCKER_REGISTRY: ghcr.io
   DOCKER_IMAGE_NAME: ${{ github.repository }}
@@ -88,7 +88,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ['3.9', '3.10', '3.11']
+        python-version: ['3.12']
     
     steps:
       - uses: actions/checkout@v4
@@ -117,7 +117,7 @@ jobs:
           python -c "from mcp_server.utils.treesitter_wrapper import TreeSitterWrapper; TreeSitterWrapper.setup_all_languages()"
 
       - name: Validate index artifacts
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         run: |
           python -c "
           import os
@@ -168,7 +168,7 @@ jobs:
             --benchmark-skip
 
       - name: Upload coverage reports
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         uses: codecov/codecov-action@v4
         with:
           file: ./coverage.xml
