@@ -408,6 +408,11 @@ class Settings(BaseModel):
     semantic_search_enabled: bool = Field(default=False)
     strict_index_compatibility: bool = Field(default=True)
     index_schema_version: str = Field(default="2")
+    artifact_provider: str = Field(default="github_actions")
+    artifact_local_cache_dir: str = Field(default=".indexes/artifacts")
+    artifact_s3_bucket: Optional[str] = Field(default=None)
+    artifact_s3_prefix: str = Field(default="mcp-index")
+    artifact_delta_enabled: bool = Field(default=False)
 
     # Semantic Search Configuration
     voyage_api_key: Optional[str] = Field(default=None)
@@ -435,6 +440,11 @@ class Settings(BaseModel):
             strict_index_compatibility=get_env_var("STRICT_INDEX_COMPATIBILITY", "true").lower()
             == "true",
             index_schema_version=get_env_var("INDEX_SCHEMA_VERSION", "2"),
+            artifact_provider=get_env_var("ARTIFACT_PROVIDER", "github_actions"),
+            artifact_local_cache_dir=get_env_var("ARTIFACT_LOCAL_CACHE_DIR", ".indexes/artifacts"),
+            artifact_s3_bucket=get_env_var("ARTIFACT_S3_BUCKET"),
+            artifact_s3_prefix=get_env_var("ARTIFACT_S3_PREFIX", "mcp-index"),
+            artifact_delta_enabled=get_env_var("ARTIFACT_DELTA_ENABLED", "false").lower() == "true",
             voyage_api_key=get_env_var("VOYAGE_AI_API_KEY"),
             qdrant_host=get_env_var("QDRANT_HOST", "localhost"),
             qdrant_port=int(get_env_var("QDRANT_PORT", "6333")),

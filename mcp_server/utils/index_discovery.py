@@ -16,6 +16,8 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
+from mcp_server.artifacts.provider_factory import ArtifactProviderFactory
+
 if TYPE_CHECKING:
     from mcp_server.storage.index_manager import IndexManifest
 
@@ -453,6 +455,14 @@ class IndexDiscovery:
     def _find_latest_artifact(self, repo: str) -> Optional[Dict[str, Any]]:
         """Find the most recent index artifact"""
         try:
+            provider = ArtifactProviderFactory.create(repo)
+            records = provider.list_artifacts(("mcp-index-", "index-"))
+            if records:
+                return records[0].to_dict()
+        except Exception as exc:
+            logger.debug("Artifact provider list failed, using gh fallback: %s", exc)
+
+        try:
             result = subprocess.run(
                 [
                     "gh",
@@ -494,6 +504,27 @@ class IndexDiscovery:
         commit: Optional[str],
     ) -> Optional[Dict[str, Any]]:
         """Find artifact by branch/commit criteria for recovery."""
+        try:
+            provider = ArtifactProviderFactory.create(repo)
+            artifacts = [r.to_dict() for r in provider.list_artifacts(("mcp-index-", "index-"))]
+
+            if branch:
+                artifacts = [a for a in artifacts if branch in a.get("name", "")]
+
+            if commit:
+                short_commit = commit[:8]
+                artifacts = [
+                    a
+                    for a in artifacts
+                    if commit in a.get("name", "") or short_commit in a.get("name", "")
+                ]
+
+            if artifacts:
+                promoted = [a for a in artifacts if "-promoted" in a.get("name", "")]
+                return promoted[0] if promoted else artifacts[0]
+        except Exception as exc:
+            logger.debug("Artifact provider recovery lookup failed, using gh fallback: %s", exc)
+
         try:
             result = subprocess.run(
                 [
@@ -588,7 +619,7 @@ class IndexDiscovery:
     def _download_and_extract_artifact(
         self,
         repo: str,
-        artifact_id: int,
+        artifact_id: Any,
         requested_schema_version: Optional[str] = None,
         requested_embedding_model: Optional[str] = None,
         strict_compatibility: bool = True,
@@ -598,20 +629,31 @@ class IndexDiscovery:
             try:
                 # Download artifact
                 zip_path = Path(tmpdir) / "artifact.zip"
-                result = subprocess.run(
-                    [
-                        "gh",
-                        "api",
-                        "-H",
-                        "Accept: application/vnd.github+json",
-                        f"/repos/{repo}/actions/artifacts/{artifact_id}/zip",
-                    ],
-                    capture_output=True,
-                    check=True,
-                )
+                downloaded = False
+                try:
+                    provider = ArtifactProviderFactory.create(repo)
+                    provider_zip_path = provider.download_artifact(str(artifact_id), Path(tmpdir))
+                    if provider_zip_path != zip_path:
+                        shutil.copy2(provider_zip_path, zip_path)
+                    downloaded = True
+                except Exception as exc:
+                    logger.debug("Artifact provider download failed, using gh fallback: %s", exc)
 
-                with open(zip_path, "wb") as f:
-                    f.write(result.stdout)
+                if not downloaded:
+                    result = subprocess.run(
+                        [
+                            "gh",
+                            "api",
+                            "-H",
+                            "Accept: application/vnd.github+json",
+                            f"/repos/{repo}/actions/artifacts/{artifact_id}/zip",
+                        ],
+                        capture_output=True,
+                        check=True,
+                    )
+
+                    with open(zip_path, "wb") as f:
+                        f.write(result.stdout)
 
                 # Extract zip
                 subprocess.run(["unzip", "-q", str(zip_path)], cwd=tmpdir, check=True)
