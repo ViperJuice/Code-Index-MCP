@@ -1,7 +1,7 @@
 .PHONY: help install test test-unit test-integration test-all test-parallel test-interfaces test-plugins test-performance test-resilience lint format clean coverage benchmark security docker
 .PHONY: docker-up docker-down docker-dev docker-prod docker-test docker-logs docker-health
 .PHONY: test-dormant test-real-world test-semantic test-redis test-advanced test-cross-lang
-.PHONY: setup-env setup-dev-env setup-prod-env backup restore clean-docker
+.PHONY: setup-env setup-dev-env setup-prod-env backup restore clean-docker check-diagrams
 
 help:
 	@echo "Available commands:"
@@ -78,6 +78,10 @@ lint:
 format:
 	black mcp_server tests
 	isort mcp_server tests
+
+
+check-diagrams:
+	python scripts/check_mermaid_diagrams.py architecture/portable_index_architecture.md architecture/index_artifact_architecture.md docs/implementation/PRODUCTIONIZATION_PLAN_2026-02.md
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} +

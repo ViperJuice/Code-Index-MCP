@@ -16,7 +16,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from mcp_server.config.index_paths import IndexPathConfig
-from mcp_server.utils.index_discovery import IndexDiscovery
+from mcp_server.utils.index_discovery import IndexDiscovery, _is_within_directory
 
 
 class TestIndexPathConfig:
@@ -163,6 +163,15 @@ class TestIndexDiscovery:
 
         assert discovery.enable_multi_path is True
         assert discovery.path_config is not None
+
+    def test_is_within_directory_blocks_traversal(self, temp_workspace):
+        """Ensure archive extraction guard rejects path traversal entries."""
+        base = temp_workspace / ".mcp-index"
+        base.mkdir(parents=True, exist_ok=True)
+
+        assert _is_within_directory(base, base / "code_index.db") is True
+        assert _is_within_directory(base, base / "subdir" / "../code_index.db") is True
+        assert _is_within_directory(base, base / ".." / "outside.txt") is False
 
     def test_find_index_in_legacy_location(self, temp_workspace, create_test_index):
         """Test finding index in legacy .mcp-index location."""

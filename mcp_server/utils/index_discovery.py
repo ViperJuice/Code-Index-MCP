@@ -21,6 +21,15 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _is_within_directory(base_dir: Path, candidate_path: Path) -> bool:
+    """Return whether candidate_path resolves under base_dir."""
+    try:
+        candidate_path.resolve().relative_to(base_dir.resolve())
+        return True
+    except ValueError:
+        return False
+
+
 class IndexDiscovery:
     """Discovers and manages portable MCP indexes in repositories"""
 
@@ -426,7 +435,17 @@ class IndexDiscovery:
                 # Extract to index directory
                 self.index_dir.mkdir(parents=True, exist_ok=True)
                 with tarfile.open(tar_path, "r:gz") as tar:
-                    tar.extractall(self.index_dir)
+                    members = tar.getmembers()
+                    for member in members:
+                        target_path = self.index_dir / member.name
+                        if not _is_within_directory(self.index_dir, target_path):
+                            logger.error(
+                                "Blocked archive extraction outside index directory: %s",
+                                member.name,
+                            )
+                            return False
+
+                    tar.extractall(self.index_dir, members=members)
 
                 return True
 
