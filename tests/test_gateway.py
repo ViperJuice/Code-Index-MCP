@@ -31,7 +31,7 @@ class TestGatewayStartupShutdown:
         # Trigger startup event
         with test_client:
             # Verify components were initialized
-            mock_store.assert_called_once_with("code_index.db")
+            mock_store.assert_called_once()
             mock_plugin.assert_called_once()
             mock_dispatcher.assert_called_once()
             mock_watcher.assert_called_once()

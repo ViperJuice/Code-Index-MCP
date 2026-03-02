@@ -406,6 +406,8 @@ class Settings(BaseModel):
     # Feature Flags
     dynamic_plugin_loading: bool = Field(default=True)
     semantic_search_enabled: bool = Field(default=False)
+    strict_index_compatibility: bool = Field(default=True)
+    index_schema_version: str = Field(default="2")
 
     # Semantic Search Configuration
     voyage_api_key: Optional[str] = Field(default=None)
@@ -430,6 +432,9 @@ class Settings(BaseModel):
             debug=get_env_var("DEBUG", "false").lower() == "true",
             semantic_search_enabled=get_env_var("SEMANTIC_SEARCH_ENABLED", "true").lower()
             == "true",
+            strict_index_compatibility=get_env_var("STRICT_INDEX_COMPATIBILITY", "true").lower()
+            == "true",
+            index_schema_version=get_env_var("INDEX_SCHEMA_VERSION", "2"),
             voyage_api_key=get_env_var("VOYAGE_AI_API_KEY"),
             qdrant_host=get_env_var("QDRANT_HOST", "localhost"),
             qdrant_port=int(get_env_var("QDRANT_PORT", "6333")),

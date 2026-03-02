@@ -8,6 +8,7 @@ import hashlib
 import json
 import logging
 import os
+import shutil
 import sqlite3
 import subprocess
 import tarfile
@@ -98,9 +99,7 @@ class IndexDiscovery:
         # Determine storage strategy
         if storage_strategy is None:
             config = self.get_index_config()
-            storage_strategy = (
-                config.get("storage_strategy", "inline") if config else "inline"
-            )
+            storage_strategy = config.get("storage_strategy", "inline") if config else "inline"
 
         self.storage_strategy = storage_strategy
         self.index_manager = IndexManager(storage_strategy=storage_strategy)
@@ -171,14 +170,14 @@ class IndexDiscovery:
         self,
         requested_schema_version: Optional[str] = None,
         requested_embedding_model: Optional[str] = None,
+        strict_compatibility: bool = False,
     ) -> Optional[Path]:
         """Get path to local SQLite index if it exists."""
         if not self.is_index_enabled():
             return None
 
         require_selection = bool(
-            requested_schema_version is not None
-            or requested_embedding_model is not None
+            requested_schema_version is not None or requested_embedding_model is not None
         )
         candidates: List[Dict[str, Any]] = []
         search_paths: List[Path] = []
@@ -191,18 +190,14 @@ class IndexDiscovery:
                 return None
 
             if require_selection:
-                candidates.append(
-                    {"path": db_path, "manifest": self.read_index_manifest(db_path)}
-                )
+                candidates.append({"path": db_path, "manifest": self.read_index_manifest(db_path)})
                 return None
 
             return db_path
 
         # Try centralized storage first if enabled
         if self.storage_strategy == "centralized":
-            centralized_path = self.index_manager.get_current_index_path(
-                self.workspace_root
-            )
+            centralized_path = self.index_manager.get_current_index_path(self.workspace_root)
             candidate = _record_candidate(centralized_path)
             if candidate:
                 return candidate
@@ -237,21 +232,35 @@ class IndexDiscovery:
 
         # Log detailed information about search failure
         if self.enable_multi_path:
-            logger.warning(
-                f"No valid index found after searching {len(search_paths)} paths"
-            )
-            validation = self.path_config.validate_paths(
-                self._get_repository_identifier()
-            )
+            logger.warning(f"No valid index found after searching {len(search_paths)} paths")
+            validation = self.path_config.validate_paths(self._get_repository_identifier())
             existing_paths = [str(p) for p, exists in validation.items() if exists]
             if existing_paths:
                 logger.info(f"Existing search paths: {existing_paths}")
 
         if require_selection and candidates:
+            if strict_compatibility:
+                compatible_candidates = []
+                for candidate in candidates:
+                    if self._validate_runtime_compatibility(
+                        candidate["path"],
+                        requested_schema_version=requested_schema_version,
+                        requested_embedding_model=requested_embedding_model,
+                        strict=True,
+                    ):
+                        compatible_candidates.append(candidate)
+
+                if not compatible_candidates:
+                    logger.warning("No compatible local index candidates found in strict mode")
+                    return None
+
+                candidates = compatible_candidates
+
             return self.index_manager.select_best_index(
                 candidates,
                 requested_schema_version=requested_schema_version,
                 requested_embedding_model=requested_embedding_model,
+                strict_compatibility=strict_compatibility,
             )
 
         return None
@@ -261,12 +270,10 @@ class IndexDiscovery:
         try:
             conn = sqlite3.connect(str(db_path))
             # Check for expected tables
-            cursor = conn.execute(
-                """
+            cursor = conn.execute("""
                 SELECT name FROM sqlite_master 
                 WHERE type='table' AND name IN ('files', 'symbols', 'repositories')
-            """
-            )
+            """)
             tables = {row[0] for row in cursor.fetchall()}
             conn.close()
 
@@ -326,7 +333,12 @@ class IndexDiscovery:
 
         return None
 
-    def should_download_index(self) -> bool:
+    def should_download_index(
+        self,
+        requested_schema_version: Optional[str] = None,
+        requested_embedding_model: Optional[str] = None,
+        strict_compatibility: bool = True,
+    ) -> bool:
         """Check if we should attempt to download an index from GitHub"""
         config = self.get_index_config()
         if not config:
@@ -340,18 +352,33 @@ class IndexDiscovery:
         if not config.get("github_artifacts", {}).get("enabled", True):
             return False
 
-        # Check if we already have a recent index
-        metadata = self.get_index_metadata()
-        if metadata:
-            # Could check age here and decide if it's too old
-            # For now, if we have an index, don't download
+        # Skip download if we already have a compatible index
+        existing_index = self.get_local_index_path(
+            requested_schema_version=requested_schema_version,
+            requested_embedding_model=requested_embedding_model,
+            strict_compatibility=strict_compatibility,
+        )
+        if existing_index:
             return False
 
         return True
 
     def download_latest_index(self) -> bool:
         """Attempt to download the latest index from GitHub artifacts"""
-        if not self.should_download_index():
+        return self.download_latest_index_for_runtime()
+
+    def download_latest_index_for_runtime(
+        self,
+        requested_schema_version: Optional[str] = None,
+        requested_embedding_model: Optional[str] = None,
+        strict_compatibility: bool = True,
+    ) -> bool:
+        """Attempt to download a compatible index from GitHub artifacts."""
+        if not self.should_download_index(
+            requested_schema_version=requested_schema_version,
+            requested_embedding_model=requested_embedding_model,
+            strict_compatibility=strict_compatibility,
+        ):
             return False
 
         # Check if gh CLI is available
@@ -365,6 +392,11 @@ class IndexDiscovery:
             if not repo:
                 return False
 
+            required_schema, required_model = self._load_required_compatibility(
+                requested_schema_version=requested_schema_version,
+                requested_embedding_model=requested_embedding_model,
+            )
+
             # Find latest artifact
             artifact = self._find_latest_artifact(repo)
             if not artifact:
@@ -373,7 +405,13 @@ class IndexDiscovery:
 
             # Download and extract
             logger.info(f"Downloading index artifact: {artifact['name']}")
-            if self._download_and_extract_artifact(repo, artifact["id"]):
+            if self._download_and_extract_artifact(
+                repo,
+                artifact["id"],
+                requested_schema_version=required_schema,
+                requested_embedding_model=required_model,
+                strict_compatibility=strict_compatibility,
+            ):
                 logger.info("Successfully downloaded and extracted index")
                 return True
 
@@ -385,9 +423,7 @@ class IndexDiscovery:
     def _is_gh_cli_available(self) -> bool:
         """Check if GitHub CLI is available"""
         try:
-            result = subprocess.run(
-                ["gh", "--version"], capture_output=True, check=False
-            )
+            result = subprocess.run(["gh", "--version"], capture_output=True, check=False)
             return result.returncode == 0
         except FileNotFoundError:
             return False
@@ -451,7 +487,14 @@ class IndexDiscovery:
         except (subprocess.CalledProcessError, json.JSONDecodeError):
             return None
 
-    def _download_and_extract_artifact(self, repo: str, artifact_id: int) -> bool:
+    def _download_and_extract_artifact(
+        self,
+        repo: str,
+        artifact_id: int,
+        requested_schema_version: Optional[str] = None,
+        requested_embedding_model: Optional[str] = None,
+        strict_compatibility: bool = True,
+    ) -> bool:
         """Download and extract an artifact"""
         with tempfile.TemporaryDirectory() as tmpdir:
             try:
@@ -481,22 +524,91 @@ class IndexDiscovery:
                     logger.error("Archive not found in artifact")
                     return False
 
-                # Verify checksum if available
+                metadata_path = Path(tmpdir) / "artifact-metadata.json"
+                if not metadata_path.exists():
+                    logger.error("Artifact metadata not found in artifact")
+                    return False
+
+                try:
+                    metadata = json.loads(metadata_path.read_text())
+                except json.JSONDecodeError as exc:
+                    logger.error("Artifact metadata is invalid JSON: %s", exc)
+                    return False
+
+                metadata_error = self._validate_artifact_metadata(metadata)
+                if metadata_error:
+                    logger.error("Artifact metadata validation failed: %s", metadata_error)
+                    return False
+
+                # Verify checksum (required)
                 checksum_path = Path(tmpdir) / "mcp-index-archive.tar.gz.sha256"
                 if checksum_path.exists():
                     if not self._verify_checksum(tar_path, checksum_path):
                         logger.error("Checksum verification failed")
                         return False
+                else:
+                    expected_checksum = metadata.get("checksum")
+                    if not expected_checksum:
+                        logger.error("Artifact checksum is required but missing")
+                        return False
+                    if not self._verify_checksum_value(tar_path, expected_checksum):
+                        logger.error("Checksum verification failed")
+                        return False
 
-                # Extract to index directory
-                self.index_dir.mkdir(parents=True, exist_ok=True)
+                compatibility_error = self._validate_artifact_compatibility_metadata(
+                    metadata,
+                    requested_schema_version=requested_schema_version,
+                    requested_embedding_model=requested_embedding_model,
+                    strict=strict_compatibility,
+                )
+                if compatibility_error:
+                    logger.error(
+                        "Artifact compatibility validation failed: %s",
+                        compatibility_error,
+                    )
+                    return False
+
+                staging_dir = Path(tmpdir) / "staging_extract"
+                staging_dir.mkdir(parents=True, exist_ok=True)
+
+                # Extract to staging directory
                 with tarfile.open(tar_path, "r:gz") as tar:
                     members = tar.getmembers()
                     for member in members:
-                        if not _validate_tar_member(member, self.index_dir):
+                        if not _validate_tar_member(member, staging_dir):
                             return False
 
-                    tar.extractall(self.index_dir, members=members)
+                    tar.extractall(staging_dir, members=members)
+
+                staged_index_path = staging_dir / "code_index.db"
+                if not staged_index_path.exists():
+                    logger.error("Extracted artifact missing code_index.db")
+                    return False
+
+                if not self._validate_runtime_compatibility(
+                    staged_index_path,
+                    requested_schema_version=requested_schema_version,
+                    requested_embedding_model=requested_embedding_model,
+                    strict=strict_compatibility,
+                ):
+                    logger.error("Extracted artifact index failed runtime compatibility checks")
+                    return False
+
+                # Replace index directory atomically from staged files
+                self.index_dir.mkdir(parents=True, exist_ok=True)
+
+                for item in self.index_dir.iterdir():
+                    if item.is_dir():
+                        shutil.rmtree(item)
+                    else:
+                        item.unlink()
+
+                for item in staging_dir.iterdir():
+                    destination = self.index_dir / item.name
+                    if item.is_dir():
+                        shutil.copytree(item, destination)
+                    else:
+                        shutil.copy2(item, destination)
 
                 return True
 
@@ -521,6 +633,187 @@ class IndexDiscovery:
         except Exception as e:
             logger.warning(f"Checksum verification failed: {e}")
             return False
+
+    def _verify_checksum_value(self, file_path: Path, expected_checksum: str) -> bool:
+        """Verify SHA256 checksum against an expected checksum value."""
+        try:
+            sha256 = hashlib.sha256()
+            with open(file_path, "rb") as f:
+                for chunk in iter(lambda: f.read(65536), b""):
+                    sha256.update(chunk)
+
+            actual_checksum = sha256.hexdigest()
+            return actual_checksum == expected_checksum
+        except Exception as e:
+            logger.warning(f"Checksum verification failed: {e}")
+            return False
+
+    def _load_required_compatibility(
+        self,
+        requested_schema_version: Optional[str] = None,
+        requested_embedding_model: Optional[str] = None,
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Resolve required schema/model compatibility from args + config + env."""
+        if requested_schema_version and requested_embedding_model:
+            return requested_schema_version, requested_embedding_model
+
+        config = self.get_index_config() or {}
+        github_artifacts = config.get("github_artifacts", {})
+
+        resolved_schema = requested_schema_version or github_artifacts.get(
+            "required_schema_version"
+        )
+        resolved_schema = resolved_schema or os.getenv("INDEX_SCHEMA_VERSION")
+
+        resolved_model = requested_embedding_model or github_artifacts.get(
+            "required_embedding_model"
+        )
+        resolved_model = resolved_model or os.getenv("SEMANTIC_EMBEDDING_MODEL")
+
+        return resolved_schema, resolved_model
+
+    def _validate_artifact_metadata(self, metadata: Dict[str, Any]) -> Optional[str]:
+        """Validate required artifact metadata fields."""
+        required_keys = ["checksum", "commit", "branch", "timestamp", "compatibility"]
+        for key in required_keys:
+            if key not in metadata:
+                return f"Missing required metadata key: {key}"
+
+        compatibility = metadata.get("compatibility")
+        if not isinstance(compatibility, dict):
+            return "Metadata compatibility field must be an object"
+
+        for key in ["schema_version", "embedding_model"]:
+            if key not in compatibility:
+                return f"Missing compatibility metadata field: {key}"
+
+        return None
+
+    def _validate_artifact_compatibility_metadata(
+        self,
+        metadata: Dict[str, Any],
+        requested_schema_version: Optional[str],
+        requested_embedding_model: Optional[str],
+        strict: bool,
+    ) -> Optional[str]:
+        """Validate artifact metadata compatibility against required schema/model."""
+        if not strict:
+            return None
+
+        compatibility = metadata.get("compatibility", {})
+        artifact_schema = compatibility.get("schema_version")
+        artifact_model = compatibility.get("embedding_model")
+
+        if requested_schema_version and artifact_schema != requested_schema_version:
+            return (
+                "schema mismatch: "
+                f"required={requested_schema_version}, artifact={artifact_schema}"
+            )
+
+        if requested_embedding_model and artifact_model != requested_embedding_model:
+            return (
+                "embedding model mismatch: "
+                f"required={requested_embedding_model}, artifact={artifact_model}"
+            )
+
+        return None
+
+    def _validate_runtime_compatibility(
+        self,
+        index_path: Path,
+        requested_schema_version: Optional[str],
+        requested_embedding_model: Optional[str],
+        strict: bool,
+    ) -> bool:
+        """Validate runtime index compatibility against required schema/model."""
+        if not strict:
+            return True
+
+        manifest = self.read_index_manifest(index_path)
+        actual_schema = (
+            manifest.schema_version if manifest else self._read_schema_version(index_path)
+        )
+        actual_model = (
+            manifest.embedding_model if manifest else self._read_embedding_model(index_path)
+        )
+
+        if requested_schema_version:
+            if not actual_schema:
+                logger.error("Schema version unavailable for compatibility check")
+                return False
+            if actual_schema != requested_schema_version:
+                logger.error(
+                    "Index schema mismatch: required=%s, found=%s",
+                    requested_schema_version,
+                    actual_schema,
+                )
+                return False
+
+        if requested_embedding_model:
+            if not actual_model:
+                logger.error("Embedding model unavailable for compatibility check")
+                return False
+            if actual_model != requested_embedding_model:
+                logger.error(
+                    "Index embedding model mismatch: required=%s, found=%s",
+                    requested_embedding_model,
+                    actual_model,
+                )
+                return False
+
+        return True
+
+    def _read_schema_version(self, index_path: Path) -> Optional[str]:
+        """Read schema version from SQLite index."""
+        try:
+            conn = sqlite3.connect(str(index_path))
+            try:
+                cursor = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'"
+                )
+                if cursor.fetchone() is None:
+                    return None
+
+                cursor = conn.execute("SELECT MAX(version) FROM schema_version")
+                value = cursor.fetchone()[0]
+                return str(value) if value is not None else None
+            finally:
+                conn.close()
+        except Exception as e:
+            logger.warning("Failed to read index schema version: %s", e)
+            return None
+
+    def _read_embedding_model(self, index_path: Path) -> Optional[str]:
+        """Read embedding model from index config or metadata."""
+        try:
+            conn = sqlite3.connect(str(index_path))
+            try:
+                cursor = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='index_config'"
+                )
+                if cursor.fetchone() is not None:
+                    cursor = conn.execute(
+                        "SELECT config_value FROM index_config WHERE config_key='embedding_model'"
+                    )
+                    row = cursor.fetchone()
+                    if row and row[0]:
+                        return str(row[0])
+            finally:
+                conn.close()
+        except Exception as e:
+            logger.warning("Failed to read embedding model from index DB: %s", e)
+
+        metadata_path = index_path.parent / ".index_metadata.json"
+        if metadata_path.exists():
+            try:
+                metadata = json.loads(metadata_path.read_text())
+                model = metadata.get("embedding_model")
+                if model:
+                    return str(model)
+            except Exception as e:
+                logger.warning("Failed to read index metadata: %s", e)
+
+        return None
 
     def get_index_info(self) -> Dict[str, Any]:
         """Get comprehensive information about the index"""
@@ -553,9 +846,7 @@ class IndexDiscovery:
             # Include search paths if multi-path is enabled
             if self.enable_multi_path and self.path_config:
                 repo_id = self._get_repository_identifier()
-                info["search_paths"] = [
-                    str(p) for p in self.path_config.get_search_paths(repo_id)
-                ]
+                info["search_paths"] = [str(p) for p in self.path_config.get_search_paths(repo_id)]
 
         return info
 

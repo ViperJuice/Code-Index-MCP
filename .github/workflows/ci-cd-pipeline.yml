@@ -56,6 +56,9 @@ jobs:
           pip install -r requirements.txt
           pip install black isort flake8 mypy pylint safety bandit
 
+      - name: Enforce Mermaid diagram policy
+        run: make check-diagrams
+
       - name: Run black
         run: black --check mcp_server tests
 

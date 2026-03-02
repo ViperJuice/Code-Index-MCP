@@ -143,28 +143,38 @@ class PreFlightValidator:
         result = {"status": "pending", "critical": True, "details": {}, "issues": []}
 
         try:
+            from mcp_server.config.settings import get_settings
             from mcp_server.utils.index_discovery import IndexDiscovery
 
             # Check current directory
             workspace = Path.cwd()
             discovery = IndexDiscovery(workspace)
+            settings = get_settings()
+
+            compatible_index = discovery.get_local_index_path(
+                requested_schema_version=settings.index_schema_version,
+                requested_embedding_model=settings.semantic_embedding_model,
+                strict_compatibility=settings.strict_index_compatibility,
+            )
 
             # Get index information
             index_info = discovery.get_index_info()
             result["details"]["index_enabled"] = index_info["enabled"]
-            result["details"]["has_index"] = index_info["has_local_index"]
-            result["details"]["found_at"] = index_info.get("found_at")
+            result["details"]["has_index"] = compatible_index is not None
+            result["details"]["found_at"] = (
+                str(compatible_index) if compatible_index else index_info.get("found_at")
+            )
 
             if not index_info["enabled"]:
                 result["issues"].append("MCP indexing not enabled for this repository")
                 result["status"] = "failed"
-            elif not index_info["has_local_index"]:
+            elif compatible_index is None:
                 result["issues"].append("No index found in any configured location")
                 result["details"]["search_paths"] = index_info.get("search_paths", [])
                 result["status"] = "failed"
             else:
                 # Validate the index
-                index_path = Path(index_info["found_at"])
+                index_path = Path(compatible_index)
                 if index_path.exists():
                     try:
                         conn = sqlite3.connect(str(index_path))
@@ -310,7 +320,9 @@ class PreFlightValidator:
             for cmd_name, cmd_args in commands.items():
                 try:
                     proc = await asyncio.create_subprocess_exec(
-                        *cmd_args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+                        *cmd_args,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
                     )
                     await proc.wait()
                     result["details"][f"{cmd_name}_available"] = proc.returncode == 0

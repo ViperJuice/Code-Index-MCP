@@ -130,32 +130,26 @@ class TestIndexDiscovery:
 
             if with_tables:
                 # Create minimal schema
-                conn.execute(
-                    """
+                conn.execute("""
                     CREATE TABLE files (
                         id INTEGER PRIMARY KEY,
                         path TEXT,
                         content TEXT
                     )
-                """
-                )
-                conn.execute(
-                    """
+                """)
+                conn.execute("""
                     CREATE TABLE symbols (
                         id INTEGER PRIMARY KEY,
                         name TEXT,
                         file_id INTEGER
                     )
-                """
-                )
-                conn.execute(
-                    """
+                """)
+                conn.execute("""
                     CREATE TABLE repositories (
                         id INTEGER PRIMARY KEY,
                         path TEXT
                     )
-                """
-                )
+                """)
 
             conn.commit()
             conn.close()
@@ -246,6 +240,31 @@ class TestIndexDiscovery:
 
         assert _validate_tar_member(member, base) is False
 
+    def test_validate_artifact_metadata_requires_compatibility_fields(self, temp_workspace):
+        """Artifact metadata must include strict compatibility keys."""
+        discovery = IndexDiscovery(temp_workspace)
+
+        missing = {
+            "checksum": "abc",
+            "commit": "deadbeef",
+            "branch": "main",
+            "timestamp": "2026-01-01T00:00:00Z",
+            "compatibility": {"embedding_model": "voyage-code-3"},
+        }
+        assert discovery._validate_artifact_metadata(missing) is not None
+
+        valid = {
+            "checksum": "abc",
+            "commit": "deadbeef",
+            "branch": "main",
+            "timestamp": "2026-01-01T00:00:00Z",
+            "compatibility": {
+                "embedding_model": "voyage-code-3",
+                "schema_version": "2",
+            },
+        }
+        assert discovery._validate_artifact_metadata(valid) is None
+
     def test_find_index_in_legacy_location(self, temp_workspace, create_test_index):
         """Test finding index in legacy .mcp-index location."""
         # Create .mcp-index.json to enable indexing
@@ -310,15 +329,8 @@ class TestIndexDiscovery:
         config_file = temp_workspace / ".mcp-index.json"
         config_file.write_text(json.dumps({"enabled": True}))
 
-        index_a = (
-            temp_workspace / "test_indexes" / temp_workspace.name / "code_index.db"
-        )
-        index_b = (
-            temp_workspace
-            / "test_indexes"
-            / f"{temp_workspace.name}_alt"
-            / "code_index.db"
-        )
+        index_a = temp_workspace / "test_indexes" / temp_workspace.name / "code_index.db"
+        index_b = temp_workspace / "test_indexes" / f"{temp_workspace.name}_alt" / "code_index.db"
         create_test_index(index_a)
         create_test_index(index_b)
 
@@ -355,6 +367,41 @@ class TestIndexDiscovery:
             assert fallback in (index_a, index_b)
             assert any("embedding model" in message for message in caplog.messages)
 
+    def test_manifest_selection_strict_mode_requires_exact_match(
+        self, temp_workspace, create_test_index
+    ):
+        """Strict compatibility mode should reject non-exact manifest matches."""
+        config_file = temp_workspace / ".mcp-index.json"
+        config_file.write_text(json.dumps({"enabled": True}))
+
+        index_a = temp_workspace / "test_indexes" / temp_workspace.name / "code_index.db"
+        create_test_index(index_a)
+
+        discovery = IndexDiscovery(temp_workspace)
+        discovery.write_index_manifest(
+            index_a,
+            schema_version="2",
+            embedding_model="voyage-code-3",
+            creation_commit="commit-a",
+        )
+
+        with patch.object(IndexPathConfig, "get_search_paths") as mock_paths:
+            mock_paths.return_value = [index_a.parent]
+
+            selected = discovery.get_local_index_path(
+                requested_schema_version="2",
+                requested_embedding_model="voyage-code-3",
+                strict_compatibility=True,
+            )
+            assert selected == index_a
+
+            rejected = discovery.get_local_index_path(
+                requested_schema_version="999",
+                requested_embedding_model="voyage-code-3",
+                strict_compatibility=True,
+            )
+            assert rejected is None
+
     def test_validate_sqlite_index(self, temp_workspace, create_test_index):
         """Test SQLite index validation."""
         discovery = IndexDiscovery(temp_workspace)
@@ -379,9 +426,7 @@ class TestIndexDiscovery:
         # Mock git command
         with patch("subprocess.run") as mock_run:
             # Successful git remote
-            mock_run.return_value = Mock(
-                returncode=0, stdout="https://github.com/user/repo.git\n"
-            )
+            mock_run.return_value = Mock(returncode=0, stdout="https://github.com/user/repo.git\n")
 
             identifier = discovery._get_repository_identifier()
             assert identifier == "https://github.com/user/repo.git"
@@ -478,9 +523,7 @@ class TestIntegration:
 
         return envs
 
-    def test_docker_vs_native_path_resolution(
-        self, mock_environments, create_test_index
-    ):
+    def test_docker_vs_native_path_resolution(self, mock_environments, create_test_index):
         """Test that indexes work across Docker and native environments."""
         # Create index in Docker-style path
         docker_index = (
@@ -512,9 +555,7 @@ class TestIntegration:
 
             with patch.object(IndexPathConfig, "get_search_paths") as mock_paths:
                 mock_paths.return_value = [
-                    native_workspace
-                    / ".indexes"
-                    / "hash123",  # Native path (doesn't exist)
+                    native_workspace / ".indexes" / "hash123",  # Native path (doesn't exist)
                     docker_index.parent,  # Docker path (exists)
                 ]
 
@@ -526,16 +567,8 @@ class TestIntegration:
     def test_test_environment_priority(self, mock_environments, create_test_index):
         """Test that test indexes are found with priority."""
         # Create indexes in multiple locations
-        prod_index = (
-            mock_environments["test"]
-            / "project"
-            / ".indexes"
-            / "hash"
-            / "code_index.db"
-        )
-        test_index = (
-            mock_environments["test"] / "test_indexes" / "project" / "code_index.db"
-        )
+        prod_index = mock_environments["test"] / "project" / ".indexes" / "hash" / "code_index.db"
+        test_index = mock_environments["test"] / "test_indexes" / "project" / "code_index.db"
 
         create_test_index(prod_index)
         create_test_index(test_index)

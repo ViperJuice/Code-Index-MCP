@@ -85,27 +85,99 @@ jobs:
       - name: Create index metadata
         if: steps.check_index.outputs.found == 'false' && steps.download.outputs.downloaded == 'false'
         run: |
-          cat > .mcp-index/.index_metadata.json <<EOF
-          {
-            "version": "1.0",
-            "created_at": "2025-06-09T17:21:44Z",
-            "commit": "${{ github.sha }}",
-            "branch": "${{ github.ref_name }}",
-            "repository": "${{ github.repository }}"
+          python <<'PY'
+          import json
+          import sqlite3
+          from datetime import datetime
+          from pathlib import Path
+
+          index_dir = Path('.mcp-index')
+          index_db = index_dir / 'code_index.db'
+          metadata_path = index_dir / '.index_metadata.json'
+
+          embedding_model = 'voyage-code-3'
+          schema_version = '2'
+
+          if metadata_path.exists():
+              try:
+                  existing = json.loads(metadata_path.read_text())
+                  embedding_model = existing.get('embedding_model', embedding_model)
+              except Exception:
+                  pass
+
+          if index_db.exists():
+              try:
+                  conn = sqlite3.connect(str(index_db))
+                  cur = conn.execute("SELECT MAX(version) FROM schema_version")
+                  value = cur.fetchone()[0]
+                  if value is not None:
+                      schema_version = str(value)
+              except Exception:
+                  pass
+              finally:
+                  try:
+                      conn.close()
+                  except Exception:
+                      pass
+
+          metadata = {
+              "version": "1.0",
+              "created_at": datetime.utcnow().isoformat() + 'Z',
+              "commit": "${{ github.sha }}",
+              "branch": "${{ github.ref_name }}",
+              "repository": "${{ github.repository }}",
+              "compatibility": {
+                  "schema_version": schema_version,
+                  "embedding_model": embedding_model,
+              },
           }
-          EOF
+
+          metadata_path.write_text(json.dumps(metadata, indent=2))
+          PY
       
       - name: Compress index for artifact
         run: |
           cd .mcp-index
           tar -czf ../mcp-index-archive.tar.gz .
           cd ..
+          sha256sum mcp-index-archive.tar.gz > mcp-index-archive.tar.gz.sha256
+
+          CHECKSUM=$(cut -d' ' -f1 mcp-index-archive.tar.gz.sha256)
+          python <<'PY'
+          import json
+          from datetime import datetime
+          from pathlib import Path
+
+          index_metadata_path = Path('.mcp-index/.index_metadata.json')
+          index_metadata = json.loads(index_metadata_path.read_text()) if index_metadata_path.exists() else {}
+
+          artifact_metadata = {
+              "version": "1.0",
+              "timestamp": datetime.utcnow().isoformat() + 'Z',
+              "commit": "${{ github.sha }}",
+              "branch": "${{ github.ref_name }}",
+              "checksum": "__CHECKSUM__",
+              "compatibility": index_metadata.get(
+                  "compatibility",
+                  {
+                      "schema_version": "2",
+                      "embedding_model": "voyage-code-3",
+                  },
+              ),
+          }
+
+          Path('artifact-metadata.json').write_text(json.dumps(artifact_metadata, indent=2))
+          PY
+          sed -i "s/__CHECKSUM__/$CHECKSUM/g" artifact-metadata.json
       
       - name: Upload index artifact
         uses: actions/upload-artifact@v4
         with:
           name: mcp-index-${{ github.sha }}
-          path: mcp-index-archive.tar.gz
+          path: |
+            mcp-index-archive.tar.gz
+            mcp-index-archive.tar.gz.sha256
+            artifact-metadata.json
           retention-days: ${{ fromJSON(github.event_name == 'push' && '30' || '7') }}
       
       - name: Upload index for PRs
@@ -113,7 +185,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mcp-index-pr-${{ github.event.pull_request.number }}
-          path: mcp-index-archive.tar.gz
+          path: |
+            mcp-index-archive.tar.gz
+            mcp-index-archive.tar.gz.sha256
+            artifact-metadata.json
           retention-days: 7
 
   cleanup-old-artifacts:

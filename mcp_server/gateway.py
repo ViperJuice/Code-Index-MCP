@@ -14,6 +14,7 @@ from .cache import (
     QueryResultCache,
     QueryType,
 )
+from .config.settings import get_settings
 from .core.logging import setup_logging
 from .dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from .indexer.bm25_indexer import BM25Indexer
@@ -173,13 +174,34 @@ async def startup_event():
         if discovery.is_index_enabled():
             logger.info("MCP portable index detected")
 
-            # Try to use existing index
-            index_path = discovery.get_local_index_path()
+            settings = get_settings()
+            required_schema = settings.index_schema_version
+            required_model = settings.semantic_embedding_model
+            strict_compatibility = settings.strict_index_compatibility
 
-            if not index_path and discovery.should_download_index():
+            # Try to use existing compatible index
+            index_path = discovery.get_local_index_path(
+                requested_schema_version=required_schema,
+                requested_embedding_model=required_model,
+                strict_compatibility=strict_compatibility,
+            )
+
+            if not index_path and discovery.should_download_index(
+                requested_schema_version=required_schema,
+                requested_embedding_model=required_model,
+                strict_compatibility=strict_compatibility,
+            ):
                 logger.info("Attempting to download index from GitHub artifacts...")
-                if discovery.download_latest_index():
-                    index_path = discovery.get_local_index_path()
+                if discovery.download_latest_index_for_runtime(
+                    requested_schema_version=required_schema,
+                    requested_embedding_model=required_model,
+                    strict_compatibility=strict_compatibility,
+                ):
+                    index_path = discovery.get_local_index_path(
+                        requested_schema_version=required_schema,
+                        requested_embedding_model=required_model,
+                        strict_compatibility=strict_compatibility,
+                    )
                     logger.info("Successfully downloaded index from artifacts")
                 else:
                     logger.info("Could not download index, will use default")
@@ -1966,7 +1988,9 @@ async def get_graph_status(
         status = {
             "available": CHUNKER_AVAILABLE,
             "initialized": (
-                dispatcher._graph_analyzer is not None if hasattr(dispatcher, "_graph_analyzer") else False
+                dispatcher._graph_analyzer is not None
+                if hasattr(dispatcher, "_graph_analyzer")
+                else False
             ),
         }
 
@@ -1975,7 +1999,9 @@ async def get_graph_status(
             status["edges"] = len(dispatcher._graph_edges)
 
         if not CHUNKER_AVAILABLE:
-            status["message"] = "Install treesitter-chunker for graph features: pip install treesitter-chunker"
+            status["message"] = (
+                "Install treesitter-chunker for graph features: pip install treesitter-chunker"
+            )
 
         return status
     except Exception as e:

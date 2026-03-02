@@ -182,12 +182,10 @@ class IndexManager:
         try:
             conn = sqlite3.connect(str(index_path))
             # Check for expected tables
-            cursor = conn.execute(
-                """
+            cursor = conn.execute("""
                 SELECT name FROM sqlite_master 
                 WHERE type='table' AND name IN ('files', 'symbols', 'bm25_content')
-            """
-            )
+            """)
             tables = {row[0] for row in cursor.fetchall()}
             conn.close()
 
@@ -287,6 +285,7 @@ class IndexManager:
         candidates: List[Dict[str, Any]],
         requested_schema_version: Optional[str] = None,
         requested_embedding_model: Optional[str] = None,
+        strict_compatibility: bool = False,
     ) -> Optional[Path]:
         """Select the best index candidate based on requested schema/model preferences."""
         if not candidates:
@@ -325,6 +324,14 @@ class IndexManager:
 
         if exact_matches:
             return exact_matches[0]["path"]
+
+        if strict_compatibility and (
+            requested_schema_version is not None or requested_embedding_model is not None
+        ):
+            logger.warning(
+                "No index candidate matched required schema/model compatibility in strict mode"
+            )
+            return None
 
         if schema_matches:
             if requested_embedding_model:
