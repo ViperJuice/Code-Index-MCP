@@ -8,7 +8,7 @@ import json
 import tarfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 
 @dataclass
@@ -28,14 +28,45 @@ class DeltaManifest:
     target_commit: str
     operations: List[DeltaOperation]
     checksums: Dict[str, str]
+    delta_schema_version: str = "1"
 
     def to_dict(self) -> Dict[str, object]:
         return {
+            "delta_schema_version": self.delta_schema_version,
             "base_commit": self.base_commit,
             "target_commit": self.target_commit,
             "operations": [op.__dict__ for op in self.operations],
             "checksums": self.checksums,
         }
+
+
+def validate_delta_manifest(manifest_data: Dict[str, object]) -> Optional[str]:
+    """Validate required fields for a delta manifest payload."""
+    required = [
+        "delta_schema_version",
+        "base_commit",
+        "target_commit",
+        "operations",
+        "checksums",
+    ]
+    for key in required:
+        if key not in manifest_data:
+            return f"missing key: {key}"
+
+    operations = manifest_data.get("operations")
+    if not isinstance(operations, list):
+        return "operations must be a list"
+
+    for op in operations:
+        if not isinstance(op, dict):
+            return "operation entry must be an object"
+        if "op" not in op or "path" not in op:
+            return "operation requires op and path"
+        path = str(op.get("path", ""))
+        if path.startswith("/") or ".." in Path(path).parts:
+            return f"unsafe operation path: {path}"
+
+    return None
 
 
 def _sha256(file_path: Path) -> str:
@@ -94,6 +125,8 @@ def build_delta_archive(manifest: DeltaManifest, target_dir: Path, archive_path:
             if operation.op in {"add", "modify"}:
                 source = target_dir / operation.path
                 if source.exists():
+                    if operation.path.startswith("/") or ".." in Path(operation.path).parts:
+                        raise ValueError(f"Unsafe delta file path: {operation.path}")
                     tar.add(source, arcname=f"files/{operation.path}")
 
     return archive_path
@@ -103,12 +136,21 @@ def apply_delta_archive(base_dir: Path, archive_path: Path) -> None:
     """Apply delta archive to base directory in place."""
     with tarfile.open(archive_path, "r:gz") as tar:
         manifest_member = tar.getmember("delta-manifest.json")
-        manifest_data = json.load(tar.extractfile(manifest_member))
+        manifest_stream = tar.extractfile(manifest_member)
+        if manifest_stream is None:
+            raise ValueError("Missing delta manifest payload")
+        manifest_data = json.load(manifest_stream)
+
+        validation_error = validate_delta_manifest(manifest_data)
+        if validation_error:
+            raise ValueError(f"Invalid delta manifest: {validation_error}")
 
         operations = [DeltaOperation(**item) for item in manifest_data.get("operations", [])]
         checksums = manifest_data.get("checksums", {})
 
         for operation in operations:
+            if operation.path.startswith("/") or ".." in Path(operation.path).parts:
+                raise ValueError(f"Unsafe delta operation path: {operation.path}")
             target = base_dir / operation.path
             if operation.op == "delete":
                 if target.exists():

@@ -156,6 +156,9 @@ jobs:
               "timestamp": datetime.utcnow().isoformat() + 'Z',
               "commit": "${{ github.sha }}",
               "branch": "${{ github.ref_name }}",
+              "artifact_type": "full",
+              "base_commit": None,
+              "target_commit": "${{ github.sha }}",
               "checksum": "__CHECKSUM__",
               "compatibility": index_metadata.get(
                   "compatibility",

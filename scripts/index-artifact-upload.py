@@ -130,7 +130,14 @@ class IndexArtifactUploader:
                 sha256.update(chunk)
         return sha256.hexdigest()
 
-    def create_metadata(self, checksum: str, size: int, secure: bool = True) -> Dict[str, Any]:
+    def create_metadata(
+        self,
+        checksum: str,
+        size: int,
+        secure: bool = True,
+        artifact_type: str = "full",
+        delta_from: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """Create metadata for the artifact."""
         # Get current git info
         try:
@@ -159,6 +166,9 @@ class IndexArtifactUploader:
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "commit": commit,
             "branch": branch,
+            "artifact_type": artifact_type,
+            "base_commit": delta_from,
+            "target_commit": commit,
             "checksum": checksum,
             "compressed_size": size,
             "index_stats": stats,
@@ -306,6 +316,16 @@ def main():
         action="store_true",
         help="Disable secure export (include all files, even sensitive ones)",
     )
+    parser.add_argument(
+        "--artifact-type",
+        choices=["full", "delta"],
+        default="full",
+        help="Artifact type to publish",
+    )
+    parser.add_argument(
+        "--delta-from",
+        help="Base commit SHA for delta artifacts",
+    )
 
     args = parser.parse_args()
 
@@ -329,7 +349,13 @@ def main():
             sys.exit(1)
 
         # Create metadata
-        metadata = uploader.create_metadata(checksum, size, secure=secure)
+        metadata = uploader.create_metadata(
+            checksum,
+            size,
+            secure=secure,
+            artifact_type=args.artifact_type,
+            delta_from=args.delta_from,
+        )
 
         # Upload based on method
         if args.method == "workflow":

@@ -341,6 +341,15 @@ class IndexArtifactDownloader:
             if key not in compatibility:
                 return f"missing compatibility key: {key}"
 
+        artifact_type = metadata.get("artifact_type", "full")
+        if artifact_type not in {"full", "delta"}:
+            return f"invalid artifact_type: {artifact_type}"
+
+        if artifact_type == "delta":
+            for key in ["base_commit", "target_commit"]:
+                if key not in metadata or not metadata.get(key):
+                    return f"missing delta metadata key: {key}"
+
         return None
 
     def _is_within_directory(self, base_dir: Path, candidate_path: Path) -> bool:
@@ -479,6 +488,11 @@ def main():
         "--latest", action="store_true", help="Download latest compatible artifact"
     )
     download_parser.add_argument(
+        "--full-only",
+        action="store_true",
+        help="Only allow full artifacts (skip delta artifacts)",
+    )
+    download_parser.add_argument(
         "--no-backup", action="store_true", help="Skip backup of existing indexes"
     )
     download_parser.add_argument("--output-dir", default=".", help="Output directory")
@@ -547,6 +561,8 @@ def main():
             elif args.latest:
                 # Find and download latest compatible
                 artifacts = downloader.list_artifacts()
+                if args.full_only:
+                    artifacts = [a for a in artifacts if "-delta-" not in a.get("name", "")]
                 best = downloader.find_best_artifact(artifacts)
 
                 if not best:

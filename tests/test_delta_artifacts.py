@@ -6,6 +6,7 @@ from mcp_server.artifacts.delta_artifacts import (
     apply_delta_archive,
     build_delta_archive,
     create_delta_manifest,
+    validate_delta_manifest,
 )
 
 
@@ -38,3 +39,16 @@ def test_delta_manifest_and_apply_roundtrip(tmp_path: Path):
     assert (apply_dir / "a.txt").read_text() == "alpha-updated\n"
     assert (apply_dir / "c.txt").read_text() == "charlie\n"
     assert not (apply_dir / "b.txt").exists()
+
+
+def test_validate_delta_manifest_rejects_unsafe_path():
+    payload = {
+        "delta_schema_version": "1",
+        "base_commit": "aaaa",
+        "target_commit": "bbbb",
+        "checksums": {},
+        "operations": [{"op": "modify", "path": "../../etc/passwd"}],
+    }
+    err = validate_delta_manifest(payload)
+    assert err is not None
+    assert "unsafe operation path" in err

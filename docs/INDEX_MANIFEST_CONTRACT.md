@@ -21,3 +21,19 @@ Requests are provided via `IndexDiscovery.get_local_index_path(requested_schema_
 
 ## Content integrity
 `IndexManager.write_index_manifest` automatically computes the SHA256 `content_hash` for the target SQLite database. Downstream tools may use this hash to confirm the manifest matches the on-disk file when loading cached artifacts.
+
+## Artifact metadata contract (full and delta)
+Artifact payloads published via CI must include `artifact-metadata.json` with:
+- `artifact_type`: `full` or `delta`
+- `base_commit`: required for `delta`, null for `full`
+- `target_commit`: commit represented by artifact contents
+- `checksum`: SHA256 of archive payload
+- `compatibility.schema_version` and `compatibility.embedding_model`
+
+Delta artifacts must also include a `delta-manifest.json` containing:
+- `delta_schema_version`
+- `base_commit` and `target_commit`
+- ordered `operations` (`add`, `modify`, `delete`)
+- `checksums` for changed file payloads
+
+Consumers must fail closed when required metadata is missing or checksums do not match.
