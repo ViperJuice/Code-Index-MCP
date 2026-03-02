@@ -50,33 +50,32 @@ The Index Artifact Management system provides efficient sharing of code indexes 
 
 ### 3. Data Flow
 
-```
-Developer Machine                    GitHub Actions
-┌─────────────────┐                 ┌──────────────────┐
-│                 │                 │                  │
-│  Code Changes   │                 │  Artifact Store  │
-│       ↓         │                 │                  │
-│  Local Index    │    push         │  ┌────────────┐ │
-│   Rebuilding    │ ───────────────→│  │ Compressed │ │
-│       ↓         │                 │  │  Indexes   │ │
-│  Compression    │                 │  └────────────┘ │
-│       ↓         │                 │         ↓        │
-│  Upload Script  │                 │   Validation     │
-│                 │                 │         ↓        │
-└─────────────────┘                 │   Storage       │
-                                    └──────────────────┘
-                                             ↓
-┌─────────────────┐                          ↓
-│                 │     pull        ┌──────────────────┐
-│ Another Developer│ ←──────────────│  Download API    │
-│       ↓         │                 └──────────────────┘
-│  Download Script│
-│       ↓         │
-│  Decompression  │
-│       ↓         │
-│  Local Install  │
-│                 │
-└─────────────────┘
+```mermaid
+flowchart LR
+    subgraph DEV_A[Developer Machine A]
+      A1[Code changes]
+      A2[Local index rebuild]
+      A3[Compression]
+      A4[Upload script]
+      A1 --> A2 --> A3 --> A4
+    end
+
+    subgraph GH[GitHub Actions]
+      G1[Artifact upload endpoint]
+      G2[Checksum + metadata validation]
+      G3[(Artifact storage)]
+      G1 --> G2 --> G3
+    end
+
+    subgraph DEV_B[Developer Machine B]
+      B1[Download script]
+      B2[Decompression]
+      B3[Local install]
+      B1 --> B2 --> B3
+    end
+
+    A4 -->|push| G1
+    G3 -->|pull| B1
 ```
 
 ## Implementation Details

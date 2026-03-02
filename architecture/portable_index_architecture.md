@@ -18,20 +18,20 @@ The portable index management system enables any repository to benefit from pre-
 
 The portable toolkit that can be installed in any repository:
 
-```
-mcp-index-kit/
-├── install.sh              # Universal installer script
-├── package.json            # NPM package definition
-├── setup.py                # Python package definition
-├── bin/
-│   └── mcp-index          # CLI entry point
-├── scripts/
-│   └── cli.py             # Main CLI implementation
-└── templates/
-    ├── github-workflow.yml # GitHub Actions template
-    ├── mcp-index.json      # Default configuration
-    ├── mcp-index-ignore    # Default ignore patterns
-    └── download-index.sh   # Index download script
+```mermaid
+flowchart TD
+  kit[mcp-index-kit/] --> install[install.sh]
+  kit --> npm[package.json]
+  kit --> py[setup.py]
+  kit --> bin[bin/]
+  kit --> scripts[scripts/]
+  kit --> templates[templates/]
+  bin --> cli[mcp-index]
+  scripts --> cli_py[cli.py]
+  templates --> wf[github-workflow.yml]
+  templates --> cfg[mcp-index.json]
+  templates --> ignore[mcp-index-ignore]
+  templates --> dl[download-index.sh]
 ```
 
 ### 2. Index Discovery (`mcp_server/utils/index_discovery.py`)
@@ -51,82 +51,65 @@ class IndexDiscovery:
 
 When initialized in a repository:
 
-```
-your-repo/
-├── .mcp-index.json         # Configuration
-├── .mcp-index-ignore       # Ignore patterns
-├── .github/
-│   └── workflows/
-│       └── mcp-index.yml   # GitHub Actions workflow
-└── .mcp-index/             # Index storage (git-ignored)
-    ├── code_index.db       # SQLite index
-    ├── vector_index/       # Optional vector embeddings
-    └── .index_metadata.json # Index metadata
+```mermaid
+flowchart TD
+  repo[your-repo/] --> cfg[.mcp-index.json]
+  repo --> ignore[.mcp-index-ignore]
+  repo --> gh[.github/workflows/mcp-index.yml]
+  repo --> indexdir[.mcp-index/]
+  indexdir --> db[code_index.db]
+  indexdir --> vec[vector_index/]
+  indexdir --> meta[.index_metadata.json]
 ```
 
 ## Data Flow
 
 ### 1. Index Creation Flow
 
-```
-Developer Machine                GitHub Actions
-     │                               │
-     ├─[1]─> Build Index Locally     │
-     │       (mcp-index build)       │
-     │                               │
-     ├─[2]─> Compress & Checksum     │
-     │                               │
-     ├─[3]─> Upload Artifact ────────┤
-     │       (via workflow)          │
-     │                               ├─[4]─> Store as Artifact
-     │                               │       (30 day retention)
-     │                               │
-     │                               ├─[5]─> Validate Checksum
-     │                               │
-     │                               └─[6]─> Update PR Comment
+```mermaid
+sequenceDiagram
+    participant Dev as Developer Machine
+    participant GH as GitHub Actions
+
+    Dev->>Dev: 1) Build index locally
+    Dev->>Dev: 2) Compress + checksum
+    Dev->>GH: 3) Upload artifact
+    GH->>GH: 4) Store artifact (retention policy)
+    GH->>GH: 5) Validate checksum
+    GH->>GH: 6) Update PR status/comment
 ```
 
 ### 2. Index Download Flow
 
-```
-New Developer                   GitHub Actions
-     │                               │
-     ├─[1]─> Clone Repository        │
-     │                               │
-     ├─[2]─> Check .mcp-index.json   │
-     │                               │
-     ├─[3]─> Request Latest Index ───┤
-     │       (gh CLI)                │
-     │                               ├─[4]─> Find Latest Artifact
-     │                               │
-     │<──────[5]─ Download Artifact ──┤
-     │                               │
-     ├─[6]─> Verify Checksum         │
-     │                               │
-     └─[7]─> Extract to .mcp-index/  │
+```mermaid
+sequenceDiagram
+    participant Dev as New Developer
+    participant GH as GitHub Actions
+
+    Dev->>Dev: 1) Clone repository
+    Dev->>Dev: 2) Check .mcp-index.json
+    Dev->>GH: 3) Request latest index
+    GH->>GH: 4) Resolve latest artifact
+    GH-->>Dev: 5) Download artifact
+    Dev->>Dev: 6) Verify checksum
+    Dev->>Dev: 7) Extract to .mcp-index/
 ```
 
 ### 3. MCP Server Auto-Detection
 
-```
-MCP Server Startup
-     │
-     ├─[1]─> Check Current Directory
-     │       (IndexDiscovery)
-     │
-     ├─[2]─> Found .mcp-index.json?
-     │       ├─ Yes ─┐
-     │       └─ No ──┴─> Use Default Index
-     │
-     ├─[3]─> Check Local Index
-     │       ├─ Found ─> Use Local Index
-     │       └─ Missing ─┐
-     │                  │
-     ├─[4]─> Auto-Download Enabled?
-     │       ├─ Yes ─> Download from GitHub
-     │       └─ No ──> Use Default Index
-     │
-     └─[5]─> Initialize with Index Path
+```mermaid
+flowchart TD
+    A[MCP server startup] --> B[Check workspace for .mcp-index.json]
+    B -->|Missing| Z[Use default index]
+    B -->|Present| C[Check local index files]
+    C -->|Found valid index| D[Use local index]
+    C -->|Missing| E{Auto-download enabled?}
+    E -->|No| Z
+    E -->|Yes| F[Download from GitHub artifacts]
+    F --> G[Validate + extract]
+    G --> H[Initialize with resolved index path]
+    D --> H
+    Z --> H
 ```
 
 ## Configuration Schema
