@@ -30,6 +30,49 @@ def _is_within_directory(base_dir: Path, candidate_path: Path) -> bool:
         return False
 
 
+def _validate_tar_member(member: tarfile.TarInfo, extraction_dir: Path) -> bool:
+    """Return whether a tar member is safe to extract into extraction_dir."""
+    target_path = extraction_dir / member.name
+    if not _is_within_directory(extraction_dir, target_path):
+        logger.error("Blocked unsafe tar member path: %s", member.name)
+        return False
+
+    if member.issym():
+        if not member.linkname:
+            logger.error("Blocked symlink member without link target: %s", member.name)
+            return False
+
+        link_target = target_path.parent / member.linkname
+        if not _is_within_directory(extraction_dir, link_target):
+            logger.error(
+                "Blocked unsafe symlink target in tar member: %s -> %s",
+                member.name,
+                member.linkname,
+            )
+            return False
+
+    if member.islnk():
+        if not member.linkname:
+            logger.error("Blocked hardlink member without link target: %s", member.name)
+            return False
+
+        # Hardlink targets are interpreted relative to archive root.
+        link_target = extraction_dir / member.linkname
+        if not _is_within_directory(extraction_dir, link_target):
+            logger.error(
+                "Blocked unsafe hardlink target in tar member: %s -> %s",
+                member.name,
+                member.linkname,
+            )
+            return False
+
+    if member.isdev():
+        logger.error("Blocked device node in tar member: %s", member.name)
+        return False
+
+    return True
+
+
 class IndexDiscovery:
     """Discovers and manages portable MCP indexes in repositories"""
 
@@ -55,7 +98,9 @@ class IndexDiscovery:
         # Determine storage strategy
         if storage_strategy is None:
             config = self.get_index_config()
-            storage_strategy = config.get("storage_strategy", "inline") if config else "inline"
+            storage_strategy = (
+                config.get("storage_strategy", "inline") if config else "inline"
+            )
 
         self.storage_strategy = storage_strategy
         self.index_manager = IndexManager(storage_strategy=storage_strategy)
@@ -132,7 +177,8 @@ class IndexDiscovery:
             return None
 
         require_selection = bool(
-            requested_schema_version is not None or requested_embedding_model is not None
+            requested_schema_version is not None
+            or requested_embedding_model is not None
         )
         candidates: List[Dict[str, Any]] = []
         search_paths: List[Path] = []
@@ -145,14 +191,18 @@ class IndexDiscovery:
                 return None
 
             if require_selection:
-                candidates.append({"path": db_path, "manifest": self.read_index_manifest(db_path)})
+                candidates.append(
+                    {"path": db_path, "manifest": self.read_index_manifest(db_path)}
+                )
                 return None
 
             return db_path
 
         # Try centralized storage first if enabled
         if self.storage_strategy == "centralized":
-            centralized_path = self.index_manager.get_current_index_path(self.workspace_root)
+            centralized_path = self.index_manager.get_current_index_path(
+                self.workspace_root
+            )
             candidate = _record_candidate(centralized_path)
             if candidate:
                 return candidate
@@ -187,8 +237,12 @@ class IndexDiscovery:
 
         # Log detailed information about search failure
         if self.enable_multi_path:
-            logger.warning(f"No valid index found after searching {len(search_paths)} paths")
-            validation = self.path_config.validate_paths(self._get_repository_identifier())
+            logger.warning(
+                f"No valid index found after searching {len(search_paths)} paths"
+            )
+            validation = self.path_config.validate_paths(
+                self._get_repository_identifier()
+            )
             existing_paths = [str(p) for p, exists in validation.items() if exists]
             if existing_paths:
                 logger.info(f"Existing search paths: {existing_paths}")
@@ -331,7 +385,9 @@ class IndexDiscovery:
     def _is_gh_cli_available(self) -> bool:
         """Check if GitHub CLI is available"""
         try:
-            result = subprocess.run(["gh", "--version"], capture_output=True, check=False)
+            result = subprocess.run(
+                ["gh", "--version"], capture_output=True, check=False
+            )
             return result.returncode == 0
         except FileNotFoundError:
             return False
@@ -437,12 +493,7 @@ class IndexDiscovery:
                 with tarfile.open(tar_path, "r:gz") as tar:
                     members = tar.getmembers()
                     for member in members:
-                        target_path = self.index_dir / member.name
-                        if not _is_within_directory(self.index_dir, target_path):
-                            logger.error(
-                                "Blocked archive extraction outside index directory: %s",
-                                member.name,
-                            )
+                        if not _validate_tar_member(member, self.index_dir):
                             return False
 
                     tar.extractall(self.index_dir, members=members)
@@ -502,7 +553,9 @@ class IndexDiscovery:
             # Include search paths if multi-path is enabled
             if self.enable_multi_path and self.path_config:
                 repo_id = self._get_repository_identifier()
-                info["search_paths"] = [str(p) for p in self.path_config.get_search_paths(repo_id)]
+                info["search_paths"] = [
+                    str(p) for p in self.path_config.get_search_paths(repo_id)
+                ]
 
         return info
 

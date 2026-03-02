@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import sqlite3
+import tarfile
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -16,7 +17,11 @@ from unittest.mock import Mock, patch
 import pytest
 
 from mcp_server.config.index_paths import IndexPathConfig
-from mcp_server.utils.index_discovery import IndexDiscovery, _is_within_directory
+from mcp_server.utils.index_discovery import (
+    IndexDiscovery,
+    _is_within_directory,
+    _validate_tar_member,
+)
 
 
 class TestIndexPathConfig:
@@ -173,6 +178,74 @@ class TestIndexDiscovery:
         assert _is_within_directory(base, base / "subdir" / "../code_index.db") is True
         assert _is_within_directory(base, base / ".." / "outside.txt") is False
 
+    def test_validate_tar_member_allows_safe_regular_file(self, temp_workspace):
+        """Safe regular tar members should pass validation."""
+        base = temp_workspace / ".mcp-index"
+        member = tarfile.TarInfo(name="subdir/code_index.db")
+        member.type = tarfile.REGTYPE
+
+        assert _validate_tar_member(member, base) is True
+
+    def test_validate_tar_member_blocks_traversal_member_name(self, temp_workspace):
+        """Tar member names with traversal should be blocked."""
+        base = temp_workspace / ".mcp-index"
+        member = tarfile.TarInfo(name="../outside.db")
+        member.type = tarfile.REGTYPE
+
+        assert _validate_tar_member(member, base) is False
+
+    def test_validate_tar_member_blocks_absolute_member_name(self, temp_workspace):
+        """Absolute tar member names should be blocked."""
+        base = temp_workspace / ".mcp-index"
+        member = tarfile.TarInfo(name="/tmp/outside.db")
+        member.type = tarfile.REGTYPE
+
+        assert _validate_tar_member(member, base) is False
+
+    def test_validate_tar_member_blocks_unsafe_symlink_target(self, temp_workspace):
+        """Symlink targets escaping extraction directory should be blocked."""
+        base = temp_workspace / ".mcp-index"
+        member = tarfile.TarInfo(name="links/current")
+        member.type = tarfile.SYMTYPE
+        member.linkname = "../../outside.db"
+
+        assert _validate_tar_member(member, base) is False
+
+    def test_validate_tar_member_allows_safe_symlink_target(self, temp_workspace):
+        """Symlink targets inside extraction directory should be allowed."""
+        base = temp_workspace / ".mcp-index"
+        member = tarfile.TarInfo(name="links/current")
+        member.type = tarfile.SYMTYPE
+        member.linkname = "../code_index.db"
+
+        assert _validate_tar_member(member, base) is True
+
+    def test_validate_tar_member_blocks_unsafe_hardlink_target(self, temp_workspace):
+        """Hardlink targets escaping extraction directory should be blocked."""
+        base = temp_workspace / ".mcp-index"
+        member = tarfile.TarInfo(name="links/current")
+        member.type = tarfile.LNKTYPE
+        member.linkname = "../../outside.db"
+
+        assert _validate_tar_member(member, base) is False
+
+    def test_validate_tar_member_allows_safe_hardlink_target(self, temp_workspace):
+        """Hardlink targets inside extraction directory should be allowed."""
+        base = temp_workspace / ".mcp-index"
+        member = tarfile.TarInfo(name="links/current")
+        member.type = tarfile.LNKTYPE
+        member.linkname = "code_index.db"
+
+        assert _validate_tar_member(member, base) is True
+
+    def test_validate_tar_member_blocks_device_nodes(self, temp_workspace):
+        """Device entries should be blocked from extraction."""
+        base = temp_workspace / ".mcp-index"
+        member = tarfile.TarInfo(name="devnode")
+        member.type = tarfile.CHRTYPE
+
+        assert _validate_tar_member(member, base) is False
+
     def test_find_index_in_legacy_location(self, temp_workspace, create_test_index):
         """Test finding index in legacy .mcp-index location."""
         # Create .mcp-index.json to enable indexing
@@ -237,8 +310,15 @@ class TestIndexDiscovery:
         config_file = temp_workspace / ".mcp-index.json"
         config_file.write_text(json.dumps({"enabled": True}))
 
-        index_a = temp_workspace / "test_indexes" / temp_workspace.name / "code_index.db"
-        index_b = temp_workspace / "test_indexes" / f"{temp_workspace.name}_alt" / "code_index.db"
+        index_a = (
+            temp_workspace / "test_indexes" / temp_workspace.name / "code_index.db"
+        )
+        index_b = (
+            temp_workspace
+            / "test_indexes"
+            / f"{temp_workspace.name}_alt"
+            / "code_index.db"
+        )
         create_test_index(index_a)
         create_test_index(index_b)
 
@@ -299,7 +379,9 @@ class TestIndexDiscovery:
         # Mock git command
         with patch("subprocess.run") as mock_run:
             # Successful git remote
-            mock_run.return_value = Mock(returncode=0, stdout="https://github.com/user/repo.git\n")
+            mock_run.return_value = Mock(
+                returncode=0, stdout="https://github.com/user/repo.git\n"
+            )
 
             identifier = discovery._get_repository_identifier()
             assert identifier == "https://github.com/user/repo.git"
@@ -396,7 +478,9 @@ class TestIntegration:
 
         return envs
 
-    def test_docker_vs_native_path_resolution(self, mock_environments, create_test_index):
+    def test_docker_vs_native_path_resolution(
+        self, mock_environments, create_test_index
+    ):
         """Test that indexes work across Docker and native environments."""
         # Create index in Docker-style path
         docker_index = (
@@ -428,7 +512,9 @@ class TestIntegration:
 
             with patch.object(IndexPathConfig, "get_search_paths") as mock_paths:
                 mock_paths.return_value = [
-                    native_workspace / ".indexes" / "hash123",  # Native path (doesn't exist)
+                    native_workspace
+                    / ".indexes"
+                    / "hash123",  # Native path (doesn't exist)
                     docker_index.parent,  # Docker path (exists)
                 ]
 
@@ -440,8 +526,16 @@ class TestIntegration:
     def test_test_environment_priority(self, mock_environments, create_test_index):
         """Test that test indexes are found with priority."""
         # Create indexes in multiple locations
-        prod_index = mock_environments["test"] / "project" / ".indexes" / "hash" / "code_index.db"
-        test_index = mock_environments["test"] / "test_indexes" / "project" / "code_index.db"
+        prod_index = (
+            mock_environments["test"]
+            / "project"
+            / ".indexes"
+            / "hash"
+            / "code_index.db"
+        )
+        test_index = (
+            mock_environments["test"] / "test_indexes" / "project" / "code_index.db"
+        )
 
         create_test_index(prod_index)
         create_test_index(test_index)
