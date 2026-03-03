@@ -139,7 +139,9 @@ class HybridSearch:
                 "cache_ttl": self.reranking_settings.cache_ttl,
             }
 
-            self.reranker = factory.create_reranker(self.reranking_settings.reranker_type, config)
+            self.reranker = factory.create_reranker(
+                self.reranking_settings.reranker_type, config
+            )
 
             # Initialize reranker asynchronously will be done on first use
             logger.info(f"Initialized {self.reranking_settings.reranker_type} reranker")
@@ -189,7 +191,11 @@ class HybridSearch:
         combined_results = self._reciprocal_rank_fusion(all_results)
 
         # Apply reranking if enabled
-        if self.reranker and self.reranking_settings and self.reranking_settings.enabled:
+        if (
+            self.reranker
+            and self.reranking_settings
+            and self.reranking_settings.enabled
+        ):
             combined_results = await self._rerank_results(query, combined_results)
 
         # Apply post-processing
@@ -280,7 +286,9 @@ class HybridSearch:
 
         def run_search():
             kwargs = filters or {}
-            results = self.bm25_indexer.search(query, limit=self.config.individual_limit, **kwargs)
+            results = self.bm25_indexer.search(
+                query, limit=self.config.individual_limit, **kwargs
+            )
 
             search_results = []
             for r in results:
@@ -307,7 +315,9 @@ class HybridSearch:
         """Perform semantic search with availability checks."""
         # Check if semantic search is temporarily disabled
         if self._semantic_temporarily_disabled:
-            logger.debug("Semantic search is temporarily disabled due to previous errors")
+            logger.debug(
+                "Semantic search is temporarily disabled due to previous errors"
+            )
             return []
 
         # Check if semantic indexer is available before attempting search
@@ -335,22 +345,21 @@ class HybridSearch:
         def run_search():
             try:
                 # Semantic search with filters
-                kwargs = {
-                    "k": self.config.individual_limit,
-                    "threshold": self.config.min_semantic_score,
-                }
-                if filters:
-                    kwargs.update(filters)
-
-                results = self.semantic_indexer.search(query, **kwargs)
+                results = self.semantic_indexer.search(
+                    query,
+                    limit=self.config.individual_limit,
+                )
 
                 search_results = []
                 for r in results:
+                    score = float(r.get("score", 0.0))
+                    if score < self.config.min_semantic_score:
+                        continue
                     search_results.append(
                         SearchResult(
                             doc_id=r.get("filepath", ""),
                             filepath=r.get("filepath", ""),
-                            score=r.get("score", 0.0),
+                            score=score,
                             snippet=r.get("content", "")[:200],
                             metadata=r,
                             source="semantic",
@@ -379,11 +388,17 @@ class HybridSearch:
 
         def run_search():
             # Fuzzy search
-            results = self.fuzzy_indexer.search_fuzzy(
-                query,
-                max_results=self.config.individual_limit,
-                threshold=self.config.min_fuzzy_score,
-            )
+            if hasattr(self.fuzzy_indexer, "search_fuzzy"):
+                results = self.fuzzy_indexer.search_fuzzy(
+                    query,
+                    max_results=self.config.individual_limit,
+                    threshold=self.config.min_fuzzy_score,
+                )
+            else:
+                results = self.fuzzy_indexer.search(
+                    query,
+                    limit=self.config.individual_limit,
+                )
 
             search_results = []
             for r in results:
@@ -404,7 +419,9 @@ class HybridSearch:
         self._search_stats["fuzzy_searches"] += 1
         return results
 
-    def _reciprocal_rank_fusion(self, result_lists: List[List[SearchResult]]) -> List[SearchResult]:
+    def _reciprocal_rank_fusion(
+        self, result_lists: List[List[SearchResult]]
+    ) -> List[SearchResult]:
         """
         Combine results using Reciprocal Rank Fusion (RRF).
 
@@ -450,7 +467,9 @@ class HybridSearch:
 
         return combined
 
-    async def _rerank_results(self, query: str, results: List[SearchResult]) -> List[SearchResult]:
+    async def _rerank_results(
+        self, query: str, results: List[SearchResult]
+    ) -> List[SearchResult]:
         """Rerank search results using the configured reranker."""
         if not self.reranker or not results:
             return results
@@ -484,9 +503,13 @@ class HybridSearch:
 
             # Perform reranking
             top_k = (
-                self.reranking_settings.top_k if self.reranking_settings else len(reranker_results)
+                self.reranking_settings.top_k
+                if self.reranking_settings
+                else len(reranker_results)
             )
-            rerank_result = await self.reranker.rerank(query, reranker_results, top_k=top_k)
+            rerank_result = await self.reranker.rerank(
+                query, reranker_results, top_k=top_k
+            )
 
             if not rerank_result.is_success:
                 logger.warning(f"Reranking failed: {rerank_result.error}")
@@ -511,7 +534,9 @@ class HybridSearch:
             reranked_results = []
             for rerank_item in rerank_data.results:
                 # Validate original_rank is within bounds
-                if rerank_item.original_rank < 0 or rerank_item.original_rank >= len(results):
+                if rerank_item.original_rank < 0 or rerank_item.original_rank >= len(
+                    results
+                ):
                     logger.warning(
                         f"Invalid original_rank {rerank_item.original_rank} for {len(results)} results"
                     )
@@ -536,12 +561,16 @@ class HybridSearch:
                 updated_result.metadata["original_rank"] = rerank_item.original_rank
                 updated_result.metadata["new_rank"] = rerank_item.new_rank
                 if rerank_item.explanation:
-                    updated_result.metadata["rerank_explanation"] = rerank_item.explanation
+                    updated_result.metadata["rerank_explanation"] = (
+                        rerank_item.explanation
+                    )
 
                 reranked_results.append(updated_result)
 
             # Sort by new rank to ensure proper ordering
-            reranked_results.sort(key=lambda x: x.metadata.get("new_rank", float("inf")))
+            reranked_results.sort(
+                key=lambda x: x.metadata.get("new_rank", float("inf"))
+            )
 
             # Log reranking metadata if available
             if hasattr(rerank_data, "metadata") and rerank_data.metadata:
@@ -557,7 +586,9 @@ class HybridSearch:
             logger.error(f"Error during reranking: {e}", exc_info=True)
             return results
 
-    def _post_process_results(self, results: List[SearchResult], limit: int) -> List[SearchResult]:
+    def _post_process_results(
+        self, results: List[SearchResult], limit: int
+    ) -> List[SearchResult]:
         """Apply post-processing to results."""
         # Remove duplicates while preserving order
         seen = set()
@@ -574,7 +605,9 @@ class HybridSearch:
         for result in unique_results:
             if not result.snippet and result.filepath:
                 # Try to generate a snippet
-                result.snippet = self._generate_snippet(result.filepath, result.metadata)
+                result.snippet = self._generate_snippet(
+                    result.filepath, result.metadata
+                )
 
         return unique_results
 
@@ -648,7 +681,9 @@ class HybridSearch:
 
     # Configuration methods
 
-    def set_weights(self, bm25: float = None, semantic: float = None, fuzzy: float = None):
+    def set_weights(
+        self, bm25: float = None, semantic: float = None, fuzzy: float = None
+    ):
         """
         Update search method weights.
 
@@ -665,13 +700,19 @@ class HybridSearch:
             self.config.fuzzy_weight = max(0, min(1, fuzzy))
 
         # Normalize weights
-        total = self.config.bm25_weight + self.config.semantic_weight + self.config.fuzzy_weight
+        total = (
+            self.config.bm25_weight
+            + self.config.semantic_weight
+            + self.config.fuzzy_weight
+        )
         if total > 0:
             self.config.bm25_weight /= total
             self.config.semantic_weight /= total
             self.config.fuzzy_weight /= total
 
-    def enable_methods(self, bm25: bool = None, semantic: bool = None, fuzzy: bool = None):
+    def enable_methods(
+        self, bm25: bool = None, semantic: bool = None, fuzzy: bool = None
+    ):
         """
         Enable or disable search methods.
 
@@ -698,7 +739,9 @@ class HybridSearch:
             True if semantic search was successfully re-enabled, False otherwise
         """
         if not self.semantic_indexer:
-            logger.warning("Cannot retry semantic search: no semantic indexer configured")
+            logger.warning(
+                "Cannot retry semantic search: no semantic indexer configured"
+            )
             return False
 
         if not self._semantic_temporarily_disabled and self.config.enable_semantic:
@@ -706,7 +749,10 @@ class HybridSearch:
             return True
 
         # Check if semantic indexer is now available
-        if self.semantic_indexer.is_available and self.semantic_indexer.validate_connection():
+        if (
+            self.semantic_indexer.is_available
+            and self.semantic_indexer.validate_connection()
+        ):
             self._semantic_temporarily_disabled = False
             self.config.enable_semantic = True
             logger.info(
@@ -734,7 +780,9 @@ class HybridSearch:
                 "available": self.bm25_indexer is not None,
                 "enabled": self.config.enable_bm25,
                 "status": (
-                    "operational" if (self.bm25_indexer and self.config.enable_bm25) else "disabled"
+                    "operational"
+                    if (self.bm25_indexer and self.config.enable_bm25)
+                    else "disabled"
                 ),
             },
             "semantic": {
@@ -760,7 +808,9 @@ class HybridSearch:
 
             capabilities["semantic"]["available"] = is_available
             capabilities["semantic"]["connection_mode"] = connection_mode
-            capabilities["semantic"]["temporarily_disabled"] = self._semantic_temporarily_disabled
+            capabilities["semantic"]["temporarily_disabled"] = (
+                self._semantic_temporarily_disabled
+            )
 
             if self._semantic_temporarily_disabled:
                 capabilities["semantic"]["status"] = "temporarily_disabled"
@@ -837,7 +887,9 @@ class HybridSearchOptimizer:
         self.feedback_history: List[Dict[str, Any]] = []
         self.performance_history: List[Dict[str, Any]] = []
 
-    def record_feedback(self, query: str, selected_result: int, results: List[Dict[str, Any]]):
+    def record_feedback(
+        self, query: str, selected_result: int, results: List[Dict[str, Any]]
+    ):
         """
         Record user feedback on search results.
 
@@ -850,7 +902,9 @@ class HybridSearchOptimizer:
             "query": query,
             "selected_rank": selected_result + 1,
             "selected_source": (
-                results[selected_result]["source"] if selected_result < len(results) else None
+                results[selected_result]["source"]
+                if selected_result < len(results)
+                else None
             ),
             "num_results": len(results),
             "timestamp": datetime.now(),
@@ -943,9 +997,9 @@ class HybridSearchOptimizer:
         # Analyze performance
         avg_search_time = 0
         if self.performance_history:
-            avg_search_time = sum(p["search_time_ms"] for p in self.performance_history) / len(
-                self.performance_history
-            )
+            avg_search_time = sum(
+                p["search_time_ms"] for p in self.performance_history
+            ) / len(self.performance_history)
 
         return {
             "feedback_count": len(self.feedback_history),

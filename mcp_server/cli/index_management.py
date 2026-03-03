@@ -16,6 +16,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from mcp_server.storage.sqlite_store import SQLiteStore  # noqa: E402
+from mcp_server.setup.semantic_preflight import run_semantic_preflight  # noqa: E402
 from mcp_server.utils import get_semantic_indexer  # noqa: E402
 
 
@@ -405,114 +406,31 @@ def restore(backup_dir: str):
 @index.command()
 def check_semantic():
     """Check semantic search configuration and status."""
+    from mcp_server.config.settings import reload_settings
+
+    settings = reload_settings()
+    report = run_semantic_preflight(
+        settings=settings,
+        profile=settings.get_semantic_default_profile(),
+        strict=settings.semantic_strict_mode,
+    )
+
     click.echo("Semantic Search Configuration Check")
     click.echo("=" * 40)
-
-    # Check API keys
-    voyage_key = os.environ.get("VOYAGE_API_KEY") or os.environ.get("VOYAGE_AI_API_KEY")
-    semantic_enabled = (
-        os.environ.get("SEMANTIC_SEARCH_ENABLED", "false").lower() == "true"
-    )
-
-    click.echo("\n📋 Environment Variables:")
-    click.echo(f"  VOYAGE_AI_API_KEY: {'✅ Set' if voyage_key else '❌ Not set'}")
-    if voyage_key:
-        click.echo(f"    Key prefix: {voyage_key[:10]}...")
+    click.echo(f"Overall ready: {'✅' if report.overall_ready else '❌'}")
+    click.echo(f"Profiles: {report.profiles.status.value} - {report.profiles.message}")
     click.echo(
-        f"  SEMANTIC_SEARCH_ENABLED: {'✅ true' if semantic_enabled else '❌ false'}"
+        f"Embedding: {report.embedding.status.value} - {report.embedding.message}"
     )
+    click.echo(f"Qdrant: {report.qdrant.status.value} - {report.qdrant.message}")
 
-    # Check .env file
-    env_file = Path(".env")
-    if env_file.exists():
-        click.echo("\n📄 .env file: ✅ Found")
-        try:
-            with open(env_file, "r") as f:
-                content = f.read()
-                if "VOYAGE_AI_API_KEY" in content or "VOYAGE_API_KEY" in content:
-                    click.echo("    Contains API key configuration")
-                if "SEMANTIC_SEARCH_ENABLED" in content:
-                    click.echo("    Contains semantic search setting")
-        except Exception as e:
-            click.echo(f"    ⚠️ Could not read .env file: {e}")
-    else:
-        click.echo("\n📄 .env file: ❌ Not found")
+    if report.warnings:
+        click.echo("\nWarnings:")
+        for warning in report.warnings:
+            click.echo(f"- {warning}")
 
-    # Check .mcp.json configurations
-    _ = Path(".mcp.json")
-    mcp_local_json = Path(".mcp.local.json")
-
-    if mcp_local_json.exists():
-        click.echo("\n📄 .mcp.local.json: ✅ Found")
-        try:
-            with open(mcp_local_json, "r") as f:
-                config = json.load(f)
-                servers = config.get("mcpServers", {})
-                if "code-index-mcp" in servers:
-                    env_vars = servers["code-index-mcp"].get("env", {})
-                    if "VOYAGE_AI_API_KEY" in env_vars:
-                        click.echo("    ✅ Contains API key configuration")
-                    if env_vars.get("SEMANTIC_SEARCH_ENABLED") == "true":
-                        click.echo("    ✅ Semantic search enabled")
-        except Exception as e:
-            click.echo(f"    ⚠️ Could not read .mcp.local.json: {e}")
-
-    # Test Voyage AI connection
-    click.echo("\n🧪 Testing Voyage AI Connection:")
-    if voyage_key:
-        try:
-            import voyageai
-
-            client = voyageai.Client(api_key=voyage_key)
-            # Try a simple embedding
-            result = client.embed(
-                ["test"], model="voyage-code-3", input_type="document"
-            )
-            click.echo("  ✅ Successfully connected to Voyage AI")
-            click.echo("  ✅ Model: voyage-code-3")
-            click.echo(f"  ✅ Embedding dimension: {len(result.embeddings[0])}")
-        except ImportError:
-            click.echo("  ❌ voyageai package not installed")
-            click.echo("     Install with: pip install code-index-mcp[semantic]")
-        except Exception as e:
-            click.echo(f"  ❌ Failed to connect: {e}")
-    else:
-        click.echo("  ❌ Cannot test - no API key configured")
-
-    # Configuration recommendations
-    click.echo("\n💡 Configuration Methods:")
-    if not voyage_key:
-        click.echo("\n1. Claude Code (.mcp.json):")
-        click.echo("   Create .mcp.json with:")
-        click.echo("   {")
-        click.echo('     "mcpServers": {')
-        click.echo('       "code-index-mcp": {')
-        click.echo('         "command": "uvicorn",')
-        click.echo('         "args": ["mcp_server.gateway:app"],')
-        click.echo('         "env": {')
-        click.echo('           "VOYAGE_AI_API_KEY": "your-key-here",')
-        click.echo('           "SEMANTIC_SEARCH_ENABLED": "true"')
-        click.echo("         }")
-        click.echo("       }")
-        click.echo("     }")
-        click.echo("   }")
-        click.echo("\n2. Environment File (.env):")
-        click.echo("   VOYAGE_AI_API_KEY=your-key-here")
-        click.echo("   SEMANTIC_SEARCH_ENABLED=true")
-        click.echo("\n3. Get API Key:")
-        click.echo("   Visit https://www.voyageai.com/")
-
-    # Overall status
-    click.echo("\n📊 Overall Status:")
-    if voyage_key and semantic_enabled:
-        click.echo("  ✅ Semantic search is fully configured and ready!")
-    elif voyage_key and not semantic_enabled:
-        click.echo("  ⚠️ API key is set but semantic search is disabled")
-        click.echo("     Set SEMANTIC_SEARCH_ENABLED=true to enable")
-    elif not voyage_key and semantic_enabled:
-        click.echo("  ❌ Semantic search is enabled but no API key is configured")
-    else:
-        click.echo("  ❌ Semantic search is not configured")
+    click.echo("\nEffective config:")
+    click.echo(json.dumps(report.effective_config, indent=2))
 
 
 if __name__ == "__main__":

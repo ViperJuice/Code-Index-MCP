@@ -12,3 +12,9 @@ services:
       - ./qdrant_storage:/qdrant/storage:z
     environment:
       - QDRANT__SERVICE__GRPC_PORT=6334
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:6333/collections"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 5s

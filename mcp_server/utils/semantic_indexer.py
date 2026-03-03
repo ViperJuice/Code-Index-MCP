@@ -641,16 +641,25 @@ class SemanticIndexer:
             )
 
         try:
-            embedding = self._embed_texts([text], input_type="document")[0]
+            embedding = self._embed_texts([text], input_type="query")[0]
         except Exception as e:
             raise RuntimeError(f"Failed to generate query embedding: {e}")
 
         try:
-            results = self.qdrant.search(
-                collection_name=self.collection,
-                query_vector=embedding,
-                limit=limit,
-            )
+            if hasattr(self.qdrant, "search"):
+                results = self.qdrant.search(
+                    collection_name=self.collection,
+                    query_vector=embedding,
+                    limit=limit,
+                )
+            else:
+                response = self.qdrant.query_points(
+                    collection_name=self.collection,
+                    query=embedding,
+                    limit=limit,
+                    with_payload=True,
+                )
+                results = list(getattr(response, "points", []) or [])
 
             for res in results:
                 payload = res.payload or {}

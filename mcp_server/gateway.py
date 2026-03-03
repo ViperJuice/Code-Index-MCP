@@ -25,6 +25,8 @@ from .metrics.middleware import get_business_metrics, setup_metrics_middleware
 from .metrics.prometheus_exporter import get_prometheus_exporter
 from .plugin_base import SearchResult, SymbolDef
 from .plugin_system import PluginManager
+from .setup.qdrant_autostart import ensure_qdrant_running
+from .setup.semantic_preflight import run_semantic_preflight
 from .security import (
     AuthCredentials,
     AuthManager,
@@ -40,6 +42,7 @@ from .security import (
 from .storage.sqlite_store import SQLiteStore
 from .utils.fuzzy_indexer import FuzzyIndexer
 from .utils.index_discovery import IndexDiscovery
+from .utils.language_detector import detect_repository_languages
 from .watcher import FileWatcher
 
 # Set up logging
@@ -62,7 +65,10 @@ query_cache: QueryResultCache | None = None
 bm25_indexer: BM25Indexer | None = None
 hybrid_search: HybridSearch | None = None
 fuzzy_indexer: FuzzyIndexer | None = None
+semantic_indexer = None
 profile_hydration_status: Dict[str, Any] | None = None
+semantic_setup_status: Dict[str, Any] | None = None
+language_detection_status: Dict[str, Any] | None = None
 
 # Initialize metrics and health checking
 metrics_collector = get_metrics_collector()
@@ -90,7 +96,9 @@ async def startup_event():
         hybrid_search, \
         fuzzy_indexer, \
         semantic_indexer, \
-        profile_hydration_status
+        profile_hydration_status, \
+        semantic_setup_status, \
+        language_detection_status
 
     try:
         # Initialize security configuration
@@ -137,7 +145,15 @@ async def startup_event():
         security_middleware = SecurityMiddlewareStack(
             app, security_config, auth_manager
         )
-        security_middleware.setup_middleware()
+        try:
+            security_middleware.setup_middleware()
+        except RuntimeError as exc:
+            if "Cannot add middleware after an application has started" in str(exc):
+                logger.warning(
+                    "Skipping late middleware registration on this runtime: %s", exc
+                )
+            else:
+                raise
         logger.info("Security middleware configured successfully")
 
         # Initialize cache system
@@ -191,6 +207,8 @@ async def startup_event():
         )
         query_cache = QueryResultCache(cache_manager, query_cache_config)
         logger.info("Query result cache initialized successfully")
+        settings = get_settings()
+
         # Check for portable index first
         workspace_root = Path(".")
         discovery = IndexDiscovery(workspace_root)
@@ -198,7 +216,6 @@ async def startup_event():
         if discovery.is_index_enabled():
             logger.info("MCP portable index detected")
 
-            settings = get_settings()
             required_schema = settings.index_schema_version
             required_model = settings.semantic_embedding_model
             strict_compatibility = settings.strict_index_compatibility
@@ -270,7 +287,7 @@ async def startup_event():
             logger.info("Initializing SQLite store with default path...")
             sqlite_store = SQLiteStore("code_index.db")
 
-        settings = get_settings()
+        profile_registry = None
         requested_profiles: Dict[str, Optional[str]] = {}
         try:
             profile_registry = SemanticProfileRegistry.from_raw(
@@ -317,10 +334,46 @@ async def startup_event():
         # Initialize plugin loader
         plugin_loader = get_plugin_loader()
 
-        # Load plugins based on configuration or all discovered plugins
+        # Load plugins based on configuration or auto-detected repo languages
+        language_detection_status = None
         config_path = Path("plugins.yaml")
-        if config_path.exists():
-            # Load specific plugins from config
+        enabled_languages = list(discovered.keys())
+
+        if settings.mcp_auto_detect_languages:
+            detection = detect_repository_languages(
+                repo_path=Path("."),
+                max_files=settings.mcp_language_detect_max_files,
+                min_files=settings.mcp_language_detect_min_files,
+            )
+            language_detection_status = detection.to_dict()
+
+            detected = set(detection.detected_languages)
+            discovered_set = set(discovered.keys())
+
+            alias_map = {
+                "c_sharp": "csharp",
+                "js": "javascript",
+            }
+            normalized_detected = {alias_map.get(lang, lang) for lang in detected}
+            auto_enabled = sorted(normalized_detected.intersection(discovered_set))
+
+            for helper_lang in ["plaintext", "markdown"]:
+                if helper_lang in discovered_set and helper_lang not in auto_enabled:
+                    auto_enabled.append(helper_lang)
+
+            if auto_enabled:
+                enabled_languages = auto_enabled
+                logger.info(
+                    "Auto-detected plugin allowlist (%d/%d discovered): %s",
+                    len(enabled_languages),
+                    len(discovered_set),
+                    enabled_languages,
+                )
+            else:
+                logger.warning(
+                    "Language detection found no matching plugin keys; falling back to all discovered plugins"
+                )
+        elif config_path.exists():
             import yaml
 
             with open(config_path, "r") as f:
@@ -329,11 +382,14 @@ async def startup_event():
             enabled_languages = plugin_config.get(
                 "enabled_languages", list(discovered.keys())
             )
-            logger.info(f"Loading plugins for languages: {enabled_languages}")
+            logger.info(
+                "Auto-detect disabled; loading plugins from plugins.yaml: %s",
+                enabled_languages,
+            )
         else:
-            # Load all discovered plugins
-            enabled_languages = list(discovered.keys())
-            logger.info("No plugins.yaml found, loading all discovered plugins")
+            logger.info(
+                "Auto-detect disabled and no plugins.yaml found; loading all discovered plugins"
+            )
 
         # Load plugins
         plugin_instances = []
@@ -362,14 +418,12 @@ async def startup_event():
         logger.info("Creating dispatcher...")
         dispatcher = EnhancedDispatcher(
             sqlite_store=sqlite_store,
-            semantic_search_enabled=os.getenv(
-                "SEMANTIC_SEARCH_ENABLED", "false"
-            ).lower()
-            == "true",
-            lazy_load=False,
+            semantic_search_enabled=settings.semantic_search_enabled,
+            lazy_load=settings.mcp_fast_startup,
         )
         logger.info(
-            f"EnhancedDispatcher created with semantic search enabled: {dispatcher.semantic_search_enabled}"
+            "EnhancedDispatcher created with semantic search enabled: %s",
+            settings.semantic_search_enabled,
         )
 
         # Initialize BM25 indexer
@@ -382,16 +436,56 @@ async def startup_event():
         fuzzy_indexer = FuzzyIndexer(sqlite_store)
         logger.info("Fuzzy indexer initialized successfully")
 
+        semantic_runtime_enabled = settings.semantic_search_enabled
+        semantic_setup_report = run_semantic_preflight(
+            settings=settings,
+            profile=settings.get_semantic_default_profile(),
+            strict=settings.semantic_strict_mode,
+        )
+
+        if (
+            semantic_runtime_enabled
+            and settings.semantic_autostart_qdrant
+            and not semantic_setup_report.qdrant.ok
+        ):
+            autostart_result = ensure_qdrant_running(settings)
+            logger.info("Qdrant autostart result: %s", autostart_result.message)
+            semantic_setup_report = run_semantic_preflight(
+                settings=settings,
+                profile=settings.get_semantic_default_profile(),
+                strict=settings.semantic_strict_mode,
+            )
+
+        semantic_setup_status = semantic_setup_report.to_dict()
+        if semantic_setup_report.overall_ready:
+            logger.info("Semantic preflight passed")
+        else:
+            logger.warning(
+                "Semantic preflight warnings: %s", semantic_setup_report.warnings
+            )
+
+        if settings.semantic_strict_mode and not semantic_setup_report.overall_ready:
+            raise RuntimeError(
+                "Semantic strict mode is enabled and preflight failed: "
+                + "; ".join(semantic_setup_report.warnings)
+            )
+
+        if not semantic_setup_report.overall_ready:
+            semantic_runtime_enabled = False
+
         # Check if semantic indexer is available and enabled
         semantic_indexer = None
-        if os.getenv("SEMANTIC_SEARCH_ENABLED", "false").lower() == "true":
+        if semantic_runtime_enabled:
             try:
                 from .utils.semantic_indexer import SemanticIndexer
 
                 # Use central Qdrant location
                 qdrant_path = os.getenv("QDRANT_PATH", ".indexes/qdrant/main.qdrant")
                 semantic_indexer = SemanticIndexer(
-                    collection="code-embeddings", qdrant_path=qdrant_path
+                    collection=settings.semantic_collection_name,
+                    qdrant_path=qdrant_path,
+                    profile_registry=profile_registry,
+                    semantic_profile=settings.get_semantic_default_profile(),
                 )
                 logger.info(
                     f"Semantic indexer initialized successfully with Qdrant at {qdrant_path}"
@@ -402,7 +496,7 @@ async def startup_event():
                 logger.error(f"Failed to initialize semantic indexer: {e}")
         else:
             logger.info(
-                "Semantic search is disabled (set SEMANTIC_SEARCH_ENABLED=true to enable)"
+                "Semantic indexer disabled after preflight; lexical/bm25/fuzzy remain active"
             )
 
         # Initialize Hybrid Search
@@ -429,12 +523,16 @@ async def startup_event():
         )
 
         # Initialize file watcher with dispatcher and query cache
-        logger.info("Starting file watcher...")
-        file_watcher = FileWatcher(Path("."), dispatcher, query_cache)
-        file_watcher.start()
-        logger.info(
-            "File watcher started for current directory with cache invalidation"
-        )
+        if settings.mcp_fast_startup:
+            logger.info("MCP fast startup enabled: skipping file watcher start")
+            file_watcher = None
+        else:
+            logger.info("Starting file watcher...")
+            file_watcher = FileWatcher(Path("."), dispatcher, query_cache)
+            file_watcher.start()
+            logger.info(
+                "File watcher started for current directory with cache invalidation"
+            )
 
         # Store in app.state for potential future use
         app.state.dispatcher = dispatcher
@@ -451,7 +549,10 @@ async def startup_event():
         app.state.bm25_indexer = bm25_indexer
         app.state.hybrid_search = hybrid_search
         app.state.fuzzy_indexer = fuzzy_indexer
+        app.state.semantic_indexer = semantic_indexer
         app.state.profile_hydration = profile_hydration_status
+        app.state.semantic_setup = semantic_setup_status
+        app.state.language_detection = language_detection_status
 
         # Update status to include search capabilities
         search_capabilities = []
@@ -1003,7 +1104,10 @@ async def search(
         elif effective_mode == "fuzzy" and fuzzy_indexer:
             # Direct fuzzy search
             with metrics_collector.time_function("search", labels={"mode": "fuzzy"}):
-                fuzzy_results = fuzzy_indexer.search_fuzzy(q, max_results=limit)
+                if hasattr(fuzzy_indexer, "search_fuzzy"):
+                    fuzzy_results = fuzzy_indexer.search_fuzzy(q, max_results=limit)
+                else:
+                    fuzzy_results = fuzzy_indexer.search(q, limit=limit)
                 for r in fuzzy_results:
                     results.append(
                         SearchResult(
@@ -1025,8 +1129,9 @@ async def search(
                     503,
                     detail={
                         "error": "Semantic search not available",
-                        "reason": "Missing Voyage AI API key configuration",
+                        "reason": "Semantic preflight failed (embedding endpoint or credentials unavailable)",
                         "setup": {
+                            "recommended": "Run: python scripts/cli/mcp_cli.py setup semantic",
                             "method_1_mcp_json": [
                                 "Configure in .mcp.json (recommended for Claude Code):",
                                 "{",
@@ -1036,6 +1141,7 @@ async def search(
                                 '      "args": ["mcp_server.gateway:app"],',
                                 '      "env": {',
                                 '        "VOYAGE_AI_API_KEY": "your-key-here",',
+                                '        "OPENAI_API_BASE": "http://localhost:8001/v1",',
                                 '        "SEMANTIC_SEARCH_ENABLED": "true"',
                                 "      }",
                                 "    }",
@@ -1113,6 +1219,7 @@ async def search(
 async def get_search_capabilities() -> Dict[str, Any]:
     """Get available search capabilities and configuration guidance."""
     voyage_key = os.environ.get("VOYAGE_API_KEY") or os.environ.get("VOYAGE_AI_API_KEY")
+    openai_base = os.environ.get("OPENAI_API_BASE")
     semantic_enabled = (
         os.environ.get("SEMANTIC_SEARCH_ENABLED", "false").lower() == "true"
     )
@@ -1128,9 +1235,12 @@ async def get_search_capabilities() -> Dict[str, Any]:
         "semantic_config": {
             "enabled": semantic_indexer is not None,
             "api_key_configured": bool(voyage_key),
+            "openai_api_base": openai_base,
             "semantic_enabled_flag": semantic_enabled,
             "status": "ready" if semantic_indexer else "not_configured",
+            "setup": semantic_setup_status,
         },
+        "language_detection": language_detection_status,
         "configuration_guide": {
             "mcp_json_example": {
                 "description": "Add to .mcp.json for Claude Code (recommended)",
@@ -1141,6 +1251,7 @@ async def get_search_capabilities() -> Dict[str, Any]:
                             "args": ["mcp_server.gateway:app"],
                             "env": {
                                 "VOYAGE_AI_API_KEY": "your-key-here",
+                                "OPENAI_API_BASE": "http://localhost:8001/v1",
                                 "SEMANTIC_SEARCH_ENABLED": "true",
                             },
                         }
@@ -1226,6 +1337,8 @@ async def get_status(
             "cache": cache_stats,
             "search_capabilities": [],
             "profile_hydration": profile_hydration_status,
+            "semantic_setup": semantic_setup_status,
+            "language_detection": language_detection_status,
             "version": "0.1.0",
         }
 

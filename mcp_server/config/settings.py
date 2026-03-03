@@ -438,6 +438,10 @@ class Settings(BaseModel):
 
     # Feature Flags
     dynamic_plugin_loading: bool = Field(default=True)
+    mcp_auto_detect_languages: bool = Field(default=True)
+    mcp_language_detect_max_files: int = Field(default=5000)
+    mcp_language_detect_min_files: int = Field(default=2)
+    mcp_fast_startup: bool = Field(default=False)
     semantic_search_enabled: bool = Field(default=False)
     strict_index_compatibility: bool = Field(default=True)
     index_schema_version: str = Field(default="2")
@@ -463,6 +467,10 @@ class Settings(BaseModel):
     semantic_collection_name: str = Field(default="code-embeddings")
     semantic_profiles_json: Optional[str] = Field(default=None)
     semantic_default_profile: str = Field(default="legacy-default")
+    semantic_autostart_qdrant: bool = Field(default=True)
+    semantic_strict_mode: bool = Field(default=False)
+    semantic_preflight_timeout_seconds: int = Field(default=10)
+    qdrant_compose_file: str = Field(default="docker-compose.qdrant.yml")
 
     @classmethod
     def from_environment(cls) -> "Settings":
@@ -477,6 +485,19 @@ class Settings(BaseModel):
             port=int(get_env_var("PORT", "8000")),
             environment=env,
             debug=get_env_var("DEBUG", "false").lower() == "true",
+            dynamic_plugin_loading=get_env_var("DYNAMIC_PLUGIN_LOADING", "true").lower()
+            == "true",
+            mcp_auto_detect_languages=get_env_var(
+                "MCP_AUTO_DETECT_LANGUAGES", "true"
+            ).lower()
+            == "true",
+            mcp_language_detect_max_files=int(
+                get_env_var("MCP_LANGUAGE_DETECT_MAX_FILES", "5000")
+            ),
+            mcp_language_detect_min_files=int(
+                get_env_var("MCP_LANGUAGE_DETECT_MIN_FILES", "2")
+            ),
+            mcp_fast_startup=get_env_var("MCP_FAST_STARTUP", "false").lower() == "true",
             semantic_search_enabled=get_env_var(
                 "SEMANTIC_SEARCH_ENABLED", "true"
             ).lower()
@@ -528,6 +549,18 @@ class Settings(BaseModel):
             semantic_profiles_json=get_env_var("SEMANTIC_PROFILES_JSON"),
             semantic_default_profile=get_env_var(
                 "SEMANTIC_DEFAULT_PROFILE", "legacy-default"
+            ),
+            semantic_autostart_qdrant=get_env_var(
+                "SEMANTIC_AUTOSTART_QDRANT", "true"
+            ).lower()
+            == "true",
+            semantic_strict_mode=get_env_var("SEMANTIC_STRICT_MODE", "false").lower()
+            == "true",
+            semantic_preflight_timeout_seconds=int(
+                get_env_var("SEMANTIC_PREFLIGHT_TIMEOUT_SECONDS", "10")
+            ),
+            qdrant_compose_file=get_env_var(
+                "QDRANT_COMPOSE_FILE", "docker-compose.qdrant.yml"
             ),
         )
 

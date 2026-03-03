@@ -13,7 +13,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Add project root to Python path
-project_root = Path(__file__).parent
+project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 # Load environment variables from .env file
@@ -21,5 +21,5 @@ load_dotenv()
 
 from mcp_server.cli import cli
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     cli()

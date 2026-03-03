@@ -11,6 +11,7 @@ from .. import __version__
 from .artifact_commands import artifact
 from .index_management import index
 from .repository_commands import repository
+from .setup_commands import setup
 
 
 @click.group()
@@ -23,6 +24,7 @@ def cli():
 cli.add_command(index)
 cli.add_command(artifact)
 cli.add_command(repository)
+cli.add_command(setup)
 
 
 if __name__ == "__main__":

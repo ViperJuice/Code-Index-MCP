@@ -2,6 +2,7 @@
 .PHONY: docker-up docker-down docker-dev docker-prod docker-test docker-logs docker-health
 .PHONY: test-dormant test-real-world test-semantic test-redis test-advanced test-cross-lang
 .PHONY: setup-env setup-dev-env setup-prod-env backup restore clean-docker check-diagrams
+.PHONY: semantic-up semantic-down semantic-preflight semantic-setup
 
 help:
 	@echo "Available commands:"
@@ -45,6 +46,10 @@ help:
 	@echo "  setup-env       Setup basic environment files"
 	@echo "  setup-dev-env   Setup development environment"
 	@echo "  setup-prod-env  Setup production environment"
+	@echo "  semantic-setup  Run semantic onboarding flow"
+	@echo "  semantic-preflight Validate semantic stack readiness"
+	@echo "  semantic-up     Start local Qdrant (docker-only)"
+	@echo "  semantic-down   Stop local Qdrant"
 	@echo ""
 	@echo "💾 Data Management:"
 	@echo "  backup          Backup all data"
@@ -253,6 +258,20 @@ setup-prod-env:
 	else \
 		echo "⚠️  .env.production already exists"; \
 	fi
+
+semantic-up:
+	@echo "🚀 Starting local Qdrant..."
+	docker compose -f docker-compose.qdrant.yml up -d qdrant
+
+semantic-down:
+	@echo "🛑 Stopping local Qdrant..."
+	docker compose -f docker-compose.qdrant.yml down
+
+semantic-preflight:
+	python scripts/cli/mcp_cli.py setup semantic --dry-run
+
+semantic-setup:
+	python scripts/cli/mcp_cli.py setup semantic
 
 # Data management
 backup:

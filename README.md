@@ -679,6 +679,45 @@ Multi-profile semantic config can be provided in either:
 - `SEMANTIC_PROFILES_JSON` (environment variable), or
 - `code-index-mcp.profiles.yaml` (repository root).
 
+### Easy Semantic Setup (Docker-First)
+
+Run onboarding with automatic local Qdrant startup:
+
+```bash
+python scripts/cli/mcp_cli.py setup semantic
+```
+
+Settings precedence (highest to lowest):
+1. CLI flags (for one command run)
+2. Environment variables / `.env`
+3. `code-index-mcp.profiles.yaml`
+4. `SEMANTIC_PROFILES_JSON`
+5. Built-in defaults
+
+Common controls:
+
+```bash
+# Preflight checks only
+python scripts/cli/mcp_cli.py setup semantic --dry-run
+
+# Strict mode: fail command if semantic stack isn't ready
+python scripts/cli/mcp_cli.py setup semantic --strict
+
+# Override local embedding endpoint
+python scripts/cli/mcp_cli.py setup semantic --openai-api-base http://127.0.0.1:8001/v1
+```
+
+Plugin loading is auto-optimized by default using fast repository language detection:
+- `MCP_AUTO_DETECT_LANGUAGES=true`
+- `MCP_LANGUAGE_DETECT_MAX_FILES=5000`
+- `MCP_LANGUAGE_DETECT_MIN_FILES=2`
+
+For startup-sensitive environments, enable:
+- `MCP_FAST_STARTUP=true` (uses lazy plugin loading and skips file watcher startup)
+
+When `MCP_AUTO_DETECT_LANGUAGES=true`, auto-detection takes precedence over `plugins.yaml`.
+Set `MCP_AUTO_DETECT_LANGUAGES=false` to force `plugins.yaml` language selection.
+
 For a dual-profile setup (Voyage + local vLLM/Qwen), set:
 - `VOYAGE_API_KEY` (or `VOYAGE_AI_API_KEY`)
 - `OPENAI_API_BASE` (for example `http://127.0.0.1:8000/v1`)
