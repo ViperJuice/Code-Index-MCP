@@ -3,10 +3,13 @@ Comprehensive settings management for production deployments.
 """
 
 import json
+import os
 import secrets
+from importlib.metadata import PackageNotFoundError, version
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
+import yaml
 from pydantic import BaseModel, Field, model_validator, validator
 
 from .environment import Environment, get_env_var, get_environment, is_production
@@ -451,6 +454,8 @@ class Settings(BaseModel):
 
     # Semantic Search Configuration
     voyage_api_key: Optional[str] = Field(default=None)
+    openai_api_key: Optional[str] = Field(default=None)
+    openai_api_base: str = Field(default="http://localhost:8001/v1")
     qdrant_host: str = Field(default="localhost")
     qdrant_port: int = Field(default=6333)
     qdrant_grpc_port: int = Field(default=6334)
@@ -509,6 +514,8 @@ class Settings(BaseModel):
             ).lower()
             == "true",
             voyage_api_key=get_env_var("VOYAGE_AI_API_KEY"),
+            openai_api_key=get_env_var("OPENAI_API_KEY"),
+            openai_api_base=get_env_var("OPENAI_API_BASE", "http://localhost:8001/v1"),
             qdrant_host=get_env_var("QDRANT_HOST", "localhost"),
             qdrant_port=int(get_env_var("QDRANT_PORT", "6333")),
             qdrant_grpc_port=int(get_env_var("QDRANT_GRPC_PORT", "6334")),
@@ -576,6 +583,59 @@ class Settings(BaseModel):
                 raise ValueError("SEMANTIC_PROFILES_JSON must decode to an object")
             return parsed
 
+        chunker_version = self._detect_treesitter_chunker_version()
+        yaml_path = "code-index-mcp.profiles.yaml"
+        if os.path.exists(yaml_path):
+            with open(yaml_path, "r", encoding="utf-8") as handle:
+                payload = yaml.safe_load(handle) or {}
+
+            profile_map = payload.get("profiles") or {}
+            if isinstance(profile_map, dict) and profile_map:
+                converted: Dict[str, Dict[str, Any]] = {}
+                for profile_id, config in profile_map.items():
+                    model = config.get("model") or {}
+                    vector_store = config.get("vector_store") or {}
+                    metadata = config.get("metadata") or {}
+                    normalization = config.get("normalization") or {}
+
+                    converted[str(profile_id)] = {
+                        "provider": str(config.get("provider", "voyage")),
+                        "model_name": str(
+                            model.get("name", self.semantic_embedding_model)
+                        ),
+                        "model_version": str(
+                            model.get("version")
+                            or metadata.get("embed_schema_version")
+                            or "1"
+                        ),
+                        "vector_dimension": int(
+                            model.get("output_dimension")
+                            or vector_store.get("vector_size")
+                            or 1024
+                        ),
+                        "distance_metric": str(vector_store.get("distance", "cosine")),
+                        "normalization_policy": (
+                            "l2"
+                            if normalization.get("l2_normalize_vectors")
+                            else "provider-default"
+                        ),
+                        "chunk_schema_version": str(
+                            metadata.get(
+                                "chunk_schema_version", self.index_schema_version
+                            )
+                        ),
+                        "chunker_version": chunker_version,
+                        "build_metadata": {
+                            "openai_api_base": str(
+                                ((config.get("serving") or {}).get("vllm") or {}).get(
+                                    "base_url", self.openai_api_base
+                                )
+                            )
+                        },
+                    }
+
+                return converted
+
         return {
             "legacy-default": {
                 "provider": "voyage",
@@ -585,9 +645,28 @@ class Settings(BaseModel):
                 "distance_metric": "cosine",
                 "normalization_policy": "provider-default",
                 "chunk_schema_version": self.index_schema_version,
-                "chunker_version": "legacy",
+                "chunker_version": chunker_version,
             }
         }
+
+    def get_semantic_default_profile(self) -> str:
+        """Resolve semantic default profile with safe fallback behavior."""
+        configured = (self.semantic_default_profile or "").strip()
+        profiles = self.get_semantic_profiles_config()
+        if configured and configured in profiles:
+            return configured
+        if configured and configured != "legacy-default" and configured not in profiles:
+            raise ValueError(
+                f"Configured SEMANTIC_DEFAULT_PROFILE '{configured}' not found in profile set"
+            )
+        return next(iter(profiles.keys()))
+
+    def _detect_treesitter_chunker_version(self) -> str:
+        """Return installed treesitter-chunker version label for metadata."""
+        try:
+            return f"treesitter-chunker@{version('treesitter-chunker')}"
+        except PackageNotFoundError:
+            return "treesitter-chunker@not-installed"
 
 
 # Global settings instance

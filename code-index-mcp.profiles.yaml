@@ -1,0 +1,80 @@
+# Two-profile setup: commercial Voyage + open Qwen
+
+profiles:
+  commercial_high:
+    profile_id: commercial_high
+    kind: semantic
+    provider: voyage
+    enabled: true
+
+    model:
+      name: voyage-code-3
+      input_type_for_index: document
+      input_type_for_query: query
+      output_dimension: 2048
+      output_dtype: float
+      truncation: true
+
+    vector_store:
+      type: qdrant
+      collection: "code_index__commercial_high__v1"
+      vector_size: 2048
+      distance: dot
+      hnsw:
+        m: 32
+        ef_construct: 256
+      query:
+        hnsw_ef: 128
+        top_k: 50
+
+    normalization:
+      l2_normalize_vectors: false
+
+    metadata:
+      chunk_schema_version: 1
+      embed_schema_version: 1
+
+    auth:
+      api_key_env: VOYAGE_API_KEY
+
+  oss_high:
+    profile_id: oss_high
+    kind: semantic
+    provider: openai_compatible
+    enabled: true
+
+    model:
+      name: Qwen/Qwen3-Embedding-8B
+      max_model_len: 8192
+      output_dimension: 4096
+
+    serving:
+      default_backend: vllm
+      vllm:
+        base_url: "http://127.0.0.1:8000"
+        embeddings_path: "/v1/embeddings"
+        model_id: "Qwen/Qwen3-Embedding-8B"
+        tensor_parallel_size: 2
+      ollama:
+        base_url: "http://127.0.0.1:11434"
+        embed_path: "/api/embed"
+        model_id: "qwen3-embedding:8b"
+
+    vector_store:
+      type: qdrant
+      collection: "code_index__oss_high__v1"
+      vector_size: 4096
+      distance: dot
+      hnsw:
+        m: 32
+        ef_construct: 256
+      query:
+        hnsw_ef: 128
+        top_k: 50
+
+    normalization:
+      l2_normalize_vectors: true
+
+    metadata:
+      chunk_schema_version: 1
+      embed_schema_version: 1

@@ -275,7 +275,7 @@ async def startup_event():
         try:
             profile_registry = SemanticProfileRegistry.from_raw(
                 settings.get_semantic_profiles_config(),
-                settings.semantic_default_profile,
+                settings.get_semantic_default_profile(),
                 tool_version=settings.app_version,
             )
             requested_profiles = {

@@ -675,6 +675,15 @@ The system tracks embedding model versions to ensure compatibility:
 - **Distance metric**: Cosine similarity
 - **Auto-detection**: System checks compatibility before download
 
+Multi-profile semantic config can be provided in either:
+- `SEMANTIC_PROFILES_JSON` (environment variable), or
+- `code-index-mcp.profiles.yaml` (repository root).
+
+For a dual-profile setup (Voyage + local vLLM/Qwen), set:
+- `VOYAGE_API_KEY` (or `VOYAGE_AI_API_KEY`)
+- `OPENAI_API_BASE` (for example `http://127.0.0.1:8000/v1`)
+- `OPENAI_API_KEY` (placeholder accepted for local vLLM setups)
+
 If you use a different embedding model, the system will detect incompatibility and rebuild locally with your configuration.
 
 ## 💻 Development

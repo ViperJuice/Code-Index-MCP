@@ -36,7 +36,9 @@ def index():
 
 
 @index.command()
-@click.option("--detailed", "-d", is_flag=True, help="Show detailed compatibility information")
+@click.option(
+    "--detailed", "-d", is_flag=True, help="Show detailed compatibility information"
+)
 def check_compatibility(detailed: bool):
     """Check if current configuration is compatible with existing indexes."""
     try:
@@ -74,7 +76,9 @@ def check_compatibility(detailed: bool):
 
         # Display results
         click.echo("Index Compatibility Status:")
-        click.echo(f"  SQLite index: {'✅ Compatible' if sqlite_compatible else '❌ Incompatible'}")
+        click.echo(
+            f"  SQLite index: {'✅ Compatible' if sqlite_compatible else '❌ Incompatible'}"
+        )
         if not vector_available:
             click.echo("  Vector index: ⚠️ Not available (semantic deps not installed)")
         else:
@@ -88,7 +92,9 @@ def check_compatibility(detailed: bool):
 
         if detailed and metadata:
             click.echo("\nMetadata details:")
-            click.echo(f"  Embedding model: {metadata.get('embedding_model', 'unknown')}")
+            click.echo(
+                f"  Embedding model: {metadata.get('embedding_model', 'unknown')}"
+            )
             click.echo(f"  Created: {metadata.get('created_at', 'unknown')}")
             click.echo(f"  Git commit: {metadata.get('git_commit', 'unknown')}")
 
@@ -96,7 +102,9 @@ def check_compatibility(detailed: bool):
         overall_compatible = sqlite_compatible and metadata_exists
         if vector_available:
             overall_compatible = overall_compatible and vector_compatible
-        click.echo(f"\nOverall: {'✅ All compatible' if overall_compatible else '❌ Issues found'}")
+        click.echo(
+            f"\nOverall: {'✅ All compatible' if overall_compatible else '❌ Issues found'}"
+        )
 
         sys.exit(0 if overall_compatible else 1)
 
@@ -109,7 +117,9 @@ def check_compatibility(detailed: bool):
 @click.option("--force", "-f", is_flag=True, help="Force rebuild even if compatible")
 @click.option("--sqlite-only", is_flag=True, help="Rebuild SQLite index only")
 @click.option("--vector-only", is_flag=True, help="Rebuild vector index only")
-@click.option("--sample-size", default=100, help="Number of files to index (default: 100)")
+@click.option(
+    "--sample-size", default=100, help="Number of files to index (default: 100)"
+)
 def rebuild(force: bool, sqlite_only: bool, vector_only: bool, sample_size: int):
     """Rebuild index artifacts."""
 
@@ -120,7 +130,9 @@ def rebuild(force: bool, sqlite_only: bool, vector_only: bool, sample_size: int)
             if indexer:
                 compatible = indexer.check_compatibility()
                 if compatible and os.path.exists("code_index.db"):
-                    click.echo("Indexes appear compatible. Use --force to rebuild anyway.")
+                    click.echo(
+                        "Indexes appear compatible. Use --force to rebuild anyway."
+                    )
                     return
         except Exception:
             pass  # Proceed with rebuild if check fails
@@ -150,7 +162,8 @@ def rebuild(force: bool, sqlite_only: bool, vector_only: bool, sample_size: int)
                     f
                     for f in python_files
                     if not any(
-                        exclude in f for exclude in ["test_repos", ".git", "__pycache__", ".venv"]
+                        exclude in f
+                        for exclude in ["test_repos", ".git", "__pycache__", ".venv"]
                     )
                 ]
 
@@ -168,7 +181,9 @@ def rebuild(force: bool, sqlite_only: bool, vector_only: bool, sample_size: int)
                             if force:
                                 continue  # Skip errors in force mode
                             else:
-                                click.echo(f"\nError indexing {file_path}: {e}", err=True)
+                                click.echo(
+                                    f"\nError indexing {file_path}: {e}", err=True
+                                )
                                 return
 
                 click.echo(f"✅ Vector index rebuilt with {indexed_count} files")
@@ -190,7 +205,9 @@ def rebuild(force: bool, sqlite_only: bool, vector_only: bool, sample_size: int)
             click.echo("✅ SQLite index schema created")
 
             # TODO: Add actual file indexing here when dispatcher is available
-            click.echo("Note: Run full indexing via the main application to populate SQLite index")
+            click.echo(
+                "Note: Run full indexing via the main application to populate SQLite index"
+            )
 
         except Exception as e:
             click.echo(f"❌ SQLite index rebuild failed: {e}", err=True)
@@ -278,9 +295,13 @@ def status():
                 metadata = json.load(f)
 
             click.echo("Metadata:")
-            click.echo(f"  🤖 Embedding model: {metadata.get('embedding_model', 'unknown')}")
+            click.echo(
+                f"  🤖 Embedding model: {metadata.get('embedding_model', 'unknown')}"
+            )
             click.echo(f"  📅 Created: {metadata.get('created_at', 'unknown')}")
-            click.echo(f"  🔗 Git commit: {metadata.get('git_commit', 'unknown')[:8]}...")
+            click.echo(
+                f"  🔗 Git commit: {metadata.get('git_commit', 'unknown')[:8]}..."
+            )
 
         except Exception as e:
             click.echo(f"Metadata: ❌ Error reading ({e})")
@@ -389,13 +410,17 @@ def check_semantic():
 
     # Check API keys
     voyage_key = os.environ.get("VOYAGE_API_KEY") or os.environ.get("VOYAGE_AI_API_KEY")
-    semantic_enabled = os.environ.get("SEMANTIC_SEARCH_ENABLED", "false").lower() == "true"
+    semantic_enabled = (
+        os.environ.get("SEMANTIC_SEARCH_ENABLED", "false").lower() == "true"
+    )
 
     click.echo("\n📋 Environment Variables:")
     click.echo(f"  VOYAGE_AI_API_KEY: {'✅ Set' if voyage_key else '❌ Not set'}")
     if voyage_key:
         click.echo(f"    Key prefix: {voyage_key[:10]}...")
-    click.echo(f"  SEMANTIC_SEARCH_ENABLED: {'✅ true' if semantic_enabled else '❌ false'}")
+    click.echo(
+        f"  SEMANTIC_SEARCH_ENABLED: {'✅ true' if semantic_enabled else '❌ false'}"
+    )
 
     # Check .env file
     env_file = Path(".env")
@@ -440,7 +465,9 @@ def check_semantic():
 
             client = voyageai.Client(api_key=voyage_key)
             # Try a simple embedding
-            result = client.embed(["test"], model="voyage-code-3", input_type="document")
+            result = client.embed(
+                ["test"], model="voyage-code-3", input_type="document"
+            )
             click.echo("  ✅ Successfully connected to Voyage AI")
             click.echo("  ✅ Model: voyage-code-3")
             click.echo(f"  ✅ Embedding dimension: {len(result.embeddings[0])}")

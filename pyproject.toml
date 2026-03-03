@@ -26,7 +26,7 @@ dependencies = [
     "mcp>=1.0.0",
     "fastapi>=0.100.0",
     "uvicorn>=0.23.0",
-    "treesitter-chunker>=2.0.0",
+    "treesitter-chunker>=2.2.2",
     # Legacy tree-sitter deps (for backward compatibility during migration)
     "tree-sitter>=0.20.0",
     "tree-sitter-languages>=1.7.0",
@@ -47,6 +47,7 @@ dependencies = [
 [project.optional-dependencies]
 semantic = [
     # Additional semantic search features (reranking, transformers)
+    "openai>=1.51.0",
     "sentence-transformers>=2.0.0",
     "cohere>=4.0.0",
     "anthropic>=0.18.0",

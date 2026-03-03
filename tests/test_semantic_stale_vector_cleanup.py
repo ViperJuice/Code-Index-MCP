@@ -11,10 +11,15 @@ from mcp_server.storage.sqlite_store import SQLiteStore
 from mcp_server.utils.semantic_indexer import SemanticIndexer
 
 
-class _FakeVoyageClient:
-    def embed(self, texts, **kwargs):
-        dimension = int(kwargs.get("output_dimension", 8))
-        return SimpleNamespace(embeddings=[[0.0] * dimension for _ in texts])
+class _FakeEmbeddingProvider:
+    provider_name = "voyage"
+
+    def __init__(self, dimension: int = 8) -> None:
+        self.dimension = dimension
+
+    def embed(self, texts, input_type="document"):
+        del input_type
+        return [[0.0] * self.dimension for _ in texts]
 
 
 class _FakeQdrantClient:
@@ -41,7 +46,8 @@ class _FakeQdrantClient:
 
 def _build_indexer(repo_path: Path, qdrant: _FakeQdrantClient) -> SemanticIndexer:
     indexer = SemanticIndexer.__new__(SemanticIndexer)
-    indexer.voyage = _FakeVoyageClient()
+    indexer.embedding_client = _FakeEmbeddingProvider(8)
+    indexer.embedding_provider = "voyage"
     indexer.embedding_model = "voyage-code-3"
     indexer.embedding_dimension = 8
     indexer.path_resolver = PathResolver(repo_path)

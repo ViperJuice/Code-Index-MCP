@@ -1,4 +1,4 @@
-"""Semantic code indexing using Voyage AI embeddings and Qdrant."""
+"""Semantic code indexing using configurable embedding providers and Qdrant."""
 
 from __future__ import annotations
 
@@ -12,13 +12,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Union
 
-import voyageai
 from qdrant_client import QdrantClient, models
 from qdrant_client.http.models import FieldCondition, Filter, MatchValue
 
 from ..artifacts.semantic_namespace import SemanticNamespaceResolver
 from ..artifacts.semantic_profiles import SemanticProfile, SemanticProfileRegistry
 from ..core.path_resolver import PathResolver
+from .embedding_providers import create_embedding_provider
 from .treesitter_wrapper import TreeSitterWrapper
 
 if TYPE_CHECKING:
@@ -54,7 +54,7 @@ class DocumentSection:
 
 
 class SemanticIndexer:
-    """Index code using Voyage Code 3 embeddings stored in Qdrant."""
+    """Index code using semantic profile embeddings stored in Qdrant."""
 
     # Document type weights for similarity calculations
     DOCUMENT_TYPE_WEIGHTS = {
@@ -90,7 +90,6 @@ class SemanticIndexer:
             semantic_profile_id=semantic_profile,
         )
 
-        self.embedding_provider = self.semantic_profile.provider
         self.embedding_model = self.semantic_profile.model_name
         self.embedding_model_version = self.semantic_profile.model_version
         self.embedding_dimension = self.semantic_profile.vector_dimension
@@ -117,25 +116,16 @@ class SemanticIndexer:
         self.qdrant = self._init_qdrant_client(qdrant_path)
         self.wrapper = TreeSitterWrapper()
 
-        # Initialize Voyage AI client with proper API key handling
-        api_key = os.environ.get("VOYAGE_API_KEY") or os.environ.get(
-            "VOYAGE_AI_API_KEY"
+        self.embedding_client = create_embedding_provider(
+            provider_name=self.semantic_profile.provider,
+            model_name=self.embedding_model,
+            vector_dimension=self.embedding_dimension,
+            api_key=(self.semantic_profile.build_metadata or {}).get("openai_api_key"),
+            base_url=(self.semantic_profile.build_metadata or {}).get(
+                "openai_api_base"
+            ),
         )
-        if api_key:
-            self.voyage = voyageai.Client(api_key=api_key)
-        else:
-            # Let voyageai.Client() look for VOYAGE_API_KEY environment variable
-            try:
-                self.voyage = voyageai.Client()
-            except Exception:
-                raise RuntimeError(
-                    "Semantic search requires Voyage AI API key. "
-                    "Configure it using one of these methods:\n"
-                    "1. Create .mcp.json with env.VOYAGE_AI_API_KEY for Claude Code\n"
-                    "2. Set VOYAGE_AI_API_KEY environment variable\n"
-                    "3. Add VOYAGE_AI_API_KEY to .env file\n"
-                    "Get your API key from: https://www.voyageai.com/"
-                )
+        self.embedding_provider = self.embedding_client.provider_name
 
         self._ensure_collection()
         self._update_metadata()
@@ -200,6 +190,13 @@ class SemanticIndexer:
             profile_id=self.semantic_profile.profile_id,
             lineage_id=effective_lineage,
         )
+
+    # ------------------------------------------------------------------
+    def _embed_texts(
+        self, texts: List[str], input_type: str = "document"
+    ) -> List[List[float]]:
+        """Generate embeddings using the configured provider."""
+        return self.embedding_client.embed(texts, input_type=input_type)
 
     def _init_qdrant_client(self, qdrant_path: str) -> QdrantClient:
         """Initialize Qdrant client with server mode preference.
@@ -557,13 +554,7 @@ class SemanticIndexer:
         # Generate embeddings and upsert into Qdrant
         texts = ["\n".join(lines[s.line - 1 : s.span[1]]) for s in symbols]
         if texts:
-            embeds = self.voyage.embed(
-                texts,
-                model=self.embedding_model,
-                input_type="document",
-                output_dimension=self.embedding_dimension,
-                output_dtype="float",
-            ).embeddings
+            embeds = self._embed_texts(texts, input_type="document")
 
             points = []
             for sym, vec in zip(symbols, embeds):
@@ -650,13 +641,7 @@ class SemanticIndexer:
             )
 
         try:
-            embedding = self.voyage.embed(
-                [text],
-                model=self.embedding_model,
-                input_type="document",
-                output_dimension=self.embedding_dimension,
-                output_dtype="float",
-            ).embeddings[0]
+            embedding = self._embed_texts([text], input_type="document")[0]
         except Exception as e:
             raise RuntimeError(f"Failed to generate query embedding: {e}")
 
@@ -720,13 +705,7 @@ class SemanticIndexer:
 
         # Generate embedding
         try:
-            embedding = self.voyage.embed(
-                [embedding_text],
-                model=self.embedding_model,
-                input_type="document",
-                output_dimension=self.embedding_dimension,
-                output_dtype="float",
-            ).embeddings[0]
+            embedding = self._embed_texts([embedding_text], input_type="document")[0]
 
             # Compute content hash
             content_hash = (
@@ -938,13 +917,7 @@ class SemanticIndexer:
         input_type = "document" if doc_type in ["markdown", "readme"] else "query"
 
         try:
-            embedding = self.voyage.embed(
-                [embedding_text],
-                model=self.embedding_model,
-                input_type=input_type,
-                output_dimension=self.embedding_dimension,
-                output_dtype="float",
-            ).embeddings[0]
+            embedding = self._embed_texts([embedding_text], input_type=input_type)[0]
             return embedding
         except Exception as e:
             raise RuntimeError(f"Failed to create document embedding: {e}")
@@ -1119,13 +1092,7 @@ class SemanticIndexer:
 
         try:
             # Generate query embedding
-            embedding = self.voyage.embed(
-                [query],
-                model=self.embedding_model,
-                input_type="query",  # Use query type for natural language
-                output_dimension=self.embedding_dimension,
-                output_dtype="float",
-            ).embeddings[0]
+            embedding = self._embed_texts([query], input_type="query")[0]
         except Exception as e:
             raise RuntimeError(f"Failed to generate query embedding: {e}")
 

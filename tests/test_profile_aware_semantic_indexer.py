@@ -6,13 +6,22 @@ import hashlib
 from types import SimpleNamespace
 
 from mcp_server.artifacts.semantic_profiles import SemanticProfileRegistry
+from mcp_server.utils import semantic_indexer as semantic_indexer_module
 from mcp_server.utils.semantic_indexer import SemanticIndexer
 
 
-class _FakeVoyageClient:
-    def embed(self, texts, **kwargs):
-        dimension = int(kwargs.get("output_dimension", 8))
-        return SimpleNamespace(embeddings=[[0.0] * dimension for _ in texts])
+class _FakeEmbeddingProvider:
+    def __init__(self, provider_name: str, dimension: int) -> None:
+        self._provider_name = provider_name
+        self._dimension = dimension
+
+    @property
+    def provider_name(self) -> str:
+        return self._provider_name
+
+    def embed(self, texts, input_type="document"):
+        del input_type
+        return [[0.0] * self._dimension for _ in texts]
 
 
 class _FakeQdrantClient:
@@ -32,12 +41,12 @@ def _sample_profiles() -> dict[str, dict[str, object]]:
             "chunker_version": "treesitter-v2",
         },
         "oss-high": {
-            "provider": "sentence-transformers",
-            "model_name": "intfloat/e5-large-v2",
-            "model_version": "hf-sha-abc123",
-            "vector_dimension": 768,
-            "distance_metric": "dot",
-            "normalization_policy": "l2",
+            "provider": "openai_compatible",
+            "model_name": "Qwen/Qwen3-Embedding-8B",
+            "model_version": "vllm-local",
+            "vector_dimension": 4096,
+            "distance_metric": "cosine",
+            "normalization_policy": "none",
             "chunk_schema_version": "2.1",
             "chunker_version": "treesitter-v3",
         },
@@ -57,9 +66,24 @@ def _patch_indexer_runtime(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(
         SemanticIndexer, "_get_git_commit_hash", lambda self: "deadbeef"
     )
+
+    def _fake_provider(
+        provider_name: str,
+        model_name: str,
+        vector_dimension: int,
+        api_key=None,
+        base_url=None,
+    ):
+        del model_name, api_key, base_url
+        normalized = provider_name.strip().lower()
+        if normalized in {"voyage", "voyageai"}:
+            return _FakeEmbeddingProvider("voyage", vector_dimension)
+        return _FakeEmbeddingProvider("openai_compatible", vector_dimension)
+
     monkeypatch.setattr(
-        "mcp_server.utils.semantic_indexer.voyageai.Client",
-        lambda *args, **kwargs: _FakeVoyageClient(),
+        semantic_indexer_module,
+        "create_embedding_provider",
+        _fake_provider,
     )
 
 
@@ -77,11 +101,12 @@ def test_profile_configuration_is_selected_from_registry(monkeypatch, tmp_path):
         commit="abcdef123456",
     )
 
-    assert indexer.embedding_model == "intfloat/e5-large-v2"
-    assert indexer.embedding_model_version == "hf-sha-abc123"
-    assert indexer.embedding_dimension == 768
-    assert indexer.distance_metric == "dot"
-    assert indexer.normalization_policy == "l2"
+    assert indexer.embedding_provider == "openai_compatible"
+    assert indexer.embedding_model == "Qwen/Qwen3-Embedding-8B"
+    assert indexer.embedding_model_version == "vllm-local"
+    assert indexer.embedding_dimension == 4096
+    assert indexer.distance_metric == "cosine"
+    assert indexer.normalization_policy == "none"
     assert indexer.chunk_schema_version == "2.1"
     assert "__oss-high__" in indexer.collection
 
