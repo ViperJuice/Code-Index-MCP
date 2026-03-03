@@ -10,14 +10,19 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Union
 
 import voyageai
 from qdrant_client import QdrantClient, models
 from qdrant_client.http.models import FieldCondition, Filter, MatchValue
 
+from ..artifacts.semantic_namespace import SemanticNamespaceResolver
+from ..artifacts.semantic_profiles import SemanticProfile, SemanticProfileRegistry
 from ..core.path_resolver import PathResolver
 from .treesitter_wrapper import TreeSitterWrapper
+
+if TYPE_CHECKING:
+    from ..storage.sqlite_store import SQLiteStore
 
 logger = logging.getLogger(__name__)
 
@@ -68,10 +73,41 @@ class SemanticIndexer:
         collection: str = "code-index",
         qdrant_path: str = "./vector_index.qdrant",
         path_resolver: Optional[PathResolver] = None,
+        profile: Optional[SemanticProfile] = None,
+        profile_registry: Optional[SemanticProfileRegistry] = None,
+        semantic_profile: Optional[str] = None,
+        namespace_resolver: Optional[SemanticNamespaceResolver] = None,
+        repo_identifier: Optional[str] = None,
+        branch: Optional[str] = None,
+        commit: Optional[str] = None,
+        lineage_id: Optional[str] = None,
     ) -> None:
-        self.collection = collection
+        self.profile_registry = profile_registry
+        self._profile_active = bool(profile or profile_registry or semantic_profile)
+        self.semantic_profile = self._resolve_semantic_profile(
+            profile=profile,
+            profile_registry=profile_registry,
+            semantic_profile_id=semantic_profile,
+        )
+
+        self.embedding_provider = self.semantic_profile.provider
+        self.embedding_model = self.semantic_profile.model_name
+        self.embedding_model_version = self.semantic_profile.model_version
+        self.embedding_dimension = self.semantic_profile.vector_dimension
+        self.distance_metric = self.semantic_profile.distance_metric
+        self.normalization_policy = self.semantic_profile.normalization_policy
+        self.chunk_schema_version = self.semantic_profile.chunk_schema_version
+        self.compatibility_fingerprint = self.semantic_profile.compatibility_fingerprint
+
+        self.namespace_resolver = namespace_resolver or SemanticNamespaceResolver()
+        self.collection = self._resolve_collection_name(
+            requested_collection=collection,
+            repo_identifier=repo_identifier,
+            lineage_id=lineage_id,
+            branch=branch,
+            commit=commit,
+        )
         self.qdrant_path = qdrant_path
-        self.embedding_model = "voyage-code-3"
         self.metadata_file = ".index_metadata.json"
         self.path_resolver = path_resolver or PathResolver()
 
@@ -82,7 +118,9 @@ class SemanticIndexer:
         self.wrapper = TreeSitterWrapper()
 
         # Initialize Voyage AI client with proper API key handling
-        api_key = os.environ.get("VOYAGE_API_KEY") or os.environ.get("VOYAGE_AI_API_KEY")
+        api_key = os.environ.get("VOYAGE_API_KEY") or os.environ.get(
+            "VOYAGE_AI_API_KEY"
+        )
         if api_key:
             self.voyage = voyageai.Client(api_key=api_key)
         else:
@@ -101,6 +139,67 @@ class SemanticIndexer:
 
         self._ensure_collection()
         self._update_metadata()
+
+    def _resolve_semantic_profile(
+        self,
+        *,
+        profile: Optional[SemanticProfile],
+        profile_registry: Optional[SemanticProfileRegistry],
+        semantic_profile_id: Optional[str],
+    ) -> SemanticProfile:
+        """Resolve semantic profile with legacy-safe fallback behavior."""
+        if profile is not None:
+            return profile
+
+        if profile_registry is not None:
+            return profile_registry.get(semantic_profile_id)
+
+        if semantic_profile_id:
+            logger.warning(
+                "Semantic profile '%s' requested without a profile registry; "
+                "falling back to legacy defaults",
+                semantic_profile_id,
+            )
+
+        legacy_payload: Mapping[str, Any] = {
+            "provider": "voyage",
+            "model_name": "voyage-code-3",
+            "model_version": "legacy",
+            "vector_dimension": 1024,
+            "distance_metric": "cosine",
+            "normalization_policy": "provider-default",
+            "chunk_schema_version": "legacy",
+            "chunker_version": "legacy",
+        }
+        return SemanticProfile.from_dict("legacy-default", legacy_payload)
+
+    def _resolve_collection_name(
+        self,
+        *,
+        requested_collection: str,
+        repo_identifier: Optional[str],
+        lineage_id: Optional[str],
+        branch: Optional[str],
+        commit: Optional[str],
+    ) -> str:
+        """Resolve collection name, using namespace contract when context exists."""
+        if not repo_identifier:
+            return requested_collection
+
+        effective_lineage = lineage_id
+        if not effective_lineage and (branch or commit):
+            effective_lineage = self.namespace_resolver.derive_lineage_id(
+                branch, commit
+            )
+
+        if not effective_lineage:
+            return requested_collection
+
+        return self.namespace_resolver.resolve_collection_name(
+            repo_identifier=repo_identifier,
+            profile_id=self.semantic_profile.profile_id,
+            lineage_id=effective_lineage,
+        )
 
     def _init_qdrant_client(self, qdrant_path: str) -> QdrantClient:
         """Initialize Qdrant client with server mode preference.
@@ -247,16 +346,22 @@ class SemanticIndexer:
             # Attempt a simple operation to verify connection
             collections = self.qdrant.get_collections()
             # Check if our collection exists
-            collection_exists = any(c.name == self.collection for c in collections.collections)
+            collection_exists = any(
+                c.name == self.collection for c in collections.collections
+            )
             if collection_exists:
-                logger.debug(f"Qdrant connection valid - collection '{self.collection}' exists")
+                logger.debug(
+                    f"Qdrant connection valid - collection '{self.collection}' exists"
+                )
             else:
                 logger.warning(
                     f"Qdrant connection active but collection '{self.collection}' not found"
                 )
             return True
         except Exception as e:
-            logger.error(f"Qdrant connection validation failed: {type(e).__name__}: {e}")
+            logger.error(
+                f"Qdrant connection validation failed: {type(e).__name__}: {e}"
+            )
             self._qdrant_available = False
             return False
 
@@ -277,7 +382,10 @@ class SemanticIndexer:
                 logger.info(f"Creating Qdrant collection: {self.collection}")
                 self.qdrant.recreate_collection(
                     collection_name=self.collection,
-                    vectors_config=models.VectorParams(size=1024, distance=models.Distance.COSINE),
+                    vectors_config=models.VectorParams(
+                        size=self.embedding_dimension,
+                        distance=self._resolve_qdrant_distance(self.distance_metric),
+                    ),
                 )
                 logger.info(f"Successfully created collection: {self.collection}")
             else:
@@ -292,18 +400,51 @@ class SemanticIndexer:
             )
 
     # ------------------------------------------------------------------
-    def _update_metadata(self) -> None:
-        """Update index metadata with current model and configuration."""
+    def _resolve_qdrant_distance(self, metric: str) -> models.Distance:
+        """Map profile distance metric to Qdrant enum."""
+        metric_value = (metric or "").strip().lower()
+        mapping = {
+            "cosine": models.Distance.COSINE,
+            "dot": models.Distance.DOT,
+            "dotproduct": models.Distance.DOT,
+            "euclidean": models.Distance.EUCLID,
+            "euclid": models.Distance.EUCLID,
+            "manhattan": models.Distance.MANHATTAN,
+        }
+        resolved = mapping.get(metric_value)
+        if resolved is None:
+            logger.warning("Unknown distance metric '%s', defaulting to cosine", metric)
+            return models.Distance.COSINE
+        return resolved
+
+    # ------------------------------------------------------------------
+    def _build_metadata(self) -> Dict[str, Any]:
+        """Build metadata payload for semantic index compatibility checks."""
         metadata = {
+            "embedding_provider": self.embedding_provider,
             "embedding_model": self.embedding_model,
-            "model_dimension": 1024,
-            "distance_metric": "cosine",
+            "model_version": self.embedding_model_version,
+            "model_dimension": self.embedding_dimension,
+            "distance_metric": self.distance_metric,
+            "normalization_policy": self.normalization_policy,
+            "chunk_schema_version": self.chunk_schema_version,
             "created_at": datetime.now().isoformat(),
             "qdrant_path": self.qdrant_path,
             "collection_name": self.collection,
             "compatibility_hash": self._generate_compatibility_hash(),
             "git_commit": self._get_git_commit_hash(),
         }
+
+        if self._profile_active:
+            metadata["semantic_profile"] = self.semantic_profile.profile_id
+            metadata["compatibility_fingerprint"] = self.compatibility_fingerprint
+
+        return metadata
+
+    # ------------------------------------------------------------------
+    def _update_metadata(self) -> None:
+        """Update index metadata with current model and configuration."""
+        metadata = self._build_metadata()
 
         try:
             with open(self.metadata_file, "w") as f:
@@ -315,7 +456,12 @@ class SemanticIndexer:
     # ------------------------------------------------------------------
     def _generate_compatibility_hash(self) -> str:
         """Generate a hash for compatibility checking."""
-        compatibility_string = f"{self.embedding_model}:1024:cosine"
+        if self._profile_active:
+            return self.compatibility_fingerprint
+
+        compatibility_string = (
+            f"{self.embedding_model}:{self.embedding_dimension}:{self.distance_metric}"
+        )
         return hashlib.sha256(compatibility_string.encode()).hexdigest()[:16]
 
     # ------------------------------------------------------------------
@@ -334,7 +480,9 @@ class SemanticIndexer:
         return None
 
     # ------------------------------------------------------------------
-    def check_compatibility(self, other_metadata_file: str = ".index_metadata.json") -> bool:
+    def check_compatibility(
+        self, other_metadata_file: str = ".index_metadata.json"
+    ) -> bool:
         """Check if current configuration is compatible with existing index."""
         if not os.path.exists(other_metadata_file):
             return True  # No existing metadata, assume compatible
@@ -391,7 +539,9 @@ class SemanticIndexer:
             name = name_node.text.decode()
             start_line = node.start_point[0] + 1
             end_line = node.end_point[0] + 1
-            signature = lines[start_line - 1].strip() if start_line - 1 < len(lines) else name
+            signature = (
+                lines[start_line - 1].strip() if start_line - 1 < len(lines) else name
+            )
             kind = "function" if node.type == "function_definition" else "class"
 
             symbols.append(
@@ -409,9 +559,9 @@ class SemanticIndexer:
         if texts:
             embeds = self.voyage.embed(
                 texts,
-                model="voyage-code-3",
+                model=self.embedding_model,
                 input_type="document",
-                output_dimension=1024,
+                output_dimension=self.embedding_dimension,
                 output_dtype="float",
             ).embeddings
 
@@ -438,7 +588,9 @@ class SemanticIndexer:
                 }
                 points.append(
                     models.PointStruct(
-                        id=self._symbol_id(str(path), sym.symbol, sym.line, content_hash),
+                        id=self._symbol_id(
+                            str(path), sym.symbol, sym.line, content_hash
+                        ),
                         vector=vec,
                         payload=payload,
                     )
@@ -446,7 +598,9 @@ class SemanticIndexer:
 
             # Upsert to Qdrant with error handling
             if not self._qdrant_available:
-                raise RuntimeError(f"Qdrant is not available - cannot index file {path}")
+                raise RuntimeError(
+                    f"Qdrant is not available - cannot index file {path}"
+                )
 
             try:
                 self.qdrant.upsert(collection_name=self.collection, points=points)
@@ -456,7 +610,9 @@ class SemanticIndexer:
                     f"{type(e).__name__}: {e}"
                 )
                 self._qdrant_available = False
-                raise RuntimeError(f"Failed to store embeddings for {path} in Qdrant: {e}")
+                raise RuntimeError(
+                    f"Failed to store embeddings for {path} in Qdrant: {e}"
+                )
 
         return {
             "file": str(path),
@@ -496,9 +652,9 @@ class SemanticIndexer:
         try:
             embedding = self.voyage.embed(
                 [text],
-                model="voyage-code-3",
+                model=self.embedding_model,
                 input_type="document",
-                output_dimension=1024,
+                output_dimension=self.embedding_dimension,
                 output_dtype="float",
             ).embeddings[0]
         except Exception as e:
@@ -519,7 +675,8 @@ class SemanticIndexer:
             logger.error(f"Qdrant search failed: {type(e).__name__}: {e}")
             self._qdrant_available = False
             raise RuntimeError(
-                f"Semantic search failed - Qdrant error: {e}. " "Connection may have been lost."
+                f"Semantic search failed - Qdrant error: {e}. "
+                "Connection may have been lost."
             )
 
     # ------------------------------------------------------------------
@@ -534,6 +691,8 @@ class SemanticIndexer:
         doc: str | None = None,
         content: str = "",
         metadata: dict[str, Any] | None = None,
+        sqlite_store: Optional["SQLiteStore"] = None,
+        profile_id: Optional[str] = None,
     ) -> None:
         """Index a single code symbol with its embedding.
 
@@ -563,14 +722,16 @@ class SemanticIndexer:
         try:
             embedding = self.voyage.embed(
                 [embedding_text],
-                model="voyage-code-3",
+                model=self.embedding_model,
                 input_type="document",
-                output_dimension=1024,
+                output_dimension=self.embedding_dimension,
                 output_dtype="float",
             ).embeddings[0]
 
             # Compute content hash
-            content_hash = hashlib.sha256(content.encode()).hexdigest() if content else None
+            content_hash = (
+                hashlib.sha256(content.encode()).hexdigest() if content else None
+            )
 
             # Use relative path
             relative_path = self.path_resolver.normalize_path(file)
@@ -603,13 +764,27 @@ class SemanticIndexer:
 
             try:
                 self.qdrant.upsert(collection_name=self.collection, points=[point])
+
+                chunk_id = (metadata or {}).get("chunk_id") if metadata else None
+                if chunk_id and sqlite_store is not None:
+                    effective_profile_id = (
+                        profile_id or self.semantic_profile.profile_id
+                    )
+                    sqlite_store.upsert_semantic_point(
+                        profile_id=effective_profile_id,
+                        chunk_id=str(chunk_id),
+                        point_id=point_id,
+                        collection=self.collection,
+                    )
             except Exception as upsert_error:
                 logger.error(
                     f"Qdrant upsert failed for symbol '{name}': "
                     f"{type(upsert_error).__name__}: {upsert_error}"
                 )
                 self._qdrant_available = False
-                raise RuntimeError(f"Failed to store symbol '{name}' in Qdrant: {upsert_error}")
+                raise RuntimeError(
+                    f"Failed to store symbol '{name}' in Qdrant: {upsert_error}"
+                )
         except Exception as e:
             if "API key" in str(e) or "authentication" in str(e).lower():
                 raise RuntimeError(
@@ -620,6 +795,36 @@ class SemanticIndexer:
                     "3. VOYAGE_AI_API_KEY in .env file"
                 )
             raise RuntimeError(f"Failed to index symbol {name}: {e}")
+
+    def delete_stale_vectors(
+        self,
+        profile_id: str,
+        chunk_ids: List[str],
+        sqlite_store: Optional["SQLiteStore"] = None,
+    ) -> int:
+        """Delete stale vectors for profile-scoped chunk ids and clear mappings."""
+        if sqlite_store is None or not chunk_ids:
+            return 0
+
+        point_ids = sqlite_store.get_semantic_point_ids(profile_id, chunk_ids)
+
+        if point_ids and self._qdrant_available:
+            try:
+                self.qdrant.delete(
+                    collection_name=self.collection,
+                    points_selector=models.PointIdsList(points=point_ids),
+                )
+            except Exception as e:
+                logger.error(
+                    "Failed deleting stale vectors for profile '%s': %s",
+                    profile_id,
+                    e,
+                )
+                self._qdrant_available = False
+                raise RuntimeError(f"Failed to delete stale vectors from Qdrant: {e}")
+
+        sqlite_store.delete_semantic_point_mappings(profile_id, chunk_ids)
+        return len(point_ids)
 
     # ------------------------------------------------------------------
     def search(self, query: str, limit: int = 20) -> list[dict[str, Any]]:
@@ -646,7 +851,9 @@ class SemanticIndexer:
     # Document-specific methods
     # ------------------------------------------------------------------
 
-    def _parse_markdown_sections(self, content: str, file_path: str) -> list[DocumentSection]:
+    def _parse_markdown_sections(
+        self, content: str, file_path: str
+    ) -> list[DocumentSection]:
         """Parse markdown content into hierarchical sections."""
         lines = content.split("\n")
         sections = []
@@ -733,9 +940,9 @@ class SemanticIndexer:
         try:
             embedding = self.voyage.embed(
                 [embedding_text],
-                model="voyage-code-3",
+                model=self.embedding_model,
                 input_type=input_type,
-                output_dimension=1024,
+                output_dimension=self.embedding_dimension,
                 output_dtype="float",
             ).embeddings[0]
             return embedding
@@ -806,7 +1013,9 @@ class SemanticIndexer:
             )
 
             # Create unique ID for section
-            section_id = self._document_section_id(str(path), section.title, section.start_line)
+            section_id = self._document_section_id(
+                str(path), section.title, section.start_line
+            )
 
             # Use relative path
             relative_path = self.path_resolver.normalize_path(path)
@@ -829,14 +1038,18 @@ class SemanticIndexer:
                 "subsections": section.subsections,
                 "doc_type": doc_type,
                 "type": "document_section",
-                "language": ("markdown" if doc_type in ["markdown", "readme"] else "text"),
+                "language": (
+                    "markdown" if doc_type in ["markdown", "readme"] else "text"
+                ),
                 "is_deleted": False,
             }
 
             if metadata:
                 payload["metadata"] = metadata
 
-            points.append(models.PointStruct(id=section_id, vector=embedding, payload=payload))
+            points.append(
+                models.PointStruct(id=section_id, vector=embedding, payload=payload)
+            )
 
             indexed_sections.append(
                 {
@@ -850,7 +1063,9 @@ class SemanticIndexer:
         # Upsert all sections with error handling
         if points:
             if not self._qdrant_available:
-                raise RuntimeError(f"Qdrant is not available - cannot index document {path}")
+                raise RuntimeError(
+                    f"Qdrant is not available - cannot index document {path}"
+                )
 
             try:
                 self.qdrant.upsert(collection_name=self.collection, points=points)
@@ -860,7 +1075,9 @@ class SemanticIndexer:
                     f"{type(e).__name__}: {e}"
                 )
                 self._qdrant_available = False
-                raise RuntimeError(f"Failed to store document sections for {path} in Qdrant: {e}")
+                raise RuntimeError(
+                    f"Failed to store document sections for {path} in Qdrant: {e}"
+                )
 
         return {
             "file": str(path),
@@ -896,15 +1113,17 @@ class SemanticIndexer:
             RuntimeError: If Qdrant is unavailable or query fails
         """
         if not self._qdrant_available:
-            raise RuntimeError("Qdrant is not available - cannot perform natural language query")
+            raise RuntimeError(
+                "Qdrant is not available - cannot perform natural language query"
+            )
 
         try:
             # Generate query embedding
             embedding = self.voyage.embed(
                 [query],
-                model="voyage-code-3",
+                model=self.embedding_model,
                 input_type="query",  # Use query type for natural language
-                output_dimension=1024,
+                output_dimension=self.embedding_dimension,
                 output_dtype="float",
             ).embeddings[0]
         except Exception as e:
@@ -918,7 +1137,9 @@ class SemanticIndexer:
                 limit=limit * 2 if doc_types else limit,
             )
         except Exception as e:
-            logger.error(f"Qdrant natural language query failed: {type(e).__name__}: {e}")
+            logger.error(
+                f"Qdrant natural language query failed: {type(e).__name__}: {e}"
+            )
             self._qdrant_available = False
             raise RuntimeError(f"Natural language query failed - Qdrant error: {e}")
 
@@ -930,7 +1151,9 @@ class SemanticIndexer:
             # Filter by document types if specified
             if doc_types:
                 doc_type = payload.get("doc_type", "code")
-                if doc_type not in doc_types and not (include_code and doc_type == "code"):
+                if doc_type not in doc_types and not (
+                    include_code and doc_type == "code"
+                ):
                     continue
 
             # Apply document type weighting
@@ -1014,7 +1237,9 @@ class SemanticIndexer:
             RuntimeError: If Qdrant is unavailable or deletion fails
         """
         if not self._qdrant_available:
-            raise RuntimeError(f"Qdrant is not available - cannot remove file {file_path}")
+            raise RuntimeError(
+                f"Qdrant is not available - cannot remove file {file_path}"
+            )
 
         # Normalize to relative path
         try:
@@ -1025,14 +1250,18 @@ class SemanticIndexer:
 
         # Search for all points with this file
         filter_condition = Filter(
-            must=[FieldCondition(key="relative_path", match=MatchValue(value=relative_path))]
+            must=[
+                FieldCondition(
+                    key="relative_path", match=MatchValue(value=relative_path)
+                )
+            ]
         )
 
         try:
             # Get count before deletion for logging
             search_result = self.qdrant.search(
                 collection_name=self.collection,
-                query_vector=[0.0] * 1024,  # Dummy vector
+                query_vector=[0.0] * self.embedding_dimension,  # Dummy vector
                 filter=filter_condition,
                 limit=1000,  # Get all matches
                 with_payload=False,
@@ -1047,13 +1276,19 @@ class SemanticIndexer:
                     collection_name=self.collection,
                     points_selector=models.PointIdsList(points=point_ids),
                 )
-                logger.info(f"Removed {len(point_ids)} embeddings for file: {relative_path}")
+                logger.info(
+                    f"Removed {len(point_ids)} embeddings for file: {relative_path}"
+                )
 
             return len(point_ids)
         except Exception as e:
-            logger.error(f"Failed to remove file {relative_path}: {type(e).__name__}: {e}")
+            logger.error(
+                f"Failed to remove file {relative_path}: {type(e).__name__}: {e}"
+            )
             self._qdrant_available = False
-            raise RuntimeError(f"Failed to remove file {relative_path} from Qdrant: {e}")
+            raise RuntimeError(
+                f"Failed to remove file {relative_path} from Qdrant: {e}"
+            )
 
     def move_file(
         self,
@@ -1085,14 +1320,18 @@ class SemanticIndexer:
 
         # Find all points for the old file
         filter_condition = Filter(
-            must=[FieldCondition(key="relative_path", match=MatchValue(value=old_relative))]
+            must=[
+                FieldCondition(
+                    key="relative_path", match=MatchValue(value=old_relative)
+                )
+            ]
         )
 
         try:
             # Search for all points
             search_result = self.qdrant.search(
                 collection_name=self.collection,
-                query_vector=[0.0] * 1024,  # Dummy vector
+                query_vector=[0.0] * self.embedding_dimension,  # Dummy vector
                 filter=filter_condition,
                 limit=1000,
                 with_payload=True,
@@ -1113,7 +1352,9 @@ class SemanticIndexer:
 
                 # Verify content hash if provided
                 if content_hash and new_payload.get("content_hash") != content_hash:
-                    logger.warning(f"Content hash mismatch for {old_relative} -> {new_relative}")
+                    logger.warning(
+                        f"Content hash mismatch for {old_relative} -> {new_relative}"
+                    )
                     continue
 
                 updated_points.append(
@@ -1159,7 +1400,8 @@ class SemanticIndexer:
             return len(updated_points)
         except Exception as e:
             logger.error(
-                f"Failed to move file {old_relative} -> {new_relative}: " f"{type(e).__name__}: {e}"
+                f"Failed to move file {old_relative} -> {new_relative}: "
+                f"{type(e).__name__}: {e}"
             )
             self._qdrant_available = False
             raise RuntimeError(
@@ -1179,16 +1421,20 @@ class SemanticIndexer:
             RuntimeError: If Qdrant is unavailable or query fails
         """
         if not self._qdrant_available:
-            raise RuntimeError("Qdrant is not available - cannot query embeddings by content hash")
+            raise RuntimeError(
+                "Qdrant is not available - cannot query embeddings by content hash"
+            )
 
         filter_condition = Filter(
-            must=[FieldCondition(key="content_hash", match=MatchValue(value=content_hash))]
+            must=[
+                FieldCondition(key="content_hash", match=MatchValue(value=content_hash))
+            ]
         )
 
         try:
             results = self.qdrant.search(
                 collection_name=self.collection,
-                query_vector=[0.0] * 1024,  # Dummy vector
+                query_vector=[0.0] * self.embedding_dimension,  # Dummy vector
                 filter=filter_condition,
                 limit=1000,
                 with_payload=True,
@@ -1197,9 +1443,13 @@ class SemanticIndexer:
 
             return [{"id": res.id, **res.payload} for res in results]
         except Exception as e:
-            logger.error(f"Failed to get embeddings by content hash: {type(e).__name__}: {e}")
+            logger.error(
+                f"Failed to get embeddings by content hash: {type(e).__name__}: {e}"
+            )
             self._qdrant_available = False
-            raise RuntimeError(f"Failed to query embeddings by content hash in Qdrant: {e}")
+            raise RuntimeError(
+                f"Failed to query embeddings by content hash in Qdrant: {e}"
+            )
 
     def mark_file_deleted(self, file_path: Union[str, Path]) -> int:
         """Mark all embeddings for a file as deleted (soft delete).
@@ -1214,20 +1464,26 @@ class SemanticIndexer:
             RuntimeError: If Qdrant is unavailable or update fails
         """
         if not self._qdrant_available:
-            raise RuntimeError(f"Qdrant is not available - cannot mark file {file_path} as deleted")
+            raise RuntimeError(
+                f"Qdrant is not available - cannot mark file {file_path} as deleted"
+            )
 
         # This is similar to move_file but only updates is_deleted flag
         relative_path = self.path_resolver.normalize_path(file_path)
 
         filter_condition = Filter(
-            must=[FieldCondition(key="relative_path", match=MatchValue(value=relative_path))]
+            must=[
+                FieldCondition(
+                    key="relative_path", match=MatchValue(value=relative_path)
+                )
+            ]
         )
 
         try:
             # Search and update
             search_result = self.qdrant.search(
                 collection_name=self.collection,
-                query_vector=[0.0] * 1024,
+                query_vector=[0.0] * self.embedding_dimension,
                 filter=filter_condition,
                 limit=1000,
                 with_payload=True,
@@ -1263,11 +1519,16 @@ class SemanticIndexer:
 
             self.qdrant.upsert(collection_name=self.collection, points=updated_points)
 
-            logger.info(f"Marked {len(updated_points)} embeddings as deleted for: {relative_path}")
+            logger.info(
+                f"Marked {len(updated_points)} embeddings as deleted for: {relative_path}"
+            )
             return len(updated_points)
         except Exception as e:
             logger.error(
-                f"Failed to mark file {relative_path} as deleted: " f"{type(e).__name__}: {e}"
+                f"Failed to mark file {relative_path} as deleted: "
+                f"{type(e).__name__}: {e}"
             )
             self._qdrant_available = False
-            raise RuntimeError(f"Failed to mark file {relative_path} as deleted in Qdrant: {e}")
+            raise RuntimeError(
+                f"Failed to mark file {relative_path} as deleted in Qdrant: {e}"
+            )

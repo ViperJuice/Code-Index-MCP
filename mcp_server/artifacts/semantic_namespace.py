@@ -1,0 +1,55 @@
+"""Deterministic namespace helpers for semantic collection naming."""
+
+from __future__ import annotations
+
+import hashlib
+import re
+from typing import Optional
+
+
+class SemanticNamespaceResolver:
+    """Resolve profile-isolated semantic collection namespace identifiers."""
+
+    _MAX_COMPONENT_LENGTH = 48
+    _INVALID_CHARS = re.compile(r"[^a-z0-9-]+")
+    _DASH_RUN = re.compile(r"-{2,}")
+
+    def derive_repo_hash(self, repo_identifier: str) -> str:
+        """Derive deterministic short hash for a repository identifier."""
+        normalized = (repo_identifier or "").strip() or "unknown-repo"
+        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:12]
+
+    def derive_lineage_id(self, branch: Optional[str], commit: Optional[str]) -> str:
+        """Derive deterministic lineage token from branch and commit."""
+        branch_token = (branch or "").strip().lower()
+        commit_token = (commit or "").strip().lower()
+
+        if not branch_token and not commit_token:
+            return "workspace"
+
+        canonical = f"{branch_token}::{commit_token}"
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:12]
+
+    def sanitize_profile_id(self, profile_id: str) -> str:
+        """Sanitize profile identifier for safe collection naming."""
+        normalized = (profile_id or "").strip().lower().replace("_", "-")
+        normalized = self._INVALID_CHARS.sub("-", normalized)
+        normalized = self._DASH_RUN.sub("-", normalized)
+        normalized = normalized.strip("-")
+
+        if not normalized:
+            return "default"
+
+        return normalized[: self._MAX_COMPONENT_LENGTH]
+
+    def resolve_collection_name(
+        self,
+        repo_identifier: str,
+        profile_id: str,
+        lineage_id: str,
+    ) -> str:
+        """Resolve collection name using deterministic namespace contract."""
+        repo_hash = self.derive_repo_hash(repo_identifier)
+        profile_segment = self.sanitize_profile_id(profile_id)
+        lineage_segment = self.sanitize_profile_id(lineage_id)
+        return f"ci__{repo_hash}__{profile_segment}__{lineage_segment}"

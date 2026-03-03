@@ -126,7 +126,9 @@ class BaseDocumentPlugin(SpecializedPluginBase):
 
         return chunks
 
-    def _intelligent_chunk(self, text: str, structure: DocumentStructure) -> List[DocumentChunk]:
+    def _intelligent_chunk(
+        self, text: str, structure: DocumentStructure
+    ) -> List[DocumentChunk]:
         """Perform structure-aware chunking."""
         chunks = []
         chunk_index = 0
@@ -428,6 +430,7 @@ class BaseDocumentPlugin(SpecializedPluginBase):
                 doc=chunk.content[:200],  # First 200 chars as doc
                 content=contextual_text,  # Use contextual text for embedding
                 metadata={
+                    "chunk_id": chunk_id,
                     "contextual_text": contextual_text,
                     "original_content": chunk.content,
                     "section": chunk.metadata.get("section", ""),
@@ -439,6 +442,7 @@ class BaseDocumentPlugin(SpecializedPluginBase):
                     "context_after": context_after,
                     "chunk_metadata": chunk.metadata,
                 },
+                sqlite_store=self._sqlite_store,
             )
 
     def getDefinition(self, symbol: str) -> Optional[SymbolDef]:
@@ -480,7 +484,8 @@ class BaseDocumentPlugin(SpecializedPluginBase):
                     references.append(
                         Reference(
                             file=file_path,
-                            line=chunk.chunk_index * 10 + lines_before,  # Rough estimate
+                            line=chunk.chunk_index * 10
+                            + lines_before,  # Rough estimate
                         )
                     )
 
@@ -493,7 +498,9 @@ class BaseDocumentPlugin(SpecializedPluginBase):
 
         if opts.get("semantic", False) and self.enable_semantic:
             # Use semantic search
-            semantic_results = self.semantic_indexer.search(query, limit=opts.get("limit", 20))
+            semantic_results = self.semantic_indexer.search(
+                query, limit=opts.get("limit", 20)
+            )
 
             for result in semantic_results:
                 if result.get("kind") == "chunk":
@@ -517,8 +524,12 @@ class BaseDocumentPlugin(SpecializedPluginBase):
                                     "section_hierarchy": chunk.metadata.get(
                                         "section_hierarchy", []
                                     ),
-                                    "document_title": chunk.metadata.get("document_title", ""),
-                                    "document_type": chunk.metadata.get("document_type", ""),
+                                    "document_title": chunk.metadata.get(
+                                        "document_title", ""
+                                    ),
+                                    "document_type": chunk.metadata.get(
+                                        "document_type", ""
+                                    ),
                                     "tags": chunk.metadata.get("document_tags", []),
                                     "chunk_index": chunk.chunk_index,
                                     "total_chunks": len(chunks),
@@ -527,9 +538,13 @@ class BaseDocumentPlugin(SpecializedPluginBase):
 
                             # Add surrounding context if available
                             if chunk.metadata.get("context_before"):
-                                search_result["context_before"] = chunk.metadata["context_before"]
+                                search_result["context_before"] = chunk.metadata[
+                                    "context_before"
+                                ]
                             if chunk.metadata.get("context_after"):
-                                search_result["context_after"] = chunk.metadata["context_after"]
+                                search_result["context_after"] = chunk.metadata[
+                                    "context_after"
+                                ]
 
                             results.append(search_result)
         else:
@@ -553,7 +568,9 @@ class BaseDocumentPlugin(SpecializedPluginBase):
 
         return results[: opts.get("limit", 20)]
 
-    def _extract_snippet(self, content: str, query: str, context_chars: int = 100) -> str:
+    def _extract_snippet(
+        self, content: str, query: str, context_chars: int = 100
+    ) -> str:
         """Extract a snippet around the query match."""
         query_lower = query.lower()
         content_lower = content.lower()
@@ -588,7 +605,9 @@ class BaseDocumentPlugin(SpecializedPluginBase):
         hash_input = f"{file_path}:{chunk_index}"
         return hashlib.sha256(hash_input.encode()).hexdigest()[:16]
 
-    def _extract_text_around_position(self, content: str, position: int, radius: int = 100) -> str:
+    def _extract_text_around_position(
+        self, content: str, position: int, radius: int = 100
+    ) -> str:
         """Extract text around a specific position."""
         start = max(0, position - radius)
         end = min(len(content), position + radius)

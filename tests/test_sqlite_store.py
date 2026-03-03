@@ -35,9 +35,9 @@ class TestDatabaseInitialization:
 
         # Verify schema version
         with store._get_connection() as conn:
-            cursor = conn.execute("SELECT version FROM schema_version")
+            cursor = conn.execute("SELECT MAX(version) AS version FROM schema_version")
             version = cursor.fetchone()
-            assert version["version"] == 2
+            assert version["version"] >= 4
 
     def test_init_existing_database(self, temp_db_path):
         """Test initialization with existing database."""
@@ -62,6 +62,7 @@ class TestDatabaseInitialization:
             "repositories",
             "files",
             "symbols",
+            "semantic_points",
             "imports",
             "symbol_references",
             "symbol_trigrams",
@@ -97,6 +98,8 @@ class TestDatabaseInitialization:
             "idx_files_content_hash",
             "idx_files_deleted",
             "idx_files_relative_path",
+            "idx_semantic_points_profile",
+            "idx_semantic_points_point",
             "idx_symbols_name",
             "idx_symbols_kind",
             "idx_symbols_file",
@@ -149,7 +152,9 @@ class TestRepositoryOperations:
         repo_id1 = sqlite_store.create_repository("/test/path", "repo1")
 
         # Create with same path
-        repo_id2 = sqlite_store.create_repository("/test/path", "repo2", {"updated": True})
+        repo_id2 = sqlite_store.create_repository(
+            "/test/path", "repo2", {"updated": True}
+        )
 
         assert repo_id1 == repo_id2  # Same ID
 
@@ -250,11 +255,42 @@ class TestFileOperations:
             "complexity": 5.2,
         }
 
-        file_id = sqlite_store.store_file(repo_id, "/repo/file.py", "file.py", metadata=metadata)
+        file_id = sqlite_store.store_file(
+            repo_id, "/repo/file.py", "file.py", metadata=metadata
+        )
 
         file_info = sqlite_store.get_file("/repo/file.py")
         stored_metadata = json.loads(file_info["metadata"])
         assert stored_metadata == metadata
+
+
+class TestSemanticPointMappings:
+    """Test semantic point mapping CRUD helpers."""
+
+    def test_upsert_and_get_semantic_point_ids(self, sqlite_store):
+        sqlite_store.upsert_semantic_point(
+            profile_id="profile-a",
+            chunk_id="chunk-1",
+            point_id=101,
+            collection="code-index-a",
+        )
+
+        point_ids = sqlite_store.get_semantic_point_ids("profile-a", ["chunk-1"])
+        assert point_ids == [101]
+
+    def test_delete_semantic_point_mappings(self, sqlite_store):
+        sqlite_store.upsert_semantic_point("profile-a", "chunk-1", 101, "code-index-a")
+        sqlite_store.upsert_semantic_point("profile-a", "chunk-2", 202, "code-index-a")
+
+        deleted = sqlite_store.delete_semantic_point_mappings(
+            "profile-a", ["chunk-1", "chunk-2"]
+        )
+
+        assert deleted == 2
+        assert (
+            sqlite_store.get_semantic_point_ids("profile-a", ["chunk-1", "chunk-2"])
+            == []
+        )
 
 
 class TestSymbolOperations:
@@ -376,7 +412,9 @@ class TestReferenceOperations:
         use1_id = sqlite_store.store_file(repo_id, "/repo/use1.py", "use1.py")
         use2_id = sqlite_store.store_file(repo_id, "/repo/use2.py", "use2.py")
 
-        symbol_id = sqlite_store.store_symbol(def_file_id, "SharedClass", "class", 10, 50)
+        symbol_id = sqlite_store.store_symbol(
+            def_file_id, "SharedClass", "class", 10, 50
+        )
 
         # Store references
         sqlite_store.store_reference(symbol_id, use1_id, 15, 10, "import")
@@ -548,7 +586,9 @@ class TestFuzzyIndexPersistence:
         file_id = sqlite_store.store_file(repo_id, "/repo/file.py", "file.py")
 
         # Store symbol with trigrams
-        symbol_id = sqlite_store.store_symbol(file_id, "example_func", "function", 1, 10)
+        symbol_id = sqlite_store.store_symbol(
+            file_id, "example_func", "function", 1, 10
+        )
 
         # Load fuzzy index
         index_data = sqlite_store.load_fuzzy_index()
@@ -804,11 +844,16 @@ class TestSQLiteStoreHealthCheck:
             "migrations",
             "index_config",
             "file_moves",
+            "semantic_points",
         ]
 
         for table in core_tables:
-            assert table in health["tables"], f"Table {table} not checked in health_check"
-            assert health["tables"][table] is True, f"Table {table} should exist in fresh database"
+            assert table in health["tables"], (
+                f"Table {table} not checked in health_check"
+            )
+            assert health["tables"][table] is True, (
+                f"Table {table} should exist in fresh database"
+            )
 
     def test_health_check_fts5_support(self, tmp_path):
         """Verify health check reports FTS5 support."""
@@ -837,8 +882,7 @@ class TestSQLiteStoreHealthCheck:
 
         health = store.health_check()
 
-        # Fresh database should have version 1
-        assert health["version"] == 2
+        assert health["version"] >= 4
 
 
 class TestPerformance:

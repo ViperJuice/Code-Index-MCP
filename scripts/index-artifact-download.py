@@ -23,6 +23,12 @@ from typing import Dict, Any, Optional, List, Tuple
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+from mcp_server.artifacts.integrity_gate import (
+    ArtifactIntegrityGateResult,
+    validate_artifact_integrity,
+    validate_required_metadata_fields,
+)
+
 
 class IndexArtifactDownloader:
     """Handle downloading index files from GitHub Actions Artifacts."""
@@ -165,30 +171,20 @@ class IndexArtifactDownloader:
             with open(metadata_path, "r") as f:
                 metadata = json.load(f)
 
-            metadata_error = self._validate_metadata(metadata)
-            if metadata_error:
-                raise ValueError(f"Invalid artifact metadata: {metadata_error}")
-
-            # Verify checksum (required)
-            if checksum_path and checksum_path.exists():
-                expected_checksum = checksum_path.read_text().split()[0]
-            else:
-                expected_checksum = metadata.get("checksum")
-
-            if not expected_checksum:
-                raise ValueError("Artifact checksum is required but missing")
-
-            actual_checksum = self._calculate_checksum(archive_path)
-            if actual_checksum != expected_checksum:
-                raise ValueError(
-                    f"Checksum mismatch! Expected: {expected_checksum}, Got: {actual_checksum}"
-                )
-            print("✅ Checksum verified")
+            gate_result = self._run_integrity_gate(
+                metadata=metadata,
+                archive_path=archive_path,
+                checksum_path=checksum_path,
+            )
+            if gate_result.manifest_v2_validated:
+                print("✅ Manifest v2 verified")
 
             compatible, issues = self.check_compatibility(metadata)
             if not compatible:
                 issue_text = "; ".join(issues)
-                raise ValueError(f"Artifact compatibility validation failed: {issue_text}")
+                raise ValueError(
+                    f"Artifact compatibility validation failed: {issue_text}"
+                )
 
             # Extract archive
             print("📦 Extracting index files...")
@@ -196,7 +192,9 @@ class IndexArtifactDownloader:
                 members = tar.getmembers()
                 for member in members:
                     if not self._validate_tar_member(member, output_dir):
-                        raise ValueError(f"Unsafe archive member blocked: {member.name}")
+                        raise ValueError(
+                            f"Unsafe archive member blocked: {member.name}"
+                        )
 
                 tar.extractall(output_dir, members=members)
 
@@ -255,7 +253,9 @@ class IndexArtifactDownloader:
 
         return len(issues) == 0, issues
 
-    def find_best_artifact(self, artifacts: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    def find_best_artifact(
+        self, artifacts: List[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
         """
         Find the best compatible artifact to download.
 
@@ -276,7 +276,8 @@ class IndexArtifactDownloader:
         default_branch = [
             a
             for a in artifacts
-            if a["name"].startswith("mcp-index-") and not a["name"].startswith("mcp-index-pr-")
+            if a["name"].startswith("mcp-index-")
+            and not a["name"].startswith("mcp-index-pr-")
         ]
         if default_branch:
             return default_branch[0]
@@ -326,30 +327,30 @@ class IndexArtifactDownloader:
 
         return selected[0]
 
+    def _run_integrity_gate(
+        self,
+        metadata: Dict[str, Any],
+        archive_path: Path,
+        checksum_path: Optional[Path],
+    ) -> ArtifactIntegrityGateResult:
+        """Run fail-closed artifact integrity checks before extraction."""
+        gate_result = validate_artifact_integrity(
+            metadata=metadata,
+            archive_path=archive_path,
+            checksum_path=checksum_path,
+        )
+        if not gate_result.passed:
+            reason_text = "; ".join(gate_result.reasons)
+            raise ValueError(f"Artifact integrity gate failed: {reason_text}")
+
+        print("✅ Integrity gate passed")
+        return gate_result
+
     def _validate_metadata(self, metadata: Dict[str, Any]) -> Optional[str]:
         """Validate required artifact metadata fields."""
-        required_keys = ["checksum", "commit", "branch", "timestamp", "compatibility"]
-        for key in required_keys:
-            if key not in metadata:
-                return f"missing key: {key}"
-
-        compatibility = metadata.get("compatibility")
-        if not isinstance(compatibility, dict):
-            return "compatibility must be an object"
-
-        for key in ["schema_version", "embedding_model"]:
-            if key not in compatibility:
-                return f"missing compatibility key: {key}"
-
-        artifact_type = metadata.get("artifact_type", "full")
-        if artifact_type not in {"full", "delta"}:
-            return f"invalid artifact_type: {artifact_type}"
-
-        if artifact_type == "delta":
-            for key in ["base_commit", "target_commit"]:
-                if key not in metadata or not metadata.get(key):
-                    return f"missing delta metadata key: {key}"
-
+        reasons = validate_required_metadata_fields(metadata)
+        if reasons:
+            return reasons[0]
         return None
 
     def _is_within_directory(self, base_dir: Path, candidate_path: Path) -> bool:
@@ -360,7 +361,9 @@ class IndexArtifactDownloader:
         except ValueError:
             return False
 
-    def _validate_tar_member(self, member: tarfile.TarInfo, extraction_dir: Path) -> bool:
+    def _validate_tar_member(
+        self, member: tarfile.TarInfo, extraction_dir: Path
+    ) -> bool:
         """Validate tar member path and link safety."""
         target_path = extraction_dir / member.name
         if not self._is_within_directory(extraction_dir, target_path):
@@ -397,7 +400,9 @@ class IndexArtifactDownloader:
 
         # Backup existing indexes if requested
         if backup:
-            backup_dir = Path(f"index_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+            backup_dir = Path(
+                f"index_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            )
             backup_dir.mkdir(exist_ok=True)
 
             for file_name in [
@@ -482,8 +487,12 @@ def main():
     list_parser.add_argument("--filter", help="Filter artifact names")
 
     # Download command
-    download_parser = subparsers.add_parser("download", help="Download and install indexes")
-    download_parser.add_argument("--artifact-id", type=int, help="Specific artifact ID to download")
+    download_parser = subparsers.add_parser(
+        "download", help="Download and install indexes"
+    )
+    download_parser.add_argument(
+        "--artifact-id", type=int, help="Specific artifact ID to download"
+    )
     download_parser.add_argument(
         "--latest", action="store_true", help="Download latest compatible artifact"
     )
@@ -537,7 +546,9 @@ def main():
                 output_dir = Path(args.output_dir) / "artifact_download"
                 output_dir.mkdir(exist_ok=True)
 
-                extracted_dir = downloader.download_artifact(args.artifact_id, output_dir)
+                extracted_dir = downloader.download_artifact(
+                    args.artifact_id, output_dir
+                )
 
                 # Check compatibility
                 metadata_file = extracted_dir / "artifact-metadata.json"
@@ -562,7 +573,9 @@ def main():
                 # Find and download latest compatible
                 artifacts = downloader.list_artifacts()
                 if args.full_only:
-                    artifacts = [a for a in artifacts if "-delta-" not in a.get("name", "")]
+                    artifacts = [
+                        a for a in artifacts if "-delta-" not in a.get("name", "")
+                    ]
                 best = downloader.find_best_artifact(artifacts)
 
                 if not best:

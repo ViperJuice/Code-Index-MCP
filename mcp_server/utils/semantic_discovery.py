@@ -3,13 +3,14 @@ Semantic Database Discovery System for MCP
 Automatically discovers and maps semantic collections to codebases.
 """
 
-import hashlib
 import logging
 import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
 from qdrant_client import QdrantClient
+
+from ..artifacts.semantic_namespace import SemanticNamespaceResolver
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ class SemanticDatabaseDiscovery:
         self.workspace_root = Path(workspace_root)
         self.qdrant_paths = qdrant_paths or self._discover_qdrant_paths()
         self._clients: Dict[str, QdrantClient] = {}
+        self._namespace_resolver = SemanticNamespaceResolver()
 
     def _discover_qdrant_paths(self) -> List[str]:
         """Discover available Qdrant database paths."""
@@ -73,7 +75,11 @@ class SemanticDatabaseDiscovery:
 
     def get_repository_identifier(self) -> str:
         """Get unique identifier for the current repository."""
-        # Try git remote URL first
+        repo_identifier = self._get_repository_namespace_identifier()
+        return self._namespace_resolver.derive_repo_hash(repo_identifier)
+
+    def _get_repository_namespace_identifier(self) -> str:
+        """Return raw repository identifier for namespace derivation."""
         try:
             result = subprocess.run(
                 ["git", "remote", "get-url", "origin"],
@@ -84,13 +90,45 @@ class SemanticDatabaseDiscovery:
             )
             remote_url = result.stdout.strip()
             if remote_url:
-                # Use git URL hash as primary identifier
-                return hashlib.sha256(remote_url.encode()).hexdigest()[:12]
+                return remote_url
         except (subprocess.CalledProcessError, FileNotFoundError):
             pass
 
-        # Fall back to directory path hash
-        return hashlib.sha256(str(self.workspace_root).encode()).hexdigest()[:12]
+        return str(self.workspace_root)
+
+    def _get_git_branch(self) -> Optional[str]:
+        """Return current branch name when available."""
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                capture_output=True,
+                text=True,
+                cwd=str(self.workspace_root),
+                check=True,
+            )
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return None
+
+        branch = result.stdout.strip()
+        if not branch or branch == "HEAD":
+            return None
+        return branch
+
+    def _get_git_commit(self) -> Optional[str]:
+        """Return current commit hash when available."""
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                capture_output=True,
+                text=True,
+                cwd=str(self.workspace_root),
+                check=True,
+            )
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return None
+
+        commit = result.stdout.strip()
+        return commit or None
 
     def find_codebase_collections(self) -> List[Tuple[str, str, Dict]]:
         """Find collections that contain files from the current codebase.
@@ -124,7 +162,9 @@ class SemanticDatabaseDiscovery:
 
                         # Analyze file paths to see if they match current codebase
                         file_paths = self._extract_file_paths(sample[0])
-                        match_score = self._calculate_match_score(file_paths, repo_patterns)
+                        match_score = self._calculate_match_score(
+                            file_paths, repo_patterns
+                        )
 
                         if match_score > 0.1:  # At least 10% match
                             metadata = {
@@ -139,7 +179,9 @@ class SemanticDatabaseDiscovery:
                             )
 
                     except Exception as e:
-                        logger.debug(f"Error sampling collection {collection.name}: {e}")
+                        logger.debug(
+                            f"Error sampling collection {collection.name}: {e}"
+                        )
 
             except Exception as e:
                 logger.warning(f"Error listing collections in {qdrant_path}: {e}")
@@ -225,14 +267,25 @@ class SemanticDatabaseDiscovery:
                     # Might be a path
                     if any(
                         ext in value
-                        for ext in [".py", ".js", ".ts", ".java", ".go", ".rs", ".cpp", ".c"]
+                        for ext in [
+                            ".py",
+                            ".js",
+                            ".ts",
+                            ".java",
+                            ".go",
+                            ".rs",
+                            ".cpp",
+                            ".c",
+                        ]
                     ):
                         file_paths.append(value.lower())
                         break
 
         return list(set(file_paths))  # Remove duplicates
 
-    def _calculate_match_score(self, file_paths: List[str], repo_patterns: Set[str]) -> float:
+    def _calculate_match_score(
+        self, file_paths: List[str], repo_patterns: Set[str]
+    ) -> float:
         """Calculate how well file paths match the current repository."""
         if not file_paths:
             return 0.0
@@ -261,7 +314,9 @@ class SemanticDatabaseDiscovery:
             return (qdrant_path, collection_name)
 
         # If no matches found, check if code-embeddings has data
-        logger.info("No specific collection found, checking code-embeddings fallback...")
+        logger.info(
+            "No specific collection found, checking code-embeddings fallback..."
+        )
         for qdrant_path in self.qdrant_paths:
             client = self._get_client(qdrant_path)
             if not client:
@@ -270,9 +325,10 @@ class SemanticDatabaseDiscovery:
             try:
                 # Check if code-embeddings exists and has data
                 info = client.get_collection("code-embeddings")
-                if info.points_count > 0:
+                points_count = info.points_count or 0
+                if points_count > 0:
                     logger.info(
-                        f"Using fallback collection 'code-embeddings' with {info.points_count} points"
+                        f"Using fallback collection 'code-embeddings' with {points_count} points"
                     )
                     return (qdrant_path, "code-embeddings")
             except Exception:
@@ -289,8 +345,15 @@ class SemanticDatabaseDiscovery:
         # Try centralized path first
         centralized_path = str(self.workspace_root / ".indexes/qdrant/main.qdrant")
         if Path(centralized_path).exists():
-            repo_id = self.get_repository_identifier()
-            collection_name = f"codebase-{repo_id}"
+            repo_identifier = self._get_repository_namespace_identifier()
+            lineage_id = self._namespace_resolver.derive_lineage_id(
+                self._get_git_branch(), self._get_git_commit()
+            )
+            collection_name = self._namespace_resolver.resolve_collection_name(
+                repo_identifier=repo_identifier,
+                profile_id="default",
+                lineage_id=lineage_id,
+            )
             return (centralized_path, collection_name)
 
         # Fall back to legacy path
@@ -333,7 +396,8 @@ class SemanticDatabaseDiscovery:
             client.create_collection(
                 collection_name=collection_name,
                 vectors_config=models.VectorParams(
-                    size=1024, distance=models.Distance.COSINE  # Voyage Code 3 dimension
+                    size=1024,
+                    distance=models.Distance.COSINE,  # Voyage Code 3 dimension
                 ),
             )
 
@@ -364,13 +428,17 @@ class SemanticDatabaseDiscovery:
                     "collection_name": collection_name,
                     "match_score": metadata["match_score"],
                     "sample_files": metadata["sample_files"],
-                    "recommendation": "primary" if metadata["match_score"] > 0.5 else "secondary",
+                    "recommendation": "primary"
+                    if metadata["match_score"] > 0.5
+                    else "secondary",
                 }
             )
 
         # Add recommendations
         if not matches:
-            summary["recommendations"].append("No existing collections found for this codebase")
+            summary["recommendations"].append(
+                "No existing collections found for this codebase"
+            )
             summary["recommendations"].append("Consider creating a new semantic index")
         else:
             best_match = matches[0]

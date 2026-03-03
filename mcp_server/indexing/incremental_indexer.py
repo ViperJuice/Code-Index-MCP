@@ -9,7 +9,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from ..core.path_resolver import PathResolver
 from ..dispatcher.dispatcher_enhanced import EnhancedDispatcher
@@ -39,7 +39,12 @@ class IncrementalStats:
 
     def total_operations(self) -> int:
         """Get total number of operations performed."""
-        return self.files_indexed + self.files_removed + self.files_moved + self.files_skipped
+        return (
+            self.files_indexed
+            + self.files_removed
+            + self.files_moved
+            + self.files_skipped
+        )
 
 
 class IncrementalIndexer:
@@ -50,11 +55,49 @@ class IncrementalIndexer:
         store: SQLiteStore,
         dispatcher: Optional[EnhancedDispatcher] = None,
         repo_path: Optional[Path] = None,
+        semantic_indexer: Optional[Any] = None,
     ):
         self.store = store
         self.dispatcher = dispatcher
         self.repo_path = repo_path or Path.cwd()
         self.path_resolver = PathResolver(self.repo_path)
+        self.semantic_indexer = semantic_indexer
+
+    def _get_chunk_ids_for_path(self, path: str) -> List[str]:
+        """Get indexed chunk ids for a relative repository path."""
+        relative_path = self.path_resolver.normalize_path(self.repo_path / path)
+        repo_id = self._get_repository_id()
+
+        with self.store._get_connection() as conn:
+            cursor = conn.execute(
+                "SELECT id FROM files WHERE relative_path = ? AND repository_id = ?",
+                (relative_path, repo_id),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return []
+
+            file_id = row[0]
+            cursor = conn.execute(
+                "SELECT chunk_id FROM code_chunks WHERE file_id = ?",
+                (file_id,),
+            )
+            return [record[0] for record in cursor.fetchall()]
+
+    def _cleanup_stale_vectors(self, chunk_ids: List[str]) -> None:
+        """Delete stale semantic vectors for existing chunk ids."""
+        if not self.semantic_indexer or not chunk_ids:
+            return
+
+        try:
+            profile_id = self.semantic_indexer.semantic_profile.profile_id
+            self.semantic_indexer.delete_stale_vectors(
+                profile_id=profile_id,
+                chunk_ids=chunk_ids,
+                sqlite_store=self.store,
+            )
+        except Exception as e:
+            logger.warning(f"Failed stale vector cleanup for chunks {chunk_ids}: {e}")
 
     def update_from_changes(self, changes: List[FileChange]) -> IncrementalStats:
         """Update index based on file changes.
@@ -85,7 +128,9 @@ class IncrementalIndexer:
                 stats.errors += 1
 
         # Process additions and modifications
-        for change in changes_by_type.get("added", []) + changes_by_type.get("modified", []):
+        for change in changes_by_type.get("added", []) + changes_by_type.get(
+            "modified", []
+        ):
             result = self._index_file(change.path)
             if result == "indexed":
                 stats.files_indexed += 1
@@ -108,7 +153,9 @@ class IncrementalIndexer:
 
         return stats
 
-    def _group_changes_by_type(self, changes: List[FileChange]) -> Dict[str, List[FileChange]]:
+    def _group_changes_by_type(
+        self, changes: List[FileChange]
+    ) -> Dict[str, List[FileChange]]:
         """Group changes by their type.
 
         Args:
@@ -134,6 +181,9 @@ class IncrementalIndexer:
             True if successful
         """
         try:
+            chunk_ids = self._get_chunk_ids_for_path(path)
+            self._cleanup_stale_vectors(chunk_ids)
+
             if self.dispatcher:
                 # Use dispatcher if available
                 full_path = self.repo_path / path
@@ -183,7 +233,9 @@ class IncrementalIndexer:
                 self.dispatcher.move_file(old_full_path, new_full_path, content_hash)
             else:
                 # Direct database operation
-                old_relative = self.path_resolver.normalize_path(self.repo_path / old_path)
+                old_relative = self.path_resolver.normalize_path(
+                    self.repo_path / old_path
+                )
                 new_relative = self.path_resolver.normalize_path(new_full_path)
                 repo_id = self._get_repository_id()
 
@@ -224,6 +276,8 @@ class IncrementalIndexer:
                 logger.debug(f"File unchanged, skipping: {path}")
                 return "skipped"
 
+            self._cleanup_stale_vectors(self._get_chunk_ids_for_path(path))
+
             if self.dispatcher:
                 # Use dispatcher if available
                 self.dispatcher.index_file(full_path)
@@ -239,7 +293,9 @@ class IncrementalIndexer:
             logger.error(f"Failed to index file {path}: {e}")
             return "error"
 
-    def _needs_reindex(self, file_path: Path, stored_file: Optional[Dict] = None) -> bool:
+    def _needs_reindex(
+        self, file_path: Path, stored_file: Optional[Dict] = None
+    ) -> bool:
         """Check if a file needs to be reindexed.
 
         Args:
@@ -257,7 +313,9 @@ class IncrementalIndexer:
             relative_path = self.path_resolver.normalize_path(file_path)
             repo_id = self._get_repository_id()
 
-            stored_file = stored_file or self.store.get_file_by_path(relative_path, repo_id)
+            stored_file = stored_file or self.store.get_file_by_path(
+                relative_path, repo_id
+            )
             if not stored_file:
                 # File not in index
                 return True
@@ -328,7 +386,12 @@ class IncrementalIndexer:
         Returns:
             Dictionary with validation statistics
         """
-        stats = {"total_indexed": 0, "files_missing": 0, "files_changed": 0, "files_ok": 0}
+        stats = {
+            "total_indexed": 0,
+            "files_missing": 0,
+            "files_changed": 0,
+            "files_ok": 0,
+        }
 
         repo_id = self._get_repository_id()
 
