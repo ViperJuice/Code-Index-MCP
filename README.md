@@ -968,6 +968,34 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 | Code Search | <500ms (p95) | ✅ Achieved - BM25 search < 50ms |
 | File Indexing | 10K files/min | ✅ Achieved - 152K files indexed |
 
+### Full-Repo E2E Baseline (2026-03-04)
+
+Baseline run indexed the full `Code-Index-MCP` repository using:
+- Qwen embeddings via Fireworks (`fireworks/qwen3-embedding-8b`)
+- Voyage embeddings (`voyage-code-3`)
+- BM25, fuzzy, classic FTS, and hybrid retrieval
+
+| Metric | Result |
+|---|---:|
+| Files indexed | 1266 |
+| Semantic-skipped files (oversized) | 1 |
+| MCP query suite pass rate | 60.0% |
+| Native tools pass rate (`rg`/`grep`/`glob`) | 55.6% |
+| Semantic Qwen latency (single query, top-5) | 368.13 ms |
+| Semantic Voyage latency (single query, top-5) | 116.5 ms |
+| BM25 latency (single query, top-5) | 41.58 ms |
+| Fuzzy latency (single query, top-5) | 12.94 ms |
+| Hybrid latency (single query, top-5) | 5090.93 ms |
+
+Known gaps from this run:
+- `classic` mode returned 0 results for the benchmark suite's semantic-preflight probe.
+- `hybrid` mode returned a result count but failed top-file shaping in one benchmark case.
+
+Benchmark artifacts:
+- `docs/benchmarks/e2e_retrieval_validation_fullrepo_fireworks_qwen_voyage.json`
+- `docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage.json`
+- `docs/benchmarks/fullrepo-benchmark-analysis.md`
+
 ## 🏗️ Architecture Overview
 
 The system follows C4 model architecture patterns:

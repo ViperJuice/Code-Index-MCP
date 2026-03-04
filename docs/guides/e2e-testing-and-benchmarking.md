@@ -9,6 +9,21 @@ against native retrieval methods (`grep`, `rg`, `glob`).
 - OpenAI-compatible embedding endpoint (for Qwen profile)
 - Voyage key configured when running commercial profile benchmarks
 
+### Recommended Cloud Provider for Qwen
+
+Use Fireworks AI for cloud-hosted Qwen embeddings (OpenAI-compatible API):
+
+- Base URL: `https://api.fireworks.ai/inference/v1`
+- Model: `fireworks/qwen3-embedding-8b`
+- Env key: `OPENAI_API_KEY` (Fireworks API key)
+
+Example shell setup:
+
+```bash
+export OPENAI_API_BASE=https://api.fireworks.ai/inference/v1
+export OPENAI_API_KEY="<fireworks_api_key>"
+```
+
 ## 1) E2E Retrieval Validation
 
 Run full retrieval validation on this repository:
@@ -17,7 +32,9 @@ Run full retrieval validation on this repository:
 uv run python scripts/run_e2e_retrieval_validation.py \
   --repo . \
   --qdrant-url http://localhost:6333 \
-  --openai-base http://ai:8001/v1 \
+  --openai-base ${OPENAI_API_BASE:-https://api.fireworks.ai/inference/v1} \
+  --openai-key ${OPENAI_API_KEY} \
+  --qwen-model fireworks/qwen3-embedding-8b \
   --enable-voyage
 ```
 
@@ -39,6 +56,15 @@ Validated modes:
 
 ```bash
 uv run python scripts/run_mcp_vs_native_benchmark.py --repo .
+
+# Cloud Qwen + Voyage
+uv run python scripts/run_mcp_vs_native_benchmark.py \
+  --repo . \
+  --qdrant-url http://localhost:6333 \
+  --openai-base ${OPENAI_API_BASE:-https://api.fireworks.ai/inference/v1} \
+  --openai-key ${OPENAI_API_KEY} \
+  --qwen-model fireworks/qwen3-embedding-8b \
+  --enable-voyage
 ```
 
 Outputs:

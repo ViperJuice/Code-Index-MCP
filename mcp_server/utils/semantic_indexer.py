@@ -34,6 +34,20 @@ class SymbolEntry:
     signature: str
     line: int
     span: tuple[int, int]
+    parent_class: Optional[str] = None
+    parent_symbol: Optional[str] = None
+
+
+@dataclass
+class SymbolChunk:
+    """Size-bounded chunk derived from a symbol body."""
+
+    symbol: SymbolEntry
+    chunk_index: int
+    chunk_total: int
+    start_line: int
+    end_line: int
+    content: str
 
 
 @dataclass
@@ -197,6 +211,146 @@ class SemanticIndexer:
     ) -> List[List[float]]:
         """Generate embeddings using the configured provider."""
         return self.embedding_client.embed(texts, input_type=input_type)
+
+    def _max_chunk_chars(self) -> int:
+        """Return max chunk size for embedding payloads."""
+        raw = os.environ.get("SEMANTIC_MAX_CHARS", "12000")
+        try:
+            value = int(raw)
+        except ValueError:
+            value = 12000
+        return max(2000, value)
+
+    def _collect_symbol_entries(self, root: Any, lines: List[str]) -> List[SymbolEntry]:
+        """Collect class/function symbols including nested method context."""
+        entries: List[SymbolEntry] = []
+
+        def walk(node: Any, stack: List[SymbolEntry]) -> None:
+            name_node = (
+                node.child_by_field_name("name")
+                if hasattr(node, "child_by_field_name")
+                else None
+            )
+            current = None
+            if (
+                node.type in {"function_definition", "class_definition"}
+                and name_node is not None
+            ):
+                name = name_node.text.decode()
+                start_line = node.start_point[0] + 1
+                end_line = node.end_point[0] + 1
+                signature = (
+                    lines[start_line - 1].strip()
+                    if 0 <= start_line - 1 < len(lines)
+                    else name
+                )
+                kind = "function" if node.type == "function_definition" else "class"
+
+                parent_class = None
+                for parent in reversed(stack):
+                    if parent.kind == "class":
+                        parent_class = parent.symbol
+                        break
+
+                parent_symbol = stack[-1].symbol if stack else None
+                current = SymbolEntry(
+                    symbol=name,
+                    kind=kind,
+                    signature=signature,
+                    line=start_line,
+                    span=(start_line, end_line),
+                    parent_class=parent_class,
+                    parent_symbol=parent_symbol,
+                )
+                entries.append(current)
+
+            next_stack = stack + ([current] if current else [])
+            for child in getattr(node, "children", []):
+                walk(child, next_stack)
+
+        walk(root, [])
+        return entries
+
+    def _split_symbol_chunks(
+        self, symbol: SymbolEntry, lines: List[str]
+    ) -> List[SymbolChunk]:
+        """Split a symbol body into size-bounded chunks while preserving context."""
+        start = max(1, symbol.span[0])
+        end = max(start, symbol.span[1])
+        symbol_lines = lines[start - 1 : end]
+        if not symbol_lines:
+            return []
+
+        max_chars = self._max_chunk_chars()
+        chunks: List[SymbolChunk] = []
+
+        # Step 1: paragraph-aware splitting on blank lines.
+        blocks: List[tuple[int, int]] = []
+        block_start = start
+        for idx, text in enumerate(symbol_lines, start=start):
+            if text.strip() == "":
+                if block_start <= idx - 1:
+                    blocks.append((block_start, idx - 1))
+                block_start = idx + 1
+        if block_start <= end:
+            blocks.append((block_start, end))
+        if not blocks:
+            blocks = [(start, end)]
+
+        pending: List[tuple[int, int]] = []
+        acc_start: Optional[int] = None
+        acc_end: Optional[int] = None
+        acc_chars = 0
+        for b_start, b_end in blocks:
+            block_text = "\n".join(lines[b_start - 1 : b_end])
+            block_chars = len(block_text)
+            if block_chars > max_chars:
+                # Step 2: line-window split for oversized blocks.
+                win_start = b_start
+                while win_start <= b_end:
+                    win_end = win_start
+                    current = 0
+                    while win_end <= b_end:
+                        line_len = len(lines[win_end - 1]) + 1
+                        if current + line_len > max_chars and win_end > win_start:
+                            break
+                        current += line_len
+                        win_end += 1
+                    pending.append((win_start, win_end - 1))
+                    win_start = win_end
+                continue
+
+            if acc_start is None:
+                acc_start, acc_end = b_start, b_end
+                acc_chars = block_chars
+                continue
+
+            if acc_chars + block_chars + 1 <= max_chars:
+                acc_end = b_end
+                acc_chars += block_chars + 1
+            else:
+                if acc_start is not None and acc_end is not None:
+                    pending.append((acc_start, acc_end))
+                acc_start, acc_end = b_start, b_end
+                acc_chars = block_chars
+
+        if acc_start is not None:
+            final_end = acc_end if acc_end is not None else acc_start
+            pending.append((acc_start, final_end))
+
+        for i, (c_start, c_end) in enumerate(pending, start=1):
+            content = "\n".join(lines[c_start - 1 : c_end])
+            chunks.append(
+                SymbolChunk(
+                    symbol=symbol,
+                    chunk_index=i,
+                    chunk_total=len(pending),
+                    start_line=c_start,
+                    end_line=c_end,
+                    content=content,
+                )
+            )
+        return chunks
 
     def _init_qdrant_client(self, qdrant_path: str) -> QdrantClient:
         """Initialize Qdrant client with server mode preference.
@@ -524,63 +678,63 @@ class SemanticIndexer:
         root = self.wrapper.parse(content)
         lines = content.decode("utf-8", "ignore").splitlines()
 
-        symbols: list[SymbolEntry] = []
+        symbols = self._collect_symbol_entries(root, lines)
 
-        for node in root.children:
-            if node.type not in {"function_definition", "class_definition"}:
-                continue
+        chunks: List[SymbolChunk] = []
+        for sym in symbols:
+            chunks.extend(self._split_symbol_chunks(sym, lines))
 
-            name_node = node.child_by_field_name("name")
-            if name_node is None:
-                continue
-            name = name_node.text.decode()
-            start_line = node.start_point[0] + 1
-            end_line = node.end_point[0] + 1
-            signature = (
-                lines[start_line - 1].strip() if start_line - 1 < len(lines) else name
-            )
-            kind = "function" if node.type == "function_definition" else "class"
-
-            symbols.append(
-                SymbolEntry(
-                    symbol=name,
-                    kind=kind,
-                    signature=signature,
-                    line=start_line,
-                    span=(start_line, end_line),
+        if chunks:
+            relative_path = self.path_resolver.normalize_path(path)
+            embedding_inputs = []
+            for chunk in chunks:
+                context = [f"file: {relative_path}"]
+                if chunk.symbol.parent_class:
+                    context.append(f"class: {chunk.symbol.parent_class}")
+                if chunk.symbol.kind == "function":
+                    context.append(f"function: {chunk.symbol.symbol}")
+                elif chunk.symbol.kind == "class":
+                    context.append(f"class_def: {chunk.symbol.symbol}")
+                context.append(
+                    f"chunk: {chunk.chunk_index}/{chunk.chunk_total} lines {chunk.start_line}-{chunk.end_line}"
                 )
-            )
+                context.append(chunk.content)
+                embedding_inputs.append("\n".join(context))
 
-        # Generate embeddings and upsert into Qdrant
-        texts = ["\n".join(lines[s.line - 1 : s.span[1]]) for s in symbols]
-        if texts:
-            embeds = self._embed_texts(texts, input_type="document")
+            embeds = self._embed_texts(embedding_inputs, input_type="document")
 
             points = []
-            for sym, vec in zip(symbols, embeds):
-                # Compute content hash for this symbol
-                symbol_content = "\n".join(lines[sym.line - 1 : sym.span[1]])
-                content_hash = hashlib.sha256(symbol_content.encode()).hexdigest()
-
-                # Use relative path in payload
-                relative_path = self.path_resolver.normalize_path(path)
+            for chunk, vec in zip(chunks, embeds):
+                content_hash = hashlib.sha256(chunk.content.encode()).hexdigest()
+                chunk_id = (
+                    f"{relative_path}:{chunk.symbol.symbol}:{chunk.start_line}:"
+                    f"{chunk.chunk_index}:{content_hash[:12]}"
+                )
 
                 payload = {
                     "file": str(path),  # Keep absolute for backward compatibility
                     "relative_path": relative_path,
                     "content_hash": content_hash,
-                    "symbol": sym.symbol,
-                    "kind": sym.kind,
-                    "signature": sym.signature,
-                    "line": sym.line,
-                    "span": list(sym.span),
+                    "chunk_id": chunk_id,
+                    "chunk_index": chunk.chunk_index,
+                    "chunk_total": chunk.chunk_total,
+                    "symbol": chunk.symbol.symbol,
+                    "kind": chunk.symbol.kind,
+                    "signature": chunk.symbol.signature,
+                    "line": chunk.start_line,
+                    "span": [chunk.start_line, chunk.end_line],
+                    "parent_class": chunk.symbol.parent_class,
+                    "parent_symbol": chunk.symbol.parent_symbol,
                     "language": "python",
                     "is_deleted": False,
                 }
                 points.append(
                     models.PointStruct(
                         id=self._symbol_id(
-                            str(path), sym.symbol, sym.line, content_hash
+                            str(path),
+                            f"{chunk.symbol.symbol}#chunk{chunk.chunk_index}",
+                            chunk.start_line,
+                            content_hash,
                         ),
                         vector=vec,
                         payload=payload,
@@ -614,6 +768,8 @@ class SemanticIndexer:
                     "signature": s.signature,
                     "line": s.line,
                     "span": list(s.span),
+                    "parent_class": s.parent_class,
+                    "parent_symbol": s.parent_symbol,
                 }
                 for s in symbols
             ],

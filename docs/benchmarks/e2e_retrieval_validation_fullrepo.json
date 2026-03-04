@@ -1,0 +1,75 @@
+{
+  "repo": "/home/viperjuice/code/Code-Index-MCP",
+  "indexed_files": 1260,
+  "semantic_skipped_files": 172,
+  "qdrant_url": "http://localhost:6333",
+  "openai_base": "http://ai:8001/v1",
+  "results": [
+    {
+      "mode": "classic",
+      "query": "semantic preflight",
+      "expected": "semantic_preflight.py",
+      "count": 0,
+      "top_file": "",
+      "latency_ms": 9.51,
+      "pass": false
+    },
+    {
+      "mode": "bm25",
+      "query": "qdrant docker compose autostart",
+      "expected": "qdrant_autostart.py",
+      "count": 5,
+      "top_file": "/home/viperjuice/code/Code-Index-MCP/mcp_server/setup/qdrant_autostart.py",
+      "latency_ms": 40.58,
+      "pass": true
+    },
+    {
+      "mode": "fuzzy",
+      "query": "semntic preflite raport",
+      "expected": "semantic_preflight.py",
+      "count": 5,
+      "top_file": "/home/viperjuice/code/Code-Index-MCP/mcp_server/setup/semantic_preflight.py",
+      "latency_ms": 11.62,
+      "pass": true
+    },
+    {
+      "mode": "semantic",
+      "query": "where is qdrant autostart implemented",
+      "expected": "qdrant_autostart.py",
+      "count": 5,
+      "top_file": "/home/viperjuice/code/Code-Index-MCP/mcp_server/setup/qdrant_autostart.py",
+      "latency_ms": 58.04,
+      "pass": true
+    },
+    {
+      "mode": "hybrid",
+      "query": "how does semantic setup validate qdrant and embedding readiness",
+      "expected": "setup_commands.py",
+      "count": 1,
+      "top_file": "",
+      "latency_ms": 5169.1,
+      "pass": false
+    }
+  ],
+  "semantic_models": [
+    {
+      "mode": "semantic_qwen",
+      "query": "where is qdrant autostart implemented",
+      "expected": "qdrant_autostart.py",
+      "count": 5,
+      "top_file": "/home/viperjuice/code/Code-Index-MCP/mcp_server/setup/qdrant_autostart.py",
+      "latency_ms": 51.72,
+      "pass": true
+    },
+    {
+      "mode": "semantic_voyage",
+      "query": "where is qdrant autostart implemented",
+      "expected": "qdrant_autostart.py",
+      "count": 5,
+      "top_file": "/home/viperjuice/code/Code-Index-MCP/mcp_server/setup/qdrant_autostart.py",
+      "latency_ms": 323.31,
+      "pass": true
+    }
+  ],
+  "pass_rate": 60.0
+}

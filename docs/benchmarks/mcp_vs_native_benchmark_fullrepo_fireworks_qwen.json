@@ -1,0 +1,123 @@
+{
+  "repo": "/home/viperjuice/code/Code-Index-MCP",
+  "native": {
+    "rows": [
+      {
+        "backend": "ripgrep",
+        "query": "semantic preflight",
+        "top": "/home/viperjuice/code/Code-Index-MCP/scripts/run_mcp_vs_native_benchmark.py:15:    {\"query\": \"semantic preflight\", \"expected\": \"semantic_preflight.py\"},",
+        "latency_ms": 30.86,
+        "pass": true
+      },
+      {
+        "backend": "grep",
+        "query": "semantic preflight",
+        "top": "/home/viperjuice/code/Code-Index-MCP/mcp_server/setup/semantic_preflight.py:192:    \"\"\"Run semantic preflight checks and return structured report.\"\"\"",
+        "latency_ms": 33086.75,
+        "pass": true
+      },
+      {
+        "backend": "glob",
+        "query": "semantic preflight",
+        "top": "/home/viperjuice/code/Code-Index-MCP/semantic_indexing_progress.json",
+        "latency_ms": 0.0,
+        "pass": false
+      },
+      {
+        "backend": "ripgrep",
+        "query": "qdrant autostart",
+        "top": "/home/viperjuice/code/Code-Index-MCP/scripts/run_e2e_retrieval_validation.py:40:        \"semantic\", \"where is qdrant autostart implemented\", \"qdrant_autostart.py\"",
+        "latency_ms": 18.01,
+        "pass": true
+      },
+      {
+        "backend": "grep",
+        "query": "qdrant autostart",
+        "top": "/home/viperjuice/code/Code-Index-MCP/docs/benchmarks/e2e_retrieval_validation_fullrepo.md:14:| semantic | where is qdrant autostart implemented | /home/viperjuice/code/Code-Index-MCP/mcp_server/setup/qdrant_autostart.py | yes | 58.04 |",
+        "latency_ms": 33711.73,
+        "pass": true
+      },
+      {
+        "backend": "glob",
+        "query": "qdrant autostart",
+        "top": "/home/viperjuice/code/Code-Index-MCP/qdrant_server_mode.patch",
+        "latency_ms": 0.0,
+        "pass": false
+      },
+      {
+        "backend": "ripgrep",
+        "query": "setup semantic",
+        "top": "/home/viperjuice/code/Code-Index-MCP/README.md:687:python scripts/cli/mcp_cli.py setup semantic",
+        "latency_ms": 21.01,
+        "pass": false
+      },
+      {
+        "backend": "grep",
+        "query": "setup semantic",
+        "top": "/home/viperjuice/code/Code-Index-MCP/code_index_mcp.egg-info/PKG-INFO:749:python scripts/cli/mcp_cli.py setup semantic",
+        "latency_ms": 33134.88,
+        "pass": false
+      },
+      {
+        "backend": "glob",
+        "query": "setup semantic",
+        "top": "/home/viperjuice/code/Code-Index-MCP/codex-setup.sh",
+        "latency_ms": 0.0,
+        "pass": false
+      }
+    ],
+    "pass_rate": 44.4
+  },
+  "mcp": {
+    "latency_ms": 993518.05,
+    "pass_rate": 60.0,
+    "results": [
+      {
+        "mode": "classic",
+        "query": "semantic preflight",
+        "expected": "semantic_preflight.py",
+        "count": 0,
+        "top_file": "",
+        "latency_ms": 10.46,
+        "pass": false
+      },
+      {
+        "mode": "bm25",
+        "query": "qdrant docker compose autostart",
+        "expected": "qdrant_autostart.py",
+        "count": 5,
+        "top_file": "/home/viperjuice/code/Code-Index-MCP/mcp_server/setup/qdrant_autostart.py",
+        "latency_ms": 45.61,
+        "pass": true
+      },
+      {
+        "mode": "fuzzy",
+        "query": "semntic preflite raport",
+        "expected": "semantic_preflight.py",
+        "count": 5,
+        "top_file": "/home/viperjuice/code/Code-Index-MCP/mcp_server/setup/semantic_preflight.py",
+        "latency_ms": 10.91,
+        "pass": true
+      },
+      {
+        "mode": "semantic",
+        "query": "where is qdrant autostart implemented",
+        "expected": "qdrant_autostart.py",
+        "count": 5,
+        "top_file": "/home/viperjuice/code/Code-Index-MCP/mcp_server/setup/qdrant_autostart.py",
+        "latency_ms": 211.27,
+        "pass": true
+      },
+      {
+        "mode": "hybrid",
+        "query": "how does semantic setup validate qdrant and embedding readiness",
+        "expected": "setup_commands.py",
+        "count": 1,
+        "top_file": "",
+        "latency_ms": 5075.15,
+        "pass": false
+      }
+    ],
+    "semantic_models": []
+  }
+}

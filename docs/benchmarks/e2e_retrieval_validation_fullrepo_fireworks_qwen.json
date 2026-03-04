@@ -1,0 +1,56 @@
+{
+  "repo": "/home/viperjuice/code/Code-Index-MCP",
+  "indexed_files": 1262,
+  "semantic_skipped_files": 1,
+  "qdrant_url": "http://localhost:6333",
+  "openai_base": "https://api.fireworks.ai/inference/v1",
+  "results": [
+    {
+      "mode": "classic",
+      "query": "semantic preflight",
+      "expected": "semantic_preflight.py",
+      "count": 0,
+      "top_file": "",
+      "latency_ms": 8.62,
+      "pass": false
+    },
+    {
+      "mode": "bm25",
+      "query": "qdrant docker compose autostart",
+      "expected": "qdrant_autostart.py",
+      "count": 5,
+      "top_file": "/home/viperjuice/code/Code-Index-MCP/mcp_server/setup/qdrant_autostart.py",
+      "latency_ms": 37.5,
+      "pass": true
+    },
+    {
+      "mode": "fuzzy",
+      "query": "semntic preflite raport",
+      "expected": "semantic_preflight.py",
+      "count": 5,
+      "top_file": "/home/viperjuice/code/Code-Index-MCP/mcp_server/setup/semantic_preflight.py",
+      "latency_ms": 11.58,
+      "pass": true
+    },
+    {
+      "mode": "semantic",
+      "query": "where is qdrant autostart implemented",
+      "expected": "qdrant_autostart.py",
+      "count": 5,
+      "top_file": "/home/viperjuice/code/Code-Index-MCP/mcp_server/setup/qdrant_autostart.py",
+      "latency_ms": 243.63,
+      "pass": true
+    },
+    {
+      "mode": "hybrid",
+      "query": "how does semantic setup validate qdrant and embedding readiness",
+      "expected": "setup_commands.py",
+      "count": 1,
+      "top_file": "",
+      "latency_ms": 5102.41,
+      "pass": false
+    }
+  ],
+  "semantic_models": [],
+  "pass_rate": 60.0
+}

@@ -152,6 +152,7 @@ def run(args: argparse.Namespace) -> Dict[str, object]:
                 semantic_profile="commercial_high",
             )
 
+        semantic_skipped_files = 0
         for path in files:
             text = path.read_text(encoding="utf-8", errors="ignore")
             fid = store.store_file(
@@ -159,9 +160,12 @@ def run(args: argparse.Namespace) -> Dict[str, object]:
             )
             bm25.add_document(str(path), text, metadata={"language": "python"})
             fuzzy.add_file(str(path), text)
-            qwen_sem.index_file(path)
-            if voyage_sem:
-                voyage_sem.index_file(path)
+            if len(text) <= args.semantic_max_chars:
+                qwen_sem.index_file(path)
+                if voyage_sem:
+                    voyage_sem.index_file(path)
+            else:
+                semantic_skipped_files += 1
             # lightweight symbols for fuzzy symbol route
             for n, line in enumerate(text.splitlines(), 1):
                 s = line.strip()
@@ -238,6 +242,7 @@ def run(args: argparse.Namespace) -> Dict[str, object]:
         summary = {
             "repo": str(repo_path),
             "indexed_files": len(files),
+            "semantic_skipped_files": semantic_skipped_files,
             "qdrant_url": args.qdrant_url,
             "openai_base": args.openai_base,
             "results": rows,
@@ -262,13 +267,15 @@ def write_markdown(result: Dict[str, object], output: Path) -> None:
         "| Mode | Query | Top File | Pass | Latency (ms) |",
         "|---|---|---|---:|---:|",
     ]
-    for row in result["results"]:
-        lines.append(
-            f"| {row['mode']} | {row['query']} | {row['top_file']} | {'yes' if row['pass'] else 'no'} | {row['latency_ms']} |"
-        )
+    result_rows = result.get("results", [])
+    if isinstance(result_rows, list):
+        for row in result_rows:
+            lines.append(
+                f"| {row['mode']} | {row['query']} | {row['top_file']} | {'yes' if row['pass'] else 'no'} | {row['latency_ms']} |"
+            )
 
     semantic_models = result.get("semantic_models") or []
-    if semantic_models:
+    if isinstance(semantic_models, list) and semantic_models:
         lines.extend(
             [
                 "",
@@ -290,6 +297,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run MCP retrieval E2E validation")
     parser.add_argument("--repo", default=".")
     parser.add_argument("--max-files", type=int, default=200)
+    parser.add_argument("--semantic-max-chars", type=int, default=24000)
     parser.add_argument("--limit", type=int, default=5)
     parser.add_argument("--qdrant-url", default="http://localhost:6333")
     parser.add_argument("--openai-base", default="http://localhost:8001/v1")

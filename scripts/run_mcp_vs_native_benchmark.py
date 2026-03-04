@@ -101,7 +101,9 @@ def benchmark_mcp(
         "--repo",
         str(repo),
         "--max-files",
-        "200",
+        str(args.max_files),
+        "--semantic-max-chars",
+        str(args.semantic_max_chars),
         "--limit",
         "5",
         "--qdrant-url",
@@ -110,6 +112,10 @@ def benchmark_mcp(
         args.openai_base,
         "--openai-key",
         args.openai_key,
+        "--qwen-model",
+        args.qwen_model,
+        "--qwen-dim",
+        str(args.qwen_dim),
         "--json-out",
         str(temp_json),
         "--md-out",
@@ -138,9 +144,13 @@ def main() -> int:
         description="Benchmark MCP retrieval vs native tools"
     )
     parser.add_argument("--repo", default=".")
+    parser.add_argument("--max-files", type=int, default=200)
+    parser.add_argument("--semantic-max-chars", type=int, default=24000)
     parser.add_argument("--qdrant-url", default="http://localhost:6333")
     parser.add_argument("--openai-base", default="http://localhost:8001/v1")
     parser.add_argument("--openai-key", default="vllm-local")
+    parser.add_argument("--qwen-model", default="Qwen/Qwen3-Embedding-8B")
+    parser.add_argument("--qwen-dim", type=int, default=4096)
     parser.add_argument("--enable-voyage", action="store_true")
     parser.add_argument(
         "--out-json", default="docs/benchmarks/mcp_vs_native_benchmark.json"
