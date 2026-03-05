@@ -6,22 +6,26 @@ against native retrieval methods (`grep`, `rg`, `glob`).
 ## Prerequisites
 
 - Qdrant reachable (`http://localhost:6333` by default)
-- OpenAI-compatible embedding endpoint (for Qwen profile)
+- Fireworks API key (for cloud Qwen profile)
+- Optional local OpenAI-compatible endpoint (for local Qwen profile)
 - Voyage key configured when running commercial profile benchmarks
 
 ### Recommended Cloud Provider for Qwen
 
-Use Fireworks AI for cloud-hosted Qwen embeddings (OpenAI-compatible API):
+Use Fireworks AI for cloud-hosted Qwen embeddings:
 
 - Base URL: `https://api.fireworks.ai/inference/v1`
 - Model: `fireworks/qwen3-embedding-8b`
-- Env key: `OPENAI_API_KEY` (Fireworks API key)
+- Env key: `FIREWORKS_API_KEY`
 
 Example shell setup:
 
 ```bash
 export OPENAI_API_BASE=https://api.fireworks.ai/inference/v1
-export OPENAI_API_KEY="<fireworks_api_key>"
+export FIREWORKS_BASE=https://api.fireworks.ai/inference/v1
+export FIREWORKS_API_KEY="<fireworks_api_key>"
+export VOYAGE_API_KEY="<voyage_api_key>"
+export LOCAL_OPENAI_BASE=http://ai:8001/v1
 ```
 
 ## 1) E2E Retrieval Validation
@@ -31,17 +35,26 @@ Run full retrieval validation on this repository:
 ```bash
 uv run python scripts/run_e2e_retrieval_validation.py \
   --repo . \
+  --max-files 5000 \
+  --semantic-max-chars 5000000 \
+  --iterations 5 \
+  --limit 5 \
   --qdrant-url http://localhost:6333 \
-  --openai-base ${OPENAI_API_BASE:-https://api.fireworks.ai/inference/v1} \
-  --openai-key ${OPENAI_API_KEY} \
+  --fireworks-base ${FIREWORKS_BASE:-https://api.fireworks.ai/inference/v1} \
+  --fireworks-api-key ${FIREWORKS_API_KEY} \
   --qwen-model fireworks/qwen3-embedding-8b \
-  --enable-voyage
+  --qwen-dim 4096 \
+  --enable-voyage \
+  --local-openai-base ${LOCAL_OPENAI_BASE:-http://ai:8001/v1} \
+  --local-qwen-model Qwen/Qwen3-Embedding-8B \
+  --json-out docs/benchmarks/e2e_retrieval_validation_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.json \
+  --md-out docs/benchmarks/e2e_retrieval_validation_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md
 ```
 
 Outputs:
 
-- `docs/benchmarks/e2e_retrieval_validation.json`
-- `docs/benchmarks/e2e_retrieval_validation.md`
+- `docs/benchmarks/e2e_retrieval_validation_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.json`
+- `docs/benchmarks/e2e_retrieval_validation_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md`
 
 Validated modes:
 
@@ -60,17 +73,25 @@ uv run python scripts/run_mcp_vs_native_benchmark.py --repo .
 # Cloud Qwen + Voyage
 uv run python scripts/run_mcp_vs_native_benchmark.py \
   --repo . \
+  --max-files 5000 \
+  --semantic-max-chars 5000000 \
+  --iterations 5 \
   --qdrant-url http://localhost:6333 \
-  --openai-base ${OPENAI_API_BASE:-https://api.fireworks.ai/inference/v1} \
-  --openai-key ${OPENAI_API_KEY} \
+  --fireworks-base ${FIREWORKS_BASE:-https://api.fireworks.ai/inference/v1} \
+  --fireworks-api-key ${FIREWORKS_API_KEY} \
   --qwen-model fireworks/qwen3-embedding-8b \
-  --enable-voyage
+  --qwen-dim 4096 \
+  --enable-voyage \
+  --local-openai-base ${LOCAL_OPENAI_BASE:-http://ai:8001/v1} \
+  --local-qwen-model Qwen/Qwen3-Embedding-8B \
+  --out-json docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.json \
+  --out-md docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md
 ```
 
 Outputs:
 
-- `docs/benchmarks/mcp_vs_native_benchmark.json`
-- `docs/benchmarks/mcp_vs_native_benchmark.md`
+- `docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.json`
+- `docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md`
 
 Benchmark compares:
 
@@ -84,3 +105,4 @@ Benchmark compares:
 - If lexical pass-rate regresses: inspect BM25/FTS indexing and symbol upserts.
 - If semantic pass-rate regresses: inspect embedding endpoint, profile dimensions, and vector collection.
 - If hybrid regresses: tune BM25/semantic/fuzzy weights and top-k limits.
+- If hybrid p95 remains high (>5s): inspect branch timeout logs and per-branch latency budgets.
