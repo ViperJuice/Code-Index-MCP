@@ -10,7 +10,7 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Awaitable, Dict, List, Optional
 
 # Import only what we need to avoid circular dependencies
 from ..config.settings import RerankingSettings
@@ -58,6 +58,7 @@ class HybridSearchConfig:
 
     # Optimization
     parallel_execution: bool = True
+    parallel_timeout_seconds: float = 5.0
     cache_results: bool = True
 
     # Minimum scores
@@ -218,19 +219,45 @@ class HybridSearch:
         filters: Optional[Dict[str, Any]],
     ) -> List[List[SearchResult]]:
         """Execute searches in parallel."""
-        tasks = []
+        tasks: List[tuple[str, Awaitable[List[SearchResult]]]] = []
 
         if self.config.enable_bm25 and self.bm25_indexer:
-            tasks.append(self._search_bm25(query, filters))
+            tasks.append(("bm25", self._search_bm25(query, filters)))
 
         if self.config.enable_semantic and self.semantic_indexer:
-            tasks.append(self._search_semantic(query, filters))
+            tasks.append(("semantic", self._search_semantic(query, filters)))
 
         if self.config.enable_fuzzy and self.fuzzy_indexer:
-            tasks.append(self._search_fuzzy(query, filters))
+            tasks.append(("fuzzy", self._search_fuzzy(query, filters)))
 
-        # Execute all searches in parallel
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        if not tasks:
+            return []
+
+        async def _execute_branch(
+            branch_name: str, branch_task: Awaitable[List[SearchResult]]
+        ) -> List[SearchResult]:
+            try:
+                return await asyncio.wait_for(
+                    branch_task,
+                    timeout=self.config.parallel_timeout_seconds,
+                )
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Hybrid branch '%s' timed out after %.2fs",
+                    branch_name,
+                    self.config.parallel_timeout_seconds,
+                )
+                self._search_stats["parallel_branch_timeouts"] += 1
+                return []
+            except Exception as exc:  # pragma: no cover - defensive guard
+                logger.error("Search error in branch '%s': %s", branch_name, exc)
+                return []
+
+        # Execute all branches in parallel, allowing partial success on timeout
+        results = await asyncio.gather(
+            *[_execute_branch(name, task) for name, task in tasks],
+            return_exceptions=True,
+        )
 
         # Filter out exceptions and empty results
         valid_results = []
@@ -355,10 +382,17 @@ class HybridSearch:
                     score = float(r.get("score", 0.0))
                     if score < self.config.min_semantic_score:
                         continue
+                    filepath = (
+                        r.get("filepath")
+                        or r.get("relative_path")
+                        or r.get("file")
+                        or r.get("path")
+                        or ""
+                    )
                     search_results.append(
                         SearchResult(
-                            doc_id=r.get("filepath", ""),
-                            filepath=r.get("filepath", ""),
+                            doc_id=str(filepath),
+                            filepath=str(filepath),
                             score=score,
                             snippet=r.get("content", "")[:200],
                             metadata=r,
@@ -402,13 +436,21 @@ class HybridSearch:
 
             search_results = []
             for r in results:
-                if r["score"] >= self.config.min_fuzzy_score:
+                score = float(r.get("score", 1.0))
+                if score >= self.config.min_fuzzy_score:
+                    filepath = (
+                        r.get("file_path")
+                        or r.get("filepath")
+                        or r.get("file")
+                        or r.get("path")
+                        or ""
+                    )
                     search_results.append(
                         SearchResult(
-                            doc_id=r.get("file_path", ""),
-                            filepath=r.get("file_path", ""),
-                            score=r["score"],
-                            snippet=r.get("context", ""),
+                            doc_id=str(filepath),
+                            filepath=str(filepath),
+                            score=score,
+                            snippet=r.get("context", "") or r.get("snippet", ""),
                             metadata=r,
                             source="fuzzy",
                         )
@@ -431,11 +473,14 @@ class HybridSearch:
         # Track scores for each document
         doc_scores: Dict[str, float] = defaultdict(float)
         doc_info: Dict[str, SearchResult] = {}
+        best_rank_by_doc: Dict[str, int] = {}
 
         # Calculate RRF scores
         for result_list in result_lists:
             for rank, result in enumerate(result_list):
                 doc_id = result.doc_id
+                if not doc_id:
+                    continue
 
                 # RRF score for this ranking
                 rrf_score = 1.0 / (self.config.rrf_k + rank + 1)
@@ -450,9 +495,18 @@ class HybridSearch:
 
                 doc_scores[doc_id] += rrf_score
 
-                # Keep the result with the best individual score
-                if doc_id not in doc_info or result.score > doc_info[doc_id].score:
-                    doc_info[doc_id] = result
+                # Keep metadata from the best ranked occurrence for stable snippets/paths
+                previous_rank = best_rank_by_doc.get(doc_id)
+                if previous_rank is None or rank < previous_rank:
+                    best_rank_by_doc[doc_id] = rank
+                    doc_info[doc_id] = SearchResult(
+                        doc_id=result.doc_id,
+                        filepath=result.filepath,
+                        score=result.score,
+                        snippet=result.snippet,
+                        metadata=result.metadata.copy() if result.metadata else {},
+                        source=result.source,
+                    )
 
         # Create combined results
         combined = []

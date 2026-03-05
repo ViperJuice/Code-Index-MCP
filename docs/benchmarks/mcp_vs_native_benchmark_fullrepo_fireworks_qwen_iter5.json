@@ -1,0 +1,232 @@
+{
+  "repo": "/home/viperjuice/code/Code-Index-MCP",
+  "native": {
+    "rows": [
+      {
+        "backend": "ripgrep",
+        "query": "semantic preflight",
+        "top": "/home/viperjuice/code/Code-Index-MCP/scripts/run_mcp_vs_native_benchmark.py:15:    {\"query\": \"semantic preflight\", \"expected\": \"semantic_preflight.py\"},",
+        "latency_ms": 20.76,
+        "latency_p50_ms": 20.76,
+        "latency_p95_ms": 106.59,
+        "top1_accuracy_pct": 100.0,
+        "pass": true
+      },
+      {
+        "backend": "grep",
+        "query": "semantic preflight",
+        "top": "/home/viperjuice/code/Code-Index-MCP/htmlcov/z_0425c7814bfde65c_semantic_preflight_py.html:276:    <p class=\"pln\"><span class=\"n\"><a id=\"t192\" href=\"#t192\">192</a></span><span class=\"t\">    <span class=\"str\">\"\"\"Run semantic preflight checks and return structured report.\"\"\"</span>&nbsp;</span><span class=\"r\"></span></p>",
+        "latency_ms": 61211.4,
+        "latency_p50_ms": 61211.4,
+        "latency_p95_ms": 63104.54,
+        "top1_accuracy_pct": 0.0,
+        "pass": false
+      },
+      {
+        "backend": "glob",
+        "query": "semantic preflight",
+        "top": "/home/viperjuice/code/Code-Index-MCP/semantic_indexing_progress.json",
+        "latency_ms": 156.19,
+        "latency_p50_ms": 156.19,
+        "latency_p95_ms": 291.85,
+        "top1_accuracy_pct": 0.0,
+        "pass": false
+      },
+      {
+        "backend": "ripgrep",
+        "query": "qdrant autostart",
+        "top": "/home/viperjuice/code/Code-Index-MCP/docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen.json:28:        \"query\": \"qdrant autostart\",",
+        "latency_ms": 20.81,
+        "latency_p50_ms": 20.81,
+        "latency_p95_ms": 22.22,
+        "top1_accuracy_pct": 80.0,
+        "pass": true
+      },
+      {
+        "backend": "grep",
+        "query": "qdrant autostart",
+        "top": "/home/viperjuice/code/Code-Index-MCP/docs/benchmarks/e2e_retrieval_validation_fullrepo.md:14:| semantic | where is qdrant autostart implemented | /home/viperjuice/code/Code-Index-MCP/mcp_server/setup/qdrant_autostart.py | yes | 58.04 |",
+        "latency_ms": 61922.54,
+        "latency_p50_ms": 61922.54,
+        "latency_p95_ms": 62448.61,
+        "top1_accuracy_pct": 100.0,
+        "pass": true
+      },
+      {
+        "backend": "glob",
+        "query": "qdrant autostart",
+        "top": "/home/viperjuice/code/Code-Index-MCP/qdrant_server_mode.patch",
+        "latency_ms": 145.52,
+        "latency_p50_ms": 145.52,
+        "latency_p95_ms": 154.57,
+        "top1_accuracy_pct": 0.0,
+        "pass": false
+      },
+      {
+        "backend": "ripgrep",
+        "query": "setup semantic",
+        "top": "/home/viperjuice/code/Code-Index-MCP/README.md:687:python scripts/cli/mcp_cli.py setup semantic",
+        "latency_ms": 19.25,
+        "latency_p50_ms": 19.25,
+        "latency_p95_ms": 27.44,
+        "top1_accuracy_pct": 40.0,
+        "pass": true
+      },
+      {
+        "backend": "grep",
+        "query": "setup semantic",
+        "top": "/home/viperjuice/code/Code-Index-MCP/code_index_mcp.egg-info/PKG-INFO:749:python scripts/cli/mcp_cli.py setup semantic",
+        "latency_ms": 62103.48,
+        "latency_p50_ms": 62103.48,
+        "latency_p95_ms": 62400.32,
+        "top1_accuracy_pct": 0.0,
+        "pass": false
+      },
+      {
+        "backend": "glob",
+        "query": "setup semantic",
+        "top": "/home/viperjuice/code/Code-Index-MCP/codex-setup.sh",
+        "latency_ms": 147.27,
+        "latency_p50_ms": 147.27,
+        "latency_p95_ms": 171.23,
+        "top1_accuracy_pct": 0.0,
+        "pass": false
+      }
+    ],
+    "pass_rate": 44.4
+  },
+  "mcp": {
+    "latency_ms": 648079.56,
+    "pass_rate": 33.3,
+    "results": [
+      {
+        "mode": "classic",
+        "category": "semantic",
+        "query": "semantic preflight",
+        "expected": "semantic_preflight.py",
+        "count": 5,
+        "top_file": "/home/viperjuice/code/Code-Index-MCP/docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen.json",
+        "latency_ms": 3.31,
+        "latency_p50_ms": 3.31,
+        "latency_p95_ms": 3.77,
+        "top1_accuracy_pct": 0.0,
+        "top3_accuracy_pct": 0.0,
+        "pass": false
+      },
+      {
+        "mode": "bm25",
+        "category": "symbol_precise",
+        "query": "qdrant docker compose autostart",
+        "expected": "qdrant_autostart.py",
+        "count": 5,
+        "top_file": "/home/viperjuice/code/Code-Index-MCP/mcp_server/setup/qdrant_autostart.py",
+        "latency_ms": 43.46,
+        "latency_p50_ms": 43.46,
+        "latency_p95_ms": 44.79,
+        "top1_accuracy_pct": 100.0,
+        "top3_accuracy_pct": 100.0,
+        "pass": true
+      },
+      {
+        "mode": "fuzzy",
+        "category": "noisy",
+        "query": "semntic preflite raport",
+        "expected": "semantic_preflight.py",
+        "count": 5,
+        "top_file": "/home/viperjuice/code/Code-Index-MCP/mcp_server/setup/semantic_preflight.py",
+        "latency_ms": 9.52,
+        "latency_p50_ms": 9.52,
+        "latency_p95_ms": 23.91,
+        "top1_accuracy_pct": 100.0,
+        "top3_accuracy_pct": 100.0,
+        "pass": true
+      },
+      {
+        "mode": "semantic",
+        "category": "general",
+        "query": "where is qdrant autostart implemented",
+        "expected": "qdrant_autostart.py",
+        "count": 5,
+        "top_file": "/home/viperjuice/code/Code-Index-MCP/mcp_server/setup/qdrant_autostart.py",
+        "latency_ms": 211.09,
+        "latency_p50_ms": 211.09,
+        "latency_p95_ms": 345.79,
+        "top1_accuracy_pct": 100.0,
+        "top3_accuracy_pct": 100.0,
+        "pass": true
+      },
+      {
+        "mode": "hybrid",
+        "category": "semantic_intent",
+        "query": "how does semantic setup validate qdrant and embedding readiness",
+        "expected": "setup_commands.py",
+        "count": 0,
+        "top_file": "",
+        "latency_ms": 5068.16,
+        "latency_p50_ms": 5068.16,
+        "latency_p95_ms": 5076.9,
+        "top1_accuracy_pct": 0.0,
+        "top3_accuracy_pct": 0.0,
+        "pass": false
+      },
+      {
+        "mode": "bm25",
+        "category": "symbol_precise",
+        "query": "class SemanticIndexer",
+        "expected": "semantic_indexer.py",
+        "count": 5,
+        "top_file": "/home/viperjuice/code/Code-Index-MCP/mcp_server/utils/__init__.py",
+        "latency_ms": 20.31,
+        "latency_p50_ms": 20.31,
+        "latency_p95_ms": 21.08,
+        "top1_accuracy_pct": 0.0,
+        "top3_accuracy_pct": 100.0,
+        "pass": false
+      },
+      {
+        "mode": "semantic",
+        "category": "semantic_intent",
+        "query": "extract symbols from python using treesitter",
+        "expected": "semantic_indexer.py",
+        "count": 5,
+        "top_file": "/home/viperjuice/code/Code-Index-MCP/ai_docs/tree_sitter_overview.md",
+        "latency_ms": 214.81,
+        "latency_p50_ms": 214.81,
+        "latency_p95_ms": 246.27,
+        "top1_accuracy_pct": 0.0,
+        "top3_accuracy_pct": 0.0,
+        "pass": false
+      },
+      {
+        "mode": "fuzzy",
+        "category": "noisy",
+        "query": "SemnticIndexer index_file",
+        "expected": "semantic_indexer.py",
+        "count": 5,
+        "top_file": "/home/viperjuice/code/Code-Index-MCP/architecture/path_management_architecture.md",
+        "latency_ms": 15.36,
+        "latency_p50_ms": 15.36,
+        "latency_p95_ms": 16.22,
+        "top1_accuracy_pct": 0.0,
+        "top3_accuracy_pct": 100.0,
+        "pass": false
+      },
+      {
+        "mode": "hybrid",
+        "category": "persistence",
+        "query": "how do artifact push pull and delta resolution work",
+        "expected": "delta_resolver.py",
+        "count": 0,
+        "top_file": "",
+        "latency_ms": 8478.35,
+        "latency_p50_ms": 8478.35,
+        "latency_p95_ms": 8558.34,
+        "top1_accuracy_pct": 0.0,
+        "top3_accuracy_pct": 0.0,
+        "pass": false
+      }
+    ],
+    "semantic_models": []
+  },
+  "iterations": 5
+}

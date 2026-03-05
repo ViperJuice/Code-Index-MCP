@@ -1326,9 +1326,14 @@ class SQLiteStore:
         """
         with self._get_connection() as conn:
             cursor = conn.execute(
-                """SELECT fts.*, f.path as file_path
+                """SELECT
+                       fts.*,
+                       COALESCE(f.path, f.relative_path, CAST(fts.file_id AS TEXT)) as file_path
                    FROM fts_code fts
-                   JOIN files f ON fts.file_id = f.id
+                   LEFT JOIN files f
+                     ON fts.file_id = f.id
+                     OR CAST(fts.file_id AS TEXT) = f.path
+                     OR CAST(fts.file_id AS TEXT) = f.relative_path
                    WHERE fts_code MATCH ?
                    ORDER BY rank
                    LIMIT ?""",

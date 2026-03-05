@@ -1,10 +1,16 @@
 {
-  "embedding_model": "voyage-code-3",
-  "model_dimension": 1024,
-  "distance_metric": "cosine",
-  "created_at": "2025-06-28T19:22:41.654710",
-  "qdrant_path": "/workspaces/Code-Index-MCP/.indexes/qdrant/main.qdrant",
-  "collection_name": "code-embeddings",
-  "compatibility_hash": "1a8eb12939e6a631",
-  "git_commit": "1d11bf0bd5c46d40e5b682109b036bcba0b78fcc"
+  "embedding_provider": "openai_compatible",
+  "embedding_model": "fireworks/qwen3-embedding-8b",
+  "model_version": "e2e-local",
+  "model_dimension": 4096,
+  "distance_metric": "dot",
+  "normalization_policy": "l2",
+  "chunk_schema_version": "1",
+  "created_at": "2026-03-05T05:10:02.226505",
+  "qdrant_path": "http://localhost:6333",
+  "collection_name": "code-index-e2e-oss-high",
+  "compatibility_hash": "77713789f5f4352bcb85fff77ac2d9d8",
+  "git_commit": "92517c5b8a2f40882cb191d4171d9769918dd902",
+  "semantic_profile": "oss_high_local",
+  "compatibility_fingerprint": "77713789f5f4352bcb85fff77ac2d9d8"
 }
