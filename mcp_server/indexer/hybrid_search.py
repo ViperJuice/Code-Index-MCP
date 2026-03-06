@@ -652,8 +652,84 @@ class HybridSearch:
                 seen.add(result.filepath)
                 unique_results.append(result)
 
+        def _extension(path: str) -> str:
+            if not path:
+                return ""
+            if "." not in path:
+                return ""
+            return path.rsplit(".", 1)[-1].lower()
+
+        code_exts = {
+            "py",
+            "js",
+            "ts",
+            "tsx",
+            "jsx",
+            "go",
+            "rs",
+            "java",
+            "kt",
+            "swift",
+            "c",
+            "cpp",
+            "h",
+            "hpp",
+            "cs",
+            "rb",
+            "php",
+            "scala",
+            "dart",
+            "html",
+            "css",
+            "scss",
+            "sql",
+        }
+        prose_exts = {"md", "txt", "rst"}
+        config_exts = {"json", "yaml", "yml", "toml", "ini", "cfg"}
+
+        for result in unique_results:
+            ext = _extension(result.filepath)
+            if ext in code_exts:
+                result.score *= 1.2
+            elif ext in prose_exts:
+                result.score *= 0.5
+            elif ext in config_exts:
+                result.score *= 0.8
+
+        unique_results.sort(key=lambda item: item.score, reverse=True)
+
+        code_results = [
+            r for r in unique_results if _extension(r.filepath) in code_exts
+        ]
+        prose_results = [
+            r for r in unique_results if _extension(r.filepath) in prose_exts
+        ]
+        other_results = [
+            r
+            for r in unique_results
+            if _extension(r.filepath) not in code_exts
+            and _extension(r.filepath) not in prose_exts
+        ]
+
+        prose_cap = min(len(prose_results), max(1, limit // 4))
+        code_cap = min(len(code_results), max(limit - prose_cap, 0))
+
+        final_results: List[SearchResult] = []
+        if code_results:
+            final_results.extend(code_results[:code_cap])
+        if prose_results and len(final_results) < limit:
+            final_results.extend(prose_results[:prose_cap])
+        if other_results and len(final_results) < limit:
+            remaining = limit - len(final_results)
+            final_results.extend(other_results[:remaining])
+
+        # If we still have capacity, top up with remaining code results
+        if len(final_results) < limit and code_results:
+            remaining = limit - len(final_results)
+            final_results.extend(code_results[code_cap : code_cap + remaining])
+
         # Apply limit
-        unique_results = unique_results[:limit]
+        unique_results = final_results[:limit]
 
         # Enhance snippets if needed
         for result in unique_results:
