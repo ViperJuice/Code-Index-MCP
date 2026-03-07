@@ -7,6 +7,7 @@ multiple search methods, providing better overall search quality.
 
 import asyncio
 import logging
+import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -200,7 +201,7 @@ class HybridSearch:
             combined_results = await self._rerank_results(query, combined_results)
 
         # Apply post-processing
-        final_results = self._post_process_results(combined_results, limit)
+        final_results = self._post_process_results(combined_results, limit, query=query)
 
         # Cache results if enabled
         if self.config.cache_results:
@@ -640,8 +641,71 @@ class HybridSearch:
             logger.error(f"Error during reranking: {e}", exc_info=True)
             return results
 
+    def _looks_like_code_intent(self, query: str) -> bool:
+        """Detect when a query is likely asking for implementation code."""
+        normalized = query.lower()
+        if not normalized.strip():
+            return False
+
+        if re.search(
+            r"\b(class|def|function|method|symbol|module|file|filepath)\b", normalized
+        ):
+            return True
+        if re.search(
+            r"\b(py|python|js|ts|typescript|javascript|treesitter|tree-sitter)\b",
+            normalized,
+        ):
+            return True
+        if re.search(
+            r"\b(where is|how does|how do|implemented|implementation|extract|validate)\b",
+            normalized,
+        ):
+            return True
+        return bool(re.search(r"\.[a-z0-9]{1,6}\b", normalized))
+
+    def _path_score_multiplier(self, filepath: str, code_intent: bool) -> float:
+        """Apply lightweight source-path priors during result ranking."""
+        normalized = filepath.replace("\\", "/").lower().lstrip("./")
+        multiplier = 1.0
+
+        is_impl = normalized.startswith(("mcp_server/", "src/"))
+        is_script = normalized.startswith("scripts/")
+        is_test = normalized.startswith("tests/") or "/tests/" in normalized
+        is_doc = normalized.startswith(
+            ("docs/", "ai_docs/", "architecture/")
+        ) or normalized.endswith(("readme.md", "readme.rst", "readme.txt"))
+        is_benchmark_artifact = "/benchmarks/" in normalized or normalized.startswith(
+            "benchmarks/"
+        )
+
+        if is_impl:
+            multiplier *= 1.15
+        elif is_script:
+            multiplier *= 1.05
+        elif is_test:
+            multiplier *= 0.75
+        elif is_doc:
+            multiplier *= 0.7
+
+        if is_benchmark_artifact:
+            multiplier *= 0.85
+
+        if code_intent:
+            if is_impl:
+                multiplier *= 1.2
+            elif is_script:
+                multiplier *= 1.1
+            if is_test:
+                multiplier *= 0.55
+            if is_doc:
+                multiplier *= 0.35
+            if is_benchmark_artifact:
+                multiplier *= 0.7
+
+        return multiplier
+
     def _post_process_results(
-        self, results: List[SearchResult], limit: int
+        self, results: List[SearchResult], limit: int, query: str = ""
     ) -> List[SearchResult]:
         """Apply post-processing to results."""
         # Remove duplicates while preserving order
@@ -687,6 +751,8 @@ class HybridSearch:
         prose_exts = {"md", "txt", "rst"}
         config_exts = {"json", "yaml", "yml", "toml", "ini", "cfg"}
 
+        code_intent = self._looks_like_code_intent(query)
+
         for result in unique_results:
             ext = _extension(result.filepath)
             if ext in code_exts:
@@ -695,6 +761,8 @@ class HybridSearch:
                 result.score *= 0.5
             elif ext in config_exts:
                 result.score *= 0.8
+
+            result.score *= self._path_score_multiplier(result.filepath, code_intent)
 
         unique_results.sort(key=lambda item: item.score, reverse=True)
 

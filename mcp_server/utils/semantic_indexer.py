@@ -12,6 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Union
 
+from chunker.core import chunk_file
 from qdrant_client import QdrantClient, models
 from qdrant_client.http.models import FieldCondition, Filter, MatchValue
 
@@ -19,7 +20,6 @@ from ..artifacts.semantic_namespace import SemanticNamespaceResolver
 from ..artifacts.semantic_profiles import SemanticProfile, SemanticProfileRegistry
 from ..core.path_resolver import PathResolver
 from .embedding_providers import create_embedding_provider
-from .treesitter_wrapper import TreeSitterWrapper
 
 if TYPE_CHECKING:
     from ..storage.sqlite_store import SQLiteStore
@@ -60,7 +60,7 @@ class DocumentSection:
     start_line: int
     end_line: int
     parent_section: Optional[str] = None
-    subsections: list[str] = None
+    subsections: Optional[list[str]] = None
 
     def __post_init__(self):
         if self.subsections is None:
@@ -128,7 +128,6 @@ class SemanticIndexer:
         self._qdrant_available = False
         self._connection_mode = None  # 'server', 'file', or 'memory'
         self.qdrant = self._init_qdrant_client(qdrant_path)
-        self.wrapper = TreeSitterWrapper()
 
         self.embedding_client = create_embedding_provider(
             provider_name=self.semantic_profile.provider,
@@ -670,69 +669,249 @@ class SemanticIndexer:
         h = hashlib.sha1(id_str.encode("utf-8")).digest()[:8]
         return int.from_bytes(h, "big", signed=False)
 
+    def _looks_like_code_intent(self, query: str) -> bool:
+        """Detect when a query is likely asking for implementation code."""
+        normalized = query.lower()
+        if not normalized.strip():
+            return False
+
+        code_patterns = [
+            r"\b(class|def|function|method|symbol|symbols|module|file|filepath)\b",
+            r"\b(py|python|js|ts|typescript|javascript|treesitter|tree-sitter)\b",
+            r"\b(where is|how does|how do|implemented|implementation|extract|validate)\b",
+            r"\.[a-z0-9]{1,6}\b",
+        ]
+        return any(re.search(pattern, normalized) for pattern in code_patterns)
+
+    def _path_score_multiplier(
+        self, path: str, doc_type: str, code_intent: bool
+    ) -> float:
+        """Apply lightweight source-path priors to semantic results."""
+        normalized = path.replace("\\", "/").lower().lstrip("./")
+        doc_type_normalized = (doc_type or "").lower()
+        multiplier = 1.0
+
+        is_impl = normalized.startswith(("mcp_server/", "src/"))
+        is_script = normalized.startswith("scripts/")
+        is_test = normalized.startswith("tests/") or "/tests/" in normalized
+        is_doc = normalized.startswith(
+            ("docs/", "ai_docs/", "architecture/")
+        ) or normalized.endswith(("readme.md", "readme.rst", "readme.txt"))
+        is_benchmark_artifact = "/benchmarks/" in normalized or normalized.startswith(
+            "benchmarks/"
+        )
+
+        if is_impl:
+            multiplier *= 1.15
+        elif is_script:
+            multiplier *= 1.05
+        elif is_test:
+            multiplier *= 0.75
+        elif is_doc or doc_type_normalized in {
+            "markdown",
+            "readme",
+            "guide",
+            "tutorial",
+        }:
+            multiplier *= 0.7
+
+        if is_benchmark_artifact:
+            multiplier *= 0.85
+
+        if code_intent:
+            if is_impl:
+                multiplier *= 1.25
+            elif is_script:
+                multiplier *= 1.1
+            if is_test:
+                multiplier *= 0.55
+            if is_doc or doc_type_normalized in {
+                "markdown",
+                "readme",
+                "guide",
+                "tutorial",
+            }:
+                multiplier *= 0.35
+            if is_benchmark_artifact:
+                multiplier *= 0.7
+
+        return multiplier
+
+    def _query_overlap_bonus(self, query: str, payload: Mapping[str, Any]) -> float:
+        """Apply a small lexical bonus using retrieval metadata fields."""
+        terms = {
+            token
+            for token in re.findall(r"[a-z0-9_]+", query.lower())
+            if len(token) >= 3
+        }
+        if not terms:
+            return 1.0
+
+        haystack = " ".join(
+            str(payload.get(key, ""))
+            for key in (
+                "symbol",
+                "qualified_name",
+                "semantic_path",
+                "signature",
+                "signature_text",
+                "semantic_text",
+                "embedding_text",
+                "content",
+            )
+        ).lower()
+        matches = sum(1 for term in terms if term in haystack)
+        return 1.0 + min(matches, 5) * 0.05
+
+    def _rerank_query_results(
+        self, query: str, results: List[dict[str, Any]], limit: int
+    ) -> List[dict[str, Any]]:
+        """Apply lightweight query-aware reranking to semantic results."""
+        code_intent = self._looks_like_code_intent(query)
+        reranked: List[dict[str, Any]] = []
+
+        for result in results:
+            path = str(
+                result.get("relative_path")
+                or result.get("filepath")
+                or result.get("file")
+                or result.get("path")
+                or ""
+            )
+            doc_type = str(result.get("doc_type") or result.get("type") or "")
+            adjusted = dict(result)
+            adjusted["score"] = (
+                float(result.get("score", 0.0))
+                * self._path_score_multiplier(
+                    path,
+                    doc_type,
+                    code_intent,
+                )
+                * self._query_overlap_bonus(query, result)
+            )
+            reranked.append(adjusted)
+
+        reranked.sort(key=lambda item: float(item.get("score", 0.0)), reverse=True)
+        return reranked[:limit]
+
     # ------------------------------------------------------------------
     def index_file(self, path: Path) -> dict[str, Any]:
         """Index a single Python file and return the shard info."""
 
-        content = path.read_bytes()
-        root = self.wrapper.parse(content)
-        lines = content.decode("utf-8", "ignore").splitlines()
+        relative_path = self.path_resolver.normalize_path(path)
+        try:
+            chunk_results = chunk_file(
+                path,
+                "python",
+                extract_metadata=True,
+                include_retrieval_metadata=True,
+            )
+        except TypeError:
+            chunk_results = chunk_file(
+                path,
+                "python",
+                extract_metadata=True,
+            )
 
-        symbols = self._collect_symbol_entries(root, lines)
-
-        chunks: List[SymbolChunk] = []
-        for sym in symbols:
-            chunks.extend(self._split_symbol_chunks(sym, lines))
+        chunks = [chunk for chunk in chunk_results if chunk.content.strip()]
+        symbols: List[Dict[str, Any]] = []
+        seen_symbols: set[tuple[str, int, int]] = set()
 
         if chunks:
-            relative_path = self.path_resolver.normalize_path(path)
-            embedding_inputs = []
+            embedding_inputs: List[str] = []
+            normalized_chunks: List[Dict[str, Any]] = []
             for chunk in chunks:
-                context = [f"file: {relative_path}"]
-                if chunk.symbol.parent_class:
-                    context.append(f"class: {chunk.symbol.parent_class}")
-                if chunk.symbol.kind == "function":
-                    context.append(f"function: {chunk.symbol.symbol}")
-                elif chunk.symbol.kind == "class":
-                    context.append(f"class_def: {chunk.symbol.symbol}")
-                context.append(
-                    f"chunk: {chunk.chunk_index}/{chunk.chunk_total} lines {chunk.start_line}-{chunk.end_line}"
+                metadata = dict(chunk.metadata or {})
+                signature_data = metadata.get("signature")
+                signature = str(metadata.get("signature_text") or signature_data or "")
+                symbol_name = str(
+                    metadata.get("symbol")
+                    or metadata.get("name")
+                    or metadata.get("qualified_name")
+                    or Path(relative_path).stem
                 )
-                context.append(chunk.content)
-                embedding_inputs.append("\n".join(context))
+                kind = str(metadata.get("kind") or chunk.node_type)
+                parent_symbol = metadata.get("parent_symbol")
+                embedding_text = str(
+                    metadata.get("semantic_text")
+                    or metadata.get("embedding_text")
+                    or chunk.content
+                )
+
+                normalized_chunks.append(
+                    {
+                        "chunk": chunk,
+                        "metadata": metadata,
+                        "symbol": symbol_name,
+                        "kind": kind,
+                        "signature": signature,
+                        "parent_symbol": parent_symbol,
+                        "embedding_text": embedding_text,
+                    }
+                )
+                embedding_inputs.append(embedding_text)
+
+                symbol_key = (symbol_name, chunk.start_line, chunk.end_line)
+                if symbol_key not in seen_symbols:
+                    seen_symbols.add(symbol_key)
+                    symbols.append(
+                        {
+                            "symbol": symbol_name,
+                            "kind": kind,
+                            "signature": signature,
+                            "line": chunk.start_line,
+                            "span": [chunk.start_line, chunk.end_line],
+                            "parent_class": parent_symbol,
+                            "parent_symbol": parent_symbol,
+                        }
+                    )
 
             embeds = self._embed_texts(embedding_inputs, input_type="document")
 
             points = []
-            for chunk, vec in zip(chunks, embeds):
+            for chunk_index, (normalized, vec) in enumerate(
+                zip(normalized_chunks, embeds), start=1
+            ):
+                chunk = normalized["chunk"]
+                metadata = normalized["metadata"]
                 content_hash = hashlib.sha256(chunk.content.encode()).hexdigest()
-                chunk_id = (
-                    f"{relative_path}:{chunk.symbol.symbol}:{chunk.start_line}:"
-                    f"{chunk.chunk_index}:{content_hash[:12]}"
-                )
+                chunk_id = str(chunk.chunk_id or chunk.node_id)
 
                 payload = {
-                    "file": str(path),  # Keep absolute for backward compatibility
+                    "file": str(path),
                     "relative_path": relative_path,
                     "content_hash": content_hash,
                     "chunk_id": chunk_id,
-                    "chunk_index": chunk.chunk_index,
-                    "chunk_total": chunk.chunk_total,
-                    "symbol": chunk.symbol.symbol,
-                    "kind": chunk.symbol.kind,
-                    "signature": chunk.symbol.signature,
+                    "chunk_index": chunk_index,
+                    "chunk_total": len(normalized_chunks),
+                    "symbol": normalized["symbol"],
+                    "kind": normalized["kind"],
+                    "signature": normalized["signature"],
                     "line": chunk.start_line,
                     "span": [chunk.start_line, chunk.end_line],
-                    "parent_class": chunk.symbol.parent_class,
-                    "parent_symbol": chunk.symbol.parent_symbol,
+                    "parent_class": normalized["parent_symbol"],
+                    "parent_symbol": normalized["parent_symbol"],
                     "language": "python",
                     "is_deleted": False,
+                    "content": chunk.content,
+                    "embedding_text": normalized["embedding_text"],
                 }
+                for key in [
+                    "qualified_name",
+                    "semantic_path",
+                    "signature_text",
+                    "semantic_text",
+                    "imports",
+                    "calls",
+                    "dependencies",
+                ]:
+                    if key in metadata:
+                        payload[key] = metadata[key]
                 points.append(
                     models.PointStruct(
                         id=self._symbol_id(
                             str(path),
-                            f"{chunk.symbol.symbol}#chunk{chunk.chunk_index}",
+                            f"{normalized['symbol']}#chunk{chunk_index}",
                             chunk.start_line,
                             content_hash,
                         ),
@@ -761,18 +940,7 @@ class SemanticIndexer:
 
         return {
             "file": str(path),
-            "symbols": [
-                {
-                    "symbol": s.symbol,
-                    "kind": s.kind,
-                    "signature": s.signature,
-                    "line": s.line,
-                    "span": list(s.span),
-                    "parent_class": s.parent_class,
-                    "parent_symbol": s.parent_symbol,
-                }
-                for s in symbols
-            ],
+            "symbols": symbols,
             "language": "python",
         }
 
@@ -801,26 +969,33 @@ class SemanticIndexer:
         except Exception as e:
             raise RuntimeError(f"Failed to generate query embedding: {e}")
 
+        query_limit = limit
+        if self._looks_like_code_intent(text):
+            query_limit = min(max(limit * 4, limit), 50)
+
         try:
             if hasattr(self.qdrant, "search"):
                 results = self.qdrant.search(
                     collection_name=self.collection,
                     query_vector=embedding,
-                    limit=limit,
+                    limit=query_limit,
                 )
             else:
                 response = self.qdrant.query_points(
                     collection_name=self.collection,
                     query=embedding,
-                    limit=limit,
+                    limit=query_limit,
                     with_payload=True,
                 )
                 results = list(getattr(response, "points", []) or [])
 
+            rerank_input: List[dict[str, Any]] = []
             for res in results:
                 payload = res.payload or {}
                 payload["score"] = res.score
-                yield payload
+                rerank_input.append(payload)
+
+            yield from self._rerank_query_results(text, rerank_input, limit)
         except Exception as e:
             logger.error(f"Qdrant search failed: {type(e).__name__}: {e}")
             self._qdrant_available = False

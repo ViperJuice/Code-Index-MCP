@@ -1,10 +1,14 @@
 import pytest
 import time
+from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 
 from mcp_server.indexer.hybrid_search import HybridSearch, HybridSearchConfig
 from mcp_server.storage.sqlite_store import SQLiteStore
-from mcp_server.utils.fuzzy_indexer import FuzzyIndexer
+from mcp_server.utils import semantic_indexer as semantic_indexer_module
+from mcp_server.utils.semantic_indexer import SemanticIndexer
+from scripts.run_e2e_retrieval_validation import _collect_files
 
 
 class _SemanticStub:
@@ -165,3 +169,158 @@ def test_rrf_prefers_best_rank_for_result_metadata(temp_db_path):
 
     assert fused
     assert fused[0].filepath == "mcp_server/cli/setup_commands.py"
+
+
+def test_index_file_uses_chunker_retrieval_metadata(monkeypatch, tmp_path):
+    file_path = tmp_path / "example.py"
+    file_path.write_text("def index_file(path):\n    return path\n", encoding="utf-8")
+
+    fake_chunk = SimpleNamespace(
+        content="def index_file(path):\n    return path",
+        metadata={
+            "symbol": "index_file",
+            "kind": "function",
+            "signature_text": "index_file(path)",
+            "parent_symbol": "SemanticIndexer",
+            "qualified_name": "SemanticIndexer.index_file",
+            "semantic_path": "example.py::SemanticIndexer.index_file",
+            "semantic_text": "function index_file path SemanticIndexer TreeSitterWrapper",
+            "imports": ["from .treesitter_wrapper import TreeSitterWrapper"],
+        },
+        chunk_id="chunk-1",
+        node_id="node-1",
+        start_line=1,
+        end_line=2,
+        node_type="function_definition",
+    )
+
+    captured = {}
+
+    class _QdrantStub:
+        def upsert(self, collection_name, points):
+            captured["collection_name"] = collection_name
+            captured["points"] = points
+
+    monkeypatch.setattr(
+        semantic_indexer_module, "chunk_file", lambda *args, **kwargs: [fake_chunk]
+    )
+
+    indexer = object.__new__(SemanticIndexer)
+    indexer.path_resolver = cast(
+        Any, SimpleNamespace(normalize_path=lambda _: "tmp/example.py")
+    )
+    indexer.collection = "test-collection"
+    indexer._qdrant_available = True
+    indexer.qdrant = cast(Any, _QdrantStub())
+    indexer._embed_texts = lambda texts, input_type="document": [[0.1, 0.2, 0.3]]
+
+    result = SemanticIndexer.index_file(indexer, Path(file_path))
+
+    assert result["symbols"][0]["symbol"] == "index_file"
+    point = captured["points"][0]
+    payload = point.payload
+    assert payload["symbol"] == "index_file"
+    assert payload["kind"] == "function"
+    assert payload["signature"] == "index_file(path)"
+    assert payload["qualified_name"] == "SemanticIndexer.index_file"
+    assert payload["semantic_text"].startswith("function index_file")
+    assert payload["embedding_text"] == payload["semantic_text"]
+
+
+def test_semantic_query_reranks_code_paths_for_code_intent():
+    indexer = object.__new__(SemanticIndexer)
+
+    results = [
+        {
+            "relative_path": "ai_docs/tree_sitter_overview.md",
+            "doc_type": "markdown",
+            "semantic_text": "extract symbols from python using treesitter overview",
+            "score": 0.92,
+        },
+        {
+            "relative_path": "mcp_server/utils/semantic_indexer.py",
+            "language": "python",
+            "semantic_text": "function index_file extracts symbols from python using treesitter metadata",
+            "qualified_name": "SemanticIndexer.index_file",
+            "score": 0.84,
+        },
+    ]
+
+    reranked = SemanticIndexer._rerank_query_results(
+        indexer,
+        "extract symbols from python using treesitter",
+        results,
+        limit=2,
+    )
+
+    assert reranked[0]["relative_path"] == "mcp_server/utils/semantic_indexer.py"
+
+
+def test_hybrid_post_process_prefers_impl_paths_for_code_intent(temp_db_path):
+    store = SQLiteStore(str(temp_db_path))
+    hybrid = HybridSearch(storage=store, config=HybridSearchConfig())
+
+    from mcp_server.indexer.hybrid_search import SearchResult
+
+    results = [
+        SearchResult(
+            doc_id="docs",
+            filepath="ai_docs/tree_sitter_overview.md",
+            score=0.9,
+            snippet="docs",
+            metadata={},
+            source="semantic",
+        ),
+        SearchResult(
+            doc_id="code",
+            filepath="mcp_server/utils/semantic_indexer.py",
+            score=0.8,
+            snippet="code",
+            metadata={},
+            source="semantic",
+        ),
+    ]
+
+    reranked = hybrid._post_process_results(
+        results,
+        limit=2,
+        query="extract symbols from python using treesitter",
+    )
+
+    assert reranked[0].filepath == "mcp_server/utils/semantic_indexer.py"
+
+
+def test_collect_files_excludes_generated_dirs_and_prioritizes_source(tmp_path):
+    (tmp_path / "mcp_server").mkdir()
+    (tmp_path / "mcp_server" / "core.py").write_text(
+        "print('core')\n", encoding="utf-8"
+    )
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "runner.py").write_text(
+        "print('runner')\n", encoding="utf-8"
+    )
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "guide.md").write_text("# Guide\n", encoding="utf-8")
+    (tmp_path / "docs" / "benchmarks").mkdir(parents=True)
+    (tmp_path / "docs" / "benchmarks" / "report.md").write_text(
+        "# Report\n", encoding="utf-8"
+    )
+    (tmp_path / "analysis_archive").mkdir()
+    (tmp_path / "analysis_archive" / "notes.md").write_text(
+        "# Notes\n", encoding="utf-8"
+    )
+    (tmp_path / "htmlcov").mkdir()
+    (tmp_path / "htmlcov" / "status.json").write_text("{}\n", encoding="utf-8")
+
+    files = _collect_files(tmp_path, max_files=10)
+    relative_paths = [path.relative_to(tmp_path).as_posix() for path in files]
+
+    assert "mcp_server/core.py" in relative_paths
+    assert "scripts/runner.py" in relative_paths
+    assert "docs/guide.md" in relative_paths
+    assert "docs/benchmarks/report.md" not in relative_paths
+    assert "analysis_archive/notes.md" not in relative_paths
+    assert "htmlcov/status.json" not in relative_paths
+    assert relative_paths.index("mcp_server/core.py") < relative_paths.index(
+        "docs/guide.md"
+    )

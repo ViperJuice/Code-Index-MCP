@@ -25,6 +25,31 @@ from mcp_server.utils.fuzzy_indexer import FuzzyIndexer
 from mcp_server.utils.semantic_indexer import SemanticIndexer
 
 
+INDEXABLE_EXTENSIONS = {".py", ".md", ".yml", ".yaml", ".json"}
+IGNORED_DIR_NAMES = {
+    ".git",
+    ".venv",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".indexes",
+    "__pycache__",
+    "node_modules",
+    "qdrant_storage",
+    "htmlcov",
+    "dist",
+    "build",
+    ".eggs",
+    ".tox",
+    "site-packages",
+    "analysis_archive",
+}
+IGNORED_PATH_FRAGMENTS = {
+    "docs/benchmarks/",
+    "coverage.xml",
+    ".coverage",
+}
+
+
 def _load_local_env_file() -> None:
     env_path = Path(".env.local")
     if not env_path.exists():
@@ -116,17 +141,29 @@ def _extract_file_path(result: Dict[str, object]) -> str:
 
 
 def _collect_files(repo_path: Path, max_files: int) -> List[Path]:
-    exts = {".py", ".md", ".yml", ".yaml", ".json"}
-    ignored = {".git", ".venv", "node_modules", "qdrant_storage", ".indexes"}
     files: List[Path] = []
+    source_first: List[Path] = []
+    other_docs: List[Path] = []
+
     for path in repo_path.rglob("*"):
-        if any(part in ignored for part in path.parts):
+        if any(part in IGNORED_DIR_NAMES for part in path.parts):
             continue
-        if path.is_file() and path.suffix.lower() in exts:
-            files.append(path)
-            if len(files) >= max_files:
-                break
-    return files
+        if not path.is_file() or path.suffix.lower() not in INDEXABLE_EXTENSIONS:
+            continue
+
+        normalized = path.relative_to(repo_path).as_posix()
+        if any(fragment in normalized for fragment in IGNORED_PATH_FRAGMENTS):
+            continue
+
+        if normalized.startswith(("mcp_server/", "tests/", "scripts/")):
+            source_first.append(path)
+        else:
+            other_docs.append(path)
+
+    files.extend(source_first)
+    if len(files) < max_files:
+        files.extend(other_docs[: max_files - len(files)])
+    return files[:max_files]
 
 
 def _top_file(results: List[Dict[str, object]]) -> str:
