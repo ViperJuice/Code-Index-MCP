@@ -389,6 +389,40 @@ def test_semantic_query_prefers_semantic_indexer_over_generic_treesitter_plugin(
     assert reranked[0]["relative_path"] == "mcp_server/utils/semantic_indexer.py"
 
 
+def test_semantic_query_deduplicates_chunks_per_file():
+    indexer = object.__new__(SemanticIndexer)
+
+    results = [
+        {
+            "relative_path": "mcp_server/plugins/generic_treesitter_plugin.py",
+            "semantic_text": "generic treesitter plugin extracts symbols from source files",
+            "score": 0.9,
+        },
+        {
+            "relative_path": "mcp_server/plugins/generic_treesitter_plugin.py",
+            "semantic_text": "generic treesitter plugin parser chunks and symbols",
+            "score": 0.89,
+        },
+        {
+            "relative_path": "mcp_server/utils/semantic_indexer.py",
+            "semantic_text": "semantic indexer extracts symbols from python using treesitter",
+            "score": 0.82,
+        },
+    ]
+
+    reranked = SemanticIndexer._rerank_query_results(
+        indexer,
+        "extract symbols from python using treesitter",
+        results,
+        limit=3,
+    )
+
+    assert [item["relative_path"] for item in reranked] == [
+        "mcp_server/utils/semantic_indexer.py",
+        "mcp_server/plugins/generic_treesitter_plugin.py",
+    ]
+
+
 def test_semantic_query_overlap_uses_relative_path_tokens():
     indexer = object.__new__(SemanticIndexer)
 
@@ -568,6 +602,42 @@ def test_hybrid_post_process_prefers_delta_resolver_for_delta_resolution(temp_db
             snippet="resolve delta chain for artifact pull",
             metadata={},
             source="bm25",
+        ),
+    ]
+
+    reranked = hybrid._post_process_results(
+        results,
+        limit=2,
+        query="how do artifact push pull and delta resolution work",
+    )
+
+    assert reranked[0].filepath == "mcp_server/artifacts/delta_resolver.py"
+
+
+def test_hybrid_post_process_demotes_artifact_commands_for_resolution_query(
+    temp_db_path,
+):
+    store = SQLiteStore(str(temp_db_path))
+    hybrid = HybridSearch(storage=store, config=HybridSearchConfig())
+
+    from mcp_server.indexer.hybrid_search import SearchResult
+
+    results = [
+        SearchResult(
+            doc_id="commands",
+            filepath="mcp_server/cli/artifact_commands.py",
+            score=0.92,
+            snippet="artifact push and pull CLI commands",
+            metadata={},
+            source="bm25",
+        ),
+        SearchResult(
+            doc_id="resolver",
+            filepath="mcp_server/artifacts/delta_resolver.py",
+            score=0.81,
+            snippet="resolve delta chain for artifact pull target commit",
+            metadata={},
+            source="semantic",
         ),
     ]
 

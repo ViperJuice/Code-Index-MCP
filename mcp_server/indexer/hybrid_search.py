@@ -762,15 +762,27 @@ class HybridSearch:
 
         if {"artifact", "delta", "resolution"}.issubset(terms):
             if "delta_resolver.py" in normalized_path:
-                bonus *= 1.18
+                bonus *= 1.22
             elif "delta_artifacts.py" in normalized_path:
                 bonus *= 0.97
 
+        if {"artifact", "push", "pull", "delta", "resolution"}.issubset(terms):
+            if "delta_resolver.py" in normalized_path:
+                bonus *= 1.12
+            elif "artifact_commands.py" in normalized_path:
+                bonus *= 0.84
+
         if {"extract", "symbols", "treesitter"}.issubset(terms):
             if "semantic_indexer.py" in normalized_path:
-                bonus *= 1.16
+                bonus *= 1.28
             elif "generic_treesitter_plugin.py" in normalized_path:
-                bonus *= 0.9
+                bonus *= 0.82
+
+        if {"extract", "symbols", "python", "treesitter"}.issubset(terms):
+            if "semantic_indexer.py" in normalized_path:
+                bonus *= 1.08
+            elif "generic_treesitter_plugin.py" in normalized_path:
+                bonus *= 0.88
 
         if "validate" in terms and "command" in normalized_snippet:
             bonus *= 1.03
