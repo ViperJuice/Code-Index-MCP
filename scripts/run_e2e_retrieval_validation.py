@@ -285,7 +285,9 @@ def run(args: argparse.Namespace) -> Dict[str, object]:
                 semantic_profile="commercial_high",
             )
 
-        semantic_skipped_files = 0
+        semantic_files_indexed = 0
+        semantic_embedding_units = 0
+        semantic_fallback_files = 0
         for path in files:
             text = path.read_text(encoding="utf-8", errors="ignore")
             fid = store.store_file(
@@ -293,15 +295,13 @@ def run(args: argparse.Namespace) -> Dict[str, object]:
             )
             bm25.add_document(str(path), text, metadata={"language": "python"})
             fuzzy.add_file(str(path), text)
-            should_semantic_index = (
-                path.suffix == ".py" or len(text) <= args.semantic_max_chars
-            )
-            if should_semantic_index:
-                qwen_sem.index_file(path)
-                if voyage_sem:
-                    voyage_sem.index_file(path)
-            else:
-                semantic_skipped_files += 1
+            qwen_result = qwen_sem.index_file(path)
+            semantic_files_indexed += 1
+            semantic_embedding_units += int(qwen_result.get("embedding_unit_count", 0))
+            if qwen_result.get("used_fallback_chunks"):
+                semantic_fallback_files += 1
+            if voyage_sem:
+                voyage_sem.index_file(path)
             # lightweight symbols for fuzzy symbol route
             for n, line in enumerate(text.splitlines(), 1):
                 s = line.strip()
@@ -505,7 +505,10 @@ def run(args: argparse.Namespace) -> Dict[str, object]:
         summary = {
             "repo": str(repo_path),
             "indexed_files": len(files),
-            "semantic_skipped_files": semantic_skipped_files,
+            "semantic_files_indexed": semantic_files_indexed,
+            "semantic_embedding_units": semantic_embedding_units,
+            "semantic_fallback_files": semantic_fallback_files,
+            "semantic_skipped_files": max(0, len(files) - semantic_files_indexed),
             "qdrant_url": args.qdrant_url,
             "fireworks_base": args.fireworks_base,
             "results": rows,
@@ -531,6 +534,9 @@ def write_markdown(result: Dict[str, object], output: Path) -> None:
         "",
         f"- Repo: `{result['repo']}`",
         f"- Indexed files: `{result['indexed_files']}`",
+        f"- Semantic files indexed: `{result.get('semantic_files_indexed', 0)}`",
+        f"- Semantic embedding units: `{result.get('semantic_embedding_units', 0)}`",
+        f"- Semantic fallback files: `{result.get('semantic_fallback_files', 0)}`",
         f"- Iterations per query: `{result.get('iterations', 1)}`",
         f"- Top-1 pass rate: `{result['pass_rate']}%`",
         f"- Top-3 pass rate: `{result.get('top3_pass_rate', 0)}%`",

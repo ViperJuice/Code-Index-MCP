@@ -308,13 +308,17 @@ def test_index_file_uses_chunker_retrieval_metadata(monkeypatch, tmp_path):
 
     def _embed_texts(texts, input_type="document"):
         embed_calls.extend(texts)
-        return [[0.1, 0.2, 0.3]]
+        return [[0.1, 0.2, 0.3] for _ in texts]
 
     indexer._embed_texts = _embed_texts
 
     result = SemanticIndexer.index_file(indexer, Path(file_path))
 
     assert result["symbols"][0]["symbol"] == "index_file"
+    assert result["chunk_count"] == 1
+    assert result["embedding_unit_count"] == 1
+    assert result["file_summary_indexed"] is True
+    assert result["used_fallback_chunks"] is False
     point = captured["points"][0]
     payload = point.payload
     assert payload["symbol"] == "index_file"
@@ -332,13 +336,14 @@ def test_index_file_uses_chunker_retrieval_metadata(monkeypatch, tmp_path):
     assert embed_calls[0] == payload["embedding_text"]
     assert len(embed_calls) == 2
     assert "symbols index_file" in embed_calls[1]
+    assert captured["points"][-1].payload["chunk_id"] == "tmp/example.py:file-summary"
 
 
-def test_index_file_truncates_embedding_text(monkeypatch, tmp_path):
+def test_index_file_splits_oversize_embedding_units(monkeypatch, tmp_path):
     file_path = tmp_path / "long_example.py"
     file_path.write_text("def index_file(path):\n    return path\n", encoding="utf-8")
 
-    long_content = "x" * 5000
+    long_content = "\n\n".join([f"block_{idx}\n" + ("x" * 320) for idx in range(1, 8)])
     fake_chunk = SimpleNamespace(
         content=long_content,
         metadata={
@@ -363,7 +368,7 @@ def test_index_file_truncates_embedding_text(monkeypatch, tmp_path):
 
     class _QdrantStub:
         def upsert(self, collection_name, points):
-            captured["payload"] = points[0].payload
+            captured["points"] = points
 
     indexer = object.__new__(SemanticIndexer)
     indexer.path_resolver = cast(
@@ -376,17 +381,28 @@ def test_index_file_truncates_embedding_text(monkeypatch, tmp_path):
 
     def _embed_texts(texts, input_type="document"):
         embedded.extend(texts)
-        return [[0.1, 0.2, 0.3]]
+        return [[0.1, 0.2, 0.3] for _ in texts]
 
     indexer._embed_texts = _embed_texts
 
     SemanticIndexer.index_file(indexer, Path(file_path))
 
-    embedding_text = captured["payload"]["embedding_text"]
-    assert len(embedding_text) <= 1200
-    assert embedded[0] == embedding_text
-    assert len(embedded) == 2
-    assert "symbols index_file" in embedded[1]
+    payloads = [point.payload for point in captured["points"]]
+    chunk_payloads = [
+        payload for payload in payloads if payload["kind"] != "file_summary"
+    ]
+
+    assert len(chunk_payloads) > 1
+    assert all(len(payload["embedding_text"]) <= 1200 for payload in chunk_payloads)
+    assert [payload["subchunk_index"] for payload in chunk_payloads] == list(
+        range(1, len(chunk_payloads) + 1)
+    )
+    assert all(
+        payload["subchunk_total"] == len(chunk_payloads) for payload in chunk_payloads
+    )
+    assert all(payload["source_chunk_id"] == "chunk-1" for payload in chunk_payloads)
+    assert any("chunk part 1 of" in text for text in embedded)
+    assert payloads[-1]["kind"] == "file_summary"
 
 
 def test_build_chunk_embedding_text_adds_symbol_extraction_summary(monkeypatch):
@@ -437,6 +453,46 @@ def test_build_file_embedding_text_adds_semantic_indexer_summary(monkeypatch):
         "semantic indexer extracts symbols from python using treesitter"
         in embedding_text
     )
+
+
+def test_index_file_falls_back_to_text_chunks_for_unknown_language(
+    monkeypatch, tmp_path
+):
+    file_path = tmp_path / "NOTES.md"
+    file_path.write_text(
+        "# Notes\n\nFirst paragraph.\n\nSecond paragraph.", encoding="utf-8"
+    )
+
+    def _raise_chunk_error(*args, **kwargs):
+        raise RuntimeError("no grammar available")
+
+    monkeypatch.setattr(semantic_indexer_module, "chunk_file", _raise_chunk_error)
+
+    captured = {}
+
+    class _QdrantStub:
+        def upsert(self, collection_name, points):
+            captured["points"] = points
+
+    indexer = object.__new__(SemanticIndexer)
+    indexer.path_resolver = cast(
+        Any, SimpleNamespace(normalize_path=lambda _: "tmp/NOTES.md")
+    )
+    indexer.collection = "test-collection"
+    indexer._qdrant_available = True
+    indexer.qdrant = cast(Any, _QdrantStub())
+    indexer._embed_texts = lambda texts, input_type="document": [
+        [0.1, 0.2, 0.3] for _ in texts
+    ]
+
+    result = SemanticIndexer.index_file(indexer, Path(file_path))
+
+    assert result["language"] == "markdown"
+    assert result["used_fallback_chunks"] is True
+    payloads = [point.payload for point in captured["points"]]
+    assert payloads[0]["language"] == "markdown"
+    assert payloads[0]["kind"] == "text"
+    assert "First paragraph." in payloads[0]["embedding_text"]
 
 
 def test_semantic_query_reranks_code_paths_for_code_intent():
@@ -707,6 +763,46 @@ def test_hybrid_post_process_prefers_delta_resolver_for_delta_resolution(temp_db
             filepath="mcp_server/artifacts/delta_resolver.py",
             score=0.82,
             snippet="resolve delta chain for artifact pull",
+            metadata={},
+            source="bm25",
+        ),
+    ]
+
+    reranked = hybrid._post_process_results(
+        results,
+        limit=2,
+        query="how do artifact push pull and delta resolution work",
+    )
+
+    assert reranked[0].filepath == "mcp_server/artifacts/delta_resolver.py"
+
+
+def test_hybrid_post_process_prefers_delta_resolver_over_delta_artifacts(temp_db_path):
+    store = SQLiteStore(str(temp_db_path))
+    hybrid = HybridSearch(storage=store, config=HybridSearchConfig())
+
+    from mcp_server.indexer.hybrid_search import SearchResult
+
+    results = [
+        SearchResult(
+            doc_id="artifacts",
+            filepath="mcp_server/artifacts/delta_artifacts.py",
+            score=0.96,
+            snippet=(
+                "build delta archive manifest operations checksums apply artifact "
+                "push pull workflow"
+            ),
+            metadata={},
+            source="semantic",
+        ),
+        SearchResult(
+            doc_id="resolver",
+            filepath="mcp_server/artifacts/delta_resolver.py",
+            score=0.82,
+            snippet=(
+                "resolve delta chain base_commit target_commit for artifact pull "
+                "resolution"
+            ),
             metadata={},
             source="bm25",
         ),

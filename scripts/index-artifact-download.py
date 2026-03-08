@@ -388,7 +388,7 @@ class IndexArtifactDownloader:
 
         return True
 
-    def install_indexes(self, source_dir: Path, backup: bool = True) -> None:
+    def install_indexes(self, source_dir: Path, backup: bool = True) -> List[str]:
         """
         Install downloaded indexes to the working directory.
 
@@ -421,6 +421,7 @@ class IndexArtifactDownloader:
             print(f"  ✅ Backup created in {backup_dir}")
 
         # Install new indexes
+        installed_items: List[str] = []
         for item in source_dir.iterdir():
             if item.name in [
                 "code_index.db",
@@ -443,8 +444,12 @@ class IndexArtifactDownloader:
                     shutil.copytree(item, dest)
                 else:
                     shutil.copy2(item, dest)
+                installed_items.append(item.name)
 
         print("✅ Indexes installed successfully!")
+        if installed_items:
+            print(f"📦 Restored items: {', '.join(installed_items)}")
+        return installed_items
 
 
 def format_artifact_table(artifacts: List[Dict[str, Any]]) -> None:
