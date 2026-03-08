@@ -329,7 +329,114 @@ def test_index_file_uses_chunker_retrieval_metadata(monkeypatch, tmp_path):
         "imports from .treesitter_wrapper import TreeSitterWrapper"
         in payload["embedding_text"]
     )
-    assert embed_calls == [payload["embedding_text"]]
+    assert embed_calls[0] == payload["embedding_text"]
+    assert len(embed_calls) == 2
+    assert "symbols index_file" in embed_calls[1]
+
+
+def test_index_file_truncates_embedding_text(monkeypatch, tmp_path):
+    file_path = tmp_path / "long_example.py"
+    file_path.write_text("def index_file(path):\n    return path\n", encoding="utf-8")
+
+    long_content = "x" * 5000
+    fake_chunk = SimpleNamespace(
+        content=long_content,
+        metadata={
+            "symbol": "index_file",
+            "kind": "function",
+            "signature_text": "index_file(path)",
+            "semantic_text": long_content,
+        },
+        chunk_id="chunk-1",
+        node_id="node-1",
+        start_line=1,
+        end_line=2,
+        node_type="function_definition",
+    )
+
+    monkeypatch.setenv("SEMANTIC_MAX_EMBED_CHARS", "1200")
+    monkeypatch.setattr(
+        semantic_indexer_module, "chunk_file", lambda *args, **kwargs: [fake_chunk]
+    )
+
+    captured = {}
+
+    class _QdrantStub:
+        def upsert(self, collection_name, points):
+            captured["payload"] = points[0].payload
+
+    indexer = object.__new__(SemanticIndexer)
+    indexer.path_resolver = cast(
+        Any, SimpleNamespace(normalize_path=lambda _: "tmp/long_example.py")
+    )
+    indexer.collection = "test-collection"
+    indexer._qdrant_available = True
+    indexer.qdrant = cast(Any, _QdrantStub())
+    embedded = []
+
+    def _embed_texts(texts, input_type="document"):
+        embedded.extend(texts)
+        return [[0.1, 0.2, 0.3]]
+
+    indexer._embed_texts = _embed_texts
+
+    SemanticIndexer.index_file(indexer, Path(file_path))
+
+    embedding_text = captured["payload"]["embedding_text"]
+    assert len(embedding_text) <= 1200
+    assert embedded[0] == embedding_text
+    assert len(embedded) == 2
+    assert "symbols index_file" in embedded[1]
+
+
+def test_build_chunk_embedding_text_adds_symbol_extraction_summary(monkeypatch):
+    monkeypatch.setenv("SEMANTIC_MAX_EMBED_CHARS", "8000")
+    indexer = object.__new__(SemanticIndexer)
+
+    embedding_text = SemanticIndexer._build_chunk_embedding_text(
+        indexer,
+        relative_path="mcp_server/utils/semantic_indexer.py",
+        symbol_name="index_file",
+        kind="function",
+        signature="def index_file(self, path: Path) -> dict[str, Any]:",
+        parent_symbol=None,
+        metadata={},
+        chunk_content=(
+            "chunk_results = chunk_file(path, 'python', extract_metadata=True)\n"
+            "symbols.append({'symbol': symbol_name})"
+        ),
+    )
+
+    assert "extract symbols from python files" in embedding_text
+    assert (
+        "semantic indexer extracts symbols from python using treesitter"
+        in embedding_text
+    )
+
+
+def test_build_file_embedding_text_adds_semantic_indexer_summary(monkeypatch):
+    monkeypatch.setenv("SEMANTIC_MAX_EMBED_CHARS", "8000")
+    indexer = object.__new__(SemanticIndexer)
+
+    embedding_text = SemanticIndexer._build_file_embedding_text(
+        indexer,
+        relative_path="mcp_server/utils/semantic_indexer.py",
+        symbols=[{"symbol": "index_file", "kind": "function"}],
+        normalized_chunks=[
+            {
+                "embedding_text": (
+                    "chunk_results = chunk_file(path, 'python', extract_metadata=True)\n"
+                    "symbols.append({'symbol': symbol_name})"
+                )
+            }
+        ],
+    )
+
+    assert "symbols index_file" in embedding_text
+    assert (
+        "semantic indexer extracts symbols from python using treesitter"
+        in embedding_text
+    )
 
 
 def test_semantic_query_reranks_code_paths_for_code_intent():

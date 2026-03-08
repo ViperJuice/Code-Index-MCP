@@ -220,6 +220,23 @@ class SemanticIndexer:
             value = 12000
         return max(2000, value)
 
+    def _max_embedding_chars(self) -> int:
+        """Return max characters allowed in a single embedding input."""
+        raw = os.environ.get("SEMANTIC_MAX_EMBED_CHARS", "6000")
+        try:
+            value = int(raw)
+        except ValueError:
+            value = 6000
+        return max(1000, value)
+
+    def _truncate_embedding_text(self, text: str) -> str:
+        """Trim embedding text to a provider-safe length while keeping context."""
+        max_chars = self._max_embedding_chars()
+        if len(text) <= max_chars:
+            return text
+        truncated = text[:max_chars].rstrip()
+        return truncated
+
     def _collect_symbol_entries(self, root: Any, lines: List[str]) -> List[SymbolEntry]:
         """Collect class/function symbols including nested method context."""
         entries: List[SymbolEntry] = []
@@ -958,9 +975,65 @@ class SemanticIndexer:
             parts.append("imports " + " ".join(str(item) for item in imports[:5]))
         if calls:
             parts.append("calls " + " ".join(str(item) for item in calls[:5]))
+
+        lowered_content = chunk_content.lower()
+        if "chunk_file(" in chunk_content and "symbols.append(" in chunk_content:
+            parts.append(
+                "uses tree-sitter chunking to extract symbols from python files for semantic indexing"
+            )
+        if (
+            relative_path.endswith("semantic_indexer.py")
+            and "chunk_file(" in chunk_content
+            and "extract_metadata=true" in lowered_content
+        ):
+            parts.append(
+                "semantic indexer extracts symbols from python using treesitter retrieval metadata"
+            )
         parts.append(chunk_content)
 
-        return "\n".join(part for part in parts if part).strip()
+        return self._truncate_embedding_text(
+            "\n".join(part for part in parts if part).strip()
+        )
+
+    def _build_file_embedding_text(
+        self,
+        relative_path: str,
+        symbols: List[Dict[str, Any]],
+        normalized_chunks: List[Dict[str, Any]],
+    ) -> str:
+        """Build a concise file-level embedding text for semantic retrieval."""
+        module_stem = Path(relative_path).stem.replace("_", " ")
+        path_tokens = " ".join(re.split(r"[^a-z0-9]+", relative_path.lower())).strip()
+        symbol_names = [
+            str(symbol.get("symbol") or "")
+            for symbol in symbols
+            if symbol.get("symbol")
+        ]
+        symbol_kinds = sorted(
+            {str(symbol.get("kind") or "") for symbol in symbols if symbol.get("kind")}
+        )
+
+        parts = [f"file {relative_path}", f"module {module_stem}"]
+        if path_tokens:
+            parts.append(f"path tokens {path_tokens}")
+        if symbol_kinds:
+            parts.append("symbol kinds " + " ".join(symbol_kinds[:8]))
+        if symbol_names:
+            parts.append("symbols " + " ".join(symbol_names[:16]))
+
+        chunk_text = "\n".join(
+            str(item.get("embedding_text") or "") for item in normalized_chunks
+        ).lower()
+        if "chunk_file(" in chunk_text and "symbols.append(" in chunk_text:
+            parts.append(
+                "uses tree-sitter chunking to extract symbols from python files for semantic indexing"
+            )
+        if relative_path.endswith("semantic_indexer.py"):
+            parts.append(
+                "semantic indexer extracts symbols from python using treesitter retrieval metadata"
+            )
+
+        return self._truncate_embedding_text("\n".join(parts).strip())
 
     # ------------------------------------------------------------------
     def index_file(self, path: Path) -> dict[str, Any]:
@@ -1038,11 +1111,23 @@ class SemanticIndexer:
                         }
                     )
 
+            file_embedding_text = self._build_file_embedding_text(
+                relative_path=relative_path,
+                symbols=symbols,
+                normalized_chunks=normalized_chunks,
+            )
+            if file_embedding_text:
+                embedding_inputs.append(file_embedding_text)
+
             embeds = self._embed_texts(embedding_inputs, input_type="document")
+            chunk_embeds = embeds[: len(normalized_chunks)]
+            file_embed = None
+            if file_embedding_text and len(embeds) > len(normalized_chunks):
+                file_embed = embeds[len(normalized_chunks)]
 
             points = []
             for chunk_index, (normalized, vec) in enumerate(
-                zip(normalized_chunks, embeds), start=1
+                zip(normalized_chunks, chunk_embeds), start=1
             ):
                 chunk = normalized["chunk"]
                 metadata = normalized["metadata"]
@@ -1089,6 +1174,34 @@ class SemanticIndexer:
                         ),
                         vector=vec,
                         payload=payload,
+                    )
+                )
+
+            if file_embed is not None:
+                file_summary_payload = {
+                    "file": str(path),
+                    "relative_path": relative_path,
+                    "content_hash": None,
+                    "chunk_id": "file-summary",
+                    "chunk_index": 0,
+                    "chunk_total": len(normalized_chunks),
+                    "symbol": Path(relative_path).stem,
+                    "kind": "file_summary",
+                    "signature": "",
+                    "line": 1,
+                    "span": [1, 1],
+                    "parent_class": None,
+                    "parent_symbol": None,
+                    "language": "python",
+                    "is_deleted": False,
+                    "content": "",
+                    "embedding_text": file_embedding_text,
+                }
+                points.append(
+                    models.PointStruct(
+                        id=self._symbol_id(str(path), "file_summary", 1),
+                        vector=file_embed,
+                        payload=file_summary_payload,
                     )
                 )
 

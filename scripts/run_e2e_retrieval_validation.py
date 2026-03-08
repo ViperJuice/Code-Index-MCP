@@ -293,7 +293,10 @@ def run(args: argparse.Namespace) -> Dict[str, object]:
             )
             bm25.add_document(str(path), text, metadata={"language": "python"})
             fuzzy.add_file(str(path), text)
-            if len(text) <= args.semantic_max_chars:
+            should_semantic_index = (
+                path.suffix == ".py" or len(text) <= args.semantic_max_chars
+            )
+            if should_semantic_index:
                 qwen_sem.index_file(path)
                 if voyage_sem:
                     voyage_sem.index_file(path)
