@@ -116,9 +116,17 @@ jobs:
           index_dir = Path('.mcp-index')
           index_db = index_dir / 'code_index.db'
           metadata_path = index_dir / '.index_metadata.json'
+          repo_metadata_path = Path('.index_metadata.json')
 
           embedding_model = 'voyage-code-3'
           schema_version = '2'
+
+          if repo_metadata_path.exists():
+              try:
+                  repo_metadata = json.loads(repo_metadata_path.read_text())
+                  embedding_model = repo_metadata.get('embedding_model', embedding_model)
+              except Exception:
+                  pass
 
           if metadata_path.exists():
               try:
