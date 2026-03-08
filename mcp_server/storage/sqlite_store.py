@@ -7,6 +7,7 @@ for efficient full-text search capabilities.
 
 import json
 import logging
+import re
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -16,6 +17,51 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from ..core.path_resolver import PathResolver
 
 logger = logging.getLogger(__name__)
+
+
+def _normalized_query_terms(query: str) -> List[str]:
+    expanded = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", query)
+    return [
+        token
+        for token in re.findall(r"[a-z0-9_]+", expanded.lower())
+        if len(token) >= 3
+    ]
+
+
+def _looks_like_symbol_precise_query(query: str) -> bool:
+    normalized = query.strip()
+    if not normalized:
+        return False
+    if re.search(
+        r"\b(class|def|function|method|symbol)\s+[A-Za-z_][A-Za-z0-9_]*", normalized
+    ):
+        return True
+    if re.search(r"\b[A-Z][A-Za-z0-9_]{2,}\b", normalized):
+        return True
+    return bool(re.search(r"\b[a-z]+_[a-z0-9_]+\b", normalized))
+
+
+def _fts_rank_adjustment(query: str, file_path: str) -> float:
+    normalized_path = file_path.replace("\\", "/").lower().lstrip("./")
+    filename_stem = Path(normalized_path).stem
+    path_tokens = set(re.findall(r"[a-z0-9_]+", normalized_path))
+    terms = _normalized_query_terms(query)
+
+    adjustment = 0.0
+    if normalized_path.endswith("/__init__.py") or normalized_path == "__init__.py":
+        adjustment += 0.45
+    if _looks_like_symbol_precise_query(query) and (
+        normalized_path.startswith("tests/") or "/tests/" in normalized_path
+    ):
+        adjustment += 0.7
+
+    filename_matches = sum(
+        1 for term in terms if term.replace("-", "_") in filename_stem
+    )
+    path_matches = sum(1 for term in terms if term.replace("-", "_") in path_tokens)
+    adjustment -= min(filename_matches, 3) * 0.22
+    adjustment -= min(path_matches, 4) * 0.08
+    return adjustment
 
 
 class SQLiteStore:
@@ -1324,6 +1370,7 @@ class SQLiteStore:
         Returns:
             List of matching code snippets
         """
+        fetch_limit = min(max(limit * 4, limit), 100)
         with self._get_connection() as conn:
             cursor = conn.execute(
                 """SELECT
@@ -1337,9 +1384,19 @@ class SQLiteStore:
                    WHERE fts_code MATCH ?
                    ORDER BY rank
                    LIMIT ?""",
-                (query, limit),
+                (query, fetch_limit),
             )
-            return [dict(row) for row in cursor.fetchall()]
+            results = [dict(row) for row in cursor.fetchall()]
+
+        for result in results:
+            file_path = str(result.get("file_path", ""))
+            base_rank = float(result.get("rank", 0.0) or 0.0)
+            result["adjusted_rank"] = base_rank + _fts_rank_adjustment(query, file_path)
+
+        results.sort(
+            key=lambda row: float(row.get("adjusted_rank", row.get("rank", 0.0)))
+        )
+        return results[:limit]
 
     # Index operations for fuzzy_indexer.py integration
     def persist_fuzzy_index(self, index_data: Dict[str, List[Tuple[str, Any]]]):

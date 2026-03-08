@@ -7,6 +7,7 @@ extension, which includes built-in BM25 ranking algorithms.
 
 import hashlib
 import logging
+import re
 import sqlite3
 
 # Interface definition inline for now
@@ -17,6 +18,74 @@ from typing import Any, Dict, List, Optional
 from ..storage.sqlite_store import SQLiteStore
 
 logger = logging.getLogger(__name__)
+
+
+def _normalized_query_terms(query: str) -> List[str]:
+    expanded = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", query)
+    return [
+        token
+        for token in re.findall(r"[a-z0-9_]+", expanded.lower())
+        if len(token) >= 3
+    ]
+
+
+def _looks_like_symbol_precise_query(query: str) -> bool:
+    normalized = query.strip()
+    if not normalized:
+        return False
+    if re.search(
+        r"\b(class|def|function|method|symbol)\s+[A-Za-z_][A-Za-z0-9_]*", normalized
+    ):
+        return True
+    if re.search(r"\b[A-Z][A-Za-z0-9_]{2,}\b", normalized):
+        return True
+    return bool(re.search(r"\b[a-z]+_[a-z0-9_]+\b", normalized))
+
+
+def _bm25_score_adjustment(query: str, file_path: str) -> float:
+    normalized_path = file_path.replace("\\", "/").lower().lstrip("./")
+    filename_stem = Path(normalized_path).stem
+    path_tokens = set(re.findall(r"[a-z0-9_]+", normalized_path))
+    terms = _normalized_query_terms(query)
+
+    adjustment = 0.0
+    if normalized_path.endswith("/__init__.py") or normalized_path == "__init__.py":
+        adjustment += 1.2
+    if _looks_like_symbol_precise_query(query) and (
+        normalized_path.startswith("tests/") or "/tests/" in normalized_path
+    ):
+        adjustment += 1.4
+
+    filename_matches = sum(
+        1 for term in terms if term.replace("-", "_") in filename_stem
+    )
+    path_matches = sum(1 for term in terms if term.replace("-", "_") in path_tokens)
+    adjustment -= min(filename_matches, 3) * 0.45
+    adjustment -= min(path_matches, 4) * 0.16
+    return adjustment
+
+
+def _symbol_query_candidates(query: str) -> List[str]:
+    candidates: List[str] = []
+
+    keyword_match = re.search(
+        r"\b(?:class|def|function|method|symbol)\s+([A-Za-z_][A-Za-z0-9_]*)",
+        query,
+    )
+    if keyword_match:
+        candidates.append(keyword_match.group(1))
+
+    for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", query):
+        if re.search(r"[A-Z]", token) or "_" in token:
+            candidates.append(token)
+
+    normalized: List[str] = []
+    seen = set()
+    for candidate in candidates:
+        if candidate not in seen:
+            seen.add(candidate)
+            normalized.append(candidate)
+    return normalized
 
 
 # Define IIndexer interface inline
@@ -147,7 +216,9 @@ class BM25Indexer(IIndexer):
             logger.error(f"Failed to index documents: {e}")
             return False
 
-    def add_document(self, doc_id: str, content: str, metadata: Optional[Dict] = None) -> None:
+    def add_document(
+        self, doc_id: str, content: str, metadata: Optional[Dict] = None
+    ) -> None:
         """
         Add a document to the BM25 index.
 
@@ -160,7 +231,9 @@ class BM25Indexer(IIndexer):
             # Get or create file record
             file_record = self.storage.get_file(doc_id)
             if not file_record:
-                logger.warning(f"File record not found for {doc_id}, skipping BM25 indexing")
+                logger.warning(
+                    f"File record not found for {doc_id}, skipping BM25 indexing"
+                )
                 return
 
             file_id = file_record["id"]
@@ -293,7 +366,71 @@ class BM25Indexer(IIndexer):
             elif search_type == "documents":
                 return self._search_documents(conn, query, limit, **kwargs)
             else:
-                return self._search_content(conn, query, limit, language, file_filter)
+                content_results = self._search_content(
+                    conn,
+                    query,
+                    limit,
+                    language,
+                    file_filter,
+                )
+
+        if not _looks_like_symbol_precise_query(query):
+            return content_results
+
+        symbol_results = self._search_symbol_definitions(query, limit)
+        if not symbol_results:
+            return content_results
+
+        merged: List[Dict[str, Any]] = []
+        seen_paths = set()
+        for result in symbol_results + content_results:
+            path = str(result.get("filepath") or result.get("file_path") or "")
+            if path in seen_paths:
+                continue
+            seen_paths.add(path)
+            merged.append(result)
+            if len(merged) >= limit:
+                break
+        return merged
+
+    def _search_symbol_definitions(
+        self, query: str, limit: int
+    ) -> List[Dict[str, Any]]:
+        """Search stored symbol definitions for symbol-precise queries."""
+        candidates = _symbol_query_candidates(query)
+        if not candidates:
+            return []
+
+        results: List[Dict[str, Any]] = []
+        seen_paths = set()
+        for candidate in candidates:
+            matches = self.storage.search_symbols(query=candidate, limit=limit * 4)
+            for match in matches:
+                file_path = str(match.get("file_path") or "")
+                if not file_path or file_path in seen_paths:
+                    continue
+
+                name = str(match.get("name") or "")
+                exact_name = name == candidate
+                score = 0.0 if exact_name else 0.25
+                score += _bm25_score_adjustment(query, file_path)
+                results.append(
+                    {
+                        "filepath": file_path,
+                        "filename": Path(file_path).name,
+                        "language": match.get("language"),
+                        "snippet": match.get("signature") or name,
+                        "score": score,
+                        "adjusted_score": score,
+                        "type": "symbol_definition",
+                        "name": name,
+                        "kind": match.get("type"),
+                    }
+                )
+                seen_paths.add(file_path)
+
+        results.sort(key=lambda item: float(item.get("adjusted_score", item["score"])))
+        return results[:limit]
 
     def _search_content(
         self,
@@ -306,7 +443,7 @@ class BM25Indexer(IIndexer):
         """Search in file content with BM25 ranking."""
         # Build WHERE clause
         where_clauses = [f"{self.table_name} MATCH ?"]
-        params = [query]
+        params: List[Any] = [query]
 
         if language:
             where_clauses.append("language = ?")
@@ -351,6 +488,13 @@ class BM25Indexer(IIndexer):
                 }
             )
 
+        for result in results:
+            result["adjusted_score"] = float(result["score"]) + _bm25_score_adjustment(
+                query,
+                str(result["filepath"]),
+            )
+
+        results.sort(key=lambda item: float(item.get("adjusted_score", item["score"])))
         return results
 
     def _search_symbols(
@@ -361,7 +505,7 @@ class BM25Indexer(IIndexer):
 
         # Build WHERE clause
         where_clauses = ["bm25_symbols MATCH ?"]
-        params = [query]
+        params: List[Any] = [query]
 
         if kind_filter:
             where_clauses.append("kind = ?")
@@ -384,9 +528,7 @@ class BM25Indexer(IIndexer):
             WHERE {}
             ORDER BY score
             LIMIT ?
-        """.format(
-                where_clause
-            ),
+        """.format(where_clause),
             params,
         )
 
@@ -405,6 +547,13 @@ class BM25Indexer(IIndexer):
                 }
             )
 
+        for result in results:
+            result["adjusted_score"] = float(result["score"]) + _bm25_score_adjustment(
+                query,
+                str(result["filepath"]),
+            )
+
+        results.sort(key=lambda item: float(item.get("adjusted_score", item["score"])))
         return results
 
     def _search_documents(
@@ -489,7 +638,9 @@ class BM25Indexer(IIndexer):
 
             logger.debug(f"Removed {doc_id} from BM25 index")
 
-    def update_document(self, doc_id: str, content: str, metadata: Optional[Dict] = None) -> None:
+    def update_document(
+        self, doc_id: str, content: str, metadata: Optional[Dict] = None
+    ) -> None:
         """
         Update a document in the BM25 index.
 
@@ -556,13 +707,17 @@ class BM25Indexer(IIndexer):
         """Optimize the FTS5 index for better performance."""
         with self.storage._get_connection() as conn:
             # Optimize main content table
-            conn.execute(f"INSERT INTO {self.table_name}({self.table_name}) VALUES('optimize')")
+            conn.execute(
+                f"INSERT INTO {self.table_name}({self.table_name}) VALUES('optimize')"
+            )
 
             # Optimize symbol table
             conn.execute("INSERT INTO bm25_symbols(bm25_symbols) VALUES('optimize')")
 
             # Optimize document table
-            conn.execute("INSERT INTO bm25_documents(bm25_documents) VALUES('optimize')")
+            conn.execute(
+                "INSERT INTO bm25_documents(bm25_documents) VALUES('optimize')"
+            )
 
             logger.info("BM25 index optimized")
 
@@ -570,7 +725,9 @@ class BM25Indexer(IIndexer):
         """Rebuild the entire FTS5 index."""
         with self.storage._get_connection() as conn:
             # Rebuild main content table
-            conn.execute(f"INSERT INTO {self.table_name}({self.table_name}) VALUES('rebuild')")
+            conn.execute(
+                f"INSERT INTO {self.table_name}({self.table_name}) VALUES('rebuild')"
+            )
 
             # Rebuild symbol table
             conn.execute("INSERT INTO bm25_symbols(bm25_symbols) VALUES('rebuild')")

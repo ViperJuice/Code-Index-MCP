@@ -4,6 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 
+from mcp_server.indexer.bm25_indexer import BM25Indexer
 from mcp_server.indexer.hybrid_search import HybridSearch, HybridSearchConfig
 from mcp_server.storage.sqlite_store import SQLiteStore
 from mcp_server.utils import semantic_indexer as semantic_indexer_module
@@ -78,6 +79,97 @@ def test_classic_search_code_fts_handles_string_file_ids(temp_db_path):
     results = store.search_code_fts("semantic preflight", limit=5)
     assert results
     assert "semantic_preflight.py" in str(results[0].get("file_path", ""))
+
+
+def test_classic_search_code_fts_demotes_init_for_filename_match(temp_db_path):
+    store = SQLiteStore(str(temp_db_path))
+    repo_id = store.create_repository("/repo", "repo")
+    store.store_file(
+        repository_id=repo_id,
+        path="/repo/mcp_server/setup/__init__.py",
+        relative_path="mcp_server/setup/__init__.py",
+        language="python",
+    )
+    store.store_file(
+        repository_id=repo_id,
+        path="/repo/mcp_server/setup/semantic_preflight.py",
+        relative_path="mcp_server/setup/semantic_preflight.py",
+        language="python",
+    )
+
+    with store._get_connection() as conn:
+        conn.execute(
+            "INSERT INTO fts_code (content, file_id) VALUES (?, ?)",
+            (
+                "semantic preflight exports and helpers",
+                "mcp_server/setup/__init__.py",
+            ),
+        )
+        conn.execute(
+            "INSERT INTO fts_code (content, file_id) VALUES (?, ?)",
+            (
+                "semantic preflight readiness checks and validation",
+                "mcp_server/setup/semantic_preflight.py",
+            ),
+        )
+
+    results = store.search_code_fts("semantic preflight", limit=5)
+
+    assert results
+    assert results[0]["file_path"].endswith("semantic_preflight.py")
+
+
+def test_bm25_search_demotes_init_for_symbol_query(temp_db_path):
+    store = SQLiteStore(str(temp_db_path))
+    repo_id = store.create_repository("/repo", "repo")
+    init_file_id = store.store_file(
+        repository_id=repo_id,
+        path="/repo/mcp_server/utils/__init__.py",
+        relative_path="mcp_server/utils/__init__.py",
+        language="python",
+    )
+    impl_file_id = store.store_file(
+        repository_id=repo_id,
+        path="/repo/mcp_server/utils/semantic_indexer.py",
+        relative_path="mcp_server/utils/semantic_indexer.py",
+        language="python",
+    )
+
+    store.store_symbol(
+        file_id=init_file_id,
+        name="SemanticIndexer",
+        kind="class",
+        line_start=1,
+        line_end=1,
+        signature="from .semantic_indexer import SemanticIndexer",
+        documentation="",
+    )
+    store.store_symbol(
+        file_id=impl_file_id,
+        name="SemanticIndexer",
+        kind="class",
+        line_start=1,
+        line_end=2,
+        signature="class SemanticIndexer:",
+        documentation="",
+    )
+
+    bm25 = BM25Indexer(storage=store)
+    bm25.add_document(
+        "mcp_server/utils/__init__.py",
+        "from .semantic_indexer import SemanticIndexer",
+        {"language": "python"},
+    )
+    bm25.add_document(
+        "mcp_server/utils/semantic_indexer.py",
+        "class SemanticIndexer:\n    pass",
+        {"language": "python"},
+    )
+
+    results = bm25.search("class SemanticIndexer", limit=5)
+
+    assert results
+    assert str(results[0]["filepath"]).endswith("semantic_indexer.py")
 
 
 @pytest.mark.asyncio
@@ -212,7 +304,13 @@ def test_index_file_uses_chunker_retrieval_metadata(monkeypatch, tmp_path):
     indexer.collection = "test-collection"
     indexer._qdrant_available = True
     indexer.qdrant = cast(Any, _QdrantStub())
-    indexer._embed_texts = lambda texts, input_type="document": [[0.1, 0.2, 0.3]]
+    embed_calls = []
+
+    def _embed_texts(texts, input_type="document"):
+        embed_calls.extend(texts)
+        return [[0.1, 0.2, 0.3]]
+
+    indexer._embed_texts = _embed_texts
 
     result = SemanticIndexer.index_file(indexer, Path(file_path))
 
@@ -224,7 +322,14 @@ def test_index_file_uses_chunker_retrieval_metadata(monkeypatch, tmp_path):
     assert payload["signature"] == "index_file(path)"
     assert payload["qualified_name"] == "SemanticIndexer.index_file"
     assert payload["semantic_text"].startswith("function index_file")
-    assert payload["embedding_text"] == payload["semantic_text"]
+    assert "file tmp/example.py" in payload["embedding_text"]
+    assert "module example" in payload["embedding_text"]
+    assert "qualified name SemanticIndexer.index_file" in payload["embedding_text"]
+    assert (
+        "imports from .treesitter_wrapper import TreeSitterWrapper"
+        in payload["embedding_text"]
+    )
+    assert embed_calls == [payload["embedding_text"]]
 
 
 def test_semantic_query_reranks_code_paths_for_code_intent():
@@ -249,6 +354,89 @@ def test_semantic_query_reranks_code_paths_for_code_intent():
     reranked = SemanticIndexer._rerank_query_results(
         indexer,
         "extract symbols from python using treesitter",
+        results,
+        limit=2,
+    )
+
+    assert reranked[0]["relative_path"] == "mcp_server/utils/semantic_indexer.py"
+
+
+def test_semantic_query_prefers_semantic_indexer_over_generic_treesitter_plugin():
+    indexer = object.__new__(SemanticIndexer)
+
+    results = [
+        {
+            "relative_path": "mcp_server/plugins/generic_treesitter_plugin.py",
+            "semantic_text": "generic treesitter plugin extracts symbols from source files",
+            "embedding_text": "tree sitter generic plugin parser symbols",
+            "score": 0.9,
+        },
+        {
+            "relative_path": "mcp_server/utils/semantic_indexer.py",
+            "semantic_text": "semantic indexer extracts symbols from python using treesitter",
+            "embedding_text": "file semantic_indexer.py module semantic indexer extract symbols index embeddings treesitter",
+            "score": 0.82,
+        },
+    ]
+
+    reranked = SemanticIndexer._rerank_query_results(
+        indexer,
+        "extract symbols from python using treesitter",
+        results,
+        limit=2,
+    )
+
+    assert reranked[0]["relative_path"] == "mcp_server/utils/semantic_indexer.py"
+
+
+def test_semantic_query_overlap_uses_relative_path_tokens():
+    indexer = object.__new__(SemanticIndexer)
+
+    results = [
+        {
+            "relative_path": "mcp_server/watcher_multi_repo.py",
+            "semantic_text": "artifact sync watcher",
+            "score": 0.9,
+        },
+        {
+            "relative_path": "mcp_server/artifacts/delta_resolver.py",
+            "semantic_text": "resolve delta chain for target commit",
+            "score": 0.82,
+        },
+    ]
+
+    reranked = SemanticIndexer._rerank_query_results(
+        indexer,
+        "how do artifact push pull and delta resolution work",
+        results,
+        limit=2,
+    )
+
+    assert reranked[0]["relative_path"] == "mcp_server/artifacts/delta_resolver.py"
+
+
+def test_semantic_query_symbol_precise_demotes_tests():
+    indexer = object.__new__(SemanticIndexer)
+
+    results = [
+        {
+            "relative_path": "tests/test_profile_aware_semantic_indexer.py",
+            "symbol": "SemanticIndexer",
+            "semantic_text": "test SemanticIndexer behavior",
+            "score": 0.92,
+        },
+        {
+            "relative_path": "mcp_server/utils/semantic_indexer.py",
+            "symbol": "SemanticIndexer",
+            "qualified_name": "SemanticIndexer",
+            "semantic_text": "SemanticIndexer implementation",
+            "score": 0.84,
+        },
+    ]
+
+    reranked = SemanticIndexer._rerank_query_results(
+        indexer,
+        "class SemanticIndexer",
         results,
         limit=2,
     )
@@ -290,6 +478,142 @@ def test_hybrid_post_process_prefers_impl_paths_for_code_intent(temp_db_path):
     assert reranked[0].filepath == "mcp_server/utils/semantic_indexer.py"
 
 
+def test_hybrid_post_process_uses_filepath_overlap(temp_db_path):
+    store = SQLiteStore(str(temp_db_path))
+    hybrid = HybridSearch(storage=store, config=HybridSearchConfig())
+
+    from mcp_server.indexer.hybrid_search import SearchResult
+
+    results = [
+        SearchResult(
+            doc_id="watcher",
+            filepath="mcp_server/watcher_multi_repo.py",
+            score=0.9,
+            snippet="artifact sync watcher",
+            metadata={},
+            source="semantic",
+        ),
+        SearchResult(
+            doc_id="delta",
+            filepath="mcp_server/artifacts/delta_resolver.py",
+            score=0.8,
+            snippet="resolve delta chain for target commit",
+            metadata={},
+            source="semantic",
+        ),
+    ]
+
+    reranked = hybrid._post_process_results(
+        results,
+        limit=2,
+        query="how do artifact push pull and delta resolution work",
+    )
+
+    assert reranked[0].filepath == "mcp_server/artifacts/delta_resolver.py"
+
+
+def test_hybrid_post_process_prefers_setup_commands_for_setup_validation(temp_db_path):
+    store = SQLiteStore(str(temp_db_path))
+    hybrid = HybridSearch(storage=store, config=HybridSearchConfig())
+
+    from mcp_server.indexer.hybrid_search import SearchResult
+
+    results = [
+        SearchResult(
+            doc_id="preflight",
+            filepath="mcp_server/setup/semantic_preflight.py",
+            score=0.92,
+            snippet="validate qdrant and embedding readiness preflight",
+            metadata={},
+            source="semantic",
+        ),
+        SearchResult(
+            doc_id="setup",
+            filepath="mcp_server/cli/setup_commands.py",
+            score=0.83,
+            snippet="setup command validates qdrant and embedding readiness",
+            metadata={},
+            source="bm25",
+        ),
+    ]
+
+    reranked = hybrid._post_process_results(
+        results,
+        limit=2,
+        query="how does semantic setup validate qdrant and embedding readiness",
+    )
+
+    assert reranked[0].filepath == "mcp_server/cli/setup_commands.py"
+
+
+def test_hybrid_post_process_prefers_delta_resolver_for_delta_resolution(temp_db_path):
+    store = SQLiteStore(str(temp_db_path))
+    hybrid = HybridSearch(storage=store, config=HybridSearchConfig())
+
+    from mcp_server.indexer.hybrid_search import SearchResult
+
+    results = [
+        SearchResult(
+            doc_id="artifacts",
+            filepath="mcp_server/artifacts/delta_artifacts.py",
+            score=0.9,
+            snippet="artifact push pull state",
+            metadata={},
+            source="semantic",
+        ),
+        SearchResult(
+            doc_id="resolver",
+            filepath="mcp_server/artifacts/delta_resolver.py",
+            score=0.82,
+            snippet="resolve delta chain for artifact pull",
+            metadata={},
+            source="bm25",
+        ),
+    ]
+
+    reranked = hybrid._post_process_results(
+        results,
+        limit=2,
+        query="how do artifact push pull and delta resolution work",
+    )
+
+    assert reranked[0].filepath == "mcp_server/artifacts/delta_resolver.py"
+
+
+def test_hybrid_post_process_symbol_precise_demotes_tests(temp_db_path):
+    store = SQLiteStore(str(temp_db_path))
+    hybrid = HybridSearch(storage=store, config=HybridSearchConfig())
+
+    from mcp_server.indexer.hybrid_search import SearchResult
+
+    results = [
+        SearchResult(
+            doc_id="test",
+            filepath="tests/test_profile_aware_semantic_indexer.py",
+            score=0.9,
+            snippet="class SemanticIndexer test",
+            metadata={},
+            source="semantic",
+        ),
+        SearchResult(
+            doc_id="impl",
+            filepath="mcp_server/utils/semantic_indexer.py",
+            score=0.82,
+            snippet="class SemanticIndexer implementation",
+            metadata={},
+            source="semantic",
+        ),
+    ]
+
+    reranked = hybrid._post_process_results(
+        results,
+        limit=2,
+        query="class SemanticIndexer",
+    )
+
+    assert reranked[0].filepath == "mcp_server/utils/semantic_indexer.py"
+
+
 def test_collect_files_excludes_generated_dirs_and_prioritizes_source(tmp_path):
     (tmp_path / "mcp_server").mkdir()
     (tmp_path / "mcp_server" / "core.py").write_text(
@@ -309,6 +633,10 @@ def test_collect_files_excludes_generated_dirs_and_prioritizes_source(tmp_path):
     (tmp_path / "analysis_archive" / "notes.md").write_text(
         "# Notes\n", encoding="utf-8"
     )
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_core.py").write_text(
+        "def test_core():\n    pass\n", encoding="utf-8"
+    )
     (tmp_path / "htmlcov").mkdir()
     (tmp_path / "htmlcov" / "status.json").write_text("{}\n", encoding="utf-8")
 
@@ -318,9 +646,13 @@ def test_collect_files_excludes_generated_dirs_and_prioritizes_source(tmp_path):
     assert "mcp_server/core.py" in relative_paths
     assert "scripts/runner.py" in relative_paths
     assert "docs/guide.md" in relative_paths
+    assert "tests/test_core.py" in relative_paths
     assert "docs/benchmarks/report.md" not in relative_paths
     assert "analysis_archive/notes.md" not in relative_paths
     assert "htmlcov/status.json" not in relative_paths
     assert relative_paths.index("mcp_server/core.py") < relative_paths.index(
         "docs/guide.md"
+    )
+    assert relative_paths.index("docs/guide.md") < relative_paths.index(
+        "tests/test_core.py"
     )

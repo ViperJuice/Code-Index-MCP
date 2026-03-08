@@ -142,8 +142,10 @@ def _extract_file_path(result: Dict[str, object]) -> str:
 
 def _collect_files(repo_path: Path, max_files: int) -> List[Path]:
     files: List[Path] = []
-    source_first: List[Path] = []
-    other_docs: List[Path] = []
+    impl_files: List[Path] = []
+    script_files: List[Path] = []
+    doc_files: List[Path] = []
+    test_files: List[Path] = []
 
     for path in repo_path.rglob("*"):
         if any(part in IGNORED_DIR_NAMES for part in path.parts):
@@ -155,14 +157,19 @@ def _collect_files(repo_path: Path, max_files: int) -> List[Path]:
         if any(fragment in normalized for fragment in IGNORED_PATH_FRAGMENTS):
             continue
 
-        if normalized.startswith(("mcp_server/", "tests/", "scripts/")):
-            source_first.append(path)
+        if normalized.startswith(("mcp_server/", "src/")):
+            impl_files.append(path)
+        elif normalized.startswith("scripts/"):
+            script_files.append(path)
+        elif normalized.startswith("tests/"):
+            test_files.append(path)
         else:
-            other_docs.append(path)
+            doc_files.append(path)
 
-    files.extend(source_first)
-    if len(files) < max_files:
-        files.extend(other_docs[: max_files - len(files)])
+    for bucket in (impl_files, script_files, doc_files, test_files):
+        if len(files) >= max_files:
+            break
+        files.extend(bucket[: max_files - len(files)])
     return files[:max_files]
 
 
