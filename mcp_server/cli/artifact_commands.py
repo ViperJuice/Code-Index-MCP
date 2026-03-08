@@ -7,10 +7,13 @@ index artifacts using GitHub Actions Artifacts storage.
 
 import subprocess
 import sys
+import json
 from pathlib import Path
 from typing import Optional
 
 import click
+
+from mcp_server.indexing.change_detector import ChangeDetector, FileChange
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
@@ -45,6 +48,135 @@ def _get_restored_index_paths() -> list[Path]:
 def _verify_local_index_restored() -> bool:
     """Check whether artifact retrieval restored a usable local index."""
     return bool(_get_restored_index_paths())
+
+
+def _load_json_file(path: Path) -> dict | None:
+    """Load JSON data if the file exists and is valid."""
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _get_artifact_identity() -> dict[str, str | None]:
+    """Return restored artifact commit and branch metadata."""
+    artifact_metadata = _load_json_file(Path("artifact-metadata.json")) or {}
+    index_metadata = _load_json_file(Path(".index_metadata.json")) or {}
+
+    return {
+        "commit": artifact_metadata.get("commit") or index_metadata.get("git_commit"),
+        "branch": artifact_metadata.get("branch"),
+        "embedding_model": artifact_metadata.get("compatibility", {}).get(
+            "embedding_model"
+        )
+        or index_metadata.get("embedding_model"),
+        "schema_version": artifact_metadata.get("compatibility", {}).get(
+            "schema_version"
+        )
+        or index_metadata.get("chunk_schema_version"),
+    }
+
+
+def _get_git_ref_info() -> dict[str, str | None]:
+    """Return current repository HEAD and branch information."""
+    info: dict[str, str | None] = {"head": None, "branch": None}
+    try:
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        info["head"] = head.stdout.strip()
+    except Exception:
+        return info
+
+    try:
+        branch = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        info["branch"] = branch.stdout.strip()
+    except Exception:
+        pass
+
+    return info
+
+
+def _merge_changes(*change_groups: list[FileChange]) -> list:
+    """Combine file changes while preserving unique path/type pairs."""
+    merged = []
+    seen: set[tuple[str, str, str | None]] = set()
+    for changes in change_groups:
+        for change in changes:
+            key = (change.path, change.change_type, change.old_path)
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(change)
+    return merged
+
+
+def _print_reconcile_guidance() -> None:
+    """Print reconcile guidance after restore or sync."""
+    artifact_identity = _get_artifact_identity()
+    git_info = _get_git_ref_info()
+
+    if artifact_identity.get("commit"):
+        click.echo(
+            f"📦 Restored artifact commit: {artifact_identity['commit']}"
+            + (
+                f" ({artifact_identity['branch']})"
+                if artifact_identity.get("branch")
+                else ""
+            )
+        )
+    if artifact_identity.get("embedding_model"):
+        click.echo(
+            f"🧠 Artifact embedding model: {artifact_identity['embedding_model']}"
+        )
+
+    if not artifact_identity.get("commit") or not git_info.get("head"):
+        click.echo("ℹ️  Artifact restore complete. Git drift could not be determined.")
+        return
+
+    if artifact_identity["commit"] == git_info["head"]:
+        click.echo("✅ Local HEAD matches the restored artifact commit.")
+    detector = ChangeDetector(Path.cwd())
+    committed_changes = []
+    if artifact_identity["commit"] != git_info["head"]:
+        from_commit = artifact_identity["commit"]
+        if from_commit is not None:
+            committed_changes = detector.get_changes_since_commit(from_commit, "HEAD")
+
+    uncommitted_changes = detector.get_uncommitted_changes()
+    all_changes = _merge_changes(committed_changes, uncommitted_changes)
+
+    if not all_changes:
+        click.echo("✅ No local drift detected. The restored artifact is ready to use.")
+        return
+
+    cost = detector.estimate_reindex_cost(all_changes)
+    change_summary = (
+        f"added/modified={cost['files_to_index']}, "
+        f"deleted={cost['files_to_remove']}, moved={cost['files_to_move']}"
+    )
+    click.echo(
+        f"🔄 Local drift detected relative to the restored artifact: {change_summary}"
+    )
+    if detector.should_use_incremental(all_changes):
+        click.echo(
+            "💡 Recommended: keep the restored artifact and let local incremental reindexing "
+            "catch up these changes."
+        )
+    else:
+        click.echo(
+            "⚠️  Change volume is large; a local rebuild may be simpler than incremental catch-up."
+        )
 
 
 @click.group()
@@ -133,6 +265,7 @@ def pull(latest: bool, artifact_id: Optional[int], no_backup: bool):
 
         restored = ", ".join(path.name for path in _get_restored_index_paths())
         click.echo(f"✅ Local index files restored: {restored}")
+        _print_reconcile_guidance()
 
     except Exception as e:
         click.echo(f"❌ Error: {e}", err=True)
@@ -195,6 +328,7 @@ def sync():
                     sys.exit(1)
                 restored = ", ".join(path.name for path in _get_restored_index_paths())
                 click.echo(f"✅ Indexes synchronized! Restored: {restored}")
+                _print_reconcile_guidance()
             else:
                 click.echo("❌ Sync failed", err=True)
                 sys.exit(1)
@@ -227,6 +361,7 @@ def sync():
 
             # Check remote artifacts
             click.echo("\n📡 Checking remote artifacts...")
+            _print_reconcile_guidance()
 
             cmd = [
                 sys.executable,
@@ -358,6 +493,7 @@ def recover(branch: Optional[str], commit: Optional[str], no_backup: bool):
 
         restored = ", ".join(path.name for path in _get_restored_index_paths())
         click.echo(f"✅ Local index files restored: {restored}")
+        _print_reconcile_guidance()
 
     except Exception as e:
         click.echo(f"❌ Error: {e}", err=True)

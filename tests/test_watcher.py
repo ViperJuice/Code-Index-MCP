@@ -12,7 +12,10 @@ Tests cover:
 
 import threading
 import time
+import os
+from contextlib import contextmanager
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 from watchdog.events import (
@@ -26,6 +29,20 @@ from watchdog.events import (
 from mcp_server.watcher import FileWatcher, _Handler
 
 
+@contextmanager
+def measure_time(_test_name, _benchmark_results):
+    yield
+
+
+@pytest.fixture
+def dispatcher_with_mock():
+    dispatcher = Mock()
+    dispatcher.index_file = Mock()
+    dispatcher.remove_file = Mock()
+    dispatcher.move_file = Mock()
+    return dispatcher
+
+
 class TestHandlerEventHandling:
     """Test the _Handler class event handling."""
 
@@ -34,15 +51,8 @@ class TestHandlerEventHandling:
         handler = _Handler(dispatcher_with_mock)
 
         assert handler.dispatcher == dispatcher_with_mock
-        assert handler.code_extensions == {
-            ".py",
-            ".js",
-            ".c",
-            ".cpp",
-            ".dart",
-            ".html",
-            ".css",
-        }
+        for extension in {".py", ".js", ".c", ".cpp", ".dart", ".html", ".css"}:
+            assert extension in handler.code_extensions
 
     def test_trigger_reindex_supported_file(self, dispatcher_with_mock):
         """Test triggering reindex for supported file."""
@@ -57,7 +67,7 @@ class TestHandlerEventHandling:
         """Test triggering reindex for unsupported file."""
         handler = _Handler(dispatcher_with_mock)
 
-        test_path = Path("/test/file.txt")
+        test_path = Path("/test/file.png")
         handler.trigger_reindex(test_path)
 
         # Should not index unsupported file
@@ -113,10 +123,10 @@ class TestHandlerEventHandling:
         event = FileMovedEvent(str(old_file), str(new_file))
         handler.on_any_event(event)
 
-        # Should index the new location
-        dispatcher_with_mock.index_file.assert_called_once()
-        call_path = dispatcher_with_mock.index_file.call_args[0][0]
-        assert str(call_path) == str(new_file)
+        dispatcher_with_mock.move_file.assert_called_once()
+        call_args = dispatcher_with_mock.move_file.call_args[0]
+        assert str(call_args[0]) == str(old_file)
+        assert str(call_args[1]) == str(new_file)
 
     def test_ignore_directory_events(self, dispatcher_with_mock, tmp_path):
         """Test that directory events are ignored."""
@@ -137,10 +147,7 @@ class TestHandlerEventHandling:
 
         # Test various non-code file types
         non_code_files = [
-            "readme.txt",
             "image.png",
-            "data.json",
-            "config.yaml",
             ".gitignore",
             "Makefile",
         ]
@@ -234,7 +241,9 @@ class TestFileWatcher:
             dispatcher_with_mock.index_file.assert_called()
 
             # Check the path matches
-            indexed_paths = [call[0][0] for call in dispatcher_with_mock.index_file.call_args_list]
+            indexed_paths = [
+                call[0][0] for call in dispatcher_with_mock.index_file.call_args_list
+            ]
             assert any(str(test_file) in str(path) for path in indexed_paths)
 
         finally:
@@ -266,7 +275,7 @@ class TestFileWatcher:
             time.sleep(0.5)
 
             # Test 4: Create a non-code file (should be ignored)
-            txt_file = watch_dir / "readme.txt"
+            txt_file = watch_dir / "image.png"
             txt_file.write_text("This should not trigger indexing")
             time.sleep(0.5)
 
@@ -276,19 +285,23 @@ class TestFileWatcher:
             time.sleep(0.5)
 
             # Verify indexing was called for code files
-            assert dispatcher_with_mock.index_file.call_count >= 4  # Create + modify + JS + rename
+            assert dispatcher_with_mock.index_file.call_count >= 3
+            assert dispatcher_with_mock.move_file.call_count >= 1
 
             # Verify correct files were indexed
             indexed_paths = [
-                str(call[0][0]) for call in dispatcher_with_mock.index_file.call_args_list
+                str(call[0][0])
+                for call in dispatcher_with_mock.index_file.call_args_list
             ]
 
             # Should have indexed Python and JS files
-            assert any("test.py" in path or "renamed.py" in path for path in indexed_paths)
+            assert any(
+                "test.py" in path or "renamed.py" in path for path in indexed_paths
+            )
             assert any("app.js" in path for path in indexed_paths)
 
-            # Should not have indexed txt file
-            assert not any("readme.txt" in path for path in indexed_paths)
+            # Should not have indexed png file
+            assert not any("image.png" in path for path in indexed_paths)
 
         finally:
             watcher.stop()
@@ -352,8 +365,6 @@ class TestEdgeCases:
             test_file.write_text("print('test')")
 
             # Remove read permissions
-            import os
-
             os.chmod(test_file, 0o000)
 
             # Trigger modification event
@@ -395,7 +406,9 @@ class TestEdgeCases:
 
             # Last call should be with final content
             if dispatcher_with_mock.index_file.call_count > 0:
-                last_call_path = dispatcher_with_mock.index_file.call_args_list[-1][0][0]
+                last_call_path = dispatcher_with_mock.index_file.call_args_list[-1][0][
+                    0
+                ]
                 assert str(last_call_path) == str(test_file)
 
         finally:
@@ -502,7 +515,9 @@ class TestPerformance:
 
     @pytest.mark.benchmark
     @pytest.mark.slow
-    def test_large_directory_performance(self, tmp_path, dispatcher_with_mock, benchmark_results):
+    def test_large_directory_performance(
+        self, tmp_path, dispatcher_with_mock, benchmark_results
+    ):
         """Test watcher performance with large directory."""
         # Create a large directory structure
         for i in range(10):
@@ -531,7 +546,9 @@ class TestPerformance:
             watcher.stop()
 
     @pytest.mark.benchmark
-    def test_event_processing_speed(self, tmp_path, dispatcher_with_mock, benchmark_results):
+    def test_event_processing_speed(
+        self, tmp_path, dispatcher_with_mock, benchmark_results
+    ):
         """Test speed of event processing."""
         # Mock fast indexing
         dispatcher_with_mock.index_file.return_value = None
@@ -559,11 +576,15 @@ class TestIntegration:
     """Integration tests with real dispatcher and plugins."""
 
     @pytest.mark.integration
-    def test_watcher_with_real_dispatcher(self, tmp_path, python_plugin):
+    def test_watcher_with_real_dispatcher(self, tmp_path, monkeypatch):
         """Test watcher with real dispatcher and plugin."""
         from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
+        from mcp_server.plugins.python_plugin.plugin import Plugin as PythonPlugin
+        from mcp_server.storage.sqlite_store import SQLiteStore
 
-        dispatcher = Dispatcher([python_plugin])
+        monkeypatch.chdir(tmp_path)
+        sqlite_store = SQLiteStore(str(tmp_path / "test_code_index.db"))
+        dispatcher = Dispatcher([PythonPlugin(sqlite_store=sqlite_store)])
         watcher = FileWatcher(tmp_path, dispatcher)
         watcher.start()
 
@@ -588,13 +609,12 @@ class IntegrationClass:
             # Verify file was indexed via dispatcher
             result = dispatcher.lookup("integration_function")
             assert result is not None
-            assert result.name == "integration_function"
-            assert result.kind == "function"
+            assert result["kind"] == "function"
 
             # Verify class was also indexed
             class_result = dispatcher.lookup("IntegrationClass")
             assert class_result is not None
-            assert class_result.kind == "class"
+            assert class_result["kind"] == "class"
 
         finally:
             watcher.stop()

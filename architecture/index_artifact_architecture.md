@@ -8,7 +8,7 @@ The Index Artifact Management system provides efficient sharing of code indexes 
 
 1. **Zero GitHub Compute**: All indexing happens on developer machines
 2. **Cost-Effective Storage**: Uses free GitHub Actions Artifacts
-3. **Smart Synchronization**: Only downloads when needed
+3. **Simple Remote Sync**: Full artifact download when needed, local incremental reconciliation afterward
 4. **Compatibility Checking**: Ensures indexes match local configuration
 5. **Automatic Cleanup**: Old artifacts removed after retention period
 
@@ -30,7 +30,7 @@ The Index Artifact Management system provides efficient sharing of code indexes 
 #### CLI Interface
 - `mcp_cli.py artifact push`: Upload local indexes
 - `mcp_cli.py artifact pull`: Download indexes
-- `mcp_cli.py artifact sync`: Check synchronization status
+- `mcp_cli.py artifact sync`: Check restored artifact drift against local branch/worktree
 - `mcp_cli.py artifact list`: View available artifacts
 
 ### 2. GitHub Components
@@ -152,8 +152,14 @@ python mcp_cli.py artifact pull --latest
 
 ### Pattern 2: Feature Development
 ```bash
+# Pull a full artifact snapshot
+python mcp_cli.py artifact pull --latest
+
+# Reconcile local branch/worktree drift if needed
+python mcp_cli.py artifact sync
+
 # Make code changes
-# Indexes update automatically
+# Indexes update automatically via watcher/incremental indexing
 git add .
 git commit -m "feat: new feature"
 python mcp_cli.py artifact push  # Share updated indexes
@@ -179,12 +185,13 @@ git push
 
 3. **Scalability**:
    - Works with any repository size
-   - Handles large indexes efficiently
+   - Keeps remote transport simple by using whole-artifact snapshots
+   - Uses local incremental indexing to avoid most rebuild cost
    - Automatic cleanup prevents bloat
 
 ## Future Enhancements
 
-1. **Incremental Updates**: Delta compression for faster uploads
+1. **Local Branch Cache**: Cache a few recent branch-local reconciled snapshots if branch hopping becomes expensive
 2. **P2P Sharing**: Direct developer-to-developer index sharing
 3. **Cloud Cache**: CDN distribution for global teams
-4. **Index Versioning**: Multiple index versions for different branches
+4. **Remote Delta Transport**: Revisit only if artifact size or pull frequency justifies the added complexity

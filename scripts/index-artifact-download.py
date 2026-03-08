@@ -477,6 +477,19 @@ class IndexArtifactDownloader:
         print("✅ Indexes installed successfully!")
         if installed_items:
             print(f"📦 Restored items: {', '.join(installed_items)}")
+        metadata_path = source_dir / "artifact-metadata.json"
+        if metadata_path.exists():
+            try:
+                metadata = json.loads(metadata_path.read_text())
+                commit = metadata.get("commit")
+                branch = metadata.get("branch")
+                if commit:
+                    if branch:
+                        print(f"🔖 Restored artifact commit: {commit} ({branch})")
+                    else:
+                        print(f"🔖 Restored artifact commit: {commit}")
+            except Exception:
+                pass
         return installed_items
 
 

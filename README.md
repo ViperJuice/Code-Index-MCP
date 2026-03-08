@@ -472,8 +472,8 @@ This project uses GitHub Actions Artifacts for efficient index sharing, eliminat
 # First time setup - pull latest indexes
 python scripts/cli/mcp_cli.py artifact pull --latest
 
-# After making changes - rebuild locally
-python scripts/cli/mcp_cli.py index rebuild
+# After pull, let local incremental indexing catch up branch/worktree drift
+python scripts/cli/mcp_cli.py artifact sync
 
 # Share your indexes with the team
 python scripts/cli/mcp_cli.py artifact push
@@ -657,10 +657,14 @@ python scripts/cli/mcp_cli.py index restore my_backup
    ```bash
    python scripts/cli/mcp_cli.py artifact pull --latest
    ```
+   - This downloads the current full GitHub artifact snapshot.
+   - If your local branch or working tree differs from the artifact commit, use
+     `python scripts/cli/mcp_cli.py artifact sync` to inspect that drift and
+     let local incremental indexing catch up.
 
 3. **Make Your Changes**
    - Edit code as normal
-   - Indexes update automatically via file watcher
+    - Indexes update automatically via file watcher
 
 4. **Share Updates**
    ```bash
@@ -678,6 +682,19 @@ The system tracks embedding model versions to ensure compatibility:
 Multi-profile semantic config can be provided in either:
 - `SEMANTIC_PROFILES_JSON` (environment variable), or
 - `code-index-mcp.profiles.yaml` (repository root).
+
+### Artifact Strategy
+
+- GitHub artifact pulls are full snapshot downloads, not partial remote patch fetches.
+- The current compressed artifact is modest enough that full downloads stay simpler
+  than a remote delta protocol.
+- Efficiency comes from local incremental indexing after restore:
+  - pull the latest full artifact
+  - compare the restored artifact commit to local `HEAD`
+  - let the watcher or local incremental reindexing reconcile added, modified,
+    deleted, and renamed files
+- Branch-specific remote artifacts are optional. The default strategy is to use
+  the latest `main` artifact as the base and reconcile branch drift locally.
 
 ### Easy Semantic Setup (Docker-First)
 
