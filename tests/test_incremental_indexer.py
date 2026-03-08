@@ -148,3 +148,64 @@ def test_incremental_deletion_handles_missing_files(incremental_indexer):
     assert stats.errors == 0
     assert dispatcher.removed == [repo_path / "removed.py"]
     assert semantic_indexer.cleanup_calls[-1]["chunk_ids"] == ["chunk-removed-1"]
+
+
+def test_incremental_cleanup_includes_split_semantic_chunk_ids(incremental_indexer):
+    repo_path, store, dispatcher, indexer, semantic_indexer = incremental_indexer
+    existing_file = repo_path / "split.py"
+    existing_file.write_text("value = 1\n")
+
+    repo_id = indexer._get_repository_id()
+    file_id = store.store_file(repo_id, existing_file, language="python")
+    store.store_chunk(
+        file_id=file_id,
+        content="value = 1",
+        content_start=0,
+        content_end=9,
+        line_start=1,
+        line_end=1,
+        chunk_id="chunk-split-1",
+        node_id="node-split-1",
+        treesitter_file_id="ts-split-1",
+    )
+    store.upsert_semantic_point(
+        profile_id="test-profile",
+        chunk_id="chunk-split-1",
+        point_id=9101,
+        collection="code-index",
+    )
+    store.upsert_semantic_point(
+        profile_id="test-profile",
+        chunk_id="chunk-split-1:part:1:3",
+        point_id=9102,
+        collection="code-index",
+    )
+    store.upsert_semantic_point(
+        profile_id="test-profile",
+        chunk_id="chunk-split-1:part:2:3",
+        point_id=9103,
+        collection="code-index",
+    )
+    store.upsert_semantic_point(
+        profile_id="test-profile",
+        chunk_id="split.py:file-summary",
+        point_id=9104,
+        collection="code-index",
+    )
+
+    with store._get_connection() as conn:
+        conn.execute("UPDATE files SET content_hash = NULL WHERE id = ?", (file_id,))
+
+    existing_file.write_text("value = 2\n")
+
+    stats = indexer.update_from_changes([FileChange("split.py", "modified")])
+
+    assert stats.files_indexed == 1
+    assert stats.errors == 0
+    assert dispatcher.indexed[-1] == existing_file
+    assert semantic_indexer.cleanup_calls[-1]["chunk_ids"] == [
+        "chunk-split-1",
+        "chunk-split-1:part:1:3",
+        "chunk-split-1:part:2:3",
+        "split.py:file-summary",
+    ]

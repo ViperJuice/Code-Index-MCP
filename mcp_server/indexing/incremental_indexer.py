@@ -82,7 +82,31 @@ class IncrementalIndexer:
                 "SELECT chunk_id FROM code_chunks WHERE file_id = ?",
                 (file_id,),
             )
-            return [record[0] for record in cursor.fetchall()]
+            chunk_ids = [record[0] for record in cursor.fetchall()]
+            if not chunk_ids:
+                return []
+
+            like_clauses = " OR ".join(["chunk_id LIKE ?"] * len(chunk_ids))
+            params = [f"{chunk_id}:part:%" for chunk_id in chunk_ids]
+            cursor = conn.execute(
+                f"SELECT chunk_id FROM semantic_points WHERE {like_clauses}",
+                params,
+            )
+            derived_chunk_ids = [record[0] for record in cursor.fetchall()]
+
+            file_summary_ids: List[str] = []
+            if self.semantic_indexer is not None:
+                file_summary_chunk_id = f"{relative_path}:file-summary"
+                cursor = conn.execute(
+                    "SELECT chunk_id FROM semantic_points WHERE profile_id = ? AND chunk_id = ?",
+                    (
+                        self.semantic_indexer.semantic_profile.profile_id,
+                        file_summary_chunk_id,
+                    ),
+                )
+                file_summary_ids = [record[0] for record in cursor.fetchall()]
+
+            return chunk_ids + derived_chunk_ids + file_summary_ids
 
     def _cleanup_stale_vectors(self, chunk_ids: List[str]) -> None:
         """Delete stale semantic vectors for existing chunk ids."""
@@ -277,6 +301,12 @@ class IncrementalIndexer:
                 return "skipped"
 
             self._cleanup_stale_vectors(self._get_chunk_ids_for_path(path))
+
+            relative_path = self.path_resolver.normalize_path(full_path)
+            repo_id = self._get_repository_id()
+            stored_file = self.store.get_file_by_path(relative_path, repo_id)
+            if stored_file is not None:
+                self.store.remove_file(relative_path, repo_id)
 
             if self.dispatcher:
                 # Use dispatcher if available

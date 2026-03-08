@@ -17,6 +17,36 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 
+def _run_artifact_command(cmd: list[str]) -> subprocess.CompletedProcess[str]:
+    """Run an artifact helper command and relay output."""
+    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    if result.stdout:
+        click.echo(result.stdout)
+
+    if result.stderr:
+        click.echo(result.stderr, err=True)
+
+    return result
+
+
+def _get_restored_index_paths() -> list[Path]:
+    """Return restored index artifacts present in the working directory."""
+    expected_paths = [
+        Path("code_index.db"),
+        Path(".index_metadata.json"),
+        Path("artifact-metadata.json"),
+        Path("semantic_index_metadata.json"),
+        Path("vector_index.qdrant"),
+    ]
+    return [path for path in expected_paths if path.exists()]
+
+
+def _verify_local_index_restored() -> bool:
+    """Check whether artifact retrieval restored a usable local index."""
+    return bool(_get_restored_index_paths())
+
+
 @click.group()
 def artifact():
     """Manage index artifacts in GitHub Actions."""
@@ -25,7 +55,9 @@ def artifact():
 @artifact.command()
 @click.option("--validate", is_flag=True, help="Validate indexes before upload")
 @click.option("--compress-only", is_flag=True, help="Only compress, do not upload")
-@click.option("--no-secure", is_flag=True, help="Disable secure export (include all files)")
+@click.option(
+    "--no-secure", is_flag=True, help="Disable secure export (include all files)"
+)
 def push(validate: bool, compress_only: bool, no_secure: bool):
     """Upload local indexes to GitHub Actions Artifacts."""
     try:
@@ -50,13 +82,7 @@ def push(validate: bool, compress_only: bool, no_secure: bool):
             cmd.append("--no-secure")
 
         # Run upload script
-        result = subprocess.run(cmd, capture_output=True, text=True)
-
-        if result.stdout:
-            click.echo(result.stdout)
-
-        if result.stderr:
-            click.echo(result.stderr, err=True)
+        result = _run_artifact_command(cmd)
 
         if result.returncode != 0:
             click.echo("❌ Upload failed", err=True)
@@ -93,17 +119,20 @@ def pull(latest: bool, artifact_id: Optional[int], no_backup: bool):
             cmd.append("--no-backup")
 
         # Run download script
-        result = subprocess.run(cmd, capture_output=True, text=True)
-
-        if result.stdout:
-            click.echo(result.stdout)
-
-        if result.stderr:
-            click.echo(result.stderr, err=True)
+        result = _run_artifact_command(cmd)
 
         if result.returncode != 0:
             click.echo("❌ Download failed", err=True)
             sys.exit(1)
+
+        if not _verify_local_index_restored():
+            click.echo(
+                "❌ Download completed but no local index files were restored", err=True
+            )
+            sys.exit(1)
+
+        restored = ", ".join(path.name for path in _get_restored_index_paths())
+        click.echo(f"✅ Local index files restored: {restored}")
 
     except Exception as e:
         click.echo(f"❌ Error: {e}", err=True)
@@ -126,13 +155,7 @@ def list(filter: Optional[str]):
             cmd.extend(["--filter", filter])
 
         # Run list command
-        result = subprocess.run(cmd, capture_output=True, text=True)
-
-        if result.stdout:
-            click.echo(result.stdout)
-
-        if result.stderr:
-            click.echo(result.stderr, err=True)
+        result = _run_artifact_command(cmd)
 
         if result.returncode != 0:
             click.echo("❌ List failed", err=True)
@@ -161,10 +184,17 @@ def sync():
                 "download",
                 "--latest",
             ]
-            result = subprocess.run(cmd)
+            result = _run_artifact_command(cmd)
 
             if result.returncode == 0:
-                click.echo("✅ Indexes synchronized!")
+                if not _verify_local_index_restored():
+                    click.echo(
+                        "❌ Sync download completed but no local index files were restored",
+                        err=True,
+                    )
+                    sys.exit(1)
+                restored = ", ".join(path.name for path in _get_restored_index_paths())
+                click.echo(f"✅ Indexes synchronized! Restored: {restored}")
             else:
                 click.echo("❌ Sync failed", err=True)
                 sys.exit(1)
@@ -203,7 +233,7 @@ def sync():
                 str(project_root / "scripts" / "index-artifact-download.py"),
                 "list",
             ]
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            result = _run_artifact_command(cmd)
 
             if result.returncode == 0 and "Available Index Artifacts:" in result.stdout:
                 # Parse output to check if update available
@@ -218,10 +248,14 @@ def sync():
                 if has_artifacts:
                     click.echo("\n✅ Remote artifacts available")
                     click.echo("   Use 'mcp_cli.py artifact pull --latest' to update")
-                    click.echo("   Use 'mcp_cli.py artifact push' to upload your indexes")
+                    click.echo(
+                        "   Use 'mcp_cli.py artifact push' to upload your indexes"
+                    )
                 else:
                     click.echo("\n📤 No remote artifacts found")
-                    click.echo("   Use 'mcp_cli.py artifact push' to upload your indexes")
+                    click.echo(
+                        "   Use 'mcp_cli.py artifact push' to upload your indexes"
+                    )
 
             click.echo("\n✅ Sync check complete!")
 
@@ -231,9 +265,15 @@ def sync():
 
 
 @artifact.command()
-@click.option("--older-than", type=int, default=30, help="Delete artifacts older than N days")
-@click.option("--keep-latest", type=int, default=5, help="Keep at least N latest artifacts")
-@click.option("--dry-run", is_flag=True, help="Show what would be deleted without deleting")
+@click.option(
+    "--older-than", type=int, default=30, help="Delete artifacts older than N days"
+)
+@click.option(
+    "--keep-latest", type=int, default=5, help="Keep at least N latest artifacts"
+)
+@click.option(
+    "--dry-run", is_flag=True, help="Show what would be deleted without deleting"
+)
 def cleanup(older_than: int, keep_latest: int, dry_run: bool):
     """Clean up old artifacts to save storage."""
     try:
@@ -269,13 +309,7 @@ def info(artifact_id: int):
         ]
 
         # Run info command
-        result = subprocess.run(cmd, capture_output=True, text=True)
-
-        if result.stdout:
-            click.echo(result.stdout)
-
-        if result.stderr:
-            click.echo(result.stderr, err=True)
+        result = _run_artifact_command(cmd)
 
         if result.returncode != 0:
             click.echo("❌ Info failed", err=True)
@@ -310,17 +344,20 @@ def recover(branch: Optional[str], commit: Optional[str], no_backup: bool):
         if no_backup:
             cmd.append("--no-backup")
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
-
-        if result.stdout:
-            click.echo(result.stdout)
-
-        if result.stderr:
-            click.echo(result.stderr, err=True)
+        result = _run_artifact_command(cmd)
 
         if result.returncode != 0:
             click.echo("❌ Recovery failed", err=True)
             sys.exit(1)
+
+        if not _verify_local_index_restored():
+            click.echo(
+                "❌ Recovery completed but no local index files were restored", err=True
+            )
+            sys.exit(1)
+
+        restored = ", ".join(path.name for path in _get_restored_index_paths())
+        click.echo(f"✅ Local index files restored: {restored}")
 
     except Exception as e:
         click.echo(f"❌ Error: {e}", err=True)

@@ -9,6 +9,7 @@ enabling developers to quickly get up-to-date indexes without rebuilding.
 import os
 import sys
 import json
+import sqlite3
 import tarfile
 import hashlib
 import subprocess
@@ -138,10 +139,9 @@ class IndexArtifactDownloader:
                 "gh",
                 "api",
                 f"/repos/{self.repo}/actions/artifacts/{artifact_id}/zip",
-                "--output",
-                str(temp_dir / "artifact.zip"),
             ]
-            subprocess.run(cmd, check=True)
+            with open(temp_dir / "artifact.zip", "wb") as zip_file:
+                subprocess.run(cmd, check=True, stdout=zip_file)
 
             # Extract zip file
             import zipfile
@@ -229,7 +229,28 @@ class IndexArtifactDownloader:
         artifact_model = compatibility.get("embedding_model")
         artifact_schema = compatibility.get("schema_version")
 
-        required_schema = os.environ.get("INDEX_SCHEMA_VERSION", "2")
+        required_schema = os.environ.get("INDEX_SCHEMA_VERSION")
+        if not required_schema:
+            local_db = Path("code_index.db")
+            if local_db.exists():
+                conn = None
+                try:
+                    conn = sqlite3.connect(str(local_db))
+                    required_schema = str(
+                        conn.execute(
+                            "SELECT MAX(version) FROM schema_version"
+                        ).fetchone()[0]
+                    )
+                except Exception:
+                    required_schema = None
+                finally:
+                    if conn is not None:
+                        try:
+                            conn.close()
+                        except Exception:
+                            pass
+        if not required_schema:
+            required_schema = "2"
         if artifact_schema != required_schema:
             issues.append(
                 f"Schema mismatch: artifact={artifact_schema}, required={required_schema}"
@@ -237,9 +258,16 @@ class IndexArtifactDownloader:
 
         if artifact_model:
             try:
-                from mcp_server.config.settings import get_settings
+                current_model = None
+                metadata_path = Path(".index_metadata.json")
+                if metadata_path.exists():
+                    current_model = json.loads(metadata_path.read_text()).get(
+                        "embedding_model"
+                    )
+                if not current_model:
+                    from mcp_server.config.settings import get_settings
 
-                current_model = get_settings().semantic_embedding_model
+                    current_model = get_settings().semantic_embedding_model
 
                 if artifact_model != current_model:
                     issues.append(
@@ -388,7 +416,7 @@ class IndexArtifactDownloader:
 
         return True
 
-    def install_indexes(self, source_dir: Path, backup: bool = True) -> None:
+    def install_indexes(self, source_dir: Path, backup: bool = True) -> List[str]:
         """
         Install downloaded indexes to the working directory.
 
@@ -421,6 +449,7 @@ class IndexArtifactDownloader:
             print(f"  ✅ Backup created in {backup_dir}")
 
         # Install new indexes
+        installed_items: List[str] = []
         for item in source_dir.iterdir():
             if item.name in [
                 "code_index.db",
@@ -443,8 +472,12 @@ class IndexArtifactDownloader:
                     shutil.copytree(item, dest)
                 else:
                     shutil.copy2(item, dest)
+                installed_items.append(item.name)
 
         print("✅ Indexes installed successfully!")
+        if installed_items:
+            print(f"📦 Restored items: {', '.join(installed_items)}")
+        return installed_items
 
 
 def format_artifact_table(artifacts: List[Dict[str, Any]]) -> None:
