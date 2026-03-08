@@ -6,8 +6,9 @@ plugin management, discovery, loading, and lifecycle management.
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from .shared_interfaces import IObservable, PluginStatus, Result
 
@@ -76,9 +77,21 @@ class PluginMetadata:
     author: str
     supported_extensions: List[str]
     supported_languages: List[str]
-    dependencies: List[str]
-    entry_point: str
+    dependencies: List[str] = field(default_factory=list)
+    entry_point: str = "plugin.py"
     config_schema: Optional[Dict[str, Any]] = None
+
+
+@dataclass
+class PluginRuntimeInfo:
+    """Stable runtime status shared across plugin managers and status endpoints."""
+
+    name: str
+    status: PluginStatus
+    enabled: bool
+    version: Optional[str] = None
+    language: Optional[str] = None
+    error: Optional[str] = None
 
 
 # ========================================
@@ -109,7 +122,9 @@ class IPlugin(ABC):
         """Check if this plugin can handle the given file"""
 
     @abstractmethod
-    def index(self, file_path: str, content: Optional[str] = None) -> Result[IndexedFile]:
+    def index(
+        self, file_path: str, content: Optional[str] = None
+    ) -> Result[IndexedFile]:
         """Index a file and extract symbols"""
 
     @abstractmethod
@@ -119,7 +134,9 @@ class IPlugin(ABC):
         """Get the definition of a symbol"""
 
     @abstractmethod
-    def get_references(self, symbol: str, context: Dict[str, Any]) -> Result[List[SymbolReference]]:
+    def get_references(
+        self, symbol: str, context: Dict[str, Any]
+    ) -> Result[List[SymbolReference]]:
         """Get all references to a symbol"""
 
     @abstractmethod
@@ -131,7 +148,9 @@ class IPlugin(ABC):
         """Validate syntax of code content"""
 
     @abstractmethod
-    def get_completions(self, file_path: str, line: int, column: int) -> Result[List[str]]:
+    def get_completions(
+        self, file_path: str, line: int, column: int
+    ) -> Result[List[str]]:
         """Get code completions at a position"""
 
 
@@ -147,7 +166,9 @@ class ILanguageAnalyzer(ABC):
         """Extract all symbols from content"""
 
     @abstractmethod
-    def resolve_type(self, symbol: str, context: Dict[str, Any]) -> Result[Optional[str]]:
+    def resolve_type(
+        self, symbol: str, context: Dict[str, Any]
+    ) -> Result[Optional[str]]:
         """Resolve the type of a symbol"""
 
     @abstractmethod
@@ -198,31 +219,35 @@ class IPluginDiscovery(ABC):
     """Interface for discovering available plugins"""
 
     @abstractmethod
-    def discover_plugins(self, search_paths: List[str]) -> Result[List[PluginMetadata]]:
+    def discover_plugins(
+        self, search_paths: List[str | Path]
+    ) -> Result[List[PluginMetadata]]:
         """Discover plugins in the given search paths"""
 
     @abstractmethod
-    def scan_directory(self, directory: str) -> Result[List[PluginMetadata]]:
+    def scan_directory(self, directory: str | Path) -> Result[List[PluginMetadata]]:
         """Scan a directory for plugins"""
 
     @abstractmethod
-    def validate_plugin(self, plugin_path: str) -> Result[PluginMetadata]:
-        """Validate a plugin and extract its metadata"""
+    def validate_plugin(self, plugin_path: str | Path) -> Result[bool]:
+        """Validate a plugin path before loading it"""
 
 
 class IPluginLoader(ABC):
     """Interface for loading and unloading plugins"""
 
     @abstractmethod
-    def load_plugin(self, plugin_path: str, metadata: PluginMetadata) -> Result[IPlugin]:
-        """Load a plugin from the given path"""
+    def load_plugin(
+        self, plugin_path: str | Path, metadata: PluginMetadata
+    ) -> Result[type[IPlugin]]:
+        """Load a plugin class from the given path"""
 
     @abstractmethod
     def unload_plugin(self, plugin_name: str) -> Result[None]:
         """Unload a plugin"""
 
     @abstractmethod
-    def reload_plugin(self, plugin_name: str) -> Result[IPlugin]:
+    def reload_plugin(self, plugin_name: str) -> Result[None]:
         """Reload a plugin"""
 
     @abstractmethod
@@ -238,42 +263,42 @@ class IPluginManager(IObservable):
     """Interface for overall plugin management"""
 
     @abstractmethod
-    def initialize(self, config: Dict[str, Any]) -> Result[None]:
-        """Initialize the plugin manager"""
+    def load_plugins(
+        self, config_path: Optional[str | Path] = None
+    ) -> Result[List[str]]:
+        """Discover, load, and optionally initialize configured plugins."""
 
     @abstractmethod
     def shutdown(self) -> Result[None]:
-        """Shutdown the plugin manager"""
+        """Shutdown the plugin manager and destroy active instances."""
 
     @abstractmethod
-    def load_all_plugins(self, plugin_directories: List[str]) -> Result[List[str]]:
-        """Load all plugins from directories"""
+    def reload_plugin(self, plugin_name: str) -> Result[None]:
+        """Reload a specific plugin."""
 
     @abstractmethod
     def enable_plugin(self, plugin_name: str) -> Result[None]:
-        """Enable a plugin"""
+        """Enable and initialize a plugin if configured."""
 
     @abstractmethod
     def disable_plugin(self, plugin_name: str) -> Result[None]:
-        """Disable a plugin"""
+        """Disable a plugin and stop any active instance."""
 
     @abstractmethod
-    def get_plugin_status(self, plugin_name: str) -> PluginStatus:
-        """Get the status of a plugin"""
+    def get_plugin_by_language(self, language: str) -> Optional[IPlugin]:
+        """Return an active plugin instance for a language."""
 
     @abstractmethod
-    def get_all_plugin_statuses(self) -> Dict[str, PluginStatus]:
-        """Get the status of all plugins"""
+    def get_plugin_for_file(self, file_path: str | Path) -> Optional[IPlugin]:
+        """Return the best active plugin instance for a file path."""
 
     @abstractmethod
-    def execute_on_plugin(
-        self, plugin_name: str, operation: Callable[[IPlugin], Any]
-    ) -> Result[Any]:
-        """Execute an operation on a specific plugin"""
+    def get_plugin_status(self) -> Dict[str, PluginRuntimeInfo]:
+        """Return runtime status for all known plugins."""
 
     @abstractmethod
-    def execute_on_all_plugins(self, operation: Callable[[IPlugin], Any]) -> Dict[str, Result[Any]]:
-        """Execute an operation on all plugins"""
+    def get_detailed_plugin_status(self) -> Dict[str, Dict[str, Any]]:
+        """Return expanded runtime and configuration details for plugins."""
 
 
 # ========================================
@@ -318,7 +343,9 @@ class IPythonPlugin(IPlugin):
         """Get import dependency graph"""
 
     @abstractmethod
-    def resolve_module(self, module_name: str, context: Dict[str, Any]) -> Result[Optional[str]]:
+    def resolve_module(
+        self, module_name: str, context: Dict[str, Any]
+    ) -> Result[Optional[str]]:
         """Resolve a module to its file path"""
 
 

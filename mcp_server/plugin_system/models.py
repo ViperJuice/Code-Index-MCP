@@ -5,6 +5,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
+import yaml
+
 
 class PluginState(Enum):
     """Plugin lifecycle states."""
@@ -161,9 +163,14 @@ class PluginSystemConfig:
 
     def __post_init__(self):
         """Ensure paths are Path objects and set defaults."""
-        self.plugin_dirs = [Path(p) if isinstance(p, str) else p for p in self.plugin_dirs]
+        self.plugin_dirs = [
+            Path(p) if isinstance(p, str) else p for p in self.plugin_dirs
+        ]
         if self.config_file and isinstance(self.config_file, str):
             self.config_file = Path(self.config_file)
+
+        if self.config_file and self.config_file.exists():
+            self._load_config_file(self.config_file)
 
         # Set default values for enhanced options
         if not self.defaults:
@@ -233,7 +240,9 @@ class PluginSystemConfig:
 
         return config
 
-    def get_environment_config(self, environment: str = None) -> Dict[str, Any]:
+    def get_environment_config(
+        self, environment: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Get configuration for specific environment."""
         if not environment:
             import os
@@ -242,10 +251,28 @@ class PluginSystemConfig:
 
         return self.environments.get(environment, {})
 
-    def apply_environment_overrides(self, environment: str = None) -> None:
+    def _load_config_file(self, config_path: Path) -> None:
+        """Load config values from YAML without replacing explicit constructor args."""
+        try:
+            with open(config_path, "r", encoding="utf-8") as handle:
+                data = yaml.safe_load(handle) or {}
+        except Exception:
+            return
+
+        self.auto_discover = data.get("auto_discover", self.auto_discover)
+        self.auto_load = data.get("auto_load", self.auto_load)
+        self.validate_interfaces = data.get(
+            "validate_interfaces", self.validate_interfaces
+        )
+        self.enable_hot_reload = data.get("enable_hot_reload", self.enable_hot_reload)
+        self.environments = data.get("environments", self.environments)
+
+    def apply_environment_overrides(self, environment: Optional[str] = None) -> None:
         """Apply environment-specific configuration overrides."""
         env_config = self.get_environment_config(environment)
 
+        if "auto_discover" in env_config:
+            self.auto_discover = env_config["auto_discover"]
         if "enable_hot_reload" in env_config:
             self.enable_hot_reload = env_config["enable_hot_reload"]
         if "validate_interfaces" in env_config:

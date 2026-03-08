@@ -13,6 +13,8 @@ from mcp_server.plugin_base import IndexShard, Reference, SearchResult, SymbolDe
 from mcp_server.plugins.specialized_plugin_base import SpecializedPluginBase
 from mcp_server.storage.sqlite_store import SQLiteStore
 
+from . import document_interfaces as document_contracts
+
 logger = logging.getLogger(__name__)
 
 
@@ -102,6 +104,97 @@ class BaseDocumentPlugin(SpecializedPluginBase):
     @abstractmethod
     def parse_content(self, content: str, file_path: Path) -> str:
         """Parse raw content to plain text."""
+
+    def process_document(
+        self, content: str, file_path: Optional[str | Path] = None
+    ) -> document_contracts.ProcessedDocument:
+        """Process a document using the shared document contract."""
+        resolved_path = Path(file_path or f"memory.{self.lang}")
+        metadata = self.extract_metadata(content, resolved_path)
+        structure = self.extract_structure(content, resolved_path)
+        chunks = self.create_searchable_chunks(content, resolved_path)
+
+        return document_contracts.ProcessedDocument(
+            path=str(resolved_path),
+            content=content,
+            structure=self._to_contract_structure(structure, metadata),
+            chunks=chunks,
+            metadata=metadata.__dict__,
+            language=self.lang,
+        )
+
+    def create_searchable_chunks(
+        self, content: str, file_path: Optional[str | Path] = None
+    ) -> List[document_contracts.DocumentChunk]:
+        """Create document chunks that conform to the shared contract."""
+        resolved_path = Path(file_path or f"memory.{self.lang}")
+        raw_chunks = self.chunk_document(content, resolved_path)
+        total_chunks = len(raw_chunks)
+
+        return [
+            self._to_contract_chunk(chunk, str(resolved_path), total_chunks)
+            for chunk in raw_chunks
+        ]
+
+    def _to_contract_chunk(
+        self, chunk: DocumentChunk, document_path: str, total_chunks: int
+    ) -> document_contracts.DocumentChunk:
+        """Convert internal chunk objects to the shared interface type."""
+        metadata = document_contracts.ChunkMetadata(
+            document_path=document_path,
+            section_hierarchy=[chunk.metadata.get("section", "")]
+            if chunk.metadata.get("section")
+            else [],
+            chunk_index=chunk.chunk_index,
+            total_chunks=total_chunks,
+            has_code=bool(chunk.metadata.get("has_code", False)),
+            language=chunk.metadata.get("language"),
+            keywords=list(chunk.metadata.get("keywords", [])),
+            word_count=len(chunk.content.split()),
+            line_start=int(chunk.metadata.get("line_start", 0) or 0),
+            line_end=int(chunk.metadata.get("line_end", 0) or 0),
+        )
+        chunk_type = (
+            document_contracts.ChunkType.CODE_BLOCK
+            if metadata.has_code
+            else document_contracts.ChunkType.PARAGRAPH
+        )
+
+        return document_contracts.DocumentChunk(
+            id=f"{document_path}:chunk:{chunk.chunk_index}",
+            content=chunk.content,
+            type=chunk_type,
+            metadata=metadata,
+            context_before=chunk.metadata.get("context_before"),
+            context_after=chunk.metadata.get("context_after"),
+        )
+
+    def _to_contract_structure(
+        self, structure: DocumentStructure, metadata: DocumentMetadata
+    ) -> document_contracts.DocumentStructure:
+        """Convert internal structure data to the shared interface type."""
+        sections = [
+            self._to_contract_section(section) for section in structure.sections
+        ]
+        return document_contracts.DocumentStructure(
+            title=metadata.title,
+            sections=sections,
+            metadata=structure.metadata,
+            outline=sections[0] if sections else None,
+        )
+
+    def _to_contract_section(
+        self, section: Dict[str, Any]
+    ) -> document_contracts.Section:
+        """Convert internal section dictionaries to the shared interface type."""
+        return document_contracts.Section(
+            id=str(section.get("title", "section")).lower().replace(" ", "-"),
+            heading=str(section.get("title", "")),
+            level=int(section.get("level", 1) or 1),
+            content=str(section.get("content", section.get("title", ""))),
+            start_line=int(section.get("start_line", section.get("line", 0)) or 0),
+            end_line=int(section.get("end_line", section.get("line", 0)) or 0),
+        )
 
     # Document chunking methods
 

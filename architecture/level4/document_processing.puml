@@ -6,8 +6,10 @@ package "Document Processing Core" {
         # chunkSizeTarget: int
         # chunkOverlap: int
         # sqlite_store: SQLiteStore
-        + {abstract} createDocumentChunks(content): Chunk[]
-        + {abstract} extractDocumentStructure(content): Structure
+        + processDocument(content, filePath): ProcessedDocument
+        + createSearchableChunks(content, filePath): DocumentChunk[]
+        + {abstract} extractStructure(content, filePath): Structure
+        + {abstract} extractMetadata(content, filePath): Metadata
         + indexFile(path, content): IndexShard
         + generateDocumentSymbols(structure): Symbol[]
         # optimizeChunkSize(content): int
@@ -15,21 +17,21 @@ package "Document Processing Core" {
     }
     
     interface IDocumentProcessor {
-        + processDocument(content): ProcessedDocument
-        + extractMetadata(content): Metadata
-        + createSearchableChunks(content): Chunk[]
+        + processDocument(content, filePath): ProcessedDocument
+        + extractMetadata(content, filePath): Metadata
+        + createSearchableChunks(content, filePath): DocumentChunk[]
     }
     
     interface IChunkStrategy {
-        + chunk(content, structure): Chunk[]
+        + chunk(content, structure): DocumentChunk[]
         + validateChunk(chunk): bool
-        + mergeSmallChunks(chunks): Chunk[]
+        + mergeSmallChunks(chunks): DocumentChunk[]
     }
     
     interface IStructureExtractor {
-        + extractStructure(content): DocumentStructure
+        + extractStructure(content, filePath): DocumentStructure
         + findSections(content): Section[]
-        + buildHierarchy(sections): Tree
+        + buildHierarchy(sections): Section
     }
     
     class DocumentChunk {
@@ -52,13 +54,15 @@ package "Document Processing Core" {
         + hasCode: bool
         + language: string
         + keywords: string[]
+        + lineStart: int
+        + lineEnd: int
     }
     
     class DocumentStructure {
         + title: string
         + sections: Section[]
         + metadata: Metadata
-        + outline: TreeNode
+        + outline: Section
         + crossReferences: Reference[]
     }
     

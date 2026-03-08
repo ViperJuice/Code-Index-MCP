@@ -1,9 +1,10 @@
 """Interfaces and data structures for document processing."""
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 
 class ChunkType(Enum):
@@ -29,7 +30,7 @@ class ChunkMetadata:
     total_chunks: int
     has_code: bool
     language: Optional[str] = None
-    keywords: List[str] = None
+    keywords: List[str] = field(default_factory=list)
     word_count: int = 0
     line_start: int = 0
     line_end: int = 0
@@ -37,6 +38,8 @@ class ChunkMetadata:
     def __post_init__(self):
         if self.keywords is None:
             self.keywords = []
+        if self.line_end and self.line_start and self.line_end < self.line_start:
+            raise ValueError("line_end must be greater than or equal to line_start")
 
 
 @dataclass
@@ -50,6 +53,15 @@ class DocumentChunk:
     embedding: Optional[List[float]] = None
     context_before: Optional[str] = None
     context_after: Optional[str] = None
+
+    def is_valid(self) -> bool:
+        """Validate minimum chunk contract invariants."""
+        return (
+            bool(self.id)
+            and bool(self.content.strip())
+            and self.metadata.chunk_index >= 0
+            and self.metadata.total_chunks >= self.metadata.chunk_index + 1
+        )
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for storage."""
@@ -84,13 +96,9 @@ class Section:
     level: int  # 1 for #, 2 for ##, etc.
     content: str
     parent: Optional["Section"] = None
-    children: List["Section"] = None
+    children: List["Section"] = field(default_factory=list)
     start_line: int = 0
     end_line: int = 0
-
-    def __post_init__(self):
-        if self.children is None:
-            self.children = []
 
     def get_hierarchy_path(self) -> List[str]:
         """Get the full hierarchy path to this section."""
@@ -110,11 +118,9 @@ class DocumentStructure:
     sections: List[Section]
     metadata: Dict[str, Any]
     outline: Optional[Section] = None  # Root of section tree
-    cross_references: List[Dict[str, str]] = None
+    cross_references: List[Dict[str, str]] = field(default_factory=list)
 
     def __post_init__(self):
-        if self.cross_references is None:
-            self.cross_references = []
         if self.metadata is None:
             self.metadata = {}
 
@@ -123,15 +129,21 @@ class IDocumentProcessor(ABC):
     """Interface for document processing."""
 
     @abstractmethod
-    def process_document(self, content: str) -> "ProcessedDocument":
+    def process_document(
+        self, content: str, file_path: Optional[Union[str, Path]] = None
+    ) -> "ProcessedDocument":
         """Process a document and extract structured information."""
 
     @abstractmethod
-    def extract_metadata(self, content: str) -> Dict[str, Any]:
+    def extract_metadata(
+        self, content: str, file_path: Optional[Union[str, Path]] = None
+    ) -> Dict[str, Any]:
         """Extract metadata from document content."""
 
     @abstractmethod
-    def create_searchable_chunks(self, content: str) -> List[DocumentChunk]:
+    def create_searchable_chunks(
+        self, content: str, file_path: Optional[Union[str, Path]] = None
+    ) -> List[DocumentChunk]:
         """Create searchable chunks from document content."""
 
 
@@ -140,7 +152,10 @@ class IChunkStrategy(ABC):
 
     @abstractmethod
     def chunk(self, content: str, structure: DocumentStructure) -> List[DocumentChunk]:
-        """Chunk document content based on structure."""
+        """Chunk document content based on structure.
+
+        Returned chunks must be ordered by ``metadata.chunk_index``.
+        """
 
     @abstractmethod
     def validate_chunk(self, chunk: DocumentChunk) -> bool:
@@ -155,7 +170,9 @@ class IStructureExtractor(ABC):
     """Interface for document structure extraction."""
 
     @abstractmethod
-    def extract_structure(self, content: str) -> DocumentStructure:
+    def extract_structure(
+        self, content: str, file_path: Optional[Union[str, Path]] = None
+    ) -> DocumentStructure:
         """Extract the hierarchical structure of a document."""
 
     @abstractmethod
@@ -181,6 +198,21 @@ class ProcessedDocument:
     def get_total_chunks(self) -> int:
         """Get total number of chunks."""
         return len(self.chunks)
+
+    def validate_chunk_order(self) -> bool:
+        """Check that chunk indices are sequential and total metadata is stable."""
+        if not self.chunks:
+            return True
+
+        expected_total = len(self.chunks)
+        for index, chunk in enumerate(self.chunks):
+            if chunk.metadata.chunk_index != index:
+                return False
+            if chunk.metadata.total_chunks != expected_total:
+                return False
+            if not chunk.is_valid():
+                return False
+        return True
 
     def get_sections_at_level(self, level: int) -> List[Section]:
         """Get all sections at a specific level."""

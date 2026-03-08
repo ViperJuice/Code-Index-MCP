@@ -11,14 +11,12 @@ package "mcp_server.plugin_system" <<Component>> {
     ' ========================================
     
     interface IPlugin COMPONENT_INTERFACE #LightGreen {
-        +ASYNC index(file_path: str): IndexResult
-        +ASYNC get_definition(symbol: str, context: Dict): Definition
-        +ASYNC get_references(symbol: str, context: Dict): List<Reference>
-        +ASYNC search(query: str, options: SearchOptions): List<SearchResult>
-        +ASYNC extract_graph_data(file_path: str): GraphData
-        +get_supported_extensions(): List<str>
-        +get_language_name(): str
-        +get_capabilities(): PluginCapabilities
+        +supports(path: str | Path): bool
+        +indexFile(path: str | Path, content: str): IndexShard
+        +getDefinition(symbol: str): SymbolDef
+        +findReferences(symbol: str): Iterable<Reference>
+        +search(query: str, opts: SearchOpts): Iterable<SearchResult>
+        +language: str
     }
     
     interface ILanguageAnalyzer COMPONENT_INTERFACE #LightGreen {
@@ -39,35 +37,38 @@ package "mcp_server.plugin_system" <<Component>> {
     }
     
     interface IPluginDiscovery COMPONENT_INTERFACE #LightGreen {
-        +discover_plugins(path: str): List<PluginInfo]
-        +ASYNC scan_directory(directory: str): List<PluginInfo]
-        +validate_plugin(plugin_path: str): ValidationResult
-        +get_plugin_metadata(plugin_path: str): PluginMetadata
+        +discover_plugins(plugin_dirs: List<Path>): List<PluginInfo>
+        +discover_plugins_safe(plugin_dirs: List<Path>): Result<List<PluginInfo>>
+        +validate_plugin(plugin_path: Path): bool
+        +validate_plugin_safe(plugin_path: Path): Result<bool>
     }
     
     interface IPluginManager COMPONENT_INTERFACE #LightGreen {
-        +ASYNC load_plugin(plugin_info: PluginInfo): IPlugin
-        +ASYNC unload_plugin(name: str): void
-        +ASYNC reload_plugin(name: str): void
-        +get_plugin_status(name: str): PluginStatus
-        +get_all_statuses(): Dict<str, PluginStatus]
-        +ASYNC enable_plugin(name: str): void
-        +ASYNC disable_plugin(name: str): void
+        +load_plugins(config_path: Path): void
+        +load_plugins_safe(config_path: Path): Result<List<PluginLoadResult>>
+        +reload_plugin(name: str): void
+        +enable_plugin(name: str): void
+        +disable_plugin(name: str): void
+        +get_plugin_by_language(language: str): Optional<IPlugin>
+        +get_plugin_for_file(file_path: Path): Optional<IPlugin>
+        +get_plugin_status(): Dict<str, PluginRuntimeInfo>
+        +get_detailed_plugin_status(): Dict<str, Dict>
     }
     
     interface ILifecycleManager COMPONENT_INTERFACE #LightGreen {
-        +ASYNC initialize_plugin(plugin: IPlugin): void
-        +ASYNC start_plugin(plugin: IPlugin): void
-        +ASYNC stop_plugin(plugin: IPlugin): void
-        +ASYNC destroy_plugin(plugin: IPlugin): void
-        +get_lifecycle_state(plugin: IPlugin): LifecycleState
+        +initialize_plugin(plugin_name: str, config: Dict): IPlugin
+        +start_plugin(plugin_name: str): void
+        +stop_plugin(plugin_name: str): void
+        +destroy_plugin(plugin_name: str): void
+        +get_plugin_instance(plugin_name: str): Optional<IPlugin>
+        +get_active_plugins(): Dict<str, IPlugin>
     }
     
     interface IPluginLoader COMPONENT_INTERFACE #LightGreen {
-        +load_module(module_path: str): Module
-        +create_instance(module: Module, config: Dict): IPlugin
-        +validate_interface(instance: Any): bool
-        +get_plugin_class(module: Module): Type[IPlugin]
+        +load_plugin(plugin_info: PluginInfo): Type<IPlugin>
+        +load_plugin_safe(plugin_info: PluginInfo): Result<Type<IPlugin>>
+        +unload_plugin(plugin_name: str): void
+        +unload_plugin_safe(plugin_name: str): Result<None>
     }
     
     interface IModuleImporter COMPONENT_INTERFACE #LightGreen {
@@ -141,20 +142,20 @@ package "mcp_server.plugin_system" <<Component>> {
         -config: IConfig
         -event_bus: IEventBus
         
-        +ASYNC load_plugin(plugin_info: PluginInfo): IPlugin
-        +ASYNC unload_plugin(name: str): void
-        +ASYNC reload_plugin(name: str): void
-        +get_plugin_status(name: str): PluginStatus
-        +get_all_statuses(): Dict<str, PluginStatus]
-        +ASYNC enable_plugin(name: str): void
-        +ASYNC disable_plugin(name: str): void
-        +ASYNC initialize_plugin(plugin: IPlugin): void
-        +ASYNC start_plugin(plugin: IPlugin): void
-        +ASYNC stop_plugin(plugin: IPlugin): void
-        +ASYNC destroy_plugin(plugin: IPlugin): void
-        +get_lifecycle_state(plugin: IPlugin): LifecycleState
-        -ASYNC _execute_lifecycle_hook(plugin: IPlugin, hook: str): void
-        -_emit_plugin_event(event_type: str, plugin_name: str): void
+        +load_plugins(config_path: Path): void
+        +reload_plugin(name: str): void
+        +enable_plugin(name: str): void
+        +disable_plugin(name: str): void
+        +get_plugin_by_language(language: str): Optional<IPlugin>
+        +get_plugin_for_file(file_path: Path): Optional<IPlugin>
+        +get_plugin_status(): Dict<str, PluginRuntimeInfo>
+        +get_detailed_plugin_status(): Dict<str, Dict>
+        +initialize_plugin(plugin_name: str, config: Dict): IPlugin
+        +start_plugin(plugin_name: str): void
+        +stop_plugin(plugin_name: str): void
+        +destroy_plugin(plugin_name: str): void
+        +get_plugin_instance(plugin_name: str): Optional<IPlugin>
+        +get_active_plugins(): Dict<str, IPlugin>
     }
     
     class PluginLoader implements IPluginLoader, IModuleImporter {

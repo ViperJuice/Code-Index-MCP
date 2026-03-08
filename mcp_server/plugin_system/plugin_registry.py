@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type
 
 from ..interfaces.shared_interfaces import Error, Result
 from ..plugin_base import IPlugin
@@ -21,7 +21,9 @@ class PluginRegistry(IPluginRegistry):
         self._language_map: Dict[str, List[str]] = {}  # language -> plugin names
         self._extension_map: Dict[str, List[str]] = {}  # extension -> plugin names
 
-    def register_plugin(self, plugin_info: PluginInfo, plugin_class: Type[IPlugin]) -> None:
+    def register_plugin(
+        self, plugin_info: PluginInfo, plugin_class: Type[IPlugin]
+    ) -> None:
         """Register a plugin with its metadata."""
         plugin_name = plugin_info.name
 
@@ -178,13 +180,14 @@ class PluginRegistry(IPluginRegistry):
         self._extension_map.clear()
         logger.info("Cleared plugin registry")
 
-    def get_plugin_status(self, plugin_name: str) -> Optional[Dict[str, any]]:
+    def get_plugin_status(self, plugin_name: str) -> Optional[Dict[str, Any]]:
         """Get detailed status information for a plugin."""
         if plugin_name not in self._plugins:
             return None
 
         plugin_info = self._plugin_info[plugin_name]
         return {
+            "symbol": plugin_info.name,
             "name": plugin_info.name,
             "version": plugin_info.version,
             "description": plugin_info.description,
@@ -196,7 +199,7 @@ class PluginRegistry(IPluginRegistry):
             "registration_time": getattr(plugin_info, "registration_time", None),
         }
 
-    def get_all_plugin_statuses(self) -> Dict[str, Dict[str, any]]:
+    def get_all_plugin_statuses(self) -> Dict[str, Dict[str, Any]]:
         """Get status information for all registered plugins."""
         statuses = {}
         for plugin_name in self._plugins.keys():

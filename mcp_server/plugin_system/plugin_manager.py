@@ -53,7 +53,9 @@ class PluginManager(IPluginManager, ILifecycleManager):
     def _get_default_config(self) -> PluginSystemConfig:
         """Get default plugin system configuration."""
         return PluginSystemConfig(
-            plugin_dirs=[Path(__file__).parent.parent / "plugins"],  # Default plugins directory
+            plugin_dirs=[
+                Path(__file__).parent.parent / "plugins"
+            ],  # Default plugins directory
             auto_discover=True,
             auto_load=True,
             validate_interfaces=True,
@@ -102,7 +104,9 @@ class PluginManager(IPluginManager, ILifecycleManager):
                     self._registry.register_plugin(plugin_info, plugin_class)
 
                     # Get plugin config
-                    plugin_config = self.config.plugin_configs.get(plugin_info.name, PluginConfig())
+                    plugin_config = self.config.plugin_configs.get(
+                        plugin_info.name, PluginConfig()
+                    )
 
                     # Create instance record with timing
                     import time
@@ -130,61 +134,15 @@ class PluginManager(IPluginManager, ILifecycleManager):
     ) -> Result[List[PluginLoadResult]]:
         """Load plugins using Result pattern for error handling."""
         try:
-            results = []
-            if config_path:
-                self._load_config_file(config_path)
-
-            if self.config.auto_discover:
-                discovered = self._discovery.discover_plugins(self.config.plugin_dirs)
-                logger.info(f"Discovered {len(discovered)} plugins")
-
-                for plugin_info in discovered:
-                    if plugin_info.name in self.config.disabled_plugins:
-                        results.append(
-                            PluginLoadResult(
-                                success=False,
-                                plugin_name=plugin_info.name,
-                                message="Plugin is disabled",
-                            )
-                        )
-                        continue
-
-                    try:
-                        plugin_class = self._loader.load_plugin(plugin_info)
-                        self._registry.register_plugin(plugin_info, plugin_class)
-
-                        plugin_config = self.config.plugin_configs.get(
-                            plugin_info.name, PluginConfig()
-                        )
-
-                        instance = PluginInstance(
-                            info=plugin_info,
-                            config=plugin_config,
-                            instance=None,
-                            state=PluginState.LOADED,
-                        )
-                        self._instances[plugin_info.name] = instance
-
-                        if self.config.auto_load and plugin_config.enabled:
-                            self.initialize_plugin(plugin_info.name, plugin_config.settings)
-
-                        results.append(
-                            PluginLoadResult(
-                                success=True,
-                                plugin_name=plugin_info.name,
-                                message="Plugin loaded successfully",
-                            )
-                        )
-
-                    except Exception as e:
-                        results.append(
-                            PluginLoadResult(
-                                success=False,
-                                plugin_name=plugin_info.name,
-                                message=f"Failed to load: {str(e)}",
-                                error=e,
-                            )
-                        )
+            self.load_plugins(config_path)
+            results = [
+                PluginLoadResult(
+                    success=not instance.is_error,
+                    plugin_name=instance.info.name,
+                    message=(instance.error or "Plugin loaded successfully"),
+                )
+                for instance in self._instances.values()
+            ]
 
             successful_loads = sum(1 for r in results if r.success)
             return Result.success_result(
@@ -199,7 +157,7 @@ class PluginManager(IPluginManager, ILifecycleManager):
         except Exception as e:
             error = Error(
                 code="PLUGIN_LOAD_BATCH_ERROR",
-                message="Failed to load plugins",
+                message=f"Failed to load plugins: {str(e)}",
                 details={
                     "config_path": str(config_path) if config_path else None,
                     "error_type": type(e).__name__,
@@ -239,7 +197,9 @@ class PluginManager(IPluginManager, ILifecycleManager):
 
             # Re-initialize if it was active
             if self._instances[plugin_name].config.enabled:
-                self.initialize_plugin(plugin_name, self._instances[plugin_name].config.settings)
+                self.initialize_plugin(
+                    plugin_name, self._instances[plugin_name].config.settings
+                )
 
             logger.info(f"Successfully reloaded plugin: {plugin_name}")
 
@@ -401,7 +361,9 @@ class PluginManager(IPluginManager, ILifecycleManager):
         """Shutdown all plugins using Result pattern for error handling."""
         try:
             self.shutdown()
-            return Result.success_result(None, metadata={"shutdown_at": datetime.now().isoformat()})
+            return Result.success_result(
+                None, metadata={"shutdown_at": datetime.now().isoformat()}
+            )
         except Exception as e:
             error = Error(
                 code="PLUGIN_SHUTDOWN_ERROR",
@@ -420,7 +382,9 @@ class PluginManager(IPluginManager, ILifecycleManager):
 
         instance_info = self._instances[plugin_name]
         if instance_info.state == PluginState.ERROR:
-            raise PluginInitError(f"Plugin {plugin_name} is in error state: {instance_info.error}")
+            raise PluginInitError(
+                f"Plugin {plugin_name} is in error state: {instance_info.error}"
+            )
 
         try:
             # Get plugin class
@@ -455,7 +419,9 @@ class PluginManager(IPluginManager, ILifecycleManager):
             instance_info.state = PluginState.ERROR
             instance_info.error = str(e)
             logger.error(f"Failed to initialize plugin {plugin_name}: {e}")
-            raise PluginInitError(f"Failed to initialize plugin {plugin_name}: {str(e)}") from e
+            raise PluginInitError(
+                f"Failed to initialize plugin {plugin_name}: {str(e)}"
+            ) from e
 
     def start_plugin(self, plugin_name: str) -> None:
         """Start a plugin (called after initialization)."""
@@ -464,7 +430,9 @@ class PluginManager(IPluginManager, ILifecycleManager):
 
         instance_info = self._instances[plugin_name]
         if instance_info.state != PluginState.INITIALIZED:
-            raise PluginInitError(f"Plugin {plugin_name} must be initialized before starting")
+            raise PluginInitError(
+                f"Plugin {plugin_name} must be initialized before starting"
+            )
 
         try:
             # Call start method if it exists
@@ -591,34 +559,43 @@ class PluginManager(IPluginManager, ILifecycleManager):
 
     def get_plugins_by_status(self, state: PluginState) -> List[str]:
         """Get list of plugin names by their state."""
-        return [name for name, instance in self._instances.items() if instance.state == state]
+        return [
+            name
+            for name, instance in self._instances.items()
+            if instance.state == state
+        ]
 
     def get_enabled_plugins(self) -> List[str]:
         """Get list of enabled plugin names."""
-        return [name for name, instance in self._instances.items() if instance.config.enabled]
+        return [
+            name
+            for name, instance in self._instances.items()
+            if instance.config.enabled
+        ]
 
     def get_plugins_by_language(self, language: str) -> List[str]:
         """Get plugin names that support a specific language."""
         plugin_names = self._registry.get_plugins_by_language(language)
+        if plugin_names:
+            return plugin_names
 
-        # Filter to only return active plugins
-        active_plugins = []
-        for name in plugin_names:
-            instance = self.get_plugin_instance(name)
-            if instance:
-                active_plugins.append(name)
-
-        return active_plugins
+        return [
+            name
+            for name, instance in self._instances.items()
+            if instance.info.language == language
+        ]
 
     def get_plugins_by_extension(self, extension: str) -> List[str]:
         """Get plugin names that support a specific file extension."""
         plugin_names = self._registry.get_plugins_by_extension(extension)
+        if plugin_names:
+            return plugin_names
 
-        # Filter to only return active plugins
-        active_plugins = []
-        for name in plugin_names:
-            instance = self.get_plugin_instance(name)
-            if instance:
-                active_plugins.append(name)
+        if not extension.startswith("."):
+            extension = f".{extension}"
 
-        return active_plugins
+        return [
+            name
+            for name, instance in self._instances.items()
+            if extension in instance.info.file_extensions
+        ]
