@@ -5,6 +5,9 @@ from mcp_server.document_processing.document_interfaces import ProcessedDocument
 from mcp_server.interfaces.plugin_interfaces import PluginRuntimeInfo
 from mcp_server.interfaces.shared_interfaces import PluginStatus
 from mcp_server.plugin_system.plugin_manager import PluginManager
+from mcp_server.plugin_system.interfaces import (
+    IPluginManager as PluginSystemManagerContract,
+)
 from mcp_server.document_processing.base_document_plugin import (
     DocumentMetadata as BaseDocumentMetadata,
 )
@@ -59,6 +62,14 @@ def test_plugin_manager_status_uses_runtime_info_shape():
         language="python",
     )
     assert runtime.status is PluginStatus.READY
+
+    required_methods = {
+        "load_plugins_safe",
+        "shutdown_safe",
+        "get_plugin_status",
+        "get_detailed_plugin_status",
+    }
+    assert required_methods.issubset(set(dir(PluginSystemManagerContract)))
 
 
 def test_base_document_plugin_process_document_matches_contract():

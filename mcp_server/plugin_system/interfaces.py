@@ -1,7 +1,9 @@
 """Plugin system interfaces.
 
-This module defines all the interfaces for the plugin system components,
-following the architecture defined in level3_mcp_components.dsl.
+This module defines plugin-system contracts used by concrete loader/registry/
+manager implementations. These interfaces intentionally track the runtime-facing
+contracts in ``mcp_server.interfaces.plugin_interfaces`` while remaining focused
+on plugin-system internals.
 """
 
 from __future__ import annotations
@@ -10,6 +12,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type
 
+from ..interfaces.plugin_interfaces import PluginRuntimeInfo
 from ..interfaces.shared_interfaces import Result
 from ..plugin_base import IPlugin
 
@@ -42,11 +45,22 @@ class IPluginDiscovery(ABC):
             True if valid plugin, False otherwise
         """
 
-    def discover_plugins_safe(self, plugin_dirs: List[Path]) -> Result[List["PluginInfo"]]:
+    @abstractmethod
+    def discover_plugins_safe(
+        self, plugin_dirs: List[Path]
+    ) -> Result[List["PluginInfo"]]:
         """Discover plugins using Result pattern for error handling."""
+        ...
 
+    @abstractmethod
     def validate_plugin_safe(self, plugin_path: Path) -> Result[bool]:
         """Validate a plugin using Result pattern for error handling."""
+        ...
+
+    @abstractmethod
+    def scan_directory(self, directory: Path) -> List["PluginInfo"]:
+        """Compatibility alias for scanning a single directory."""
+        ...
 
 
 class IPluginLoader(ABC):
@@ -74,18 +88,29 @@ class IPluginLoader(ABC):
             plugin_name: Name of the plugin to unload
         """
 
+    @abstractmethod
     def load_plugin_safe(self, plugin_info: "PluginInfo") -> Result[Type[IPlugin]]:
         """Load a plugin using Result pattern for error handling."""
+        ...
 
+    @abstractmethod
     def unload_plugin_safe(self, plugin_name: str) -> Result[None]:
         """Unload a plugin using Result pattern for error handling."""
+        ...
+
+    @abstractmethod
+    def reload_plugin(self, plugin_info: "PluginInfo") -> Type[IPlugin]:
+        """Reload and return a plugin class when supported."""
+        ...
 
 
 class IPluginRegistry(ABC):
     """Interface for managing plugin registration and metadata."""
 
     @abstractmethod
-    def register_plugin(self, plugin_info: "PluginInfo", plugin_class: Type[IPlugin]) -> None:
+    def register_plugin(
+        self, plugin_info: "PluginInfo", plugin_class: Type[IPlugin]
+    ) -> None:
         """Register a plugin with its metadata.
 
         Args:
@@ -139,13 +164,17 @@ class IPluginRegistry(ABC):
             List of plugin information
         """
 
+    @abstractmethod
     def register_plugin_safe(
         self, plugin_info: "PluginInfo", plugin_class: Type[IPlugin]
     ) -> Result[None]:
         """Register a plugin using Result pattern for error handling."""
+        ...
 
+    @abstractmethod
     def unregister_plugin_safe(self, plugin_name: str) -> Result[None]:
         """Unregister a plugin using Result pattern for error handling."""
+        ...
 
 
 class ILifecycleManager(ABC):
@@ -223,6 +252,13 @@ class IPluginManager(ABC):
         """
 
     @abstractmethod
+    def load_plugins_safe(
+        self, config_path: Optional[Path] = None
+    ) -> Result[List[Any]]:
+        """Load plugins using Result-style error handling."""
+        ...
+
+    @abstractmethod
     def reload_plugin(self, plugin_name: str) -> None:
         """Reload a specific plugin.
 
@@ -271,6 +307,21 @@ class IPluginManager(ABC):
     @abstractmethod
     def shutdown(self) -> None:
         """Shutdown all plugins and cleanup resources."""
+
+    @abstractmethod
+    def shutdown_safe(self) -> Result[None]:
+        """Shutdown plugins using Result-style error handling."""
+        ...
+
+    @abstractmethod
+    def get_plugin_status(self) -> Dict[str, PluginRuntimeInfo | Dict[str, Any]]:
+        """Get runtime status for all known plugins."""
+        ...
+
+    @abstractmethod
+    def get_detailed_plugin_status(self) -> Dict[str, Dict[str, Any]]:
+        """Get expanded runtime and config status for all known plugins."""
+        ...
 
 
 # Hook interfaces for extensibility
