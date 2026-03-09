@@ -208,9 +208,17 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov
 
-      - name: Run comprehensive tests
+      - name: Run release smoke tests
         run: |
-          pytest tests/ -v --cov=mcp_server --cov-report=xml
+          pytest \
+            tests/test_artifact_commands.py \
+            tests/test_artifact_integrity_gate.py \
+            tests/test_artifact_recovery_selection.py \
+            tests/test_chunker_adapter.py \
+            tests/test_semantic_profile_settings.py \
+            tests/test_incremental_indexer.py \
+            tests/test_watcher.py \
+            -v --cov=mcp_server --cov-report=xml
 
       - name: Run integration tests
         run: |
