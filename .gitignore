@@ -160,6 +160,10 @@ tests/fixtures/repos/
 
 # Local index storage (3.1GB of data - DO NOT COMMIT)
 .indexes/
+code_index.db
+.index_metadata.json
+vector_index.qdrant/
+qdrant_storage/collections/code_index__*/
 
 test_repos/
 temp_cookbook/

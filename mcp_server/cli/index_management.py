@@ -45,10 +45,32 @@ def _get_vector_backend_status() -> Dict[str, Any]:
 
     vector_path = os.getenv("QDRANT_PATH", "vector_index.qdrant")
     if os.path.exists(vector_path):
+        collections: List[Dict[str, Any]] = []
+        try:
+            from qdrant_client import QdrantClient
+
+            lock_path = Path(vector_path) / ".lock"
+            if lock_path.exists():
+                lock_path.unlink()
+
+            client = QdrantClient(path=vector_path)
+            for collection_meta in client.get_collections().collections:
+                info = client.get_collection(collection_meta.name)
+                vectors = info.config.params.vectors
+                collections.append(
+                    {
+                        "name": collection_meta.name,
+                        "size": getattr(vectors, "size", None),
+                        "points": getattr(info, "points_count", None),
+                    }
+                )
+        except Exception:
+            collections = []
+
         return {
             "backend": "file",
             "location": vector_path,
-            "collections": [],
+            "collections": collections,
             "size_mb": _directory_size_mb(vector_path),
         }
 
@@ -58,17 +80,17 @@ def _get_vector_backend_status() -> Dict[str, Any]:
             from qdrant_client import QdrantClient
 
             client = QdrantClient(url=server_url, timeout=5)
-            collections = list(client.get_collections().collections)
+            collection_descriptions = list(client.get_collections().collections)
             details = []
             total_size_bytes = 0
-            for collection in collections:
-                info = client.get_collection(collection.name)
+            for collection_meta in collection_descriptions:
+                info = client.get_collection(collection_meta.name)
                 vectors = info.config.params.vectors
                 size = getattr(vectors, "size", None)
                 points = getattr(info, "points_count", None)
                 details.append(
                     {
-                        "name": collection.name,
+                        "name": collection_meta.name,
                         "size": size,
                         "points": points,
                     }
@@ -185,7 +207,9 @@ def check_compatibility(detailed: bool):
 @click.option("--sqlite-only", is_flag=True, help="Rebuild SQLite index only")
 @click.option("--vector-only", is_flag=True, help="Rebuild vector index only")
 @click.option(
-    "--sample-size", default=100, help="Number of files to index (default: 100)"
+    "--sample-size",
+    default=0,
+    help="Number of files to index (0 means full repository)",
 )
 def rebuild(force: bool, sqlite_only: bool, vector_only: bool, sample_size: int):
     """Rebuild index artifacts."""
@@ -205,6 +229,9 @@ def rebuild(force: bool, sqlite_only: bool, vector_only: bool, sample_size: int)
             pass  # Proceed with rebuild if check fails
 
     click.echo("Starting index rebuild...")
+    click.echo(
+        "This rebuild regenerates local runtime/artifact state. Publish the refreshed baseline via GitHub artifacts instead of committing generated index files."
+    )
 
     if not sqlite_only:
         SemanticIndexer = get_semantic_indexer()
@@ -280,6 +307,11 @@ def rebuild(force: bool, sqlite_only: bool, vector_only: bool, sample_size: int)
 
                     if sample_size > 0:
                         python_files = python_files[:sample_size]
+
+                    click.echo(
+                        f"  -> Candidate Python files: {len(python_files)}"
+                        + (" (full repository)" if sample_size <= 0 else "")
+                    )
 
                     profile_counts: dict[str, int] = {}
                     profile_errors: dict[str, int] = {}
@@ -374,6 +406,9 @@ def status():
     """Show current index status."""
     click.echo("Index Status Report")
     click.echo("=" * 30)
+    click.echo(
+        "Local runtime index state is restored/generated on disk for MCP use; the shared baseline is published via GitHub artifacts, not normal git history."
+    )
 
     # SQLite index
     sqlite_path = "code_index.db"

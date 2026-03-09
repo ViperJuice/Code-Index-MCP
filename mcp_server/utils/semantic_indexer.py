@@ -738,6 +738,39 @@ class SemanticIndexer:
         Raises:
             RuntimeError: If all connection methods fail
         """
+        # Prefer explicit local/file-backed paths over server mode so callers that
+        # pass a concrete artifact path do not silently write to a running daemon.
+        if (
+            qdrant_path
+            and not qdrant_path.startswith("http")
+            and qdrant_path != ":memory:"
+        ):
+            try:
+                logger.info(f"Using file-based Qdrant at explicit path: {qdrant_path}")
+                Path(qdrant_path).mkdir(parents=True, exist_ok=True)
+                client = QdrantClient(path=qdrant_path)
+                self._qdrant_available = True
+                self._connection_mode = "file"
+                return client
+            except Exception as e:
+                lock_path = Path(qdrant_path) / ".lock"
+                if lock_path.exists():
+                    try:
+                        logger.warning(
+                            f"Removing stale Qdrant lock file at {lock_path} and retrying"
+                        )
+                        lock_path.unlink()
+                        client = QdrantClient(path=qdrant_path)
+                        self._qdrant_available = True
+                        self._connection_mode = "file"
+                        return client
+                    except Exception as retry_error:
+                        e = retry_error
+                logger.warning(
+                    f"Explicit file-based Qdrant unavailable at {qdrant_path}: "
+                    f"{type(e).__name__}: {e}. Falling back to server mode."
+                )
+
         # First, try server mode (recommended for concurrent access)
         server_url = os.environ.get("QDRANT_URL", "http://localhost:6333")
 

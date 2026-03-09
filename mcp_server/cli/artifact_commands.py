@@ -44,6 +44,15 @@ def _verify_local_index_restored() -> bool:
     return bool(_get_restored_index_paths())
 
 
+def _print_runtime_restore_note() -> None:
+    """Explain that restored index files are local runtime state for MCP use."""
+    click.echo(
+        "ℹ️  These restored index files are local runtime state for the MCP "
+        "(`code_index.db`, `.index_metadata.json`, `vector_index.qdrant`) and are "
+        "normally distributed via GitHub artifacts rather than git history."
+    )
+
+
 def _load_json_file(path: Path) -> dict | None:
     """Load JSON data if the file exists and is valid."""
     if not path.exists():
@@ -331,6 +340,7 @@ def pull(latest: bool, artifact_id: Optional[int], no_backup: bool):
 
         restored = ", ".join(path.name for path in _get_restored_index_paths())
         click.echo(f"✅ Local index files restored: {restored}")
+        _print_runtime_restore_note()
         _print_reconcile_guidance()
 
     except Exception as e:
@@ -383,6 +393,7 @@ def sync():
                 raise click.Abort()
             restored = ", ".join(path.name for path in _get_restored_index_paths())
             click.echo(f"✅ Indexes synchronized! Restored: {restored}")
+            _print_runtime_restore_note()
             _print_reconcile_guidance()
 
             detector, changes = _get_local_drift()
@@ -392,6 +403,9 @@ def sync():
 
         else:
             click.echo("📊 Local indexes found:")
+            click.echo(
+                "   These files are local artifact/runtime state used by the MCP, not source-controlled code."
+            )
 
             # Get local stats
             import sqlite3

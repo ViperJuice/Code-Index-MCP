@@ -280,6 +280,11 @@ mcp-index artifact pull --latest
 # Reconcile only your local drift after restore
 mcp-index artifact sync
 
+# The restored files live locally for MCP runtime use:
+# - code_index.db
+# - .index_metadata.json
+# - vector_index.qdrant/
+
 # Check index status
 mcp-index index status
 
@@ -298,8 +303,10 @@ curl -X POST http://localhost:8000/search \
 Create a `.env` file for configuration:
 
 ```env
-# Optional: Voyage AI for semantic search
+# Semantic profile setup
 VOYAGE_AI_API_KEY=your_api_key_here
+OPENAI_API_BASE=http://ai:8001/v1
+QDRANT_PATH=vector_index.qdrant
 
 # Server settings
 MCP_SERVER_HOST=0.0.0.0
@@ -315,6 +322,19 @@ MCP_ARTIFACT_SYNC=false  # Set to true to enable
 AUTO_UPLOAD=false        # Auto-upload on changes
 AUTO_DOWNLOAD=true       # Auto-download on clone
 ```
+
+Published artifacts now carry the full lexical baseline plus two semantic
+profiles:
+
+- `commercial_high` using `voyage-code-3`
+- `oss_high` using `Qwen/Qwen3-Embedding-8B`
+
+Those profiles are stored in separate Qdrant collections inside the artifact so
+consumers can pull one baseline and use either profile locally.
+
+The generated index files are not meant to live in git history. The repo tracks
+the code, workflow, and configuration needed to build/publish them; GitHub
+artifacts distribute the actual runtime baseline that MCP restores locally.
 
 ### 🔐 Privacy & GitHub Artifact Sync
 

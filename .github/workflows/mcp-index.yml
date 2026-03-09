@@ -71,10 +71,17 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install -r requirements-semantic.txt
           pip install -e .
 
       - name: Build Index
         if: steps.check_index.outputs.found == 'false' && steps.download.outputs.downloaded == 'false'
+        env:
+          QDRANT_USE_SERVER: 'false'
+          QDRANT_PATH: .mcp-index/vector_index.qdrant
+          OPENAI_API_BASE: ${{ vars.OPENAI_API_BASE || 'http://ai:8001/v1' }}
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+          VOYAGE_AI_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
         run: |
           # Create index directory
           mkdir -p .mcp-index
@@ -103,6 +110,12 @@ jobs:
           print(f"Indexed files: {stats.get('indexed_files', 0)}")
           print(f"Failed files: {stats.get('failed_files', 0)}")
           PY
+
+          mcp-index index rebuild --vector-only --force --sample-size 0
+
+          if [ -f ".index_metadata.json" ]; then
+            cp .index_metadata.json .mcp-index/.index_metadata.json
+          fi
       
       - name: Create index metadata
         if: steps.check_index.outputs.found == 'false' && steps.download.outputs.downloaded == 'false'
@@ -120,11 +133,16 @@ jobs:
 
           embedding_model = 'voyage-code-3'
           schema_version = '2'
+          compatibility = {
+              "schema_version": schema_version,
+              "embedding_model": embedding_model,
+          }
 
           if repo_metadata_path.exists():
               try:
                   repo_metadata = json.loads(repo_metadata_path.read_text())
                   embedding_model = repo_metadata.get('embedding_model', embedding_model)
+                  compatibility = repo_metadata.get('compatibility', compatibility)
               except Exception:
                   pass
 
@@ -132,6 +150,7 @@ jobs:
               try:
                   existing = json.loads(metadata_path.read_text())
                   embedding_model = existing.get('embedding_model', embedding_model)
+                  compatibility = existing.get('compatibility', compatibility)
               except Exception:
                   pass
 
@@ -156,10 +175,7 @@ jobs:
               "commit": "${{ github.sha }}",
               "branch": "${{ github.ref_name }}",
               "repository": "${{ github.repository }}",
-              "compatibility": {
-                  "schema_version": schema_version,
-                  "embedding_model": embedding_model,
-              },
+              "compatibility": compatibility,
           }
 
           metadata_path.write_text(json.dumps(metadata, indent=2))

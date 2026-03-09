@@ -85,12 +85,38 @@ jobs:
             DB_SIZE=$(stat -c%s "${{ inputs.index_path }}/code_index.db" 2>/dev/null || stat -f%z "${{ inputs.index_path }}/code_index.db" 2>/dev/null || echo "0")
             echo "db_size=$DB_SIZE" >> $GITHUB_OUTPUT
           fi
+
+          if [ -d "${{ inputs.index_path }}/vector_index.qdrant" ]; then
+            VECTOR_SIZE=$(du -sb "${{ inputs.index_path }}/vector_index.qdrant" | cut -f1)
+            echo "vector_size=$VECTOR_SIZE" >> $GITHUB_OUTPUT
+          else
+            echo "vector_size=0" >> $GITHUB_OUTPUT
+          fi
       
       - name: Compress index files
         id: compress
         run: |
           cd "${{ inputs.index_path }}"
-          
+
+          COMPATIBILITY_JSON='{}'
+          if [ -f ".index_metadata.json" ]; then
+            COMPATIBILITY_JSON=$(python - <<'PY'
+              import json
+              from pathlib import Path
+
+              metadata = json.loads(Path('.index_metadata.json').read_text())
+              compatibility = {
+                  'schema_version': metadata.get('chunk_schema_version') or '2',
+                  'embedding_model': metadata.get('embedding_model'),
+              }
+              if isinstance(metadata.get('semantic_profiles'), dict):
+                  compatibility['semantic_profiles'] = metadata['semantic_profiles']
+                  compatibility['available_semantic_profiles'] = metadata.get('available_semantic_profiles', sorted(metadata['semantic_profiles'].keys()))
+              print(json.dumps(compatibility))
+              PY
+            )
+          fi
+
           # Create compressed archive
           echo "Creating compressed archive..."
           tar -czf index-archive.tar.gz \
@@ -125,8 +151,10 @@ jobs:
             "files_included": $(echo '${{ env.INDEX_FILES }}' | jq -R -s -c 'split("\n") | map(select(length > 0))'),
             "compression_level": ${{ env.COMPRESSION_LEVEL }},
             "index_stats": {
-              "db_size": ${{ steps.metadata.outputs.db_size || 0 }}
-            }
+              "db_size": ${{ steps.metadata.outputs.db_size || 0 }},
+              "vector_size": ${{ steps.metadata.outputs.vector_size || 0 }}
+            },
+            "compatibility": $COMPATIBILITY_JSON
           }
           EOF
       

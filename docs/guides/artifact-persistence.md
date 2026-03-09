@@ -6,12 +6,13 @@ drift without adding a complicated remote delta-download protocol.
 
 ## Lifecycle Overview
 
-1. Local index build creates lexical and semantic assets (`code_index.db`, metadata, and any semantic sidecar data).
+1. Local index build creates lexical and semantic assets (`code_index.db`, `.index_metadata.json`, and `vector_index.qdrant`).
 2. `mcp-index artifact push` packages and uploads a full snapshot artifact.
 3. Teammates or fresh clones run `mcp-index artifact pull --latest` to hydrate local indexes from that full snapshot.
-4. The CLI reports the restored artifact commit and compares it to local `HEAD`.
-5. If your branch or working tree has drifted, use local incremental reindexing to reconcile only changed files.
-6. On branch/commit targeting, `mcp-index artifact recover --branch ... --commit ...` resolves and restores matching artifact state.
+4. MCP reads the restored local runtime files directly from disk (`code_index.db`, `.index_metadata.json`, `vector_index.qdrant`).
+5. The CLI reports the restored artifact commit and compares it to local `HEAD`.
+6. If your branch or working tree has drifted, use local incremental reindexing to reconcile only changed files.
+7. On branch/commit targeting, `mcp-index artifact recover --branch ... --commit ...` resolves and restores matching artifact state.
 
 ## Commands
 
@@ -35,9 +36,23 @@ mcp-index artifact recover --branch main --commit <sha>
 - Semantic payloads and profile metadata
 - Artifact metadata (`artifact-metadata.json`, manifest payloads)
 
+These files are expected to exist locally for MCP runtime use, but they are
+distributed through GitHub artifacts rather than committed to normal git
+history.
+
+The canonical published baseline includes two semantic profiles in separate
+collections inside `vector_index.qdrant`:
+
+- `commercial_high` -> `code_index__commercial_high__v1`
+- `oss_high` -> `code_index__oss_high__v1`
+
+That lets teammates pull one artifact and choose either the proprietary or OSS
+semantic profile without rebuilding the whole repository.
+
 ## Recommended Remote/Local Split
 
 - **Remote transport:** full GitHub artifact snapshot only.
+- **Canonical semantic storage:** file-backed `vector_index.qdrant` built in CI.
 - **Local efficiency:** incremental reindex after restore based on git diff and
   watcher-driven file changes.
 
