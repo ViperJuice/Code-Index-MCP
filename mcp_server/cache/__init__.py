@@ -76,4 +76,4 @@ __all__ = [
     "cache_project_status",
 ]
 
-__version__ = "1.0.0"
+__version__ = "2.14.6"
