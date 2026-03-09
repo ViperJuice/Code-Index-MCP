@@ -1,5 +1,5 @@
 [project]
-name = "code-index-mcp"
+name = "index-it-mcp"
 version = "1.0.0"
 description = "Local-first code indexer for AI assistants via Model Context Protocol (MCP)"
 readme = "README.md"
@@ -67,12 +67,13 @@ dev = [
     "mypy>=1.5.1",
 ]
 all = [
-    "code-index-mcp[semantic,dev]",
+    "index-it-mcp[semantic,dev]",
 ]
 
 [project.scripts]
 mcp-index = "mcp_server.cli:cli"
 code-index-mcp = "mcp_server.cli:cli"
+index-it-mcp = "mcp_server.cli:cli"
 
 [project.urls]
 Homepage = "https://github.com/ViperJuice/Code-Index-MCP"

@@ -31,9 +31,9 @@ permissions:
   packages: write
   issues: write
   pull-requests: write
+  id-token: write
 
 env:
-  PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
   SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
 
 jobs:
@@ -336,10 +336,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish to PyPI
-        if: env.PYPI_API_TOKEN != ''
-        run: |
-          pip install twine
-          twine upload dist/* -u __token__ -p "$PYPI_API_TOKEN"
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
 
   merge-release:
     name: Merge Release Branch
@@ -424,9 +423,13 @@ jobs:
       - name: Trigger deployment workflows
         run: |
           VERSION="${{ needs.prepare-release.outputs.version }}"
-          
-          # Trigger staging deployment
-          gh workflow run deploy-staging.yml -f version=$VERSION
+
+          # Trigger staging deployment when the workflow exists
+          if gh workflow view deploy-staging.yml >/dev/null 2>&1; then
+            gh workflow run deploy-staging.yml -f version=$VERSION
+          else
+            echo "deploy-staging.yml not present; skipping staging trigger"
+          fi
           
           # Create issue for production deployment approval
           gh issue create \

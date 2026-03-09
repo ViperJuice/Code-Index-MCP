@@ -408,107 +408,6 @@ wheels = [
 ]
 
 [[package]]
-name = "code-index-mcp"
-version = "1.0.0"
-source = { editable = "." }
-dependencies = [
-    { name = "bcrypt" },
-    { name = "click" },
-    { name = "fastapi" },
-    { name = "httpx" },
-    { name = "jedi" },
-    { name = "mcp" },
-    { name = "numpy" },
-    { name = "passlib", extra = ["bcrypt"] },
-    { name = "psutil" },
-    { name = "pydantic" },
-    { name = "python-dotenv" },
-    { name = "pyyaml" },
-    { name = "qdrant-client" },
-    { name = "tree-sitter" },
-    { name = "tree-sitter-languages" },
-    { name = "treesitter-chunker" },
-    { name = "uvicorn" },
-    { name = "voyageai" },
-    { name = "watchdog" },
-]
-
-[package.optional-dependencies]
-all = [
-    { name = "anthropic" },
-    { name = "black" },
-    { name = "cohere" },
-    { name = "isort" },
-    { name = "mypy" },
-    { name = "openai" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-benchmark" },
-    { name = "pytest-cov" },
-    { name = "pytest-mock" },
-    { name = "pytest-timeout" },
-    { name = "pytest-xdist" },
-    { name = "sentence-transformers" },
-]
-dev = [
-    { name = "black" },
-    { name = "isort" },
-    { name = "mypy" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-benchmark" },
-    { name = "pytest-cov" },
-    { name = "pytest-mock" },
-    { name = "pytest-timeout" },
-    { name = "pytest-xdist" },
-]
-semantic = [
-    { name = "anthropic" },
-    { name = "cohere" },
-    { name = "openai" },
-    { name = "sentence-transformers" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "anthropic", marker = "extra == 'semantic'", specifier = ">=0.18.0" },
-    { name = "bcrypt", specifier = "<5.0.0" },
-    { name = "black", marker = "extra == 'dev'", specifier = ">=23.7.0" },
-    { name = "click", specifier = ">=8.1.0" },
-    { name = "code-index-mcp", extras = ["semantic", "dev"], marker = "extra == 'all'" },
-    { name = "cohere", marker = "extra == 'semantic'", specifier = ">=4.0.0" },
-    { name = "fastapi", specifier = ">=0.100.0" },
-    { name = "httpx", specifier = ">=0.24.1" },
-    { name = "isort", marker = "extra == 'dev'", specifier = ">=5.12.0" },
-    { name = "jedi", specifier = ">=0.19.0" },
-    { name = "mcp", specifier = ">=1.0.0" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.5.1" },
-    { name = "numpy", specifier = ">=1.24.0" },
-    { name = "openai", marker = "extra == 'semantic'", specifier = ">=1.51.0" },
-    { name = "passlib", extras = ["bcrypt"], specifier = ">=1.7.4,<2.0.0" },
-    { name = "psutil", specifier = ">=5.9.0" },
-    { name = "pydantic", specifier = ">=2.0.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.0" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21.0" },
-    { name = "pytest-benchmark", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
-    { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.11.1" },
-    { name = "pytest-timeout", marker = "extra == 'dev'", specifier = ">=2.1.0" },
-    { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.3.1" },
-    { name = "python-dotenv", specifier = ">=1.0.0" },
-    { name = "pyyaml", specifier = ">=6.0.0" },
-    { name = "qdrant-client", specifier = ">=1.7.0" },
-    { name = "sentence-transformers", marker = "extra == 'semantic'", specifier = ">=2.0.0" },
-    { name = "tree-sitter", specifier = ">=0.20.0" },
-    { name = "tree-sitter-languages", specifier = ">=1.7.0" },
-    { name = "treesitter-chunker", specifier = "==2.2.4" },
-    { name = "uvicorn", specifier = ">=0.23.0" },
-    { name = "voyageai", specifier = ">=0.2.0" },
-    { name = "watchdog", specifier = ">=3.0.0" },
-]
-provides-extras = ["semantic", "dev", "all"]
-
-[[package]]
 name = "cohere"
 version = "5.20.7"
 source = { registry = "https://pypi.org/simple" }
@@ -1097,6 +996,107 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/af/77/a85b3745cf40a0572bae2de8cd9c2a2a8af78e5cf3e880fc0a249114e609/igraph-1.0.0-cp39-abi3-win_amd64.whl", hash = "sha256:faeff8ede0cf15eb4ded44b0fcea6e1886740146e60504c24ad2da14e0939563", size = 3221663, upload-time = "2025-10-23T12:22:39.404Z" },
     { url = "https://files.pythonhosted.org/packages/ef/7e/5df541c37bdf6493035e89c22bd53f30d99b291bcda6c78e9a8afeecec2b/igraph-1.0.0-cp39-abi3-win_arm64.whl", hash = "sha256:b607cafc24b10a615e713ee96e58208ef27e0764af80140c7cc45d4724a3f2df", size = 2785701, upload-time = "2025-10-23T12:22:41.03Z" },
 ]
+
+[[package]]
+name = "index-it-mcp"
+version = "1.0.0"
+source = { editable = "." }
+dependencies = [
+    { name = "bcrypt" },
+    { name = "click" },
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "jedi" },
+    { name = "mcp" },
+    { name = "numpy" },
+    { name = "passlib", extra = ["bcrypt"] },
+    { name = "psutil" },
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "pyyaml" },
+    { name = "qdrant-client" },
+    { name = "tree-sitter" },
+    { name = "tree-sitter-languages" },
+    { name = "treesitter-chunker" },
+    { name = "uvicorn" },
+    { name = "voyageai" },
+    { name = "watchdog" },
+]
+
+[package.optional-dependencies]
+all = [
+    { name = "anthropic" },
+    { name = "black" },
+    { name = "cohere" },
+    { name = "isort" },
+    { name = "mypy" },
+    { name = "openai" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-benchmark" },
+    { name = "pytest-cov" },
+    { name = "pytest-mock" },
+    { name = "pytest-timeout" },
+    { name = "pytest-xdist" },
+    { name = "sentence-transformers" },
+]
+dev = [
+    { name = "black" },
+    { name = "isort" },
+    { name = "mypy" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-benchmark" },
+    { name = "pytest-cov" },
+    { name = "pytest-mock" },
+    { name = "pytest-timeout" },
+    { name = "pytest-xdist" },
+]
+semantic = [
+    { name = "anthropic" },
+    { name = "cohere" },
+    { name = "openai" },
+    { name = "sentence-transformers" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "anthropic", marker = "extra == 'semantic'", specifier = ">=0.18.0" },
+    { name = "bcrypt", specifier = "<5.0.0" },
+    { name = "black", marker = "extra == 'dev'", specifier = ">=23.7.0" },
+    { name = "click", specifier = ">=8.1.0" },
+    { name = "cohere", marker = "extra == 'semantic'", specifier = ">=4.0.0" },
+    { name = "fastapi", specifier = ">=0.100.0" },
+    { name = "httpx", specifier = ">=0.24.1" },
+    { name = "index-it-mcp", extras = ["semantic", "dev"], marker = "extra == 'all'" },
+    { name = "isort", marker = "extra == 'dev'", specifier = ">=5.12.0" },
+    { name = "jedi", specifier = ">=0.19.0" },
+    { name = "mcp", specifier = ">=1.0.0" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.5.1" },
+    { name = "numpy", specifier = ">=1.24.0" },
+    { name = "openai", marker = "extra == 'semantic'", specifier = ">=1.51.0" },
+    { name = "passlib", extras = ["bcrypt"], specifier = ">=1.7.4,<2.0.0" },
+    { name = "psutil", specifier = ">=5.9.0" },
+    { name = "pydantic", specifier = ">=2.0.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.0" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21.0" },
+    { name = "pytest-benchmark", marker = "extra == 'dev'", specifier = ">=4.0.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
+    { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.11.1" },
+    { name = "pytest-timeout", marker = "extra == 'dev'", specifier = ">=2.1.0" },
+    { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.3.1" },
+    { name = "python-dotenv", specifier = ">=1.0.0" },
+    { name = "pyyaml", specifier = ">=6.0.0" },
+    { name = "qdrant-client", specifier = ">=1.7.0" },
+    { name = "sentence-transformers", marker = "extra == 'semantic'", specifier = ">=2.0.0" },
+    { name = "tree-sitter", specifier = ">=0.20.0" },
+    { name = "tree-sitter-languages", specifier = ">=1.7.0" },
+    { name = "treesitter-chunker", specifier = "==2.2.4" },
+    { name = "uvicorn", specifier = ">=0.23.0" },
+    { name = "voyageai", specifier = ">=0.2.0" },
+    { name = "watchdog", specifier = ">=3.0.0" },
+]
+provides-extras = ["semantic", "dev", "all"]
 
 [[package]]
 name = "iniconfig"

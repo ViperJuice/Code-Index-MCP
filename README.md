@@ -248,10 +248,10 @@ The setup script creates the appropriate `.mcp.json` for your environment. Manua
 #### Option 1: Install via pip (Recommended)
 ```bash
 # Install the package
-pip install code-index-mcp
+pip install index-it-mcp
 
 # Or install with dev tools for testing
-pip install code-index-mcp[dev]
+pip install index-it-mcp[dev]
 ```
 
 #### Option 2: Install from Source
