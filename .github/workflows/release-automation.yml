@@ -430,6 +430,10 @@ jobs:
           else
             echo "deploy-staging.yml not present; skipping staging trigger"
           fi
+
+          # Ensure deployment labels exist before creating the approval issue
+          gh label create deployment --color 1d76db --description "Deployment tracking" 2>/dev/null || true
+          gh label create production --color b60205 --description "Production release work" 2>/dev/null || true
           
           # Create issue for production deployment approval
           gh issue create \
