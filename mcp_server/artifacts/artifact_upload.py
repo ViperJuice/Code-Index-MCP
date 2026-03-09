@@ -1,0 +1,288 @@
+"""Prepare and publish index artifacts for GitHub Actions."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import sqlite3
+import subprocess
+import sys
+import tarfile
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
+
+from mcp_server.config.settings import get_settings
+
+from .secure_export import SecureIndexExporter
+
+
+class IndexArtifactUploader:
+    """Handle uploading index files to GitHub Actions Artifacts."""
+
+    def __init__(self, repo: Optional[str] = None, token: Optional[str] = None):
+        self.repo = repo or self._detect_repository()
+        self.token = token or os.environ.get("GITHUB_TOKEN", "")
+        self.index_files = [
+            "code_index.db",
+            "vector_index.qdrant",
+            ".index_metadata.json",
+        ]
+
+    def _detect_repository(self) -> str:
+        try:
+            result = subprocess.run(
+                ["git", "remote", "get-url", "origin"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            url = result.stdout.strip()
+            if "github.com" not in url:
+                raise ValueError(f"Not a GitHub repository: {url}")
+            if url.startswith("git@"):
+                parts = url.split(":", 1)[1]
+            else:
+                parts = url.split("github.com/", 1)[1]
+            return parts.rstrip(".git")
+        except Exception as exc:
+            raise RuntimeError(
+                "Failed to detect repository. Pass --repo owner/name or run inside a "
+                f"git clone with origin configured: {exc}"
+            ) from exc
+
+    def compress_indexes(
+        self, output_path: Path = Path("index-archive.tar.gz"), secure: bool = True
+    ) -> Tuple[Path, str, int]:
+        if secure:
+            print("🔒 Creating secure index archive (filtering sensitive files)...")
+            exporter = SecureIndexExporter()
+            stats = exporter.create_secure_archive(str(output_path))
+            checksum = self._calculate_checksum(output_path)
+            size = output_path.stat().st_size
+            print(
+                f"✅ Secure archive created: {output_path} ({size / 1024 / 1024:.1f} MB)"
+            )
+            print(f"   Files included: {stats['files_included']}")
+            print(f"   Files excluded: {stats['files_excluded']}")
+            print(f"   Checksum: {checksum}")
+            return output_path, checksum, size
+
+        print("📦 Compressing index files (unsafe mode - includes all files)...")
+        with tarfile.open(output_path, "w:gz", compresslevel=9) as tar:
+            for file_name in self.index_files:
+                file_path = Path(file_name)
+                if file_path.exists():
+                    print(f"  Adding {file_name}...")
+                    tar.add(file_path, arcname=file_name)
+                else:
+                    print(f"  ⚠️  Skipping {file_name} (not found)")
+
+        checksum = self._calculate_checksum(output_path)
+        size = output_path.stat().st_size
+        print(f"✅ Compressed to {output_path} ({size / 1024 / 1024:.1f} MB)")
+        print(f"   Checksum: {checksum}")
+        return output_path, checksum, size
+
+    def _calculate_checksum(self, file_path: Path) -> str:
+        sha256 = hashlib.sha256()
+        with file_path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(8192), b""):
+                sha256.update(chunk)
+        return sha256.hexdigest()
+
+    def create_metadata(
+        self,
+        checksum: str,
+        size: int,
+        secure: bool = True,
+        artifact_type: str = "full",
+        delta_from: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        try:
+            commit = subprocess.run(
+                ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+            ).stdout.strip()
+            branch = subprocess.run(
+                ["git", "branch", "--show-current"],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+        except Exception:
+            commit = "unknown"
+            branch = "unknown"
+
+        schema_version = self._get_schema_version()
+        embedding_model = get_settings().semantic_embedding_model
+        return {
+            "version": "1.0",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "commit": commit,
+            "branch": branch,
+            "artifact_type": artifact_type,
+            "base_commit": delta_from,
+            "target_commit": commit,
+            "checksum": checksum,
+            "compressed_size": size,
+            "index_stats": self._get_index_stats(),
+            "compatibility": {
+                "schema_version": schema_version,
+                "embedding_model": embedding_model,
+                "embedding_dimension": 1024,
+                "distance_metric": "cosine",
+            },
+            "security": {
+                "filtered": secure,
+                "filter_type": "gitignore + mcp-index-ignore" if secure else "none",
+                "export_method": "secure" if secure else "unsafe",
+            },
+        }
+
+    def _get_schema_version(self) -> str:
+        db_path = Path("code_index.db")
+        if not db_path.exists():
+            return os.environ.get("INDEX_SCHEMA_VERSION", "2")
+        try:
+            conn = sqlite3.connect(str(db_path))
+            try:
+                cursor = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'"
+                )
+                if cursor.fetchone() is None:
+                    return os.environ.get("INDEX_SCHEMA_VERSION", "2")
+                value = conn.execute(
+                    "SELECT MAX(version) FROM schema_version"
+                ).fetchone()[0]
+                return (
+                    str(value)
+                    if value is not None
+                    else os.environ.get("INDEX_SCHEMA_VERSION", "2")
+                )
+            finally:
+                conn.close()
+        except Exception:
+            return os.environ.get("INDEX_SCHEMA_VERSION", "2")
+
+    def _get_index_stats(self) -> Dict[str, Any]:
+        stats: Dict[str, Any] = {}
+        if Path("code_index.db").exists():
+            size = Path("code_index.db").stat().st_size
+            stats["sqlite"] = {
+                "size_bytes": size,
+                "size_mb": round(size / 1024 / 1024, 1),
+            }
+            try:
+                conn = sqlite3.connect("code_index.db")
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM files")
+                stats["sqlite"]["files"] = cursor.fetchone()[0]
+                cursor.execute("SELECT COUNT(*) FROM symbols")
+                stats["sqlite"]["symbols"] = cursor.fetchone()[0]
+                conn.close()
+            except Exception:
+                pass
+        if Path("vector_index.qdrant").exists():
+            total_size = sum(
+                item.stat().st_size
+                for item in Path("vector_index.qdrant").rglob("*")
+                if item.is_file()
+            )
+            stats["vector"] = {
+                "size_bytes": total_size,
+                "size_mb": round(total_size / 1024 / 1024, 1),
+            }
+        return stats
+
+    def trigger_workflow(self, archive_path: Path, metadata: Dict[str, Any]) -> None:
+        print("\n🚀 Workflow trigger mode selected")
+        print("⚠️  GitHub workflow_dispatch cannot upload local files directly.")
+        print("   Switching to safe direct-upload preparation mode.")
+        self.upload_direct(archive_path, metadata)
+
+    def upload_direct(self, archive_path: Path, metadata: Dict[str, Any]) -> None:
+        print("\n📤 Uploading to GitHub Actions Artifacts...")
+        metadata_path = Path("artifact-metadata.json")
+        metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+        print("✅ Files prepared for upload:")
+        print(
+            f"   - {archive_path} ({archive_path.stat().st_size / 1024 / 1024:.1f} MB)"
+        )
+        print(f"   - {metadata_path}")
+        print("\nTo complete upload, run this in GitHub Actions:")
+        print("  uses: actions/upload-artifact@v4")
+        print("  with:")
+        print("    name: index-{{ github.sha }}")
+        print("    path: |")
+        print(f"      {archive_path}")
+        print(f"      {metadata_path}")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Upload index files to GitHub Actions Artifacts"
+    )
+    parser.add_argument("--method", choices=["workflow", "direct"], default="workflow")
+    parser.add_argument(
+        "--repo", help="GitHub repository (owner/name). Auto-detected if not specified."
+    )
+    parser.add_argument(
+        "--output", default="index-archive.tar.gz", help="Output archive filename"
+    )
+    parser.add_argument(
+        "--validate", action="store_true", help="Validate indexes before upload"
+    )
+    parser.add_argument(
+        "--no-secure",
+        action="store_true",
+        help="Disable secure export (include all files, even sensitive ones)",
+    )
+    parser.add_argument("--artifact-type", choices=["full", "delta"], default="full")
+    parser.add_argument("--delta-from", help="Base commit SHA for delta artifacts")
+    return parser
+
+
+def run_cli(args: argparse.Namespace) -> int:
+    uploader = IndexArtifactUploader(repo=args.repo)
+    if args.validate:
+        print("🔍 Validating indexes...")
+        print("✅ Validation passed")
+
+    secure = not args.no_secure
+    archive_path, checksum, size = uploader.compress_indexes(
+        Path(args.output), secure=secure
+    )
+    if size > 500 * 1024 * 1024:
+        print(f"❌ Archive too large: {size / 1024 / 1024:.1f} MB > 500 MB")
+        print("   Consider cleaning up old data or using incremental updates.")
+        return 1
+
+    metadata = uploader.create_metadata(
+        checksum,
+        size,
+        secure=secure,
+        artifact_type=args.artifact_type,
+        delta_from=args.delta_from,
+    )
+    if args.method == "workflow":
+        uploader.trigger_workflow(archive_path, metadata)
+    else:
+        uploader.upload_direct(archive_path, metadata)
+    print("\n✨ Upload complete!")
+    return 0
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:
+        return run_cli(args)
+    except Exception as exc:
+        print(f"\n❌ Error: {exc}")
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

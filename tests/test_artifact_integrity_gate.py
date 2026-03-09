@@ -1,26 +1,13 @@
 """Tests for artifact integrity gate validation and downloader integration."""
 
 import hashlib
-import importlib.util
 from pathlib import Path
 
 import pytest
 
+from mcp_server.artifacts.artifact_download import IndexArtifactDownloader
 from mcp_server.artifacts.integrity_gate import validate_artifact_integrity
 from mcp_server.artifacts.manifest_v2 import ArtifactManifestV2, ManifestUnit
-
-
-def _load_downloader_class():
-    module_path = (
-        Path(__file__).parent.parent / "scripts" / "index-artifact-download.py"
-    )
-    spec = importlib.util.spec_from_file_location(
-        "index_artifact_download", module_path
-    )
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.IndexArtifactDownloader
 
 
 def _write_archive(tmp_path: Path, payload: bytes = b"index-archive") -> Path:
@@ -126,7 +113,6 @@ def test_integrity_gate_fails_for_invalid_manifest_v2_payload(tmp_path: Path):
 
 
 def test_downloader_run_integrity_gate_reuses_shared_gate(tmp_path: Path):
-    IndexArtifactDownloader = _load_downloader_class()
     downloader = IndexArtifactDownloader(repo="owner/repo")
 
     archive_path = _write_archive(tmp_path)
@@ -143,7 +129,6 @@ def test_downloader_run_integrity_gate_reuses_shared_gate(tmp_path: Path):
 
 
 def test_downloader_run_integrity_gate_fails_closed(tmp_path: Path):
-    IndexArtifactDownloader = _load_downloader_class()
     downloader = IndexArtifactDownloader(repo="owner/repo")
 
     archive_path = _write_archive(tmp_path)

@@ -240,7 +240,7 @@ The setup script creates the appropriate `.mcp.json` for your environment. Manua
 ## 🚀 Quickstart (Python)
 
 ### Prerequisites
-- Python 3.8+
+- Python 3.12+
 - Git
 
 ### Installation
@@ -271,8 +271,14 @@ pip install -e .
 ### Quick Start After Installation
 
 ```bash
-# Build index for your project (from project root)
-mcp-index index rebuild
+# Authenticate GitHub artifact access once
+gh auth login
+
+# Pull the latest published index baseline for this repo
+mcp-index artifact pull --latest
+
+# Reconcile only your local drift after restore
+mcp-index artifact sync
 
 # Check index status
 mcp-index index status
@@ -466,20 +472,20 @@ python scripts/move_indexes_to_central.py
 
 ### For This Repository
 
-This project uses GitHub Actions Artifacts for efficient index sharing, eliminating reindexing time while keeping the repository lean.
+This project uses GitHub Actions Artifacts for efficient index sharing, so most users start from a published index baseline instead of rebuilding locally.
 
 ```bash
 # First time setup - pull latest indexes
-python scripts/cli/mcp_cli.py artifact pull --latest
+mcp-index artifact pull --latest
 
-# After pull, let local incremental indexing catch up branch/worktree drift
-python scripts/cli/mcp_cli.py artifact sync
+# After pull, reconcile only your branch/worktree drift
+mcp-index artifact sync
 
 # Share your indexes with the team
-python scripts/cli/mcp_cli.py artifact push
+mcp-index artifact push
 
 # Check sync status
-python scripts/cli/mcp_cli.py artifact sync
+mcp-index artifact sync
 
 # Optional: Install git hooks for automatic sync
 mcp-index hooks install
@@ -610,19 +616,19 @@ See [mcp-index-kit](./mcp-index-kit/) for full documentation
 
 
 # View artifact details
-python scripts/cli/mcp_cli.py artifact info 12345
+mcp-index artifact info 12345
 ```
 
 #### Index Management
 ```bash
 # Check index status
-python scripts/cli/mcp_cli.py index status
+mcp-index index status
 
 # Check compatibility
-python scripts/cli/mcp_cli.py index check-compatibility
+mcp-index index check-compatibility
 
-# Rebuild indexes locally
-python scripts/cli/mcp_cli.py index rebuild
+# Rebuild indexes locally only if artifact sync cannot catch up
+mcp-index index rebuild
 
 # Create backup
 python scripts/cli/mcp_cli.py index backup my_backup
@@ -655,12 +661,11 @@ python scripts/cli/mcp_cli.py index restore my_backup
 
 2. **Get Latest Indexes**
    ```bash
-   python scripts/cli/mcp_cli.py artifact pull --latest
+    gh auth login
+    mcp-index artifact pull --latest
    ```
-   - This downloads the current full GitHub artifact snapshot.
-   - If your local branch or working tree differs from the artifact commit, use
-     `python scripts/cli/mcp_cli.py artifact sync` to inspect that drift and
-     let local incremental indexing catch up.
+    - This downloads the current full GitHub artifact snapshot.
+    - `mcp-index artifact sync` then reconciles only your local branch/worktree drift when incremental catch-up is appropriate.
 
 3. **Make Your Changes**
    - Edit code as normal
@@ -669,7 +674,7 @@ python scripts/cli/mcp_cli.py index restore my_backup
 4. **Share Updates**
    ```bash
    # Your indexes are already updated locally
-   python scripts/cli/mcp_cli.py artifact push
+    mcp-index artifact push
    ```
 
 ### Embedding Model Compatibility

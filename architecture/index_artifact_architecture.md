@@ -146,23 +146,24 @@ flowchart LR
 ```bash
 git clone <repository>
 cd <repository>
-python mcp_cli.py artifact pull --latest
+mcp-index artifact pull --latest
+mcp-index artifact sync
 # Ready to develop immediately
 ```
 
 ### Pattern 2: Feature Development
 ```bash
 # Pull a full artifact snapshot
-python mcp_cli.py artifact pull --latest
+mcp-index artifact pull --latest
 
 # Reconcile local branch/worktree drift if needed
-python mcp_cli.py artifact sync
+mcp-index artifact sync
 
 # Make code changes
 # Indexes update automatically via watcher/incremental indexing
 git add .
 git commit -m "feat: new feature"
-python mcp_cli.py artifact push  # Share updated indexes
+mcp-index artifact push  # Share updated indexes
 git push
 ```
 

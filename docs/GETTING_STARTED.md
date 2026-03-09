@@ -4,9 +4,10 @@ This guide walks you through installing and using Code-Index-MCP to index and se
 
 ## Prerequisites
 
-- Python 3.8 or higher
+- Python 3.12 or higher
 - Git (for version control features)
 - A code repository to index
+- `gh` CLI authenticated with access to the repository artifacts (`gh auth login`)
 
 ## Installation
 
@@ -37,24 +38,28 @@ pip install -e .
 
 ## Quick Start
 
-### 1. Index Your Project
+### 1. Pull Your Project Baseline Index
 
-Navigate to your project directory and build the index:
+Navigate to your project directory and restore the latest published index:
 
 ```bash
 cd /path/to/your/project
 
-# Build the index
-mcp-index index rebuild
+# Pull the latest shared artifact baseline
+mcp-index artifact pull --latest
+
+# Reconcile only your local changes after restore
+mcp-index artifact sync
 
 # Check the index status
 mcp-index index status
 ```
 
-The indexer will:
-- Scan all supported source files (48 languages)
-- Extract symbols (functions, classes, variables)
-- Build a searchable FTS5 index in SQLite
+If there is no published artifact yet, fall back to a local rebuild:
+
+```bash
+mcp-index index rebuild --force
+```
 
 ### 2. Start the MCP Server
 
@@ -153,10 +158,10 @@ mcp-index index status          # Show index status
 mcp-index index rebuild         # Rebuild the index
 mcp-index index check-compatibility  # Check index compatibility
 
-# Artifact sync (optional)
-mcp-index artifact pull --latest    # Download team index
-mcp-index artifact push             # Upload your index
-mcp-index artifact sync             # Sync with team
+# Artifact sync (recommended)
+mcp-index artifact pull --latest    # Download team index baseline
+mcp-index artifact sync             # Reconcile local drift after restore
+mcp-index artifact push             # Publish a refreshed index baseline
 
 # Repository
 mcp-index repository status     # Show repository info
@@ -167,8 +172,21 @@ mcp-index repository status     # Show repository info
 ### Index not found
 
 ```bash
-# Rebuild the index
+# Pull the team baseline first, then rebuild only if needed
+mcp-index artifact pull --latest
+mcp-index artifact sync
+
+# Fallback if no artifact is available or drift is too large
 mcp-index index rebuild --force
+```
+
+### Artifact pull fails
+
+Check GitHub authentication and repository remote:
+
+```bash
+gh auth status
+git remote get-url origin
 ```
 
 ### Server won't start

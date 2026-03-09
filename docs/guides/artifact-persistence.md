@@ -7,26 +7,26 @@ drift without adding a complicated remote delta-download protocol.
 ## Lifecycle Overview
 
 1. Local index build creates lexical and semantic assets (`code_index.db`, metadata, and any semantic sidecar data).
-2. `mcp_cli.py artifact push` packages and uploads a full snapshot artifact.
-3. Teammates or fresh clones run `mcp_cli.py artifact pull --latest` to hydrate local indexes from that full snapshot.
+2. `mcp-index artifact push` packages and uploads a full snapshot artifact.
+3. Teammates or fresh clones run `mcp-index artifact pull --latest` to hydrate local indexes from that full snapshot.
 4. The CLI reports the restored artifact commit and compares it to local `HEAD`.
 5. If your branch or working tree has drifted, use local incremental reindexing to reconcile only changed files.
-6. On branch/commit targeting, `mcp_cli.py artifact recover --branch ... --commit ...` resolves and restores matching artifact state.
+6. On branch/commit targeting, `mcp-index artifact recover --branch ... --commit ...` resolves and restores matching artifact state.
 
 ## Commands
 
 ```bash
 # Upload local indexes
-uv run python scripts/cli/mcp_cli.py artifact push --validate
+mcp-index artifact push --validate
 
 # Pull latest compatible artifact
-uv run python scripts/cli/mcp_cli.py artifact pull --latest
+mcp-index artifact pull --latest
 
 # Check whether the restored artifact matches local HEAD/worktree drift
-uv run python scripts/cli/mcp_cli.py artifact sync
+mcp-index artifact sync
 
 # Recover by branch and/or commit
-uv run python scripts/cli/mcp_cli.py artifact recover --branch main --commit <sha>
+mcp-index artifact recover --branch main --commit <sha>
 ```
 
 ## What Gets Persisted
@@ -64,8 +64,9 @@ When `main` advances:
 1. Pull the newest compatible full artifact.
 2. Read the restored artifact commit and compare it to local `HEAD`.
 3. If `HEAD` matches, start using the restored index immediately.
-4. If `HEAD` differs, run local incremental reconciliation for added, modified,
-   deleted, and renamed files.
+4. If `HEAD` differs, run `mcp-index artifact sync` to let local incremental
+   reconciliation handle added, modified, deleted, and renamed files when the
+   drift volume is small enough.
 5. If drift is very large, prefer a local rebuild instead of forcing incremental catch-up.
 
 ## Branch Switching Strategy
