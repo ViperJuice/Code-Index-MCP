@@ -272,8 +272,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:${{ needs.prepare-release.outputs.version }}
-            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/viperjuice/code-index-mcp:${{ needs.prepare-release.outputs.version }}
+            ghcr.io/viperjuice/code-index-mcp:latest
           build-args: |
             VERSION=${{ needs.prepare-release.outputs.version }}
             BUILD_DATE=${{ github.event.repository.updated_at }}
