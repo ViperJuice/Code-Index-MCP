@@ -17,6 +17,7 @@ from mcp_server.artifacts.artifact_download import (
     format_artifact_table,
 )
 from mcp_server.artifacts.artifact_upload import IndexArtifactUploader
+from mcp_server.artifacts.semantic_profiles import extract_semantic_profile_metadata
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from mcp_server.indexing.change_detector import ChangeDetector, FileChange
 from mcp_server.indexing.incremental_indexer import IncrementalIndexer
@@ -57,18 +58,19 @@ def _get_artifact_identity() -> dict[str, str | None]:
     """Return restored artifact commit and branch metadata."""
     artifact_metadata = _load_json_file(Path("artifact-metadata.json")) or {}
     index_metadata = _load_json_file(Path(".index_metadata.json")) or {}
+    compatibility = artifact_metadata.get("compatibility", {})
+    profile_source = compatibility if compatibility else index_metadata
+    semantic_profiles = extract_semantic_profile_metadata(profile_source)
+    profile_names = ", ".join(sorted(semantic_profiles)) if semantic_profiles else None
 
     return {
         "commit": artifact_metadata.get("commit") or index_metadata.get("git_commit"),
         "branch": artifact_metadata.get("branch"),
-        "embedding_model": artifact_metadata.get("compatibility", {}).get(
-            "embedding_model"
-        )
+        "embedding_model": compatibility.get("embedding_model")
         or index_metadata.get("embedding_model"),
-        "schema_version": artifact_metadata.get("compatibility", {}).get(
-            "schema_version"
-        )
+        "schema_version": compatibility.get("schema_version")
         or index_metadata.get("chunk_schema_version"),
+        "semantic_profiles": profile_names,
     }
 
 
@@ -212,6 +214,10 @@ def _print_reconcile_guidance() -> None:
     if artifact_identity.get("embedding_model"):
         click.echo(
             f"🧠 Artifact embedding model: {artifact_identity['embedding_model']}"
+        )
+    if artifact_identity.get("semantic_profiles"):
+        click.echo(
+            f"🧩 Artifact semantic profiles: {artifact_identity['semantic_profiles']}"
         )
 
     if not artifact_identity.get("commit") or not git_info.get("head"):

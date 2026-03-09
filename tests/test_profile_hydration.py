@@ -68,6 +68,21 @@ def test_incompatible_profile_is_flagged() -> None:
     )
 
 
+def test_multi_profile_metadata_marks_available_and_missing_profiles() -> None:
+    coordinator = ProfileHydrationCoordinator()
+
+    report = coordinator.from_index_metadata(
+        requested_profiles={"oss_high": "oss123", "commercial_high": "voy123"},
+        index_metadata={
+            "semantic_profiles": {"oss_high": {"compatibility_fingerprint": "oss123"}}
+        },
+        lexical_available=True,
+    )
+
+    assert report.profiles["oss_high"].status is HydrationState.AVAILABLE
+    assert report.profiles["commercial_high"].status is HydrationState.MISSING
+
+
 def test_index_discovery_exposes_profile_hydration_from_metadata(
     tmp_path: Path,
 ) -> None:

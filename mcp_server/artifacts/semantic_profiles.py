@@ -191,3 +191,67 @@ def _compute_compatibility_fingerprint(canonical_payload: Mapping[str, Any]) -> 
     """Compute deterministic compatibility fingerprint for a profile."""
     raw = json.dumps(canonical_payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]
+
+
+def extract_semantic_profile_metadata(
+    metadata: Optional[Mapping[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+    """Extract normalized semantic profile metadata from multi or legacy payloads."""
+    if not metadata:
+        return {}
+
+    discovered: Dict[str, Dict[str, Any]] = {}
+    semantic_profiles = metadata.get("semantic_profiles")
+    if isinstance(semantic_profiles, Mapping):
+        for raw_profile_id, payload in semantic_profiles.items():
+            if not isinstance(raw_profile_id, str) or not raw_profile_id:
+                continue
+
+            normalized: Dict[str, Any] = {"profile_id": raw_profile_id}
+            if isinstance(payload, Mapping):
+                normalized.update(dict(payload))
+            elif isinstance(payload, str):
+                normalized["compatibility_fingerprint"] = payload
+
+            discovered[raw_profile_id] = normalized
+
+    legacy_profile = metadata.get("semantic_profile")
+    if (
+        isinstance(legacy_profile, str)
+        and legacy_profile
+        and legacy_profile not in discovered
+    ):
+        discovered[legacy_profile] = {
+            "profile_id": legacy_profile,
+            "compatibility_fingerprint": metadata.get("compatibility_fingerprint"),
+            "compatibility_hash": metadata.get("compatibility_hash"),
+            "embedding_provider": metadata.get("embedding_provider"),
+            "embedding_model": metadata.get("embedding_model"),
+            "model_version": metadata.get("model_version"),
+            "model_dimension": metadata.get("model_dimension"),
+            "distance_metric": metadata.get("distance_metric"),
+            "normalization_policy": metadata.get("normalization_policy"),
+            "chunk_schema_version": metadata.get("chunk_schema_version"),
+            "collection_name": metadata.get("collection_name"),
+            "qdrant_path": metadata.get("qdrant_path"),
+            "created_at": metadata.get("created_at"),
+            "updated_at": metadata.get("updated_at"),
+        }
+
+    return discovered
+
+
+def get_primary_semantic_profile_metadata(
+    metadata: Optional[Mapping[str, Any]],
+) -> tuple[Optional[str], Optional[Dict[str, Any]]]:
+    """Return the primary semantic profile metadata entry, if present."""
+    profiles = extract_semantic_profile_metadata(metadata)
+    if not profiles:
+        return None, None
+
+    requested = metadata.get("semantic_profile") if metadata else None
+    if isinstance(requested, str) and requested in profiles:
+        return requested, profiles[requested]
+
+    profile_id = next(iter(profiles.keys()))
+    return profile_id, profiles[profile_id]

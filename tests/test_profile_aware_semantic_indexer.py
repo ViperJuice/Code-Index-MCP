@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from types import SimpleNamespace
 
 from mcp_server.artifacts.semantic_profiles import SemanticProfileRegistry
@@ -39,6 +40,7 @@ def _sample_profiles() -> dict[str, dict[str, object]]:
             "normalization_policy": "provider-default",
             "chunk_schema_version": "2.0",
             "chunker_version": "treesitter-v2",
+            "build_metadata": {"collection_name": "semantic-commercial-high"},
         },
         "oss-high": {
             "provider": "openai_compatible",
@@ -49,6 +51,7 @@ def _sample_profiles() -> dict[str, dict[str, object]]:
             "normalization_policy": "none",
             "chunk_schema_version": "2.1",
             "chunker_version": "treesitter-v3",
+            "build_metadata": {"collection_name": "semantic-oss-high"},
         },
     }
 
@@ -157,4 +160,50 @@ def test_compatibility_metadata_differs_by_profile(monkeypatch, tmp_path):
     assert (
         commercial_metadata["compatibility_fingerprint"]
         != oss_metadata["compatibility_fingerprint"]
+    )
+    assert commercial.collection == "semantic-commercial-high"
+    assert oss.collection == "semantic-oss-high"
+
+
+def test_metadata_file_accumulates_multiple_semantic_profiles(monkeypatch, tmp_path):
+    _patch_indexer_runtime(monkeypatch, tmp_path)
+    registry = SemanticProfileRegistry.from_raw(_sample_profiles(), "commercial-high")
+
+    SemanticIndexer(
+        collection="code-index",
+        qdrant_path=":memory:",
+        profile_registry=registry,
+        semantic_profile="commercial-high",
+    )
+    SemanticIndexer(
+        collection="code-index",
+        qdrant_path=":memory:",
+        profile_registry=registry,
+        semantic_profile="oss-high",
+    )
+
+    metadata = json.loads(
+        (tmp_path / ".index_metadata.json").read_text(encoding="utf-8")
+    )
+
+    assert metadata["semantic_profile"] == "oss-high"
+    assert sorted(metadata["semantic_profiles"].keys()) == [
+        "commercial-high",
+        "oss-high",
+    ]
+    assert (
+        metadata["semantic_profiles"]["commercial-high"]["compatibility_fingerprint"]
+        == registry.get("commercial-high").compatibility_fingerprint
+    )
+    assert (
+        metadata["semantic_profiles"]["oss-high"]["compatibility_fingerprint"]
+        == registry.get("oss-high").compatibility_fingerprint
+    )
+    assert (
+        metadata["semantic_profiles"]["commercial-high"]["collection_name"]
+        == "semantic-commercial-high"
+    )
+    assert (
+        metadata["semantic_profiles"]["oss-high"]["collection_name"]
+        == "semantic-oss-high"
     )

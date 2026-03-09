@@ -4,7 +4,29 @@ Environment detection and management for production deployments.
 
 import os
 from enum import Enum
+from pathlib import Path
 from typing import Optional
+
+from dotenv import load_dotenv
+
+
+_DOTENV_LOADED = False
+
+
+def load_local_env_files() -> None:
+    """Load local env files once for CLI and development workflows."""
+    global _DOTENV_LOADED
+
+    if _DOTENV_LOADED:
+        return
+
+    repo_root = Path(__file__).resolve().parents[2]
+    for name in (".env.local", ".env", ".env.native"):
+        env_path = repo_root / name
+        if env_path.exists():
+            load_dotenv(env_path, override=False)
+
+    _DOTENV_LOADED = True
 
 
 class Environment(str, Enum):
@@ -128,7 +150,9 @@ def get_environment_prefix() -> str:
     return prefixes[env]
 
 
-def get_env_var(key: str, default: Optional[str] = None, required: bool = False) -> Optional[str]:
+def get_env_var(
+    key: str, default: Optional[str] = None, required: bool = False
+) -> Optional[str]:
     """
     Get environment variable with environment-specific prefix support.
 
@@ -147,6 +171,8 @@ def get_env_var(key: str, default: Optional[str] = None, required: bool = False)
         # In production, looks for MCP_PROD_SECRET_KEY, then SECRET_KEY
         secret = get_env_var("SECRET_KEY", required=True)
     """
+    load_local_env_files()
+
     # Try environment-specific variable first
     env_prefix = get_environment_prefix()
     prefixed_key = f"{env_prefix}{key}"
@@ -162,6 +188,8 @@ def get_env_var(key: str, default: Optional[str] = None, required: bool = False)
 
     # Check if required
     if required and value is None:
-        raise ValueError(f"Required environment variable not found: {prefixed_key} or {key}")
+        raise ValueError(
+            f"Required environment variable not found: {prefixed_key} or {key}"
+        )
 
     return value

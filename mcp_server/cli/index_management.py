@@ -8,6 +8,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 import click
 
@@ -16,8 +17,73 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from mcp_server.storage.sqlite_store import SQLiteStore  # noqa: E402
+from mcp_server.artifacts.semantic_profiles import SemanticProfileRegistry  # noqa: E402
+from mcp_server.config.settings import reload_settings  # noqa: E402
 from mcp_server.setup.semantic_preflight import run_semantic_preflight  # noqa: E402
 from mcp_server.utils import get_semantic_indexer  # noqa: E402
+
+
+def _get_profile_collection_name(profile: Any, fallback: str) -> str:
+    """Return per-profile collection name with fallback to global default."""
+    build_metadata = getattr(profile, "build_metadata", None) or {}
+    collection_name = build_metadata.get("collection_name")
+    if isinstance(collection_name, str) and collection_name.strip():
+        return collection_name.strip()
+    return fallback
+
+
+def _get_vector_backend_status() -> Dict[str, Any]:
+    """Inspect active vector backend, preferring the live Qdrant server."""
+
+    def _directory_size_mb(path: str) -> float:
+        total_size = 0
+        if os.path.exists(path):
+            for dirpath, _, filenames in os.walk(path):
+                for filename in filenames:
+                    total_size += os.path.getsize(os.path.join(dirpath, filename))
+        return total_size / (1024 * 1024)
+
+    vector_path = os.getenv("QDRANT_PATH", "vector_index.qdrant")
+    if os.path.exists(vector_path):
+        return {
+            "backend": "file",
+            "location": vector_path,
+            "collections": [],
+            "size_mb": _directory_size_mb(vector_path),
+        }
+
+    server_url = os.getenv("QDRANT_URL", "http://localhost:6333")
+    if os.environ.get("QDRANT_USE_SERVER", "true").lower() == "true":
+        try:
+            from qdrant_client import QdrantClient
+
+            client = QdrantClient(url=server_url, timeout=5)
+            collections = list(client.get_collections().collections)
+            details = []
+            total_size_bytes = 0
+            for collection in collections:
+                info = client.get_collection(collection.name)
+                vectors = info.config.params.vectors
+                size = getattr(vectors, "size", None)
+                points = getattr(info, "points_count", None)
+                details.append(
+                    {
+                        "name": collection.name,
+                        "size": size,
+                        "points": points,
+                    }
+                )
+            storage_hint = "qdrant_storage"
+            return {
+                "backend": "server",
+                "location": server_url,
+                "collections": details,
+                "size_mb": _directory_size_mb(storage_hint),
+            }
+        except Exception:
+            pass
+
+    return {}
 
 
 def _get_semantic_indexer_instance():
@@ -141,53 +207,138 @@ def rebuild(force: bool, sqlite_only: bool, vector_only: bool, sample_size: int)
     click.echo("Starting index rebuild...")
 
     if not sqlite_only:
-        indexer = _get_semantic_indexer_instance()
-        if indexer is None:
+        SemanticIndexer = get_semantic_indexer()
+        if SemanticIndexer is None:
             click.echo("⚠️ Skipping vector index (semantic dependencies not installed)")
             click.echo("   Install with: pip install code-index-mcp[semantic]")
         else:
             click.echo("Rebuilding vector index...")
             try:
+                settings = reload_settings()
+                registry = SemanticProfileRegistry.from_raw(
+                    settings.get_semantic_profiles_config(),
+                    settings.get_semantic_default_profile(),
+                    tool_version=settings.app_version,
+                )
+                profile_ids = list(registry.list().keys())
+                qdrant_path = os.getenv("QDRANT_PATH", "vector_index.qdrant")
+                target_collections = {
+                    _get_profile_collection_name(
+                        registry.get(profile_id), settings.semantic_collection_name
+                    )
+                    for profile_id in profile_ids
+                }
+
                 # Remove old vector index
-                vector_path = "vector_index.qdrant"
-                if os.path.exists(vector_path):
+                if qdrant_path == "vector_index.qdrant" and os.path.exists(qdrant_path):
                     import shutil
 
-                    shutil.rmtree(vector_path)
+                    shutil.rmtree(qdrant_path)
 
-                # Find Python files to index
-                import glob
+                if os.environ.get("QDRANT_USE_SERVER", "true").lower() == "true":
+                    try:
+                        from qdrant_client import QdrantClient
 
-                python_files = glob.glob("**/*.py", recursive=True)
-                python_files = [
-                    f
-                    for f in python_files
-                    if not any(
-                        exclude in f
-                        for exclude in ["test_repos", ".git", "__pycache__", ".venv"]
+                        client = QdrantClient(
+                            url=os.getenv("QDRANT_URL", "http://localhost:6333"),
+                            timeout=5,
+                        )
+                        existing = {
+                            collection.name
+                            for collection in client.get_collections().collections
+                        }
+                        stale_collections = set(target_collections)
+                        if settings.semantic_collection_name not in target_collections:
+                            stale_collections.add(settings.semantic_collection_name)
+                        for collection_name in sorted(stale_collections & existing):
+                            client.delete_collection(collection_name)
+                    except Exception:
+                        pass
+
+                original_qdrant_use_server = os.environ.get("QDRANT_USE_SERVER")
+                if not qdrant_path.startswith("http") and qdrant_path != ":memory:":
+                    os.environ["QDRANT_USE_SERVER"] = "false"
+
+                try:
+                    # Find Python files to index
+                    import glob
+
+                    python_files = glob.glob("**/*.py", recursive=True)
+                    python_files = [
+                        f
+                        for f in python_files
+                        if not any(
+                            exclude in f
+                            for exclude in [
+                                "test_repos",
+                                ".git",
+                                "__pycache__",
+                                ".venv",
+                            ]
+                        )
+                    ]
+
+                    if sample_size > 0:
+                        python_files = python_files[:sample_size]
+
+                    profile_counts: dict[str, int] = {}
+                    profile_errors: dict[str, int] = {}
+                    for profile_id in profile_ids:
+                        click.echo(f"  -> Building semantic profile: {profile_id}")
+                        profile = registry.get(profile_id)
+                        indexer = SemanticIndexer(
+                            collection=_get_profile_collection_name(
+                                profile, settings.semantic_collection_name
+                            ),
+                            qdrant_path=qdrant_path,
+                            profile_registry=registry,
+                            semantic_profile=profile_id,
+                        )
+
+                        indexed_count = 0
+                        error_count = 0
+                        with click.progressbar(
+                            python_files, label=f"Indexing files ({profile_id})"
+                        ) as files:
+                            for file_path in files:
+                                try:
+                                    result = indexer.index_file(Path(file_path))
+                                    if result:
+                                        indexed_count += 1
+                                except Exception as e:
+                                    if force:
+                                        error_count += 1
+                                        continue
+                                    click.echo(
+                                        f"\nError indexing {file_path} for {profile_id}: {e}",
+                                        err=True,
+                                    )
+                                    return
+
+                        profile_counts[profile_id] = indexed_count
+                        profile_errors[profile_id] = error_count
+                finally:
+                    if original_qdrant_use_server is None:
+                        os.environ.pop("QDRANT_USE_SERVER", None)
+                    else:
+                        os.environ["QDRANT_USE_SERVER"] = original_qdrant_use_server
+
+                click.echo(
+                    "✅ Vector index rebuilt for profiles: "
+                    + ", ".join(
+                        f"{profile_id}={count} files"
+                        for profile_id, count in profile_counts.items()
                     )
-                ]
-
-                if sample_size > 0:
-                    python_files = python_files[:sample_size]
-
-                indexed_count = 0
-                with click.progressbar(python_files, label="Indexing files") as files:
-                    for file_path in files:
-                        try:
-                            result = indexer.index_file(Path(file_path))
-                            if result:
-                                indexed_count += 1
-                        except Exception as e:
-                            if force:
-                                continue  # Skip errors in force mode
-                            else:
-                                click.echo(
-                                    f"\nError indexing {file_path}: {e}", err=True
-                                )
-                                return
-
-                click.echo(f"✅ Vector index rebuilt with {indexed_count} files")
+                )
+                if any(profile_errors.values()):
+                    click.echo(
+                        "⚠️  Files skipped due to forced errors: "
+                        + ", ".join(
+                            f"{profile_id}={count}"
+                            for profile_id, count in profile_errors.items()
+                            if count
+                        )
+                    )
 
             except Exception as e:
                 click.echo(f"❌ Vector index rebuild failed: {e}", err=True)
@@ -252,36 +403,28 @@ def status():
         click.echo("SQLite Index: ❌ Not found")
 
     # Vector index
-    vector_path = "vector_index.qdrant"
-    if os.path.exists(vector_path):
+    vector_status = _get_vector_backend_status()
+    if vector_status:
         try:
-            # Calculate directory size
-            total_size = 0
-            for dirpath, dirnames, filenames in os.walk(vector_path):
-                for filename in filenames:
-                    total_size += os.path.getsize(os.path.join(dirpath, filename))
-
-            vector_size = total_size / (1024 * 1024)  # MB
-
-            # Try to get collection info
-            indexer = _get_semantic_indexer_instance()
-            if indexer:
-                try:
-                    collections = indexer.qdrant.get_collections()
-                    collection_count = len(collections.collections)
-                    click.echo("Vector Index:")
-                    click.echo(f"  🧠 Collections: {collection_count}")
-                    click.echo(f"  💾 Storage size: {vector_size:.1f} MB")
-                except Exception:
-                    click.echo("Vector Index:")
-                    click.echo(f"  💾 Storage size: {vector_size:.1f} MB")
-                    click.echo("  ⚠️ Could not read collection info")
-            else:
-                click.echo("Vector Index:")
-                click.echo(f"  💾 Storage size: {vector_size:.1f} MB")
-                click.echo(
-                    "  ⚠️ Semantic deps not installed - install with: pip install code-index-mcp[semantic]"
-                )
+            click.echo("Vector Index:")
+            click.echo(
+                f"  🔌 Backend: {vector_status['backend']} ({vector_status['location']})"
+            )
+            click.echo(f"  💾 Storage size: {vector_status['size_mb']:.1f} MB")
+            collections = vector_status.get("collections") or []
+            if collections:
+                click.echo(f"  🧠 Collections: {len(collections)}")
+                for collection in collections:
+                    click.echo(
+                        f"     - {collection['name']}"
+                        + (
+                            f" ({collection['points']} pts, dim={collection['size']})"
+                            if collection.get("size")
+                            else ""
+                        )
+                    )
+            elif vector_status["backend"] == "file":
+                click.echo("  ⚠️ Could not read collection info")
 
         except Exception as e:
             click.echo(f"Vector Index: ❌ Error reading ({e})")
@@ -303,6 +446,17 @@ def status():
             click.echo(
                 f"  🔗 Git commit: {metadata.get('git_commit', 'unknown')[:8]}..."
             )
+            semantic_profiles = metadata.get("semantic_profiles") or {}
+            if isinstance(semantic_profiles, dict) and semantic_profiles:
+                click.echo(
+                    "  🧩 Semantic profiles: "
+                    + ", ".join(sorted(semantic_profiles.keys()))
+                )
+                for profile_id in sorted(semantic_profiles.keys()):
+                    profile_meta = semantic_profiles.get(profile_id) or {}
+                    collection = profile_meta.get("collection_name", "unknown")
+                    model = profile_meta.get("embedding_model", "unknown")
+                    click.echo(f"     - {profile_id}: {model} @ {collection}")
 
         except Exception as e:
             click.echo(f"Metadata: ❌ Error reading ({e})")

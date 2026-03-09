@@ -17,6 +17,10 @@ from typing import Any, Dict, Optional, Tuple
 from mcp_server.config.settings import get_settings
 
 from .secure_export import SecureIndexExporter
+from .semantic_profiles import (
+    extract_semantic_profile_metadata,
+    get_primary_semantic_profile_metadata,
+)
 
 
 class IndexArtifactUploader:
@@ -116,7 +120,7 @@ class IndexArtifactUploader:
             branch = "unknown"
 
         schema_version = self._get_schema_version()
-        embedding_model = get_settings().semantic_embedding_model
+        compatibility = self._build_compatibility_metadata(schema_version)
         return {
             "version": "1.0",
             "timestamp": datetime.utcnow().isoformat() + "Z",
@@ -128,18 +132,63 @@ class IndexArtifactUploader:
             "checksum": checksum,
             "compressed_size": size,
             "index_stats": self._get_index_stats(),
-            "compatibility": {
-                "schema_version": schema_version,
-                "embedding_model": embedding_model,
-                "embedding_dimension": 1024,
-                "distance_metric": "cosine",
-            },
+            "compatibility": compatibility,
             "security": {
                 "filtered": secure,
                 "filter_type": "gitignore + mcp-index-ignore" if secure else "none",
                 "export_method": "secure" if secure else "unsafe",
             },
         }
+
+    def _read_index_metadata(self) -> Dict[str, Any]:
+        metadata_path = Path(".index_metadata.json")
+        if not metadata_path.exists():
+            return {}
+        try:
+            payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+        return payload if isinstance(payload, dict) else {}
+
+    def _build_compatibility_metadata(self, schema_version: str) -> Dict[str, Any]:
+        index_metadata = self._read_index_metadata()
+        profile_id, primary_profile = get_primary_semantic_profile_metadata(
+            index_metadata
+        )
+        semantic_profiles = extract_semantic_profile_metadata(index_metadata)
+        settings = get_settings()
+
+        primary_profile = primary_profile or {}
+        compatibility: Dict[str, Any] = {
+            "schema_version": schema_version,
+            "embedding_model": primary_profile.get("embedding_model")
+            or index_metadata.get("embedding_model")
+            or settings.semantic_embedding_model,
+            "embedding_dimension": primary_profile.get("model_dimension")
+            or index_metadata.get("model_dimension")
+            or 1024,
+            "distance_metric": primary_profile.get("distance_metric")
+            or index_metadata.get("distance_metric")
+            or "cosine",
+        }
+
+        if profile_id:
+            compatibility["semantic_profile"] = profile_id
+
+        if semantic_profiles:
+            compatibility["semantic_profiles"] = semantic_profiles
+            compatibility["available_semantic_profiles"] = sorted(semantic_profiles)
+            embedding_models = sorted(
+                {
+                    str(profile.get("embedding_model"))
+                    for profile in semantic_profiles.values()
+                    if profile.get("embedding_model")
+                }
+            )
+            if embedding_models:
+                compatibility["embedding_models"] = embedding_models
+
+        return compatibility
 
     def _get_schema_version(self) -> str:
         db_path = Path("code_index.db")

@@ -18,7 +18,11 @@ from qdrant_client import QdrantClient, models
 from qdrant_client.http.models import FieldCondition, Filter, MatchValue
 
 from ..artifacts.semantic_namespace import SemanticNamespaceResolver
-from ..artifacts.semantic_profiles import SemanticProfile, SemanticProfileRegistry
+from ..artifacts.semantic_profiles import (
+    SemanticProfile,
+    SemanticProfileRegistry,
+    extract_semantic_profile_metadata,
+)
 from ..core.path_resolver import PathResolver
 from ..plugins.language_registry import get_language_by_extension
 from .embedding_providers import create_embedding_provider
@@ -126,10 +130,15 @@ class SemanticIndexer:
         self.normalization_policy = self.semantic_profile.normalization_policy
         self.chunk_schema_version = self.semantic_profile.chunk_schema_version
         self.compatibility_fingerprint = self.semantic_profile.compatibility_fingerprint
+        profile_collection = None
+        if self.semantic_profile.build_metadata:
+            raw_collection = self.semantic_profile.build_metadata.get("collection_name")
+            if isinstance(raw_collection, str) and raw_collection.strip():
+                profile_collection = raw_collection.strip()
 
         self.namespace_resolver = namespace_resolver or SemanticNamespaceResolver()
         self.collection = self._resolve_collection_name(
-            requested_collection=collection,
+            requested_collection=profile_collection or collection,
             repo_identifier=repo_identifier,
             lineage_id=lineage_id,
             branch=branch,
@@ -888,9 +897,44 @@ class SemanticIndexer:
         try:
             collections = self.qdrant.get_collections()
             exists = any(c.name == self.collection for c in collections.collections)
+            should_recreate = False
 
             if not exists:
                 logger.info(f"Creating Qdrant collection: {self.collection}")
+            else:
+                try:
+                    collection_info = self.qdrant.get_collection(self.collection)
+                    vectors_config = collection_info.config.params.vectors
+                    expected_distance = self._resolve_qdrant_distance(
+                        self.distance_metric
+                    )
+                    current_size = getattr(vectors_config, "size", None)
+                    current_distance = getattr(vectors_config, "distance", None)
+                    should_recreate = current_size not in (
+                        None,
+                        self.embedding_dimension,
+                    ) or current_distance not in (None, expected_distance)
+                    if should_recreate:
+                        logger.warning(
+                            "Recreating Qdrant collection %s due to config mismatch "
+                            "(size=%s, distance=%s, expected_size=%s, expected_distance=%s)",
+                            self.collection,
+                            current_size,
+                            current_distance,
+                            self.embedding_dimension,
+                            expected_distance,
+                        )
+                    else:
+                        logger.debug(f"Collection already exists: {self.collection}")
+                except Exception as info_error:
+                    logger.warning(
+                        "Failed to inspect collection %s; recreating. Error: %s",
+                        self.collection,
+                        info_error,
+                    )
+                    should_recreate = True
+
+            if not exists or should_recreate:
                 self.qdrant.recreate_collection(
                     collection_name=self.collection,
                     vectors_config=models.VectorParams(
@@ -899,8 +943,6 @@ class SemanticIndexer:
                     ),
                 )
                 logger.info(f"Successfully created collection: {self.collection}")
-            else:
-                logger.debug(f"Collection already exists: {self.collection}")
         except Exception as e:
             logger.error(
                 f"Failed to ensure collection '{self.collection}': {type(e).__name__}: {e}"
@@ -931,6 +973,8 @@ class SemanticIndexer:
     # ------------------------------------------------------------------
     def _build_metadata(self) -> Dict[str, Any]:
         """Build metadata payload for semantic index compatibility checks."""
+        timestamp = datetime.now().isoformat()
+        existing_metadata = self._load_existing_metadata()
         metadata = {
             "embedding_provider": self.embedding_provider,
             "embedding_model": self.embedding_model,
@@ -939,7 +983,8 @@ class SemanticIndexer:
             "distance_metric": self.distance_metric,
             "normalization_policy": self.normalization_policy,
             "chunk_schema_version": self.chunk_schema_version,
-            "created_at": datetime.now().isoformat(),
+            "created_at": existing_metadata.get("created_at", timestamp),
+            "updated_at": timestamp,
             "qdrant_path": self.qdrant_path,
             "collection_name": self.collection,
             "compatibility_hash": self._generate_compatibility_hash(),
@@ -947,8 +992,33 @@ class SemanticIndexer:
         }
 
         if self._profile_active:
+            semantic_profiles = extract_semantic_profile_metadata(existing_metadata)
+            current_profile_metadata = {
+                "profile_id": self.semantic_profile.profile_id,
+                "compatibility_fingerprint": self.compatibility_fingerprint,
+                "compatibility_hash": self._generate_compatibility_hash(),
+                "embedding_provider": self.embedding_provider,
+                "embedding_model": self.embedding_model,
+                "model_version": self.embedding_model_version,
+                "model_dimension": self.embedding_dimension,
+                "distance_metric": self.distance_metric,
+                "normalization_policy": self.normalization_policy,
+                "chunk_schema_version": self.chunk_schema_version,
+                "collection_name": self.collection,
+                "qdrant_path": self.qdrant_path,
+                "created_at": semantic_profiles.get(
+                    self.semantic_profile.profile_id, {}
+                ).get("created_at", timestamp),
+                "updated_at": timestamp,
+            }
+            semantic_profiles[self.semantic_profile.profile_id] = (
+                current_profile_metadata
+            )
+
             metadata["semantic_profile"] = self.semantic_profile.profile_id
             metadata["compatibility_fingerprint"] = self.compatibility_fingerprint
+            metadata["semantic_profiles"] = semantic_profiles
+            metadata["available_semantic_profiles"] = sorted(semantic_profiles.keys())
 
         return metadata
 
@@ -974,6 +1044,15 @@ class SemanticIndexer:
             f"{self.embedding_model}:{self.embedding_dimension}:{self.distance_metric}"
         )
         return hashlib.sha256(compatibility_string.encode()).hexdigest()[:16]
+
+    def _load_existing_metadata(self) -> Dict[str, Any]:
+        """Load any existing metadata file for multi-profile merge behavior."""
+        try:
+            with open(self.metadata_file, "r", encoding="utf-8") as handle:
+                payload = json.load(handle)
+            return payload if isinstance(payload, dict) else {}
+        except Exception:
+            return {}
 
     # ------------------------------------------------------------------
     def _get_git_commit_hash(self) -> Optional[str]:
@@ -1003,6 +1082,15 @@ class SemanticIndexer:
                 other_metadata = json.load(f)
 
             current_hash = self._generate_compatibility_hash()
+            if self._profile_active:
+                other_profiles = extract_semantic_profile_metadata(other_metadata)
+                other_profile = other_profiles.get(self.semantic_profile.profile_id, {})
+                other_hash = other_profile.get(
+                    "compatibility_fingerprint"
+                ) or other_profile.get("compatibility_hash")
+                if other_hash:
+                    return current_hash == other_hash
+
             other_hash = other_metadata.get("compatibility_hash")
 
             return current_hash == other_hash

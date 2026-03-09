@@ -15,6 +15,7 @@ profiles:
       name: voyage-code-3
       output_dimension: 2048
     vector_store:
+      collection: code_index__commercial_high__v1
       vector_size: 2048
       distance: dot
     normalization:
@@ -31,6 +32,7 @@ profiles:
       vllm:
         base_url: http://127.0.0.1:8000
     vector_store:
+      collection: code_index__oss_high__v1
       vector_size: 4096
       distance: dot
     normalization:
@@ -49,7 +51,6 @@ profiles:
         "_detect_treesitter_chunker_version",
         lambda self: "treesitter-chunker@2.2.4",
     )
-
     settings = Settings()
     profiles = settings.get_semantic_profiles_config()
 
@@ -58,13 +59,21 @@ profiles:
     assert profiles["commercial_high"]["vector_dimension"] == 2048
     assert profiles["commercial_high"]["distance_metric"] == "dot"
     assert profiles["commercial_high"]["chunker_version"] == "treesitter-chunker@2.2.4"
+    assert (
+        profiles["commercial_high"]["build_metadata"]["collection_name"]
+        == "code_index__commercial_high__v1"
+    )
 
     assert profiles["oss_high"]["provider"] == "openai_compatible"
     assert profiles["oss_high"]["vector_dimension"] == 4096
     assert profiles["oss_high"]["normalization_policy"] == "l2"
     assert (
         profiles["oss_high"]["build_metadata"]["openai_api_base"]
-        == "http://127.0.0.1:8000"
+        == settings.openai_api_base
+    )
+    assert (
+        profiles["oss_high"]["build_metadata"]["collection_name"]
+        == "code_index__oss_high__v1"
     )
 
 

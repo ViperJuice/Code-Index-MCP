@@ -2,12 +2,40 @@
 
 import hashlib
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+import mcp_server.artifacts.artifact_download as artifact_download_module
 from mcp_server.artifacts.artifact_download import IndexArtifactDownloader
 from mcp_server.artifacts.integrity_gate import validate_artifact_integrity
 from mcp_server.artifacts.manifest_v2 import ArtifactManifestV2, ManifestUnit
+from mcp_server.artifacts.semantic_profiles import SemanticProfileRegistry
+
+
+def _configured_profiles() -> dict:
+    return {
+        "oss_high": {
+            "provider": "openai_compatible",
+            "model_name": "Qwen/Qwen3-Embedding-8B",
+            "model_version": "e2e",
+            "vector_dimension": 4096,
+            "distance_metric": "dot",
+            "normalization_policy": "l2",
+            "chunk_schema_version": "1",
+            "chunker_version": "treesitter-v2",
+        },
+        "commercial_high": {
+            "provider": "voyage",
+            "model_name": "voyage-code-3",
+            "model_version": "3",
+            "vector_dimension": 2048,
+            "distance_metric": "dot",
+            "normalization_policy": "provider-default",
+            "chunk_schema_version": "1",
+            "chunker_version": "treesitter-v2",
+        },
+    }
 
 
 def _write_archive(tmp_path: Path, payload: bytes = b"index-archive") -> Path:
@@ -142,3 +170,74 @@ def test_downloader_run_integrity_gate_fails_closed(tmp_path: Path):
             archive_path=archive_path,
             checksum_path=None,
         )
+
+
+def test_downloader_accepts_artifact_when_any_profile_matches(
+    monkeypatch, tmp_path: Path
+):
+    monkeypatch.chdir(tmp_path)
+    configured_profiles = _configured_profiles()
+    registry = SemanticProfileRegistry.from_raw(configured_profiles, "oss_high")
+    monkeypatch.setattr(
+        artifact_download_module,
+        "get_settings",
+        lambda: SimpleNamespace(
+            app_version="test",
+            semantic_embedding_model="voyage-code-3",
+            get_semantic_profiles_config=lambda: configured_profiles,
+            get_semantic_default_profile=lambda: "oss_high",
+        ),
+    )
+
+    downloader = IndexArtifactDownloader(repo="owner/repo")
+    metadata = {
+        "compatibility": {
+            "schema_version": "2",
+            "semantic_profiles": {
+                "oss_high": {
+                    "compatibility_fingerprint": registry.get(
+                        "oss_high"
+                    ).compatibility_fingerprint
+                }
+            },
+        }
+    }
+
+    compatible, issues = downloader.check_compatibility(metadata)
+
+    assert compatible is True
+    assert issues == []
+
+
+def test_downloader_rejects_artifact_when_profile_fingerprints_mismatch(
+    monkeypatch, tmp_path: Path
+):
+    monkeypatch.chdir(tmp_path)
+    configured_profiles = _configured_profiles()
+    monkeypatch.setattr(
+        artifact_download_module,
+        "get_settings",
+        lambda: SimpleNamespace(
+            app_version="test",
+            semantic_embedding_model="voyage-code-3",
+            get_semantic_profiles_config=lambda: {
+                "oss_high": configured_profiles["oss_high"]
+            },
+            get_semantic_default_profile=lambda: "oss_high",
+        ),
+    )
+
+    downloader = IndexArtifactDownloader(repo="owner/repo")
+    metadata = {
+        "compatibility": {
+            "schema_version": "2",
+            "semantic_profiles": {
+                "oss_high": {"compatibility_fingerprint": "different-fingerprint"}
+            },
+        }
+    }
+
+    compatible, issues = downloader.check_compatibility(metadata)
+
+    assert compatible is False
+    assert issues == ["Semantic profile fingerprint mismatch for profiles: oss_high"]

@@ -17,11 +17,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from mcp_server.config.settings import get_settings
+
 from .integrity_gate import (
     ArtifactIntegrityGateResult,
     validate_artifact_integrity,
     validate_required_metadata_fields,
 )
+from .semantic_profiles import extract_semantic_profile_metadata
 
 
 @dataclass
@@ -174,6 +177,7 @@ class IndexArtifactDownloader:
         compatibility = metadata.get("compatibility", {})
         artifact_model = compatibility.get("embedding_model")
         artifact_schema = compatibility.get("schema_version")
+        artifact_profiles = extract_semantic_profile_metadata(compatibility)
 
         required_schema = os.environ.get("INDEX_SCHEMA_VERSION")
         if not required_schema:
@@ -199,7 +203,41 @@ class IndexArtifactDownloader:
                 f"Schema mismatch: artifact={artifact_schema}, required={required_schema}"
             )
 
-        if artifact_model:
+        if artifact_profiles:
+            try:
+                requested_profiles = self._get_requested_semantic_profiles()
+                if requested_profiles:
+                    overlap = sorted(
+                        set(requested_profiles).intersection(artifact_profiles)
+                    )
+                    compatible_profiles = []
+                    mismatched_profiles = []
+                    for profile_id in overlap:
+                        expected = requested_profiles.get(profile_id)
+                        discovered = artifact_profiles[profile_id].get(
+                            "compatibility_fingerprint"
+                        ) or artifact_profiles[profile_id].get("compatibility_hash")
+                        if expected and discovered and expected != discovered:
+                            mismatched_profiles.append(profile_id)
+                        else:
+                            compatible_profiles.append(profile_id)
+
+                    if not compatible_profiles:
+                        if mismatched_profiles:
+                            issues.append(
+                                "Semantic profile fingerprint mismatch for profiles: "
+                                + ", ".join(mismatched_profiles)
+                            )
+                        else:
+                            issues.append(
+                                "No compatible semantic profiles found: artifact has "
+                                + ", ".join(sorted(artifact_profiles))
+                                + "; local config expects "
+                                + ", ".join(sorted(requested_profiles))
+                            )
+            except Exception:
+                pass
+        elif artifact_model:
             try:
                 current_model = None
                 metadata_path = Path(".index_metadata.json")
@@ -208,8 +246,6 @@ class IndexArtifactDownloader:
                         metadata_path.read_text(encoding="utf-8")
                     ).get("embedding_model")
                 if not current_model:
-                    from mcp_server.config.settings import get_settings
-
                     current_model = get_settings().semantic_embedding_model
                 if artifact_model != current_model:
                     issues.append(
@@ -219,6 +255,36 @@ class IndexArtifactDownloader:
                 pass
 
         return len(issues) == 0, issues
+
+    def _get_requested_semantic_profiles(self) -> Dict[str, Optional[str]]:
+        """Return locally configured semantic profile fingerprints, if available."""
+        try:
+            settings = get_settings()
+            profiles = settings.get_semantic_profiles_config()
+            requested: Dict[str, Optional[str]] = {}
+            for profile_id, payload in profiles.items():
+                if not isinstance(profile_id, str) or not isinstance(payload, dict):
+                    continue
+                requested[profile_id] = (
+                    str(payload.get("compatibility_fingerprint", "")) or None
+                )
+
+            if any(value for value in requested.values()):
+                return requested
+
+            from .semantic_profiles import SemanticProfileRegistry
+
+            registry = SemanticProfileRegistry.from_raw(
+                profiles,
+                settings.get_semantic_default_profile(),
+                tool_version=settings.app_version,
+            )
+            return {
+                profile_id: profile.compatibility_fingerprint
+                for profile_id, profile in registry.list().items()
+            }
+        except Exception:
+            return {}
 
     def find_best_artifact(
         self, artifacts: List[Dict[str, Any]]

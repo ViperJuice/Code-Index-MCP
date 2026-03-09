@@ -627,12 +627,26 @@ class Settings(BaseModel):
                 converted: Dict[str, Dict[str, Any]] = {}
                 for profile_id, config in profile_map.items():
                     model = config.get("model") or {}
+                    auth = config.get("auth") or {}
+                    serving = config.get("serving") or {}
+                    vllm = serving.get("vllm") or {}
                     vector_store = config.get("vector_store") or {}
                     metadata = config.get("metadata") or {}
                     normalization = config.get("normalization") or {}
 
+                    provider = str(config.get("provider", "voyage"))
+                    openai_base = str(vllm.get("base_url") or self.openai_api_base)
+                    if provider in {
+                        "openai_compatible",
+                        "openai-compatible",
+                        "openai",
+                        "vllm",
+                        "qwen",
+                    }:
+                        openai_base = str(self.openai_api_base or openai_base)
+
                     converted[str(profile_id)] = {
-                        "provider": str(config.get("provider", "voyage")),
+                        "provider": provider,
                         "model_name": str(
                             model.get("name", self.semantic_embedding_model)
                         ),
@@ -659,11 +673,15 @@ class Settings(BaseModel):
                         ),
                         "chunker_version": chunker_version,
                         "build_metadata": {
-                            "openai_api_base": str(
-                                ((config.get("serving") or {}).get("vllm") or {}).get(
-                                    "base_url", self.openai_api_base
+                            "openai_api_base": openai_base,
+                            "openai_api_key_env": str(
+                                auth.get("api_key_env", "OPENAI_API_KEY")
+                            ),
+                            "collection_name": str(
+                                vector_store.get(
+                                    "collection", self.semantic_collection_name
                                 )
-                            )
+                            ),
                         },
                     }
 
