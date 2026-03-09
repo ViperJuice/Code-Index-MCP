@@ -218,7 +218,7 @@ jobs:
             tests/test_semantic_profile_settings.py \
             tests/test_incremental_indexer.py \
             tests/test_watcher.py \
-            -v --cov=mcp_server --cov-report=xml
+            -v --no-cov
 
       - name: Run integration tests
         run: |
