@@ -17,13 +17,13 @@ on:
         description: 'Artifact name (for promote/validate)'
         required: false
         type: string
-  schedule:
-    - cron: '15 3 * * *'
       retention_days:
         description: 'Retention days for promoted artifacts'
         required: false
         default: '30'
         type: string
+  schedule:
+    - cron: '15 3 * * *'
   
   workflow_call:
     inputs:
