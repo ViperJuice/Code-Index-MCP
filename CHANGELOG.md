@@ -1,5 +1,21 @@
 # Changelog
 
+## [v2.14.3] - 2026-03-09
+
+## What's Changed
+
+Initial release
+
+
+## Feature Highlights
+- 🚀 Dynamic plugin loading system
+- 📊 Comprehensive monitoring with Prometheus & Grafana
+- 🔍 48+ language support via tree-sitter
+- 📝 Document processing (Markdown & PlainText)
+- 🔐 Security with JWT authentication
+- ⚡ High-performance caching system
+
+
 All notable changes to Code-Index-MCP will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
