@@ -47,7 +47,7 @@ profiles:
     monkeypatch.setattr(
         Settings,
         "_detect_treesitter_chunker_version",
-        lambda self: "treesitter-chunker@2.2.2",
+        lambda self: "treesitter-chunker@2.2.4",
     )
 
     settings = Settings()
@@ -57,7 +57,7 @@ profiles:
     assert profiles["commercial_high"]["provider"] == "voyage"
     assert profiles["commercial_high"]["vector_dimension"] == 2048
     assert profiles["commercial_high"]["distance_metric"] == "dot"
-    assert profiles["commercial_high"]["chunker_version"] == "treesitter-chunker@2.2.2"
+    assert profiles["commercial_high"]["chunker_version"] == "treesitter-chunker@2.2.4"
 
     assert profiles["oss_high"]["provider"] == "openai_compatible"
     assert profiles["oss_high"]["vector_dimension"] == 4096
@@ -91,7 +91,7 @@ profiles:
     monkeypatch.setattr(
         Settings,
         "_detect_treesitter_chunker_version",
-        lambda self: "treesitter-chunker@2.2.2",
+        lambda self: "treesitter-chunker@2.2.4",
     )
 
     settings = Settings()
@@ -121,7 +121,7 @@ profiles:
     monkeypatch.setattr(
         Settings,
         "_detect_treesitter_chunker_version",
-        lambda self: "treesitter-chunker@2.2.2",
+        lambda self: "treesitter-chunker@2.2.4",
     )
 
     settings = Settings(semantic_default_profile="oss_high")

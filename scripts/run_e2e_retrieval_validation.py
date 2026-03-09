@@ -247,7 +247,7 @@ def run(args: argparse.Namespace) -> Dict[str, object]:
                 "distance_metric": "dot",
                 "normalization_policy": "l2",
                 "chunk_schema_version": "1",
-                "chunker_version": "treesitter-chunker@2.2.2",
+                "chunker_version": "treesitter-chunker@2.2.4",
                 "build_metadata": {"openai_api_base": args.fireworks_base},
             }
         }
@@ -260,7 +260,7 @@ def run(args: argparse.Namespace) -> Dict[str, object]:
                 "distance_metric": "dot",
                 "normalization_policy": "provider-default",
                 "chunk_schema_version": "1",
-                "chunker_version": "treesitter-chunker@2.2.2",
+                "chunker_version": "treesitter-chunker@2.2.4",
             }
 
         os.environ["OPENAI_API_BASE"] = args.fireworks_base
@@ -452,7 +452,7 @@ def run(args: argparse.Namespace) -> Dict[str, object]:
                     "distance_metric": "dot",
                     "normalization_policy": "l2",
                     "chunk_schema_version": "1",
-                    "chunker_version": "treesitter-chunker@2.2.2",
+                    "chunker_version": "treesitter-chunker@2.2.4",
                     "build_metadata": {
                         "openai_api_base": args.local_openai_base,
                         "openai_api_key": args.local_openai_key or fireworks_api_key,

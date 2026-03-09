@@ -501,7 +501,7 @@ requires-dist = [
     { name = "sentence-transformers", marker = "extra == 'semantic'", specifier = ">=2.0.0" },
     { name = "tree-sitter", specifier = ">=0.20.0" },
     { name = "tree-sitter-languages", specifier = ">=1.7.0" },
-    { name = "treesitter-chunker", editable = "../treesitter-chunker" },
+    { name = "treesitter-chunker", specifier = "==2.2.4" },
     { name = "uvicorn", specifier = ">=0.23.0" },
     { name = "voyageai", specifier = ">=0.2.0" },
     { name = "watchdog", specifier = ">=3.0.0" },
@@ -3376,8 +3376,8 @@ wheels = [
 
 [[package]]
 name = "treesitter-chunker"
-version = "2.2.2"
-source = { editable = "../treesitter-chunker" }
+version = "2.2.4"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "chardet" },
     { name = "gitpython" },
@@ -3397,58 +3397,10 @@ dependencies = [
     { name = "tree-sitter-language-pack" },
     { name = "typer" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "bandit", extras = ["toml"], marker = "extra == 'dev'", specifier = ">=1.7.8" },
-    { name = "black", marker = "extra == 'dev'", specifier = "==25.12.0" },
-    { name = "build", marker = "extra == 'dev'" },
-    { name = "chardet", specifier = ">=5.0.0" },
-    { name = "fastapi", marker = "extra == 'api'", specifier = ">=0.100.0" },
-    { name = "gitpython", specifier = ">=3.1.40" },
-    { name = "graphviz", marker = "extra == 'viz'" },
-    { name = "igraph", specifier = ">=0.11.0" },
-    { name = "isort", marker = "extra == 'dev'", specifier = ">=5.13.0" },
-    { name = "jinja2", marker = "extra == 'full'", specifier = ">=3.0.0" },
-    { name = "jinja2", marker = "extra == 'templates'", specifier = ">=3.0.0" },
-    { name = "leidenalg", specifier = ">=0.10.0" },
-    { name = "line-profiler", marker = "extra == 'profile'", specifier = ">=4.1.0" },
-    { name = "memory-profiler", marker = "extra == 'profile'", specifier = ">=0.61.0" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.9.0" },
-    { name = "networkx", specifier = ">=3.0" },
-    { name = "numpy", marker = "extra == 'advanced'", specifier = ">=1.20.0" },
-    { name = "numpy", marker = "extra == 'full'", specifier = ">=1.20.0" },
-    { name = "pathspec", specifier = ">=0.11.0" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.5.0" },
-    { name = "psutil", marker = "extra == 'dev'", specifier = ">=5.9.0" },
-    { name = "pyarrow", specifier = ">=15.0.0" },
-    { name = "pydantic", marker = "extra == 'api'", specifier = ">=2.0.0" },
-    { name = "pygments", specifier = ">=2.15.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
-    { name = "pytest-timeout", marker = "extra == 'dev'", specifier = ">=2.1.0" },
-    { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.3.1" },
-    { name = "python-dateutil", specifier = ">=2.9.0" },
-    { name = "pyyaml", specifier = ">=6.0" },
-    { name = "rich", specifier = ">=13.0.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.3.4" },
-    { name = "sphinx", marker = "extra == 'docs'" },
-    { name = "sphinx-autodoc-typehints", marker = "extra == 'docs'" },
-    { name = "sphinx-rtd-theme", marker = "extra == 'docs'" },
-    { name = "tiktoken", specifier = ">=0.7.0" },
-    { name = "tomli-w", specifier = ">=1.0.0" },
-    { name = "tqdm", specifier = ">=4.66.0" },
-    { name = "tree-sitter", specifier = ">=0.20.0,<1.0.0" },
-    { name = "tree-sitter-language-pack", specifier = ">=0.4.0" },
-    { name = "treesitter-chunker", extras = ["dev", "viz", "docs", "profile", "api", "templates", "advanced"], marker = "extra == 'all'" },
-    { name = "twine", marker = "extra == 'dev'" },
-    { name = "typer", specifier = ">=0.9.0" },
-    { name = "types-pyyaml", marker = "extra == 'dev'" },
-    { name = "types-setuptools", marker = "extra == 'dev'" },
-    { name = "uvicorn", extras = ["standard"], marker = "extra == 'api'", specifier = ">=0.23.0" },
-    { name = "wheel", marker = "extra == 'dev'" },
+sdist = { url = "https://files.pythonhosted.org/packages/b7/17/83d301f09eec10e65fd909c33acaea512310e3653b53dfb50efe09eb0a52/treesitter_chunker-2.2.4.tar.gz", hash = "sha256:347d4585aa6bc5ebff36330fc9163c35e5e9d9337c33bfe64dbabc6f5383a5a4", size = 1365669, upload-time = "2026-03-08T21:26:42.776Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a9/3a/86692793e2dfbb1b7184456904ac901478ec8c78f437eb286e3533b80674/treesitter_chunker-2.2.4-py3-none-any.whl", hash = "sha256:af356c53c4c81732363c365b7fb1e101b1409d26980aa9d23e717e41b3f9a5b4", size = 1115377, upload-time = "2026-03-08T21:26:41.109Z" },
 ]
-provides-extras = ["dev", "viz", "profile", "docs", "api", "templates", "advanced", "full", "all"]
 
 [[package]]
 name = "triton"
