@@ -1026,6 +1026,13 @@ class SemanticIndexer:
 
         if self._profile_active:
             semantic_profiles = extract_semantic_profile_metadata(existing_metadata)
+            if self.profile_registry is not None:
+                active_profiles = set(self.profile_registry.list().keys())
+                semantic_profiles = {
+                    profile_id: payload
+                    for profile_id, payload in semantic_profiles.items()
+                    if profile_id in active_profiles
+                }
             current_profile_metadata = {
                 "profile_id": self.semantic_profile.profile_id,
                 "compatibility_fingerprint": self.compatibility_fingerprint,
