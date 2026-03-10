@@ -167,30 +167,6 @@ jobs:
       
       - name: Compress index for artifact
         run: |
-          COMPATIBILITY_JSON='{}'
-          if [ -f .mcp-index/.index_metadata.json ]; then
-            COMPATIBILITY_JSON=$(python <<'PY'
-            import json
-            from pathlib import Path
-
-            metadata = json.loads(Path('.mcp-index/.index_metadata.json').read_text())
-            compatibility = metadata.get('compatibility') or {}
-            if not compatibility:
-                compatibility = {
-                    'schema_version': metadata.get('chunk_schema_version') or '2',
-                    'embedding_model': metadata.get('embedding_model'),
-                }
-            if isinstance(metadata.get('semantic_profiles'), dict):
-                compatibility['semantic_profiles'] = metadata['semantic_profiles']
-                compatibility['available_semantic_profiles'] = metadata.get(
-                    'available_semantic_profiles',
-                    sorted(metadata['semantic_profiles'].keys()),
-                )
-            print(json.dumps(compatibility))
-            PY
-            )
-          fi
-
           python <<'PY'
           import json
           from datetime import datetime
@@ -198,11 +174,16 @@ jobs:
 
           metadata_path = Path('.mcp-index/.index_metadata.json')
           artifact_metadata_path = Path('.mcp-index/artifact-metadata.json')
-          compatibility = json.loads('''$COMPATIBILITY_JSON''') if '$COMPATIBILITY_JSON' else {}
+          compatibility = {}
 
           if metadata_path.exists():
               index_metadata = json.loads(metadata_path.read_text())
-              compatibility = compatibility or index_metadata.get('compatibility') or {}
+              compatibility = index_metadata.get('compatibility') or {}
+              if not compatibility:
+                  compatibility = {
+                      'schema_version': index_metadata.get('chunk_schema_version') or '2',
+                      'embedding_model': index_metadata.get('embedding_model'),
+                  }
               if isinstance(index_metadata.get('semantic_profiles'), dict):
                   compatibility['semantic_profiles'] = index_metadata['semantic_profiles']
                   compatibility['available_semantic_profiles'] = index_metadata.get(
@@ -234,6 +215,18 @@ jobs:
 
           index_metadata_path = Path('.mcp-index/.index_metadata.json')
           index_metadata = json.loads(index_metadata_path.read_text()) if index_metadata_path.exists() else {}
+          compatibility = index_metadata.get("compatibility") or {}
+          if not compatibility:
+              compatibility = {
+                  "schema_version": index_metadata.get("chunk_schema_version") or "2",
+                  "embedding_model": index_metadata.get("embedding_model"),
+              }
+          if isinstance(index_metadata.get("semantic_profiles"), dict):
+              compatibility["semantic_profiles"] = index_metadata["semantic_profiles"]
+              compatibility["available_semantic_profiles"] = index_metadata.get(
+                  "available_semantic_profiles",
+                  sorted(index_metadata["semantic_profiles"].keys()),
+              )
 
           artifact_metadata = {
               "version": "1.0",
@@ -244,13 +237,7 @@ jobs:
               "base_commit": None,
               "target_commit": "${{ github.sha }}",
               "checksum": "__CHECKSUM__",
-              "compatibility": index_metadata.get(
-                  "compatibility",
-                  {
-                      "schema_version": "2",
-                      "embedding_model": "voyage-code-3",
-                  },
-              ),
+              "compatibility": compatibility,
           }
 
           Path('artifact-metadata.json').write_text(json.dumps(artifact_metadata, indent=2))
