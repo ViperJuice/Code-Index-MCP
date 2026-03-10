@@ -59,6 +59,21 @@ semantic profile without rebuilding the whole repository.
 This keeps the GitHub path simple while still avoiding full local rebuilds for
 normal development.
 
+## Same-Machine Multi-Repo Workflow
+
+For open source users running multiple repositories on one machine, the
+recommended model is local-first:
+
+- each repository keeps its own local runtime/index files
+- the shared registry tracks which repos are ready, stale, or missing local state
+- `mcp-index artifact workspace-status` reports readiness across registered repos
+- `mcp-index artifact reconcile-workspace` refreshes that readiness after restores or rebuilds
+- `mcp-index artifact publish-workspace` prepares local artifact payloads without requiring paid remote publication per repo
+
+This avoids turning multi-repo usage into a GitHub-artifact-per-repo system,
+which helps keep the tool practical for open source developers who do not want
+ongoing infrastructure costs.
+
 ## Why Not Partial Remote Downloads?
 
 The current compressed artifact for this repository is only a few dozen megabytes,

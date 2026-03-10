@@ -336,6 +336,29 @@ The generated index files are not meant to live in git history. The repo tracks
 the code, workflow, and configuration needed to build/publish them; GitHub
 artifacts distribute the actual runtime baseline that MCP restores locally.
 
+### Same-Machine Multi-Repo Workflow
+
+For open source users, the recommended multi-repo model is local-first on one
+machine:
+
+```bash
+# Inspect all registered repositories and their local artifact/runtime readiness
+mcp-index artifact workspace-status
+
+# Refresh readiness after restoring or rebuilding local indexes
+mcp-index artifact reconcile-workspace
+
+# Prepare per-repo local artifact payloads without requiring remote publication
+mcp-index artifact publish-workspace
+```
+
+Recommended pattern:
+
+1. keep each repo checkout self-contained
+2. restore or rebuild local runtime files per repo as needed
+3. use workspace status/reconcile to see which repos are ready or stale
+4. only use GitHub artifact publication when you actually want to share a repo baseline
+
 ### 🔐 Privacy & GitHub Artifact Sync
 
 Control how your code index is shared:
