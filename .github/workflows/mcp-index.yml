@@ -117,7 +117,7 @@ jobs:
             cp .index_metadata.json .mcp-index/.index_metadata.json
           fi
       
-      - name: Create index metadata
+      - name: Preserve generated index metadata
         if: steps.check_index.outputs.found == 'false' && steps.download.outputs.downloaded == 'false'
         run: |
           python <<'PY'
@@ -129,31 +129,12 @@ jobs:
           index_dir = Path('.mcp-index')
           index_db = index_dir / 'code_index.db'
           metadata_path = index_dir / '.index_metadata.json'
-          repo_metadata_path = Path('.index_metadata.json')
-
-          embedding_model = 'voyage-code-3'
-          schema_version = '2'
-          compatibility = {
-              "schema_version": schema_version,
-              "embedding_model": embedding_model,
-          }
-
-          if repo_metadata_path.exists():
-              try:
-                  repo_metadata = json.loads(repo_metadata_path.read_text())
-                  embedding_model = repo_metadata.get('embedding_model', embedding_model)
-                  compatibility = repo_metadata.get('compatibility', compatibility)
-              except Exception:
-                  pass
 
           if metadata_path.exists():
-              try:
-                  existing = json.loads(metadata_path.read_text())
-                  embedding_model = existing.get('embedding_model', embedding_model)
-                  compatibility = existing.get('compatibility', compatibility)
-              except Exception:
-                  pass
+              print('Using generated dual-profile index metadata')
+              raise SystemExit(0)
 
+          schema_version = '2'
           if index_db.exists():
               try:
                   conn = sqlite3.connect(str(index_db))
@@ -169,20 +150,77 @@ jobs:
                   except Exception:
                       pass
 
-          metadata = {
+          fallback_metadata = {
               "version": "1.0",
               "created_at": datetime.utcnow().isoformat() + 'Z',
               "commit": "${{ github.sha }}",
               "branch": "${{ github.ref_name }}",
               "repository": "${{ github.repository }}",
-              "compatibility": compatibility,
+              "compatibility": {
+                  "schema_version": schema_version,
+                  "embedding_model": None,
+              },
           }
-
-          metadata_path.write_text(json.dumps(metadata, indent=2))
+          metadata_path.write_text(json.dumps(fallback_metadata, indent=2))
+          print('Generated fallback metadata because no index metadata was produced')
           PY
       
       - name: Compress index for artifact
         run: |
+          COMPATIBILITY_JSON='{}'
+          if [ -f .mcp-index/.index_metadata.json ]; then
+            COMPATIBILITY_JSON=$(python <<'PY'
+            import json
+            from pathlib import Path
+
+            metadata = json.loads(Path('.mcp-index/.index_metadata.json').read_text())
+            compatibility = metadata.get('compatibility') or {}
+            if not compatibility:
+                compatibility = {
+                    'schema_version': metadata.get('chunk_schema_version') or '2',
+                    'embedding_model': metadata.get('embedding_model'),
+                }
+            if isinstance(metadata.get('semantic_profiles'), dict):
+                compatibility['semantic_profiles'] = metadata['semantic_profiles']
+                compatibility['available_semantic_profiles'] = metadata.get(
+                    'available_semantic_profiles',
+                    sorted(metadata['semantic_profiles'].keys()),
+                )
+            print(json.dumps(compatibility))
+            PY
+            )
+          fi
+
+          python <<'PY'
+          import json
+          from datetime import datetime
+          from pathlib import Path
+
+          metadata_path = Path('.mcp-index/.index_metadata.json')
+          artifact_metadata_path = Path('.mcp-index/artifact-metadata.json')
+          compatibility = json.loads('''$COMPATIBILITY_JSON''') if '$COMPATIBILITY_JSON' else {}
+
+          if metadata_path.exists():
+              index_metadata = json.loads(metadata_path.read_text())
+              compatibility = compatibility or index_metadata.get('compatibility') or {}
+              if isinstance(index_metadata.get('semantic_profiles'), dict):
+                  compatibility['semantic_profiles'] = index_metadata['semantic_profiles']
+                  compatibility['available_semantic_profiles'] = index_metadata.get(
+                      'available_semantic_profiles',
+                      sorted(index_metadata['semantic_profiles'].keys()),
+                  )
+
+          artifact_metadata = {
+              'version': '1.0',
+              'created_at': datetime.utcnow().isoformat() + 'Z',
+              'commit': '${{ github.sha }}',
+              'branch': '${{ github.ref_name }}',
+              'repository': '${{ github.repository }}',
+              'compatibility': compatibility,
+          }
+          artifact_metadata_path.write_text(json.dumps(artifact_metadata, indent=2))
+          PY
+
           cd .mcp-index
           tar -czf ../mcp-index-archive.tar.gz .
           cd ..
