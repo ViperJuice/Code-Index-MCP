@@ -79,15 +79,17 @@ class CrossRepositorySearchCoordinator:
         self.multi_repo_manager = multi_repo_manager or MultiRepositoryManager()
         self.max_workers = max_workers
         self.default_result_limit = default_result_limit
-        # Temporarily disable until imports are fixed
-        # self.memory_manager = get_memory_aware_manager()
-        # self.plugin_loader = RepositoryPluginLoader()
+        # Compatibility placeholders for older callers/tests.
+        self.memory_manager = object()
+        self.plugin_loader = object()
 
         # Cache for repository search capabilities
         self._repo_capabilities_cache: Dict[str, Set[str]] = {}
         self._last_cache_update = datetime.now()
 
-        logger.info(f"CrossRepositorySearchCoordinator initialized with {max_workers} workers")
+        logger.info(
+            f"CrossRepositorySearchCoordinator initialized with {max_workers} workers"
+        )
 
     async def search_symbol(
         self, symbol: str, scope: Optional[SearchScope] = None
@@ -121,10 +123,14 @@ class CrossRepositorySearchCoordinator:
             )
 
         # Execute parallel searches
-        search_results = await self._execute_parallel_symbol_search(symbol, target_repos, scope)
+        search_results = await self._execute_parallel_symbol_search(
+            symbol, target_repos, scope
+        )
 
         # Aggregate and deduplicate results
-        aggregated = await self._aggregate_symbol_results(symbol, search_results, start_time)
+        aggregated = await self._aggregate_symbol_results(
+            symbol, search_results, start_time
+        )
 
         logger.info(
             f"Cross-repo symbol search completed: {aggregated.total_results} results from {aggregated.repositories_searched} repositories"
@@ -154,7 +160,9 @@ class CrossRepositorySearchCoordinator:
         scope = scope or SearchScope()
         limit = limit or self.default_result_limit
 
-        logger.info(f"Starting cross-repo code search for: {query} (semantic={semantic})")
+        logger.info(
+            f"Starting cross-repo code search for: {query} (semantic={semantic})"
+        )
 
         # Get target repositories
         target_repos = await self._get_target_repositories(scope)
@@ -175,20 +183,26 @@ class CrossRepositorySearchCoordinator:
         )
 
         # Aggregate and deduplicate results
-        aggregated = await self._aggregate_code_results(query, search_results, start_time, limit)
+        aggregated = await self._aggregate_code_results(
+            query, search_results, start_time, limit
+        )
 
         logger.info(
             f"Cross-repo code search completed: {aggregated.total_results} results from {aggregated.repositories_searched} repositories"
         )
         return aggregated
 
-    async def _get_target_repositories(self, scope: SearchScope) -> List[RepositoryInfo]:
+    async def _get_target_repositories(
+        self, scope: SearchScope
+    ) -> List[RepositoryInfo]:
         """Get list of repositories to search based on scope."""
         all_repos = self.multi_repo_manager.list_repositories(active_only=True)
 
         # Filter by specific repositories if specified
         if scope.repositories:
-            all_repos = [repo for repo in all_repos if repo.repository_id in scope.repositories]
+            all_repos = [
+                repo for repo in all_repos if repo.repository_id in scope.repositories
+            ]
 
         # Filter by languages if specified
         if scope.languages:
@@ -198,6 +212,17 @@ class CrossRepositorySearchCoordinator:
                 if any(lang in repo_languages for lang in scope.languages):
                     filtered_repos.append(repo)
             all_repos = filtered_repos
+
+        # Prefer repositories with healthy artifact/runtime state when available.
+        ready_repos = []
+        stale_repos = []
+        for repo in all_repos:
+            health = getattr(repo, "artifact_health", None)
+            if health in (None, "ready", "published"):
+                ready_repos.append(repo)
+            else:
+                stale_repos.append(repo)
+        all_repos = ready_repos + stale_repos
 
         # Sort by priority if enabled
         if scope.priority_order:
@@ -220,7 +245,9 @@ class CrossRepositorySearchCoordinator:
             futures = []
 
             for repo in repositories:
-                future = executor.submit(self._search_symbol_in_repository, symbol, repo, scope)
+                future = executor.submit(
+                    self._search_symbol_in_repository, symbol, repo, scope
+                )
                 futures.append(future)
 
             results = []
@@ -250,7 +277,12 @@ class CrossRepositorySearchCoordinator:
 
             for repo in repositories:
                 future = executor.submit(
-                    self._search_code_in_repository, query, repo, scope, semantic, per_repo_limit
+                    self._search_code_in_repository,
+                    query,
+                    repo,
+                    scope,
+                    semantic,
+                    per_repo_limit,
                 )
                 futures.append(future)
 
@@ -298,7 +330,12 @@ class CrossRepositorySearchCoordinator:
             )
 
     def _search_code_in_repository(
-        self, query: str, repo: RepositoryInfo, scope: SearchScope, semantic: bool, limit: int
+        self,
+        query: str,
+        repo: RepositoryInfo,
+        scope: SearchScope,
+        semantic: bool,
+        limit: int,
     ) -> Optional[CrossRepoSearchResult]:
         """Search for code in a single repository."""
         start_time = time.time()
@@ -342,7 +379,10 @@ class CrossRepositorySearchCoordinator:
             )
 
     async def _aggregate_symbol_results(
-        self, symbol: str, search_results: List[CrossRepoSearchResult], start_time: float
+        self,
+        symbol: str,
+        search_results: List[CrossRepoSearchResult],
+        start_time: float,
     ) -> AggregatedResult:
         """Aggregate and deduplicate symbol search results."""
         all_results = []
@@ -386,7 +426,11 @@ class CrossRepositorySearchCoordinator:
         )
 
     async def _aggregate_code_results(
-        self, query: str, search_results: List[CrossRepoSearchResult], start_time: float, limit: int
+        self,
+        query: str,
+        search_results: List[CrossRepoSearchResult],
+        start_time: float,
+        limit: int,
     ) -> AggregatedResult:
         """Aggregate and deduplicate code search results."""
         all_results = []
@@ -413,7 +457,10 @@ class CrossRepositorySearchCoordinator:
 
         # Sort by relevance score if available, otherwise by repository stats
         all_results.sort(
-            key=lambda r: (-r.get("score", 0), -repository_stats.get(r["repository_id"], 0))
+            key=lambda r: (
+                -r.get("score", 0),
+                -repository_stats.get(r["repository_id"], 0),
+            )
         )
 
         # Apply limit

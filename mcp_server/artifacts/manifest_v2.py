@@ -109,3 +109,49 @@ class ArtifactManifestV2:
         )
         manifest.validate()
         return manifest
+
+
+@dataclass(frozen=True)
+class WorkspaceArtifactManifest:
+    """Manifest describing a workspace composed of multiple repository artifacts."""
+
+    workspace_id: str
+    workspace_commit: str
+    repositories: List[Dict[str, Any]]
+    manifest_version: str = "1"
+
+    def validate(self) -> None:
+        """Validate workspace manifest invariants."""
+        if not self.repositories:
+            raise ValueError("Workspace manifest requires at least one repository")
+
+        seen_ids = set()
+        for repo in self.repositories:
+            repo_id = repo.get("repo_id")
+            if not repo_id:
+                raise ValueError("Workspace manifest repository entry missing repo_id")
+            if repo_id in seen_ids:
+                raise ValueError(f"Duplicate workspace repository id: {repo_id}")
+            seen_ids.add(repo_id)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize workspace manifest."""
+        self.validate()
+        return {
+            "manifest_version": self.manifest_version,
+            "workspace_id": self.workspace_id,
+            "workspace_commit": self.workspace_commit,
+            "repositories": self.repositories,
+        }
+
+    @classmethod
+    def from_dict(cls, payload: Dict[str, Any]) -> "WorkspaceArtifactManifest":
+        """Create workspace manifest from JSON payload."""
+        manifest = cls(
+            manifest_version=str(payload.get("manifest_version", "1")),
+            workspace_id=payload["workspace_id"],
+            workspace_commit=payload["workspace_commit"],
+            repositories=list(payload.get("repositories", [])),
+        )
+        manifest.validate()
+        return manifest

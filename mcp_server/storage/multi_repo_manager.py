@@ -45,6 +45,11 @@ class RepositoryInfo:
     active: bool = True
     priority: int = 0  # Higher priority repos searched first
     index_location: Optional[str] = None
+    last_published_commit: Optional[str] = None
+    last_recovered_commit: Optional[str] = None
+    available_semantic_profiles: Optional[List[str]] = None
+    artifact_backend: Optional[str] = None
+    artifact_health: Optional[str] = None
 
     def __post_init__(self) -> None:
         """Normalize paths and derived fields."""
@@ -291,6 +296,43 @@ class MultiRepositoryManager:
     def get_repository_info(self, repository_id: str) -> Optional[RepositoryInfo]:
         """Get information about a specific repository."""
         return self.registry.get(repository_id)
+
+    def has_local_runtime_state(self, repository_id: str) -> bool:
+        """Return True when the repository has a local MCP runtime baseline."""
+        repo = self.registry.get(repository_id)
+        if not repo:
+            return False
+        base = Path(repo.index_location) if repo.index_location else repo.path
+        return (repo.path / "code_index.db").exists() or (base / "current.db").exists()
+
+    def get_ready_repositories(self) -> List[RepositoryInfo]:
+        """Return repositories ready for local search/reconcile use."""
+        ready = []
+        for repo in self.list_repositories(active_only=True):
+            health = repo.artifact_health or ""
+            if health in {
+                "ready",
+                "prepared",
+                "published",
+            } or self.has_local_runtime_state(repo.repository_id):
+                ready.append(repo)
+        return ready
+
+    def get_stale_repositories(self) -> List[RepositoryInfo]:
+        """Return repositories whose local/runtime state appears stale or missing."""
+        stale = []
+        for repo in self.list_repositories(active_only=True):
+            if repo.current_commit and repo.last_recovered_commit:
+                if repo.current_commit != repo.last_recovered_commit:
+                    stale.append(repo)
+                    continue
+            if repo.current_commit and repo.last_published_commit:
+                if repo.current_commit != repo.last_published_commit:
+                    stale.append(repo)
+                    continue
+            if not self.has_local_runtime_state(repo.repository_id):
+                stale.append(repo)
+        return stale
 
     def _get_connection(self, repository_id: str) -> Optional[SQLiteStore]:
         """Get cached connection to repository index."""

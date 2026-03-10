@@ -2,7 +2,7 @@
 
 from .artifact_download import IndexArtifactDownloader
 from .artifact_upload import IndexArtifactUploader
-from .manifest_v2 import ArtifactManifestV2, ManifestUnit
+from .manifest_v2 import ArtifactManifestV2, ManifestUnit, WorkspaceArtifactManifest
 from .integrity_gate import (
     ArtifactIntegrityGateResult,
     validate_artifact_integrity,
@@ -34,6 +34,7 @@ __all__ = [
     "SemanticNamespaceResolver",
     "SemanticProfile",
     "SemanticProfileRegistry",
+    "WorkspaceArtifactManifest",
     "validate_artifact_integrity",
     "validate_required_metadata_fields",
 ]

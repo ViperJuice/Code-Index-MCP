@@ -16,6 +16,9 @@ from mcp_server.artifacts.artifact_download import (
     IndexArtifactDownloader,
     format_artifact_table,
 )
+from mcp_server.artifacts.multi_repo_artifact_coordinator import (
+    MultiRepoArtifactCoordinator,
+)
 from mcp_server.artifacts.artifact_upload import IndexArtifactUploader
 from mcp_server.artifacts.semantic_profiles import extract_semantic_profile_metadata
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
@@ -547,3 +550,68 @@ def recover(branch: Optional[str], commit: Optional[str], no_backup: bool):
     except Exception as e:
         click.echo(f"❌ Error: {e}", err=True)
         raise click.Abort()
+
+
+def _format_workspace_results(results: List) -> None:
+    for result in results:
+        status = "✅" if result.success else "❌"
+        click.echo(f"{status} {result.repository_name} ({result.repository_id})")
+        if result.details:
+            for key, value in sorted(result.details.items()):
+                click.echo(f"   {key}: {value}")
+        if result.error:
+            click.echo(f"   error: {result.error}")
+
+
+@artifact.command("workspace-status")
+@click.option(
+    "--repository", "repositories", multiple=True, help="Repository ID to inspect"
+)
+def workspace_status(repositories: tuple[str, ...]):
+    """Show local-first artifact/runtime lifecycle state for registered repositories."""
+    coordinator = MultiRepoArtifactCoordinator()
+    manifest = coordinator.build_workspace_manifest(repositories or None)
+    click.echo("🗂️  Workspace manifest")
+    click.echo(f"   workspace_id: {manifest.workspace_id}")
+    click.echo(f"   repositories: {len(manifest.repositories)}")
+    _format_workspace_results(coordinator.get_workspace_status(repositories or None))
+
+
+@artifact.command("publish-workspace")
+@click.option(
+    "--repository", "repositories", multiple=True, help="Repository ID to publish"
+)
+def publish_workspace(repositories: tuple[str, ...]):
+    """Prepare local artifact payloads for registered repositories."""
+    coordinator = MultiRepoArtifactCoordinator()
+    click.echo(
+        "ℹ️  Local-first mode: this prepares per-repo artifact payloads and records workspace state without requiring paid remote publication."
+    )
+    results = coordinator.publish_workspace(repositories or None)
+    _format_workspace_results(results)
+    if any(not result.success for result in results):
+        raise click.Abort()
+
+
+@artifact.command("fetch-workspace")
+@click.option(
+    "--repository", "repositories", multiple=True, help="Repository ID to fetch"
+)
+def fetch_workspace(repositories: tuple[str, ...]):
+    """Fetch available artifacts for registered repositories where configured."""
+    coordinator = MultiRepoArtifactCoordinator()
+    results = coordinator.fetch_workspace(repositories or None)
+    _format_workspace_results(results)
+    if any(not result.success for result in results):
+        raise click.Abort()
+
+
+@artifact.command("reconcile-workspace")
+@click.option(
+    "--repository", "repositories", multiple=True, help="Repository ID to reconcile"
+)
+def reconcile_workspace(repositories: tuple[str, ...]):
+    """Refresh local readiness state for registered repositories."""
+    coordinator = MultiRepoArtifactCoordinator()
+    results = coordinator.reconcile_workspace(repositories or None)
+    _format_workspace_results(results)
