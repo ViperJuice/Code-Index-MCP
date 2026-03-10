@@ -20,17 +20,31 @@ from mcp_server.plugin_base import SearchResult, SymbolDef
 class TestGatewayStartupShutdown:
     """Test server startup and shutdown events."""
 
+    @patch("mcp_server.gateway.format_preflight_report")
+    @patch("mcp_server.gateway.run_startup_preflight")
     @patch("mcp_server.gateway.SQLiteStore")
     @patch("mcp_server.gateway.PythonPlugin")
     @patch("mcp_server.gateway.Dispatcher")
     @patch("mcp_server.gateway.FileWatcher")
     def test_startup_success(
-        self, mock_watcher, mock_dispatcher, mock_plugin, mock_store, test_client
+        self,
+        mock_watcher,
+        mock_dispatcher,
+        mock_plugin,
+        mock_store,
+        mock_run_preflight,
+        mock_format_preflight,
+        test_client,
     ):
         """Test successful server startup."""
+        mock_run_preflight.return_value = type(
+            "PreflightResult", (), {"status": "warning", "checks": []}
+        )()
+        mock_format_preflight.return_value = ["warning"]
         # Trigger startup event
         with test_client:
             # Verify components were initialized
+            mock_run_preflight.assert_called_once()
             mock_store.assert_called_once()
             mock_plugin.assert_called_once()
             mock_dispatcher.assert_called_once()
@@ -62,7 +76,9 @@ class TestGatewayStartupShutdown:
 class TestSymbolEndpoint:
     """Test /symbol endpoint."""
 
-    def test_symbol_lookup_success(self, test_client_with_dispatcher, sample_symbol_def):
+    def test_symbol_lookup_success(
+        self, test_client_with_dispatcher, sample_symbol_def
+    ):
         """Test successful symbol lookup."""
         # Configure dispatcher mock
         test_client_with_dispatcher.app.state.dispatcher.lookup = Mock(
@@ -80,7 +96,9 @@ class TestSymbolEndpoint:
 
     def test_symbol_lookup_not_found(self, test_client_with_dispatcher):
         """Test symbol lookup when symbol doesn't exist."""
-        test_client_with_dispatcher.app.state.dispatcher.lookup = Mock(return_value=None)
+        test_client_with_dispatcher.app.state.dispatcher.lookup = Mock(
+            return_value=None
+        )
 
         response = test_client_with_dispatcher.get("/symbol?symbol=nonexistent")
 
@@ -119,10 +137,16 @@ class TestSymbolEndpoint:
             "🐍python_emoji",  # Unicode support
         ],
     )
-    def test_symbol_lookup_various_names(self, test_client_with_dispatcher, symbol_name):
+    def test_symbol_lookup_various_names(
+        self, test_client_with_dispatcher, symbol_name
+    ):
         """Test symbol lookup with various name formats."""
-        mock_symbol = SymbolDef(name=symbol_name, kind="function", path="/test.py", line=1)
-        test_client_with_dispatcher.app.state.dispatcher.lookup = Mock(return_value=mock_symbol)
+        mock_symbol = SymbolDef(
+            name=symbol_name, kind="function", path="/test.py", line=1
+        )
+        test_client_with_dispatcher.app.state.dispatcher.lookup = Mock(
+            return_value=mock_symbol
+        )
 
         response = test_client_with_dispatcher.get(f"/symbol?symbol={symbol_name}")
 
@@ -210,13 +234,19 @@ class TestSearchEndpoint:
             ("very long query " * 10, 2),
         ],
     )
-    def test_search_various_queries(self, test_client_with_dispatcher, query, expected_results):
+    def test_search_various_queries(
+        self, test_client_with_dispatcher, query, expected_results
+    ):
         """Test search with various query types."""
         results = [
-            SearchResult(name=f"result_{i}", kind="function", path=f"/file{i}.py", score=1.0)
+            SearchResult(
+                name=f"result_{i}", kind="function", path=f"/file{i}.py", score=1.0
+            )
             for i in range(expected_results)
         ]
-        test_client_with_dispatcher.app.state.dispatcher.search = Mock(return_value=results)
+        test_client_with_dispatcher.app.state.dispatcher.search = Mock(
+            return_value=results
+        )
 
         response = test_client_with_dispatcher.get(f"/search?q={query}")
 
@@ -227,7 +257,9 @@ class TestSearchEndpoint:
 class TestStatusEndpoint:
     """Test /status endpoint."""
 
-    def test_status_operational(self, test_client_with_dispatcher, populated_sqlite_store):
+    def test_status_operational(
+        self, test_client_with_dispatcher, populated_sqlite_store
+    ):
         """Test status endpoint when server is operational."""
         # Mock dispatcher statistics
         test_client_with_dispatcher.app.state.dispatcher.get_statistics = Mock(
@@ -366,12 +398,17 @@ class TestReindexEndpoint:
             assert "Python files" in data["message"]
 
             # Verify index_file was called for Python files
-            assert test_client_with_dispatcher.app.state.dispatcher.index_file.call_count >= 2
+            assert (
+                test_client_with_dispatcher.app.state.dispatcher.index_file.call_count
+                >= 2
+            )
         finally:
             os.chdir(original_cwd)
 
     @pytest.mark.asyncio
-    async def test_reindex_specific_file(self, test_client_with_dispatcher, temp_code_directory):
+    async def test_reindex_specific_file(
+        self, test_client_with_dispatcher, temp_code_directory
+    ):
         """Test reindexing a specific file."""
         test_client_with_dispatcher.app.state.dispatcher.index_file = Mock()
         file_path = temp_code_directory / "sample.py"
@@ -388,7 +425,9 @@ class TestReindexEndpoint:
         )
 
     @pytest.mark.asyncio
-    async def test_reindex_directory(self, test_client_with_dispatcher, temp_code_directory):
+    async def test_reindex_directory(
+        self, test_client_with_dispatcher, temp_code_directory
+    ):
         """Test reindexing a directory."""
         test_client_with_dispatcher.app.state.dispatcher.index_file = Mock()
 
@@ -397,7 +436,9 @@ class TestReindexEndpoint:
         mock_plugin.supports.side_effect = lambda p: p.suffix == ".py"
         test_client_with_dispatcher.app.state.dispatcher._plugins = [mock_plugin]
 
-        response = test_client_with_dispatcher.post(f"/reindex?path={temp_code_directory}")
+        response = test_client_with_dispatcher.post(
+            f"/reindex?path={temp_code_directory}"
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -405,7 +446,9 @@ class TestReindexEndpoint:
         assert "Reindexed" in data["message"]
 
         # Should have indexed Python files
-        assert test_client_with_dispatcher.app.state.dispatcher.index_file.call_count >= 2
+        assert (
+            test_client_with_dispatcher.app.state.dispatcher.index_file.call_count >= 2
+        )
 
     @pytest.mark.asyncio
     async def test_reindex_nonexistent_path(self, test_client_with_dispatcher):
@@ -462,7 +505,9 @@ class TestErrorHandling:
             ("/plugins", "get"),
         ],
     )
-    def test_missing_required_params(self, test_client_with_dispatcher, endpoint, method):
+    def test_missing_required_params(
+        self, test_client_with_dispatcher, endpoint, method
+    ):
         """Test endpoints with missing required parameters."""
         client_method = getattr(test_client_with_dispatcher, method)
 
@@ -495,17 +540,24 @@ class TestConcurrency:
 
         # All requests should succeed
         assert all(r.status_code == 200 for r in results)
-        assert test_client_with_dispatcher.app.state.dispatcher.search.call_count == num_requests
+        assert (
+            test_client_with_dispatcher.app.state.dispatcher.search.call_count
+            == num_requests
+        )
 
 
 class TestPerformance:
     """Performance benchmarks for API endpoints."""
 
     @pytest.mark.benchmark
-    def test_symbol_lookup_performance(self, test_client_with_dispatcher, benchmark_results):
+    def test_symbol_lookup_performance(
+        self, test_client_with_dispatcher, benchmark_results
+    ):
         """Benchmark symbol lookup performance."""
         test_client_with_dispatcher.app.state.dispatcher.lookup = Mock(
-            return_value=SymbolDef(name="test", kind="function", path="/test.py", line=1)
+            return_value=SymbolDef(
+                name="test", kind="function", path="/test.py", line=1
+            )
         )
 
         with measure_time("symbol_lookup", benchmark_results):
@@ -518,7 +570,9 @@ class TestPerformance:
         """Benchmark search performance."""
         test_client_with_dispatcher.app.state.dispatcher.search = Mock(
             return_value=[
-                SearchResult(name=f"result_{i}", kind="function", path=f"/file{i}.py", score=1.0)
+                SearchResult(
+                    name=f"result_{i}", kind="function", path=f"/file{i}.py", score=1.0
+                )
                 for i in range(20)
             ]
         )

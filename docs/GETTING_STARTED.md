@@ -45,6 +45,9 @@ Navigate to your project directory and restore the latest published index:
 ```bash
 cd /path/to/your/project
 
+# Check repo/artifact readiness first
+mcp-index preflight
+
 # Pull the latest shared artifact baseline
 mcp-index artifact pull --latest
 
@@ -204,6 +207,19 @@ Check GitHub authentication and repository remote:
 ```bash
 gh auth status
 git remote get-url origin
+```
+
+### Preflight warns that you are behind remote
+
+```bash
+git pull --rebase
+mcp-index artifact sync
+```
+
+### Preflight warns that local runtime files are missing
+
+```bash
+mcp-index artifact pull --latest
 ```
 
 ### Server won't start

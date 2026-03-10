@@ -8,11 +8,12 @@ drift without adding a complicated remote delta-download protocol.
 
 1. Local index build creates lexical and semantic assets (`code_index.db`, `.index_metadata.json`, and `vector_index.qdrant`).
 2. `mcp-index artifact push` packages and uploads a full snapshot artifact.
-3. Teammates or fresh clones run `mcp-index artifact pull --latest` to hydrate local indexes from that full snapshot.
-4. MCP reads the restored local runtime files directly from disk (`code_index.db`, `.index_metadata.json`, `vector_index.qdrant`).
-5. The CLI reports the restored artifact commit and compares it to local `HEAD`.
-6. If your branch or working tree has drifted, use local incremental reindexing to reconcile only changed files.
-7. On branch/commit targeting, `mcp-index artifact recover --branch ... --commit ...` resolves and restores matching artifact state.
+3. Teammates or fresh clones run `mcp-index preflight` first to see whether they are behind remote or missing local runtime state.
+4. `mcp-index artifact pull --latest` hydrates local indexes from the full snapshot when needed.
+5. MCP reads the restored local runtime files directly from disk (`code_index.db`, `.index_metadata.json`, `vector_index.qdrant`).
+6. The CLI reports the restored artifact commit and compares it to local `HEAD`.
+7. If your branch or working tree has drifted, use local incremental reindexing to reconcile only changed files.
+8. On branch/commit targeting, `mcp-index artifact recover --branch ... --commit ...` resolves and restores matching artifact state.
 
 ## Commands
 

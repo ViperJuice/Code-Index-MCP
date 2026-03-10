@@ -15,6 +15,7 @@ from .cache import (
     QueryResultCache,
     QueryType,
 )
+from .cli.preflight_commands import format_preflight_report, run_startup_preflight
 from .config.settings import get_settings
 from .core.logging import setup_logging
 from .dispatcher.dispatcher_enhanced import EnhancedDispatcher
@@ -101,6 +102,13 @@ async def startup_event():
         language_detection_status
 
     try:
+        preflight_result = run_startup_preflight()
+        for line in format_preflight_report(preflight_result):
+            if preflight_result.status == "warning":
+                logger.warning(line)
+            else:
+                logger.info(line)
+
         # Initialize security configuration
         logger.info("Initializing security configuration...")
         security_config = SecurityConfig(
@@ -553,6 +561,10 @@ async def startup_event():
         app.state.profile_hydration = profile_hydration_status
         app.state.semantic_setup = semantic_setup_status
         app.state.language_detection = language_detection_status
+        app.state.preflight = {
+            "status": preflight_result.status,
+            "checks": [check.__dict__ for check in preflight_result.checks],
+        }
 
         # Update status to include search capabilities
         search_capabilities = []

@@ -10,6 +10,7 @@ import click
 from .. import __version__
 from .artifact_commands import artifact
 from .index_management import index
+from .preflight_commands import preflight
 from .repository_commands import repository
 from .setup_commands import setup
 
@@ -23,6 +24,7 @@ def cli():
 # Register command groups
 cli.add_command(index)
 cli.add_command(artifact)
+cli.add_command(preflight)
 cli.add_command(repository)
 cli.add_command(setup)
 

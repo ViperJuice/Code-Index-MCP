@@ -274,6 +274,9 @@ pip install -e .
 # Authenticate GitHub artifact access once
 gh auth login
 
+# Check repo/artifact readiness before starting work
+mcp-index preflight
+
 # Pull the latest published index baseline for this repo
 mcp-index artifact pull --latest
 
