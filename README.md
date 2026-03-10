@@ -342,6 +342,13 @@ For open source users, the recommended multi-repo model is local-first on one
 machine:
 
 ```bash
+# Register each local repository once
+mcp-index repository register /path/to/repo-a
+mcp-index repository register /path/to/repo-b
+
+# Inspect repository-level readiness details
+mcp-index repository list -v
+
 # Inspect all registered repositories and their local artifact/runtime readiness
 mcp-index artifact workspace-status
 
@@ -354,10 +361,11 @@ mcp-index artifact publish-workspace
 
 Recommended pattern:
 
-1. keep each repo checkout self-contained
-2. restore or rebuild local runtime files per repo as needed
-3. use workspace status/reconcile to see which repos are ready or stale
-4. only use GitHub artifact publication when you actually want to share a repo baseline
+1. register each repo checkout once with `mcp-index repository register <path>`
+2. keep each repo checkout self-contained
+3. restore or rebuild local runtime files per repo as needed
+4. use `mcp-index repository list -v` and workspace status/reconcile to see which repos are ready or stale
+5. only use GitHub artifact publication when you actually want to share a repo baseline
 
 ### 🔐 Privacy & GitHub Artifact Sync
 

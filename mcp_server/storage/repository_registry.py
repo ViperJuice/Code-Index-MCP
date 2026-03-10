@@ -214,6 +214,9 @@ class RepositoryRegistry:
             active=True,
             priority=priority,
             index_location=str(index_base),
+            artifact_backend="local_workspace",
+            artifact_health="missing",
+            available_semantic_profiles=[],
         )
 
         self.register(repo_info)

@@ -15,7 +15,7 @@ This guide walks you through installing and using Code-Index-MCP to index and se
 
 ```bash
 # Install core package
-pip install code-index-mcp
+pip install index-it-mcp
 
 # Verify installation
 mcp-index --version
@@ -71,6 +71,23 @@ uvicorn mcp_server.gateway:app --host 127.0.0.1 --port 8000
 The server exposes:
 - REST API at `http://127.0.0.1:8000`
 - MCP protocol for AI assistant integration
+
+### Same-Machine Multi-Repo Setup
+
+If you work across multiple local repositories on one machine, register each
+checkout and inspect readiness before starting work:
+
+```bash
+mcp-index repository register /path/to/repo-a
+mcp-index repository register /path/to/repo-b
+mcp-index repository list -v
+mcp-index artifact workspace-status
+mcp-index artifact reconcile-workspace
+```
+
+Newly registered repos usually start with `artifact_health: missing` until you
+restore local runtime files with `mcp-index artifact pull --latest` or build a
+local index with `mcp-index repository sync`.
 
 ### 3. Search Your Code
 
@@ -137,7 +154,7 @@ build/
 For AI-powered semantic search, install with semantic support:
 
 ```bash
-pip install code-index-mcp[semantic]
+pip install index-it-mcp[semantic]
 ```
 
 Then configure Voyage AI:

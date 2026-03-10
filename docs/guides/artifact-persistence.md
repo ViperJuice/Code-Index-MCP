@@ -64,11 +64,23 @@ normal development.
 For open source users running multiple repositories on one machine, the
 recommended model is local-first:
 
+- register each checkout once with `mcp-index repository register <path>`
+- use `mcp-index repository list -v` to inspect repo-level readiness and semantic profiles
 - each repository keeps its own local runtime/index files
 - the shared registry tracks which repos are ready, stale, or missing local state
 - `mcp-index artifact workspace-status` reports readiness across registered repos
 - `mcp-index artifact reconcile-workspace` refreshes that readiness after restores or rebuilds
 - `mcp-index artifact publish-workspace` prepares local artifact payloads without requiring paid remote publication per repo
+
+Typical flow:
+
+```bash
+mcp-index repository register /path/to/repo-a
+mcp-index repository register /path/to/repo-b
+mcp-index repository list -v
+mcp-index artifact workspace-status
+mcp-index artifact reconcile-workspace
+```
 
 This avoids turning multi-repo usage into a GitHub-artifact-per-repo system,
 which helps keep the tool practical for open source developers who do not want
