@@ -12,6 +12,7 @@ from .artifact_commands import artifact
 from .index_management import index
 from .preflight_commands import preflight
 from .repository_commands import repository
+from .server_commands import serve
 from .setup_commands import setup
 
 
@@ -25,6 +26,7 @@ def cli():
 cli.add_command(index)
 cli.add_command(artifact)
 cli.add_command(preflight)
+cli.add_command(serve)
 cli.add_command(repository)
 cli.add_command(setup)
 

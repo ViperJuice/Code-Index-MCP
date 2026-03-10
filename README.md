@@ -292,7 +292,10 @@ mcp-index artifact sync
 mcp-index index status
 
 # Start the API server
-uvicorn mcp_server.gateway:app --host 0.0.0.0 --port 8000
+mcp-index serve
+
+# Or choose a custom port explicitly
+mcp-index serve --port 9123
 
 # Test the API
 curl http://localhost:8000/status

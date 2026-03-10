@@ -68,7 +68,10 @@ mcp-index index rebuild --force
 
 ```bash
 # Start the server
-uvicorn mcp_server.gateway:app --host 127.0.0.1 --port 8000
+mcp-index serve
+
+# Or pick a less crowded port
+mcp-index serve --port 9123
 ```
 
 The server exposes:
