@@ -69,6 +69,56 @@ fuzzy_indexer: FuzzyIndexer | None = None
 semantic_indexer = None
 profile_hydration_status: Dict[str, Any] | None = None
 semantic_setup_status: Dict[str, Any] | None = None
+
+
+def _normalize_search_result(raw_result: Any) -> SearchResult:
+    """Normalize internal search payloads to the public SearchResult schema."""
+    if isinstance(raw_result, dict):
+        file_value = (
+            raw_result.get("file")
+            or raw_result.get("file_path")
+            or raw_result.get("filepath")
+            or raw_result.get("defined_in")
+            or ""
+        )
+        line_value = raw_result.get("line")
+        if line_value is None:
+            line_value = raw_result.get("line_start")
+        if line_value is None:
+            span = raw_result.get("span")
+            if isinstance(span, (list, tuple)) and span:
+                line_value = span[0]
+        snippet_value = (
+            raw_result.get("snippet")
+            or raw_result.get("context")
+            or raw_result.get("content")
+            or raw_result.get("doc")
+            or raw_result.get("signature")
+            or ""
+        )
+        return SearchResult(
+            file=str(file_value),
+            line=int(line_value or 1),
+            snippet=str(snippet_value),
+        )
+
+    file_value = (
+        getattr(raw_result, "file", None)
+        or getattr(raw_result, "file_path", None)
+        or getattr(raw_result, "filepath", None)
+        or ""
+    )
+    line_value = getattr(raw_result, "line", None) or 1
+    snippet_value = (
+        getattr(raw_result, "snippet", None)
+        or getattr(raw_result, "context", None)
+        or ""
+    )
+    return SearchResult(
+        file=str(file_value), line=int(line_value), snippet=str(snippet_value)
+    )
+
+
 language_detection_status: Dict[str, Any] | None = None
 
 # Initialize metrics and health checking
@@ -1069,6 +1119,7 @@ async def search(
             )
 
         if cached_results is not None:
+            cached_results = [_normalize_search_result(r) for r in cached_results]
             logger.debug(
                 f"Found cached search results for: '{q}' ({len(cached_results)} results)"
             )
@@ -1090,28 +1141,13 @@ async def search(
                 hybrid_results = await hybrid_search.search(
                     query=q, filters=filters, limit=limit
                 )
-                # Convert to SearchResult format
-                for r in hybrid_results:
-                    results.append(
-                        SearchResult(
-                            file_path=r["filepath"],
-                            snippet=r["snippet"],
-                            score=r["score"],
-                        )
-                    )
+                results = [_normalize_search_result(r) for r in hybrid_results]
 
         elif effective_mode == "bm25" and bm25_indexer:
             # Direct BM25 search
             with metrics_collector.time_function("search", labels={"mode": "bm25"}):
                 bm25_results = bm25_indexer.search(q, limit=limit, **filters)
-                for r in bm25_results:
-                    results.append(
-                        SearchResult(
-                            file_path=r["filepath"],
-                            snippet=r.get("snippet", ""),
-                            score=r["score"],
-                        )
-                    )
+                results = [_normalize_search_result(r) for r in bm25_results]
 
         elif effective_mode == "fuzzy" and fuzzy_indexer:
             # Direct fuzzy search
@@ -1120,14 +1156,7 @@ async def search(
                     fuzzy_results = fuzzy_indexer.search_fuzzy(q, max_results=limit)
                 else:
                     fuzzy_results = fuzzy_indexer.search(q, limit=limit)
-                for r in fuzzy_results:
-                    results.append(
-                        SearchResult(
-                            file_path=r.get("file_path", ""),
-                            snippet=r.get("context", ""),
-                            score=r.get("score", 0.0),
-                        )
-                    )
+                results = [_normalize_search_result(r) for r in fuzzy_results]
 
         elif effective_mode == "semantic":
             # Use classic dispatcher with semantic=True
@@ -1136,6 +1165,7 @@ async def search(
                     "search", labels={"mode": "semantic"}
                 ):
                     results = list(dispatcher.search(q, semantic=True, limit=limit))
+                    results = [_normalize_search_result(r) for r in results]
             else:
                 raise HTTPException(
                     503,
@@ -1187,10 +1217,12 @@ async def search(
                     "search", labels={"mode": "classic"}
                 ):
                     results = list(dispatcher.search(q, semantic=False, limit=limit))
+                    results = [_normalize_search_result(r) for r in results]
             else:
                 raise HTTPException(503, "Classic search not available")
 
         # Cache the results if available
+        results = [_normalize_search_result(r) for r in results]
         if query_cache and query_cache.config.enabled and results:
             query_type = (
                 QueryType.SEMANTIC_SEARCH

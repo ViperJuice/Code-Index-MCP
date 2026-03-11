@@ -21,7 +21,10 @@ from ..plugins.language_registry import get_all_extensions, get_language_by_exte
 from ..plugins.memory_aware_manager import MemoryAwarePluginManager
 from ..plugins.plugin_factory import PluginFactory
 from ..plugins.repository_plugin_loader import RepositoryPluginLoader
-from ..storage.cross_repo_coordinator import CrossRepositorySearchCoordinator, SearchScope
+from ..storage.cross_repo_coordinator import (
+    CrossRepositorySearchCoordinator,
+    SearchScope,
+)
 from ..storage.multi_repo_manager import MultiRepositoryManager
 from ..storage.sqlite_store import SQLiteStore
 from ..utils.semantic_indexer import SemanticIndexer
@@ -115,7 +118,9 @@ class EnhancedDispatcher:
 
         # Initialize multi-repo manager if enabled
         if multi_repo_enabled is None:
-            multi_repo_enabled = os.getenv("MCP_ENABLE_MULTI_REPO", "false").lower() == "true"
+            multi_repo_enabled = (
+                os.getenv("MCP_ENABLE_MULTI_REPO", "false").lower() == "true"
+            )
 
         if multi_repo_enabled and sqlite_store:
             # Get current repo ID
@@ -133,10 +138,15 @@ class EnhancedDispatcher:
             except Exception:
                 _ = hashlib.sha256(str(Path.cwd()).encode()).hexdigest()[:12]
 
-            storage_path = os.getenv("MCP_INDEX_STORAGE_PATH", ".indexes")
+            default_storage_path = Path.home() / ".mcp" / "indexes"
+            storage_path = os.getenv(
+                "MCP_INDEX_STORAGE_PATH", str(default_storage_path)
+            )
             # Use the correct registry path
             registry_path = Path(storage_path) / "repository_registry.json"
-            self._multi_repo_manager = MultiRepositoryManager(central_index_path=registry_path)
+            self._multi_repo_manager = MultiRepositoryManager(
+                central_index_path=registry_path
+            )
             self._cross_repo_coordinator = CrossRepositorySearchCoordinator(
                 self._multi_repo_manager
             )
@@ -188,7 +198,9 @@ class EnhancedDispatcher:
                     )
                 else:
                     # No existing collection found, use default configuration
-                    qdrant_path, collection_name = discovery.get_default_collection_config()
+                    qdrant_path, collection_name = (
+                        discovery.get_default_collection_config()
+                    )
                     logger.info(
                         f"No existing collection found, using default: {collection_name} at {qdrant_path}"
                     )
@@ -198,7 +210,9 @@ class EnhancedDispatcher:
                     self._semantic_indexer = SemanticIndexer(
                         qdrant_path=qdrant_path, collection=collection_name
                     )
-                    logger.info(f"Semantic search initialized: {collection_name} at {qdrant_path}")
+                    logger.info(
+                        f"Semantic search initialized: {collection_name} at {qdrant_path}"
+                    )
                 else:
                     logger.warning(f"Qdrant path not found: {qdrant_path}")
             except Exception as e:
@@ -230,10 +244,12 @@ class EnhancedDispatcher:
 
         # Compile document query patterns for performance
         self._compiled_doc_patterns = [
-            re.compile(pattern, re.IGNORECASE) for pattern in self.DOCUMENT_QUERY_PATTERNS
+            re.compile(pattern, re.IGNORECASE)
+            for pattern in self.DOCUMENT_QUERY_PATTERNS
         ]
         self._compiled_file_patterns = [
-            re.compile(pattern, re.IGNORECASE) for pattern in self.DOCUMENTATION_FILE_PATTERNS
+            re.compile(pattern, re.IGNORECASE)
+            for pattern in self.DOCUMENTATION_FILE_PATTERNS
         ]
 
         # Graph analysis components (lazy initialized)
@@ -243,7 +259,9 @@ class EnhancedDispatcher:
         self._graph_nodes: List[GraphNode] = []
         self._graph_edges = []
 
-        logger.info(f"Enhanced dispatcher initialized with {len(self._plugins)} plugins")
+        logger.info(
+            f"Enhanced dispatcher initialized with {len(self._plugins)} plugins"
+        )
 
     def _load_all_plugins(self):
         """Load all available plugins using PluginFactory with timeout protection."""
@@ -271,7 +289,7 @@ class EnhancedDispatcher:
                 yield
 
         try:
-            with timeout(5):  # 5 second timeout
+            with timeout(30):  # 30 second timeout for startup plugin loading
                 # Use repository-aware loading if available
                 if self._repo_plugin_loader and self._memory_aware:
                     # Get languages to load based on repository content
@@ -297,11 +315,15 @@ class EnhancedDispatcher:
                                             f"Cannot use async memory manager from sync context for {lang}, using direct creation"
                                         )
                                         plugin = PluginFactory.create_plugin(
-                                            lang, self._sqlite_store, self._semantic_enabled
+                                            lang,
+                                            self._sqlite_store,
+                                            self._semantic_enabled,
                                         )
                                     except RuntimeError:
                                         # No running loop, safe to use asyncio.run
-                                        plugin = asyncio.run(self._memory_manager.get_plugin(lang))
+                                        plugin = asyncio.run(
+                                            self._memory_manager.get_plugin(lang)
+                                        )
                                 else:
                                     plugin = PluginFactory.create_plugin(
                                         lang, self._sqlite_store, self._semantic_enabled
@@ -318,7 +340,8 @@ class EnhancedDispatcher:
                 else:
                     # Fall back to loading all plugins
                     all_plugins = PluginFactory.create_all_plugins(
-                        sqlite_store=self._sqlite_store, enable_semantic=self._semantic_enabled
+                        sqlite_store=self._sqlite_store,
+                        enable_semantic=self._semantic_enabled,
                     )
 
                     for lang, plugin in all_plugins.items():
@@ -467,30 +490,48 @@ class EnhancedDispatcher:
         if lang == "python":
             capabilities.extend(
                 [
-                    PluginCapability("refactoring", "1.0", "Python refactoring support", 75),
-                    PluginCapability("type_analysis", "1.0", "Python type analysis", 85),
+                    PluginCapability(
+                        "refactoring", "1.0", "Python refactoring support", 75
+                    ),
+                    PluginCapability(
+                        "type_analysis", "1.0", "Python type analysis", 85
+                    ),
                 ]
             )
         elif lang in ["javascript", "typescript"]:
             capabilities.extend(
                 [
-                    PluginCapability("linting", "1.0", "JavaScript/TypeScript linting", 85),
-                    PluginCapability("bundling_analysis", "1.0", "Module bundling analysis", 70),
-                    PluginCapability("framework_support", "1.0", "Framework-specific support", 75),
+                    PluginCapability(
+                        "linting", "1.0", "JavaScript/TypeScript linting", 85
+                    ),
+                    PluginCapability(
+                        "bundling_analysis", "1.0", "Module bundling analysis", 70
+                    ),
+                    PluginCapability(
+                        "framework_support", "1.0", "Framework-specific support", 75
+                    ),
                 ]
             )
         elif lang in ["c", "cpp"]:
             capabilities.extend(
                 [
-                    PluginCapability("compilation_analysis", "1.0", "Compilation analysis", 80),
-                    PluginCapability("memory_analysis", "1.0", "Memory usage analysis", 70),
-                    PluginCapability("performance_profiling", "1.0", "Performance profiling", 75),
+                    PluginCapability(
+                        "compilation_analysis", "1.0", "Compilation analysis", 80
+                    ),
+                    PluginCapability(
+                        "memory_analysis", "1.0", "Memory usage analysis", 70
+                    ),
+                    PluginCapability(
+                        "performance_profiling", "1.0", "Performance profiling", 75
+                    ),
                 ]
             )
         elif lang in ["go", "rust"]:
             capabilities.extend(
                 [
-                    PluginCapability("package_analysis", "1.0", f"{lang} package analysis", 80),
+                    PluginCapability(
+                        "package_analysis", "1.0", f"{lang} package analysis", 80
+                    ),
                     PluginCapability(
                         "concurrency_analysis",
                         "1.0",
@@ -502,8 +543,12 @@ class EnhancedDispatcher:
         elif lang in ["java", "kotlin", "scala"]:
             capabilities.extend(
                 [
-                    PluginCapability("jvm_analysis", "1.0", "JVM bytecode analysis", 75),
-                    PluginCapability("build_tool_integration", "1.0", "Build tool integration", 70),
+                    PluginCapability(
+                        "jvm_analysis", "1.0", "JVM bytecode analysis", 75
+                    ),
+                    PluginCapability(
+                        "build_tool_integration", "1.0", "Build tool integration", 70
+                    ),
                 ]
             )
 
@@ -634,7 +679,10 @@ class EnhancedDispatcher:
                                 pattern_lower = pattern.lower()
                                 if "class" in pattern_lower:
                                     kind = "class"
-                                elif "def" in pattern_lower or "function" in pattern_lower:
+                                elif (
+                                    "def" in pattern_lower
+                                    or "function" in pattern_lower
+                                ):
                                     kind = "function"
                                 else:
                                     kind = "symbol"
@@ -672,7 +720,9 @@ class EnhancedDispatcher:
                         )
                         definitions_by_plugin[plugin] = None
 
-                result = self._aggregator.aggregate_symbol_definitions(definitions_by_plugin)
+                result = self._aggregator.aggregate_symbol_definitions(
+                    definitions_by_plugin
+                )
 
                 self._operation_stats["lookups"] += 1
                 self._operation_stats["total_time"] += time.time() - start_time
@@ -903,7 +953,9 @@ class EnhancedDispatcher:
                                         metadata=result.get("metadata", {}),
                                     )
                                 self._operation_stats["searches"] += 1
-                                self._operation_stats["total_time"] += time.time() - start_time
+                                self._operation_stats["total_time"] += (
+                                    time.time() - start_time
+                                )
                                 return  # Success, exit early
                         except Exception as e:
                             logger.debug(f"BM25 search in table '{table}' failed: {e}")
@@ -924,7 +976,9 @@ class EnhancedDispatcher:
                     logger.info("No plugins loaded, using semantic search")
                     try:
                         # Search using semantic indexer
-                        semantic_results = self._semantic_indexer.search(query=query, limit=limit)
+                        semantic_results = self._semantic_indexer.search(
+                            query=query, limit=limit
+                        )
 
                         for result in semantic_results:
                             # Extract file content for snippet
@@ -935,11 +989,15 @@ class EnhancedDispatcher:
                                 snippet = "\n".join(lines[:5])
 
                             yield {
-                                "file": result.get("file_path", result.get("filepath", "")),
+                                "file": result.get(
+                                    "file_path", result.get("filepath", "")
+                                ),
                                 "line": result.get("line", 1),
                                 "snippet": snippet,
                                 "score": result.get("score", 0.0),
-                                "language": result.get("metadata", {}).get("language", "unknown"),
+                                "language": result.get("metadata", {}).get(
+                                    "language", "unknown"
+                                ),
                             }
 
                         self._operation_stats["searches"] += 1
@@ -1005,7 +1063,9 @@ class EnhancedDispatcher:
             queries = [query]
             if is_doc_query:
                 queries = self._expand_document_query(query)
-                logger.info(f"Expanded document query '{query}' to {len(queries)} variations")
+                logger.info(
+                    f"Expanded document query '{query}' to {len(queries)} variations"
+                )
                 # Force semantic search for natural language queries
                 semantic = True
 
@@ -1117,7 +1177,9 @@ class EnhancedDispatcher:
                         unique_results.append(result)
 
                 # Sort by score if available
-                unique_results.sort(key=lambda r: r.get("score", 0.5) or 0.5, reverse=True)
+                unique_results.sort(
+                    key=lambda r: r.get("score", 0.5) or 0.5, reverse=True
+                )
 
                 # Prioritize documentation files for document queries
                 if is_doc_query:
@@ -1209,7 +1271,9 @@ class EnhancedDispatcher:
 
         return stats
 
-    def index_directory(self, directory: Path, recursive: bool = True) -> Dict[str, int]:
+    def index_directory(
+        self, directory: Path, recursive: bool = True
+    ) -> Dict[str, int]:
         """
         Index all files in a directory, respecting ignore patterns.
 
@@ -1280,7 +1344,9 @@ class EnhancedDispatcher:
                 # Track by language
                 language = get_language_by_extension(path.suffix)
                 if language:
-                    stats["by_language"][language] = stats["by_language"].get(language, 0) + 1
+                    stats["by_language"][language] = (
+                        stats["by_language"].get(language, 0) + 1
+                    )
 
             except Exception as e:
                 logger.error(f"Failed to index {path}: {e}")
@@ -1321,7 +1387,9 @@ class EnhancedDispatcher:
         # Build search queries for different document types
         queries = []
         for doc_type in doc_types:
-            queries.extend([f"{doc_type} {topic}", f"{topic} {doc_type}", f"{topic} in {doc_type}"])
+            queries.extend(
+                [f"{doc_type} {topic}", f"{topic} {doc_type}", f"{topic} in {doc_type}"]
+            )
 
         # Also search for the topic in common doc filenames
         queries.extend(
@@ -1336,7 +1404,9 @@ class EnhancedDispatcher:
         # Deduplicate queries
         queries = list(dict.fromkeys(queries))
 
-        logger.info(f"Cross-document search for '{topic}' with {len(queries)} query variations")
+        logger.info(
+            f"Cross-document search for '{topic}' with {len(queries)} query variations"
+        )
 
         # Use the enhanced search with document-specific handling
         all_results = []
@@ -1433,7 +1503,9 @@ class EnhancedDispatcher:
                 logger.warning(f"Error removing from semantic index: {e}")
 
             # Update statistics
-            self._operation_stats["deletions"] = self._operation_stats.get("deletions", 0) + 1
+            self._operation_stats["deletions"] = (
+                self._operation_stats.get("deletions", 0) + 1
+            )
 
         except Exception as e:
             logger.error(f"Error removing file {path}: {e}", exc_info=True)
@@ -1488,7 +1560,9 @@ class EnhancedDispatcher:
             self._operation_stats["moves"] = self._operation_stats.get("moves", 0) + 1
 
         except Exception as e:
-            logger.error(f"Error moving file {old_path} -> {new_path}: {e}", exc_info=True)
+            logger.error(
+                f"Error moving file {old_path} -> {new_path}: {e}", exc_info=True
+            )
 
     async def cross_repo_symbol_search(
         self,
@@ -1586,7 +1660,9 @@ class EnhancedDispatcher:
         )
 
         try:
-            result = await self._cross_repo_coordinator.search_code(query, scope, semantic, limit)
+            result = await self._cross_repo_coordinator.search_code(
+                query, scope, semantic, limit
+            )
 
             # Convert to dictionary format for MCP tools
             return {
@@ -1651,7 +1727,9 @@ class EnhancedDispatcher:
             True if graph is initialized, False otherwise
         """
         if not CHUNKER_AVAILABLE:
-            logger.warning("Graph features not available: TreeSitter Chunker not installed")
+            logger.warning(
+                "Graph features not available: TreeSitter Chunker not installed"
+            )
             return False
 
         # If already initialized and no new files, return

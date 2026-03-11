@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Iterable, Optional
 
@@ -35,7 +36,10 @@ class Plugin(IPlugin):
                 str(Path.cwd()), Path.cwd().name, {"language": "python"}
             )
 
-        if preindex:
+        if (
+            preindex
+            and os.getenv("MCP_SKIP_PLUGIN_PREINDEX", "false").lower() != "true"
+        ):
             self._preindex()
 
     # ------------------------------------------------------------------

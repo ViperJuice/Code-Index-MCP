@@ -183,6 +183,29 @@ class TestSearchEndpoint:
             "test", semantic=True, limit=20
         )
 
+    def test_search_normalizes_internal_result_shapes(
+        self, test_client_with_dispatcher
+    ):
+        """Search should normalize internal file_path/filepath payloads to API schema."""
+        import mcp_server.gateway as gateway
+
+        test_client_with_dispatcher.app.state.dispatcher.search = Mock(
+            return_value=[
+                {"file_path": "a.py", "snippet": "hello", "score": 0.9},
+                {"filepath": "b.py", "context": "world", "line": 4, "score": 0.7},
+            ]
+        )
+        gateway.query_cache = None
+
+        response = test_client_with_dispatcher.get(
+            "/search?q=test&semantic=true&mode=semantic"
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload[0] == {"file": "a.py", "line": 1, "snippet": "hello"}
+        assert payload[1] == {"file": "b.py", "line": 4, "snippet": "world"}
+
     def test_search_with_limit(self, test_client_with_dispatcher):
         """Test search with custom limit."""
         test_client_with_dispatcher.app.state.dispatcher.search = Mock(return_value=[])

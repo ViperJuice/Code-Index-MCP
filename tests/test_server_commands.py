@@ -16,6 +16,7 @@ def test_serve_uses_explicit_host_port(monkeypatch):
 
     assert result.exit_code == 0
     assert calls == [("mcp_server.gateway:app", "127.0.0.1", 9123, False)]
+    assert "MCP_INDEX_STORAGE_PATH" in __import__("os").environ
 
 
 def test_serve_uses_env_defaults(monkeypatch):
@@ -33,3 +34,20 @@ def test_serve_uses_env_defaults(monkeypatch):
 
     assert result.exit_code == 0
     assert calls == [("mcp_server.gateway:app", "0.0.0.0", 8877, False)]
+
+
+def test_serve_preserves_explicit_storage_env(monkeypatch):
+    runner = CliRunner()
+    calls = []
+
+    def fake_run(app, host, port, reload):
+        calls.append((app, host, port, reload))
+
+    monkeypatch.setenv("MCP_INDEX_STORAGE_PATH", "/tmp/custom-indexes")
+    monkeypatch.setattr("uvicorn.run", fake_run)
+
+    result = runner.invoke(serve, [])
+
+    assert result.exit_code == 0
+    assert calls == [("mcp_server.gateway:app", "127.0.0.1", 8765, False)]
+    assert __import__("os").environ["MCP_INDEX_STORAGE_PATH"] == "/tmp/custom-indexes"

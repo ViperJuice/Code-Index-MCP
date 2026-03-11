@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -67,8 +68,9 @@ class GenericTreeSitterPlugin(PluginWithSemanticSearch):
                 logger.warning(f"Failed to create repository: {e}")
                 self._repository_id = None
 
-        # Pre-index existing files
-        self._preindex()
+        # Pre-index existing files unless startup is in lightweight mode.
+        if os.getenv("MCP_SKIP_PLUGIN_PREINDEX", "false").lower() != "true":
+            self._preindex()
 
     def _preindex(self) -> None:
         """Pre-index files for this language in the current directory."""
@@ -153,7 +155,9 @@ class GenericTreeSitterPlugin(PluginWithSemanticSearch):
                     # Extract symbol name (basic approach)
                     parts = line.strip().split()
                     if len(parts) > 1:
-                        symbol_name = parts[1].split("(")[0] if "(" in parts[1] else parts[1]
+                        symbol_name = (
+                            parts[1].split("(")[0] if "(" in parts[1] else parts[1]
+                        )
                         symbols.append(
                             {
                                 "symbol": symbol_name,
@@ -219,7 +223,9 @@ class GenericTreeSitterPlugin(PluginWithSemanticSearch):
                             chunks = chunk_text(content, self.lang)
                             for chunk in chunks:
                                 # Check if chunk contains this symbol
-                                symbol_name = chunk.metadata.get("name", chunk.node_type)
+                                symbol_name = chunk.metadata.get(
+                                    "name", chunk.node_type
+                                )
                                 if symbol_name == symbol:
                                     return self._adapter.chunk_to_symbol_def(chunk)
                         except Exception as e:

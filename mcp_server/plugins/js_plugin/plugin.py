@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ctypes
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
@@ -71,7 +72,8 @@ class Plugin(IPlugin):
             )
 
         # Pre-index existing files
-        self._preindex()
+        if os.getenv("MCP_SKIP_PLUGIN_PREINDEX", "false").lower() != "true":
+            self._preindex()
 
     def _preindex(self) -> None:
         """Pre-index all supported files in the current directory."""
@@ -80,7 +82,8 @@ class Plugin(IPlugin):
                 try:
                     # Skip node_modules and common build directories
                     if any(
-                        part in path.parts for part in ["node_modules", "dist", "build", ".next"]
+                        part in path.parts
+                        for part in ["node_modules", "dist", "build", ".next"]
                     ):
                         continue
 
@@ -132,7 +135,9 @@ class Plugin(IPlugin):
                 str(path),
                 str(path.relative_to(Path.cwd())),
                 language=(
-                    "javascript" if path.suffix in {".js", ".jsx", ".mjs", ".cjs"} else "typescript"
+                    "javascript"
+                    if path.suffix in {".js", ".jsx", ".mjs", ".cjs"}
+                    else "typescript"
                 ),
                 size=len(content),
                 hash=file_hash,
@@ -175,7 +180,11 @@ class Plugin(IPlugin):
                 return "esm"
 
         # Check for CommonJS patterns
-        if "require(" in content or "module.exports" in content or "exports." in content:
+        if (
+            "require(" in content
+            or "module.exports" in content
+            or "exports." in content
+        ):
             return "commonjs"
 
         return "unknown"
@@ -248,9 +257,9 @@ class Plugin(IPlugin):
             for child in node.named_children:
                 if child.type == "variable_declarator":
                     name_node = child.child_by_field_name("name")
-                    value_node = child.child_by_field_name("value") or child.child_by_field_name(
-                        "init"
-                    )
+                    value_node = child.child_by_field_name(
+                        "value"
+                    ) or child.child_by_field_name("init")
 
                     if name_node:
                         name = content[name_node.start_byte : name_node.end_byte]
@@ -331,7 +340,9 @@ class Plugin(IPlugin):
                 name = content[name_node.start_byte : name_node.end_byte]
                 superclass = self._extract_superclass(node, content)
 
-                signature = f"class {name}{' extends ' + superclass if superclass else ''}"
+                signature = (
+                    f"class {name}{' extends ' + superclass if superclass else ''}"
+                )
 
                 symbol_info = {
                     "symbol": name,
@@ -516,7 +527,9 @@ class Plugin(IPlugin):
                                 "pattern"
                             ) or child.child_by_field_name("name")
                             if name_node:
-                                param_text = content[name_node.start_byte : name_node.end_byte]
+                                param_text = content[
+                                    name_node.start_byte : name_node.end_byte
+                                ]
                                 if child.type == "optional_parameter":
                                     param_text += "?"
                                 params.append(param_text)
@@ -590,7 +603,9 @@ class Plugin(IPlugin):
             if node.type in ["import_statement", "import_declaration"]:
                 source_node = node.child_by_field_name("source")
                 if source_node:
-                    source = content[source_node.start_byte : source_node.end_byte].strip("\"'`")
+                    source = content[
+                        source_node.start_byte : source_node.end_byte
+                    ].strip("\"'`")
 
                     # Extract imported names
                     imported_names = []
@@ -619,7 +634,9 @@ class Plugin(IPlugin):
                                     for spec in clause_child.named_children:
                                         if spec.type == "import_specifier":
                                             name_node = spec.child_by_field_name("name")
-                                            alias_node = spec.child_by_field_name("alias")
+                                            alias_node = spec.child_by_field_name(
+                                                "alias"
+                                            )
                                             if name_node:
                                                 name = content[
                                                     name_node.start_byte : name_node.end_byte
@@ -628,7 +645,9 @@ class Plugin(IPlugin):
                                                     alias = content[
                                                         alias_node.start_byte : alias_node.end_byte
                                                     ]
-                                                    imported_names.append(f"{name} as {alias}")
+                                                    imported_names.append(
+                                                        f"{name} as {alias}"
+                                                    )
                                                 else:
                                                     imported_names.append(name)
 
@@ -657,7 +676,9 @@ class Plugin(IPlugin):
                     if func_text == "require" and args_node.named_child_count > 0:
                         arg_node = args_node.named_children[0]
                         if arg_node.type in ["string", "template_string"]:
-                            source = content[arg_node.start_byte : arg_node.end_byte].strip("\"'`")
+                            source = content[
+                                arg_node.start_byte : arg_node.end_byte
+                            ].strip("\"'`")
                             imports.append(
                                 {
                                     "source": source,
@@ -682,7 +703,8 @@ class Plugin(IPlugin):
                 for child in node.children:
                     if (
                         not child.is_named
-                        and content[child.start_byte : child.end_byte].strip() == "default"
+                        and content[child.start_byte : child.end_byte].strip()
+                        == "default"
                     ):
                         default_export = True
                         break
@@ -721,7 +743,9 @@ class Plugin(IPlugin):
                             if child.type == "variable_declarator":
                                 name_node = child.child_by_field_name("name")
                                 if name_node:
-                                    name = content[name_node.start_byte : name_node.end_byte]
+                                    name = content[
+                                        name_node.start_byte : name_node.end_byte
+                                    ]
                                     exports.append(
                                         {
                                             "name": name,
@@ -739,7 +763,9 @@ class Plugin(IPlugin):
                                 name_node = spec.child_by_field_name("name")
                                 alias_node = spec.child_by_field_name("alias")
                                 if name_node:
-                                    name = content[name_node.start_byte : name_node.end_byte]
+                                    name = content[
+                                        name_node.start_byte : name_node.end_byte
+                                    ]
                                     export_info = {
                                         "name": name,
                                         "kind": "named",
@@ -807,7 +833,9 @@ class Plugin(IPlugin):
             nodes.extend(self._walk_tree(child))
         return nodes
 
-    def _symbol_to_def(self, symbol: Dict[str, Any], file_path: str, content: str) -> SymbolDef:
+    def _symbol_to_def(
+        self, symbol: Dict[str, Any], file_path: str, content: str
+    ) -> SymbolDef:
         """Convert internal symbol representation to SymbolDef."""
         # Extract documentation if available
         doc = None
@@ -837,7 +865,9 @@ class Plugin(IPlugin):
             "doc": doc,
             "defined_in": file_path,
             "line": symbol.get("line", 1),
-            "span": symbol.get("span", (symbol.get("line", 1), symbol.get("line", 1) + 1)),
+            "span": symbol.get(
+                "span", (symbol.get("line", 1), symbol.get("line", 1) + 1)
+            ),
         }
 
     def getDefinition(self, symbol: str) -> SymbolDef | None:
@@ -845,7 +875,9 @@ class Plugin(IPlugin):
         # First check cache
         for file_path, symbols in self._symbol_cache.items():
             for sym_def in symbols:
-                if sym_def["symbol"] == symbol or sym_def["symbol"].endswith(f".{symbol}"):
+                if sym_def["symbol"] == symbol or sym_def["symbol"].endswith(
+                    f".{symbol}"
+                ):
                     return sym_def
 
         # Search in all supported files
@@ -854,7 +886,8 @@ class Plugin(IPlugin):
                 try:
                     # Skip node_modules and build directories
                     if any(
-                        part in path.parts for part in ["node_modules", "dist", "build", ".next"]
+                        part in path.parts
+                        for part in ["node_modules", "dist", "build", ".next"]
                     ):
                         continue
 
@@ -862,7 +895,9 @@ class Plugin(IPlugin):
                     shard = self.indexFile(path, content)
 
                     for sym in shard["symbols"]:
-                        if sym["symbol"] == symbol or sym["symbol"].endswith(f".{symbol}"):
+                        if sym["symbol"] == symbol or sym["symbol"].endswith(
+                            f".{symbol}"
+                        ):
                             return self._symbol_to_def(sym, str(path), content)
                 except Exception:
                     continue
@@ -880,7 +915,8 @@ class Plugin(IPlugin):
                 try:
                     # Skip node_modules and build directories
                     if any(
-                        part in path.parts for part in ["node_modules", "dist", "build", ".next"]
+                        part in path.parts
+                        for part in ["node_modules", "dist", "build", ".next"]
                     ):
                         continue
 
@@ -904,7 +940,9 @@ class Plugin(IPlugin):
 
         return refs
 
-    def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:
+    def search(
+        self, query: str, opts: SearchOpts | None = None
+    ) -> Iterable[SearchResult]:
         """Search for code snippets matching a query."""
         limit = 20
         if opts and "limit" in opts:

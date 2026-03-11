@@ -57,6 +57,24 @@ class TestDispatcherInitialization:
         plugins = dispatcher.plugins
         assert plugins == {"mock": mock_plugin}
 
+    @patch("mcp_server.dispatcher.dispatcher_enhanced.MultiRepositoryManager")
+    @patch("mcp_server.dispatcher.dispatcher_enhanced.CrossRepositorySearchCoordinator")
+    @patch("pathlib.Path.home")
+    def test_multi_repo_default_registry_path_uses_home_directory(
+        self, mock_home, mock_cross_repo, mock_multi_repo
+    ):
+        """Default multi-repo registry path should be user-writable under ~/.mcp."""
+        mock_home.return_value = Path("/tmp/test-home")
+
+        with patch.dict("os.environ", {"MCP_ENABLE_MULTI_REPO": "true"}, clear=False):
+            Dispatcher([], sqlite_store=Mock())
+
+        registry_path = mock_multi_repo.call_args.kwargs["central_index_path"]
+        assert (
+            registry_path
+            == Path("/tmp/test-home") / ".mcp" / "indexes" / "repository_registry.json"
+        )
+
 
 class TestPluginMatching:
     """Test plugin matching for files."""
@@ -103,7 +121,9 @@ class TestSymbolLookup:
 
     def test_lookup_found(self, mock_plugin):
         """Test successful symbol lookup."""
-        expected_symbol = SymbolDef(name="test_func", kind="function", path="/test.py", line=10)
+        expected_symbol = SymbolDef(
+            name="test_func", kind="function", path="/test.py", line=10
+        )
         mock_plugin.getDefinition.return_value = expected_symbol
 
         dispatcher = Dispatcher([mock_plugin])
@@ -127,7 +147,9 @@ class TestSymbolLookup:
         plugin1 = Mock(spec=IPlugin, lang="python")
         plugin1.getDefinition.return_value = None
 
-        expected_symbol = SymbolDef(name="found", kind="class", path="/found.js", line=5)
+        expected_symbol = SymbolDef(
+            name="found", kind="class", path="/found.js", line=5
+        )
         plugin2 = Mock(spec=IPlugin, lang="javascript")
         plugin2.getDefinition.return_value = expected_symbol
 
@@ -167,7 +189,9 @@ class TestSearch:
         results = list(dispatcher.search("func"))
 
         assert results == expected_results
-        mock_plugin.search.assert_called_once_with("func", {"semantic": False, "limit": 20})
+        mock_plugin.search.assert_called_once_with(
+            "func", {"semantic": False, "limit": 20}
+        )
 
     def test_search_semantic(self, mock_plugin):
         """Test semantic search."""
@@ -176,7 +200,9 @@ class TestSearch:
         dispatcher = Dispatcher([mock_plugin])
         list(dispatcher.search("test", semantic=True, limit=10))
 
-        mock_plugin.search.assert_called_once_with("test", {"semantic": True, "limit": 10})
+        mock_plugin.search.assert_called_once_with(
+            "test", {"semantic": True, "limit": 10}
+        )
 
     def test_search_multiple_plugins(self):
         """Test search results from multiple plugins are combined."""
@@ -355,7 +381,9 @@ class TestIndexFile:
         test_file.write_text("def hello(): pass")
 
         mock_plugin.supports.return_value = True
-        mock_plugin.indexFile.return_value = {"symbols": [{"name": "hello", "kind": "function"}]}
+        mock_plugin.indexFile.return_value = {
+            "symbols": [{"name": "hello", "kind": "function"}]
+        }
 
         dispatcher.index_file(test_file)
 

@@ -32,6 +32,12 @@ def _default_port() -> int:
 def serve(host: str, port: int, reload: bool) -> None:
     """Start the MCP HTTP server with configurable host and port."""
     import uvicorn
+    from pathlib import Path
+
+    os.environ.setdefault(
+        "MCP_INDEX_STORAGE_PATH", str(Path.home() / ".mcp" / "indexes")
+    )
+    os.environ.setdefault("MCP_SKIP_PLUGIN_PREINDEX", "true")
 
     click.echo(f"Starting MCP server on http://{host}:{port}")
     uvicorn.run("mcp_server.gateway:app", host=host, port=port, reload=reload)

@@ -12,7 +12,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from mcp_server.plugin_system.plugin_discovery import PluginDiscovery
 from mcp_server.plugins.memory_aware_manager import get_memory_aware_manager
@@ -59,7 +59,9 @@ class RepositoryPluginLoader:
             analysis_mode: Whether to load all plugins for analysis
             preload_threshold: Minimum files to justify loading a plugin
         """
-        self.plugin_strategy = plugin_strategy or os.environ.get("MCP_PLUGIN_STRATEGY", "auto")
+        self.plugin_strategy = plugin_strategy or os.environ.get(
+            "MCP_PLUGIN_STRATEGY", "auto"
+        )
         self.analysis_mode = (
             analysis_mode or os.environ.get("MCP_ANALYSIS_MODE", "").lower() == "true"
         )
@@ -70,6 +72,7 @@ class RepositoryPluginLoader:
 
         # Repository profiles cache
         self._profiles: Dict[str, RepositoryProfile] = {}
+        self._loaded_plugins: Dict[str, Any] = {}
 
         # Language to plugin mapping
         self._language_map = self._build_language_map()
@@ -218,7 +221,9 @@ class RepositoryPluginLoader:
             cursor = conn.cursor()
 
             # Query all file paths
-            cursor.execute("SELECT path FROM files WHERE is_deleted = 0 OR is_deleted IS NULL")
+            cursor.execute(
+                "SELECT path FROM files WHERE is_deleted = 0 OR is_deleted IS NULL"
+            )
 
             for (file_path,) in cursor:
                 # Determine language from extension
@@ -263,7 +268,9 @@ class RepositoryPluginLoader:
             return hashlib.sha256(url.encode()).hexdigest()[:12]
         except Exception:
             # Fall back to path hash
-            return hashlib.sha256(str(repository_path.absolute()).encode()).hexdigest()[:12]
+            return hashlib.sha256(str(repository_path.absolute()).encode()).hexdigest()[
+                :12
+            ]
 
     def _create_empty_profile(self, repo_id: str) -> RepositoryProfile:
         """Create empty profile for repositories without indexes."""
@@ -347,7 +354,8 @@ class RepositoryPluginLoader:
         plugin_dirs = [Path(__file__).parent]  # Default to plugins directory
         discovered = plugin_discovery.discover_plugins(plugin_dirs)
 
-        for plugin_name in discovered:
+        for plugin_info in discovered:
+            plugin_name = cast(str, getattr(plugin_info, "name", str(plugin_info)))
             plugin = self.memory_manager.get_plugin(plugin_name)
             if plugin:
                 loaded_plugins[plugin_name] = plugin
@@ -366,7 +374,9 @@ class RepositoryPluginLoader:
         # Calculate savings
         all_plugin_count = len(self._language_map)
         loaded_plugin_count = memory_status["loaded_plugins"]
-        reduction_percent = ((all_plugin_count - loaded_plugin_count) / all_plugin_count) * 100
+        reduction_percent = (
+            (all_plugin_count - loaded_plugin_count) / all_plugin_count
+        ) * 100
 
         return {
             "strategy": self.plugin_strategy,
@@ -385,6 +395,26 @@ class RepositoryPluginLoader:
                 for repo_id, profile in self._profiles.items()
             },
         }
+
+    def get_statistics(self) -> Dict[str, Any]:
+        """Compatibility alias for loader statistics."""
+        return self.get_loading_statistics()
+
+    def mark_loaded(self, language: str, plugin: Optional[Any] = None) -> None:
+        """Record a plugin as loaded for compatibility with dispatcher startup."""
+        if plugin is None:
+            plugin = self.memory_manager.get_plugin(language)
+        if plugin is not None:
+            self._loaded_plugins[language] = plugin
+
+    def get_active_plugins(self) -> Dict[str, Any]:
+        """Return currently known loaded plugins."""
+        active = dict(self._loaded_plugins)
+        for language in list(active.keys()):
+            plugin = self.memory_manager.get_plugin(language)
+            if plugin is not None:
+                active[language] = plugin
+        return active
 
     def clear_profile_cache(self):
         """Clear cached repository profiles."""
@@ -422,7 +452,9 @@ class RepositoryPluginLoader:
             List of language plugin names that should be loaded
         """
         if not self._profiles:
-            logger.warning("No repository profiles available, returning common languages")
+            logger.warning(
+                "No repository profiles available, returning common languages"
+            )
             return ["python", "javascript", "typescript"]
 
         # Get all languages from all profiles
