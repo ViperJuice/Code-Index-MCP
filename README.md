@@ -1132,6 +1132,7 @@ Performance optimization features are implemented and available:
 - **Input sanitization**: All queries are sanitized
 - **Secret detection**: Automatic redaction of detected secrets
 - **Plugin isolation**: Plugins run in restricted environments
+- **⚠️ Semantic Summary Risks**: If you enable LLM-generated semantic summaries (lazy or comprehensive), be aware of **prompt injection vulnerabilities**. Malicious actors could place hidden instructions in code comments (e.g., in an open-source dependency) that the summarizer LLM might execute. Always review generated index metadata if summarizing untrusted code.
 
 ## 📄 License
 
