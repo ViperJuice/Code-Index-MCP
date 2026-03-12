@@ -311,7 +311,7 @@ Create a `.env` file for configuration:
 ```env
 # Semantic profile setup
 VOYAGE_AI_API_KEY=your_api_key_here
-OPENAI_API_BASE=http://ai:8001/v1
+OPENAI_API_BASE=http://127.0.0.1:8001/v1
 QDRANT_PATH=vector_index.qdrant
 
 # Server settings

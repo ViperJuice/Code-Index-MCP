@@ -79,7 +79,7 @@ jobs:
         env:
           QDRANT_USE_SERVER: 'false'
           QDRANT_PATH: .mcp-index/vector_index.qdrant
-          OPENAI_API_BASE: ${{ vars.OPENAI_API_BASE || 'http://ai:8001/v1' }}
+          OPENAI_API_BASE: ${{ vars.OPENAI_API_BASE || 'http://127.0.0.1:8001/v1' }}
           VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
           VOYAGE_AI_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
         run: |
