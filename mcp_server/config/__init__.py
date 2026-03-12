@@ -50,5 +50,5 @@ __all__ = [
     "SecurityConfigurationError",
 ]
 
-__version__ = "1.0.0"
+__version__ = "2.14.8"
 __description__ = "Production configuration management for MCP Server"
