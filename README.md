@@ -311,6 +311,7 @@ Create a `.env` file for configuration:
 ```env
 # Semantic profile setup
 VOYAGE_AI_API_KEY=your_api_key_here
+# Use 127.0.0.1 for local inference, or a Tailscale/SSH tunnel IP for remote GPUs
 OPENAI_API_BASE=http://127.0.0.1:8001/v1
 QDRANT_PATH=vector_index.qdrant
 
@@ -337,6 +338,11 @@ profiles:
 
 Those profiles are stored in separate Qdrant collections inside the artifact so
 consumers can pull one baseline and use either profile locally.
+
+**Pro Tip: Remote Inference for the Open-Source Profile**
+If your local machine lacks the GPU power to run the `oss_high` embedding model locally (e.g., via vLLM or Ollama), you can run inference on a remote machine and point the MCP server to it:
+- **Tailscale/VPN:** Set `OPENAI_API_BASE=http://<tailnet-ip>:8001/v1`
+- **SSH Tunnel:** Run `ssh -L 8001:localhost:8001 user@remote-gpu-machine`, and the default `127.0.0.1:8001` configuration will tunnel directly to your inference server.
 
 The generated index files are not meant to live in git history. The repo tracks
 the code, workflow, and configuration needed to build/publish them; GitHub
