@@ -650,7 +650,7 @@ SEMANTIC_SEARCH_ENABLED=true
 Verify your semantic search setup:
 
 ```bash
-python scripts/cli/mcp_cli.py index check-semantic
+mcp-index index check-semantic
 ```
 
 ##### Index Configuration
@@ -688,10 +688,10 @@ mcp-index index check-compatibility
 mcp-index index rebuild
 
 # Create backup
-python scripts/cli/mcp_cli.py index backup my_backup
+mcp-index index backup my_backup
 
 # Restore from backup
-python scripts/cli/mcp_cli.py index restore my_backup
+mcp-index index restore my_backup
 ```
 
 ### GitHub Actions Integration
@@ -763,7 +763,7 @@ Multi-profile semantic config can be provided in either:
 Run onboarding with automatic local Qdrant startup:
 
 ```bash
-python scripts/cli/mcp_cli.py setup semantic
+mcp-index setup semantic
 ```
 
 Settings precedence (highest to lowest):
@@ -777,13 +777,13 @@ Common controls:
 
 ```bash
 # Preflight checks only
-python scripts/cli/mcp_cli.py setup semantic --dry-run
+mcp-index setup semantic --dry-run
 
 # Strict mode: fail command if semantic stack isn't ready
-python scripts/cli/mcp_cli.py setup semantic --strict
+mcp-index setup semantic --strict
 
 # Override local embedding endpoint
-python scripts/cli/mcp_cli.py setup semantic --openai-api-base http://127.0.0.1:8001/v1
+mcp-index setup semantic --openai-api-base http://127.0.0.1:8001/v1
 ```
 
 Plugin loading is auto-optimized by default using fast repository language detection:
