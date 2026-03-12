@@ -18,6 +18,7 @@ sys.path.insert(0, str(project_root))
 
 from mcp_server.storage.sqlite_store import SQLiteStore  # noqa: E402
 from mcp_server.artifacts.semantic_profiles import SemanticProfileRegistry  # noqa: E402
+from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher  # noqa: E402
 from mcp_server.config.settings import reload_settings  # noqa: E402
 from mcp_server.setup.semantic_preflight import run_semantic_preflight  # noqa: E402
 from mcp_server.utils import get_semantic_indexer  # noqa: E402
@@ -106,6 +107,160 @@ def _get_vector_backend_status() -> Dict[str, Any]:
             pass
 
     return {}
+
+
+def _build_sqlite_baseline() -> Dict[str, int]:
+    """Build the local lexical SQLite baseline using dispatcher indexing."""
+    original_skip_preindex = os.environ.get("MCP_SKIP_PLUGIN_PREINDEX")
+    original_lightweight_docs = os.environ.get("MCP_LIGHTWEIGHT_DOC_INDEX")
+    os.environ["MCP_SKIP_PLUGIN_PREINDEX"] = "true"
+    os.environ["MCP_LIGHTWEIGHT_DOC_INDEX"] = "true"
+    try:
+        store = SQLiteStore("code_index.db")
+        dispatcher = EnhancedDispatcher(
+            sqlite_store=store,
+            enable_advanced_features=True,
+            use_plugin_factory=True,
+            lazy_load=False,
+            semantic_search_enabled=False,
+            memory_aware=False,
+            multi_repo_enabled=False,
+        )
+        stats = dispatcher.index_directory(Path.cwd(), recursive=True)
+        stats["lexical_rows"] = store.rebuild_fts_code()
+        return stats
+    finally:
+        if original_skip_preindex is None:
+            os.environ.pop("MCP_SKIP_PLUGIN_PREINDEX", None)
+        else:
+            os.environ["MCP_SKIP_PLUGIN_PREINDEX"] = original_skip_preindex
+
+        if original_lightweight_docs is None:
+            os.environ.pop("MCP_LIGHTWEIGHT_DOC_INDEX", None)
+        else:
+            os.environ["MCP_LIGHTWEIGHT_DOC_INDEX"] = original_lightweight_docs
+
+
+def _build_semantic_baseline(
+    sample_size: int, selected_profiles: Optional[List[str]] = None
+) -> Dict[str, Dict[str, Any]]:
+    """Build the local semantic baseline only, pinned to file-backed Qdrant."""
+    SemanticIndexer = get_semantic_indexer()
+    if SemanticIndexer is None:
+        raise RuntimeError("semantic dependencies not installed")
+
+    settings = reload_settings()
+    registry = SemanticProfileRegistry.from_raw(
+        settings.get_semantic_profiles_config(),
+        settings.get_semantic_default_profile(),
+        tool_version=settings.app_version,
+    )
+    profile_ids = list(registry.list().keys())
+    if selected_profiles:
+        missing = [
+            profile for profile in selected_profiles if profile not in profile_ids
+        ]
+        if missing:
+            raise RuntimeError(
+                "Unknown semantic profile(s): " + ", ".join(sorted(missing))
+            )
+        profile_ids = [
+            profile for profile in profile_ids if profile in selected_profiles
+        ]
+    qdrant_path = os.getenv("QDRANT_PATH", "vector_index.qdrant")
+    target_collections = {
+        _get_profile_collection_name(
+            registry.get(profile_id), settings.semantic_collection_name
+        )
+        for profile_id in profile_ids
+    }
+
+    if qdrant_path == "vector_index.qdrant" and os.path.exists(qdrant_path):
+        import shutil
+
+        shutil.rmtree(qdrant_path)
+
+    original_qdrant_use_server = os.environ.get("QDRANT_USE_SERVER")
+    os.environ["QDRANT_USE_SERVER"] = "false"
+    try:
+        import glob
+
+        python_files = glob.glob("**/*.py", recursive=True)
+        python_files = [
+            f
+            for f in python_files
+            if not any(
+                exclude in f
+                for exclude in [
+                    "test_repos",
+                    ".git",
+                    "__pycache__",
+                    ".venv",
+                    "htmlcov",
+                    ".mcp-index",
+                    "vector_index.qdrant",
+                    "qdrant_storage",
+                    "code_index_mcp.egg-info",
+                ]
+            )
+        ]
+        if sample_size > 0:
+            python_files = python_files[:sample_size]
+
+        click.echo(
+            f"  -> Candidate Python files: {len(python_files)}"
+            + (" (full repository)" if sample_size <= 0 else "")
+        )
+
+        profile_stats: Dict[str, Dict[str, Any]] = {}
+        for profile_id in profile_ids:
+            click.echo(f"  -> Building semantic profile: {profile_id}")
+            profile = registry.get(profile_id)
+            indexer = SemanticIndexer(
+                collection=_get_profile_collection_name(
+                    profile, settings.semantic_collection_name
+                ),
+                qdrant_path=qdrant_path,
+                profile_registry=registry,
+                semantic_profile=profile_id,
+            )
+            indexed_count = 0
+            error_count = 0
+            with click.progressbar(
+                python_files, label=f"Indexing files ({profile_id})"
+            ) as files:
+                for file_path in files:
+                    try:
+                        result = indexer.index_file(Path(file_path))
+                        if result:
+                            indexed_count += 1
+                    except Exception:
+                        error_count += 1
+            profile_stats[profile_id] = {
+                "indexed_files": indexed_count,
+                "errors": error_count,
+            }
+
+            try:
+                collection_info = indexer.qdrant.get_collection(indexer.collection)
+                point_count = getattr(collection_info, "points_count", 0) or 0
+            except Exception:
+                point_count = 0
+
+            profile_stats[profile_id]["points"] = int(point_count)
+            profile_stats[profile_id]["collection"] = indexer.collection
+            profile_stats[profile_id]["connection_mode"] = str(indexer.connection_mode)
+
+            if point_count == 0 and indexed_count > 0:
+                raise RuntimeError(
+                    f"Semantic rebuild for {profile_id} produced 0 points in {indexer.collection} despite indexing {indexed_count} files"
+                )
+        return profile_stats
+    finally:
+        if original_qdrant_use_server is None:
+            os.environ.pop("QDRANT_USE_SERVER", None)
+        else:
+            os.environ["QDRANT_USE_SERVER"] = original_qdrant_use_server
 
 
 def _get_semantic_indexer_instance():
@@ -207,11 +362,23 @@ def check_compatibility(detailed: bool):
 @click.option("--sqlite-only", is_flag=True, help="Rebuild SQLite index only")
 @click.option("--vector-only", is_flag=True, help="Rebuild vector index only")
 @click.option(
+    "--semantic-profile",
+    "semantic_profiles",
+    multiple=True,
+    help="Limit semantic rebuild to one or more profile IDs",
+)
+@click.option(
     "--sample-size",
     default=0,
     help="Number of files to index (0 means full repository)",
 )
-def rebuild(force: bool, sqlite_only: bool, vector_only: bool, sample_size: int):
+def rebuild(
+    force: bool,
+    sqlite_only: bool,
+    vector_only: bool,
+    semantic_profiles: tuple[str, ...],
+    sample_size: int,
+):
     """Rebuild index artifacts."""
 
     if not force:
@@ -234,141 +401,30 @@ def rebuild(force: bool, sqlite_only: bool, vector_only: bool, sample_size: int)
     )
 
     if not sqlite_only:
-        SemanticIndexer = get_semantic_indexer()
-        if SemanticIndexer is None:
+        if get_semantic_indexer() is None:
             click.echo("⚠️ Skipping vector index (semantic dependencies not installed)")
             click.echo("   Install with: pip install code-index-mcp[semantic]")
         else:
             click.echo("Rebuilding vector index...")
             try:
-                settings = reload_settings()
-                registry = SemanticProfileRegistry.from_raw(
-                    settings.get_semantic_profiles_config(),
-                    settings.get_semantic_default_profile(),
-                    tool_version=settings.app_version,
+                profile_stats = _build_semantic_baseline(
+                    sample_size, list(semantic_profiles) or None
                 )
-                profile_ids = list(registry.list().keys())
-                qdrant_path = os.getenv("QDRANT_PATH", "vector_index.qdrant")
-                target_collections = {
-                    _get_profile_collection_name(
-                        registry.get(profile_id), settings.semantic_collection_name
-                    )
-                    for profile_id in profile_ids
-                }
-
-                # Remove old vector index
-                if qdrant_path == "vector_index.qdrant" and os.path.exists(qdrant_path):
-                    import shutil
-
-                    shutil.rmtree(qdrant_path)
-
-                if os.environ.get("QDRANT_USE_SERVER", "true").lower() == "true":
-                    try:
-                        from qdrant_client import QdrantClient
-
-                        client = QdrantClient(
-                            url=os.getenv("QDRANT_URL", "http://localhost:6333"),
-                            timeout=5,
-                        )
-                        existing = {
-                            collection.name
-                            for collection in client.get_collections().collections
-                        }
-                        stale_collections = set(target_collections)
-                        if settings.semantic_collection_name not in target_collections:
-                            stale_collections.add(settings.semantic_collection_name)
-                        for collection_name in sorted(stale_collections & existing):
-                            client.delete_collection(collection_name)
-                    except Exception:
-                        pass
-
-                original_qdrant_use_server = os.environ.get("QDRANT_USE_SERVER")
-                if not qdrant_path.startswith("http") and qdrant_path != ":memory:":
-                    os.environ["QDRANT_USE_SERVER"] = "false"
-
-                try:
-                    # Find Python files to index
-                    import glob
-
-                    python_files = glob.glob("**/*.py", recursive=True)
-                    python_files = [
-                        f
-                        for f in python_files
-                        if not any(
-                            exclude in f
-                            for exclude in [
-                                "test_repos",
-                                ".git",
-                                "__pycache__",
-                                ".venv",
-                            ]
-                        )
-                    ]
-
-                    if sample_size > 0:
-                        python_files = python_files[:sample_size]
-
-                    click.echo(
-                        f"  -> Candidate Python files: {len(python_files)}"
-                        + (" (full repository)" if sample_size <= 0 else "")
-                    )
-
-                    profile_counts: dict[str, int] = {}
-                    profile_errors: dict[str, int] = {}
-                    for profile_id in profile_ids:
-                        click.echo(f"  -> Building semantic profile: {profile_id}")
-                        profile = registry.get(profile_id)
-                        indexer = SemanticIndexer(
-                            collection=_get_profile_collection_name(
-                                profile, settings.semantic_collection_name
-                            ),
-                            qdrant_path=qdrant_path,
-                            profile_registry=registry,
-                            semantic_profile=profile_id,
-                        )
-
-                        indexed_count = 0
-                        error_count = 0
-                        with click.progressbar(
-                            python_files, label=f"Indexing files ({profile_id})"
-                        ) as files:
-                            for file_path in files:
-                                try:
-                                    result = indexer.index_file(Path(file_path))
-                                    if result:
-                                        indexed_count += 1
-                                except Exception as e:
-                                    if force:
-                                        error_count += 1
-                                        continue
-                                    click.echo(
-                                        f"\nError indexing {file_path} for {profile_id}: {e}",
-                                        err=True,
-                                    )
-                                    return
-
-                        profile_counts[profile_id] = indexed_count
-                        profile_errors[profile_id] = error_count
-                finally:
-                    if original_qdrant_use_server is None:
-                        os.environ.pop("QDRANT_USE_SERVER", None)
-                    else:
-                        os.environ["QDRANT_USE_SERVER"] = original_qdrant_use_server
 
                 click.echo(
                     "✅ Vector index rebuilt for profiles: "
                     + ", ".join(
-                        f"{profile_id}={count} files"
-                        for profile_id, count in profile_counts.items()
+                        f"{profile_id}={stats['indexed_files']} files"
+                        for profile_id, stats in profile_stats.items()
                     )
                 )
-                if any(profile_errors.values()):
+                if any(stats["errors"] for stats in profile_stats.values()):
                     click.echo(
                         "⚠️  Files skipped due to forced errors: "
                         + ", ".join(
-                            f"{profile_id}={count}"
-                            for profile_id, count in profile_errors.items()
-                            if count
+                            f"{profile_id}={stats['errors']}"
+                            for profile_id, stats in profile_stats.items()
+                            if stats["errors"]
                         )
                     )
 
@@ -384,14 +440,12 @@ def rebuild(force: bool, sqlite_only: bool, vector_only: bool, sample_size: int)
             if os.path.exists("code_index.db"):
                 os.remove("code_index.db")
 
-            # Create new SQLite index
-            _ = SQLiteStore("code_index.db")
-            click.echo("✅ SQLite index schema created")
-
-            # TODO: Add actual file indexing here when dispatcher is available
-            click.echo(
-                "Note: Run full indexing via the main application to populate SQLite index"
-            )
+            sqlite_stats = _build_sqlite_baseline()
+            click.echo("✅ SQLite index rebuilt")
+            click.echo(f"   Files indexed: {sqlite_stats.get('indexed_files', 0)}")
+            click.echo(f"   Files ignored: {sqlite_stats.get('ignored_files', 0)}")
+            click.echo(f"   Files failed: {sqlite_stats.get('failed_files', 0)}")
+            click.echo(f"   Lexical rows: {sqlite_stats.get('lexical_rows', 0)}")
 
         except Exception as e:
             click.echo(f"❌ SQLite index rebuild failed: {e}", err=True)
@@ -427,9 +481,13 @@ def status():
                 # Get database size
                 db_size = os.path.getsize(sqlite_path) / (1024 * 1024)  # MB
 
+                cursor = conn.execute("SELECT COUNT(*) FROM fts_code")
+                lexical_count = cursor.fetchone()[0]
+
                 click.echo("SQLite Index:")
                 click.echo(f"  📁 Files indexed: {file_count:,}")
                 click.echo(f"  🔍 Symbols found: {symbol_count:,}")
+                click.echo(f"  📝 Lexical rows: {lexical_count:,}")
                 click.echo(f"  💾 Database size: {db_size:.1f} MB")
 
         except Exception as e:

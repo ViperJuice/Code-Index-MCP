@@ -183,6 +183,45 @@ class TestSearchEndpoint:
             "test", semantic=True, limit=20
         )
 
+    def test_search_auto_prefers_semantic_path_when_requested(
+        self, test_client_with_dispatcher, monkeypatch
+    ):
+        """Auto mode should prefer semantic path instead of hybrid when semantic=true."""
+        import mcp_server.gateway as gateway
+
+        test_client_with_dispatcher.app.state.dispatcher.search = Mock(
+            return_value=[
+                {"file": "mcp_server/gateway.py", "line": 1, "snippet": "gateway"}
+            ]
+        )
+
+        class FakeHybrid:
+            async def search(self, query, filters, limit):
+                return [
+                    {"file": "htmlcov/function_index.html", "line": 1, "snippet": "bad"}
+                ]
+
+        gateway.hybrid_search = FakeHybrid()
+        gateway.query_cache = None
+
+        login_response = test_client_with_dispatcher.post(
+            "/api/v1/auth/login",
+            json={"username": "admin", "password": "admin123!"},
+        )
+        token = login_response.json()["access_token"]
+
+        response = test_client_with_dispatcher.get(
+            "/search?q=test&semantic=true",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload[0]["file"] == "mcp_server/gateway.py"
+        test_client_with_dispatcher.app.state.dispatcher.search.assert_called_with(
+            "test", semantic=True, limit=20
+        )
+
     def test_search_normalizes_internal_result_shapes(
         self, test_client_with_dispatcher
     ):

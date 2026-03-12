@@ -69,12 +69,17 @@ class FuzzyIndexer:
             try:
                 with self.sqlite_store._get_connection() as conn:
                     if self._schema_type == "fts_code":
+                        file_record = self.sqlite_store.get_file(path)
+                        file_ref = file_record["id"] if file_record else path
                         # Clear existing entries for this file
-                        conn.execute("DELETE FROM fts_code WHERE file_id = ?", (path,))
+                        conn.execute(
+                            "DELETE FROM fts_code WHERE file_id = ? OR CAST(file_id AS TEXT) = ?",
+                            (file_ref, path),
+                        )
                         # Insert new content (store full content for FTS5)
                         conn.execute(
                             "INSERT INTO fts_code (content, file_id) VALUES (?, ?)",
-                            (content, path),
+                            (content, file_ref),
                         )
                     elif self._schema_type == "bm25_content":
                         # For BM25 schema, we don't modify the table - it's already populated
@@ -95,8 +100,8 @@ class FuzzyIndexer:
 
     def _use_fts5_search(self, query: str) -> bool:
         """Determine if we should use FTS5 search."""
-        # For now, use FTS5 for queries with multiple words or special operators
-        return " " in query or any(op in query for op in ["AND", "OR", "NOT", '"'])
+        # Prefer SQLite-backed full-text search whenever available.
+        return self.sqlite_store is not None
 
     def _search_fts5(self, query: str, limit: int) -> List[Dict]:
         """Search using SQLite FTS5 or BM25."""
@@ -161,7 +166,9 @@ class FuzzyIndexer:
                     if key in seen:
                         continue
                     seen.add(key)
-                    results.append({"file": file, "line": line_no, "snippet": text.strip()})
+                    results.append(
+                        {"file": file, "line": line_no, "snippet": text.strip()}
+                    )
                     if len(results) >= limit:
                         return results
         return results
@@ -230,7 +237,9 @@ class FuzzyIndexer:
                         conn.execute("DELETE FROM fts_code")
                     elif self._schema_type == "bm25_content":
                         # For BM25, we don't clear the table as it's managed elsewhere
-                        logger.debug("BM25 content table managed by indexer, not clearing")
+                        logger.debug(
+                            "BM25 content table managed by indexer, not clearing"
+                        )
             except Exception as e:
                 logger.error(f"Failed to clear search index: {e}")
 

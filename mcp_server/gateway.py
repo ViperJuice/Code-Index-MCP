@@ -15,6 +15,7 @@ from .cache import (
     QueryResultCache,
     QueryType,
 )
+from .cli.index_management import _get_profile_collection_name
 from .cli.preflight_commands import format_preflight_report, run_startup_preflight
 from .config.settings import get_settings
 from .core.logging import setup_logging
@@ -73,13 +74,21 @@ semantic_setup_status: Dict[str, Any] | None = None
 
 def _normalize_search_result(raw_result: Any) -> SearchResult:
     """Normalize internal search payloads to the public SearchResult schema."""
+
+    def _prefer_path(candidate: Any, fallback: Any) -> str:
+        candidate_str = str(candidate or "")
+        fallback_str = str(fallback or "")
+        if candidate_str and not candidate_str.isdigit():
+            return candidate_str
+        return fallback_str or candidate_str
+
     if isinstance(raw_result, dict):
-        file_value = (
+        file_value = _prefer_path(
             raw_result.get("file")
             or raw_result.get("file_path")
             or raw_result.get("filepath")
-            or raw_result.get("defined_in")
-            or ""
+            or raw_result.get("defined_in"),
+            raw_result.get("relative_path") or raw_result.get("path"),
         )
         line_value = raw_result.get("line")
         if line_value is None:
@@ -102,11 +111,11 @@ def _normalize_search_result(raw_result: Any) -> SearchResult:
             snippet=str(snippet_value),
         )
 
-    file_value = (
+    file_value = _prefer_path(
         getattr(raw_result, "file", None)
         or getattr(raw_result, "file_path", None)
-        or getattr(raw_result, "filepath", None)
-        or ""
+        or getattr(raw_result, "filepath", None),
+        getattr(raw_result, "relative_path", None) or getattr(raw_result, "path", None),
     )
     line_value = getattr(raw_result, "line", None) or 1
     snippet_value = (
@@ -537,16 +546,28 @@ async def startup_event():
             try:
                 from .utils.semantic_indexer import SemanticIndexer
 
-                # Use central Qdrant location
-                qdrant_path = os.getenv("QDRANT_PATH", ".indexes/qdrant/main.qdrant")
+                # Use the canonical local file-backed semantic baseline by default.
+                qdrant_path = os.getenv("QDRANT_PATH", "vector_index.qdrant")
+                semantic_profile_id = settings.get_semantic_default_profile()
+                semantic_profile = profile_registry.get(semantic_profile_id)
+                if semantic_profile is None:
+                    raise RuntimeError(
+                        f"Semantic default profile '{semantic_profile_id}' is not available"
+                    )
                 semantic_indexer = SemanticIndexer(
-                    collection=settings.semantic_collection_name,
+                    collection=_get_profile_collection_name(
+                        semantic_profile, settings.semantic_collection_name
+                    ),
                     qdrant_path=qdrant_path,
                     profile_registry=profile_registry,
-                    semantic_profile=settings.get_semantic_default_profile(),
+                    semantic_profile=semantic_profile_id,
                 )
                 logger.info(
-                    f"Semantic indexer initialized successfully with Qdrant at {qdrant_path}"
+                    "Semantic indexer initialized successfully with Qdrant at %s "
+                    "(profile=%s, collection=%s)",
+                    qdrant_path,
+                    semantic_profile_id,
+                    semantic_indexer.collection,
                 )
             except ImportError:
                 logger.warning("Semantic indexer not available (missing dependencies)")
@@ -1083,11 +1104,12 @@ async def search(
         # Determine effective search mode
         effective_mode = mode
         if mode == "auto":
-            # Auto mode: use hybrid if available, otherwise fall back
-            if hybrid_search is not None:
+            # Auto mode: semantic requests prefer the dedicated semantic path.
+            if semantic and dispatcher and hasattr(dispatcher, "search"):
+                effective_mode = "semantic"
+            # Non-semantic requests use hybrid if available, otherwise fall back.
+            elif hybrid_search is not None:
                 effective_mode = "hybrid"
-            elif semantic and hasattr(dispatcher, "search"):
-                effective_mode = "classic"
             else:
                 effective_mode = "bm25" if bm25_indexer else "classic"
 
@@ -1147,6 +1169,10 @@ async def search(
             # Direct BM25 search
             with metrics_collector.time_function("search", labels={"mode": "bm25"}):
                 bm25_results = bm25_indexer.search(q, limit=limit, **filters)
+                if not bm25_results and sqlite_store:
+                    bm25_results = sqlite_store.search_bm25(
+                        q, table="fts_code", limit=limit
+                    )
                 results = [_normalize_search_result(r) for r in bm25_results]
 
         elif effective_mode == "fuzzy" and fuzzy_indexer:

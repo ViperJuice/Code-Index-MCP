@@ -18,6 +18,17 @@ from ..core.path_resolver import PathResolver
 
 logger = logging.getLogger(__name__)
 
+_LEXICAL_EXCLUDED_FILENAMES = {
+    "full_indexing_log.txt",
+    "mcp_validation_results.json",
+    "mcp_indexing_status.json",
+    "semantic_indexing_progress.json",
+    "mcp_indexing_summary.json",
+    "complete_indexing_results.json",
+    "mcp_direct_test_results.json",
+    "test_queries.json",
+}
+
 
 def _normalized_query_terms(query: str) -> List[str]:
     expanded = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", query)
@@ -1616,18 +1627,20 @@ class SQLiteStore:
             table_columns = {row[1] for row in cursor.fetchall()}
 
             if table == "fts_code" and "file_id" in table_columns:
-                # Modern schema with file_id references - join with files table
+                # Support both integer file_id references and legacy path-style file_id values.
                 cursor = conn.execute(
                     """
                     SELECT 
                         fts.content,
                         fts.file_id,
-                        f.path as filepath,
+                        COALESCE(f.path, f.relative_path, CAST(fts.file_id AS TEXT)) as filepath,
                         f.relative_path,
                         bm25(fts_code) as score,
                         snippet(fts_code, 0, '<mark>', '</mark>', '...', 32) as snippet
                     FROM fts_code fts
-                    JOIN files f ON fts.file_id = f.id
+                    LEFT JOIN files f ON fts.file_id = f.id
+                        OR CAST(fts.file_id AS TEXT) = f.path
+                        OR CAST(fts.file_id AS TEXT) = f.relative_path
                     WHERE fts_code MATCH ?
                     ORDER BY bm25(fts_code)
                     LIMIT ? OFFSET ?
@@ -1755,7 +1768,48 @@ class SQLiteStore:
             for row in cursor:
                 results.append(dict(row))
 
-            return results
+        return results
+
+    def rebuild_fts_code(self) -> int:
+        """Rebuild the fts_code table from current file records."""
+        with self._get_connection() as conn:
+            conn.execute("DELETE FROM fts_code")
+            cursor = conn.execute(
+                "SELECT id, path, relative_path FROM files WHERE is_deleted = FALSE"
+            )
+            rows = cursor.fetchall()
+            inserted = 0
+
+            for row in rows:
+                file_id = row[0]
+                path_value = row[1] or row[2]
+                if not path_value:
+                    continue
+
+                file_path = Path(path_value)
+                if (
+                    not file_path.exists()
+                    or file_path.name in _LEXICAL_EXCLUDED_FILENAMES
+                ):
+                    continue
+
+                try:
+                    content = file_path.read_text(encoding="utf-8")
+                except UnicodeDecodeError:
+                    try:
+                        content = file_path.read_text(encoding="latin-1")
+                    except Exception:
+                        continue
+                except Exception:
+                    continue
+
+                conn.execute(
+                    "INSERT INTO fts_code (content, file_id) VALUES (?, ?)",
+                    (content, file_id),
+                )
+                inserted += 1
+
+            return inserted
 
     def get_bm25_term_statistics(
         self, term: str, table: str = "fts_code"

@@ -17,6 +17,8 @@ from ..graph import (
     XRefAdapter,
 )
 from ..plugin_base import IPlugin, SearchResult, SymbolDef
+from ..config.settings import reload_settings
+from ..artifacts.semantic_profiles import SemanticProfileRegistry
 from ..plugins.language_registry import get_all_extensions, get_language_by_extension
 from ..plugins.memory_aware_manager import MemoryAwarePluginManager
 from ..plugins.plugin_factory import PluginFactory
@@ -40,6 +42,51 @@ from .result_aggregator import (
 # from ..core.ignore_patterns import get_ignore_manager
 
 logger = logging.getLogger(__name__)
+
+_INDEX_EXCLUDED_DIRS = {
+    ".git",
+    ".hg",
+    ".svn",
+    ".venv",
+    "venv",
+    "node_modules",
+    "dist",
+    "build",
+    "htmlcov",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".indexes",
+    ".mcp-index",
+    "qdrant_storage",
+    "vector_index.qdrant",
+    "code_index_mcp.egg-info",
+}
+
+_INDEX_EXCLUDED_FILENAMES = {
+    "full_indexing_log.txt",
+    "mcp_validation_results.json",
+    "mcp_indexing_status.json",
+    "semantic_indexing_progress.json",
+    "mcp_indexing_summary.json",
+    "complete_indexing_results.json",
+    "mcp_direct_test_results.json",
+    "test_queries.json",
+}
+
+
+def _get_profile_collection_name(profile: Any, fallback: str) -> str:
+    """Return the configured collection name for a semantic profile."""
+    build_metadata = getattr(profile, "build_metadata", None) or {}
+    collection_name = build_metadata.get("collection_name")
+    if isinstance(collection_name, str) and collection_name.strip():
+        return collection_name.strip()
+    return fallback
+
+
+_INDEX_EXCLUDED_SUFFIXES = {
+    ".xml",
+}
 
 
 class EnhancedDispatcher:
@@ -185,48 +232,41 @@ class EnhancedDispatcher:
         self._semantic_indexer = None
         if self._semantic_enabled and self._sqlite_store:
             try:
-                from ..utils.semantic_discovery import SemanticDatabaseDiscovery
-
-                # Auto-discover the correct semantic collection for this codebase
-                discovery = SemanticDatabaseDiscovery(Path.cwd())
-                best_collection = discovery.get_best_collection()
-
-                if best_collection:
-                    qdrant_path, collection_name = best_collection
-                    logger.info(
-                        f"Auto-discovered semantic collection: {collection_name} at {qdrant_path}"
-                    )
-                else:
-                    # No existing collection found, use default configuration
-                    qdrant_path, collection_name = (
-                        discovery.get_default_collection_config()
-                    )
-                    logger.info(
-                        f"No existing collection found, using default: {collection_name} at {qdrant_path}"
+                settings = reload_settings()
+                profile_registry = SemanticProfileRegistry.from_raw(
+                    settings.get_semantic_profiles_config(),
+                    settings.get_semantic_default_profile(),
+                    tool_version=settings.app_version,
+                )
+                semantic_profile_id = settings.get_semantic_default_profile()
+                semantic_profile = profile_registry.get(semantic_profile_id)
+                if semantic_profile is None:
+                    raise RuntimeError(
+                        f"Semantic default profile '{semantic_profile_id}' is not available"
                     )
 
-                # Only initialize if the Qdrant path exists
+                qdrant_path = os.getenv("QDRANT_PATH", "vector_index.qdrant")
+                collection_name = _get_profile_collection_name(
+                    semantic_profile, settings.semantic_collection_name
+                )
+
                 if Path(qdrant_path).exists():
                     self._semantic_indexer = SemanticIndexer(
-                        qdrant_path=qdrant_path, collection=collection_name
+                        qdrant_path=qdrant_path,
+                        collection=collection_name,
+                        profile_registry=profile_registry,
+                        semantic_profile=semantic_profile_id,
                     )
                     logger.info(
-                        f"Semantic search initialized: {collection_name} at {qdrant_path}"
+                        "Semantic search initialized: %s at %s (profile=%s)",
+                        collection_name,
+                        qdrant_path,
+                        semantic_profile_id,
                     )
                 else:
                     logger.warning(f"Qdrant path not found: {qdrant_path}")
             except Exception as e:
                 logger.warning(f"Failed to initialize semantic search: {e}")
-                # Fall back to legacy behavior
-                try:
-                    qdrant_path = Path(".indexes/qdrant/main.qdrant")
-                    if qdrant_path.exists():
-                        self._semantic_indexer = SemanticIndexer(
-                            qdrant_path=str(qdrant_path), collection="code-embeddings"
-                        )
-                        logger.info("Semantic search initialized with legacy fallback")
-                except Exception as e2:
-                    logger.warning(f"Legacy fallback also failed: {e2}")
 
         # Initialize plugins
         if plugins:
@@ -919,16 +959,11 @@ class EnhancedDispatcher:
         start_time = time.time()
 
         try:
-            # Quick BM25 bypass for non-semantic searches when plugins aren't loaded
-            if (
-                self._sqlite_store
-                and not semantic
-                and not self._semantic_enabled
-                and (not self._plugins or len(self._plugins) == 0)
-            ):
-                logger.info(f"Using direct BM25 search bypass for query: {query}")
+            # Prefer direct SQLite lexical search for non-semantic queries so the
+            # server remains useful even when plugin in-memory indexes are cold.
+            if self._sqlite_store and not semantic:
+                logger.info(f"Using direct lexical search for query: {query}")
                 try:
-                    # Try different table names based on index schema
                     tables_to_try = ["bm25_content", "fts_code"]
 
                     for table in tables_to_try:
@@ -938,31 +973,28 @@ class EnhancedDispatcher:
                             )
                             if results:
                                 for result in results:
-                                    # Handle different result formats
-                                    if "filepath" in result:
-                                        file_path = result["filepath"]
-                                    else:
-                                        file_path = result.get("file_path", "")
-
-                                    yield SearchResult(
-                                        file_path=file_path,
-                                        line=result.get("line", 0),
-                                        column=result.get("column", 0),
-                                        snippet=result.get("snippet", ""),
-                                        score=result.get("score", 0.0),
-                                        metadata=result.get("metadata", {}),
+                                    file_path = result.get("filepath") or result.get(
+                                        "file_path", ""
                                     )
+                                    yield {
+                                        "file": file_path,
+                                        "line": result.get("line", 1),
+                                        "snippet": result.get("snippet", ""),
+                                        "score": result.get("score", 0.0),
+                                        "language": result.get("language", "unknown"),
+                                    }
                                 self._operation_stats["searches"] += 1
                                 self._operation_stats["total_time"] += (
                                     time.time() - start_time
                                 )
-                                return  # Success, exit early
+                                return
                         except Exception as e:
-                            logger.debug(f"BM25 search in table '{table}' failed: {e}")
+                            logger.debug(
+                                f"Lexical search in table '{table}' failed: {e}"
+                            )
                             continue
-
                 except Exception as e:
-                    logger.warning(f"Direct BM25 bypass failed: {e}")
+                    logger.warning(f"Direct lexical search failed: {e}")
 
             # For search, we may need to search across all languages
             # Load all plugins if using lazy loading
@@ -988,10 +1020,17 @@ class EnhancedDispatcher:
                                 lines = result["code"].split("\n")
                                 snippet = "\n".join(lines[:5])
 
+                            file_value = (
+                                result.get("relative_path")
+                                or result.get("file")
+                                or result.get("path")
+                                or result.get("file_path")
+                                or result.get("filepath")
+                                or ""
+                            )
+
                             yield {
-                                "file": result.get(
-                                    "file_path", result.get("filepath", "")
-                                ),
+                                "file": file_value,
                                 "line": result.get("line", 1),
                                 "snippet": snippet,
                                 "score": result.get("score", 0.0),
@@ -1301,21 +1340,48 @@ class EnhancedDispatcher:
             "by_language": {},
         }
 
-        # Walk directory
+        # Walk directory while pruning excluded directories early.
         if recursive:
-            file_iterator = directory.rglob("*")
-        else:
-            file_iterator = directory.glob("*")
 
-        for path in file_iterator:
+            def iter_files() -> Iterable[Path]:
+                for current_root, dirnames, filenames in os.walk(directory):
+                    dirnames[:] = [d for d in dirnames if d not in _INDEX_EXCLUDED_DIRS]
+                    root_path = Path(current_root)
+                    for filename in filenames:
+                        yield root_path / filename
+
+        else:
+
+            def iter_files() -> Iterable[Path]:
+                for path in directory.glob("*"):
+                    if path.is_file():
+                        yield path
+
+        for path in iter_files():
             if not path.is_file():
                 continue
 
             stats["total_files"] += 1
 
-            # NOTE: We index ALL files locally, including gitignored ones
-            # Filtering happens only during export/sharing
-            # This allows local search of .env, secrets, etc.
+            relative_parts = (
+                path.relative_to(directory).parts
+                if path.is_relative_to(directory)
+                else path.parts
+            )
+            if any(
+                part in _INDEX_EXCLUDED_DIRS or part.endswith(".egg-info")
+                for part in relative_parts
+            ):
+                stats["ignored_files"] += 1
+                continue
+
+            if path.name in _INDEX_EXCLUDED_FILENAMES:
+                stats["ignored_files"] += 1
+                continue
+
+            if path.suffix.lower() in _INDEX_EXCLUDED_SUFFIXES:
+                stats["ignored_files"] += 1
+                continue
 
             # Try to find a plugin that supports this file
             # This allows us to index ALL files, including .env, .key, etc.

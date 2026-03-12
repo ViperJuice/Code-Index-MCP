@@ -164,6 +164,7 @@ code_index.db
 .index_metadata.json
 vector_index.qdrant/
 qdrant_storage/collections/code_index__*/
+qdrant_storage/collections/code-embeddings-*/
 
 test_repos/
 temp_cookbook/
