@@ -21,7 +21,8 @@ class SearchResult:
     """Search result information"""
 
     file_path: str
-    line: int
+    start_line: int
+    end_line: int
     column: int
     snippet: str
     match_type: str  # exact, fuzzy, semantic

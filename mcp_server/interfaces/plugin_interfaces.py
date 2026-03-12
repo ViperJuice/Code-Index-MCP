@@ -23,7 +23,8 @@ class SymbolDefinition:
 
     symbol: str
     file_path: str
-    line: int
+    start_line: int
+    end_line: int
     column: int
     symbol_type: str  # function, class, variable, etc.
     signature: Optional[str] = None
@@ -37,7 +38,8 @@ class SymbolReference:
 
     symbol: str
     file_path: str
-    line: int
+    start_line: int
+    end_line: int
     column: int
     context: Optional[str] = None
 
@@ -47,7 +49,8 @@ class SearchResult:
     """Search result information"""
 
     file_path: str
-    line: int
+    start_line: int
+    end_line: int
     column: int
     snippet: str
     match_type: str  # exact, fuzzy, semantic

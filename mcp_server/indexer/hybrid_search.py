@@ -549,7 +549,7 @@ class HybridSearch:
                 # Create a reranker-compatible search result
                 reranker_result = RerankSearchResult(
                     file_path=r.filepath,
-                    line=r.metadata.get("line", 1),
+                    start_line=r.metadata.get("line", 1), end_line=r.metadata.get("line", 1),
                     column=r.metadata.get("column", 0),
                     snippet=r.snippet,
                     match_type=r.source,  # Use source as match type

@@ -92,7 +92,7 @@ class MockPlugin(IPlugin):
                 results.append(
                     SearchResult(
                         path=symbol.path,
-                        line=symbol.line,
+                        start_line=symbol.line, end_line=symbol.line,
                         character=symbol.character,
                         snippet=symbol.definition,
                         score=1.0,

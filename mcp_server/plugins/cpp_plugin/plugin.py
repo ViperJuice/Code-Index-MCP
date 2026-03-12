@@ -1149,7 +1149,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
             search_results = [
                 InterfaceSearchResult(
                     file_path=result["file"],
-                    line=result["line"],
+                    start_line=result["line"], end_line=result["line"],
                     column=0,
                     snippet=result["snippet"],
                     match_type="fuzzy",

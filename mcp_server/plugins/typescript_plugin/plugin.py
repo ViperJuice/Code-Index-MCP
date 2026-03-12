@@ -1704,7 +1704,7 @@ class Plugin(IPlugin):
                             snippet = "\n".join(snippet_lines)
 
                             yield SearchResult(
-                                file=result["file"], line=line_num, snippet=snippet
+                                file=result["file"], start_line=line_num, end_line=line_num, snippet=snippet
                             )
                     except Exception as e:
                         logger.debug(

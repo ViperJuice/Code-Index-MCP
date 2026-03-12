@@ -90,13 +90,30 @@ def _normalize_search_result(raw_result: Any) -> SearchResult:
             or raw_result.get("defined_in"),
             raw_result.get("relative_path") or raw_result.get("path"),
         )
-        line_value = raw_result.get("line")
-        if line_value is None:
-            line_value = raw_result.get("line_start")
-        if line_value is None:
+
+        start_line = raw_result.get("start_line")
+        end_line = raw_result.get("end_line")
+
+        if start_line is None:
+            start_line = raw_result.get("line_start")
+        if end_line is None:
+            end_line = raw_result.get("line_end")
+
+        if start_line is None:
+            start_line = raw_result.get("line")
+
+        if start_line is None:
             span = raw_result.get("span")
-            if isinstance(span, (list, tuple)) and span:
-                line_value = span[0]
+            if isinstance(span, (list, tuple)) and len(span) >= 2:
+                start_line = span[0]
+                if end_line is None:
+                    end_line = span[1]
+            elif isinstance(span, (list, tuple)) and len(span) >= 1:
+                start_line = span[0]
+
+        start_line = int(start_line) if start_line is not None else 1
+        end_line = int(end_line) if end_line is not None else start_line
+
         snippet_value = (
             raw_result.get("snippet")
             or raw_result.get("context")
@@ -105,10 +122,18 @@ def _normalize_search_result(raw_result: Any) -> SearchResult:
             or raw_result.get("signature")
             or ""
         )
+
+        # Prepend line numbers to snippet if start_line is known
+        snippet_lines = str(snippet_value).split("\n")
+        numbered_snippet = "\n".join(
+            f"{start_line + i}: {line}" for i, line in enumerate(snippet_lines)
+        )
+
         return SearchResult(
             file=str(file_value),
-            line=int(line_value or 1),
-            snippet=str(snippet_value),
+            start_line=start_line,
+            end_line=end_line,
+            snippet=numbered_snippet,
         )
 
     file_value = _prefer_path(
@@ -117,14 +142,36 @@ def _normalize_search_result(raw_result: Any) -> SearchResult:
         or getattr(raw_result, "filepath", None),
         getattr(raw_result, "relative_path", None) or getattr(raw_result, "path", None),
     )
-    line_value = getattr(raw_result, "line", None) or 1
+    start_line = (
+        getattr(raw_result, "start_line", None)
+        or getattr(raw_result, "line_start", None)
+        or getattr(raw_result, "line", None)
+        or 1
+    )
+    end_line = (
+        getattr(raw_result, "end_line", None)
+        or getattr(raw_result, "line_end", None)
+        or start_line
+    )
+    start_line = int(start_line)
+    end_line = int(end_line)
+
     snippet_value = (
         getattr(raw_result, "snippet", None)
         or getattr(raw_result, "context", None)
         or ""
     )
+
+    snippet_lines = str(snippet_value).split("\n")
+    numbered_snippet = "\n".join(
+        f"{start_line + i}: {line}" for i, line in enumerate(snippet_lines)
+    )
+
     return SearchResult(
-        file=str(file_value), line=int(line_value), snippet=str(snippet_value)
+        file=str(file_value),
+        start_line=start_line,
+        end_line=end_line,
+        snippet=numbered_snippet,
     )
 
 

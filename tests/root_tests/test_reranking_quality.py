@@ -224,7 +224,7 @@ class RerankingQualityTester:
             search_results.append(
                 ISearchResult(
                     file_path=r.get("filepath", ""),
-                    line=r.get("metadata", {}).get("line", 1),
+                    start_line=r.get("metadata", {}).get("line", 1), end_line=r.get("metadata", {}).get("line", 1),
                     column=0,
                     snippet=r.get("snippet", "")[:200],
                     match_type="bm25",

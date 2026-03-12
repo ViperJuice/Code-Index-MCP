@@ -37,6 +37,15 @@ profiles:
     auth:
       api_key_env: VOYAGE_API_KEY
 
+    summarization:
+      enabled: true
+      mode: lazy
+      provider: openai_compatible
+      model_name: o3-mini
+      base_url: "https://api.openai.com/v1"
+      api_key_env: OPENAI_API_KEY
+      prompt_template: "Describe this code chunk's inputs, outputs, and purpose in 2 concise sentences. Do not output code."
+
   oss_high:
     profile_id: oss_high
     kind: semantic

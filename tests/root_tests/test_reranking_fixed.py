@@ -79,7 +79,7 @@ async def test_tfidf_reranking():
     for doc in documents:
         result = SearchResult(
             file_path=doc["filepath"],
-            line=1,
+            start_line=1, end_line=1,
             column=0,
             snippet=doc["snippet"],
             match_type="test",
@@ -142,7 +142,7 @@ async def test_reranking_performance():
             results.append(
                 SearchResult(
                     file_path=f"/app/file_{i}.py",
-                    line=i + 1,
+                    start_line=i + 1, end_line=i + 1,
                     column=0,
                     snippet=f"Sample code with test query keywords in line {i}",
                     match_type="test",
@@ -176,7 +176,7 @@ async def test_reranking_quality():
         # Low score but highly relevant
         SearchResult(
             file_path="/app/auth/user_authentication.py",
-            line=10,
+            start_line=10, end_line=10,
             column=0,
             snippet="class UserAuthentication: handles complete user auth flow",
             match_type="test",
@@ -186,7 +186,7 @@ async def test_reranking_quality():
         # High score but less relevant
         SearchResult(
             file_path="/app/utils/logger.py",
-            line=50,
+            start_line=50, end_line=50,
             column=0,
             snippet='logger.info("User logged in")',
             match_type="test",
@@ -196,7 +196,7 @@ async def test_reranking_quality():
         # Medium score, good relevance
         SearchResult(
             file_path="/app/auth/login_handler.py",
-            line=1,
+            start_line=1, end_line=1,
             column=0,
             snippet="def handle_user_authentication(credentials):",
             match_type="test",

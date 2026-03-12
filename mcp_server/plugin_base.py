@@ -15,7 +15,8 @@ class IndexShard(TypedDict):
 @dataclass(frozen=True)
 class Reference:
     file: str
-    line: int
+    start_line: int
+    end_line: int
 
 
 class SymbolDef(TypedDict):
@@ -25,13 +26,15 @@ class SymbolDef(TypedDict):
     signature: str
     doc: str | None
     defined_in: str
-    line: int
+    start_line: int
+    end_line: int
     span: tuple[int, int]
 
 
 class SearchResult(TypedDict):
     file: str
-    line: int
+    start_line: int
+    end_line: int
     snippet: str
 
 

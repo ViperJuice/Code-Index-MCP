@@ -46,7 +46,7 @@ class SimpleDispatcher:
 
                         yield SearchResult(
                             file_path=file_path,
-                            line=result.get("line", 0),
+                            start_line=result.get("line", 0), end_line=result.get("line", 0),
                             column=result.get("column", 0),
                             snippet=result.get("snippet", ""),
                             score=result.get("score", 0.0),

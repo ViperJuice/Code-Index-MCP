@@ -182,7 +182,7 @@ class SimpleTextPlugin(IPlugin):
             for result in results:
                 yield SearchResult(
                     file=result["file"],
-                    line=result["line"],
+                    start_line=result["line"], end_line=result["line"],
                     snippet=result["snippet"],
                     score=result.get("score", 0.5),
                     kind=result.get("kind", "text"),

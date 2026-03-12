@@ -690,7 +690,7 @@ class Plugin(SpecializedPluginBase):
                                 0,
                                 SearchResult(
                                     file=file_path,
-                                    line=symbol["line"],
+                                    start_line=symbol["line"], end_line=symbol["line"],
                                     snippet=symbol["signature"],
                                 ),
                             )

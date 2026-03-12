@@ -392,6 +392,23 @@ class SQLiteStore:
             CREATE INDEX IF NOT EXISTS idx_semantic_points_point ON semantic_points(profile_id, point_id);
             CREATE INDEX IF NOT EXISTS idx_semantic_points_collection ON semantic_points(collection);
             
+            -- Chunk Summaries (for LLM-generated summaries)
+            CREATE TABLE IF NOT EXISTS chunk_summaries (
+                chunk_hash TEXT PRIMARY KEY,
+                file_id INTEGER NOT NULL,
+                chunk_start INTEGER NOT NULL,
+                chunk_end INTEGER NOT NULL,
+                symbol TEXT,
+                summary_text TEXT NOT NULL,
+                is_authoritative BOOLEAN DEFAULT 0,
+                llm_model TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(file_id) REFERENCES files(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_chunk_summaries_file_bounds ON chunk_summaries(file_id, chunk_start, chunk_end);
+
             -- Imports
             CREATE TABLE IF NOT EXISTS imports (
                 id INTEGER PRIMARY KEY,
@@ -2000,8 +2017,104 @@ class SQLiteStore:
                 for row in cursor:
                     file_id, path = row
                     # Use remove_file for thorough cleanup
-                    self.remove_file(path, repository_id=None)
+                    self.remove_file(path, repository_id=0)
 
                 logger.info(
                     f"Cleaned up {count} deleted files older than {days_old} days"
                 )
+
+    def store_chunk_summary(
+        self,
+        chunk_hash: str,
+        file_id: int,
+        chunk_start: int,
+        chunk_end: int,
+        summary_text: str,
+        llm_model: str,
+        symbol: Optional[str] = None,
+        is_authoritative: bool = False,
+    ) -> bool:
+        """Store or update a semantic chunk summary."""
+        with self._get_connection() as conn:
+            # Check if authoritative summary exists
+            cursor = conn.execute(
+                "SELECT is_authoritative FROM chunk_summaries WHERE chunk_hash = ?",
+                (chunk_hash,),
+            )
+            row = cursor.fetchone()
+            if row and row[0] and not is_authoritative:
+                return False  # Cannot overwrite authoritative summary with non-authoritative
+
+            conn.execute(
+                """INSERT INTO chunk_summaries 
+                   (chunk_hash, file_id, chunk_start, chunk_end, symbol, summary_text, is_authoritative, llm_model, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                   ON CONFLICT(chunk_hash) DO UPDATE SET
+                   summary_text=excluded.summary_text,
+                   is_authoritative=excluded.is_authoritative,
+                   llm_model=excluded.llm_model,
+                   updated_at=CURRENT_TIMESTAMP
+                """,
+                (
+                    chunk_hash,
+                    file_id,
+                    chunk_start,
+                    chunk_end,
+                    symbol,
+                    summary_text,
+                    is_authoritative,
+                    llm_model,
+                ),
+            )
+            return True
+
+    def get_chunk_summary(self, chunk_hash: str) -> Optional[Dict[str, Any]]:
+        """Get a specific chunk summary."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """SELECT chunk_hash, file_id, chunk_start, chunk_end, symbol, 
+                          summary_text, is_authoritative, llm_model, created_at, updated_at
+                   FROM chunk_summaries WHERE chunk_hash = ?""",
+                (chunk_hash,),
+            )
+            row = cursor.fetchone()
+            if row:
+                return {
+                    "chunk_hash": row[0],
+                    "file_id": row[1],
+                    "chunk_start": row[2],
+                    "chunk_end": row[3],
+                    "symbol": row[4],
+                    "summary_text": row[5],
+                    "is_authoritative": bool(row[6]),
+                    "llm_model": row[7],
+                    "created_at": row[8],
+                    "updated_at": row[9],
+                }
+            return None
+
+    def get_missing_summaries(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """Find chunks that don't have summaries yet."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """SELECT c.chunk_id, c.file_id, c.content_start, c.content_end, c.line_start, c.line_end, c.content, s.name as symbol
+                   FROM code_chunks c
+                   LEFT JOIN symbols s ON c.symbol_id = s.id
+                   LEFT JOIN chunk_summaries cs ON c.chunk_id = cs.chunk_hash
+                   WHERE cs.chunk_hash IS NULL
+                   LIMIT ?""",
+                (limit,),
+            )
+            return [
+                {
+                    "chunk_id": row[0],
+                    "file_id": row[1],
+                    "content_start": row[2],
+                    "content_end": row[3],
+                    "line_start": row[4],
+                    "line_end": row[5],
+                    "content": row[6],
+                    "symbol": row[7],
+                }
+                for row in cursor.fetchall()
+            ]

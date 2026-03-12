@@ -739,7 +739,7 @@ class Plugin(SpecializedPluginBase):
 
                     for line_num, line in enumerate(lines, 1):
                         if protocol_name in line and ":" in line:
-                            yield SearchResult(file=file_path, line=line_num, snippet=line.strip())
+                            yield SearchResult(file=file_path, start_line=line_num, end_line=line_num, snippet=line.strip())
                 except Exception as e:
                     logger.warning(f"Failed to search conformances in {file_path}: {e}")
 
@@ -755,7 +755,7 @@ class Plugin(SpecializedPluginBase):
                 for line_num, line in enumerate(lines, 1):
                     if pattern in line:
                         yield SearchResult(
-                            file=str(swift_file), line=line_num, snippet=line.strip()
+                            file=str(swift_file), start_line=line_num, end_line=line_num, snippet=line.strip()
                         )
             except Exception as e:
                 logger.warning(f"Failed to search property wrappers in {swift_file}: {e}")
@@ -772,7 +772,7 @@ class Plugin(SpecializedPluginBase):
                 for line_num, line in enumerate(lines, 1):
                     if pattern in line:
                         yield SearchResult(
-                            file=str(swift_file), line=line_num, snippet=line.strip()
+                            file=str(swift_file), start_line=line_num, end_line=line_num, snippet=line.strip()
                         )
             except Exception as e:
                 logger.warning(f"Failed to search module usage in {swift_file}: {e}")

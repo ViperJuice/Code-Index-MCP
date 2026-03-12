@@ -29,7 +29,7 @@ def create_test_results() -> List[SearchResult]:
     return [
         SearchResult(
             file_path="/app/src/auth/login.py",
-            line=42,
+            start_line=42, end_line=42,
             column=0,
             snippet="def authenticate_user(username: str, password: str) -> User:",
             match_type="exact",
@@ -38,7 +38,7 @@ def create_test_results() -> List[SearchResult]:
         ),
         SearchResult(
             file_path="/app/docs/auth_guide.md",
-            line=15,
+            start_line=15, end_line=15,
             column=0,
             snippet="## User Authentication\n\nThe authentication system uses JWT tokens...",
             match_type="semantic",
@@ -47,7 +47,7 @@ def create_test_results() -> List[SearchResult]:
         ),
         SearchResult(
             file_path="/app/src/models/user.py",
-            line=10,
+            start_line=10, end_line=10,
             column=0,
             snippet="class User(BaseModel):\n    username: str\n    email: str",
             match_type="exact",
@@ -56,7 +56,7 @@ def create_test_results() -> List[SearchResult]:
         ),
         SearchResult(
             file_path="/app/tests/test_auth.py",
-            line=25,
+            start_line=25, end_line=25,
             column=0,
             snippet="def test_user_login():\n    # Test user authentication",
             match_type="fuzzy",
@@ -65,7 +65,7 @@ def create_test_results() -> List[SearchResult]:
         ),
         SearchResult(
             file_path="/app/src/utils/password.py",
-            line=5,
+            start_line=5, end_line=5,
             column=0,
             snippet="def hash_password(password: str) -> str:",
             match_type="exact",
