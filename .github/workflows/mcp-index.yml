@@ -106,12 +106,22 @@ jobs:
               multi_repo_enabled=False,
           )
 
-          stats = dispatcher.index_directory(repo_root, recursive=True)
-          print(f"Indexed files: {stats.get('indexed_files', 0)}")
-          print(f"Failed files: {stats.get('failed_files', 0)}")
-          PY
-
-          mcp-index index rebuild --vector-only --force --sample-size 0
+          echo "Skipping CI index rebuild. Artifacts should be pushed via local machine."
+          # Lexical and semantic rebuild is intentionally skipped in CI.
+          # We rely on mcp-index artifact push from the local machine.
+          # python <<'PY'
+          # from pathlib import Path
+          # from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
+          # from mcp_server.storage.sqlite_store import SQLiteStore
+          # repo_root = Path.cwd()
+          # index_path = repo_root / '.mcp-index' / 'code_index.db'
+          # store = SQLiteStore(str(index_path))
+          # dispatcher = EnhancedDispatcher(sqlite_store=store, enable_advanced_features=True, use_plugin_factory=True, lazy_load=False, semantic_search_enabled=False, memory_aware=False, multi_repo_enabled=False)
+          # stats = dispatcher.index_directory(repo_root, recursive=True)
+          # print(f"Indexed files: {stats.get('indexed_files', 0)}")
+          # print(f"Failed files: {stats.get('failed_files', 0)}")
+          # PY
+          # mcp-index index rebuild --vector-only --force --sample-size 0
 
           if [ -f ".index_metadata.json" ]; then
             cp .index_metadata.json .mcp-index/.index_metadata.json
