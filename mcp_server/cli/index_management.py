@@ -213,6 +213,7 @@ def _build_semantic_baseline(
         )
 
         profile_stats: Dict[str, Dict[str, Any]] = {}
+        store = SQLiteStore("code_index.db")
         for profile_id in profile_ids:
             click.echo(f"  -> Building semantic profile: {profile_id}")
             profile = registry.get(profile_id)
@@ -223,6 +224,7 @@ def _build_semantic_baseline(
                 qdrant_path=qdrant_path,
                 profile_registry=registry,
                 semantic_profile=profile_id,
+                sqlite_store=store,
             )
             indexed_count = 0
             error_count = 0

@@ -1,0 +1,103 @@
+{
+  "repo": "/home/viperjuice/code/Code-Index-MCP",
+  "native": {
+    "rows": [
+      {
+        "backend": "ripgrep",
+        "query": "semantic preflight",
+        "top": "/home/viperjuice/code/Code-Index-MCP/scripts/run_e2e_retrieval_validation.py:78:    QueryCase(\"classic\", \"semantic preflight\", \"semantic_preflight.py\", \"semantic\"),",
+        "latency_ms": 56.9,
+        "latency_p50_ms": 56.9,
+        "latency_p95_ms": 56.9,
+        "top1_accuracy_pct": 100.0,
+        "pass": true
+      },
+      {
+        "backend": "grep",
+        "query": "semantic preflight",
+        "top": "/home/viperjuice/code/Code-Index-MCP/htmlcov/z_0425c7814bfde65c_semantic_preflight_py.html:276:    <p class=\"pln\"><span class=\"n\"><a id=\"t192\" href=\"#t192\">192</a></span><span class=\"t\">    <span class=\"str\">\"\"\"Run semantic preflight checks and return structured report.\"\"\"</span>&nbsp;</span><span class=\"r\"></span></p>",
+        "latency_ms": 14133.68,
+        "latency_p50_ms": 14133.68,
+        "latency_p95_ms": 14133.68,
+        "top1_accuracy_pct": 0.0,
+        "pass": false
+      },
+      {
+        "backend": "glob",
+        "query": "semantic preflight",
+        "top": "/home/viperjuice/code/Code-Index-MCP/semantic_indexing_progress.json",
+        "latency_ms": 78.66,
+        "latency_p50_ms": 78.66,
+        "latency_p95_ms": 78.66,
+        "top1_accuracy_pct": 0.0,
+        "pass": false
+      },
+      {
+        "backend": "ripgrep",
+        "query": "qdrant autostart",
+        "top": "/home/viperjuice/code/Code-Index-MCP/scripts/run_e2e_retrieval_validation.py:87:        \"semantic\", \"where is qdrant autostart implemented\", \"qdrant_autostart.py\"",
+        "latency_ms": 31.86,
+        "latency_p50_ms": 31.86,
+        "latency_p95_ms": 31.86,
+        "top1_accuracy_pct": 100.0,
+        "pass": true
+      },
+      {
+        "backend": "grep",
+        "query": "qdrant autostart",
+        "top": "/home/viperjuice/code/Code-Index-MCP/docs/benchmarks/e2e_retrieval_validation_fullrepo.md:14:| semantic | where is qdrant autostart implemented | /home/viperjuice/code/Code-Index-MCP/mcp_server/setup/qdrant_autostart.py | yes | 58.04 |",
+        "latency_ms": 10990.7,
+        "latency_p50_ms": 10990.7,
+        "latency_p95_ms": 10990.7,
+        "top1_accuracy_pct": 100.0,
+        "pass": true
+      },
+      {
+        "backend": "glob",
+        "query": "qdrant autostart",
+        "top": "/home/viperjuice/code/Code-Index-MCP/qdrant_server_mode.patch",
+        "latency_ms": 76.09,
+        "latency_p50_ms": 76.09,
+        "latency_p95_ms": 76.09,
+        "top1_accuracy_pct": 0.0,
+        "pass": false
+      },
+      {
+        "backend": "ripgrep",
+        "query": "setup semantic",
+        "top": "/home/viperjuice/code/Code-Index-MCP/README.md:772:mcp-index setup semantic",
+        "latency_ms": 19.78,
+        "latency_p50_ms": 19.78,
+        "latency_p95_ms": 19.78,
+        "top1_accuracy_pct": 0.0,
+        "pass": false
+      },
+      {
+        "backend": "grep",
+        "query": "setup semantic",
+        "top": "/home/viperjuice/code/Code-Index-MCP/code_index_mcp.egg-info/PKG-INFO:766:python scripts/cli/mcp_cli.py setup semantic",
+        "latency_ms": 10598.09,
+        "latency_p50_ms": 10598.09,
+        "latency_p95_ms": 10598.09,
+        "top1_accuracy_pct": 0.0,
+        "pass": false
+      },
+      {
+        "backend": "glob",
+        "query": "setup semantic",
+        "top": "/home/viperjuice/code/Code-Index-MCP/codex-setup.sh",
+        "latency_ms": 81.86,
+        "latency_p50_ms": 81.86,
+        "latency_p95_ms": 81.86,
+        "top1_accuracy_pct": 0.0,
+        "pass": false
+      }
+    ],
+    "pass_rate": 33.3
+  },
+  "mcp": {
+    "error": "/home/viperjuice/code/Code-Index-MCP/.venv/lib/python3.12/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.0) or chardet (6.0.0.post1)/charset_normalizer (3.4.4) doesn't match a supported version!\n  warnings.warn(\nWARNING:mcp_server.storage.sqlite_store:Migration 003_stable_ids.sql encountered duplicate column (likely already applied), continuing...\nTraceback (most recent call last):\n  File \"/home/viperjuice/code/Code-Index-MCP/scripts/run_e2e_retrieval_validation.py\", line 640, in <module>\n    raise SystemExit(main())\n                     ^^^^^^\n  File \"/home/viperjuice/code/Code-Index-MCP/scripts/run_e2e_retrieval_validation.py\", line 616, in main\n    result = run(args)\n             ^^^^^^^^^\n  File \"/home/viperjuice/code/Code-Index-MCP/scripts/run_e2e_retrieval_validation.py\", line 298, in run\n    qwen_result = qwen_sem.index_file(path)\n                  ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/viperjuice/code/Code-Index-MCP/mcp_server/utils/semantic_indexer.py\", line 1810, in index_file\n    embeds = self._embed_texts(prep[\"embedding_inputs\"], input_type=\"document\")\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/viperjuice/code/Code-Index-MCP/mcp_server/utils/semantic_indexer.py\", line 238, in _embed_texts\n    return self.embedding_client.embed(texts, input_type=input_type)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/viperjuice/code/Code-Index-MCP/mcp_server/utils/embedding_providers.py\", line 109, in embed\n    response = self.client.embeddings.create(model=self.model_name, input=texts)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/viperjuice/code/Code-Index-MCP/.venv/lib/python3.12/site-packages/openai/resources/embeddings.py\", line 136, in create\n    return self._post(\n           ^^^^^^^^^^^\n  File \"/home/viperjuice/code/Code-Index-MCP/.venv/lib/python3.12/site-packages/openai/_base_client.py\", line 1297, in post\n    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))\n                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/viperjuice/code/Code-Index-MCP/.venv/lib/python3.12/site-packages/openai/_base_client.py\", line 1070, in request\n    raise self._make_status_error_from_response(err.response) from None\nopenai.BadRequestError: Qwen/Qwen3-Embedding-8B not available\n",
+    "latency_ms": 2637.79
+  },
+  "iterations": 1
+}

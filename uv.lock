@@ -182,6 +182,21 @@ wheels = [
 ]
 
 [[package]]
+name = "baml-py"
+version = "0.220.0"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d8/ba/7684ad7c0742439c872e55d4c44f1206bf232cb8b5603a66808dc6f33dca/baml_py-0.220.0-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:edf4112d1b1da5765ebfcadab7f9eee48ac337e5b06ff8286c970e27cd87e28e", size = 21731462, upload-time = "2026-03-11T05:11:30.61Z" },
+    { url = "https://files.pythonhosted.org/packages/8f/a1/8a1aa018034b5a0c93aece104d369bcf17047c82bfb7b9b6ad2a4f458742/baml_py-0.220.0-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:5e72466c12d9b6597d3dbe16a364699307911483bffc07e0b66d701cdefecf6d", size = 20617760, upload-time = "2026-03-11T05:11:34.225Z" },
+    { url = "https://files.pythonhosted.org/packages/e1/7a/079a2a62f5ad4d8ec0dc824621fb0bb11711297ede1039323777cfc3daac/baml_py-0.220.0-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1da0548281e0d21d56886a46aaeef0680e660fc1b36a9bdbc11d04efad96cfcc", size = 24374095, upload-time = "2026-03-11T05:11:37.637Z" },
+    { url = "https://files.pythonhosted.org/packages/b5/ab/3c84bac43ec1b504d44763c9d2c655dbe35c75e65c21a98ffa834df509a5/baml_py-0.220.0-cp38-abi3-manylinux_2_24_aarch64.whl", hash = "sha256:0895a3633b061505a3d48d259ca6a480dd37f2a9dade6ea3bf5b8fb1f7632d11", size = 23730399, upload-time = "2026-03-11T05:11:41.287Z" },
+    { url = "https://files.pythonhosted.org/packages/80/b3/8a8642f354f8e5d3cd35a7663dc854b13fafa135465b127009cbb75c16f2/baml_py-0.220.0-cp38-abi3-musllinux_1_1_aarch64.whl", hash = "sha256:52ba7755026322fd73dd70087c09745aae86df47306b1dde06cf731266b55c34", size = 24102622, upload-time = "2026-03-11T05:11:45.152Z" },
+    { url = "https://files.pythonhosted.org/packages/88/ca/376e18d65d68c6159498db725bf57998026552cd026da8e94f24e82d3f8f/baml_py-0.220.0-cp38-abi3-musllinux_1_1_x86_64.whl", hash = "sha256:a240cdc76455f8bd8aa5a5b3ad805369edb27320111bb915df543c55a846b916", size = 24629359, upload-time = "2026-03-11T05:11:49.122Z" },
+    { url = "https://files.pythonhosted.org/packages/29/f6/8290b6bf74bb9e6e3ca35cca15015010b905d90d7ea84e6c6c41aa28e434/baml_py-0.220.0-cp38-abi3-win_amd64.whl", hash = "sha256:a5b6d1374eec1225bc76444fc2e5dbb0b7f14ed5a1a043e20beef778475ff8d4", size = 21982867, upload-time = "2026-03-11T05:11:52.714Z" },
+    { url = "https://files.pythonhosted.org/packages/e3/ab/5fa351b54b124c7131aae231d8945b00c9878f9599f6c952160f808876cb/baml_py-0.220.0-cp38-abi3-win_arm64.whl", hash = "sha256:76fe51528ac5cd07ea2bd8ab2ccd0fd302cd9fc1f5c5c3236c35edfede2d8b48", size = 20401712, upload-time = "2026-03-11T05:11:56.683Z" },
+]
+
+[[package]]
 name = "bcrypt"
 version = "4.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1002,6 +1017,7 @@ name = "index-it-mcp"
 version = "1.0.0"
 source = { editable = "." }
 dependencies = [
+    { name = "baml-py" },
     { name = "bcrypt" },
     { name = "click" },
     { name = "fastapi" },
@@ -1062,6 +1078,7 @@ semantic = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", marker = "extra == 'semantic'", specifier = ">=0.18.0" },
+    { name = "baml-py", specifier = ">=0.220.0" },
     { name = "bcrypt", specifier = "<5.0.0" },
     { name = "black", marker = "extra == 'dev'", specifier = ">=23.7.0" },
     { name = "click", specifier = ">=8.1.0" },
@@ -1091,7 +1108,7 @@ requires-dist = [
     { name = "sentence-transformers", marker = "extra == 'semantic'", specifier = ">=2.0.0" },
     { name = "tree-sitter", specifier = ">=0.20.0" },
     { name = "tree-sitter-languages", specifier = ">=1.7.0" },
-    { name = "treesitter-chunker", specifier = "==2.2.4" },
+    { name = "treesitter-chunker", specifier = "==2.2.21" },
     { name = "uvicorn", specifier = ">=0.23.0" },
     { name = "voyageai", specifier = ">=0.2.0" },
     { name = "watchdog", specifier = ">=3.0.0" },
@@ -3205,6 +3222,11 @@ dependencies = [
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d3/54/a2ba279afcca44bbd320d4e73675b282fcee3d81400ea1b53934efca6462/torch-2.10.0-2-cp312-none-macosx_11_0_arm64.whl", hash = "sha256:13ec4add8c3faaed8d13e0574f5cd4a323c11655546f91fbe6afa77b57423574", size = 79498202, upload-time = "2026-02-10T21:44:52.603Z" },
     { url = "https://files.pythonhosted.org/packages/ec/23/2c9fe0c9c27f7f6cb865abcea8a4568f29f00acaeadfc6a37f6801f84cb4/torch-2.10.0-2-cp313-none-macosx_11_0_arm64.whl", hash = "sha256:e521c9f030a3774ed770a9c011751fb47c4d12029a3d6522116e48431f2ff89e", size = 79498254, upload-time = "2026-02-10T21:44:44.095Z" },
+    { url = "https://files.pythonhosted.org/packages/b3/7a/abada41517ce0011775f0f4eacc79659bc9bc6c361e6bfe6f7052a6b9363/torch-2.10.0-3-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:98c01b8bb5e3240426dcde1446eed6f40c778091c8544767ef1168fc663a05a6", size = 915622781, upload-time = "2026-03-11T14:17:11.354Z" },
+    { url = "https://files.pythonhosted.org/packages/ab/c6/4dfe238342ffdcec5aef1c96c457548762d33c40b45a1ab7033bb26d2ff2/torch-2.10.0-3-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:80b1b5bfe38eb0e9f5ff09f206dcac0a87aadd084230d4a36eea5ec5232c115b", size = 915627275, upload-time = "2026-03-11T14:16:11.325Z" },
+    { url = "https://files.pythonhosted.org/packages/d8/f0/72bf18847f58f877a6a8acf60614b14935e2f156d942483af1ffc081aea0/torch-2.10.0-3-cp313-cp313t-manylinux_2_28_x86_64.whl", hash = "sha256:46b3574d93a2a8134b3f5475cfb98e2eb46771794c57015f6ad1fb795ec25e49", size = 915523474, upload-time = "2026-03-11T14:17:44.422Z" },
+    { url = "https://files.pythonhosted.org/packages/f4/39/590742415c3030551944edc2ddc273ea1fdfe8ffb2780992e824f1ebee98/torch-2.10.0-3-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:b1d5e2aba4eb7f8e87fbe04f86442887f9167a35f092afe4c237dfcaaef6e328", size = 915632474, upload-time = "2026-03-11T14:15:13.666Z" },
+    { url = "https://files.pythonhosted.org/packages/b6/8e/34949484f764dde5b222b7fe3fede43e4a6f0da9d7f8c370bb617d629ee2/torch-2.10.0-3-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:0228d20b06701c05a8f978357f657817a4a63984b0c90745def81c18aedfa591", size = 915523882, upload-time = "2026-03-11T14:14:46.311Z" },
     { url = "https://files.pythonhosted.org/packages/cc/af/758e242e9102e9988969b5e621d41f36b8f258bb4a099109b7a4b4b50ea4/torch-2.10.0-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:5fd4117d89ffd47e3dcc71e71a22efac24828ad781c7e46aaaf56bf7f2796acf", size = 145996088, upload-time = "2026-01-21T16:24:44.171Z" },
     { url = "https://files.pythonhosted.org/packages/23/8e/3c74db5e53bff7ed9e34c8123e6a8bfef718b2450c35eefab85bb4a7e270/torch-2.10.0-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:787124e7db3b379d4f1ed54dd12ae7c741c16a4d29b49c0226a89bea50923ffb", size = 915711952, upload-time = "2026-01-21T16:23:53.503Z" },
     { url = "https://files.pythonhosted.org/packages/6e/01/624c4324ca01f66ae4c7cd1b74eb16fb52596dce66dbe51eff95ef9e7a4c/torch-2.10.0-cp312-cp312-win_amd64.whl", hash = "sha256:2c66c61f44c5f903046cc696d088e21062644cbe541c7f1c4eaae88b2ad23547", size = 113757972, upload-time = "2026-01-21T16:24:39.516Z" },
@@ -3376,7 +3398,7 @@ wheels = [
 
 [[package]]
 name = "treesitter-chunker"
-version = "2.2.4"
+version = "2.2.21"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "chardet" },
@@ -3397,9 +3419,9 @@ dependencies = [
     { name = "tree-sitter-language-pack" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b7/17/83d301f09eec10e65fd909c33acaea512310e3653b53dfb50efe09eb0a52/treesitter_chunker-2.2.4.tar.gz", hash = "sha256:347d4585aa6bc5ebff36330fc9163c35e5e9d9337c33bfe64dbabc6f5383a5a4", size = 1365669, upload-time = "2026-03-08T21:26:42.776Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4a/11/ed2ecd17915c7b123060deed40053e1306d158d6ff3ec2e5a30aaa1bc619/treesitter_chunker-2.2.21.tar.gz", hash = "sha256:71c29e1ee21517bad91fe4303548b4deb2b9825b254559c497ac6d72770b547b", size = 1366036, upload-time = "2026-03-13T18:03:07.259Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a9/3a/86692793e2dfbb1b7184456904ac901478ec8c78f437eb286e3533b80674/treesitter_chunker-2.2.4-py3-none-any.whl", hash = "sha256:af356c53c4c81732363c365b7fb1e101b1409d26980aa9d23e717e41b3f9a5b4", size = 1115377, upload-time = "2026-03-08T21:26:41.109Z" },
+    { url = "https://files.pythonhosted.org/packages/50/4f/5ec7dd6011c248743b6d4ec04d38c2a8a3b097940ee6968304c3ac7233bc/treesitter_chunker-2.2.21-py3-none-any.whl", hash = "sha256:38b02a732878eeab97e6d133390b9715290457b642ad347ad3f48e0793332ff8", size = 1115136, upload-time = "2026-03-13T18:03:05.125Z" },
 ]
 
 [[package]]

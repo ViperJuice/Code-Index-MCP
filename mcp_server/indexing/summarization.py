@@ -1,67 +1,197 @@
-import os
 import asyncio
 import logging
-from typing import Dict, Any, Optional
+import os
 import sqlite3
+from typing import Any, Dict, List, Optional
 
-from mcp_server.config.settings import get_settings
+import mcp.types as types
 
 logger = logging.getLogger(__name__)
 
+_SYSTEM_PROMPT = (
+    "You are a concise code documentation assistant. "
+    "Respond with exactly 2 sentences summarizing the code chunk: "
+    "what it does, its key inputs/parameters, and what it returns or produces."
+)
 
-class LLMProviderFactory:
-    """Configures LLM clients based on configuration and MCP client context."""
+_USER_PROMPT_TEMPLATE = (
+    "Describe this {language} code chunk in 2 concise sentences. "
+    "Cover: what it does, its inputs/parameters, and what it returns or produces. "
+    "Do not repeat the code. Do not output code.\n\n"
+    "{parent_context}"
+    "{file_context}"
+    "Code chunk '{symbol}' (lines {start}-{end}):\n```{language}\n{content}\n```"
+)
 
-    @staticmethod
-    def get_provider(client_name: Optional[str] = None) -> Dict[str, Any]:
-        """Determine the optimal summarization model."""
-        settings = get_settings()
-        profiles = settings.get_semantic_profiles_config()
+# Max characters of the surrounding file to include as context (~100k tokens ≈ 400k chars,
+# but we keep it conservative to leave room for the chunk itself and the response.
+_MAX_FILE_CONTEXT_CHARS = 60_000
 
-        # Look for summarization config in the default profile, or fallback to an empty dict
-        default_profile_id = settings.get_semantic_default_profile()
-        default_profile = profiles.get(default_profile_id, {})
-        summary_cfg = default_profile.get("summarization", {})
+# Files larger than this (in characters) skip the single-batch API call and fall back
+# to the topological per-chunk path.
+_BATCH_FILE_SIZE_THRESHOLD = 400_000
 
-        if summary_cfg.get("model_name") and summary_cfg.get("provider"):
-            return summary_cfg
 
-        # Fallback based on client
-        if client_name == "claude-code" or client_name == "claude-desktop":
-            return {
-                "provider": "anthropic",
-                "model_name": "claude-3-5-haiku-latest",
-                "base_url": None,
-                "api_key_env": "ANTHROPIC_API_KEY",
-                "prompt_template": "Describe this code chunk's inputs, outputs, and purpose in 2 concise sentences. Do not output code.",
-            }
-        elif client_name in ["cursor", "windsurf"]:
-            return {
-                "provider": "openai",
-                "model_name": "o3-mini",
-                "base_url": None,
-                "api_key_env": "OPENAI_API_KEY",
-                "prompt_template": "Describe this code chunk's inputs, outputs, and purpose in 2 concise sentences. Do not output code.",
-            }
-        else:
-            return {
-                "provider": "openai_compatible",
-                "model_name": "qwen2.5-coder:7b",
-                "base_url": "http://127.0.0.1:11434/v1",
-                "api_key_env": None,
-                "prompt_template": "Describe this code chunk's inputs, outputs, and purpose in 2 concise sentences. Do not output code.",
-            }
+class FileTooLargeError(Exception):
+    """Raised when a file exceeds the batch summarization size limit."""
+
+
+def _topological_order(chunks: List[Dict]) -> List[str]:
+    """Return chunk_ids in topological order — leaves (innermost scopes) first.
+
+    Kahn's algorithm over the parent→child relationship.  Any cycles (rare in
+    practice) are appended at the end in their original order.
+    """
+    chunk_map = {c["chunk_id"]: c for c in chunks}
+    children: Dict[str, List[str]] = {cid: [] for cid in chunk_map}
+    parent_of: Dict[str, Optional[str]] = {}
+    for c in chunks:
+        cid = c["chunk_id"]
+        pid = c.get("parent_chunk_id")
+        parent_of[cid] = pid
+        if pid and pid in children:
+            children[pid].append(cid)
+
+    in_degree = {
+        cid: (1 if parent_of.get(cid) and parent_of[cid] in chunk_map else 0)
+        for cid in chunk_map
+    }
+    queue: List[str] = [cid for cid, deg in in_degree.items() if deg == 0]
+    order: List[str] = []
+    while queue:
+        node = queue.pop(0)
+        order.append(node)
+        for child in children.get(node, []):
+            in_degree[child] -= 1
+            if in_degree[child] == 0:
+                queue.append(child)
+
+    seen = set(order)
+    order.extend(cid for cid in chunk_map if cid not in seen)
+    return order
 
 
 class ChunkWriter:
-    """Base interface for semantic chunk summarization."""
+    """Base interface for semantic chunk summarization.
+
+    Summarization is attempted via three paths in order:
+    1. MCP ``sampling/createMessage`` — if the connected client declares
+       sampling capability (e.g. Cursor).
+    2. BAML ``SummarizeChunkAlone`` — if ``CEREBRAS_API_KEY`` is set.
+    3. Direct LLM API — if ``ANTHROPIC_API_KEY`` or ``OPENAI_API_KEY`` is
+       set in the environment (works in Claude Code which lacks sampling).
+    """
 
     def __init__(
-        self, db_path: str, qdrant_client: Any, client_name: Optional[str] = None
+        self,
+        db_path: str,
+        qdrant_client: Any,
+        session: Any = None,
+        client_name: Optional[str] = None,
     ):
         self.db_path = db_path
         self.qdrant_client = qdrant_client
-        self.config = LLMProviderFactory.get_provider(client_name)
+        self.session = session
+        self.client_name = client_name
+
+    def _has_sampling_capability(self) -> bool:
+        """Return True if the connected MCP client supports sampling/createMessage."""
+        if self.session is None:
+            return False
+        try:
+            params = getattr(self.session, "client_params", None)
+            caps = params.capabilities if params else None
+            return caps is not None and caps.sampling is not None
+        except Exception:
+            return False
+
+    def _has_direct_api(self) -> bool:
+        """Return True if any direct LLM API key is configured."""
+        return bool(
+            os.environ.get("CEREBRAS_API_KEY")
+            or os.environ.get("ANTHROPIC_API_KEY")
+            or os.environ.get("OPENAI_API_KEY")
+        )
+
+    def can_summarize(self) -> bool:
+        """Return True if any summarization path is available."""
+        return self._has_sampling_capability() or self._has_direct_api()
+
+    async def _call_cerebras_api(self, system: str, prompt: str) -> str:
+        """Call Cerebras inference API via the openai SDK (OpenAI-compatible)."""
+        from openai import AsyncOpenAI
+
+        model = os.environ.get("CEREBRAS_MODEL", "gpt-oss-120b")
+        client = AsyncOpenAI(
+            api_key=os.environ["CEREBRAS_API_KEY"],
+            base_url="https://api.cerebras.ai/v1",
+        )
+        response = await client.chat.completions.create(
+            model=model,
+            max_tokens=150,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        return response.choices[0].message.content
+
+    async def _call_anthropic_api(self, system: str, prompt: str) -> str:
+        """Call Anthropic API directly via httpx (no SDK required)."""
+        import httpx
+
+        api_key = os.environ["ANTHROPIC_API_KEY"]
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": "claude-haiku-4-5-20251001",
+                    "max_tokens": 150,
+                    "system": system,
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+                timeout=30.0,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data["content"][0]["text"]
+
+    async def _call_openai_api(self, system: str, prompt: str) -> str:
+        """Call OpenAI API via the openai SDK."""
+        from openai import AsyncOpenAI
+
+        client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
+        response = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            max_tokens=150,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        return response.choices[0].message.content
+
+    async def _call_direct_api(self, system: str, prompt: str) -> Optional[str]:
+        """Try Cerebras first, then Anthropic, then OpenAI."""
+        if os.environ.get("CEREBRAS_API_KEY"):
+            return await self._call_cerebras_api(system, prompt)
+        elif os.environ.get("ANTHROPIC_API_KEY"):
+            return await self._call_anthropic_api(system, prompt)
+        elif os.environ.get("OPENAI_API_KEY"):
+            return await self._call_openai_api(system, prompt)
+        return None
+
+    def _get_model_name(self) -> str:
+        if os.environ.get("CEREBRAS_API_KEY"):
+            return os.environ.get("CEREBRAS_MODEL", "gpt-oss-120b")
+        if os.environ.get("ANTHROPIC_API_KEY"):
+            return "claude-haiku-4-5-20251001"
+        return "gpt-4o-mini"
 
     async def summarize_chunk(
         self,
@@ -71,36 +201,149 @@ class ChunkWriter:
         chunk_end: int,
         symbol: str,
         content: str,
-    ) -> None:
-        """Fetch summary from LLM and persist to SQLite and Qdrant."""
-        prompt = self.config.get(
-            "prompt_template",
-            "Describe this code chunk's inputs, outputs, and purpose in 2 concise sentences. Do not output code.",
-        )
+        language: str = "unknown",
+        parent_context: str = "",
+        file_content: str = "",
+    ) -> Optional[str]:
+        """Generate a summary for a code chunk and persist it to SQLite.
 
-        # Placeholder for actual LLM call. Here you would use Anthropic or OpenAI clients
-        # to fetch the generated string.
-        model_name = self.config.get("model_name", "unknown")
-        summary_text = f"Summary of {symbol} (Lines {chunk_start}-{chunk_end}): Generated by {model_name}."
+        Tries MCP sampling first; then BAML ``SummarizeChunkAlone`` (Cerebras);
+        then falls back to a direct LLM API call (Cerebras → Anthropic → OpenAI).
 
+        *parent_context*: pre-computed summary of the enclosing scope, from
+        the topological traversal — improves accuracy for nested symbols.
+
+        *file_content*: the full source file text.  When provided, this is
+        injected into the prompt so the model understands the chunk in its
+        broader file context — especially valuable for cross-reference and
+        import analysis.
+
+        Returns the summary text on success, ``None`` otherwise.
+        """
+        if not self.can_summarize():
+            logger.debug(
+                "Skipping summary for '%s': no sampling capability and no API key",
+                symbol,
+            )
+            return None
+
+        # Skip if an authoritative summary already exists.
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute(
-                "SELECT is_authoritative FROM chunk_summaries WHERE chunk_hash = ?",
+                "SELECT is_authoritative, summary_text FROM chunk_summaries WHERE chunk_hash = ?",
                 (chunk_hash,),
             )
             row = cursor.fetchone()
             if row and row[0]:
-                return  # Skip, authoritative summary exists
+                return row[1]
 
+        # Prompt without file context — used by MCP sampling (tight token budget).
+        sampling_prompt = _USER_PROMPT_TEMPLATE.format(
+            language=language,
+            parent_context=parent_context,
+            file_context="",
+            symbol=symbol,
+            start=chunk_start,
+            end=chunk_end,
+            content=content,
+        )
+
+        # File context injected for direct API calls (large context window).
+        api_file_context = ""
+        if file_content:
+            trimmed = file_content[:_MAX_FILE_CONTEXT_CHARS]
+            if len(file_content) > _MAX_FILE_CONTEXT_CHARS:
+                trimmed += "\n... [file truncated for context window]"
+            api_file_context = (
+                f"Full source file ({language}):\n```{language}\n{trimmed}\n```\n\n"
+                f"Now summarize only the following chunk from that file:\n\n"
+            )
+
+        # Fallback manual prompt for non-BAML direct API paths.
+        api_prompt = _USER_PROMPT_TEMPLATE.format(
+            language=language,
+            parent_context=parent_context,
+            file_context=api_file_context,
+            symbol=symbol,
+            start=chunk_start,
+            end=chunk_end,
+            content=content,
+        )
+
+        summary_text: Optional[str] = None
+        model_name: Optional[str] = None
+
+        # Path 1: MCP sampling (client performs the inference, no file context)
+        if self._has_sampling_capability():
+            try:
+                result = await self.session.create_message(
+                    messages=[
+                        types.SamplingMessage(
+                            role="user",
+                            content=types.TextContent(type="text", text=sampling_prompt),
+                        )
+                    ],
+                    system_prompt=_SYSTEM_PROMPT,
+                    max_tokens=150,
+                )
+                content_block = result.content
+                if hasattr(content_block, "text"):
+                    summary_text = content_block.text
+                elif isinstance(content_block, list) and content_block:
+                    first = content_block[0]
+                    summary_text = getattr(first, "text", str(first))
+                else:
+                    summary_text = str(content_block)
+                model_name = result.model or "mcp-sampling"
+            except Exception as exc:
+                logger.warning("MCP sampling failed for chunk '%s': %s", symbol, exc)
+
+        # Path 2: BAML SummarizeChunkAlone (Cerebras, cache-friendly prompt structure)
+        if summary_text is None and os.environ.get("CEREBRAS_API_KEY"):
+            try:
+                from mcp_server.indexing.baml_client.baml_client.async_client import b
+                result = await b.SummarizeChunkAlone(
+                    language=language,
+                    symbol=symbol or "unknown",
+                    line_start=chunk_start,
+                    line_end=chunk_end,
+                    content=content or "",
+                    parent_context=parent_context or "",
+                    file_context=api_file_context,
+                )
+                summary_text = result.summary
+                model_name = self._get_model_name()
+            except Exception as exc:
+                logger.warning(
+                    "BAML SummarizeChunkAlone failed for '%s': %s, falling back to direct API",
+                    symbol,
+                    exc,
+                )
+
+        # Path 3: Direct API fallback (Anthropic / OpenAI raw call, or Cerebras raw)
+        if summary_text is None and self._has_direct_api():
+            try:
+                summary_text = await self._call_direct_api(_SYSTEM_PROMPT, api_prompt)
+                model_name = self._get_model_name()
+            except Exception as exc:
+                logger.warning(
+                    "Direct API summarization failed for '%s': %s", symbol, exc
+                )
+
+        if summary_text is None:
+            return None
+
+        with sqlite3.connect(self.db_path) as conn:
             conn.execute(
-                """INSERT INTO chunk_summaries 
-                   (chunk_hash, file_id, chunk_start, chunk_end, symbol, summary_text, is_authoritative, llm_model, updated_at)
+                """INSERT INTO chunk_summaries
+                   (chunk_hash, file_id, chunk_start, chunk_end, symbol,
+                    summary_text, is_authoritative, llm_model, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?, 0, ?, CURRENT_TIMESTAMP)
                    ON CONFLICT(chunk_hash) DO UPDATE SET
-                   summary_text=excluded.summary_text,
-                   is_authoritative=excluded.is_authoritative,
-                   llm_model=excluded.llm_model,
-                   updated_at=CURRENT_TIMESTAMP
+                       summary_text=excluded.summary_text,
+                       is_authoritative=excluded.is_authoritative,
+                       llm_model=excluded.llm_model,
+                       updated_at=CURRENT_TIMESTAMP
                 """,
                 (
                     chunk_hash,
@@ -112,39 +355,374 @@ class ChunkWriter:
                     model_name,
                 ),
             )
+        logger.info("Stored summary for chunk '%s' via %s", symbol, model_name)
+        return summary_text
 
 
-class ComprehensiveChunkWriter(ChunkWriter):
-    """Processes entire repository."""
+class FileBatchSummarizer(ChunkWriter):
+    """Summarizes all chunks of a file in a single BAML API call.
 
-    async def process_all(self):
-        """Find all missing summaries and generate them."""
-        pass
+    For files that exceed ``_BATCH_FILE_SIZE_THRESHOLD`` characters the batch
+    call is skipped and a topological per-chunk fallback is used instead
+    (same Kahn's-sort logic as ``ComprehensiveChunkWriter``, but operating on
+    ``Dict`` rows rather than raw SQL tuples).
+    """
+
+    async def _call_batch_api(
+        self,
+        file_id: int,
+        file_path: str,
+        file_content: str,
+        chunks: List[Dict],
+        symbol_map: Dict[int, str],
+    ) -> List[Any]:
+        """Call BAML SummarizeFileChunks for all chunks in a single request.
+
+        Raises ``FileTooLargeError`` when *file_content* exceeds the threshold
+        so callers can switch to the per-chunk fallback.
+        """
+        if len(file_content) > _BATCH_FILE_SIZE_THRESHOLD:
+            raise FileTooLargeError(
+                f"{file_path} ({len(file_content):,} chars) exceeds batch threshold "
+                f"({_BATCH_FILE_SIZE_THRESHOLD:,} chars)"
+            )
+
+        from mcp_server.indexing.baml_client.baml_client.async_client import b
+        from mcp_server.indexing.baml_client.baml_client.types import ChunkInput
+
+        language = (chunks[0].get("language") or "unknown") if chunks else "unknown"
+        chunk_inputs = [
+            ChunkInput(
+                chunk_id=c["chunk_id"],
+                symbol=symbol_map.get(c.get("symbol_id")) or c.get("node_type") or "unknown",
+                node_type=c.get("node_type") or "unknown",
+                line_start=c.get("line_start") or 1,
+                line_end=c.get("line_end") or 1,
+                content=c.get("content") or "",
+            )
+            for c in chunks
+        ]
+
+        result = await b.SummarizeFileChunks(
+            language=language,
+            file_path=file_path,
+            file_content=file_content,
+            chunks=chunk_inputs,
+        )
+        return result.summaries
+
+    async def _summarize_topological(
+        self,
+        file_id: int,
+        file_path: str,
+        file_content: str,
+        chunks: List[Dict],
+        symbol_map: Dict[int, str],
+    ) -> List[Any]:
+        """Per-chunk fallback: summarize in topological order (leaves first)."""
+        from mcp_server.indexing.baml_client.baml_client.types import ChunkSummary
+
+        order = _topological_order(chunks)
+        chunk_map = {c["chunk_id"]: c for c in chunks}
+        stored_summaries: Dict[str, str] = {}
+        results: List[Any] = []
+
+        for chunk_id in order:
+            c = chunk_map[chunk_id]
+            symbol = (
+                symbol_map.get(c.get("symbol_id")) or c.get("node_type") or "unknown"
+            )
+
+            parent_context = ""
+            pid = c.get("parent_chunk_id")
+            if pid and pid in stored_summaries:
+                parent_chunk = chunk_map.get(pid)
+                parent_sym = (
+                    (
+                        symbol_map.get(parent_chunk.get("symbol_id"))
+                        or parent_chunk.get("node_type")
+                        or "parent"
+                    )
+                    if parent_chunk
+                    else "parent"
+                )
+                parent_context = (
+                    f"Context from enclosing scope ({parent_sym}): "
+                    f"{stored_summaries[pid]}\n\n"
+                )
+
+            try:
+                summary_text = await self.summarize_chunk(
+                    chunk_hash=chunk_id,
+                    file_id=file_id,
+                    chunk_start=c.get("line_start") or 1,
+                    chunk_end=c.get("line_end") or 1,
+                    symbol=symbol,
+                    content=c.get("content") or "",
+                    language=c.get("language") or "unknown",
+                    parent_context=parent_context,
+                    file_content=file_content,
+                )
+                if summary_text:
+                    stored_summaries[chunk_id] = summary_text
+                    results.append(ChunkSummary(chunk_id=chunk_id, summary=summary_text))
+            except Exception as exc:
+                logger.error("Failed to summarize chunk %s: %s", chunk_id, exc)
+
+        return results
+
+    async def summarize_file_chunks(
+        self,
+        file_id: int,
+        file_path: str,
+        file_content: str,
+        chunks: List[Dict],
+        symbol_map: Optional[Dict[int, str]] = None,
+        persist: bool = True,
+    ) -> List[Any]:
+        """Summarize all chunks of a file, preferring the batch API path.
+
+        Filters already-authoritative chunks, calls ``_call_batch_api``, and
+        handles ``FileTooLargeError`` by delegating to the topological
+        per-chunk path.  Persists to ``chunk_summaries`` with
+        ``is_authoritative=1`` when *persist* is ``True``.
+
+        Returns a list of ``ChunkSummary`` objects.
+        """
+        if symbol_map is None:
+            symbol_map = {}
+
+        # Filter already-authoritative chunks.
+        with sqlite3.connect(self.db_path) as conn:
+            auth_hashes = {
+                row[0]
+                for row in conn.execute(
+                    "SELECT chunk_hash FROM chunk_summaries WHERE is_authoritative=1"
+                ).fetchall()
+            }
+
+        to_summarize = [c for c in chunks if c["chunk_id"] not in auth_hashes]
+        if not to_summarize:
+            return []
+
+        try:
+            summaries = await self._call_batch_api(
+                file_id, file_path, file_content, to_summarize, symbol_map
+            )
+        except FileTooLargeError as exc:
+            logger.info("Large-file fallback for %s: %s", file_path, exc)
+            summaries = await self._summarize_topological(
+                file_id, file_path, file_content, to_summarize, symbol_map
+            )
+        except Exception as exc:
+            logger.warning(
+                "Batch API failed for %s (%s), falling back to per-chunk path",
+                file_path,
+                exc,
+            )
+            summaries = await self._summarize_topological(
+                file_id, file_path, file_content, to_summarize, symbol_map
+            )
+
+        if persist and summaries:
+            chunk_lookup = {c["chunk_id"]: c for c in to_summarize}
+            model_name = self._get_model_name()
+            with sqlite3.connect(self.db_path) as conn:
+                for s in summaries:
+                    c = chunk_lookup.get(s.chunk_id)
+                    if c is None:
+                        continue
+                    sym = (
+                        symbol_map.get(c.get("symbol_id")) or c.get("node_type") or "unknown"
+                    )
+                    conn.execute(
+                        """INSERT INTO chunk_summaries
+                           (chunk_hash, file_id, chunk_start, chunk_end, symbol,
+                            summary_text, is_authoritative, llm_model, updated_at)
+                           VALUES (?, ?, ?, ?, ?, ?, 1, ?, CURRENT_TIMESTAMP)
+                           ON CONFLICT(chunk_hash) DO UPDATE SET
+                               summary_text=excluded.summary_text,
+                               is_authoritative=excluded.is_authoritative,
+                               llm_model=excluded.llm_model,
+                               updated_at=CURRENT_TIMESTAMP
+                        """,
+                        (
+                            s.chunk_id,
+                            file_id,
+                            c.get("line_start") or 1,
+                            c.get("line_end") or 1,
+                            sym,
+                            s.summary,
+                            model_name,
+                        ),
+                    )
+            logger.info(
+                "FileBatchSummarizer: persisted %d summaries for %s",
+                len(summaries),
+                file_path,
+            )
+
+        return summaries
+
+
+class ComprehensiveChunkWriter(FileBatchSummarizer):
+    """Summarizes all un-summarized chunks in the index.
+
+    Chunks are grouped by file so each file's content is read from disk only
+    once.  Each file's chunks are handed off to ``FileBatchSummarizer``, which
+    sends a single API call per file (or falls back to the topological
+    per-chunk path for very large files).
+
+    Requires either an active MCP session with sampling capability **or** an
+    ``ANTHROPIC_API_KEY`` / ``OPENAI_API_KEY`` / ``CEREBRAS_API_KEY``
+    environment variable.
+    """
+
+    async def process_all(self, limit: int = 500) -> int:
+        """Generate summaries for every unsummarized chunk, grouped by file.
+
+        Returns the number of summaries successfully written.
+        """
+        if not self.can_summarize():
+            logger.warning(
+                "Cannot run summarization: no MCP sampling and no API key set "
+                "(set CEREBRAS_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY)"
+            )
+            return 0
+
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                """SELECT c.chunk_id, c.file_id, c.line_start, c.line_end,
+                          c.content, c.node_type, c.parent_chunk_id,
+                          c.language, s.name AS symbol, f.path AS file_path,
+                          c.symbol_id
+                   FROM code_chunks c
+                   JOIN files f ON c.file_id = f.id
+                   LEFT JOIN symbols s ON c.symbol_id = s.id
+                   LEFT JOIN chunk_summaries cs ON c.chunk_id = cs.chunk_hash
+                   WHERE cs.chunk_hash IS NULL
+                   LIMIT ?""",
+                (limit,),
+            )
+            rows = cursor.fetchall()
+
+        if not rows:
+            logger.info("ComprehensiveChunkWriter: no unsummarized chunks found")
+            return 0
+
+        # Group chunks and symbol names by file_id.
+        file_meta: Dict[int, tuple] = {}  # file_id -> (file_path, language)
+        file_chunks: Dict[int, List[Dict]] = {}
+        file_symbol_maps: Dict[int, Dict[int, str]] = {}
+
+        for row in rows:
+            (
+                chunk_id,
+                file_id,
+                line_start,
+                line_end,
+                chunk_content,
+                node_type,
+                parent_chunk_id,
+                language,
+                symbol,
+                file_path,
+                symbol_id,
+            ) = row
+
+            if file_id not in file_meta:
+                file_meta[file_id] = (file_path, language or "unknown")
+                file_chunks[file_id] = []
+                file_symbol_maps[file_id] = {}
+
+            file_chunks[file_id].append(
+                {
+                    "chunk_id": chunk_id,
+                    "file_id": file_id,
+                    "line_start": line_start,
+                    "line_end": line_end,
+                    "content": chunk_content,
+                    "node_type": node_type,
+                    "parent_chunk_id": parent_chunk_id,
+                    "language": language,
+                    "symbol_id": symbol_id,
+                }
+            )
+            if symbol_id and symbol:
+                file_symbol_maps[file_id][symbol_id] = symbol
+
+        count = 0
+        for file_id, (file_path, _) in file_meta.items():
+            try:
+                with open(file_path, encoding="utf-8", errors="replace") as fh:
+                    file_content = fh.read()
+            except Exception:
+                file_content = ""
+
+            try:
+                summaries = await self.summarize_file_chunks(
+                    file_id=file_id,
+                    file_path=file_path,
+                    file_content=file_content,
+                    chunks=file_chunks[file_id],
+                    symbol_map=file_symbol_maps[file_id],
+                    persist=True,
+                )
+                count += len(summaries)
+            except Exception as exc:
+                logger.error("Failed to summarize file %s: %s", file_path, exc)
+
+        logger.info(
+            "ComprehensiveChunkWriter: stored %d/%d summaries", count, len(rows)
+        )
+        return count
 
 
 class LazyChunkWriter(ChunkWriter):
-    """Processes chunks lazily on retrieval."""
+    """Enqueues chunks seen during search and summarizes them in the background.
+
+    Usage::
+
+        writer = LazyChunkWriter(db_path=..., qdrant_client=None)
+        writer.start()                      # launch background worker
+        writer.update_session(session)      # call on every tool invocation
+        writer.enqueue(chunk_data_dict)     # fire-and-forget after each search
+    """
 
     def __init__(
-        self, db_path: str, qdrant_client: Any, client_name: Optional[str] = None
+        self,
+        db_path: str,
+        qdrant_client: Any,
+        session: Any = None,
+        client_name: Optional[str] = None,
     ):
-        super().__init__(db_path, qdrant_client, client_name)
-        self.queue = asyncio.Queue()
-        self._task = None
+        super().__init__(db_path, qdrant_client, session, client_name)
+        self.queue: asyncio.Queue = asyncio.Queue()
+        self._task: Optional[asyncio.Task] = None
 
-    def start(self):
+    def start(self) -> None:
+        """Start the background worker task (idempotent)."""
         if self._task is None:
             self._task = asyncio.create_task(self._worker())
 
-    async def _worker(self):
+    def update_session(self, session: Any) -> None:
+        """Refresh the MCP session reference used for sampling.
+
+        Call this on every tool invocation so the writer always holds a live
+        session even if the client reconnects.
+        """
+        self.session = session
+
+    async def _worker(self) -> None:
         while True:
             chunk = await self.queue.get()
             try:
                 await self.summarize_chunk(**chunk)
-            except Exception as e:
-                logger.error(f"Error summarizing chunk: {e}")
+            except Exception as exc:
+                logger.error("Error summarizing chunk: %s", exc)
             finally:
                 self.queue.task_done()
 
-    def enqueue(self, chunk_data: Dict[str, Any]):
+    def enqueue(self, chunk_data: Dict[str, Any]) -> None:
+        """Add a chunk to the background summarization queue (non-blocking)."""
         self.queue.put_nowait(chunk_data)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import fnmatch
 import json
+import logging
 import shutil
 import sqlite3
 import tarfile
@@ -11,6 +12,8 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 class SecureIndexExporter:
@@ -137,6 +140,73 @@ class SecureIndexExporter:
 
         return total_count - excluded_count, excluded_count
 
+    def filter_qdrant_vectors(
+        self, source_dir: Path, target_dir: Path
+    ) -> Tuple[int, int]:
+        """Copy a Qdrant directory and remove points for gitignored files.
+
+        Returns (included_count, excluded_count).
+        """
+        shutil.copytree(source_dir, target_dir)
+
+        # Remove the copied lock file so we can open the client without conflict.
+        lock_file = target_dir / ".lock"
+        if lock_file.exists():
+            lock_file.unlink()
+
+        try:
+            from qdrant_client import QdrantClient
+        except ImportError:
+            logger.warning("qdrant_client not available; skipping vector filtering")
+            return 0, 0
+
+        client = QdrantClient(path=str(target_dir))
+        try:
+            collections = [c.name for c in client.get_collections().collections]
+            total_excluded = 0
+            total_included = 0
+
+            for collection_name in collections:
+                ids_to_delete: List[str] = []
+                offset = None
+
+                while True:
+                    batch, next_offset = client.scroll(
+                        collection_name=collection_name,
+                        with_payload=True,
+                        with_vectors=False,
+                        limit=500,
+                        offset=offset,
+                    )
+                    if not batch:
+                        break
+                    for point in batch:
+                        rel_path = (point.payload or {}).get("relative_path", "")
+                        if rel_path and self._should_exclude(rel_path):
+                            ids_to_delete.append(point.id)
+                    offset = next_offset
+                    if offset is None:
+                        break
+
+                if ids_to_delete:
+                    client.delete(
+                        collection_name=collection_name,
+                        points_selector=ids_to_delete,
+                    )
+                    total_excluded += len(ids_to_delete)
+
+                info = client.get_collection(collection_name)
+                total_included += info.points_count or 0
+
+            logger.info(
+                "Qdrant vector filtering: %d points included, %d excluded",
+                total_included,
+                total_excluded,
+            )
+            return total_included, total_excluded
+        finally:
+            client.close()
+
     def create_secure_archive(
         self, output_path: str = "secure_index_archive.tar.gz"
     ) -> Dict[str, Any]:
@@ -163,7 +233,11 @@ class SecureIndexExporter:
 
             vector_dir = Path("vector_index.qdrant")
             if vector_dir.exists():
-                shutil.copytree(vector_dir, temp_path / "vector_index.qdrant")
+                vec_included, vec_excluded = self.filter_qdrant_vectors(
+                    vector_dir, temp_path / "vector_index.qdrant"
+                )
+                stats["vector_points_included"] = vec_included
+                stats["vector_points_excluded"] = vec_excluded
                 stats["components"].append("vector_index.qdrant")
 
             metadata_path = Path(".index_metadata.json")

@@ -95,6 +95,7 @@ class GenericTreeSitterPlugin(PluginWithSemanticSearch):
         self._indexer.add_file(str(path), content)
 
         # Parse with TreeSitter Chunker
+        chunks = []
         symbols = []
         try:
             chunks = chunk_text(content, self.lang)
@@ -134,6 +135,31 @@ class GenericTreeSitterPlugin(PluginWithSemanticSearch):
                         )
                     except Exception as e:
                         logger.error(f"Failed to store symbol: {e}")
+
+            # Store chunks in SQLite (delete old ones first since chunk_id uses temp path)
+            if file_id:
+                self._sqlite_store.delete_chunks_for_file(file_id)
+                for i, chunk in enumerate(chunks):
+                    try:
+                        self._sqlite_store.store_chunk(
+                            file_id=file_id,
+                            content=chunk.content,
+                            content_start=chunk.byte_start,
+                            content_end=chunk.byte_end,
+                            line_start=chunk.start_line,
+                            line_end=chunk.end_line,
+                            chunk_id=chunk.chunk_id,
+                            node_id=chunk.node_id,
+                            treesitter_file_id=str(chunk.file_id),
+                            definition_id=chunk.definition_id,
+                            parent_chunk_id=chunk.parent_chunk_id,
+                            node_type=chunk.node_type,
+                            language=self.lang,
+                            chunk_index=i,
+                            metadata=chunk.metadata,
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to store chunk: {e}")
 
         # Create semantic embeddings if enabled
         if self._enable_semantic and symbols:

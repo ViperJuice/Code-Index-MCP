@@ -507,21 +507,39 @@ class SmartAggregationStrategy(IAggregationStrategy):
 
         return groups
 
-    def _are_results_similar(self, result1: SearchResult, result2: SearchResult) -> bool:
+    @staticmethod
+    def _get_result_field(result: Any, *keys: str, default: Any = None) -> Any:
+        """Get a field from either a dict result or a SearchResult dataclass."""
+        for key in keys:
+            if isinstance(result, dict):
+                val = result.get(key)
+            else:
+                val = getattr(result, key, None)
+            if val is not None:
+                return val
+        return default
+
+    def _are_results_similar(self, result1: Any, result2: Any) -> bool:
         """Check if two results are similar enough to group."""
+        file1 = self._get_result_field(result1, "file", "path")
+        file2 = self._get_result_field(result2, "file", "path")
+        line1 = self._get_result_field(result1, "line", default=0)
+        line2 = self._get_result_field(result2, "line", default=0)
         # Same file and close line numbers
-        if result1["file"] == result2["file"]:
-            line_diff = abs(result1["line"] - result2["line"])
+        if file1 is not None and file1 == file2:
+            line_diff = abs((line1 or 0) - (line2 or 0))
 
             # Special handling for documentation files - larger chunks
-            if self.enable_document_chunking and self._is_documentation_file(result1["file"]):
+            if self.enable_document_chunking and file1 and self._is_documentation_file(file1):
                 if line_diff <= 10:  # Within 10 lines for docs
                     return True
             elif line_diff <= 2:  # Within 2 lines for code
                 return True
 
+        snippet1 = self._get_result_field(result1, "snippet", default="")
+        snippet2 = self._get_result_field(result2, "snippet", default="")
         # Similar snippets
-        snippet_similarity = SequenceMatcher(None, result1["snippet"], result2["snippet"]).ratio()
+        snippet_similarity = SequenceMatcher(None, snippet1, snippet2).ratio()
         if snippet_similarity >= self.similarity_threshold:
             return True
 

@@ -114,7 +114,9 @@ class SemanticIndexer:
         branch: Optional[str] = None,
         commit: Optional[str] = None,
         lineage_id: Optional[str] = None,
+        sqlite_store: Optional[Any] = None,
     ) -> None:
+        self.sqlite_store = sqlite_store
         self.profile_registry = profile_registry
         self._profile_active = bool(profile or profile_registry or semantic_profile)
         self.semantic_profile = self._resolve_semantic_profile(
@@ -553,6 +555,7 @@ class SemanticIndexer:
         subchunk_total: int = 1,
         chunk_role: str = "body",
         allow_truncate: bool = True,
+        summary_text: Optional[str] = None,
     ) -> str:
         """Compose a bounded embedding string from metadata parts and content."""
         final_parts = list(parts)
@@ -560,6 +563,11 @@ class SemanticIndexer:
             final_parts.append(f"chunk part {subchunk_index} of {subchunk_total}")
         if chunk_role and chunk_role != "body":
             final_parts.append(f"chunk role {chunk_role}")
+
+        if summary_text:
+            final_parts.append("Summary:")
+            final_parts.append(summary_text)
+
         if content:
             final_parts.append(content)
         text = "\n".join(part for part in final_parts if part).strip()
@@ -578,6 +586,7 @@ class SemanticIndexer:
         chunk_content: str,
         start_line: int,
         end_line: int,
+        summary_text: Optional[str] = None,
     ) -> List[EmbeddingUnit]:
         """Expand an oversized chunk into bounded semantic embedding units."""
         parts = self._build_chunk_embedding_parts(
@@ -590,7 +599,7 @@ class SemanticIndexer:
             chunk_content=chunk_content,
         )
         single_text = self._compose_embedding_text(
-            parts, chunk_content, allow_truncate=False
+            parts, chunk_content, allow_truncate=False, summary_text=summary_text
         )
         if len(single_text) <= self._max_embedding_chars():
             return [
@@ -1535,9 +1544,12 @@ class SemanticIndexer:
         return self._truncate_embedding_text("\n".join(parts).strip())
 
     # ------------------------------------------------------------------
-    def index_file(self, path: Path) -> dict[str, Any]:
-        """Index a single Python file and return the shard info."""
+    def _prepare_file_for_indexing(self, path: Path) -> Optional[Dict[str, Any]]:
+        """Parse and chunk a file, building embedding inputs without API calls.
 
+        Returns a preparation dict consumed by ``_store_file_embeddings`` and
+        ``index_files_batch``, or ``None`` if the file has no indexable content.
+        """
         relative_path = self.path_resolver.normalize_path(path)
         language = self._infer_chunk_language(path)
         used_fallback_chunks = False
@@ -1566,9 +1578,10 @@ class SemanticIndexer:
         symbols: List[Dict[str, Any]] = []
         seen_symbols: set[tuple[str, int, int]] = set()
         normalized_chunks: List[Dict[str, Any]] = []
+        embedding_inputs: List[str] = []
+        file_embedding_text: Optional[str] = None
 
         if chunks:
-            embedding_inputs: List[str] = []
             for chunk in chunks:
                 metadata = dict(chunk.metadata or {})
                 signature_data = metadata.get("signature")
@@ -1582,6 +1595,15 @@ class SemanticIndexer:
                 kind = str(metadata.get("kind") or chunk.node_type)
                 parent_symbol = metadata.get("parent_symbol")
                 source_chunk_id = str(chunk.chunk_id or chunk.node_id)
+
+                summary_text = None
+                _sqlite_store = getattr(self, "sqlite_store", None)
+                if _sqlite_store is not None:
+                    summary = _sqlite_store.get_chunk_summary(source_chunk_id)
+                    if summary:
+                        summary_text = summary["summary_text"]
+
+
                 units = self._expand_chunk_embedding_units(
                     relative_path=relative_path,
                     symbol_name=symbol_name,
@@ -1592,6 +1614,7 @@ class SemanticIndexer:
                     chunk_content=chunk.content,
                     start_line=chunk.start_line,
                     end_line=chunk.end_line,
+                    summary_text=summary_text,
                 )
                 for unit in units:
                     normalized_chunks.append(
@@ -1638,117 +1661,259 @@ class SemanticIndexer:
             if file_embedding_text:
                 embedding_inputs.append(file_embedding_text)
 
-            embeds = self._embed_texts(embedding_inputs, input_type="document")
-            chunk_embeds = embeds[: len(normalized_chunks)]
-            file_embed = None
-            if file_embedding_text and len(embeds) > len(normalized_chunks):
-                file_embed = embeds[len(normalized_chunks)]
+        if not embedding_inputs:
+            return None
 
-            points = []
-            for chunk_index, (normalized, vec) in enumerate(
-                zip(normalized_chunks, chunk_embeds), start=1
-            ):
-                chunk = normalized["chunk"]
-                metadata = normalized["metadata"]
-                content_hash = hashlib.sha256(chunk.content.encode()).hexdigest()
-                chunk_id = str(chunk.chunk_id or chunk.node_id)
+        return {
+            "embedding_inputs": embedding_inputs,
+            "normalized_chunks": normalized_chunks,
+            "file_embedding_text": file_embedding_text,
+            "symbols": symbols,
+            "language": language,
+            "relative_path": relative_path,
+            "chunk_count": len(chunks),
+            "used_fallback_chunks": used_fallback_chunks,
+        }
 
-                payload = {
-                    "file": str(path),
-                    "relative_path": relative_path,
-                    "content_hash": content_hash,
-                    "chunk_id": normalized["derived_chunk_id"],
-                    "source_chunk_id": chunk_id,
-                    "chunk_index": chunk_index,
-                    "chunk_total": len(normalized_chunks),
-                    "subchunk_index": normalized["subchunk_index"],
-                    "subchunk_total": normalized["subchunk_total"],
-                    "chunk_role": normalized["chunk_role"],
-                    "symbol": normalized["symbol"],
-                    "kind": normalized["kind"],
-                    "signature": normalized["signature"],
-                    "line": normalized["start_line"],
-                    "span": [normalized["start_line"], normalized["end_line"]],
-                    "parent_class": normalized["parent_symbol"],
-                    "parent_symbol": normalized["parent_symbol"],
-                    "language": language,
-                    "is_deleted": False,
-                    "content": normalized["content"],
-                    "embedding_text": normalized["embedding_text"],
-                }
-                for key in [
-                    "qualified_name",
-                    "semantic_path",
-                    "signature_text",
-                    "semantic_text",
-                    "imports",
-                    "calls",
-                    "dependencies",
-                ]:
-                    if key in metadata:
-                        payload[key] = metadata[key]
-                points.append(
-                    models.PointStruct(
-                        id=self._symbol_id(
-                            str(path),
-                            f"{normalized['symbol']}#{normalized['derived_chunk_id']}",
-                            normalized["start_line"],
-                            content_hash,
-                        ),
-                        vector=vec,
-                        payload=payload,
-                    )
-                )
+    def _store_file_embeddings(
+        self, path: Path, prep: Dict[str, Any], embeds: List[List[float]]
+    ) -> Dict[str, Any]:
+        """Build Qdrant points from pre-computed embeddings and upsert them."""
+        normalized_chunks = prep["normalized_chunks"]
+        file_embedding_text = prep["file_embedding_text"]
+        language = prep["language"]
+        relative_path = prep["relative_path"]
 
-            if file_embed is not None:
-                file_summary_chunk_id = self._file_summary_chunk_id(relative_path)
-                file_summary_payload = {
-                    "file": str(path),
-                    "relative_path": relative_path,
-                    "content_hash": None,
-                    "chunk_id": file_summary_chunk_id,
-                    "chunk_index": 0,
-                    "chunk_total": len(normalized_chunks),
-                    "symbol": Path(relative_path).stem,
-                    "kind": "file_summary",
-                    "signature": "",
-                    "line": 1,
-                    "span": [1, 1],
-                    "parent_class": None,
-                    "parent_symbol": None,
-                    "language": language,
-                    "is_deleted": False,
-                    "content": "",
-                    "embedding_text": file_embedding_text,
-                }
-                points.append(
-                    models.PointStruct(
-                        id=self._symbol_id(str(path), "file_summary", 1),
-                        vector=file_embed,
-                        payload=file_summary_payload,
-                    )
-                )
+        chunk_embeds = embeds[: len(normalized_chunks)]
+        file_embed = None
+        if file_embedding_text and len(embeds) > len(normalized_chunks):
+            file_embed = embeds[len(normalized_chunks)]
 
-            try:
-                self._upsert_points_batched(path, points)
-            except Exception as e:
-                logger.error(
-                    f"Failed to upsert {len(points)} points for file {path}: "
-                    f"{type(e).__name__}: {e}"
+        points = []
+        for chunk_index, (normalized, vec) in enumerate(
+            zip(normalized_chunks, chunk_embeds), start=1
+        ):
+            chunk = normalized["chunk"]
+            metadata = normalized["metadata"]
+            content_hash = hashlib.sha256(chunk.content.encode()).hexdigest()
+            chunk_id = str(chunk.chunk_id or chunk.node_id)
+
+            payload = {
+                "file": str(path),
+                "relative_path": relative_path,
+                "content_hash": content_hash,
+                "chunk_id": normalized["derived_chunk_id"],
+                "source_chunk_id": chunk_id,
+                "chunk_index": chunk_index,
+                "chunk_total": len(normalized_chunks),
+                "subchunk_index": normalized["subchunk_index"],
+                "subchunk_total": normalized["subchunk_total"],
+                "chunk_role": normalized["chunk_role"],
+                "symbol": normalized["symbol"],
+                "kind": normalized["kind"],
+                "signature": normalized["signature"],
+                "line": normalized["start_line"],
+                "span": [normalized["start_line"], normalized["end_line"]],
+                "parent_class": normalized["parent_symbol"],
+                "parent_symbol": normalized["parent_symbol"],
+                "language": language,
+                "is_deleted": False,
+                "content": normalized["content"],
+                "embedding_text": normalized["embedding_text"],
+            }
+            for key in [
+                "qualified_name",
+                "semantic_path",
+                "signature_text",
+                "semantic_text",
+                "imports",
+                "calls",
+                "dependencies",
+            ]:
+                if key in metadata:
+                    payload[key] = metadata[key]
+            points.append(
+                models.PointStruct(
+                    id=self._symbol_id(
+                        str(path),
+                        f"{normalized['symbol']}#{normalized['derived_chunk_id']}",
+                        normalized["start_line"],
+                        content_hash,
+                    ),
+                    vector=vec,
+                    payload=payload,
                 )
-                self._qdrant_available = False
-                raise RuntimeError(
-                    f"Failed to store embeddings for {path} in Qdrant: {e}"
+            )
+
+        if file_embed is not None:
+            file_summary_chunk_id = self._file_summary_chunk_id(relative_path)
+            file_summary_payload = {
+                "file": str(path),
+                "relative_path": relative_path,
+                "content_hash": None,
+                "chunk_id": file_summary_chunk_id,
+                "chunk_index": 0,
+                "chunk_total": len(normalized_chunks),
+                "symbol": Path(relative_path).stem,
+                "kind": "file_summary",
+                "signature": "",
+                "line": 1,
+                "span": [1, 1],
+                "parent_class": None,
+                "parent_symbol": None,
+                "language": language,
+                "is_deleted": False,
+                "content": "",
+                "embedding_text": file_embedding_text,
+            }
+            points.append(
+                models.PointStruct(
+                    id=self._symbol_id(str(path), "file_summary", 1),
+                    vector=file_embed,
+                    payload=file_summary_payload,
                 )
+            )
+
+        try:
+            self._upsert_points_batched(path, points)
+        except Exception as e:
+            logger.error(
+                f"Failed to upsert {len(points)} points for file {path}: "
+                f"{type(e).__name__}: {e}"
+            )
+            self._qdrant_available = False
+            raise RuntimeError(
+                f"Failed to store embeddings for {path} in Qdrant: {e}"
+            )
 
         return {
             "file": str(path),
-            "symbols": symbols,
+            "symbols": prep["symbols"],
             "language": language,
-            "chunk_count": len(chunks),
-            "embedding_unit_count": len(normalized_chunks) if chunks else 0,
-            "file_summary_indexed": bool(chunks),
-            "used_fallback_chunks": used_fallback_chunks,
+            "chunk_count": prep["chunk_count"],
+            "embedding_unit_count": len(normalized_chunks),
+            "file_summary_indexed": file_embed is not None,
+            "used_fallback_chunks": prep["used_fallback_chunks"],
+        }
+
+    def index_file(self, path: Path) -> Dict[str, Any]:
+        """Index a single file and return the shard info."""
+        prep = self._prepare_file_for_indexing(path)
+        if prep is None:
+            return {
+                "file": str(path),
+                "symbols": [],
+                "language": self._infer_chunk_language(path),
+                "chunk_count": 0,
+                "embedding_unit_count": 0,
+                "file_summary_indexed": False,
+                "used_fallback_chunks": False,
+            }
+        embeds = self._embed_texts(prep["embedding_inputs"], input_type="document")
+        return self._store_file_embeddings(path, prep, embeds)
+
+    def index_files_batch(
+        self, paths: List[Path], embed_batch_size: int = 1000
+    ) -> Dict[str, Any]:
+        """Index multiple files with batched embedding API calls.
+
+        Collects all embedding texts from all files first, then submits them
+        to the provider in chunks of ``embed_batch_size`` (≤1000 for Voyage AI),
+        reducing API round-trips from O(files) to O(total_units / batch_size).
+        """
+        if not self._qdrant_available:
+            raise RuntimeError("Qdrant is not available — cannot batch-index files")
+
+        # Phase 1: prepare all files — chunking + build embedding texts, no API calls
+        preparations: List[tuple] = []
+        skipped = 0
+        for path in paths:
+            try:
+                prep = self._prepare_file_for_indexing(path)
+                if prep:
+                    preparations.append((path, prep))
+                else:
+                    skipped += 1
+            except Exception as exc:
+                logger.warning(
+                    "Failed to prepare %s for semantic indexing: %s", path, exc
+                )
+                skipped += 1
+
+        if not preparations:
+            return {"files_indexed": 0, "files_failed": 0, "files_skipped": skipped,
+                    "total_embedding_units": 0}
+
+        # Phase 2: collect all texts and record per-file slices
+        all_texts: List[str] = []
+        file_slices: List[tuple] = []
+        for path, prep in preparations:
+            start = len(all_texts)
+            all_texts.extend(prep["embedding_inputs"])
+            file_slices.append((path, prep, start, len(all_texts)))
+
+        logger.info(
+            "Batch embedding %d texts from %d files (batch_size=%d)",
+            len(all_texts), len(preparations), embed_batch_size,
+        )
+
+        # Phase 3: embed in token-aware batches.
+        # Voyage AI enforces a hard 120 000-token-per-request limit in addition to
+        # the 1 000-input limit.  We estimate tokens as len(text)//4 (a conservative
+        # approximation) and split whenever the running total would exceed the budget.
+        MAX_TOKENS_PER_BATCH = 100_000  # stay under the 120 000 hard limit
+        all_embeds: List[List[float]] = []
+        batch: List[str] = []
+        batch_token_est = 0
+        batch_start_idx = 0
+
+        def _flush_batch(b: List[str], start: int) -> None:
+            if not b:
+                return
+            logger.info(
+                "Embedding texts %d–%d of %d (~%d estimated tokens)",
+                start + 1, start + len(b), len(all_texts),
+                sum(len(t) // 4 for t in b),
+            )
+            all_embeds.extend(self._embed_texts(b, input_type="document"))
+
+        for idx, text in enumerate(all_texts):
+            token_est = max(1, len(text) // 4)
+            # Flush when adding this text would exceed either limit
+            if batch and (
+                len(batch) >= embed_batch_size
+                or batch_token_est + token_est > MAX_TOKENS_PER_BATCH
+            ):
+                _flush_batch(batch, batch_start_idx)
+                batch = []
+                batch_token_est = 0
+                batch_start_idx = idx
+            batch.append(text)
+            batch_token_est += token_est
+
+        _flush_batch(batch, batch_start_idx)
+
+        # Phase 4: store per-file using pre-computed embeddings
+        indexed = 0
+        failed = 0
+        for path, prep, start, end in file_slices:
+            file_embeds = all_embeds[start:end]
+            try:
+                self._store_file_embeddings(path, prep, file_embeds)
+                indexed += 1
+            except Exception as exc:
+                logger.error("Failed to store embeddings for %s: %s", path, exc)
+                failed += 1
+
+        logger.info(
+            "Batch semantic indexing complete: %d indexed, %d failed, %d skipped",
+            indexed, failed, skipped,
+        )
+        return {
+            "files_indexed": indexed,
+            "files_failed": failed,
+            "files_skipped": skipped,
+            "total_embedding_units": len(all_texts),
         }
 
     # ------------------------------------------------------------------

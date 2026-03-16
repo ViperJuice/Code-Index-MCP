@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 CHUNKER_AVAILABLE = False
 try:
     from chunker.graph.xref import build_xref
-    from chunker.chunker import chunk_file
+    from chunker import chunk_file
 
     CHUNKER_AVAILABLE = True
     logger.info("TreeSitter Chunker graph module available")
@@ -58,11 +58,20 @@ class XRefAdapter(IGraphBuilder):
                         logger.warning(f"File not found: {file_path}")
                         continue
 
-                    # Read file content
-                    content = path.read_text(encoding="utf-8")
+                    # Infer language from extension
+                    ext = path.suffix.lower().lstrip(".")
+                    _EXT = {
+                        "py": "python", "js": "javascript", "ts": "typescript",
+                        "jsx": "javascript", "tsx": "typescript", "rs": "rust",
+                        "go": "go", "java": "java", "cpp": "cpp", "cc": "cpp",
+                        "c": "c", "h": "c", "cs": "c_sharp", "rb": "ruby",
+                        "php": "php", "swift": "swift", "kt": "kotlin",
+                        "scala": "scala", "zig": "zig",
+                    }
+                    language = _EXT.get(ext, "text")
 
                     # Chunk the file
-                    chunks = chunk_file(str(path), content)
+                    chunks = chunk_file(str(path), language)
                     all_chunks.extend(chunks)
 
                     logger.debug(f"Chunked {file_path}: {len(chunks)} chunks")

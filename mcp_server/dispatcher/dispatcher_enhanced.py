@@ -31,15 +31,14 @@ from ..storage.multi_repo_manager import MultiRepositoryManager
 from ..storage.sqlite_store import SQLiteStore
 from ..utils.semantic_indexer import SemanticIndexer
 from .plugin_router import FileTypeMatcher, PluginCapability, PluginRouter
+from .query_intent import QueryIntent, classify as classify_query_intent
 from .result_aggregator import (
     AggregatedResult,
     RankingCriteria,
     ResultAggregator,
 )
 
-# Note: We've removed ignore pattern checks to allow indexing ALL files
-# Filtering happens only during export via SecureIndexExporter
-# from ..core.ignore_patterns import get_ignore_manager
+from ..core.ignore_patterns import IgnorePatternManager
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +86,30 @@ def _get_profile_collection_name(profile: Any, fallback: str) -> str:
 _INDEX_EXCLUDED_SUFFIXES = {
     ".xml",
 }
+
+# Path segment penalties for lexical (BM25/fuzzy) results.
+# FTS5 scores are negative; adding a positive penalty degrades rank.
+_PATH_PENALTY_RULES: List[Tuple[str, float]] = [
+    ("htmlcov/",          3.0),   # coverage HTML — matches every string literally
+    ("docs/benchmarks/",  2.0),   # benchmark JSON files contain literal query strings
+    ("/tests/",           0.3),   # test files reference queries as test data
+]
+_JSON_PENALTY = 0.5  # generic .json data files are lower signal than source code
+
+
+def _path_score_penalty(file_path: str) -> float:
+    """Return an additive BM25 score penalty for non-source paths.
+
+    FTS5 bm25() scores are negative (more negative = better), so adding a
+    positive value here degrades a result's rank without altering others.
+    """
+    p = file_path.replace("\\", "/").lower()
+    for segment, penalty in _PATH_PENALTY_RULES:
+        if segment in p:
+            return penalty
+    if p.endswith(".json"):
+        return _JSON_PENALTY
+    return 0.0
 
 
 class EnhancedDispatcher:
@@ -138,6 +161,7 @@ class EnhancedDispatcher:
         semantic_search_enabled: bool = True,
         memory_aware: bool = True,
         multi_repo_enabled: bool = None,
+        reranker_type: str = "none",
     ):
         """Initialize the enhanced dispatcher.
 
@@ -150,6 +174,7 @@ class EnhancedDispatcher:
             semantic_search_enabled: Whether to enable semantic search in plugins
             memory_aware: Whether to use memory-aware plugin management
             multi_repo_enabled: Whether to enable multi-repository support (None = auto from env)
+            reranker_type: Reranker to use — "voyage", "flashrank", "cross-encoder", or "none"
         """
         self._sqlite_store = sqlite_store
         self._memory_aware = memory_aware
@@ -267,6 +292,36 @@ class EnhancedDispatcher:
                     logger.warning(f"Qdrant path not found: {qdrant_path}")
             except Exception as e:
                 logger.warning(f"Failed to initialize semantic search: {e}")
+
+        # Initialize reranker
+        self._reranker = None  # type: Optional[Any]
+        if reranker_type and reranker_type != "none":
+            try:
+                from ..indexer.reranker import (
+                    CrossEncoderReranker,
+                    FlashRankReranker,
+                    VoyageReranker,
+                )
+                if reranker_type == "voyage":
+                    voyage_model = os.getenv("VOYAGE_RERANK_MODEL", "rerank-2")
+                    self._reranker = VoyageReranker(model=voyage_model)
+                    logger.info(f"Reranker initialized: VoyageReranker model={voyage_model}")
+                elif reranker_type == "flashrank":
+                    flashrank_model = os.getenv("FLASHRANK_MODEL", "ms-marco-MiniLM-L-12-v2")
+                    self._reranker = FlashRankReranker(model=flashrank_model)
+                    logger.info(f"Reranker initialized: FlashRankReranker model={flashrank_model}")
+                elif reranker_type == "cross-encoder":
+                    ce_model = os.getenv(
+                        "CROSS_ENCODER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"
+                    )
+                    self._reranker = CrossEncoderReranker(model=ce_model)
+                    logger.info(f"Reranker initialized: CrossEncoderReranker model={ce_model}")
+                else:
+                    logger.warning(
+                        f"Unknown reranker_type '{reranker_type}', disabling reranker"
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to initialize reranker: {e}")
 
         # Initialize plugins
         if plugins:
@@ -607,9 +662,32 @@ class EnhancedDispatcher:
         else:
             return list(self._by_lang.keys())
 
+    def _get_file_hash(self, content: str) -> str:
+        """Compute SHA-256 hash of file content."""
+        return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+    def _should_reindex(self, path: Path, content: str) -> bool:
+        """Return True if the file needs to be (re-)indexed."""
+        key = str(path)
+        if key not in self._file_cache:
+            return True
+        try:
+            stat = path.stat()
+            cached_mtime, cached_size, cached_hash = self._file_cache[key]
+            if stat.st_mtime == cached_mtime and stat.st_size == cached_size:
+                return False
+            return self._get_file_hash(content) != cached_hash
+        except OSError:
+            return True
+
     def _match_plugin(self, path: Path) -> IPlugin:
         """Match a plugin for the given file path."""
-        # Ensure plugin is loaded if using lazy loading
+        # Check explicitly-registered plugins first so mocks and custom plugins take priority
+        for p in self._plugins:
+            if p.supports(path):
+                return p
+
+        # Fall back to lazy loading via factory
         if self._lazy_load and self._use_factory:
             plugin = self._ensure_plugin_for_file(path)
             if plugin:
@@ -621,12 +699,7 @@ class EnhancedDispatcher:
             if route_result:
                 return route_result.plugin
 
-        # Fallback to basic matching
-        for p in self._plugins:
-            if p.supports(path):
-                return p
-
-        raise RuntimeError(f"No plugin found for {path}")
+        raise RuntimeError(f"No plugin for {path}")
 
     def get_plugins_for_file(self, path: Path) -> List[Tuple[IPlugin, float]]:
         """Get all plugins that can handle a file with confidence scores."""
@@ -954,33 +1027,184 @@ class EnhancedDispatcher:
         # Combine with documentation files first
         return doc_results + code_results
 
-    def search(self, query: str, semantic=False, limit=20) -> Iterable[SearchResult]:
+    def _get_chunk_content_for_reranking(self, file_path: str) -> str:
+        """Return the best chunk content for a file to use as reranker document text.
+
+        Falls back to an empty string if the file has no chunks or the store
+        is unavailable — callers must handle the empty case.
+        """
+        if not self._sqlite_store or not file_path:
+            return ""
+        try:
+            file_id = self._sqlite_store.get_file_id_by_path(file_path)
+            if file_id is None:
+                return ""
+            chunk = self._sqlite_store.find_best_chunk_for_file(file_id, [])
+            return chunk.get("content", "") if chunk else ""
+        except Exception:
+            return ""
+
+    def _symbol_route(self, name: str, kind: Optional[str], limit: int) -> List[Dict]:
+        """Query the symbols table directly and return search-result-shaped dicts.
+
+        Prefers definition files over ``__init__.py`` re-exports by sorting
+        __init__.py results to the end.  Returns an empty list when the store
+        is unavailable or no matching symbol is found (caller falls back to BM25).
+        """
+        if not self._sqlite_store:
+            return []
+        try:
+            rows = self._sqlite_store.get_symbol(name, kind=kind)
+            if not rows and kind:
+                # Relax kind constraint and retry
+                rows = self._sqlite_store.get_symbol(name, kind=None)
+            if not rows:
+                return []
+            # Sort: non-__init__ files first, then by line number ascending
+            def _rank(row: Dict) -> tuple:
+                fp = (row.get("file_path") or "").replace("\\", "/")
+                is_init = 1 if (fp.endswith("/__init__.py") or fp == "__init__.py") else 0
+                return (is_init, row.get("line_start", 0))
+
+            rows.sort(key=_rank)
+            results = []
+            for row in rows[:limit]:
+                file_path = row.get("file_path", "")
+                snippet = row.get("signature") or row.get("documentation") or ""
+                results.append({
+                    "file": file_path,
+                    "line": row.get("line_start", 1),
+                    "line_end": row.get("line_end"),
+                    "symbol": row.get("name"),
+                    "snippet": snippet,
+                    "score": 1.0,
+                    "language": "unknown",
+                })
+            return results
+        except Exception as e:
+            logger.warning(f"Symbol route failed for '{name}': {e}")
+            return []
+
+    def _apply_reranker(self, query: str, candidates: List[Dict], limit: int) -> List[Dict]:
+        """Enrich candidates with chunk text and apply the reranker if configured.
+
+        Returns ``candidates[:limit]`` unchanged when no reranker is set or on error.
+
+        Pre-filters high-penalty paths (``docs/benchmarks/``, ``htmlcov/``) before
+        reranking — those files contain literal query strings and would be
+        incorrectly promoted by a text-based reranker.
+        """
+        if self._reranker is None:
+            return candidates[:limit]
+        # Exclude paths with penalty >= 1.0 (benchmark/coverage noise files).
+        filtered = [c for c in candidates if _path_score_penalty(c.get("file", "")) < 1.0]
+        if not filtered:
+            filtered = candidates  # nothing passed the filter; fall back to full set
+        for c in filtered:
+            if not c.get("_rerank_doc"):
+                c["_rerank_doc"] = self._get_chunk_content_for_reranking(c.get("file", ""))
+        try:
+            return self._reranker.rerank(query, filtered, limit)
+        except Exception as e:
+            logger.warning(f"_apply_reranker failed, returning original order: {e}")
+            return candidates[:limit]
+
+    def search(self, query: str, semantic=False, fuzzy=False, limit=20) -> Iterable[SearchResult]:
         """Search for code and documentation across all plugins."""
         start_time = time.time()
 
         try:
+            # Fuzzy (trigram) path for misspelled queries
+            if fuzzy and self._sqlite_store:
+                logger.info(f"Using fuzzy trigram search for query: {query}")
+                try:
+                    sym_results = self._sqlite_store.search_symbols_fuzzy(query, limit)
+                    file_results = self._sqlite_store.search_files_fuzzy(query, limit)
+
+                    # Merge by file_path, keeping best score
+                    merged: Dict[str, Dict] = {}
+                    for r in sym_results:
+                        fp = r.get("file_path", "")
+                        if fp and (fp not in merged or r.get("score", 0) > merged[fp]["score"]):
+                            merged[fp] = {"file": fp, "score": r.get("score", 0),
+                                          "line": r.get("line_start", 1),
+                                          "snippet": r.get("name", ""),
+                                          "language": r.get("language", "unknown")}
+                    for r in file_results:
+                        fp = r.get("file_path", "")
+                        if fp and (fp not in merged or r.get("score", 0) > merged[fp]["score"]):
+                            merged[fp] = {"file": fp, "score": r.get("score", 0),
+                                          "line": 1, "snippet": "",
+                                          "language": "unknown"}
+
+                    sorted_results = sorted(merged.values(), key=lambda x: x["score"], reverse=True)
+                    for item in sorted_results[:limit]:
+                        yield item
+                    self._operation_stats["searches"] += 1
+                    self._operation_stats["total_time"] += time.time() - start_time
+                    return
+                except Exception as e:
+                    logger.warning(f"Fuzzy search failed: {e}")
+
             # Prefer direct SQLite lexical search for non-semantic queries so the
             # server remains useful even when plugin in-memory indexes are cold.
             if self._sqlite_store and not semantic:
+                # Symbol routing: bypass BM25 for explicit symbol-pattern queries.
+                intent, sym_name, kind_hint = classify_query_intent(query)
+                if intent == QueryIntent.SYMBOL:
+                    sym_results = self._symbol_route(sym_name, kind_hint, limit)
+                    if sym_results:
+                        logger.info(
+                            f"Symbol route hit for '{query}' → '{sym_name}' "
+                            f"({len(sym_results)} result(s))"
+                        )
+                        yield from sym_results
+                        self._operation_stats["searches"] += 1
+                        self._operation_stats["total_time"] += time.time() - start_time
+                        return
+
                 logger.info(f"Using direct lexical search for query: {query}")
                 try:
                     tables_to_try = ["bm25_content", "fts_code"]
 
                     for table in tables_to_try:
                         try:
+                            # Fetch an oversampled set so path-based penalties can
+                            # surface results that BM25 ranked below the cutoff.
+                            fetch_limit = max(limit * 8, 50)
                             results = self._sqlite_store.search_bm25(
-                                query, table=table, limit=limit
+                                query, table=table, limit=fetch_limit
                             )
                             if results:
+                                # Apply path-based score penalty, re-sort, truncate.
+                                # FTS5 bm25() scores are negative; adding a positive
+                                # penalty degrades rank for non-source paths.
+                                scored = []
                                 for result in results:
                                     file_path = result.get("filepath") or result.get(
                                         "file_path", ""
                                     )
+                                    raw = result.get("score", 0.0)
+                                    adjusted = raw + _path_score_penalty(file_path)
+                                    scored.append((adjusted, file_path, result))
+                                scored.sort(key=lambda t: t[0])
+                                for adjusted, file_path, result in scored[:limit]:
+                                    chunk = None
+                                    file_id = result.get("file_id")
+                                    if file_id is not None:
+                                        try:
+                                            chunk = self._sqlite_store.find_best_chunk_for_file(
+                                                int(file_id), query.split()
+                                            )
+                                        except Exception:
+                                            chunk = None
                                     yield {
                                         "file": file_path,
-                                        "line": result.get("line", 1),
+                                        "line": chunk["line_start"] if chunk else result.get("line", 1),
+                                        "line_end": chunk["line_end"] if chunk else None,
+                                        "symbol": chunk["symbol"] if chunk else None,
                                         "snippet": result.get("snippet", ""),
-                                        "score": result.get("score", 0.0),
+                                        "score": adjusted,
                                         "language": result.get("language", "unknown"),
                                     }
                                 self._operation_stats["searches"] += 1
@@ -996,6 +1220,48 @@ class EnhancedDispatcher:
                 except Exception as e:
                     logger.warning(f"Direct lexical search failed: {e}")
 
+            # Semantic queries go directly to the vector index — plugins explicitly
+            # return [] for semantic=True, so bypassing them is correct.
+            if semantic and self._semantic_indexer:
+                logger.info(f"Using semantic indexer for query: {query}")
+                try:
+                    semantic_results = self._semantic_indexer.search(
+                        query=query, limit=limit
+                    )
+                    candidates = []
+                    for result in semantic_results:
+                        snippet = result.get("snippet", "")
+                        if not snippet and "code" in result:
+                            lines = result["code"].split("\n")
+                            snippet = "\n".join(lines[:5])
+                        file_value = (
+                            result.get("relative_path")
+                            or result.get("file")
+                            or result.get("path")
+                            or result.get("file_path")
+                            or result.get("filepath")
+                            or ""
+                        )
+                        candidates.append({
+                            "file": file_value,
+                            "line": result.get("line", 1),
+                            "snippet": snippet,
+                            "score": result.get("score", 0.0),
+                            "language": result.get("metadata", {}).get(
+                                "language", "unknown"
+                            ),
+                        })
+                    candidates = self._apply_reranker(query, candidates, limit)
+                    for item in candidates:
+                        yield {k: v for k, v in item.items() if k != "_rerank_doc"}
+                    self._operation_stats["searches"] += 1
+                    self._operation_stats["total_time"] += time.time() - start_time
+                    return
+                except Exception as e:
+                    logger.warning(
+                        f"Semantic indexer search failed, falling back to plugins: {e}"
+                    )
+
             # For search, we may need to search across all languages
             # Load all plugins if using lazy loading
             if self._lazy_load and self._use_factory and len(self._plugins) == 0:
@@ -1007,19 +1273,14 @@ class EnhancedDispatcher:
                 if semantic and self._semantic_indexer:
                     logger.info("No plugins loaded, using semantic search")
                     try:
-                        # Search using semantic indexer
                         semantic_results = self._semantic_indexer.search(
                             query=query, limit=limit
                         )
-
                         for result in semantic_results:
-                            # Extract file content for snippet
                             snippet = result.get("snippet", "")
                             if not snippet and "code" in result:
-                                # Take first few lines of code as snippet
                                 lines = result["code"].split("\n")
                                 snippet = "\n".join(lines[:5])
-
                             file_value = (
                                 result.get("relative_path")
                                 or result.get("file")
@@ -1028,7 +1289,6 @@ class EnhancedDispatcher:
                                 or result.get("filepath")
                                 or ""
                             )
-
                             yield {
                                 "file": file_value,
                                 "line": result.get("line", 1),
@@ -1038,7 +1298,6 @@ class EnhancedDispatcher:
                                     "language", "unknown"
                                 ),
                             }
-
                         self._operation_stats["searches"] += 1
                         self._operation_stats["total_time"] += time.time() - start_time
                         return
@@ -1130,57 +1389,81 @@ class EnhancedDispatcher:
                                 f"Plugin {plugin.lang} failed to search for {search_query}: {e}"
                             )
 
-                # Deduplicate results per plugin
+                # Deduplicate results per plugin (handle both dict results and SearchResult objects)
                 for plugin, results in all_results_by_plugin.items():
                     seen = set()
                     unique_results = []
                     for result in results:
-                        key = f"{result['file']}:{result['line']}"
+                        if hasattr(result, "path"):
+                            key = f"{result.path}:{getattr(result, 'line', 0)}"
+                        else:
+                            key = f"{result.get('file', result.get('path', ''))}:{result.get('line', 0)}"
                         if key not in seen:
                             seen.add(key)
                             unique_results.append(result)
                     all_results_by_plugin[plugin] = unique_results
 
-                # Configure aggregator for document queries
-                if is_doc_query and self._enable_advanced:
-                    # Adjust ranking criteria for documentation
-                    doc_criteria = RankingCriteria(
-                        relevance_weight=0.5,  # Increase relevance weight
-                        confidence_weight=0.2,  # Reduce confidence weight
-                        frequency_weight=0.2,  # Keep frequency weight
-                        recency_weight=0.1,  # Keep recency weight
-                        prefer_exact_matches=False,  # Natural language doesn't need exact matches
-                        boost_multiple_sources=True,
-                        boost_common_extensions=True,
-                    )
-                    self._aggregator.configure(ranking_criteria=doc_criteria)
-
-                aggregated_results, stats = self._aggregator.aggregate_search_results(
-                    all_results_by_plugin, limit=limit * 2 if is_doc_query else limit
+                # Determine if we have plugin SearchResult dicts (have "path"/"name", not "file")
+                # vs BM25 dict results (have "file" key). Plugin results bypass the dict-only aggregator.
+                first_result = next(
+                    (r for results in all_results_by_plugin.values() for r in results), None
+                )
+                is_search_result_objects = first_result is not None and (
+                    hasattr(first_result, "path")  # dataclass
+                    or (isinstance(first_result, dict) and "path" in first_result and "file" not in first_result)
                 )
 
-                # Adjust ranking for document queries
-                if is_doc_query:
-                    aggregated_results = self._adjust_ranking_for_documents(
-                        query, aggregated_results
+                if is_search_result_objects:
+                    # Plugin SearchResult objects: flatten and sort by score, bypassing dict-only aggregator
+                    all_search_results = []
+                    for results in all_results_by_plugin.values():
+                        all_search_results.extend(results)
+                    all_search_results.sort(key=lambda r: getattr(r, "score", 0), reverse=True)
+                    self._operation_stats["searches"] += 1
+                    self._operation_stats["total_time"] += time.time() - start_time
+                    for r in all_search_results[:limit]:
+                        yield r
+                else:
+                    # BM25/dict results: use full aggregation pipeline
+                    # Configure aggregator for document queries
+                    if is_doc_query and self._enable_advanced:
+                        doc_criteria = RankingCriteria(
+                            relevance_weight=0.5,
+                            confidence_weight=0.2,
+                            frequency_weight=0.2,
+                            recency_weight=0.1,
+                            prefer_exact_matches=False,
+                            boost_multiple_sources=True,
+                            boost_common_extensions=True,
+                        )
+                        self._aggregator.configure(ranking_criteria=doc_criteria)
+
+                    aggregated_results, stats = self._aggregator.aggregate_search_results(
+                        all_results_by_plugin, limit=limit * 2 if is_doc_query else limit
                     )
 
-                # Apply final limit
-                if limit and len(aggregated_results) > limit:
-                    aggregated_results = aggregated_results[:limit]
+                    # Adjust ranking for document queries
+                    if is_doc_query:
+                        aggregated_results = self._adjust_ranking_for_documents(
+                            query, aggregated_results
+                        )
 
-                logger.debug(
-                    f"Search aggregation stats: {stats.total_results} total, "
-                    f"{stats.unique_results} unique, {stats.plugins_used} plugins used, "
-                    f"document_query={is_doc_query}"
-                )
+                    # Apply final limit
+                    if limit and len(aggregated_results) > limit:
+                        aggregated_results = aggregated_results[:limit]
 
-                self._operation_stats["searches"] += 1
-                self._operation_stats["total_time"] += time.time() - start_time
+                    logger.debug(
+                        f"Search aggregation stats: {stats.total_results} total, "
+                        f"{stats.unique_results} unique, {stats.plugins_used} plugins used, "
+                        f"document_query={is_doc_query}"
+                    )
 
-                # Yield primary results from aggregated results
-                for aggregated in aggregated_results:
-                    yield aggregated.primary_result
+                    self._operation_stats["searches"] += 1
+                    self._operation_stats["total_time"] += time.time() - start_time
+
+                    # Yield primary results from aggregated results
+                    for aggregated in aggregated_results:
+                        yield aggregated.primary_result
             else:
                 # Fallback to basic search
                 # Detect if this is a document query
@@ -1245,7 +1528,7 @@ class EnhancedDispatcher:
         except Exception as e:
             logger.error(f"Error in search for {query}: {e}", exc_info=True)
 
-    def index_file(self, path: Path) -> None:
+    def index_file(self, path: Path, do_semantic: bool = True) -> None:
         """Index a single file if it has changed."""
         try:
             # Ensure path is absolute to avoid relative/absolute path issues
@@ -1265,13 +1548,22 @@ class EnhancedDispatcher:
                     logger.error(f"Failed to read {path}: {e}")
                     return
 
-            # Check if we need to re-index (simplified for now)
-            # TODO: Implement proper caching logic
+            # Skip if file hasn't changed since last index
+            if not self._should_reindex(path, content):
+                logger.debug(f"Skipping {path} (unchanged)")
+                return
 
             # Index the file
             start_time = time.time()
             logger.info(f"Indexing {path} with {plugin.lang} plugin")
             shard = plugin.indexFile(path, content)
+
+            # Update file cache after successful indexing
+            try:
+                stat = path.stat()
+                self._file_cache[str(path)] = (stat.st_mtime, stat.st_size, self._get_file_hash(content))
+            except OSError:
+                pass
 
             # Record performance if advanced features enabled
             if self._enable_advanced and self._router:
@@ -1285,6 +1577,13 @@ class EnhancedDispatcher:
                 f"Successfully indexed {path}: {len(shard.get('symbols', []))} symbols found"
             )
 
+            # Semantic indexing for incremental single-file updates
+            if do_semantic and self._semantic_indexer:
+                try:
+                    self._semantic_indexer.index_file(path)
+                except Exception as e:
+                    logger.warning(f"Semantic indexing failed for {path}: {e}")
+
         except RuntimeError as e:
             # No plugin found for this file type
             logger.debug(f"No plugin for {path}: {e}")
@@ -1292,23 +1591,20 @@ class EnhancedDispatcher:
             logger.error(f"Error indexing {path}: {e}", exc_info=True)
 
     def get_statistics(self) -> dict:
-        """Get comprehensive statistics across all plugins and components."""
-        stats = {
-            "total_plugins": len(self._plugins),
-            "loaded_languages": sorted(list(self._loaded_languages)),
-            "supported_languages": len(self.supported_languages),
-            "operations": self._operation_stats.copy(),
-        }
-
-        # Add language breakdown
-        stats["by_language"] = {}
-        for lang, plugin in self._by_lang.items():
-            plugin_info = {"loaded": True, "class": plugin.__class__.__name__}
-            if hasattr(plugin, "get_indexed_count"):
-                plugin_info["indexed_files"] = plugin.get_indexed_count()
-            stats["by_language"][lang] = plugin_info
-
-        return stats
+        """Get statistics about indexed files and languages."""
+        try:
+            by_language: Dict[str, int] = {}
+            for file_path in self._file_cache:
+                for lang, plugin in self._by_lang.items():
+                    if plugin.supports(Path(file_path)):
+                        by_language[lang] = by_language.get(lang, 0) + 1
+                        break
+            return {
+                "total": len(self._file_cache),
+                "by_language": by_language,
+            }
+        except Exception:
+            return {"total": 0, "by_language": {}}
 
     def index_directory(
         self, directory: Path, recursive: bool = True
@@ -1357,6 +1653,12 @@ class EnhancedDispatcher:
                     if path.is_file():
                         yield path
 
+        # Collect paths that were successfully indexed for batch semantic embedding
+        semantically_indexed_paths: List[Path] = []
+
+        # Instantiate once per index_directory call to avoid stale root between reindex calls
+        ignore_mgr = IgnorePatternManager(directory)
+
         for path in iter_files():
             if not path.is_file():
                 continue
@@ -1383,21 +1685,28 @@ class EnhancedDispatcher:
                 stats["ignored_files"] += 1
                 continue
 
+            if ignore_mgr.should_ignore(path):
+                stats["ignored_files"] += 1
+                continue
+
             # Try to find a plugin that supports this file
             # This allows us to index ALL files, including .env, .key, etc.
             try:
                 # First try to match by extension
                 if path.suffix in supported_extensions:
-                    self.index_file(path)
+                    # skip_semantic=True — we'll batch semantic embed after the loop
+                    self.index_file(path, do_semantic=False)
                     stats["indexed_files"] += 1
+                    semantically_indexed_paths.append(path.resolve())
                 # For files without recognized extensions, try each plugin's supports() method
                 # This allows plugins to match by filename patterns (e.g., .env, Dockerfile)
                 else:
                     matched = False
                     for plugin in self._plugins:
                         if plugin.supports(path):
-                            self.index_file(path)
+                            self.index_file(path, do_semantic=False)
                             stats["indexed_files"] += 1
+                            semantically_indexed_paths.append(path.resolve())
                             matched = True
                             break
 
@@ -1417,6 +1726,33 @@ class EnhancedDispatcher:
             except Exception as e:
                 logger.error(f"Failed to index {path}: {e}")
                 stats["failed_files"] += 1
+
+        # Batch semantic embedding — O(n/1000) API calls instead of O(n)
+        stats["semantic_paths_queued"] = len(semantically_indexed_paths)
+        stats["semantic_indexer_present"] = self._semantic_indexer is not None
+        if self._semantic_indexer and semantically_indexed_paths:
+            logger.info(
+                f"Batch semantic indexing {len(semantically_indexed_paths)} files "
+                f"(embed_batch_size=1000)"
+            )
+            try:
+                sem_stats = self._semantic_indexer.index_files_batch(
+                    semantically_indexed_paths, embed_batch_size=1000
+                )
+                stats["semantic_indexed"] = sem_stats.get("files_indexed", 0)
+                stats["semantic_failed"] = sem_stats.get("files_failed", 0)
+                stats["semantic_skipped"] = sem_stats.get("files_skipped", 0)
+                stats["total_embedding_units"] = sem_stats.get(
+                    "total_embedding_units", 0
+                )
+                logger.info(
+                    f"Semantic batch complete: {sem_stats.get('files_indexed', 0)} indexed, "
+                    f"{sem_stats.get('files_skipped', 0)} skipped, "
+                    f"{sem_stats.get('total_embedding_units', 0)} embedding units"
+                )
+            except Exception as e:
+                logger.error(f"Batch semantic indexing failed: {e}", exc_info=True)
+                stats["semantic_error"] = str(e)
 
         logger.info(
             f"Directory indexing complete: {stats['indexed_files']} indexed, "

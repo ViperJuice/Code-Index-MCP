@@ -26,7 +26,7 @@ dependencies = [
     "mcp>=1.0.0",
     "fastapi>=0.100.0",
     "uvicorn>=0.23.0",
-    "treesitter-chunker==2.2.4",
+    "treesitter-chunker==2.2.21",
     # Legacy tree-sitter deps (for backward compatibility during migration)
     "tree-sitter>=0.20.0",
     "tree-sitter-languages>=1.7.0",
@@ -44,6 +44,7 @@ dependencies = [
     "qdrant-client>=1.7.0",
     "numpy>=1.24.0",
     "psutil>=5.9.0",
+    "baml-py>=0.220.0",
 ]
 
 [project.optional-dependencies]
@@ -53,6 +54,7 @@ semantic = [
     "sentence-transformers>=2.0.0",
     "cohere>=4.0.0",
     "anthropic>=0.18.0",
+    "flashrank>=0.3.0",
 ]
 dev = [
     "pytest>=7.4.0",

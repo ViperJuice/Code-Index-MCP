@@ -201,6 +201,8 @@ async def initialize_services():
             # Create enhanced dispatcher with dynamic plugin loading
             logger.info("Creating enhanced dispatcher with timeout protection...")
             # Note: EnhancedDispatcher has built-in 5-second timeout in _load_all_plugins()
+            _explicit = os.getenv("RERANKER_TYPE", "").strip().lower()
+            reranker_type = _explicit if _explicit else "none"
             dispatcher = EnhancedDispatcher(
                 plugins=plugin_instances,  # Use existing plugins as base
                 sqlite_store=sqlite_store,
@@ -210,6 +212,7 @@ async def initialize_services():
                 semantic_search_enabled=True,
                 memory_aware=True,  # Enable memory-aware plugin management
                 multi_repo_enabled=None,  # Auto-detect from environment
+                reranker_type=reranker_type,
             )
 
         supported_languages = dispatcher.supported_languages
@@ -261,6 +264,11 @@ async def list_tools() -> list[types.Tool]:
                         "description": "Whether to use semantic search",
                         "default": False,
                     },
+                    "fuzzy": {
+                        "type": "boolean",
+                        "description": "Trigram-based fuzzy match for misspelled queries",
+                        "default": False,
+                    },
                     "limit": {
                         "type": "integer",
                         "description": "Maximum number of results",
@@ -290,6 +298,50 @@ async def list_tools() -> list[types.Tool]:
                         "type": "string",
                         "description": "Optional path to reindex. If not provided, reindexes all files.",
                     }
+                },
+            },
+        ),
+        types.Tool(
+            name="write_summaries",
+            description=(
+                "Run the full LLM summarization pass over all un-summarized chunks in the index. "
+                "Persists results. Use summarize_sample first to validate quality."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of chunks to summarize in this call.",
+                        "default": 500,
+                    },
+                },
+            },
+        ),
+        types.Tool(
+            name="summarize_sample",
+            description=(
+                "Summarize a sample of indexed files using the LLM and return results "
+                "for quality evaluation. Does not persist results by default."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "paths": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Specific file paths to summarize (optional).",
+                    },
+                    "n": {
+                        "type": "integer",
+                        "description": "Number of random files to sample when paths not given.",
+                        "default": 3,
+                    },
+                    "persist": {
+                        "type": "boolean",
+                        "description": "Save summaries to index (default false for evaluation).",
+                        "default": False,
+                    },
                 },
             },
         ),
@@ -429,7 +481,7 @@ def ensure_response(data: Any) -> str:
         )
 
 
-from mcp_server.indexing.summarization import LazyChunkWriter
+from mcp_server.indexing.summarization import ComprehensiveChunkWriter, FileBatchSummarizer, LazyChunkWriter
 
 # Global chunk writer instance
 lazy_summarizer = None
@@ -442,22 +494,37 @@ async def call_tool(
     """Handle tool calls."""
     global dispatcher, lazy_summarizer
 
+    # Resolve the current MCP session so the lazy summarizer can issue
+    # sampling/createMessage requests back to the client.
+    _current_session = None
+    _client_name = None
+    try:
+        from mcp.server.lowlevel.server import request_ctx
+
+        _ctx = request_ctx.get()
+        _current_session = _ctx.session
+        # clientInfo lives on client_params, not directly on session
+        _params = getattr(_current_session, "client_params", None)
+        _client_name = getattr(getattr(_params, "clientInfo", None), "name", None)
+        # Log full capabilities for diagnostics
+        _caps = getattr(_params, "capabilities", None)
+        logger.debug("MCP client caps: %s", _caps)
+    except Exception as _e:
+        logger.debug("request_ctx not available: %s", _e)
+
     if lazy_summarizer is None:
-        client_name = None
-        try:
-            from mcp.server.lowlevel.server import request_ctx
-
-            ctx = request_ctx.get()
-            client_name = ctx.session.client_info.name
-        except Exception:
-            pass
-
         lazy_summarizer = LazyChunkWriter(
             db_path=sqlite_store.db_path if sqlite_store else "code_index.db",
             qdrant_client=None,  # Passed inside SemanticIndexer
-            client_name=client_name,
+            session=_current_session,
+            client_name=_client_name,
         )
         lazy_summarizer.start()
+    else:
+        # Refresh the session reference on every call so we always hold a
+        # live handle even if the client reconnected.
+        if _current_session is not None:
+            lazy_summarizer.update_session(_current_session)
 
     # Always log tool calls for debugging
     logger.info(f"=== MCP Tool Call ===")
@@ -569,6 +636,7 @@ async def call_tool(
                 ]
 
             semantic = arguments.get("semantic", False) if arguments else False
+            fuzzy = arguments.get("fuzzy", False) if arguments else False
             limit = arguments.get("limit", 20) if arguments else 20
             repository = arguments.get("repository") if arguments else None
 
@@ -638,7 +706,7 @@ async def call_tool(
                                     None,
                                     lambda: list(
                                         dispatcher.search(
-                                            query, semantic=semantic, limit=limit
+                                            query, semantic=semantic, fuzzy=fuzzy, limit=limit
                                         )
                                     ),
                                 ),
@@ -658,7 +726,7 @@ async def call_tool(
                                     None,
                                     lambda: list(
                                         dispatcher.search(
-                                            query, semantic=semantic, limit=limit
+                                            query, semantic=semantic, fuzzy=fuzzy, limit=limit
                                         )
                                     ),
                                 ),
@@ -677,7 +745,7 @@ async def call_tool(
                                     None,
                                     lambda: list(
                                         dispatcher.search(
-                                            query, semantic=semantic, limit=limit
+                                            query, semantic=semantic, fuzzy=fuzzy, limit=limit
                                         )
                                     ),
                                 ),
@@ -713,7 +781,7 @@ async def call_tool(
                     # Create async wrapper for sync search method
                     async def async_search():
                         return list(
-                            dispatcher.search(query, semantic=semantic, limit=limit)
+                            dispatcher.search(query, semantic=semantic, fuzzy=fuzzy, limit=limit)
                         )
 
                     # Run with timeout
@@ -721,7 +789,7 @@ async def call_tool(
                         asyncio.get_event_loop().run_in_executor(
                             None,
                             lambda: list(
-                                dispatcher.search(query, semantic=semantic, limit=limit)
+                                dispatcher.search(query, semantic=semantic, fuzzy=fuzzy, limit=limit)
                             ),
                         ),
                         timeout=10.0,
@@ -800,6 +868,8 @@ async def call_tool(
                     result_item = {
                         "file": file_path,
                         "line": r.get("line"),
+                        "line_end": r.get("line_end"),
+                        "symbol": r.get("symbol"),
                         "snippet": r.get("snippet"),
                     }
 
@@ -811,6 +881,22 @@ async def call_tool(
                         )
 
                     results_data.append(result_item)
+
+                # Lazily enqueue top results for background summarization.
+                if (
+                    lazy_summarizer
+                    and lazy_summarizer.can_summarize()
+                    and sqlite_store
+                ):
+                    for r in results[:5]:
+                        raw_file = r.get("file", "")
+                        raw_line = r.get("line", 1)
+                        if raw_file and raw_line:
+                            chunk_info = sqlite_store.find_chunk_at_line(
+                                raw_file, int(raw_line)
+                            )
+                            if chunk_info:
+                                lazy_summarizer.enqueue(chunk_info)
 
                 # Include repository info in response if applicable
                 if multi_repo_info:
@@ -872,6 +958,7 @@ async def call_tool(
                     "dynamic_loading": getattr(dispatcher, "_use_factory", False),
                     "lazy_loading": getattr(dispatcher, "_lazy_load", False),
                     "semantic_search": getattr(dispatcher, "_semantic_enabled", False),
+                    "semantic_indexer_active": getattr(dispatcher, "_semantic_indexer", None) is not None,
                     "advanced_features": getattr(dispatcher, "_enable_advanced", False),
                     "timeout_protection": True,  # All dispatchers now have timeout protection
                 },
@@ -886,6 +973,19 @@ async def call_tool(
                 },
                 "operations": stats.get("operations", {}),
                 "health": health,
+                "summarization": {
+                    "available": lazy_summarizer.can_summarize() if lazy_summarizer else False,
+                    "mcp_sampling": lazy_summarizer._has_sampling_capability() if lazy_summarizer else False,
+                    "direct_api": lazy_summarizer._has_direct_api() if lazy_summarizer else False,
+                    "api_provider": (
+                        "anthropic" if os.environ.get("ANTHROPIC_API_KEY")
+                        else "openai" if os.environ.get("OPENAI_API_KEY")
+                        else None
+                    ),
+                    "client": _client_name,
+                    "session_available": _current_session is not None,
+                    "raw_capabilities": str(getattr(getattr(_current_session, "client_params", None), "capabilities", None)) if _current_session else None,
+                },
             }
 
             response = [
@@ -970,6 +1070,7 @@ async def call_tool(
                 else:
                     # Directory - use index_directory which handles ignore patterns
                     stats = dispatcher.index_directory(target_path, recursive=True)
+                    lexical_rows = sqlite_store.rebuild_fts_code() if sqlite_store else 0
 
                     response_data = {
                         "path": str(target_path),
@@ -978,6 +1079,11 @@ async def call_tool(
                         "failed_files": stats["failed_files"],
                         "total_files": stats["total_files"],
                         "by_language": stats["by_language"],
+                        "lexical_rows": lexical_rows,
+                        "semantic_indexed": stats.get("semantic_indexed"),
+                        "semantic_failed": stats.get("semantic_failed"),
+                        "semantic_skipped": stats.get("semantic_skipped"),
+                        "total_embedding_units": stats.get("total_embedding_units"),
                     }
 
                     response = [
@@ -988,6 +1094,7 @@ async def call_tool(
             else:
                 # Reindex all files in current directory
                 stats = dispatcher.index_directory(Path("."), recursive=True)
+                lexical_rows = sqlite_store.rebuild_fts_code() if sqlite_store else 0
 
                 response_data = {
                     "path": ".",
@@ -996,8 +1103,210 @@ async def call_tool(
                     "failed_files": stats["failed_files"],
                     "total_files": stats["total_files"],
                     "by_language": stats["by_language"],
+                    "lexical_rows": lexical_rows,
+                    "semantic_indexed": stats.get("semantic_indexed"),
+                    "semantic_failed": stats.get("semantic_failed"),
+                    "semantic_skipped": stats.get("semantic_skipped"),
+                    "total_embedding_units": stats.get("total_embedding_units"),
+                    "semantic_error": stats.get("semantic_error"),
+                    "semantic_paths_queued": stats.get("semantic_paths_queued"),
+                    "semantic_indexer_present": stats.get("semantic_indexer_present"),
                 }
 
+                response = [
+                    types.TextContent(type="text", text=ensure_response(response_data))
+                ]
+
+        elif name == "write_summaries":
+            if lazy_summarizer is None or not lazy_summarizer.can_summarize():
+                response = [
+                    types.TextContent(
+                        type="text",
+                        text=ensure_response(
+                            {
+                                "error": "Summarization not available",
+                                "details": (
+                                    "No API key configured. Set CEREBRAS_API_KEY, "
+                                    "ANTHROPIC_API_KEY, or OPENAI_API_KEY."
+                                ),
+                            }
+                        ),
+                    )
+                ]
+            else:
+                db_path = sqlite_store.db_path if sqlite_store else "code_index.db"
+                limit_arg = int((arguments or {}).get("limit", 500))
+                model_used = lazy_summarizer._get_model_name()
+
+                writer = ComprehensiveChunkWriter(
+                    db_path=db_path,
+                    qdrant_client=None,
+                    session=_current_session,
+                    client_name=_client_name,
+                )
+                chunks_written = await writer.process_all(limit=limit_arg)
+
+                response = [
+                    types.TextContent(
+                        type="text",
+                        text=ensure_response(
+                            {
+                                "chunks_summarized": chunks_written,
+                                "limit": limit_arg,
+                                "model_used": model_used,
+                                "persisted": True,
+                            }
+                        ),
+                    )
+                ]
+
+        elif name == "summarize_sample":
+            if lazy_summarizer is None or not lazy_summarizer.can_summarize():
+                response = [
+                    types.TextContent(
+                        type="text",
+                        text=ensure_response(
+                            {
+                                "error": "Summarization not available",
+                                "details": (
+                                    "No API key configured. Set CEREBRAS_API_KEY, "
+                                    "ANTHROPIC_API_KEY, or OPENAI_API_KEY."
+                                ),
+                            }
+                        ),
+                    )
+                ]
+            else:
+                import sqlite3 as _sqlite3
+                paths_arg = (arguments or {}).get("paths")
+                n_arg = int((arguments or {}).get("n", 3))
+                persist_flag = bool((arguments or {}).get("persist", False))
+
+                db_path = sqlite_store.db_path if sqlite_store else "code_index.db"
+                model_used = lazy_summarizer._get_model_name()
+
+                # Resolve file rows.
+                with _sqlite3.connect(db_path) as _conn:
+                    if paths_arg:
+                        placeholders = ",".join("?" * len(paths_arg))
+                        file_rows = _conn.execute(
+                            f"SELECT id, path, language FROM files WHERE path IN ({placeholders})",
+                            paths_arg,
+                        ).fetchall()
+                    else:
+                        file_rows = _conn.execute(
+                            "SELECT id, path, language FROM files ORDER BY RANDOM() LIMIT ?",
+                            (n_arg,),
+                        ).fetchall()
+
+                file_results = []
+                total_chunks = 0
+
+                for file_id, file_path, language in file_rows:
+                    # Read file from disk.
+                    try:
+                        with open(file_path, encoding="utf-8", errors="replace") as _fh:
+                            file_content = _fh.read()
+                    except Exception as _e:
+                        file_results.append(
+                            {"file_path": file_path, "error": str(_e)}
+                        )
+                        continue
+
+                    # Load chunks with symbol names via JOIN.
+                    with _sqlite3.connect(db_path) as _conn:
+                        chunk_rows = _conn.execute(
+                            """SELECT c.chunk_id, c.line_start, c.line_end,
+                                      c.content, c.node_type, c.parent_chunk_id,
+                                      c.language, c.symbol_id, s.name AS symbol
+                               FROM code_chunks c
+                               LEFT JOIN symbols s ON c.symbol_id = s.id
+                               WHERE c.file_id = ?
+                               ORDER BY c.chunk_index, c.line_start""",
+                            (file_id,),
+                        ).fetchall()
+
+                    chunks = [
+                        {
+                            "chunk_id": r[0],
+                            "line_start": r[1],
+                            "line_end": r[2],
+                            "content": r[3],
+                            "node_type": r[4],
+                            "parent_chunk_id": r[5],
+                            "language": r[6] or language,
+                            "symbol_id": r[7],
+                        }
+                        for r in chunk_rows
+                    ]
+                    symbol_map = {
+                        r[7]: r[8] for r in chunk_rows if r[7] and r[8]
+                    }
+
+                    used_batch = (
+                        len(file_content) <= 400_000
+                        and bool(os.environ.get("CEREBRAS_API_KEY"))
+                    )
+
+                    summarizer = FileBatchSummarizer(
+                        db_path=db_path,
+                        qdrant_client=None,
+                        session=_current_session,
+                        client_name=_client_name,
+                    )
+
+                    try:
+                        summaries = await summarizer.summarize_file_chunks(
+                            file_id=file_id,
+                            file_path=file_path,
+                            file_content=file_content,
+                            chunks=chunks,
+                            symbol_map=symbol_map,
+                            persist=persist_flag,
+                        )
+                    except Exception as _e:
+                        file_results.append(
+                            {"file_path": file_path, "error": str(_e)}
+                        )
+                        continue
+
+                    # Build symbol/line lookup for output enrichment.
+                    chunk_meta = {
+                        c["chunk_id"]: c for c in chunks
+                    }
+                    summary_list = []
+                    for s in summaries:
+                        meta = chunk_meta.get(s.chunk_id, {})
+                        sym_name = (
+                            symbol_map.get(meta.get("symbol_id"))
+                            or meta.get("node_type")
+                            or s.chunk_id
+                        )
+                        summary_list.append(
+                            {
+                                "symbol": sym_name,
+                                "lines": f"{meta.get('line_start', '?')}-{meta.get('line_end', '?')}",
+                                "summary": s.summary,
+                            }
+                        )
+
+                    total_chunks += len(summaries)
+                    file_results.append(
+                        {
+                            "file_path": file_path,
+                            "chunk_count": len(summaries),
+                            "used_batch_path": used_batch,
+                            "summaries": summary_list,
+                        }
+                    )
+
+                response_data = {
+                    "files_processed": len(file_results),
+                    "total_chunks": total_chunks,
+                    "model_used": model_used,
+                    "persisted": persist_flag,
+                    "files": file_results,
+                }
                 response = [
                     types.TextContent(type="text", text=ensure_response(response_data))
                 ]
@@ -1016,6 +1325,8 @@ async def call_tool(
                                 "get_status",
                                 "list_plugins",
                                 "reindex",
+                                "write_summaries",
+                                "summarize_sample",
                             ],
                         }
                     ),
@@ -1080,12 +1391,10 @@ async def main():
     logger.info(f"Debug Mode: {'Enabled' if DEBUG_MODE else 'Disabled'}")
     logger.info("=" * 60)
 
-    # Try to initialize services on startup but don't fail if it doesn't work
-    try:
-        await initialize_services()
-    except Exception as e:
-        logger.error(f"Failed to initialize services on startup: {e}", exc_info=True)
-        # Continue running - tools will return error messages
+    # Skip eager initialization — the dispatcher and sqlite_store are
+    # initialized lazily on the first tool call (see call_tool above).
+    # Eager init was causing the stdio server to never start because the
+    # embedded Qdrant client blocks the event loop indefinitely on startup.
 
     # Run the stdio server
     async with stdio_server() as (read_stream, write_stream):

@@ -334,8 +334,14 @@ class RerankingSettings(BaseModel):
     # Reranker type selection
     reranker_type: str = Field(
         default="hybrid",
-        pattern="^(cohere|cross-encoder|tfidf|hybrid)$",
+        pattern="^(cohere|cross-encoder|tfidf|hybrid|voyage|flashrank|none)$",
         description="Type of reranker to use",
+    )
+
+    # Voyage AI settings
+    voyage_model: str = Field(
+        default="rerank-2",
+        description="Voyage AI reranking model (rerank-2 or rerank-2-lite)",
     )
 
     # Cohere settings
@@ -397,6 +403,7 @@ class RerankingSettings(BaseModel):
             cross_encoder_model=get_env_var(
                 "CROSS_ENCODER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"
             ),
+            voyage_model=get_env_var("VOYAGE_MODEL", "rerank-2"),
             cross_encoder_device=get_env_var("CROSS_ENCODER_DEVICE", "cpu"),
             hybrid_primary_type=get_env_var("HYBRID_PRIMARY_TYPE", "cohere"),
             hybrid_fallback_type=get_env_var("HYBRID_FALLBACK_TYPE", "tfidf"),

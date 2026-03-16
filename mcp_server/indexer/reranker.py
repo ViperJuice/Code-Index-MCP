@@ -613,6 +613,132 @@ class HybridReranker(BaseReranker):
         return capabilities
 
 
+class VoyageReranker:
+    """Synchronous Voyage AI reranker using voyageai.Client.rerank().
+
+    Intentionally does not extend BaseReranker — the base class interface is
+    async and the dispatcher's search() is synchronous.  voyageai.Client.rerank()
+    is synchronous, so no bridge is needed.
+    """
+
+    def __init__(self, model: str = "rerank-2"):
+        api_key = os.getenv("VOYAGE_API_KEY") or os.getenv("VOYAGE_AI_API_KEY")
+        import voyageai
+
+        self._client = voyageai.Client(api_key=api_key) if api_key else voyageai.Client()
+        self._model = model
+
+    def rerank(self, query: str, candidates: List[Dict], top_k: int) -> List[Dict]:
+        """Reorder candidates by Voyage relevance score.
+
+        Document text preference order: `_rerank_doc` (full chunk content),
+        then `snippet`, then `file` path.  Falls back to original order on
+        empty documents or any API error.
+        """
+        documents = [
+            c.get("_rerank_doc") or c.get("snippet") or c.get("file", "")
+            for c in candidates
+        ]
+        if not any(documents):
+            return candidates[:top_k]
+        try:
+            result = self._client.rerank(
+                query=query, documents=documents, model=self._model, top_k=top_k
+            )
+            return [candidates[r.index] for r in result.results]
+        except Exception as e:
+            logger.warning(f"VoyageReranker.rerank() failed, using original order: {e}")
+            return candidates[:top_k]
+
+
+class FlashRankReranker:
+    """Synchronous FlashRank reranker (ONNX-quantized cross-encoder, no API key needed).
+
+    Lightweight ~34MB model, CPU-friendly. Default OSS reranker when no Voyage key
+    is present.
+    """
+
+    def __init__(self, model: str = "ms-marco-MiniLM-L-12-v2"):
+        self._model_name = model
+        self._ranker = None
+
+    def _load(self):
+        if self._ranker is None:
+            from flashrank import Ranker
+            self._ranker = Ranker(model_name=self._model_name)
+
+    def rerank(self, query: str, candidates: List[Dict], top_k: int) -> List[Dict]:
+        """Reorder candidates by FlashRank relevance score.
+
+        Document text preference order: ``_rerank_doc``, then ``snippet``, then
+        ``file`` path.  Falls back to original order on import error or exception.
+        """
+        try:
+            self._load()
+        except ImportError:
+            logger.warning("FlashRankReranker: flashrank not installed, using original order")
+            return candidates[:top_k]
+        try:
+            from flashrank import RerankRequest
+            passages = [
+                {
+                    "id": i,
+                    "text": c.get("_rerank_doc") or c.get("snippet") or c.get("file", ""),
+                }
+                for i, c in enumerate(candidates)
+            ]
+            request = RerankRequest(query=query, passages=passages)
+            results = self._ranker.rerank(request)
+            return [candidates[r["id"]] for r in results[:top_k]]
+        except Exception as e:
+            logger.warning(f"FlashRankReranker.rerank() failed, using original order: {e}")
+            return candidates[:top_k]
+
+
+class CrossEncoderReranker:
+    """Synchronous cross-encoder reranker via sentence-transformers.
+
+    Better quality than FlashRank but heavier (~500MB torch + model). Opt-in via
+    ``RERANKER_TYPE=cross-encoder``.
+    """
+
+    def __init__(self, model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"):
+        self._model_name = model
+        self._model = None
+
+    def _load(self):
+        if self._model is None:
+            from sentence_transformers import CrossEncoder
+            self._model = CrossEncoder(self._model_name)
+
+    def rerank(self, query: str, candidates: List[Dict], top_k: int) -> List[Dict]:
+        """Reorder candidates by cross-encoder relevance score.
+
+        Falls back to original order on import error or exception.
+        """
+        try:
+            self._load()
+        except ImportError:
+            logger.warning(
+                "CrossEncoderReranker: sentence-transformers not installed, using original order"
+            )
+            return candidates[:top_k]
+        try:
+            docs = [
+                c.get("_rerank_doc") or c.get("snippet") or c.get("file", "")
+                for c in candidates
+            ]
+            pairs = [(query, doc) for doc in docs]
+            scores = self._model.predict(pairs)
+            indexed = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)
+            return [candidates[i] for i, _ in indexed[:top_k]]
+        except Exception as e:
+            logger.warning(
+                f"CrossEncoderReranker.rerank() failed, using original order: {e}"
+            )
+            return candidates[:top_k]
+
+
 class RerankerFactory(IRerankerFactory):
     """Factory for creating reranker instances"""
 
@@ -622,6 +748,7 @@ class RerankerFactory(IRerankerFactory):
             "cross-encoder": LocalCrossEncoderReranker,
             "tfidf": TFIDFReranker,
             "hybrid": HybridReranker,
+            "voyage": VoyageReranker,
         }
 
     def create_reranker(self, reranker_type: str, config: Dict[str, Any]) -> IReranker:

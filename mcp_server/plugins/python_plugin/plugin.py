@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 import jedi
+from chunker import chunk_text
 
 from ...plugin_base import (
     IndexShard,
@@ -121,6 +122,36 @@ class Plugin(IPlugin):
                     "span": (start_line, end_line),
                 }
             )
+
+        # Store chunks in SQLite (delete old ones first since chunk_id uses temp path)
+        if self._sqlite_store and file_id:
+            _chunks = []
+            try:
+                _chunks = chunk_text(content, "python")
+            except Exception:
+                pass
+            self._sqlite_store.delete_chunks_for_file(file_id)
+            for i, chunk in enumerate(_chunks):
+                try:
+                    self._sqlite_store.store_chunk(
+                        file_id=file_id,
+                        content=chunk.content,
+                        content_start=chunk.byte_start,
+                        content_end=chunk.byte_end,
+                        line_start=chunk.start_line,
+                        line_end=chunk.end_line,
+                        chunk_id=chunk.chunk_id,
+                        node_id=chunk.node_id,
+                        treesitter_file_id=str(chunk.file_id),
+                        definition_id=chunk.definition_id,
+                        parent_chunk_id=chunk.parent_chunk_id,
+                        node_type=chunk.node_type,
+                        language="python",
+                        chunk_index=i,
+                        metadata=chunk.metadata,
+                    )
+                except Exception:
+                    pass
 
         return {"file": str(path), "symbols": symbols, "language": self.lang}
 

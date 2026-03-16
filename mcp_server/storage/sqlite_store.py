@@ -221,6 +221,7 @@ class SQLiteStore:
         """Get a database connection with proper error handling."""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
         try:
             yield conn
             conn.commit()
@@ -462,6 +463,7 @@ class SQLiteStore:
             );
             
             CREATE INDEX IF NOT EXISTS idx_trigrams ON symbol_trigrams(trigram);
+            CREATE INDEX IF NOT EXISTS idx_trigrams_symbol_id ON symbol_trigrams(symbol_id);
             
             -- Embeddings
             CREATE TABLE IF NOT EXISTS embeddings (
@@ -763,6 +765,20 @@ class SQLiteStore:
                     (relative_path,),
                 )
             row = cursor.fetchone()
+            if row is None:
+                # Fallback: search by absolute path stored in 'path' column
+                abs_path = str(file_path).replace("\\", "/")
+                if repository_id:
+                    cursor = conn.execute(
+                        "SELECT * FROM files WHERE path = ? AND repository_id = ? AND is_deleted = FALSE",
+                        (abs_path, repository_id),
+                    )
+                else:
+                    cursor = conn.execute(
+                        "SELECT * FROM files WHERE path = ? AND is_deleted = FALSE",
+                        (abs_path,),
+                    )
+                row = cursor.fetchone()
             return dict(row) if row else None
 
     def get_file_by_path(
@@ -1331,37 +1347,177 @@ class SQLiteStore:
         Returns:
             List of matching symbols with relevance scores
         """
+        # Generate trigrams for the query
+        query_trigrams = set()
+        padded_query = f"  {query}  "
+        for i in range(len(padded_query) - 2):
+            trigram = padded_query[i : i + 3].lower()
+            query_trigrams.add(trigram)
+
+        if not query_trigrams:
+            return []
+
+        n_query = len(query_trigrams)
+        placeholders = ",".join(["?"] * n_query)
+
+        # CTE approach: avoid correlated subquery over 1.4M rows.
+        # matched_syms: symbols that share at least one trigram with the query.
+        # sym_totals:   total trigram count per matched symbol (uses idx_trigrams_symbol_id).
+        # Jaccard = intersection / (|query| + |symbol| - intersection)
         with self._get_connection() as conn:
-            # Generate trigrams for the query
-            query_trigrams = set()
-            padded_query = f"  {query}  "
-            for i in range(len(padded_query) - 2):
-                trigram = padded_query[i : i + 3].lower()
-                query_trigrams.add(trigram)
-
-            if not query_trigrams:
-                return []
-
-            # Build query with trigram matching
-            placeholders = ",".join(["?"] * len(query_trigrams))
-
             cursor = conn.execute(
                 f"""
-                SELECT s.*, f.path as file_path,
-                       COUNT(DISTINCT st.trigram) as matches,
-                       COUNT(DISTINCT st.trigram) * 1.0 / ? as score
-                FROM symbols s
-                JOIN files f ON s.file_id = f.id
-                JOIN symbol_trigrams st ON s.id = st.symbol_id
-                WHERE st.trigram IN ({placeholders})
-                GROUP BY s.id
+                WITH matched_syms AS (
+                    SELECT symbol_id, COUNT(DISTINCT trigram) AS intersection
+                    FROM symbol_trigrams
+                    WHERE trigram IN ({placeholders})
+                    GROUP BY symbol_id
+                ),
+                sym_totals AS (
+                    SELECT st.symbol_id, COUNT(*) AS total
+                    FROM symbol_trigrams st
+                    WHERE st.symbol_id IN (SELECT symbol_id FROM matched_syms)
+                    GROUP BY st.symbol_id
+                )
+                SELECT s.*, f.path AS file_path,
+                       m.intersection AS matches,
+                       m.intersection * 1.0 / (? + t.total - m.intersection) AS score
+                FROM matched_syms m
+                JOIN sym_totals t ON t.symbol_id = m.symbol_id
+                JOIN symbols s ON s.id = m.symbol_id
+                JOIN files f ON f.id = s.file_id
                 ORDER BY score DESC, s.name
                 LIMIT ?
-            """,
-                [len(query_trigrams)] + list(query_trigrams) + [limit],
+                """,
+                list(query_trigrams) + [n_query, limit],
             )
-
             return [dict(row) for row in cursor.fetchall()]
+
+    def get_file_id_by_path(self, file_path: str) -> Optional[int]:
+        """Return the integer file id for a given relative or absolute path, or None."""
+        with self._get_connection() as conn:
+            # Try relative_path first (most common), then path
+            for col in ("relative_path", "path"):
+                cursor = conn.execute(
+                    f"SELECT id FROM files WHERE {col} = ? LIMIT 1", (file_path,)
+                )
+                row = cursor.fetchone()
+                if row:
+                    return row[0]
+            # Try matching just the end of the stored path (handles abs vs rel mismatch)
+            cursor = conn.execute(
+                "SELECT id FROM files WHERE relative_path LIKE ? OR path LIKE ? LIMIT 1",
+                (f"%{file_path}", f"%{file_path}"),
+            )
+            row = cursor.fetchone()
+            return row[0] if row else None
+
+    def search_files_fuzzy(self, query: str, limit: int = 20) -> List[Dict]:
+        """
+        Fuzzy search for file paths using trigrams.
+
+        Computes Jaccard trigram similarity between the query and each
+        relative_path in the files table, returning the top matches.
+
+        Args:
+            query: Search query (may be misspelled)
+            limit: Maximum number of results
+
+        Returns:
+            List of dicts with file_path and score, sorted descending by score
+        """
+        # Generate trigrams for the query
+        query_trigrams: set = set()
+        padded_query = f"  {query.lower()}  "
+        for i in range(len(padded_query) - 2):
+            query_trigrams.add(padded_query[i : i + 3])
+
+        if not query_trigrams:
+            return []
+
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "SELECT id, COALESCE(relative_path, path) as relative_path FROM files WHERE is_deleted = 0 OR is_deleted IS NULL"
+            )
+            rows = cursor.fetchall()
+
+        results = []
+        for row in rows:
+            file_path = row[1] or ""
+            if not file_path:
+                continue
+            padded_path = f"  {file_path.lower()}  "
+            path_trigrams: set = set()
+            for i in range(len(padded_path) - 2):
+                path_trigrams.add(padded_path[i : i + 3])
+            union_size = len(query_trigrams | path_trigrams)
+            if union_size == 0:
+                continue
+            intersection = len(query_trigrams & path_trigrams)
+            score = intersection / union_size
+            if score > 0:
+                results.append({"file_path": file_path, "score": score, "file_id": row[0]})
+
+        results.sort(key=lambda r: r["score"], reverse=True)
+        return results[:limit]
+
+    def find_best_chunk_for_file(
+        self, file_id: int, query_words: List[str]
+    ) -> Optional[Dict]:
+        """
+        Find the best-matching code chunk for a file given query words.
+
+        Scores each chunk by how many query words appear in its content,
+        returning the highest-scoring chunk as a dict with symbol, line_start,
+        line_end, and node_type. Returns None if no chunks exist for the file.
+
+        Args:
+            file_id: The integer file id from the files table
+            query_words: List of query words to match against chunk content
+
+        Returns:
+            Dict with symbol, line_start, line_end, node_type or None
+        """
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT cc.line_start, cc.line_end, cc.node_type, cc.content,
+                       s.name as symbol_name
+                FROM code_chunks cc
+                LEFT JOIN symbols s ON cc.symbol_id = s.id
+                WHERE cc.file_id = ?
+                ORDER BY cc.line_start
+                """,
+                (file_id,),
+            )
+            chunks = cursor.fetchall()
+
+        if not chunks:
+            return None
+
+        lower_words = [w.lower() for w in query_words if w]
+        if not lower_words:
+            # No query words: return the chunk with the most content
+            best_chunk = max(chunks, key=lambda c: len(c[3] or ""))
+        else:
+            best_chunk = None
+            best_score = -1
+            for chunk in chunks:
+                content_lower = (chunk[3] or "").lower()
+                score = sum(1 for w in lower_words if w in content_lower)
+                if score > best_score:
+                    best_score = score
+                    best_chunk = chunk
+            if best_chunk is None:
+                best_chunk = chunks[0]
+
+        return {
+            "symbol": best_chunk[4],
+            "line_start": best_chunk[0],
+            "line_end": best_chunk[1],
+            "node_type": best_chunk[2],
+            "content": best_chunk[3],
+        }
 
     def search_symbols_fts(self, query: str, limit: int = 20) -> List[Dict]:
         """
@@ -2118,3 +2274,39 @@ class SQLiteStore:
                 }
                 for row in cursor.fetchall()
             ]
+
+    def find_chunk_at_line(
+        self, file_path: str, line: int
+    ) -> Optional[Dict[str, Any]]:
+        """Return the tightest code chunk that covers *line* in *file_path*.
+
+        Returns ``None`` when no matching chunk is found.  The dict keys
+        match the kwargs expected by ``ChunkWriter.summarize_chunk``:
+        ``chunk_hash``, ``file_id``, ``chunk_start``, ``chunk_end``,
+        ``symbol``, ``content``.
+        """
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """SELECT c.chunk_id, c.file_id, c.line_start, c.line_end,
+                          c.content, s.name AS symbol
+                   FROM code_chunks c
+                   JOIN files f ON c.file_id = f.id
+                   LEFT JOIN symbols s ON c.symbol_id = s.id
+                   WHERE (f.path = ? OR f.path LIKE ?)
+                     AND c.line_start <= ?
+                     AND c.line_end   >= ?
+                   ORDER BY (c.line_end - c.line_start) ASC
+                   LIMIT 1""",
+                (file_path, f"%{file_path}", line, line),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                return None
+            return {
+                "chunk_hash": row[0],
+                "file_id": row[1],
+                "chunk_start": row[2] or line,
+                "chunk_end": row[3] or line,
+                "symbol": row[5] or "unknown",
+                "content": row[4] or "",
+            }
