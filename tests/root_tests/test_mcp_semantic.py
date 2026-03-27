@@ -54,8 +54,7 @@ async def test_mcp_semantic():
     test_dir.mkdir(exist_ok=True)
 
     # API client code
-    (test_dir / "api_client.py").write_text(
-        '''
+    (test_dir / "api_client.py").write_text('''
 class APIClient:
     """A client for making HTTP requests to REST APIs."""
     
@@ -74,12 +73,10 @@ class APIClient:
         url = f"{self.base_url}/{endpoint}"
         # Make GET request
         pass
-'''
-    )
+''')
 
     # Data processing code
-    (test_dir / "data_processor.py").write_text(
-        '''
+    (test_dir / "data_processor.py").write_text('''
 def parse_json_data(json_string):
     """Parse JSON string and validate structure."""
     import json
@@ -105,8 +102,7 @@ class DataPipeline:
     def add_stage(self, processor):
         """Add a processing stage to the pipeline."""
         self.stages.append(processor)
-'''
-    )
+''')
 
     # Index the files
     print("✓ Created test files\n")

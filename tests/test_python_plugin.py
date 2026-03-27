@@ -95,8 +95,7 @@ class TestSymbolExtraction:
     def test_extract_function(self):
         """Test extracting function definitions."""
         plugin = PythonPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         def simple_function():
             '''A simple function.'''
             pass
@@ -108,8 +107,7 @@ class TestSymbolExtraction:
         async def async_function():
             '''An async function.'''
             pass
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.py"), code)
 
@@ -133,8 +131,7 @@ class TestSymbolExtraction:
     def test_extract_class(self):
         """Test extracting class definitions."""
         plugin = PythonPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         class SimpleClass:
             '''A simple class.'''
             pass
@@ -158,8 +155,7 @@ class TestSymbolExtraction:
             def static_method():
                 '''Static method.'''
                 pass
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.py"), code)
         symbols = result["symbols"]
@@ -181,8 +177,7 @@ class TestSymbolExtraction:
     def test_extract_variables(self):
         """Test extracting variable assignments."""
         plugin = PythonPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         # Module level variables
         CONSTANT = 42
         module_var = "hello"
@@ -200,8 +195,7 @@ class TestSymbolExtraction:
         def function():
             # Local variables (not extracted)
             local_var = 123
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.py"), code)
         symbols = result["symbols"]
@@ -215,8 +209,7 @@ class TestSymbolExtraction:
     def test_nested_symbols(self):
         """Test extracting nested classes and functions."""
         plugin = PythonPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         class OuterClass:
             class InnerClass:
                 def inner_method(self):
@@ -231,8 +224,7 @@ class TestSymbolExtraction:
             def inner_function():
                 pass
             return inner_function
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.py"), code)
         symbols = result["symbols"]
@@ -251,8 +243,7 @@ class TestSymbolExtraction:
     def test_decorators_in_signature(self):
         """Test that decorators are included in signatures."""
         plugin = PythonPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         @decorator
         def decorated_function():
             pass
@@ -270,8 +261,7 @@ class TestSymbolExtraction:
             @my_property.setter
             def my_property(self, value):
                 self._value = value
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.py"), code)
         symbols = result["symbols"]
@@ -295,8 +285,7 @@ class TestImportTracking:
     def test_extract_imports(self):
         """Test extracting various import statements."""
         plugin = PythonPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         # Standard imports
         import os
         import sys
@@ -320,8 +309,7 @@ class TestImportTracking:
             SecondClass,
             third_function
         )
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.py"), code)
 
@@ -346,8 +334,7 @@ class TestImportTracking:
     def test_conditional_imports(self):
         """Test handling of conditional imports."""
         plugin = PythonPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         import always_imported
         
         if sys.version_info >= (3, 8):
@@ -362,8 +349,7 @@ class TestImportTracking:
         
         def function():
             import function_local_import
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.py"), code)
         imports = result.get("imports", [])
@@ -384,8 +370,7 @@ class TestDocstringExtraction:
     def test_various_docstring_formats(self):
         """Test extracting different docstring formats."""
         plugin = PythonPlugin()
-        code = dedent(
-            '''
+        code = dedent('''
         def single_line_single_quotes():
             'Single line with single quotes.'
             pass
@@ -410,8 +395,7 @@ class TestDocstringExtraction:
         
         def no_docstring():
             pass
-        '''
-        )
+        ''')
 
         result = plugin.indexFile(Path("test.py"), code)
         symbols = result["symbols"]
@@ -432,8 +416,7 @@ class TestErrorHandling:
     def test_syntax_error_handling(self):
         """Test handling of syntax errors in code."""
         plugin = PythonPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         def valid_function():
             pass
         
@@ -443,8 +426,7 @@ class TestErrorHandling:
         
         def another_valid():
             pass
-        """
-        )
+        """)
 
         # Should not raise exception
         result = plugin.indexFile(Path("test.py"), code)
@@ -458,8 +440,7 @@ class TestErrorHandling:
     def test_unicode_handling(self):
         """Test handling of Unicode in code."""
         plugin = PythonPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         # Unicode in comments: 你好世界
         
         def 函数():
@@ -468,8 +449,7 @@ class TestErrorHandling:
             return "Hello, 世界"
         
         类 = type("类", (), {})
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.py"), code)
         symbols = result["symbols"]
@@ -485,14 +465,12 @@ class TestErrorHandling:
         # Generate a large file
         code_parts = ["# Large file test\n"]
         for i in range(1000):
-            code_parts.append(
-                f'''
+            code_parts.append(f'''
 def function_{i}(arg1, arg2, arg3):
     """Function number {i}"""
     result = arg1 + arg2 + arg3
     return result * {i}
-'''
-            )
+''')
 
         code = "".join(code_parts)
 
@@ -517,8 +495,7 @@ def function_{i}(arg1, arg2, arg3):
     def test_comment_only_file(self):
         """Test file with only comments."""
         plugin = PythonPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         # This file contains only comments
         # No actual code here
         
@@ -528,8 +505,7 @@ def function_{i}(arg1, arg2, arg3):
         '''
         
         # More comments
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("comments.py"), code)
 
@@ -543,8 +519,7 @@ class TestComplexCodeStructures:
     def test_generator_and_comprehensions(self):
         """Test generator functions and comprehensions."""
         plugin = PythonPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         def generator_function():
             '''A generator function.'''
             for i in range(10):
@@ -560,8 +535,7 @@ class TestComplexCodeStructures:
         
         # Module level comprehensions (edge case)
         MODULE_LIST = [i for i in range(5)]
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.py"), code)
         symbols = result["symbols"]
@@ -574,8 +548,7 @@ class TestComplexCodeStructures:
     def test_context_managers_and_with(self):
         """Test classes with context manager protocol."""
         plugin = PythonPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         class MyContextManager:
             '''A context manager class.'''
             
@@ -591,8 +564,7 @@ class TestComplexCodeStructures:
         def function_context_manager():
             '''Context manager using decorator.'''
             yield "resource"
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.py"), code)
         symbols = result["symbols"]
@@ -606,8 +578,7 @@ class TestComplexCodeStructures:
     def test_metaclasses_and_descriptors(self):
         """Test advanced OOP features."""
         plugin = PythonPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         class MetaClass(type):
             '''A metaclass.'''
             def __new__(mcs, name, bases, namespace):
@@ -627,8 +598,7 @@ class TestComplexCodeStructures:
             
             def __delete__(self, obj):
                 pass
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.py"), code)
         symbols = result["symbols"]
@@ -653,8 +623,7 @@ class TestSearchFunctionality:
         plugin = PythonPlugin(sqlite_store=sqlite_store)
 
         # Index a file first
-        code = dedent(
-            """
+        code = dedent("""
         def target_function():
             '''Function to find.'''
             pass
@@ -662,8 +631,7 @@ class TestSearchFunctionality:
         class TargetClass:
             '''Class to find.'''
             pass
-        """
-        )
+        """)
 
         # Create repository and file in store
         repo_id = sqlite_store.create_repository("/test", "test")
@@ -779,8 +747,7 @@ class TestPersistenceIntegration:
         repo_id = sqlite_store.create_repository("/myproject", "myproject")
 
         # Index a complex file
-        code = dedent(
-            """
+        code = dedent("""
         '''Module docstring.'''
         
         import os
@@ -807,8 +774,7 @@ class TestPersistenceIntegration:
             def transform(self, item):
                 '''Transform a single item.'''
                 return item * CONSTANT
-        """
-        )
+        """)
 
         file_path = Path("/myproject/main.py")
         file_id = sqlite_store.store_file(
@@ -866,8 +832,7 @@ class TestPerformance:
         # Generate a large Python file
         code_parts = []
         for i in range(100):
-            code_parts.append(
-                f'''
+            code_parts.append(f'''
 class Class{i}:
     """Class number {i}"""
     
@@ -880,8 +845,7 @@ class Class{i}:
         if data:
             return sum(data) // len(data)
         return None
-'''
-            )
+''')
 
         large_code = "\n".join(code_parts)
 

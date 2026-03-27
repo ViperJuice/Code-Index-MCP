@@ -125,9 +125,7 @@ class IPlugin(ABC):
         """Check if this plugin can handle the given file"""
 
     @abstractmethod
-    def index(
-        self, file_path: str, content: Optional[str] = None
-    ) -> Result[IndexedFile]:
+    def index(self, file_path: str, content: Optional[str] = None) -> Result[IndexedFile]:
         """Index a file and extract symbols"""
 
     @abstractmethod
@@ -137,9 +135,7 @@ class IPlugin(ABC):
         """Get the definition of a symbol"""
 
     @abstractmethod
-    def get_references(
-        self, symbol: str, context: Dict[str, Any]
-    ) -> Result[List[SymbolReference]]:
+    def get_references(self, symbol: str, context: Dict[str, Any]) -> Result[List[SymbolReference]]:
         """Get all references to a symbol"""
 
     @abstractmethod
@@ -151,9 +147,7 @@ class IPlugin(ABC):
         """Validate syntax of code content"""
 
     @abstractmethod
-    def get_completions(
-        self, file_path: str, line: int, column: int
-    ) -> Result[List[str]]:
+    def get_completions(self, file_path: str, line: int, column: int) -> Result[List[str]]:
         """Get code completions at a position"""
 
 
@@ -169,9 +163,7 @@ class ILanguageAnalyzer(ABC):
         """Extract all symbols from content"""
 
     @abstractmethod
-    def resolve_type(
-        self, symbol: str, context: Dict[str, Any]
-    ) -> Result[Optional[str]]:
+    def resolve_type(self, symbol: str, context: Dict[str, Any]) -> Result[Optional[str]]:
         """Resolve the type of a symbol"""
 
     @abstractmethod
@@ -222,9 +214,7 @@ class IPluginDiscovery(ABC):
     """Interface for discovering available plugins"""
 
     @abstractmethod
-    def discover_plugins(
-        self, search_paths: List[str | Path]
-    ) -> Result[List[PluginMetadata]]:
+    def discover_plugins(self, search_paths: List[str | Path]) -> Result[List[PluginMetadata]]:
         """Discover plugins in the given search paths"""
 
     @abstractmethod
@@ -266,9 +256,7 @@ class IPluginManager(IObservable):
     """Interface for overall plugin management"""
 
     @abstractmethod
-    def load_plugins(
-        self, config_path: Optional[str | Path] = None
-    ) -> Result[List[str]]:
+    def load_plugins(self, config_path: Optional[str | Path] = None) -> Result[List[str]]:
         """Discover, load, and optionally initialize configured plugins."""
 
     @abstractmethod
@@ -346,9 +334,7 @@ class IPythonPlugin(IPlugin):
         """Get import dependency graph"""
 
     @abstractmethod
-    def resolve_module(
-        self, module_name: str, context: Dict[str, Any]
-    ) -> Result[Optional[str]]:
+    def resolve_module(self, module_name: str, context: Dict[str, Any]) -> Result[Optional[str]]:
         """Resolve a module to its file path"""
 
 

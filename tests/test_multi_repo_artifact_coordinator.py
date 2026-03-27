@@ -152,9 +152,7 @@ def test_publish_workspace_uses_local_first_wording(monkeypatch, tmp_path: Path)
     assert results[0].details["prepared_archive"] == "index-archive.tar.gz"
 
 
-def test_workspace_status_cli_reports_registered_repositories(
-    monkeypatch, tmp_path: Path
-):
+def test_workspace_status_cli_reports_registered_repositories(monkeypatch, tmp_path: Path):
     runner = CliRunner()
     manager = MultiRepositoryManager(central_index_path=tmp_path / "registry.json")
     repo_path = tmp_path / "repo"

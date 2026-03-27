@@ -49,12 +49,8 @@ def test_multi_repo_manager_ready_and_stale_sets(tmp_path: Path):
     manager.registry.register(ready_repo)
     manager.registry.register(stale_repo)
 
-    assert [repo.repository_id for repo in manager.get_ready_repositories()] == [
-        "ready"
-    ]
-    assert {repo.repository_id for repo in manager.get_stale_repositories()} == {
-        "stale"
-    }
+    assert [repo.repository_id for repo in manager.get_ready_repositories()] == ["ready"]
+    assert {repo.repository_id for repo in manager.get_stale_repositories()} == {"stale"}
 
 
 def test_repository_plugin_loader_analyzes_index_languages(tmp_path: Path):
@@ -73,9 +69,7 @@ def test_repository_plugin_loader_analyzes_index_languages(tmp_path: Path):
         ("python", "test.py"),
         ("javascript", "app.js"),
     ]:
-        conn.execute(
-            "INSERT INTO files (language, path) VALUES (?, ?)", (language, path)
-        )
+        conn.execute("INSERT INTO files (language, path) VALUES (?, ?)", (language, path))
     conn.commit()
     conn.close()
 

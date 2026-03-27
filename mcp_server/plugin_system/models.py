@@ -163,9 +163,7 @@ class PluginSystemConfig:
 
     def __post_init__(self):
         """Ensure paths are Path objects and set defaults."""
-        self.plugin_dirs = [
-            Path(p) if isinstance(p, str) else p for p in self.plugin_dirs
-        ]
+        self.plugin_dirs = [Path(p) if isinstance(p, str) else p for p in self.plugin_dirs]
         if self.config_file and isinstance(self.config_file, str):
             self.config_file = Path(self.config_file)
 
@@ -240,9 +238,7 @@ class PluginSystemConfig:
 
         return config
 
-    def get_environment_config(
-        self, environment: Optional[str] = None
-    ) -> Dict[str, Any]:
+    def get_environment_config(self, environment: Optional[str] = None) -> Dict[str, Any]:
         """Get configuration for specific environment."""
         if not environment:
             import os
@@ -261,9 +257,7 @@ class PluginSystemConfig:
 
         self.auto_discover = data.get("auto_discover", self.auto_discover)
         self.auto_load = data.get("auto_load", self.auto_load)
-        self.validate_interfaces = data.get(
-            "validate_interfaces", self.validate_interfaces
-        )
+        self.validate_interfaces = data.get("validate_interfaces", self.validate_interfaces)
         self.enable_hot_reload = data.get("enable_hot_reload", self.enable_hot_reload)
         self.environments = data.get("environments", self.environments)
 

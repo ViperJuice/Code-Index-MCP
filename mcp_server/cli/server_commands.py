@@ -19,9 +19,7 @@ def _default_port() -> int:
 
 
 @click.command("serve")
-@click.option(
-    "--host", default=_default_host, show_default="env MCP_SERVER_HOST or 127.0.0.1"
-)
+@click.option("--host", default=_default_host, show_default="env MCP_SERVER_HOST or 127.0.0.1")
 @click.option(
     "--port",
     default=_default_port,
@@ -34,9 +32,7 @@ def serve(host: str, port: int, reload: bool) -> None:
     import uvicorn
     from pathlib import Path
 
-    os.environ.setdefault(
-        "MCP_INDEX_STORAGE_PATH", str(Path.home() / ".mcp" / "indexes")
-    )
+    os.environ.setdefault("MCP_INDEX_STORAGE_PATH", str(Path.home() / ".mcp" / "indexes"))
     os.environ.setdefault("MCP_SKIP_PLUGIN_PREINDEX", "true")
 
     click.echo(f"Starting MCP server on http://{host}:{port}")

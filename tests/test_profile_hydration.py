@@ -62,10 +62,7 @@ def test_incompatible_profile_is_flagged() -> None:
     )
 
     assert report.profiles["commercial-high"].status is HydrationState.INCOMPATIBLE
-    assert (
-        report.profiles["commercial-high"].reason
-        == "compatibility fingerprint mismatch"
-    )
+    assert report.profiles["commercial-high"].reason == "compatibility fingerprint mismatch"
 
 
 def test_multi_profile_metadata_marks_available_and_missing_profiles() -> None:
@@ -73,9 +70,7 @@ def test_multi_profile_metadata_marks_available_and_missing_profiles() -> None:
 
     report = coordinator.from_index_metadata(
         requested_profiles={"oss_high": "oss123", "commercial_high": "voy123"},
-        index_metadata={
-            "semantic_profiles": {"oss_high": {"compatibility_fingerprint": "oss123"}}
-        },
+        index_metadata={"semantic_profiles": {"oss_high": {"compatibility_fingerprint": "oss123"}}},
         lexical_available=True,
     )
 
@@ -88,9 +83,7 @@ def test_index_discovery_exposes_profile_hydration_from_metadata(
 ) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir(parents=True)
-    (workspace / ".mcp-index.json").write_text(
-        json.dumps({"enabled": True}), encoding="utf-8"
-    )
+    (workspace / ".mcp-index.json").write_text(json.dumps({"enabled": True}), encoding="utf-8")
 
     db_path = workspace / ".mcp-index" / "code_index.db"
     _create_minimal_index(db_path)

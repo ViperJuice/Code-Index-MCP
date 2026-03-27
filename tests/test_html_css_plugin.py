@@ -356,20 +356,17 @@ class TestHTMLCSSPlugin:
 
             try:
                 # Create HTML file
-                Path("index.html").write_text(
-                    """
+                Path("index.html").write_text("""
                 <div id="header" class="main-header">
                     <h1 class="title">Title</h1>
                 </div>
                 <div class="container">
                     <p class="text-primary">Text</p>
                 </div>
-                """
-                )
+                """)
 
                 # Create CSS file
-                Path("styles.css").write_text(
-                    """
+                Path("styles.css").write_text("""
                 #header {
                     background: #333;
                 }
@@ -382,8 +379,7 @@ class TestHTMLCSSPlugin:
                 .text-primary {
                     color: #007bff;
                 }
-                """
-                )
+                """)
 
                 # Find references
                 header_refs = plugin.findReferences("#header")

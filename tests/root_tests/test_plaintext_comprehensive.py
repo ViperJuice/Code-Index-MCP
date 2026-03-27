@@ -1126,9 +1126,7 @@ while maintaining high performance and reliability standards.
         for i in range(100):
             section = f"""Section {i}
 
-This is section number {i} of the large document. """ + (
-                "Lorem ipsum dolor sit amet. " * 10
-            )
+This is section number {i} of the large document. """ + ("Lorem ipsum dolor sit amet. " * 10)
             sections.append(section)
 
         large_content = "Large Document\n\n" + "\n\n".join(sections)

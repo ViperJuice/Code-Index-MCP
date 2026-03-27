@@ -181,9 +181,7 @@ class GenericTreeSitterPlugin(PluginWithSemanticSearch):
                     # Extract symbol name (basic approach)
                     parts = line.strip().split()
                     if len(parts) > 1:
-                        symbol_name = (
-                            parts[1].split("(")[0] if "(" in parts[1] else parts[1]
-                        )
+                        symbol_name = parts[1].split("(")[0] if "(" in parts[1] else parts[1]
                         symbols.append(
                             {
                                 "symbol": symbol_name,
@@ -249,9 +247,7 @@ class GenericTreeSitterPlugin(PluginWithSemanticSearch):
                             chunks = chunk_text(content, self.lang)
                             for chunk in chunks:
                                 # Check if chunk contains this symbol
-                                symbol_name = chunk.metadata.get(
-                                    "name", chunk.node_type
-                                )
+                                symbol_name = chunk.metadata.get("name", chunk.node_type)
                                 if symbol_name == symbol:
                                     return self._adapter.chunk_to_symbol_def(chunk)
                         except Exception as e:

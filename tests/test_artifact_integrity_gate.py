@@ -172,9 +172,7 @@ def test_downloader_run_integrity_gate_fails_closed(tmp_path: Path):
         )
 
 
-def test_downloader_accepts_artifact_when_any_profile_matches(
-    monkeypatch, tmp_path: Path
-):
+def test_downloader_accepts_artifact_when_any_profile_matches(monkeypatch, tmp_path: Path):
     monkeypatch.chdir(tmp_path)
     configured_profiles = _configured_profiles()
     registry = SemanticProfileRegistry.from_raw(configured_profiles, "oss_high")
@@ -195,9 +193,7 @@ def test_downloader_accepts_artifact_when_any_profile_matches(
             "schema_version": "2",
             "semantic_profiles": {
                 "oss_high": {
-                    "compatibility_fingerprint": registry.get(
-                        "oss_high"
-                    ).compatibility_fingerprint
+                    "compatibility_fingerprint": registry.get("oss_high").compatibility_fingerprint
                 }
             },
         }
@@ -220,9 +216,7 @@ def test_downloader_rejects_artifact_when_profile_fingerprints_mismatch(
         lambda: SimpleNamespace(
             app_version="test",
             semantic_embedding_model="voyage-code-3",
-            get_semantic_profiles_config=lambda: {
-                "oss_high": configured_profiles["oss_high"]
-            },
+            get_semantic_profiles_config=lambda: {"oss_high": configured_profiles["oss_high"]},
             get_semantic_default_profile=lambda: "oss_high",
         ),
     )

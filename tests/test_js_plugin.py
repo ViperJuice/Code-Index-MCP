@@ -490,25 +490,21 @@ class TestJavaScriptPlugin:
         """Test finding references to symbols."""
         # Create test files
         file1 = temp_dir / "module1.js"
-        file1.write_text(
-            """
+        file1.write_text("""
         export function helper() {
             return "help";
         }
-        """
-        )
+        """)
 
         file2 = temp_dir / "module2.js"
-        file2.write_text(
-            """
+        file2.write_text("""
         import { helper } from './module1';
         
         function main() {
             const result = helper();
             console.log(helper());
         }
-        """
-        )
+        """)
 
         # Index files
         plugin.indexFile(file1, file1.read_text())

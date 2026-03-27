@@ -72,9 +72,7 @@ class SemanticProfile:
         fingerprint = _compute_compatibility_fingerprint(canonical)
 
         metadata = payload.get("build_metadata") or {}
-        metadata.setdefault(
-            "created_at", created_at or datetime.now(timezone.utc).isoformat()
-        )
+        metadata.setdefault("created_at", created_at or datetime.now(timezone.utc).isoformat())
         metadata.setdefault("tool_version", tool_version)
 
         return cls(
@@ -137,9 +135,7 @@ class SemanticProfileRegistry:
 
         self.default_profile = default_profile or next(iter(self._profiles.keys()))
         if self.default_profile not in self._profiles:
-            raise ValueError(
-                f"Default semantic profile '{self.default_profile}' is not defined"
-            )
+            raise ValueError(f"Default semantic profile '{self.default_profile}' is not defined")
 
     @classmethod
     def from_config_file(
@@ -181,8 +177,7 @@ class SemanticProfileRegistry:
         return {
             "semantic_default_profile": self.default_profile,
             "semantic_profiles": {
-                profile_id: profile.to_dict()
-                for profile_id, profile in self._profiles.items()
+                profile_id: profile.to_dict() for profile_id, profile in self._profiles.items()
             },
         }
 
@@ -216,11 +211,7 @@ def extract_semantic_profile_metadata(
             discovered[raw_profile_id] = normalized
 
     legacy_profile = metadata.get("semantic_profile")
-    if (
-        isinstance(legacy_profile, str)
-        and legacy_profile
-        and legacy_profile not in discovered
-    ):
+    if isinstance(legacy_profile, str) and legacy_profile and legacy_profile not in discovered:
         discovered[legacy_profile] = {
             "profile_id": legacy_profile,
             "compatibility_fingerprint": metadata.get("compatibility_fingerprint"),

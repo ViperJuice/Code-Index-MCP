@@ -143,25 +143,21 @@ class TestMultiRepositoryManager:
             # Create minimal SQLite index
             conn = sqlite3.connect(str(index_path))
             cursor = conn.cursor()
-            cursor.execute(
-                """
+            cursor.execute("""
                 CREATE TABLE files (
                     id INTEGER PRIMARY KEY,
                     path TEXT,
                     language TEXT,
                     is_deleted INTEGER DEFAULT 0
                 )
-            """
-            )
-            cursor.execute(
-                """
+            """)
+            cursor.execute("""
                 CREATE TABLE symbols (
                     id INTEGER PRIMARY KEY,
                     name TEXT,
                     is_deleted INTEGER DEFAULT 0
                 )
-            """
-            )
+            """)
             cursor.execute("INSERT INTO files (path, language) VALUES ('test.py', 'python')")
             cursor.execute("INSERT INTO symbols (name) VALUES ('test_function')")
             conn.commit()

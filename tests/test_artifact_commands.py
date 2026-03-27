@@ -102,9 +102,7 @@ def test_artifact_sync_bootstraps_local_indexes(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "mcp_server.cli.artifact_commands._get_local_drift",
         lambda: (
-            type(
-                "Detector", (), {"should_use_incremental": lambda self, changes: False}
-            )(),
+            type("Detector", (), {"should_use_incremental": lambda self, changes: False})(),
             [],
         ),
     )
@@ -127,9 +125,7 @@ def test_artifact_sync_reports_existing_local_drift(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "mcp_server.cli.artifact_commands._get_local_drift",
         lambda: (
-            type(
-                "Detector", (), {"should_use_incremental": lambda self, changes: False}
-            )(),
+            type("Detector", (), {"should_use_incremental": lambda self, changes: False})(),
             [object()],
         ),
     )
@@ -143,9 +139,7 @@ def test_artifact_sync_reports_existing_local_drift(monkeypatch, tmp_path):
     assert "too large for automatic incremental sync" in result.output.lower()
 
 
-def test_incremental_reconcile_uses_python_plugin_without_preindex(
-    monkeypatch, tmp_path
-):
+def test_incremental_reconcile_uses_python_plugin_without_preindex(monkeypatch, tmp_path):
     calls = []
 
     class FakePythonPlugin:
@@ -162,12 +156,8 @@ def test_incremental_reconcile_uses_python_plugin_without_preindex(
 
     monkeypatch.chdir(tmp_path)
     Path("code_index.db").write_text("placeholder", encoding="utf-8")
-    monkeypatch.setattr(
-        "mcp_server.cli.artifact_commands.SQLiteStore", lambda path: object()
-    )
-    monkeypatch.setattr(
-        "mcp_server.cli.artifact_commands.PythonPlugin", FakePythonPlugin
-    )
+    monkeypatch.setattr("mcp_server.cli.artifact_commands.SQLiteStore", lambda path: object())
+    monkeypatch.setattr("mcp_server.cli.artifact_commands.PythonPlugin", FakePythonPlugin)
     monkeypatch.setattr(
         "mcp_server.cli.artifact_commands.EnhancedDispatcher",
         lambda **kwargs: object(),
@@ -190,13 +180,9 @@ def test_incremental_reconcile_uses_python_plugin_without_preindex(
                 },
             )()
 
-    monkeypatch.setattr(
-        "mcp_server.cli.artifact_commands.IncrementalIndexer", FakeIndexer
-    )
+    monkeypatch.setattr("mcp_server.cli.artifact_commands.IncrementalIndexer", FakeIndexer)
 
-    result = _run_incremental_reconcile(
-        [FileChange("mcp_server/example.py", "modified")]
-    )
+    result = _run_incremental_reconcile([FileChange("mcp_server/example.py", "modified")])
 
     assert result is True
     assert calls == [False]

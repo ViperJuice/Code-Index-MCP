@@ -305,7 +305,8 @@ class RustPlugin(SpecializedPluginBase):
                 results.append(
                     SearchResult(
                         file=impl_info["file"],
-                        start_line=impl_info["line"], end_line=impl_info["line"],
+                        start_line=impl_info["line"],
+                        end_line=impl_info["line"],
                         column=0,
                         text=f"impl {trait_name} for {impl_info['type']}",
                         score=1.0,
@@ -325,7 +326,8 @@ class RustPlugin(SpecializedPluginBase):
                 results.append(
                     SearchResult(
                         file=str(cargo_path),
-                        start_line=1, end_line=1,
+                        start_line=1,
+                        end_line=1,
                         column=0,
                         text=f"dependency: {dep_name} = {crate_info.dependencies[dep_name]}",
                         score=1.0,
@@ -350,7 +352,8 @@ class RustPlugin(SpecializedPluginBase):
                             results.append(
                                 SearchResult(
                                     file=str(path),
-                                    start_line=i + 1, end_line=i + 1,
+                                    start_line=i + 1,
+                                    end_line=i + 1,
                                     column=(line.index(macro_name) if macro_name in line else 0),
                                     text=line.strip(),
                                     score=0.9,

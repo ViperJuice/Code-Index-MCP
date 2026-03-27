@@ -163,7 +163,8 @@ class PluginWithSemanticSearch(IPlugin):
                         semantic_results.append(
                             SemanticSearchResult(
                                 file=result["file"],
-                                start_line=result["line"], end_line=result["line"],
+                                start_line=result["line"],
+                                end_line=result["line"],
                                 snippet=snippet,
                                 score=result["score"],
                                 embedding_id=result.get("id"),
@@ -196,7 +197,10 @@ class PluginWithSemanticSearch(IPlugin):
             # Convert to standard SearchResult format
             for result in semantic_results:
                 yield SearchResult(
-                    file=result["file"], start_line=result["line"], end_line=result["line"], snippet=result["snippet"]
+                    file=result["file"],
+                    start_line=result["line"],
+                    end_line=result["line"],
+                    snippet=result["snippet"],
                 )
         else:
             # Fallback to traditional search (must be implemented by subclass)

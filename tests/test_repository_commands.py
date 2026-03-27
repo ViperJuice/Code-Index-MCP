@@ -37,9 +37,7 @@ def test_register_sets_local_first_defaults(monkeypatch, tmp_path: Path):
     repo_path.mkdir()
 
     class FakeRegistry:
-        def register_repository(
-            self, path, auto_sync=True, artifact_enabled=True, priority=0
-        ):
+        def register_repository(self, path, auto_sync=True, artifact_enabled=True, priority=0):
             return "repo-1"
 
         def set_artifact_enabled(self, repo_id, enabled):
@@ -48,18 +46,13 @@ def test_register_sets_local_first_defaults(monkeypatch, tmp_path: Path):
         def get_repository(self, repo_id):
             return _repo_info(tmp_path)
 
-    monkeypatch.setattr(
-        "mcp_server.cli.repository_commands.RepositoryRegistry", FakeRegistry
-    )
+    monkeypatch.setattr("mcp_server.cli.repository_commands.RepositoryRegistry", FakeRegistry)
 
     result = runner.invoke(repository, ["register", str(repo_path)])
 
     assert result.exit_code == 0
     assert "Artifact backend: local_workspace" in result.output
-    assert (
-        "Artifact health: ready" in result.output
-        or "Artifact health: missing" in result.output
-    )
+    assert "Artifact health: ready" in result.output or "Artifact health: missing" in result.output
 
 
 def test_list_shows_artifact_readiness_fields(monkeypatch, tmp_path: Path):
@@ -71,9 +64,7 @@ def test_list_shows_artifact_readiness_fields(monkeypatch, tmp_path: Path):
         def get_all_repositories(self):
             return {"repo-1": repo_info}
 
-    monkeypatch.setattr(
-        "mcp_server.cli.repository_commands.RepositoryRegistry", FakeRegistry
-    )
+    monkeypatch.setattr("mcp_server.cli.repository_commands.RepositoryRegistry", FakeRegistry)
 
     result = runner.invoke(repository, ["list", "-v"])
 
@@ -97,12 +88,8 @@ def test_unregister_removes_repo_from_registry(monkeypatch, tmp_path: Path):
         def unregister_repository(self, repo_id):
             return True
 
-    monkeypatch.setattr(
-        "mcp_server.cli.repository_commands.RepositoryRegistry", FakeRegistry
-    )
-    monkeypatch.setattr(
-        "mcp_server.cli.repository_commands.click.confirm", lambda prompt: True
-    )
+    monkeypatch.setattr("mcp_server.cli.repository_commands.RepositoryRegistry", FakeRegistry)
+    monkeypatch.setattr("mcp_server.cli.repository_commands.click.confirm", lambda prompt: True)
 
     result = runner.invoke(repository, ["unregister", "repo-1"])
 
@@ -135,19 +122,13 @@ def test_sync_guidance_matches_local_first_workflow(monkeypatch, tmp_path: Path)
         def sync_repository_index(self, repo_id, force_full=False):
             return FakeResult()
 
-    monkeypatch.setattr(
-        "mcp_server.cli.repository_commands.RepositoryRegistry", FakeRegistry
-    )
-    monkeypatch.setattr(
-        "mcp_server.cli.repository_commands.GitAwareIndexManager", FakeIndexManager
-    )
+    monkeypatch.setattr("mcp_server.cli.repository_commands.RepositoryRegistry", FakeRegistry)
+    monkeypatch.setattr("mcp_server.cli.repository_commands.GitAwareIndexManager", FakeIndexManager)
     monkeypatch.setattr(
         "mcp_server.cli.repository_commands.EnhancedDispatcher",
         lambda sqlite_store=None: object(),
     )
-    monkeypatch.setattr(
-        "mcp_server.cli.repository_commands.SQLiteStore", lambda path: object()
-    )
+    monkeypatch.setattr("mcp_server.cli.repository_commands.SQLiteStore", lambda path: object())
 
     result = runner.invoke(repository, ["sync"])
 

@@ -17,9 +17,7 @@ try:
     CHUNKER_AVAILABLE = True
     logger.info("TreeSitter Chunker graph module available")
 except ImportError:
-    logger.warning(
-        "TreeSitter Chunker not available. Install with: pip install treesitter-chunker"
-    )
+    logger.warning("TreeSitter Chunker not available. Install with: pip install treesitter-chunker")
 
 
 class XRefAdapter(IGraphBuilder):
@@ -28,13 +26,9 @@ class XRefAdapter(IGraphBuilder):
     def __init__(self):
         """Initialize the XRef adapter."""
         if not CHUNKER_AVAILABLE:
-            logger.warning(
-                "XRefAdapter initialized but TreeSitter Chunker is not available"
-            )
+            logger.warning("XRefAdapter initialized but TreeSitter Chunker is not available")
 
-    def build_graph(
-        self, file_paths: List[str]
-    ) -> Tuple[List[GraphNode], List[GraphEdge]]:
+    def build_graph(self, file_paths: List[str]) -> Tuple[List[GraphNode], List[GraphEdge]]:
         """
         Build a code graph from the given files using TreeSitter Chunker.
 
@@ -61,12 +55,25 @@ class XRefAdapter(IGraphBuilder):
                     # Infer language from extension
                     ext = path.suffix.lower().lstrip(".")
                     _EXT = {
-                        "py": "python", "js": "javascript", "ts": "typescript",
-                        "jsx": "javascript", "tsx": "typescript", "rs": "rust",
-                        "go": "go", "java": "java", "cpp": "cpp", "cc": "cpp",
-                        "c": "c", "h": "c", "cs": "c_sharp", "rb": "ruby",
-                        "php": "php", "swift": "swift", "kt": "kotlin",
-                        "scala": "scala", "zig": "zig",
+                        "py": "python",
+                        "js": "javascript",
+                        "ts": "typescript",
+                        "jsx": "javascript",
+                        "tsx": "typescript",
+                        "rs": "rust",
+                        "go": "go",
+                        "java": "java",
+                        "cpp": "cpp",
+                        "cc": "cpp",
+                        "c": "c",
+                        "h": "c",
+                        "cs": "c_sharp",
+                        "rb": "ruby",
+                        "php": "php",
+                        "swift": "swift",
+                        "kt": "kotlin",
+                        "scala": "scala",
+                        "zig": "zig",
                     }
                     language = _EXT.get(ext, "text")
 
@@ -142,9 +149,7 @@ class XRefAdapter(IGraphBuilder):
             try:
                 edge_type = EdgeType[edge_type_str]
             except KeyError:
-                logger.warning(
-                    f"Unknown edge type: {edge_type_str}, defaulting to REFERENCES"
-                )
+                logger.warning(f"Unknown edge type: {edge_type_str}, defaulting to REFERENCES")
                 edge_type = EdgeType.REFERENCES
 
             edge = GraphEdge(

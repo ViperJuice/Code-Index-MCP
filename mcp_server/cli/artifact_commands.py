@@ -154,15 +154,11 @@ def _get_local_drift() -> tuple[ChangeDetector, List[FileChange]]:
     artifact_commit = artifact_identity.get("commit")
     if isinstance(artifact_commit, str) and git_info.get("head"):
         if artifact_commit != git_info["head"]:
-            committed_changes = detector.get_changes_since_commit(
-                artifact_commit, "HEAD"
-            )
+            committed_changes = detector.get_changes_since_commit(artifact_commit, "HEAD")
 
     uncommitted_changes = detector.get_uncommitted_changes()
     merged_changes = _merge_changes(committed_changes, uncommitted_changes)
-    filtered_changes = [
-        change for change in merged_changes if _is_reconcile_candidate(change)
-    ]
+    filtered_changes = [change for change in merged_changes if _is_reconcile_candidate(change)]
     return detector, filtered_changes
 
 
@@ -197,9 +193,7 @@ def _run_incremental_reconcile(changes: List[FileChange]) -> bool:
         lazy_load=False,
         semantic_search_enabled=False,
     )
-    indexer = IncrementalIndexer(
-        store=store, dispatcher=dispatcher, repo_path=Path.cwd()
-    )
+    indexer = IncrementalIndexer(store=store, dispatcher=dispatcher, repo_path=Path.cwd())
     stats = indexer.update_from_changes(changes)
     click.echo(
         "✅ Incremental reconcile complete: "
@@ -217,20 +211,12 @@ def _print_reconcile_guidance() -> None:
     if artifact_identity.get("commit"):
         click.echo(
             f"📦 Restored artifact commit: {artifact_identity['commit']}"
-            + (
-                f" ({artifact_identity['branch']})"
-                if artifact_identity.get("branch")
-                else ""
-            )
+            + (f" ({artifact_identity['branch']})" if artifact_identity.get("branch") else "")
         )
     if artifact_identity.get("embedding_model"):
-        click.echo(
-            f"🧠 Artifact embedding model: {artifact_identity['embedding_model']}"
-        )
+        click.echo(f"🧠 Artifact embedding model: {artifact_identity['embedding_model']}")
     if artifact_identity.get("semantic_profiles"):
-        click.echo(
-            f"🧩 Artifact semantic profiles: {artifact_identity['semantic_profiles']}"
-        )
+        click.echo(f"🧩 Artifact semantic profiles: {artifact_identity['semantic_profiles']}")
 
     if not artifact_identity.get("commit") or not git_info.get("head"):
         click.echo("ℹ️  Artifact restore complete. Git drift could not be determined.")
@@ -249,13 +235,9 @@ def _print_reconcile_guidance() -> None:
         f"added/modified={cost['files_to_index']}, "
         f"deleted={cost['files_to_remove']}, moved={cost['files_to_move']}"
     )
-    click.echo(
-        f"🔄 Local drift detected relative to the restored artifact: {change_summary}"
-    )
+    click.echo(f"🔄 Local drift detected relative to the restored artifact: {change_summary}")
     if detector.should_use_incremental(all_changes):
-        click.echo(
-            "💡 Recommended: run or continue local incremental reconcile for these changes."
-        )
+        click.echo("💡 Recommended: run or continue local incremental reconcile for these changes.")
     else:
         click.echo(
             "⚠️  Change volume is large; a local rebuild may be simpler than incremental catch-up."
@@ -270,9 +252,7 @@ def artifact():
 @artifact.command()
 @click.option("--validate", is_flag=True, help="Validate indexes before upload")
 @click.option("--compress-only", is_flag=True, help="Only compress, do not upload")
-@click.option(
-    "--no-secure", is_flag=True, help="Disable secure export (include all files)"
-)
+@click.option("--no-secure", is_flag=True, help="Disable secure export (include all files)")
 def push(validate: bool, compress_only: bool, no_secure: bool):
     """Upload local indexes to GitHub Actions Artifacts."""
     try:
@@ -336,9 +316,7 @@ def pull(latest: bool, artifact_id: Optional[int], no_backup: bool):
             shutil.rmtree(output_dir, ignore_errors=True)
 
         if not _verify_local_index_restored():
-            click.echo(
-                "❌ Download completed but no local index files were restored", err=True
-            )
+            click.echo("❌ Download completed but no local index files were restored", err=True)
             raise click.Abort()
 
         restored = ", ".join(path.name for path in _get_restored_index_paths())
@@ -439,9 +417,7 @@ def sync():
                     if not _run_incremental_reconcile(changes):
                         raise click.Abort()
                 else:
-                    click.echo(
-                        "\n⚠️  Local drift is too large for automatic incremental sync."
-                    )
+                    click.echo("\n⚠️  Local drift is too large for automatic incremental sync.")
                     click.echo("   Recommended: run `mcp-index index rebuild --force`")
             else:
                 click.echo("\n✅ Local artifact baseline is already in sync.")
@@ -454,15 +430,9 @@ def sync():
 
 
 @artifact.command()
-@click.option(
-    "--older-than", type=int, default=30, help="Delete artifacts older than N days"
-)
-@click.option(
-    "--keep-latest", type=int, default=5, help="Keep at least N latest artifacts"
-)
-@click.option(
-    "--dry-run", is_flag=True, help="Show what would be deleted without deleting"
-)
+@click.option("--older-than", type=int, default=30, help="Delete artifacts older than N days")
+@click.option("--keep-latest", type=int, default=5, help="Keep at least N latest artifacts")
+@click.option("--dry-run", is_flag=True, help="Show what would be deleted without deleting")
 def cleanup(older_than: int, keep_latest: int, dry_run: bool):
     """Clean up old artifacts to save storage."""
     try:
@@ -491,9 +461,7 @@ def info(artifact_id: int):
     try:
         downloader = IndexArtifactDownloader()
         artifacts = downloader.list_artifacts()
-        artifact_info = next(
-            (item for item in artifacts if item["id"] == artifact_id), None
-        )
+        artifact_info = next((item for item in artifacts if item["id"] == artifact_id), None)
         if artifact_info is None:
             click.echo(f"❌ Artifact {artifact_id} not found", err=True)
             raise click.Abort()
@@ -538,9 +506,7 @@ def recover(branch: Optional[str], commit: Optional[str], no_backup: bool):
             shutil.rmtree(output_dir, ignore_errors=True)
 
         if not _verify_local_index_restored():
-            click.echo(
-                "❌ Recovery completed but no local index files were restored", err=True
-            )
+            click.echo("❌ Recovery completed but no local index files were restored", err=True)
             raise click.Abort()
 
         restored = ", ".join(path.name for path in _get_restored_index_paths())
@@ -564,9 +530,7 @@ def _format_workspace_results(results: List) -> None:
 
 
 @artifact.command("workspace-status")
-@click.option(
-    "--repository", "repositories", multiple=True, help="Repository ID to inspect"
-)
+@click.option("--repository", "repositories", multiple=True, help="Repository ID to inspect")
 def workspace_status(repositories: tuple[str, ...]):
     """Show local-first artifact/runtime lifecycle state for registered repositories."""
     coordinator = MultiRepoArtifactCoordinator()
@@ -578,9 +542,7 @@ def workspace_status(repositories: tuple[str, ...]):
 
 
 @artifact.command("publish-workspace")
-@click.option(
-    "--repository", "repositories", multiple=True, help="Repository ID to publish"
-)
+@click.option("--repository", "repositories", multiple=True, help="Repository ID to publish")
 def publish_workspace(repositories: tuple[str, ...]):
     """Prepare local artifact payloads for registered repositories."""
     coordinator = MultiRepoArtifactCoordinator()
@@ -594,9 +556,7 @@ def publish_workspace(repositories: tuple[str, ...]):
 
 
 @artifact.command("fetch-workspace")
-@click.option(
-    "--repository", "repositories", multiple=True, help="Repository ID to fetch"
-)
+@click.option("--repository", "repositories", multiple=True, help="Repository ID to fetch")
 def fetch_workspace(repositories: tuple[str, ...]):
     """Fetch available artifacts for registered repositories where configured."""
     coordinator = MultiRepoArtifactCoordinator()
@@ -607,9 +567,7 @@ def fetch_workspace(repositories: tuple[str, ...]):
 
 
 @artifact.command("reconcile-workspace")
-@click.option(
-    "--repository", "repositories", multiple=True, help="Repository ID to reconcile"
-)
+@click.option("--repository", "repositories", multiple=True, help="Repository ID to reconcile")
 def reconcile_workspace(repositories: tuple[str, ...]):
     """Refresh local readiness state for registered repositories."""
     coordinator = MultiRepoArtifactCoordinator()

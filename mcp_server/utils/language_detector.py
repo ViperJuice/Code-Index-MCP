@@ -9,7 +9,6 @@ from typing import Dict, List, Set
 
 from mcp_server.plugins.language_registry import LANGUAGE_CONFIGS
 
-
 _IGNORED_DIRS: Set[str] = {
     ".git",
     ".hg",

@@ -38,7 +38,9 @@ def _init_git_repository(repo_path: Path) -> str:
     return result.stdout.strip()
 
 
-def _create_registry_with_repo(tmp_path: Path, repo_name: str = "repo") -> tuple[RepositoryRegistry, str]:
+def _create_registry_with_repo(
+    tmp_path: Path, repo_name: str = "repo"
+) -> tuple[RepositoryRegistry, str]:
     """Create a registry and register a single repository for testing."""
     repo_path = tmp_path / repo_name
     initial_commit = _init_git_repository(repo_path)

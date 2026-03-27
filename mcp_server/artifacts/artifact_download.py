@@ -81,13 +81,9 @@ class IndexArtifactDownloader:
                 check=True,
             )
         except FileNotFoundError as exc:
-            raise RuntimeError(
-                "gh CLI is required for artifact download flows"
-            ) from exc
+            raise RuntimeError("gh CLI is required for artifact download flows") from exc
         except subprocess.CalledProcessError as exc:
-            raise RuntimeError(
-                f"Failed to list artifacts: {exc.stderr or exc}"
-            ) from exc
+            raise RuntimeError(f"Failed to list artifacts: {exc.stderr or exc}") from exc
 
         artifacts = []
         for line in result.stdout.strip().split("\n"):
@@ -138,26 +134,20 @@ class IndexArtifactDownloader:
                 raise ValueError("Artifact metadata file is required but missing")
 
             metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-            gate_result = self._run_integrity_gate(
-                metadata, archive_path, checksum_path
-            )
+            gate_result = self._run_integrity_gate(metadata, archive_path, checksum_path)
             if gate_result.manifest_v2_validated:
                 print("✅ Manifest v2 verified")
 
             compatible, issues = self.check_compatibility(metadata)
             if not compatible:
-                raise ValueError(
-                    "Artifact compatibility validation failed: " + "; ".join(issues)
-                )
+                raise ValueError("Artifact compatibility validation failed: " + "; ".join(issues))
 
             print("📦 Extracting index files...")
             with tarfile.open(archive_path, "r:gz") as tar:
                 members = tar.getmembers()
                 for member in members:
                     if not self._validate_tar_member(member, output_dir):
-                        raise ValueError(
-                            f"Unsafe archive member blocked: {member.name}"
-                        )
+                        raise ValueError(f"Unsafe archive member blocked: {member.name}")
                 tar.extractall(output_dir, members=members)
 
             shutil.copy2(metadata_path, output_dir / "artifact-metadata.json")
@@ -187,9 +177,7 @@ class IndexArtifactDownloader:
                 try:
                     conn = sqlite3.connect(str(local_db))
                     required_schema = str(
-                        conn.execute(
-                            "SELECT MAX(version) FROM schema_version"
-                        ).fetchone()[0]
+                        conn.execute("SELECT MAX(version) FROM schema_version").fetchone()[0]
                     )
                 except Exception:
                     required_schema = None
@@ -207,9 +195,7 @@ class IndexArtifactDownloader:
             try:
                 requested_profiles = self._get_requested_semantic_profiles()
                 if requested_profiles:
-                    overlap = sorted(
-                        set(requested_profiles).intersection(artifact_profiles)
-                    )
+                    overlap = sorted(set(requested_profiles).intersection(artifact_profiles))
                     compatible_profiles = []
                     mismatched_profiles = []
                     for profile_id in overlap:
@@ -242,9 +228,9 @@ class IndexArtifactDownloader:
                 current_model = None
                 metadata_path = Path(".index_metadata.json")
                 if metadata_path.exists():
-                    current_model = json.loads(
-                        metadata_path.read_text(encoding="utf-8")
-                    ).get("embedding_model")
+                    current_model = json.loads(metadata_path.read_text(encoding="utf-8")).get(
+                        "embedding_model"
+                    )
                 if not current_model:
                     current_model = get_settings().semantic_embedding_model
                 if artifact_model != current_model:
@@ -265,9 +251,7 @@ class IndexArtifactDownloader:
             for profile_id, payload in profiles.items():
                 if not isinstance(profile_id, str) or not isinstance(payload, dict):
                     continue
-                requested[profile_id] = (
-                    str(payload.get("compatibility_fingerprint", "")) or None
-                )
+                requested[profile_id] = str(payload.get("compatibility_fingerprint", "")) or None
 
             if any(value for value in requested.values()):
                 return requested
@@ -286,13 +270,9 @@ class IndexArtifactDownloader:
         except Exception:
             return {}
 
-    def find_best_artifact(
-        self, artifacts: List[Dict[str, Any]]
-    ) -> Optional[Dict[str, Any]]:
+    def find_best_artifact(self, artifacts: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         print("\n🔎 Finding best compatible artifact...")
-        promoted = [
-            artifact for artifact in artifacts if "-promoted" in artifact["name"]
-        ]
+        promoted = [artifact for artifact in artifacts if "-promoted" in artifact["name"]]
         if promoted:
             return promoted[0]
         default_branch = [
@@ -330,9 +310,7 @@ class IndexArtifactDownloader:
             ]
         if not selected:
             return None
-        promoted = [
-            artifact for artifact in selected if "-promoted" in artifact["name"]
-        ]
+        promoted = [artifact for artifact in selected if "-promoted" in artifact["name"]]
         return promoted[0] if promoted else selected[0]
 
     def _run_integrity_gate(
@@ -347,9 +325,7 @@ class IndexArtifactDownloader:
             checksum_path=checksum_path,
         )
         if not gate_result.passed:
-            raise ValueError(
-                "Artifact integrity gate failed: " + "; ".join(gate_result.reasons)
-            )
+            raise ValueError("Artifact integrity gate failed: " + "; ".join(gate_result.reasons))
         print("✅ Integrity gate passed")
         return gate_result
 
@@ -364,34 +340,26 @@ class IndexArtifactDownloader:
         except ValueError:
             return False
 
-    def _validate_tar_member(
-        self, member: tarfile.TarInfo, extraction_dir: Path
-    ) -> bool:
+    def _validate_tar_member(self, member: tarfile.TarInfo, extraction_dir: Path) -> bool:
         target_path = extraction_dir / member.name
         if not self._is_within_directory(extraction_dir, target_path):
             return False
         if member.issym():
             if not member.linkname:
                 return False
-            if not self._is_within_directory(
-                extraction_dir, target_path.parent / member.linkname
-            ):
+            if not self._is_within_directory(extraction_dir, target_path.parent / member.linkname):
                 return False
         if member.islnk():
             if not member.linkname:
                 return False
-            if not self._is_within_directory(
-                extraction_dir, extraction_dir / member.linkname
-            ):
+            if not self._is_within_directory(extraction_dir, extraction_dir / member.linkname):
                 return False
         return not member.isdev()
 
     def install_indexes(self, source_dir: Path, backup: bool = True) -> List[str]:
         print("\n📝 Installing indexes...")
         if backup:
-            backup_dir = Path(
-                f"index_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            )
+            backup_dir = Path(f"index_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
             backup_dir.mkdir(exist_ok=True)
             for file_name in [
                 "code_index.db",
@@ -455,9 +423,7 @@ class IndexArtifactDownloader:
     ) -> ArtifactDownloadResult:
         extracted_dir = self.download_artifact(artifact["id"], output_dir)
         installed_items = self.install_indexes(extracted_dir, backup=backup)
-        return ArtifactDownloadResult(
-            artifact=artifact, installed_items=installed_items
-        )
+        return ArtifactDownloadResult(artifact=artifact, installed_items=installed_items)
 
     def download_latest(
         self,
@@ -473,9 +439,7 @@ class IndexArtifactDownloader:
         if not best:
             raise RuntimeError("No compatible artifacts found")
         print(f"\n✅ Selected: {best['name']}")
-        return self.download_selected_artifact(
-            best, output_dir=output_dir, backup=backup
-        )
+        return self.download_selected_artifact(best, output_dir=output_dir, backup=backup)
 
     def recover(
         self,
@@ -498,9 +462,7 @@ class IndexArtifactDownloader:
                 + (f" ({', '.join(details)})" if details else "")
             )
         print(f"\n✅ Recovery artifact selected: {selected['name']}")
-        return self.download_selected_artifact(
-            selected, output_dir=output_dir, backup=backup
-        )
+        return self.download_selected_artifact(selected, output_dir=output_dir, backup=backup)
 
 
 def format_artifact_table(artifacts: List[Dict[str, Any]]) -> None:
@@ -533,12 +495,8 @@ def build_parser() -> argparse.ArgumentParser:
     list_parser = subparsers.add_parser("list", help="List available artifacts")
     list_parser.add_argument("--filter", help="Filter artifact names")
 
-    download_parser = subparsers.add_parser(
-        "download", help="Download and install indexes"
-    )
-    download_parser.add_argument(
-        "--artifact-id", type=int, help="Specific artifact ID to download"
-    )
+    download_parser = subparsers.add_parser("download", help="Download and install indexes")
+    download_parser.add_argument("--artifact-id", type=int, help="Specific artifact ID to download")
     download_parser.add_argument(
         "--latest", action="store_true", help="Download latest compatible artifact"
     )
@@ -609,9 +567,7 @@ def run_cli(args: argparse.Namespace) -> int:
 
     if args.command == "info":
         artifacts = downloader.list_artifacts()
-        artifact = next(
-            (item for item in artifacts if item["id"] == args.artifact_id), None
-        )
+        artifact = next((item for item in artifacts if item["id"] == args.artifact_id), None)
         if artifact is None:
             print(f"❌ Artifact {args.artifact_id} not found")
             return 1

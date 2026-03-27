@@ -59,9 +59,7 @@ class RepositoryPluginLoader:
             analysis_mode: Whether to load all plugins for analysis
             preload_threshold: Minimum files to justify loading a plugin
         """
-        self.plugin_strategy = plugin_strategy or os.environ.get(
-            "MCP_PLUGIN_STRATEGY", "auto"
-        )
+        self.plugin_strategy = plugin_strategy or os.environ.get("MCP_PLUGIN_STRATEGY", "auto")
         self.analysis_mode = (
             analysis_mode or os.environ.get("MCP_ANALYSIS_MODE", "").lower() == "true"
         )
@@ -221,9 +219,7 @@ class RepositoryPluginLoader:
             cursor = conn.cursor()
 
             # Query all file paths
-            cursor.execute(
-                "SELECT path FROM files WHERE is_deleted = 0 OR is_deleted IS NULL"
-            )
+            cursor.execute("SELECT path FROM files WHERE is_deleted = 0 OR is_deleted IS NULL")
 
             for (file_path,) in cursor:
                 # Determine language from extension
@@ -268,9 +264,7 @@ class RepositoryPluginLoader:
             return hashlib.sha256(url.encode()).hexdigest()[:12]
         except Exception:
             # Fall back to path hash
-            return hashlib.sha256(str(repository_path.absolute()).encode()).hexdigest()[
-                :12
-            ]
+            return hashlib.sha256(str(repository_path.absolute()).encode()).hexdigest()[:12]
 
     def _create_empty_profile(self, repo_id: str) -> RepositoryProfile:
         """Create empty profile for repositories without indexes."""
@@ -374,9 +368,7 @@ class RepositoryPluginLoader:
         # Calculate savings
         all_plugin_count = len(self._language_map)
         loaded_plugin_count = memory_status["loaded_plugins"]
-        reduction_percent = (
-            (all_plugin_count - loaded_plugin_count) / all_plugin_count
-        ) * 100
+        reduction_percent = ((all_plugin_count - loaded_plugin_count) / all_plugin_count) * 100
 
         return {
             "strategy": self.plugin_strategy,
@@ -452,9 +444,7 @@ class RepositoryPluginLoader:
             List of language plugin names that should be loaded
         """
         if not self._profiles:
-            logger.warning(
-                "No repository profiles available, returning common languages"
-            )
+            logger.warning("No repository profiles available, returning common languages")
             return ["python", "javascript", "typescript"]
 
         # Get all languages from all profiles

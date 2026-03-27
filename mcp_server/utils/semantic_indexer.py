@@ -160,9 +160,7 @@ class SemanticIndexer:
             model_name=self.embedding_model,
             vector_dimension=self.embedding_dimension,
             api_key=(self.semantic_profile.build_metadata or {}).get("openai_api_key"),
-            base_url=(self.semantic_profile.build_metadata or {}).get(
-                "openai_api_base"
-            ),
+            base_url=(self.semantic_profile.build_metadata or {}).get("openai_api_base"),
         )
         self.embedding_provider = self.embedding_client.provider_name
 
@@ -217,9 +215,7 @@ class SemanticIndexer:
 
         effective_lineage = lineage_id
         if not effective_lineage and (branch or commit):
-            effective_lineage = self.namespace_resolver.derive_lineage_id(
-                branch, commit
-            )
+            effective_lineage = self.namespace_resolver.derive_lineage_id(branch, commit)
 
         if not effective_lineage:
             return requested_collection
@@ -231,9 +227,7 @@ class SemanticIndexer:
         )
 
     # ------------------------------------------------------------------
-    def _embed_texts(
-        self, texts: List[str], input_type: str = "document"
-    ) -> List[List[float]]:
+    def _embed_texts(self, texts: List[str], input_type: str = "document") -> List[List[float]]:
         """Generate embeddings using the configured provider."""
         return self.embedding_client.embed(texts, input_type=input_type)
 
@@ -271,9 +265,7 @@ class SemanticIndexer:
         if len(normalized) <= limit:
             return normalized
 
-        paragraphs = [
-            part.strip() for part in re.split(r"\n\s*\n", normalized) if part.strip()
-        ]
+        paragraphs = [part.strip() for part in re.split(r"\n\s*\n", normalized) if part.strip()]
         if paragraphs:
             selected: List[str] = []
             total = 0
@@ -289,9 +281,7 @@ class SemanticIndexer:
                 return "\n\n".join(selected)
 
         sentences = [
-            part.strip()
-            for part in re.split(r"(?<=[.!?])\s+", normalized)
-            if part.strip()
+            part.strip() for part in re.split(r"(?<=[.!?])\s+", normalized) if part.strip()
         ]
         if sentences:
             selected = []
@@ -327,9 +317,7 @@ class SemanticIndexer:
     def _infer_chunk_language(self, path: Path) -> str:
         """Infer the chunker language for a file path."""
         return (
-            get_language_by_extension(path.name)
-            or get_language_by_extension(path.suffix)
-            or "text"
+            get_language_by_extension(path.name) or get_language_by_extension(path.suffix) or "text"
         )
 
     def _is_structural_split_candidate(self, line: str, kind: str) -> bool:
@@ -356,22 +344,15 @@ class SemanticIndexer:
 
         def walk(node: Any, stack: List[SymbolEntry]) -> None:
             name_node = (
-                node.child_by_field_name("name")
-                if hasattr(node, "child_by_field_name")
-                else None
+                node.child_by_field_name("name") if hasattr(node, "child_by_field_name") else None
             )
             current = None
-            if (
-                node.type in {"function_definition", "class_definition"}
-                and name_node is not None
-            ):
+            if node.type in {"function_definition", "class_definition"} and name_node is not None:
                 name = name_node.text.decode()
                 start_line = node.start_point[0] + 1
                 end_line = node.end_point[0] + 1
                 signature = (
-                    lines[start_line - 1].strip()
-                    if 0 <= start_line - 1 < len(lines)
-                    else name
+                    lines[start_line - 1].strip() if 0 <= start_line - 1 < len(lines) else name
                 )
                 kind = "function" if node.type == "function_definition" else "class"
 
@@ -417,9 +398,7 @@ class SemanticIndexer:
         blocks: List[tuple[int, int]] = []
         block_start = start
         for idx, text in enumerate(symbol_lines, start=start):
-            if idx > block_start and self._is_structural_split_candidate(
-                text, symbol.kind
-            ):
+            if idx > block_start and self._is_structural_split_candidate(text, symbol.kind):
                 blocks.append((block_start, idx - 1))
                 block_start = idx
                 continue
@@ -703,9 +682,7 @@ class SemanticIndexer:
                         "name": symbol.symbol,
                         "kind": "text",
                         "signature_text": symbol.signature,
-                        "semantic_text": self._compact_metadata_text(
-                            chunk.content, limit=400
-                        ),
+                        "semantic_text": self._compact_metadata_text(chunk.content, limit=400),
                     },
                     chunk_id=f"fallback-{idx}",
                     node_id=f"fallback-{idx}",
@@ -749,11 +726,7 @@ class SemanticIndexer:
         """
         # Prefer explicit local/file-backed paths over server mode so callers that
         # pass a concrete artifact path do not silently write to a running daemon.
-        if (
-            qdrant_path
-            and not qdrant_path.startswith("http")
-            and qdrant_path != ":memory:"
-        ):
+        if qdrant_path and not qdrant_path.startswith("http") and qdrant_path != ":memory:":
             try:
                 logger.info(f"Using file-based Qdrant at explicit path: {qdrant_path}")
                 Path(qdrant_path).mkdir(parents=True, exist_ok=True)
@@ -908,22 +881,16 @@ class SemanticIndexer:
             # Attempt a simple operation to verify connection
             collections = self.qdrant.get_collections()
             # Check if our collection exists
-            collection_exists = any(
-                c.name == self.collection for c in collections.collections
-            )
+            collection_exists = any(c.name == self.collection for c in collections.collections)
             if collection_exists:
-                logger.debug(
-                    f"Qdrant connection valid - collection '{self.collection}' exists"
-                )
+                logger.debug(f"Qdrant connection valid - collection '{self.collection}' exists")
             else:
                 logger.warning(
                     f"Qdrant connection active but collection '{self.collection}' not found"
                 )
             return True
         except Exception as e:
-            logger.error(
-                f"Qdrant connection validation failed: {type(e).__name__}: {e}"
-            )
+            logger.error(f"Qdrant connection validation failed: {type(e).__name__}: {e}")
             self._qdrant_available = False
             return False
 
@@ -947,9 +914,7 @@ class SemanticIndexer:
                 try:
                     collection_info = self.qdrant.get_collection(self.collection)
                     vectors_config = collection_info.config.params.vectors
-                    expected_distance = self._resolve_qdrant_distance(
-                        self.distance_metric
-                    )
+                    expected_distance = self._resolve_qdrant_distance(self.distance_metric)
                     current_size = getattr(vectors_config, "size", None)
                     current_distance = getattr(vectors_config, "distance", None)
                     should_recreate = current_size not in (
@@ -1055,14 +1020,12 @@ class SemanticIndexer:
                 "chunk_schema_version": self.chunk_schema_version,
                 "collection_name": self.collection,
                 "qdrant_path": self.qdrant_path,
-                "created_at": semantic_profiles.get(
-                    self.semantic_profile.profile_id, {}
-                ).get("created_at", timestamp),
+                "created_at": semantic_profiles.get(self.semantic_profile.profile_id, {}).get(
+                    "created_at", timestamp
+                ),
                 "updated_at": timestamp,
             }
-            semantic_profiles[self.semantic_profile.profile_id] = (
-                current_profile_metadata
-            )
+            semantic_profiles[self.semantic_profile.profile_id] = current_profile_metadata
 
             metadata["semantic_profile"] = self.semantic_profile.profile_id
             metadata["compatibility_fingerprint"] = self.compatibility_fingerprint
@@ -1119,9 +1082,7 @@ class SemanticIndexer:
         return None
 
     # ------------------------------------------------------------------
-    def check_compatibility(
-        self, other_metadata_file: str = ".index_metadata.json"
-    ) -> bool:
+    def check_compatibility(self, other_metadata_file: str = ".index_metadata.json") -> bool:
         """Check if current configuration is compatible with existing index."""
         if not os.path.exists(other_metadata_file):
             return True  # No existing metadata, assume compatible
@@ -1134,9 +1095,9 @@ class SemanticIndexer:
             if self._profile_active:
                 other_profiles = extract_semantic_profile_metadata(other_metadata)
                 other_profile = other_profiles.get(self.semantic_profile.profile_id, {})
-                other_hash = other_profile.get(
-                    "compatibility_fingerprint"
-                ) or other_profile.get("compatibility_hash")
+                other_hash = other_profile.get("compatibility_fingerprint") or other_profile.get(
+                    "compatibility_hash"
+                )
                 if other_hash:
                     return current_hash == other_hash
 
@@ -1181,9 +1142,7 @@ class SemanticIndexer:
         ]
         return any(re.search(pattern, normalized) for pattern in code_patterns)
 
-    def _path_score_multiplier(
-        self, path: str, doc_type: str, code_intent: bool
-    ) -> float:
+    def _path_score_multiplier(self, path: str, doc_type: str, code_intent: bool) -> float:
         """Apply lightweight source-path priors to semantic results."""
         normalized = path.replace("\\", "/").lower().lstrip("./")
         doc_type_normalized = (doc_type or "").lower()
@@ -1255,11 +1214,7 @@ class SemanticIndexer:
 
     def _query_overlap_bonus(self, query: str, payload: Mapping[str, Any]) -> float:
         """Apply a small lexical bonus using retrieval metadata fields."""
-        terms = {
-            token
-            for token in re.findall(r"[a-z0-9_]+", query.lower())
-            if len(token) >= 3
-        }
+        terms = {token for token in re.findall(r"[a-z0-9_]+", query.lower()) if len(token) >= 3}
         if not terms:
             return 1.0
 
@@ -1321,15 +1276,9 @@ class SemanticIndexer:
 
         return bonus
 
-    def _implementation_responsibility_bonus(
-        self, query: str, payload: Mapping[str, Any]
-    ) -> float:
+    def _implementation_responsibility_bonus(self, query: str, payload: Mapping[str, Any]) -> float:
         """Boost files whose role matches implementation-intent queries."""
-        terms = {
-            token
-            for token in re.findall(r"[a-z0-9_]+", query.lower())
-            if len(token) >= 3
-        }
+        terms = {token for token in re.findall(r"[a-z0-9_]+", query.lower()) if len(token) >= 3}
         if not terms:
             return 1.0
 
@@ -1448,9 +1397,7 @@ class SemanticIndexer:
             score *= self._implementation_responsibility_bonus(query, result)
 
             normalized_path = path.replace("\\", "/").lower().lstrip("./")
-            is_test = (
-                normalized_path.startswith("tests/") or "/tests/" in normalized_path
-            )
+            is_test = normalized_path.startswith("tests/") or "/tests/" in normalized_path
             is_impl = normalized_path.startswith(("mcp_server/", "src/"))
             if self._looks_like_symbol_precise_query(query):
                 if is_test:
@@ -1498,9 +1445,7 @@ class SemanticIndexer:
         module_stem = Path(relative_path).stem.replace("_", " ")
         path_tokens = " ".join(re.split(r"[^a-z0-9]+", relative_path.lower())).strip()
         symbol_names = [
-            str(symbol.get("symbol") or "")
-            for symbol in symbols
-            if symbol.get("symbol")
+            str(symbol.get("symbol") or "") for symbol in symbols if symbol.get("symbol")
         ]
         symbol_kinds = sorted(
             {str(symbol.get("kind") or "") for symbol in symbols if symbol.get("kind")}
@@ -1602,7 +1547,6 @@ class SemanticIndexer:
                     summary = _sqlite_store.get_chunk_summary(source_chunk_id)
                     if summary:
                         summary_text = summary["summary_text"]
-
 
                 units = self._expand_chunk_embedding_units(
                     relative_path=relative_path,
@@ -1782,9 +1726,7 @@ class SemanticIndexer:
                 f"{type(e).__name__}: {e}"
             )
             self._qdrant_available = False
-            raise RuntimeError(
-                f"Failed to store embeddings for {path} in Qdrant: {e}"
-            )
+            raise RuntimeError(f"Failed to store embeddings for {path} in Qdrant: {e}")
 
         return {
             "file": str(path),
@@ -1812,9 +1754,7 @@ class SemanticIndexer:
         embeds = self._embed_texts(prep["embedding_inputs"], input_type="document")
         return self._store_file_embeddings(path, prep, embeds)
 
-    def index_files_batch(
-        self, paths: List[Path], embed_batch_size: int = 1000
-    ) -> Dict[str, Any]:
+    def index_files_batch(self, paths: List[Path], embed_batch_size: int = 1000) -> Dict[str, Any]:
         """Index multiple files with batched embedding API calls.
 
         Collects all embedding texts from all files first, then submits them
@@ -1835,14 +1775,16 @@ class SemanticIndexer:
                 else:
                     skipped += 1
             except Exception as exc:
-                logger.warning(
-                    "Failed to prepare %s for semantic indexing: %s", path, exc
-                )
+                logger.warning("Failed to prepare %s for semantic indexing: %s", path, exc)
                 skipped += 1
 
         if not preparations:
-            return {"files_indexed": 0, "files_failed": 0, "files_skipped": skipped,
-                    "total_embedding_units": 0}
+            return {
+                "files_indexed": 0,
+                "files_failed": 0,
+                "files_skipped": skipped,
+                "total_embedding_units": 0,
+            }
 
         # Phase 2: collect all texts and record per-file slices
         all_texts: List[str] = []
@@ -1854,7 +1796,9 @@ class SemanticIndexer:
 
         logger.info(
             "Batch embedding %d texts from %d files (batch_size=%d)",
-            len(all_texts), len(preparations), embed_batch_size,
+            len(all_texts),
+            len(preparations),
+            embed_batch_size,
         )
 
         # Phase 3: embed in token-aware batches.
@@ -1872,7 +1816,9 @@ class SemanticIndexer:
                 return
             logger.info(
                 "Embedding texts %d–%d of %d (~%d estimated tokens)",
-                start + 1, start + len(b), len(all_texts),
+                start + 1,
+                start + len(b),
+                len(all_texts),
                 sum(len(t) // 4 for t in b),
             )
             all_embeds.extend(self._embed_texts(b, input_type="document"))
@@ -1881,8 +1827,7 @@ class SemanticIndexer:
             token_est = max(1, len(text) // 4)
             # Flush when adding this text would exceed either limit
             if batch and (
-                len(batch) >= embed_batch_size
-                or batch_token_est + token_est > MAX_TOKENS_PER_BATCH
+                len(batch) >= embed_batch_size or batch_token_est + token_est > MAX_TOKENS_PER_BATCH
             ):
                 _flush_batch(batch, batch_start_idx)
                 batch = []
@@ -1907,7 +1852,9 @@ class SemanticIndexer:
 
         logger.info(
             "Batch semantic indexing complete: %d indexed, %d failed, %d skipped",
-            indexed, failed, skipped,
+            indexed,
+            failed,
+            skipped,
         )
         return {
             "files_indexed": indexed,
@@ -1972,8 +1919,7 @@ class SemanticIndexer:
             logger.error(f"Qdrant search failed: {type(e).__name__}: {e}")
             self._qdrant_available = False
             raise RuntimeError(
-                f"Semantic search failed - Qdrant error: {e}. "
-                "Connection may have been lost."
+                f"Semantic search failed - Qdrant error: {e}. " "Connection may have been lost."
             )
 
     # ------------------------------------------------------------------
@@ -2020,9 +1966,7 @@ class SemanticIndexer:
             embedding = self._embed_texts([embedding_text], input_type="document")[0]
 
             # Compute content hash
-            content_hash = (
-                hashlib.sha256(content.encode()).hexdigest() if content else None
-            )
+            content_hash = hashlib.sha256(content.encode()).hexdigest() if content else None
 
             # Use relative path
             relative_path = self.path_resolver.normalize_path(file)
@@ -2058,9 +2002,7 @@ class SemanticIndexer:
 
                 chunk_id = (metadata or {}).get("chunk_id") if metadata else None
                 if chunk_id and sqlite_store is not None:
-                    effective_profile_id = (
-                        profile_id or self.semantic_profile.profile_id
-                    )
+                    effective_profile_id = profile_id or self.semantic_profile.profile_id
                     sqlite_store.upsert_semantic_point(
                         profile_id=effective_profile_id,
                         chunk_id=str(chunk_id),
@@ -2073,9 +2015,7 @@ class SemanticIndexer:
                     f"{type(upsert_error).__name__}: {upsert_error}"
                 )
                 self._qdrant_available = False
-                raise RuntimeError(
-                    f"Failed to store symbol '{name}' in Qdrant: {upsert_error}"
-                )
+                raise RuntimeError(f"Failed to store symbol '{name}' in Qdrant: {upsert_error}")
         except Exception as e:
             if "API key" in str(e) or "authentication" in str(e).lower():
                 raise RuntimeError(
@@ -2142,9 +2082,7 @@ class SemanticIndexer:
     # Document-specific methods
     # ------------------------------------------------------------------
 
-    def _parse_markdown_sections(
-        self, content: str, file_path: str
-    ) -> list[DocumentSection]:
+    def _parse_markdown_sections(self, content: str, file_path: str) -> list[DocumentSection]:
         """Parse markdown content into hierarchical sections."""
         lines = content.split("\n")
         sections = []
@@ -2298,9 +2236,7 @@ class SemanticIndexer:
             )
 
             # Create unique ID for section
-            section_id = self._document_section_id(
-                str(path), section.title, section.start_line
-            )
+            section_id = self._document_section_id(str(path), section.title, section.start_line)
 
             # Use relative path
             relative_path = self.path_resolver.normalize_path(path)
@@ -2323,18 +2259,14 @@ class SemanticIndexer:
                 "subsections": section.subsections,
                 "doc_type": doc_type,
                 "type": "document_section",
-                "language": (
-                    "markdown" if doc_type in ["markdown", "readme"] else "text"
-                ),
+                "language": ("markdown" if doc_type in ["markdown", "readme"] else "text"),
                 "is_deleted": False,
             }
 
             if metadata:
                 payload["metadata"] = metadata
 
-            points.append(
-                models.PointStruct(id=section_id, vector=embedding, payload=payload)
-            )
+            points.append(models.PointStruct(id=section_id, vector=embedding, payload=payload))
 
             indexed_sections.append(
                 {
@@ -2348,9 +2280,7 @@ class SemanticIndexer:
         # Upsert all sections with error handling
         if points:
             if not self._qdrant_available:
-                raise RuntimeError(
-                    f"Qdrant is not available - cannot index document {path}"
-                )
+                raise RuntimeError(f"Qdrant is not available - cannot index document {path}")
 
             try:
                 self.qdrant.upsert(collection_name=self.collection, points=points)
@@ -2360,9 +2290,7 @@ class SemanticIndexer:
                     f"{type(e).__name__}: {e}"
                 )
                 self._qdrant_available = False
-                raise RuntimeError(
-                    f"Failed to store document sections for {path} in Qdrant: {e}"
-                )
+                raise RuntimeError(f"Failed to store document sections for {path} in Qdrant: {e}")
 
         return {
             "file": str(path),
@@ -2398,9 +2326,7 @@ class SemanticIndexer:
             RuntimeError: If Qdrant is unavailable or query fails
         """
         if not self._qdrant_available:
-            raise RuntimeError(
-                "Qdrant is not available - cannot perform natural language query"
-            )
+            raise RuntimeError("Qdrant is not available - cannot perform natural language query")
 
         try:
             # Generate query embedding
@@ -2416,9 +2342,7 @@ class SemanticIndexer:
                 limit=limit * 2 if doc_types else limit,
             )
         except Exception as e:
-            logger.error(
-                f"Qdrant natural language query failed: {type(e).__name__}: {e}"
-            )
+            logger.error(f"Qdrant natural language query failed: {type(e).__name__}: {e}")
             self._qdrant_available = False
             raise RuntimeError(f"Natural language query failed - Qdrant error: {e}")
 
@@ -2430,9 +2354,7 @@ class SemanticIndexer:
             # Filter by document types if specified
             if doc_types:
                 doc_type = payload.get("doc_type", "code")
-                if doc_type not in doc_types and not (
-                    include_code and doc_type == "code"
-                ):
+                if doc_type not in doc_types and not (include_code and doc_type == "code"):
                     continue
 
             # Apply document type weighting
@@ -2516,9 +2438,7 @@ class SemanticIndexer:
             RuntimeError: If Qdrant is unavailable or deletion fails
         """
         if not self._qdrant_available:
-            raise RuntimeError(
-                f"Qdrant is not available - cannot remove file {file_path}"
-            )
+            raise RuntimeError(f"Qdrant is not available - cannot remove file {file_path}")
 
         # Normalize to relative path
         try:
@@ -2529,11 +2449,7 @@ class SemanticIndexer:
 
         # Search for all points with this file
         filter_condition = Filter(
-            must=[
-                FieldCondition(
-                    key="relative_path", match=MatchValue(value=relative_path)
-                )
-            ]
+            must=[FieldCondition(key="relative_path", match=MatchValue(value=relative_path))]
         )
 
         try:
@@ -2555,19 +2471,13 @@ class SemanticIndexer:
                     collection_name=self.collection,
                     points_selector=models.PointIdsList(points=point_ids),
                 )
-                logger.info(
-                    f"Removed {len(point_ids)} embeddings for file: {relative_path}"
-                )
+                logger.info(f"Removed {len(point_ids)} embeddings for file: {relative_path}")
 
             return len(point_ids)
         except Exception as e:
-            logger.error(
-                f"Failed to remove file {relative_path}: {type(e).__name__}: {e}"
-            )
+            logger.error(f"Failed to remove file {relative_path}: {type(e).__name__}: {e}")
             self._qdrant_available = False
-            raise RuntimeError(
-                f"Failed to remove file {relative_path} from Qdrant: {e}"
-            )
+            raise RuntimeError(f"Failed to remove file {relative_path} from Qdrant: {e}")
 
     def move_file(
         self,
@@ -2599,11 +2509,7 @@ class SemanticIndexer:
 
         # Find all points for the old file
         filter_condition = Filter(
-            must=[
-                FieldCondition(
-                    key="relative_path", match=MatchValue(value=old_relative)
-                )
-            ]
+            must=[FieldCondition(key="relative_path", match=MatchValue(value=old_relative))]
         )
 
         try:
@@ -2631,9 +2537,7 @@ class SemanticIndexer:
 
                 # Verify content hash if provided
                 if content_hash and new_payload.get("content_hash") != content_hash:
-                    logger.warning(
-                        f"Content hash mismatch for {old_relative} -> {new_relative}"
-                    )
+                    logger.warning(f"Content hash mismatch for {old_relative} -> {new_relative}")
                     continue
 
                 updated_points.append(
@@ -2679,8 +2583,7 @@ class SemanticIndexer:
             return len(updated_points)
         except Exception as e:
             logger.error(
-                f"Failed to move file {old_relative} -> {new_relative}: "
-                f"{type(e).__name__}: {e}"
+                f"Failed to move file {old_relative} -> {new_relative}: " f"{type(e).__name__}: {e}"
             )
             self._qdrant_available = False
             raise RuntimeError(
@@ -2700,14 +2603,10 @@ class SemanticIndexer:
             RuntimeError: If Qdrant is unavailable or query fails
         """
         if not self._qdrant_available:
-            raise RuntimeError(
-                "Qdrant is not available - cannot query embeddings by content hash"
-            )
+            raise RuntimeError("Qdrant is not available - cannot query embeddings by content hash")
 
         filter_condition = Filter(
-            must=[
-                FieldCondition(key="content_hash", match=MatchValue(value=content_hash))
-            ]
+            must=[FieldCondition(key="content_hash", match=MatchValue(value=content_hash))]
         )
 
         try:
@@ -2722,13 +2621,9 @@ class SemanticIndexer:
 
             return [{"id": res.id, **res.payload} for res in results]
         except Exception as e:
-            logger.error(
-                f"Failed to get embeddings by content hash: {type(e).__name__}: {e}"
-            )
+            logger.error(f"Failed to get embeddings by content hash: {type(e).__name__}: {e}")
             self._qdrant_available = False
-            raise RuntimeError(
-                f"Failed to query embeddings by content hash in Qdrant: {e}"
-            )
+            raise RuntimeError(f"Failed to query embeddings by content hash in Qdrant: {e}")
 
     def mark_file_deleted(self, file_path: Union[str, Path]) -> int:
         """Mark all embeddings for a file as deleted (soft delete).
@@ -2743,19 +2638,13 @@ class SemanticIndexer:
             RuntimeError: If Qdrant is unavailable or update fails
         """
         if not self._qdrant_available:
-            raise RuntimeError(
-                f"Qdrant is not available - cannot mark file {file_path} as deleted"
-            )
+            raise RuntimeError(f"Qdrant is not available - cannot mark file {file_path} as deleted")
 
         # This is similar to move_file but only updates is_deleted flag
         relative_path = self.path_resolver.normalize_path(file_path)
 
         filter_condition = Filter(
-            must=[
-                FieldCondition(
-                    key="relative_path", match=MatchValue(value=relative_path)
-                )
-            ]
+            must=[FieldCondition(key="relative_path", match=MatchValue(value=relative_path))]
         )
 
         try:
@@ -2798,19 +2687,14 @@ class SemanticIndexer:
 
             self.qdrant.upsert(collection_name=self.collection, points=updated_points)
 
-            logger.info(
-                f"Marked {len(updated_points)} embeddings as deleted for: {relative_path}"
-            )
+            logger.info(f"Marked {len(updated_points)} embeddings as deleted for: {relative_path}")
             return len(updated_points)
         except Exception as e:
             logger.error(
-                f"Failed to mark file {relative_path} as deleted: "
-                f"{type(e).__name__}: {e}"
+                f"Failed to mark file {relative_path} as deleted: " f"{type(e).__name__}: {e}"
             )
             self._qdrant_available = False
-            raise RuntimeError(
-                f"Failed to mark file {relative_path} as deleted in Qdrant: {e}"
-            )
+            raise RuntimeError(f"Failed to mark file {relative_path} as deleted in Qdrant: {e}")
 
     @staticmethod
     def _file_summary_chunk_id(relative_path: str) -> str:

@@ -51,8 +51,7 @@ def create_test_files():
     test_dir.mkdir(exist_ok=True)
 
     # File 1: Math operations
-    (test_dir / "math_operations.py").write_text(
-        '''
+    (test_dir / "math_operations.py").write_text('''
 """Mathematical operations and calculations."""
 
 def fibonacci(n):
@@ -81,12 +80,10 @@ class Calculator:
     def power(self, base, exponent):
         """Calculate base raised to exponent."""
         return base ** exponent
-'''
-    )
+''')
 
     # File 2: Data processing
-    (test_dir / "data_processing.py").write_text(
-        '''
+    (test_dir / "data_processing.py").write_text('''
 """Data processing and transformation utilities."""
 
 import json
@@ -127,12 +124,10 @@ class DataTransformer:
                 result[k] = []
             result[k].append(item)
         return result
-'''
-    )
+''')
 
     # File 3: Web utilities
-    (test_dir / "web_utils.py").write_text(
-        '''
+    (test_dir / "web_utils.py").write_text('''
 """Web-related utilities and helpers."""
 
 import re
@@ -171,8 +166,7 @@ class APIClient:
         url = self.build_url(endpoint)
         # Simulated request
         return {"url": url, "method": method, "data": data}
-'''
-    )
+''')
 
     print(f"Created test files in {test_dir}")
     return test_dir

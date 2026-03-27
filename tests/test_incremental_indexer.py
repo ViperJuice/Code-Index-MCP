@@ -30,9 +30,7 @@ class DummySemanticIndexer:
         self.semantic_profile = SimpleNamespace(profile_id="test-profile")
         self.cleanup_calls = []
 
-    def delete_stale_vectors(
-        self, profile_id: str, chunk_ids, sqlite_store=None
-    ) -> int:
+    def delete_stale_vectors(self, profile_id: str, chunk_ids, sqlite_store=None) -> int:
         self.cleanup_calls.append(
             {
                 "profile_id": profile_id,
@@ -48,9 +46,7 @@ def incremental_indexer(tmp_path: Path):
     repo_path = tmp_path / "repo"
     repo_path.mkdir()
 
-    store = SQLiteStore(
-        str(tmp_path / "code_index.db"), path_resolver=PathResolver(repo_path)
-    )
+    store = SQLiteStore(str(tmp_path / "code_index.db"), path_resolver=PathResolver(repo_path))
     repo_id = store.create_repository(str(repo_path), "test-repo")
 
     dispatcher = DummyDispatcher()

@@ -102,7 +102,7 @@ class PythonPluginSemantic(PluginWithSemanticSearch):
             name_node = child.child_by_field_name("name")
             if name_node is None:
                 continue
-            name = content[name_node.start_byte : name_node.end_byte]
+            name = name_node.text.decode("utf-8")
 
             start_line = child.start_point[0] + 1
             end_line = child.end_point[0] + 1
@@ -183,11 +183,10 @@ class PythonPluginSemantic(PluginWithSemanticSearch):
         """Extract function signature from AST node."""
         try:
             # Get the function definition line
-            start_byte = node.start_byte
-            # Find the colon that ends the signature
-            colon_pos = content.find(":", start_byte)
+            content_bytes = content.encode("utf-8")
+            colon_pos = content_bytes.find(b":", node.start_byte)
             if colon_pos != -1:
-                signature = content[start_byte : colon_pos + 1].strip()
+                signature = content_bytes[node.start_byte : colon_pos + 1].decode("utf-8").strip()
                 # Clean up multiline signatures
                 signature = " ".join(signature.split())
                 return signature
@@ -197,7 +196,7 @@ class PythonPluginSemantic(PluginWithSemanticSearch):
         # Fallback to simple signature
         name_node = node.child_by_field_name("name")
         if name_node:
-            name = content[name_node.start_byte : name_node.end_byte]
+            name = name_node.text.decode("utf-8")
             return f"def {name}(...):"
         return "def unknown(...):"
 
@@ -214,7 +213,7 @@ class PythonPluginSemantic(PluginWithSemanticSearch):
                     )
                     if expr and expr.type == "string":
                         # Extract the string content
-                        doc_text = content[expr.start_byte : expr.end_byte]
+                        doc_text = expr.text.decode("utf-8")
                         # Remove quotes and clean up
                         doc_text = doc_text.strip()
                         if doc_text.startswith('"""') or doc_text.startswith("'''"):

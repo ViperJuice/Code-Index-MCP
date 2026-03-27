@@ -41,7 +41,8 @@ class TestDataFactory:
         for i in range(count):
             result = SearchResult(
                 file_path=f"/path/to/file_{i}.py",
-                start_line=100 + i * 10, end_line=100 + i * 10,
+                start_line=100 + i * 10,
+                end_line=100 + i * 10,
                 column=5 + i,
                 snippet=f"def function_{i}():\n    '''Function {i} documentation'''\n    return {i}",
                 match_type=["exact", "fuzzy", "semantic"][i % 3],
@@ -58,7 +59,8 @@ class TestDataFactory:
             # Unicode file path and content
             SearchResult(
                 file_path="/path/to/αβγ_unicode.py",
-                start_line=42, end_line=42,
+                start_line=42,
+                end_line=42,
                 column=0,
                 snippet="def 你好():\n    return '世界'",
                 match_type="exact",
@@ -68,7 +70,8 @@ class TestDataFactory:
             # Very long file path
             SearchResult(
                 file_path="/very/long/path/that/goes/on/and/on/and/on/deeply/nested/in/directories/file.py",
-                start_line=99999, end_line=99999,
+                start_line=99999,
+                end_line=99999,
                 column=500,
                 snippet="x" * 1000,  # Very long snippet
                 match_type="fuzzy",
@@ -78,7 +81,8 @@ class TestDataFactory:
             # Special characters in path
             SearchResult(
                 file_path="/path/with spaces/and-special@chars!/file#1.py",
-                start_line=1, end_line=1,
+                start_line=1,
+                end_line=1,
                 column=1,
                 snippet="# Special\n\tcharacters\n\there",
                 match_type="semantic",
@@ -88,7 +92,8 @@ class TestDataFactory:
             # Zero values
             SearchResult(
                 file_path="/zero/values.py",
-                start_line=0, end_line=0,
+                start_line=0,
+                end_line=0,
                 column=0,
                 snippet="",
                 match_type="exact",
@@ -105,7 +110,8 @@ class TestRerankItemDataclass:
         """Test creating RerankItem with all fields"""
         original = SearchResult(
             file_path="/test.py",
-            start_line=10, end_line=10,
+            start_line=10,
+            end_line=10,
             column=5,
             snippet="test code",
             match_type="exact",
@@ -575,7 +581,8 @@ class TestEdgeCasesAndErrors:
         results = [
             SearchResult(
                 file_path="/test.py",
-                start_line=1, end_line=1,
+                start_line=1,
+                end_line=1,
                 column=0,
                 snippet="code",
                 match_type="exact",
@@ -600,7 +607,8 @@ class TestEdgeCasesAndErrors:
         results = [
             SearchResult(
                 file_path="/zero.py",
-                start_line=0, end_line=0,
+                start_line=0,
+                end_line=0,
                 column=0,
                 snippet="",
                 match_type="exact",
@@ -628,7 +636,8 @@ class TestEdgeCasesAndErrors:
         for i in range(1000):
             result = SearchResult(
                 file_path=f"/large/file_{i}.py",
-                start_line=i, end_line=i,
+                start_line=i,
+                end_line=i,
                 column=i % 100,
                 snippet=f"snippet {i}",
                 match_type=["exact", "fuzzy", "semantic"][i % 3],
@@ -657,7 +666,8 @@ class TestEdgeCasesAndErrors:
         special_results = [
             SearchResult(
                 file_path="/path/with\nnewlines\tand\ttabs.py",
-                start_line=42, end_line=42,
+                start_line=42,
+                end_line=42,
                 column=13,
                 snippet="code with\nnewlines\tand\ttabs",
                 match_type="exact",
@@ -666,7 +676,8 @@ class TestEdgeCasesAndErrors:
             ),
             SearchResult(
                 file_path="/path/with/♠♣♥♦/cards.py",
-                start_line=100, end_line=100,
+                start_line=100,
+                end_line=100,
                 column=50,
                 snippet="♠♣♥♦ unicode cards",
                 match_type="fuzzy",
@@ -743,7 +754,8 @@ class TestMetadataConsistency:
         for result in original_results:
             copy = SearchResult(
                 file_path=result.file_path,
-                start_line=result.line, end_line=result.line,
+                start_line=result.line,
+                end_line=result.line,
                 column=result.column,
                 snippet=result.snippet,
                 match_type=result.match_type,

@@ -16,9 +16,7 @@ class EmbeddingProvider(ABC):
         """Provider identifier used in metadata."""
 
     @abstractmethod
-    def embed(
-        self, texts: List[str], input_type: str = "document"
-    ) -> List[List[float]]:
+    def embed(self, texts: List[str], input_type: str = "document") -> List[List[float]]:
         """Embed a list of texts and return vectors."""
 
 
@@ -34,9 +32,7 @@ class VoyageEmbeddingProvider(EmbeddingProvider):
                 "Install semantic dependencies first."
             ) from exc
 
-        api_key = os.environ.get("VOYAGE_API_KEY") or os.environ.get(
-            "VOYAGE_AI_API_KEY"
-        )
+        api_key = os.environ.get("VOYAGE_API_KEY") or os.environ.get("VOYAGE_AI_API_KEY")
         if api_key:
             self.client = voyageai.Client(api_key=api_key)
         else:
@@ -55,9 +51,7 @@ class VoyageEmbeddingProvider(EmbeddingProvider):
     def provider_name(self) -> str:
         return "voyage"
 
-    def embed(
-        self, texts: List[str], input_type: str = "document"
-    ) -> List[List[float]]:
+    def embed(self, texts: List[str], input_type: str = "document") -> List[List[float]]:
         response = self.client.embed(
             texts,
             model=self.model_name,
@@ -102,9 +96,7 @@ class OpenAICompatibleEmbeddingProvider(EmbeddingProvider):
     def provider_name(self) -> str:
         return "openai_compatible"
 
-    def embed(
-        self, texts: List[str], input_type: str = "document"
-    ) -> List[List[float]]:
+    def embed(self, texts: List[str], input_type: str = "document") -> List[List[float]]:
         del input_type
         response = self.client.embeddings.create(model=self.model_name, input=texts)
         vectors = [item.embedding for item in response.data]

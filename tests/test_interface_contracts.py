@@ -18,9 +18,7 @@ from mcp_server.document_processing.base_document_plugin import (
 
 class _ContractDocumentPlugin(BaseDocumentPlugin):
     def __init__(self):
-        super().__init__(
-            {"name": "contract_doc", "code": "text", "extensions": [".txt"]}
-        )
+        super().__init__({"name": "contract_doc", "code": "text", "extensions": [".txt"]})
 
     def _get_supported_extensions(self):
         return [".txt"]

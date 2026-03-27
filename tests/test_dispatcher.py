@@ -122,9 +122,7 @@ class TestSymbolLookup:
 
     def test_lookup_found(self, mock_plugin):
         """Test successful symbol lookup."""
-        expected_symbol = SymbolDef(
-            name="test_func", kind="function", path="/test.py", line=10
-        )
+        expected_symbol = SymbolDef(name="test_func", kind="function", path="/test.py", line=10)
         mock_plugin.getDefinition.return_value = expected_symbol
 
         dispatcher = Dispatcher([mock_plugin])
@@ -148,9 +146,7 @@ class TestSymbolLookup:
         plugin1 = Mock(spec=IPlugin, lang="python")
         plugin1.getDefinition.return_value = None
 
-        expected_symbol = SymbolDef(
-            name="found", kind="class", path="/found.js", line=5
-        )
+        expected_symbol = SymbolDef(name="found", kind="class", path="/found.js", line=5)
         plugin2 = Mock(spec=IPlugin, lang="javascript")
         plugin2.getDefinition.return_value = expected_symbol
 
@@ -190,9 +186,7 @@ class TestSearch:
         results = list(dispatcher.search("func"))
 
         assert results == expected_results
-        mock_plugin.search.assert_called_once_with(
-            "func", {"semantic": False, "limit": 20}
-        )
+        mock_plugin.search.assert_called_once_with("func", {"semantic": False, "limit": 20})
 
     def test_search_semantic(self, mock_plugin):
         """Test semantic search."""
@@ -201,9 +195,7 @@ class TestSearch:
         dispatcher = Dispatcher([mock_plugin])
         list(dispatcher.search("test", semantic=True, limit=10))
 
-        mock_plugin.search.assert_called_once_with(
-            "test", {"semantic": True, "limit": 10}
-        )
+        mock_plugin.search.assert_called_once_with("test", {"semantic": True, "limit": 10})
 
     def test_search_multiple_plugins(self):
         """Test search results from multiple plugins are combined."""
@@ -222,9 +214,9 @@ class TestSearch:
         results = list(dispatcher.search("test"))
 
         assert len(results) == 3
-        assert results[0]['name'] == "py_func"
-        assert results[1]['name'] == "js_func"
-        assert results[2]['name'] == "js_class"
+        assert results[0]["name"] == "py_func"
+        assert results[1]["name"] == "js_func"
+        assert results[2]["name"] == "js_class"
 
     def test_search_empty_query(self, mock_plugin):
         """Test search with empty query."""
@@ -383,9 +375,7 @@ class TestIndexFile:
         test_file.write_text("def hello(): pass")
 
         mock_plugin.supports.return_value = True
-        mock_plugin.indexFile.return_value = {
-            "symbols": [{"name": "hello", "kind": "function"}]
-        }
+        mock_plugin.indexFile.return_value = {"symbols": [{"name": "hello", "kind": "function"}]}
 
         dispatcher.index_file(test_file)
 
@@ -694,6 +684,7 @@ class TestSymbolRouting:
 
     def setup_method(self):
         import os
+
         # .env.native has MCP_ENABLE_MULTI_REPO=true with stale /workspaces paths.
         # Force it off so dispatcher init doesn't try to create that directory.
         os.environ["MCP_ENABLE_MULTI_REPO"] = "false"
@@ -709,15 +700,19 @@ class TestSymbolRouting:
         return d
 
     def test_symbol_route_returns_definition_file(self):
-        store = self._make_store([{
-            "name": "SemanticIndexer",
-            "kind": "class",
-            "line_start": 42,
-            "line_end": 120,
-            "signature": "class SemanticIndexer:",
-            "documentation": None,
-            "file_path": "mcp_server/utils/semantic_indexer.py",
-        }])
+        store = self._make_store(
+            [
+                {
+                    "name": "SemanticIndexer",
+                    "kind": "class",
+                    "line_start": 42,
+                    "line_end": 120,
+                    "signature": "class SemanticIndexer:",
+                    "documentation": None,
+                    "file_path": "mcp_server/utils/semantic_indexer.py",
+                }
+            ]
+        )
         d = self._make_dispatcher(store)
         results = d._symbol_route("SemanticIndexer", "class", 5)
         assert len(results) == 1
@@ -727,26 +722,28 @@ class TestSymbolRouting:
 
     def test_symbol_route_prefers_non_init_file(self):
         """__init__.py re-export should sort after the definition file."""
-        store = self._make_store([
-            {
-                "name": "SemanticIndexer",
-                "kind": "class",
-                "line_start": 1,
-                "line_end": 1,
-                "signature": "from .semantic_indexer import SemanticIndexer",
-                "documentation": None,
-                "file_path": "mcp_server/utils/__init__.py",
-            },
-            {
-                "name": "SemanticIndexer",
-                "kind": "class",
-                "line_start": 42,
-                "line_end": 120,
-                "signature": "class SemanticIndexer:",
-                "documentation": None,
-                "file_path": "mcp_server/utils/semantic_indexer.py",
-            },
-        ])
+        store = self._make_store(
+            [
+                {
+                    "name": "SemanticIndexer",
+                    "kind": "class",
+                    "line_start": 1,
+                    "line_end": 1,
+                    "signature": "from .semantic_indexer import SemanticIndexer",
+                    "documentation": None,
+                    "file_path": "mcp_server/utils/__init__.py",
+                },
+                {
+                    "name": "SemanticIndexer",
+                    "kind": "class",
+                    "line_start": 42,
+                    "line_end": 120,
+                    "signature": "class SemanticIndexer:",
+                    "documentation": None,
+                    "file_path": "mcp_server/utils/semantic_indexer.py",
+                },
+            ]
+        )
         d = self._make_dispatcher(store)
         results = d._symbol_route("SemanticIndexer", "class", 5)
         assert results[0]["file"] == "mcp_server/utils/semantic_indexer.py"
@@ -765,9 +762,17 @@ class TestSymbolRouting:
         store = MagicMock()
         store.get_symbol.side_effect = [
             [],  # first call (with kind) → empty
-            [{"name": "rerank", "kind": "method", "line_start": 10, "line_end": 20,
-              "signature": "def rerank()", "documentation": None,
-              "file_path": "mcp_server/indexer/reranker.py"}],
+            [
+                {
+                    "name": "rerank",
+                    "kind": "method",
+                    "line_start": 10,
+                    "line_end": 20,
+                    "signature": "def rerank()",
+                    "documentation": None,
+                    "file_path": "mcp_server/indexer/reranker.py",
+                }
+            ],
         ]
         d = self._make_dispatcher(store)
         results = d._symbol_route("rerank", "class", 5)
@@ -777,15 +782,17 @@ class TestSymbolRouting:
     def test_search_routes_class_query_to_symbols(self):
         """search('class SemanticIndexer') should hit symbol table, not BM25."""
         store = MagicMock()
-        store.get_symbol.return_value = [{
-            "name": "SemanticIndexer",
-            "kind": "class",
-            "line_start": 42,
-            "line_end": 120,
-            "signature": "class SemanticIndexer:",
-            "documentation": None,
-            "file_path": "mcp_server/utils/semantic_indexer.py",
-        }]
+        store.get_symbol.return_value = [
+            {
+                "name": "SemanticIndexer",
+                "kind": "class",
+                "line_start": 42,
+                "line_end": 120,
+                "signature": "class SemanticIndexer:",
+                "documentation": None,
+                "file_path": "mcp_server/utils/semantic_indexer.py",
+            }
+        ]
         d = self._make_dispatcher(store)
         results = list(d.search("class SemanticIndexer", limit=5))
         assert len(results) >= 1

@@ -427,7 +427,12 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
 
         # Convert to legacy format
         return [
-            SearchResult(file=result["file"], start_line=result["line"], end_line=result["line"], snippet=result["snippet"])
+            SearchResult(
+                file=result["file"],
+                start_line=result["line"],
+                end_line=result["line"],
+                snippet=result["snippet"],
+            )
             for result in fuzzy_results
         ]
 

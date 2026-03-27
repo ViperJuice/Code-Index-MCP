@@ -248,7 +248,8 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
                 if isinstance(result, dict):
                     plugin_result = PluginSearchResult(
                         file_path=result.get("file", ""),
-                        start_line=result.get("line", 1), end_line=result.get("line", 1),
+                        start_line=result.get("line", 1),
+                        end_line=result.get("line", 1),
                         column=0,
                         snippet=result.get("content", result.get("match", "")),
                         match_type=("fuzzy" if not options.get("semantic") else "semantic"),

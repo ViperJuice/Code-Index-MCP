@@ -141,9 +141,7 @@ class HybridSearch:
                 "cache_ttl": self.reranking_settings.cache_ttl,
             }
 
-            self.reranker = factory.create_reranker(
-                self.reranking_settings.reranker_type, config
-            )
+            self.reranker = factory.create_reranker(self.reranking_settings.reranker_type, config)
 
             # Initialize reranker asynchronously will be done on first use
             logger.info(f"Initialized {self.reranking_settings.reranker_type} reranker")
@@ -193,11 +191,7 @@ class HybridSearch:
         combined_results = self._reciprocal_rank_fusion(all_results)
 
         # Apply reranking if enabled
-        if (
-            self.reranker
-            and self.reranking_settings
-            and self.reranking_settings.enabled
-        ):
+        if self.reranker and self.reranking_settings and self.reranking_settings.enabled:
             combined_results = await self._rerank_results(query, combined_results)
 
         # Apply post-processing
@@ -344,9 +338,7 @@ class HybridSearch:
         """Perform semantic search with availability checks."""
         # Check if semantic search is temporarily disabled
         if self._semantic_temporarily_disabled:
-            logger.debug(
-                "Semantic search is temporarily disabled due to previous errors"
-            )
+            logger.debug("Semantic search is temporarily disabled due to previous errors")
             return []
 
         # Check if semantic indexer is available before attempting search
@@ -464,9 +456,7 @@ class HybridSearch:
         self._search_stats["fuzzy_searches"] += 1
         return results
 
-    def _reciprocal_rank_fusion(
-        self, result_lists: List[List[SearchResult]]
-    ) -> List[SearchResult]:
+    def _reciprocal_rank_fusion(self, result_lists: List[List[SearchResult]]) -> List[SearchResult]:
         """
         Combine results using Reciprocal Rank Fusion (RRF).
 
@@ -524,9 +514,7 @@ class HybridSearch:
 
         return combined
 
-    async def _rerank_results(
-        self, query: str, results: List[SearchResult]
-    ) -> List[SearchResult]:
+    async def _rerank_results(self, query: str, results: List[SearchResult]) -> List[SearchResult]:
         """Rerank search results using the configured reranker."""
         if not self.reranker or not results:
             return results
@@ -549,7 +537,8 @@ class HybridSearch:
                 # Create a reranker-compatible search result
                 reranker_result = RerankSearchResult(
                     file_path=r.filepath,
-                    start_line=r.metadata.get("line", 1), end_line=r.metadata.get("line", 1),
+                    start_line=r.metadata.get("line", 1),
+                    end_line=r.metadata.get("line", 1),
                     column=r.metadata.get("column", 0),
                     snippet=r.snippet,
                     match_type=r.source,  # Use source as match type
@@ -560,13 +549,9 @@ class HybridSearch:
 
             # Perform reranking
             top_k = (
-                self.reranking_settings.top_k
-                if self.reranking_settings
-                else len(reranker_results)
+                self.reranking_settings.top_k if self.reranking_settings else len(reranker_results)
             )
-            rerank_result = await self.reranker.rerank(
-                query, reranker_results, top_k=top_k
-            )
+            rerank_result = await self.reranker.rerank(query, reranker_results, top_k=top_k)
 
             if not rerank_result.is_success:
                 logger.warning(f"Reranking failed: {rerank_result.error}")
@@ -591,9 +576,7 @@ class HybridSearch:
             reranked_results = []
             for rerank_item in rerank_data.results:
                 # Validate original_rank is within bounds
-                if rerank_item.original_rank < 0 or rerank_item.original_rank >= len(
-                    results
-                ):
+                if rerank_item.original_rank < 0 or rerank_item.original_rank >= len(results):
                     logger.warning(
                         f"Invalid original_rank {rerank_item.original_rank} for {len(results)} results"
                     )
@@ -618,16 +601,12 @@ class HybridSearch:
                 updated_result.metadata["original_rank"] = rerank_item.original_rank
                 updated_result.metadata["new_rank"] = rerank_item.new_rank
                 if rerank_item.explanation:
-                    updated_result.metadata["rerank_explanation"] = (
-                        rerank_item.explanation
-                    )
+                    updated_result.metadata["rerank_explanation"] = rerank_item.explanation
 
                 reranked_results.append(updated_result)
 
             # Sort by new rank to ensure proper ordering
-            reranked_results.sort(
-                key=lambda x: x.metadata.get("new_rank", float("inf"))
-            )
+            reranked_results.sort(key=lambda x: x.metadata.get("new_rank", float("inf")))
 
             # Log reranking metadata if available
             if hasattr(rerank_data, "metadata") and rerank_data.metadata:
@@ -649,9 +628,7 @@ class HybridSearch:
         if not normalized.strip():
             return False
 
-        if re.search(
-            r"\b(class|def|function|method|symbol|module|file|filepath)\b", normalized
-        ):
+        if re.search(r"\b(class|def|function|method|symbol|module|file|filepath)\b", normalized):
             return True
         if re.search(
             r"\b(py|python|js|ts|typescript|javascript|treesitter|tree-sitter)\b",
@@ -726,33 +703,24 @@ class HybridSearch:
 
     def _expand_query_for_branch(self, query: str, branch: str) -> str:
         """Expand a narrow set of queries with implementation-specific terms."""
-        terms = {
-            token
-            for token in re.findall(r"[a-z0-9_]+", query.lower())
-            if len(token) >= 3
-        }
+        terms = {token for token in re.findall(r"[a-z0-9_]+", query.lower()) if len(token) >= 3}
         if {
             "artifact",
             "push",
             "pull",
             "delta",
             "resolution",
-        }.issubset(terms) and branch in {"bm25", "semantic"}:
+        }.issubset(
+            terms
+        ) and branch in {"bm25", "semantic"}:
             return (
-                f"{query} resolve resolver delta chain base_commit "
-                "target_commit full artifact"
+                f"{query} resolve resolver delta chain base_commit " "target_commit full artifact"
             )
         return query
 
-    def _query_overlap_multiplier(
-        self, query: str, filepath: str, snippet: str
-    ) -> float:
+    def _query_overlap_multiplier(self, query: str, filepath: str, snippet: str) -> float:
         """Apply a small lexical bonus from file path and snippets."""
-        terms = {
-            token
-            for token in re.findall(r"[a-z0-9_]+", query.lower())
-            if len(token) >= 3
-        }
+        terms = {token for token in re.findall(r"[a-z0-9_]+", query.lower()) if len(token) >= 3}
         if not terms:
             return 1.0
 
@@ -784,12 +752,8 @@ class HybridSearch:
                 "checksum",
                 "operations",
             }
-            resolver_hits = sum(
-                1 for term in resolver_markers if term in content_haystack
-            )
-            artifact_hits = sum(
-                1 for term in artifact_markers if term in content_haystack
-            )
+            resolver_hits = sum(1 for term in resolver_markers if term in content_haystack)
+            artifact_hits = sum(1 for term in artifact_markers if term in content_haystack)
             if resolver_hits:
                 multiplier *= 1.0 + min(resolver_hits, 3) * 0.08
             if "delta_artifacts.py" in normalized_path and artifact_hits:
@@ -797,15 +761,9 @@ class HybridSearch:
 
         return multiplier
 
-    def _responsibility_multiplier(
-        self, query: str, filepath: str, snippet: str
-    ) -> float:
+    def _responsibility_multiplier(self, query: str, filepath: str, snippet: str) -> float:
         """Boost implementation files whose role matches the query."""
-        terms = {
-            token
-            for token in re.findall(r"[a-z0-9_]+", query.lower())
-            if len(token) >= 3
-        }
+        terms = {token for token in re.findall(r"[a-z0-9_]+", query.lower()) if len(token) >= 3}
         if not terms:
             return 1.0
 
@@ -939,9 +897,7 @@ class HybridSearch:
             )
 
             normalized_path = result.filepath.replace("\\", "/").lower().lstrip("./")
-            is_test = (
-                normalized_path.startswith("tests/") or "/tests/" in normalized_path
-            )
+            is_test = normalized_path.startswith("tests/") or "/tests/" in normalized_path
             is_impl = normalized_path.startswith(("mcp_server/", "src/"))
             if symbol_precise:
                 if is_test:
@@ -951,17 +907,12 @@ class HybridSearch:
 
         unique_results.sort(key=lambda item: item.score, reverse=True)
 
-        code_results = [
-            r for r in unique_results if _extension(r.filepath) in code_exts
-        ]
-        prose_results = [
-            r for r in unique_results if _extension(r.filepath) in prose_exts
-        ]
+        code_results = [r for r in unique_results if _extension(r.filepath) in code_exts]
+        prose_results = [r for r in unique_results if _extension(r.filepath) in prose_exts]
         other_results = [
             r
             for r in unique_results
-            if _extension(r.filepath) not in code_exts
-            and _extension(r.filepath) not in prose_exts
+            if _extension(r.filepath) not in code_exts and _extension(r.filepath) not in prose_exts
         ]
 
         prose_cap = min(len(prose_results), max(1, limit // 4))
@@ -988,9 +939,7 @@ class HybridSearch:
         for result in unique_results:
             if not result.snippet and result.filepath:
                 # Try to generate a snippet
-                result.snippet = self._generate_snippet(
-                    result.filepath, result.metadata
-                )
+                result.snippet = self._generate_snippet(result.filepath, result.metadata)
 
         return unique_results
 
@@ -1064,9 +1013,7 @@ class HybridSearch:
 
     # Configuration methods
 
-    def set_weights(
-        self, bm25: float = None, semantic: float = None, fuzzy: float = None
-    ):
+    def set_weights(self, bm25: float = None, semantic: float = None, fuzzy: float = None):
         """
         Update search method weights.
 
@@ -1083,19 +1030,13 @@ class HybridSearch:
             self.config.fuzzy_weight = max(0, min(1, fuzzy))
 
         # Normalize weights
-        total = (
-            self.config.bm25_weight
-            + self.config.semantic_weight
-            + self.config.fuzzy_weight
-        )
+        total = self.config.bm25_weight + self.config.semantic_weight + self.config.fuzzy_weight
         if total > 0:
             self.config.bm25_weight /= total
             self.config.semantic_weight /= total
             self.config.fuzzy_weight /= total
 
-    def enable_methods(
-        self, bm25: bool = None, semantic: bool = None, fuzzy: bool = None
-    ):
+    def enable_methods(self, bm25: bool = None, semantic: bool = None, fuzzy: bool = None):
         """
         Enable or disable search methods.
 
@@ -1122,9 +1063,7 @@ class HybridSearch:
             True if semantic search was successfully re-enabled, False otherwise
         """
         if not self.semantic_indexer:
-            logger.warning(
-                "Cannot retry semantic search: no semantic indexer configured"
-            )
+            logger.warning("Cannot retry semantic search: no semantic indexer configured")
             return False
 
         if not self._semantic_temporarily_disabled and self.config.enable_semantic:
@@ -1132,10 +1071,7 @@ class HybridSearch:
             return True
 
         # Check if semantic indexer is now available
-        if (
-            self.semantic_indexer.is_available
-            and self.semantic_indexer.validate_connection()
-        ):
+        if self.semantic_indexer.is_available and self.semantic_indexer.validate_connection():
             self._semantic_temporarily_disabled = False
             self.config.enable_semantic = True
             logger.info(
@@ -1163,9 +1099,7 @@ class HybridSearch:
                 "available": self.bm25_indexer is not None,
                 "enabled": self.config.enable_bm25,
                 "status": (
-                    "operational"
-                    if (self.bm25_indexer and self.config.enable_bm25)
-                    else "disabled"
+                    "operational" if (self.bm25_indexer and self.config.enable_bm25) else "disabled"
                 ),
             },
             "semantic": {
@@ -1191,9 +1125,7 @@ class HybridSearch:
 
             capabilities["semantic"]["available"] = is_available
             capabilities["semantic"]["connection_mode"] = connection_mode
-            capabilities["semantic"]["temporarily_disabled"] = (
-                self._semantic_temporarily_disabled
-            )
+            capabilities["semantic"]["temporarily_disabled"] = self._semantic_temporarily_disabled
 
             if self._semantic_temporarily_disabled:
                 capabilities["semantic"]["status"] = "temporarily_disabled"
@@ -1270,9 +1202,7 @@ class HybridSearchOptimizer:
         self.feedback_history: List[Dict[str, Any]] = []
         self.performance_history: List[Dict[str, Any]] = []
 
-    def record_feedback(
-        self, query: str, selected_result: int, results: List[Dict[str, Any]]
-    ):
+    def record_feedback(self, query: str, selected_result: int, results: List[Dict[str, Any]]):
         """
         Record user feedback on search results.
 
@@ -1285,9 +1215,7 @@ class HybridSearchOptimizer:
             "query": query,
             "selected_rank": selected_result + 1,
             "selected_source": (
-                results[selected_result]["source"]
-                if selected_result < len(results)
-                else None
+                results[selected_result]["source"] if selected_result < len(results) else None
             ),
             "num_results": len(results),
             "timestamp": datetime.now(),
@@ -1380,9 +1308,9 @@ class HybridSearchOptimizer:
         # Analyze performance
         avg_search_time = 0
         if self.performance_history:
-            avg_search_time = sum(
-                p["search_time_ms"] for p in self.performance_history
-            ) / len(self.performance_history)
+            avg_search_time = sum(p["search_time_ms"] for p in self.performance_history) / len(
+                self.performance_history
+            )
 
         return {
             "feedback_count": len(self.feedback_history),

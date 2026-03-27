@@ -3,6 +3,7 @@
 Test script for MCP server functionality without Docker
 This creates a minimal test environment to verify the MCP server works
 """
+
 import os
 import sys
 

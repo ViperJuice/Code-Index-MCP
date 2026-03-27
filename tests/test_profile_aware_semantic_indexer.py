@@ -66,9 +66,7 @@ def _patch_indexer_runtime(monkeypatch, tmp_path) -> None:
 
     monkeypatch.setattr(SemanticIndexer, "_init_qdrant_client", _fake_init_qdrant)
     monkeypatch.setattr(SemanticIndexer, "_ensure_collection", lambda self: None)
-    monkeypatch.setattr(
-        SemanticIndexer, "_get_git_commit_hash", lambda self: "deadbeef"
-    )
+    monkeypatch.setattr(SemanticIndexer, "_get_git_commit_hash", lambda self: "deadbeef")
 
     def _fake_provider(
         provider_name: str,
@@ -124,9 +122,7 @@ def test_legacy_fallback_remains_compatible(monkeypatch, tmp_path):
     assert indexer.embedding_dimension == 1024
     assert indexer.distance_metric == "cosine"
 
-    expected = hashlib.sha256("voyage-code-3:1024:cosine".encode("utf-8")).hexdigest()[
-        :16
-    ]
+    expected = hashlib.sha256("voyage-code-3:1024:cosine".encode("utf-8")).hexdigest()[:16]
     assert indexer._generate_compatibility_hash() == expected
 
     metadata = indexer._build_metadata()
@@ -154,9 +150,7 @@ def test_compatibility_metadata_differs_by_profile(monkeypatch, tmp_path):
     commercial_metadata = commercial._build_metadata()
     oss_metadata = oss._build_metadata()
 
-    assert (
-        commercial_metadata["compatibility_hash"] != oss_metadata["compatibility_hash"]
-    )
+    assert commercial_metadata["compatibility_hash"] != oss_metadata["compatibility_hash"]
     assert (
         commercial_metadata["compatibility_fingerprint"]
         != oss_metadata["compatibility_fingerprint"]
@@ -182,9 +176,7 @@ def test_metadata_file_accumulates_multiple_semantic_profiles(monkeypatch, tmp_p
         semantic_profile="oss-high",
     )
 
-    metadata = json.loads(
-        (tmp_path / ".index_metadata.json").read_text(encoding="utf-8")
-    )
+    metadata = json.loads((tmp_path / ".index_metadata.json").read_text(encoding="utf-8"))
 
     assert metadata["semantic_profile"] == "oss-high"
     assert sorted(metadata["semantic_profiles"].keys()) == [
@@ -203,7 +195,4 @@ def test_metadata_file_accumulates_multiple_semantic_profiles(monkeypatch, tmp_p
         metadata["semantic_profiles"]["commercial-high"]["collection_name"]
         == "semantic-commercial-high"
     )
-    assert (
-        metadata["semantic_profiles"]["oss-high"]["collection_name"]
-        == "semantic-oss-high"
-    )
+    assert metadata["semantic_profiles"]["oss-high"]["collection_name"] == "semantic-oss-high"

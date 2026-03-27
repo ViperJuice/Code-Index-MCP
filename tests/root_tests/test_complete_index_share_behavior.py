@@ -30,75 +30,60 @@ def main():
 
     # Source files
     Path("src").mkdir()
-    Path("src/app.py").write_text(
-        """
+    Path("src/app.py").write_text("""
 import os
 from config import DATABASE_URL
 
 def connect():
     api_key = os.getenv('API_KEY')
     return f"Connected with {api_key}"
-"""
-    )
+""")
 
-    Path("src/config.py").write_text(
-        """
+    Path("src/config.py").write_text("""
 import os
 
 DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///local.db')
 SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret')
-"""
-    )
+""")
 
     # Configuration files
-    Path(".env").write_text(
-        """
+    Path(".env").write_text("""
 # Production secrets - DO NOT COMMIT!
 DATABASE_URL=postgresql://prod_user:prod_pass@db.example.com/myapp
 API_KEY=sk-1234567890abcdef
 SECRET_KEY=super-secret-production-key
 AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
 AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-"""
-    )
+""")
 
-    Path(".env.development").write_text(
-        """
+    Path(".env.development").write_text("""
 DATABASE_URL=postgresql://dev:dev@localhost/myapp_dev
 API_KEY=test-api-key
 SECRET_KEY=dev-secret
-"""
-    )
+""")
 
     # Certificates
     Path("certs").mkdir()
-    Path("certs/server.key").write_text(
-        """-----BEGIN PRIVATE KEY-----
+    Path("certs/server.key").write_text("""-----BEGIN PRIVATE KEY-----
 MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC9W8bA...
------END PRIVATE KEY-----"""
-    )
+-----END PRIVATE KEY-----""")
 
-    Path("certs/server.crt").write_text(
-        """-----BEGIN CERTIFICATE-----
+    Path("certs/server.crt").write_text("""-----BEGIN CERTIFICATE-----
 MIIDXTCCAkWgAwIBAgIJAKLdQVPy90W...
------END CERTIFICATE-----"""
-    )
+-----END CERTIFICATE-----""")
 
     # Documentation
-    Path("README.md").write_text(
-        """
+    Path("README.md").write_text("""
 # My Application
 
 ## Setup
 1. Copy `.env.example` to `.env`
 2. Set your API_KEY
 3. Run `python src/app.py`
-"""
-    )
+""")
 
     # Git files
-    Path(".gitignore").write_text(
-        """
+    Path(".gitignore").write_text("""
 # Secrets
 .env
 *.key
@@ -111,8 +96,7 @@ __pycache__/
 # Dependencies
 venv/
 node_modules/
-"""
-    )
+""")
 
     # Dependencies (should be ignored in export)
     Path("node_modules").mkdir()

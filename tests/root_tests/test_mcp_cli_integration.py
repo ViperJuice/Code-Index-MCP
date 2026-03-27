@@ -85,16 +85,14 @@ async def test_mcp_cli_integration():
         try:
             # Create a temporary test file
             with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-                f.write(
-                    """
+                f.write("""
 class TestClass:
     def test_method(self):
         return "Hello, MCP!"
 
 def test_function():
     return TestClass()
-"""
-                )
+""")
                 test_file_path = f.name
 
             # Test reindexing the file

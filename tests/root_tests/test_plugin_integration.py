@@ -338,8 +338,7 @@ class TestClass:
         """Test plugins handling files with mixed content types."""
         # Create a markdown file with embedded code
         mixed_md = self.workspace / "mixed.md"
-        mixed_md.write_text(
-            """# Technical Guide
+        mixed_md.write_text("""# Technical Guide
 
 ## Python Examples
 
@@ -364,13 +363,11 @@ server:
   host: localhost
   port: 8080
 ```
-"""
-        )
+""")
 
         # Create Python file with extensive documentation
         doc_heavy_py = self.workspace / "documented.py"
-        doc_heavy_py.write_text(
-            '''"""
+        doc_heavy_py.write_text('''"""
 Comprehensive Module Documentation
 ==================================
 
@@ -399,8 +396,7 @@ def process(items):
         list: Processed items
     """
     return [item * 2 for item in items]
-'''
-        )
+''')
 
         # Index both files
         md_plugin = plugin_factory.get_plugin(str(mixed_md))
@@ -424,8 +420,7 @@ def process(items):
         large_md = self.workspace / "large.md"
         sections = []
         for i in range(100):
-            sections.append(
-                f"""## Section {i}
+            sections.append(f"""## Section {i}
 
 This is content for section {i}. It contains various information about topic {i}.
 
@@ -436,8 +431,7 @@ Detailed information about subtopic {i}.1 with examples and explanations.
 ### Subsection {i}.2
 
 More details about subtopic {i}.2 with additional context.
-"""
-            )
+""")
 
         large_content = "# Large Document\n\n" + "\n".join(sections)
         large_md.write_text(large_content)

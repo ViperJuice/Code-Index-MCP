@@ -142,8 +142,7 @@ def test_integration():
 
         # Create test file
         test_file = tmpdir / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 def hello():
     '''Say hello'''
     print('Hello, world!')
@@ -151,8 +150,7 @@ def hello():
 class TestClass:
     def method(self):
         pass
-"""
-        )
+""")
 
         # Initialize components
         db_path = tmpdir / "test.db"

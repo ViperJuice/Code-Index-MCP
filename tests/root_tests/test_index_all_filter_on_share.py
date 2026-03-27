@@ -23,29 +23,24 @@ def test_index_all_filter_on_share():
         print("\n📁 Creating test files...")
 
         # Create .gitignore
-        (root / ".gitignore").write_text(
-            """
+        (root / ".gitignore").write_text("""
 .env
 *.key
 node_modules/
 __pycache__/
-"""
-        )
+""")
 
         # Create sensitive files that should be indexed but not shared
-        (root / ".env").write_text(
-            """
+        (root / ".env").write_text("""
 DATABASE_URL=postgresql://user:password@localhost/db
 API_KEY=super-secret-key-12345
 AWS_SECRET_ACCESS_KEY=aws-secret-123
-"""
-        )
+""")
 
         (root / "private.key").write_text("-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkq...")
 
         # Create normal files
-        (root / "app.py").write_text(
-            """
+        (root / "app.py").write_text("""
 import os
 
 def get_api_key():
@@ -54,8 +49,7 @@ def get_api_key():
 class Application:
     def __init__(self):
         self.db_url = os.getenv('DATABASE_URL')
-"""
-        )
+""")
 
         (root / "config.json").write_text('{"debug": true, "port": 3000}')
 

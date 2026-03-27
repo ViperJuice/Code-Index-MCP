@@ -78,9 +78,7 @@ class Plugin(IPlugin):
             import os
 
             if os.getenv("VOYAGE_API_KEY") or os.getenv("VOYAGE_API_KEY_PATH"):
-                self._semantic_indexer = SemanticIndexer(
-                    collection=f"typescript-{id(self)}"
-                )
+                self._semantic_indexer = SemanticIndexer(collection=f"typescript-{id(self)}")
                 logger.info("Semantic indexing enabled for TypeScript plugin")
             else:
                 logger.info("Semantic indexing disabled (no Voyage API key)")
@@ -226,17 +224,11 @@ class Plugin(IPlugin):
 
         # Handle declaration files specially
         if path.suffix == ".d.ts":
-            declarations = self._declaration_handler.parse_declaration_file(
-                path, content, root
-            )
+            declarations = self._declaration_handler.parse_declaration_file(path, content, root)
             self._declaration_cache[str(path)] = declarations
-            symbols = self._convert_declarations_to_symbols(
-                declarations, str(path), content
-            )
+            symbols = self._convert_declarations_to_symbols(declarations, str(path), content)
         else:
-            self._extract_symbols_with_types(
-                root, content, symbols, imports, exports, file_id
-            )
+            self._extract_symbols_with_types(root, content, symbols, imports, exports, file_id)
 
         # Store module information if SQLite available
         if self._sqlite_store and self._repository_id and file_id:
@@ -259,9 +251,7 @@ class Plugin(IPlugin):
                             kind=symbol["kind"],
                             signature=symbol["signature"],
                             line=symbol["line"],
-                            span=symbol.get(
-                                "span", (symbol["line"], symbol["line"] + 1)
-                            ),
+                            span=symbol.get("span", (symbol["line"], symbol["line"] + 1)),
                             doc=symbol.get("doc"),
                             content=symbol.get("full_text", ""),
                         )
@@ -310,15 +300,11 @@ class Plugin(IPlugin):
 
         # Function declarations with type annotations
         if node.type in ["function_declaration", "function"]:
-            self._extract_function_with_types(
-                node, content, symbols, scope_path, file_id
-            )
+            self._extract_function_with_types(node, content, symbols, scope_path, file_id)
 
         # Variable declarations with type inference
         elif node.type in ["variable_declaration", "lexical_declaration"]:
-            self._extract_variables_with_types(
-                node, content, symbols, scope_path, file_id
-            )
+            self._extract_variables_with_types(node, content, symbols, scope_path, file_id)
 
         # Class declarations with type information
         elif node.type in ["class_declaration", "class"]:
@@ -383,9 +369,7 @@ class Plugin(IPlugin):
         return_type_node = node.child_by_field_name("return_type")
         if return_type_node:
             type_node = (
-                return_type_node.named_children[0]
-                if return_type_node.named_children
-                else None
+                return_type_node.named_children[0] if return_type_node.named_children else None
             )
             if type_node:
                 return_type = content[type_node.start_byte : type_node.end_byte]
@@ -393,9 +377,7 @@ class Plugin(IPlugin):
             # Infer return type
             body_node = node.child_by_field_name("body")
             if body_node:
-                return_type = self._type_engine.infer_type(
-                    body_node, content, self._type_context
-                )
+                return_type = self._type_engine.infer_type(body_node, content, self._type_context)
 
         # Check for modifiers
         is_async = self._has_modifier(node, content, "async")
@@ -463,9 +445,7 @@ class Plugin(IPlugin):
         for child in node.named_children:
             if child.type == "variable_declarator":
                 name_node = child.child_by_field_name("name")
-                value_node = child.child_by_field_name(
-                    "value"
-                ) or child.child_by_field_name("init")
+                value_node = child.child_by_field_name("value") or child.child_by_field_name("init")
                 type_annotation = child.child_by_field_name("type")
 
                 if name_node:
@@ -480,9 +460,7 @@ class Plugin(IPlugin):
                             else None
                         )
                         if type_node:
-                            explicit_type = content[
-                                type_node.start_byte : type_node.end_byte
-                            ]
+                            explicit_type = content[type_node.start_byte : type_node.end_byte]
 
                     # Infer type from value if no explicit type
                     inferred_type = None
@@ -543,9 +521,7 @@ class Plugin(IPlugin):
                     # Store type information
                     full_name = ".".join(scope_path + [name])
                     self._type_context["variables"][full_name] = final_type
-                    self._type_engine.set_symbol_type(
-                        name, final_type, self._current_file
-                    )
+                    self._type_engine.set_symbol_type(name, final_type, self._current_file)
 
     def _extract_class_with_types(
         self,
@@ -575,13 +551,9 @@ class Plugin(IPlugin):
         if heritage_node:
             for child in heritage_node.named_children:
                 if child.type == "extends_clause":
-                    type_node = (
-                        child.named_children[0] if child.named_children else None
-                    )
+                    type_node = child.named_children[0] if child.named_children else None
                     if type_node:
-                        extends_clause = content[
-                            type_node.start_byte : type_node.end_byte
-                        ]
+                        extends_clause = content[type_node.start_byte : type_node.end_byte]
                 elif child.type == "implements_clause":
                     for impl_child in child.named_children:
                         implements_clause.append(
@@ -620,9 +592,7 @@ class Plugin(IPlugin):
         # Store type information
         full_name = ".".join(scope_path + [name])
         self._type_context["classes"][full_name] = signature
-        self._type_engine.set_symbol_type(
-            name, name, self._current_file
-        )  # Class type is its name
+        self._type_engine.set_symbol_type(name, name, self._current_file)  # Class type is its name
 
         # Extract class members
         body_node = node.child_by_field_name("body")
@@ -661,9 +631,7 @@ class Plugin(IPlugin):
             for child in heritage_node.named_children:
                 if child.type == "extends_clause":
                     for ext_child in child.named_children:
-                        heritage.append(
-                            content[ext_child.start_byte : ext_child.end_byte]
-                        )
+                        heritage.append(content[ext_child.start_byte : ext_child.end_byte])
 
         # Build signature
         signature_parts = ["interface", name]
@@ -778,9 +746,7 @@ class Plugin(IPlugin):
                 elif child.type == "enum_assignment":
                     name_child = child.child_by_field_name("name")
                     if name_child:
-                        member_name = content[
-                            name_child.start_byte : name_child.end_byte
-                        ]
+                        member_name = content[name_child.start_byte : name_child.end_byte]
                         members.append(member_name)
 
         signature = f"enum {name} {{ {', '.join(members)} }}"
@@ -869,9 +835,7 @@ class Plugin(IPlugin):
         return_type_node = node.child_by_field_name("return_type")
         if return_type_node:
             type_node = (
-                return_type_node.named_children[0]
-                if return_type_node.named_children
-                else None
+                return_type_node.named_children[0] if return_type_node.named_children else None
             )
             if type_node:
                 return_type = content[type_node.start_byte : type_node.end_byte]
@@ -941,9 +905,7 @@ class Plugin(IPlugin):
         }
         symbols.append(symbol_info)
 
-    def _extract_type_parameters(
-        self, node: Node, content: str
-    ) -> List[Dict[str, Any]]:
+    def _extract_type_parameters(self, node: Node, content: str) -> List[Dict[str, Any]]:
         """Extract type parameters from a node."""
         type_params = []
 
@@ -966,14 +928,10 @@ class Plugin(IPlugin):
                             else None
                         )
                         if type_node:
-                            constraint = content[
-                                type_node.start_byte : type_node.end_byte
-                            ]
+                            constraint = content[type_node.start_byte : type_node.end_byte]
 
                     if default_node:
-                        default_type = content[
-                            default_node.start_byte : default_node.end_byte
-                        ]
+                        default_type = content[default_node.start_byte : default_node.end_byte]
 
                     type_params.append(
                         {
@@ -985,9 +943,7 @@ class Plugin(IPlugin):
 
         return type_params
 
-    def _extract_typed_parameters(
-        self, node: Node, content: str
-    ) -> List[Dict[str, Any]]:
+    def _extract_typed_parameters(self, node: Node, content: str) -> List[Dict[str, Any]]:
         """Extract function parameters with type information."""
         params = []
 
@@ -1001,9 +957,7 @@ class Plugin(IPlugin):
                 type_annotation = child.child_by_field_name("type")
 
                 if pattern_node:
-                    param_name = content[
-                        pattern_node.start_byte : pattern_node.end_byte
-                    ]
+                    param_name = content[pattern_node.start_byte : pattern_node.end_byte]
                     param_type = "any"
 
                     if type_annotation:
@@ -1013,9 +967,7 @@ class Plugin(IPlugin):
                             else None
                         )
                         if type_node:
-                            param_type = content[
-                                type_node.start_byte : type_node.end_byte
-                            ]
+                            param_type = content[type_node.start_byte : type_node.end_byte]
 
                     is_optional = child.type == "optional_parameter"
                     is_rest = child.type == "rest_parameter"
@@ -1085,9 +1037,7 @@ class Plugin(IPlugin):
 
         return " ".join(sig_parts)
 
-    def _extract_arrow_function_signature(
-        self, node: Node, content: str, var_name: str
-    ) -> str:
+    def _extract_arrow_function_signature(self, node: Node, content: str, var_name: str) -> str:
         """Extract arrow function signature."""
         # Extract parameters
         params = []
@@ -1100,9 +1050,7 @@ class Plugin(IPlugin):
                         "optional_parameter",
                     ]:
                         if param_child.type == "identifier":
-                            params.append(
-                                content[param_child.start_byte : param_child.end_byte]
-                            )
+                            params.append(content[param_child.start_byte : param_child.end_byte])
                         else:
                             pattern_node = param_child.child_by_field_name("pattern")
                             type_annotation = param_child.child_by_field_name("type")
@@ -1134,9 +1082,7 @@ class Plugin(IPlugin):
         return_type_node = node.child_by_field_name("return_type")
         if return_type_node:
             type_node = (
-                return_type_node.named_children[0]
-                if return_type_node.named_children
-                else None
+                return_type_node.named_children[0] if return_type_node.named_children else None
             )
             if type_node:
                 return_type = content[type_node.start_byte : type_node.end_byte]
@@ -1148,9 +1094,7 @@ class Plugin(IPlugin):
         if is_async:
             sig_parts.append("async")
 
-        param_str = (
-            ", ".join(params) if len(params) != 1 else params[0] if params else ""
-        )
+        param_str = ", ".join(params) if len(params) != 1 else params[0] if params else ""
         if len(params) != 1 or ":" in param_str:
             param_str = f"({param_str})"
 
@@ -1178,9 +1122,7 @@ class Plugin(IPlugin):
         return_type_node = node.child_by_field_name("return_type")
         if return_type_node:
             type_node = (
-                return_type_node.named_children[0]
-                if return_type_node.named_children
-                else None
+                return_type_node.named_children[0] if return_type_node.named_children else None
             )
             if type_node:
                 return_type = content[type_node.start_byte : type_node.end_byte]
@@ -1314,17 +1256,14 @@ class Plugin(IPlugin):
             if node.type in ["import_statement", "import_declaration"]:
                 source_node = node.child_by_field_name("source")
                 if source_node:
-                    source = content[
-                        source_node.start_byte : source_node.end_byte
-                    ].strip("\"'`")
+                    source = content[source_node.start_byte : source_node.end_byte].strip("\"'`")
 
                     # Check if it's a type-only import
                     is_type_only = False
                     for child in node.children:
                         if (
                             not child.is_named
-                            and content[child.start_byte : child.end_byte].strip()
-                            == "type"
+                            and content[child.start_byte : child.end_byte].strip() == "type"
                         ):
                             is_type_only = True
                             break
@@ -1338,9 +1277,7 @@ class Plugin(IPlugin):
                     if import_clause:
                         for child in import_clause.named_children:
                             if child.type == "identifier":
-                                default_import = content[
-                                    child.start_byte : child.end_byte
-                                ]
+                                default_import = content[child.start_byte : child.end_byte]
                             elif child.type == "namespace_import":
                                 name_node = child.child_by_field_name("name")
                                 if name_node:
@@ -1360,9 +1297,7 @@ class Plugin(IPlugin):
                                                 alias = content[
                                                     alias_node.start_byte : alias_node.end_byte
                                                 ]
-                                                imported_names.append(
-                                                    f"{name} as {alias}"
-                                                )
+                                                imported_names.append(f"{name} as {alias}")
                                             else:
                                                 imported_names.append(name)
 
@@ -1406,8 +1341,7 @@ class Plugin(IPlugin):
                 for child in node.children:
                     if (
                         not child.is_named
-                        and content[child.start_byte : child.end_byte].strip()
-                        == "default"
+                        and content[child.start_byte : child.end_byte].strip() == "default"
                     ):
                         is_default = True
                         break
@@ -1431,9 +1365,7 @@ class Plugin(IPlugin):
                             exported_names.append(
                                 {
                                     "name": name,
-                                    "kind": declaration.type.replace(
-                                        "_declaration", ""
-                                    ),
+                                    "kind": declaration.type.replace("_declaration", ""),
                                     "is_default": is_default,
                                 }
                             )
@@ -1446,9 +1378,7 @@ class Plugin(IPlugin):
                                     name_node = spec.child_by_field_name("name")
                                     alias_node = spec.child_by_field_name("alias")
                                     if name_node:
-                                        name = content[
-                                            name_node.start_byte : name_node.end_byte
-                                        ]
+                                        name = content[name_node.start_byte : name_node.end_byte]
                                         export_name = name
                                         if alias_node:
                                             export_name = content[
@@ -1457,9 +1387,7 @@ class Plugin(IPlugin):
                                         exported_names.append(
                                             {
                                                 "name": export_name,
-                                                "original": (
-                                                    name if alias_node else None
-                                                ),
+                                                "original": (name if alias_node else None),
                                                 "kind": "named",
                                             }
                                         )
@@ -1491,9 +1419,7 @@ class Plugin(IPlugin):
             nodes.extend(self._walk_tree(child))
         return nodes
 
-    def _symbol_to_def(
-        self, symbol: Dict[str, Any], file_path: str, content: str
-    ) -> SymbolDef:
+    def _symbol_to_def(self, symbol: Dict[str, Any], file_path: str, content: str) -> SymbolDef:
         """Convert internal symbol representation to SymbolDef with type information."""
         return {
             "symbol": symbol["symbol"],
@@ -1503,9 +1429,7 @@ class Plugin(IPlugin):
             "doc": symbol.get("doc"),
             "defined_in": file_path,
             "line": symbol.get("line", 1),
-            "span": symbol.get(
-                "span", (symbol.get("line", 1), symbol.get("line", 1) + 1)
-            ),
+            "span": symbol.get("span", (symbol.get("line", 1), symbol.get("line", 1) + 1)),
             "type": symbol.get("type"),
             "type_parameters": symbol.get("type_parameters"),
             "parameters": symbol.get("parameters"),
@@ -1546,16 +1470,12 @@ class Plugin(IPlugin):
         # First check cache
         for file_path, symbols in self._symbol_cache.items():
             for sym_def in symbols:
-                if sym_def["symbol"] == symbol or sym_def["symbol"].endswith(
-                    f".{symbol}"
-                ):
+                if sym_def["symbol"] == symbol or sym_def["symbol"].endswith(f".{symbol}"):
                     return sym_def
 
         # Search in declaration files
         for file_path, declarations in self._declaration_cache.items():
-            type_info = self._declaration_handler.get_type_information(
-                symbol, Path(file_path)
-            )
+            type_info = self._declaration_handler.get_type_information(symbol, Path(file_path))
             if type_info:
                 return self._convert_type_info_to_symbol_def(type_info, file_path)
 
@@ -1567,8 +1487,7 @@ class Plugin(IPlugin):
                 try:
                     # Skip excluded directories
                     if any(
-                        part in path.parts
-                        for part in ["node_modules", "dist", "build", ".next"]
+                        part in path.parts for part in ["node_modules", "dist", "build", ".next"]
                     ):
                         continue
 
@@ -1579,9 +1498,7 @@ class Plugin(IPlugin):
                     shard = self.indexFile(path, content)
 
                     for sym in shard["symbols"]:
-                        if sym["symbol"] == symbol or sym["symbol"].endswith(
-                            f".{symbol}"
-                        ):
+                        if sym["symbol"] == symbol or sym["symbol"].endswith(f".{symbol}"):
                             return self._symbol_to_def(sym, str(path), content)
                 except Exception:
                     continue
@@ -1620,8 +1537,7 @@ class Plugin(IPlugin):
                 try:
                     # Skip excluded directories
                     if any(
-                        part in path.parts
-                        for part in ["node_modules", "dist", "build", ".next"]
+                        part in path.parts for part in ["node_modules", "dist", "build", ".next"]
                     ):
                         continue
 
@@ -1647,11 +1563,7 @@ class Plugin(IPlugin):
 
                         # Type references (e.g., : Symbol, <Symbol>)
                         pattern_type = (
-                            r":\s*"
-                            + re.escape(symbol)
-                            + r"\b|<"
-                            + re.escape(symbol)
-                            + r">"
+                            r":\s*" + re.escape(symbol) + r"\b|<" + re.escape(symbol) + r">"
                         )
                         if re.search(pattern_type, line):
                             line_no = i + 1
@@ -1661,9 +1573,7 @@ class Plugin(IPlugin):
                                 seen.add(key)
 
                         # Import/export references
-                        pattern_import = (
-                            r"(?:import|export).*\b" + re.escape(symbol) + r"\b"
-                        )
+                        pattern_import = r"(?:import|export).*\b" + re.escape(symbol) + r"\b"
                         if re.search(pattern_import, line):
                             line_no = i + 1
                             key = (str(path), line_no)
@@ -1676,9 +1586,7 @@ class Plugin(IPlugin):
 
         return refs
 
-    def search(
-        self, query: str, opts: SearchOpts | None = None
-    ) -> Iterable[SearchResult]:
+    def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:
         """Search for code snippets with enhanced TypeScript support."""
         limit = 20
         if opts and "limit" in opts:
@@ -1704,7 +1612,10 @@ class Plugin(IPlugin):
                             snippet = "\n".join(snippet_lines)
 
                             yield SearchResult(
-                                file=result["file"], start_line=line_num, end_line=line_num, snippet=snippet
+                                file=result["file"],
+                                start_line=line_num,
+                                end_line=line_num,
+                                snippet=snippet,
                             )
                     except Exception as e:
                         logger.debug(
@@ -1723,9 +1634,7 @@ class Plugin(IPlugin):
         """Return the number of indexed files."""
         return len(self._symbol_cache)
 
-    def get_type_information(
-        self, symbol: str, file_path: Path
-    ) -> Optional[Dict[str, Any]]:
+    def get_type_information(self, symbol: str, file_path: Path) -> Optional[Dict[str, Any]]:
         """Get comprehensive type information for a symbol."""
         # Check type engine first
         symbol_type = self._type_engine.get_symbol_type(symbol, file_path)
@@ -1742,17 +1651,13 @@ class Plugin(IPlugin):
         # Check declaration cache
         file_key = str(file_path)
         if file_key in self._declaration_cache:
-            decl_info = self._declaration_handler.get_type_information(
-                symbol, file_path
-            )
+            decl_info = self._declaration_handler.get_type_information(symbol, file_path)
             if decl_info:
                 return decl_info
 
         return None
 
-    def resolve_module_import(
-        self, module_name: str, from_file: Path
-    ) -> Optional[Path]:
+    def resolve_module_import(self, module_name: str, from_file: Path) -> Optional[Path]:
         """Resolve a module import to its file path."""
         return self._tsconfig_parser.resolve_module_path(module_name, from_file)
 

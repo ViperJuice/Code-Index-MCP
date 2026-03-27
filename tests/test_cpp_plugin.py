@@ -28,8 +28,7 @@ def plugin_with_sqlite(tmp_path):
 def temp_cpp_file():
     """Create a temporary C++ file for testing."""
     with tempfile.NamedTemporaryFile(mode="w", suffix=".cpp", delete=False) as f:
-        f.write(
-            """
+        f.write("""
 #include <iostream>
 #include <vector>
 #include <string>
@@ -130,8 +129,7 @@ public:
         std::cout << "Derived" << std::endl; 
     }
 };
-"""
-        )
+""")
         path = f.name
     yield path
     if Path(path).exists():
@@ -142,8 +140,7 @@ public:
 def temp_header_file():
     """Create a temporary C++ header file for testing."""
     with tempfile.NamedTemporaryFile(mode="w", suffix=".hpp", delete=False) as f:
-        f.write(
-            """
+        f.write("""
 #pragma once
 
 /// @brief A simple interface for shapes
@@ -224,8 +221,7 @@ private:
     size_type capacity_ = 0;
     Allocator alloc_;
 };
-"""
-        )
+""")
         path = f.name
     yield path
     if Path(path).exists():

@@ -95,8 +95,7 @@ class TestSymbolExtraction:
     def test_extract_functions(self):
         """Test extracting function definitions."""
         plugin = CPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         /* Simple function */
         void simple_function() {
             return;
@@ -119,8 +118,7 @@ class TestSymbolExtraction:
         
         /* Function declaration (prototype) - should not be indexed as definition */
         void prototype_only(int x);
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.c"), code)
 
@@ -149,8 +147,7 @@ class TestSymbolExtraction:
     def test_extract_structs(self):
         """Test extracting struct definitions."""
         plugin = CPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         /* Simple struct */
         struct Point {
             int x;
@@ -175,8 +172,7 @@ class TestSymbolExtraction:
         
         /* Forward declaration - should not be indexed */
         struct ForwardDecl;
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.c"), code)
         symbols = result["symbols"]
@@ -198,8 +194,7 @@ class TestSymbolExtraction:
     def test_extract_enums(self):
         """Test extracting enum definitions."""
         plugin = CPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         /* Simple enum */
         enum Color {
             RED,
@@ -221,8 +216,7 @@ class TestSymbolExtraction:
             EAST,
             WEST
         } Direction;
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.c"), code)
         symbols = result["symbols"]
@@ -244,8 +238,7 @@ class TestSymbolExtraction:
     def test_extract_unions(self):
         """Test extracting union definitions."""
         plugin = CPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         /* Simple union */
         union Data {
             int i;
@@ -263,8 +256,7 @@ class TestSymbolExtraction:
             } channels;
             unsigned int value;
         } Color;
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.c"), code)
         symbols = result["symbols"]
@@ -281,8 +273,7 @@ class TestSymbolExtraction:
     def test_extract_typedefs(self):
         """Test extracting typedef definitions."""
         plugin = CPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         /* Simple typedef */
         typedef int Integer;
         
@@ -300,8 +291,7 @@ class TestSymbolExtraction:
             int data;
             struct Node* next;
         } Node, *NodePtr;
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.c"), code)
         symbols = result["symbols"]
@@ -319,8 +309,7 @@ class TestSymbolExtraction:
     def test_extract_macros(self):
         """Test extracting macro definitions."""
         plugin = CPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         /* Simple macro */
         #define MAX_SIZE 100
         
@@ -339,8 +328,7 @@ class TestSymbolExtraction:
         #ifndef HEADER_H
         #define HEADER_H
         #endif
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.c"), code)
         symbols = result["symbols"]
@@ -365,8 +353,7 @@ class TestSymbolExtraction:
     def test_extract_global_variables(self):
         """Test extracting global variable declarations."""
         plugin = CPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         /* Global variables */
         int global_counter;
         static double pi = 3.14159;
@@ -385,8 +372,7 @@ class TestSymbolExtraction:
         void func() {
             int local_var = 42;
         }
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.c"), code)
         symbols = result["symbols"]
@@ -412,8 +398,7 @@ class TestIncludeTracking:
     def test_extract_includes(self):
         """Test extracting various include directives."""
         plugin = CPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         /* System includes */
         #include <stdio.h>
         #include <stdlib.h>
@@ -432,8 +417,7 @@ class TestIncludeTracking:
         #ifndef CUSTOM_MATH
         #include <math.h>
         #endif
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.c"), code)
 
@@ -450,8 +434,7 @@ class TestErrorHandling:
     def test_syntax_error_handling(self):
         """Test handling of syntax errors in code."""
         plugin = CPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         /* Valid function */
         int valid_function() {
             return 42;
@@ -466,8 +449,7 @@ class TestErrorHandling:
         void another_function() {
             return;
         }
-        """
-        )
+        """)
 
         # Should not raise exception
         result = plugin.indexFile(Path("test.c"), code)
@@ -482,8 +464,7 @@ class TestErrorHandling:
     def test_unicode_handling(self):
         """Test handling of Unicode in code."""
         plugin = CPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         /* Unicode in comments: 你好世界 */
         
         /* String with unicode */
@@ -491,8 +472,7 @@ class TestErrorHandling:
         
         /* Identifiers with extended characters (if supported) */
         int café_count = 5;
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.c"), code)
         symbols = result["symbols"]
@@ -508,8 +488,7 @@ class TestErrorHandling:
         # Generate a large file
         code_parts = ["/* Large file test */\n"]
         for i in range(500):
-            code_parts.append(
-                f"""
+            code_parts.append(f"""
 int function_{i}(int arg1, int arg2) {{
     /* Function {i} */
     int result = arg1 + arg2;
@@ -522,8 +501,7 @@ struct Data_{i} {{
 }};
 
 #define MACRO_{i} {i}
-"""
-            )
+""")
 
         code = "".join(code_parts)
 
@@ -552,8 +530,7 @@ struct Data_{i} {{
     def test_comment_only_file(self):
         """Test file with only comments."""
         plugin = CPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         /* This file contains only comments */
         // No actual code here
         
@@ -563,8 +540,7 @@ struct Data_{i} {{
          */
         
         // More comments
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("comments.c"), code)
 
@@ -578,8 +554,7 @@ class TestComplexCodeStructures:
     def test_nested_structures(self):
         """Test nested structs and unions."""
         plugin = CPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         struct OuterStruct {
             int outer_field;
             
@@ -601,8 +576,7 @@ class TestComplexCodeStructures:
                 int width, height;
             } size;
         } Rectangle;
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.c"), code)
         symbols = result["symbols"]
@@ -615,8 +589,7 @@ class TestComplexCodeStructures:
     def test_function_pointers_and_callbacks(self):
         """Test function pointers and callback patterns."""
         plugin = CPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         /* Function pointer typedef */
         typedef void (*EventHandler)(int event_id, void* data);
         
@@ -639,8 +612,7 @@ class TestComplexCodeStructures:
         
         /* Array of function pointers */
         int (*operations[4])(int, int);
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.c"), code)
         symbols = result["symbols"]
@@ -657,8 +629,7 @@ class TestComplexCodeStructures:
     def test_complex_preprocessor(self):
         """Test complex preprocessor directives."""
         plugin = CPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         /* Configuration macros */
         #define CONFIG_DEBUG 1
         #define CONFIG_VERSION "1.0.0"
@@ -689,8 +660,7 @@ class TestComplexCodeStructures:
         /* Content */
         
         #endif /* COMPLEX_H */
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.c"), code)
         symbols = result["symbols"]
@@ -717,8 +687,7 @@ class TestSearchFunctionality:
         plugin = CPlugin(sqlite_store=sqlite_store)
 
         # Index a file first
-        code = dedent(
-            """
+        code = dedent("""
         int target_function(int x) {
             return x * 2;
         }
@@ -728,8 +697,7 @@ class TestSearchFunctionality:
         };
         
         #define TARGET_MACRO 42
-        """
-        )
+        """)
 
         # Create repository and file in store
         repo_id = sqlite_store.create_repository("/test", "test")
@@ -778,8 +746,7 @@ class TestSearchFunctionality:
 
         # Create test files in memory
         plugin._parsed_files["main.c"] = (
-            dedent(
-                """
+            dedent("""
         #include "math.h"
         
         int main() {
@@ -788,11 +755,8 @@ class TestSearchFunctionality:
             printf("Result: %d\\n", result);
             return 0;
         }
-        """
-            ),
-            plugin._parser.parse(
-                dedent(
-                    """
+        """),
+            plugin._parser.parse(dedent("""
         #include "math.h"
         
         int main() {
@@ -801,14 +765,11 @@ class TestSearchFunctionality:
             printf("Result: %d\\n", result);
             return 0;
         }
-        """
-                ).encode("utf-8")
-            ),
+        """).encode("utf-8")),
         )
 
         plugin._parsed_files["math.c"] = (
-            dedent(
-                """
+            dedent("""
         int add(int a, int b) {
             return a + b;
         }
@@ -816,11 +777,8 @@ class TestSearchFunctionality:
         int multiply(int a, int b) {
             return add(a, 0) + add(b, 0);
         }
-        """
-            ),
-            plugin._parser.parse(
-                dedent(
-                    """
+        """),
+            plugin._parser.parse(dedent("""
         int add(int a, int b) {
             return a + b;
         }
@@ -828,9 +786,7 @@ class TestSearchFunctionality:
         int multiply(int a, int b) {
             return add(a, 0) + add(b, 0);
         }
-        """
-                ).encode("utf-8")
-            ),
+        """).encode("utf-8")),
         )
 
         # Find references to 'add'
@@ -924,8 +880,7 @@ class TestPersistenceIntegration:
         repo_id = sqlite_store.create_repository("/myproject", "myproject")
 
         # Index a complex file
-        code = dedent(
-            """
+        code = dedent("""
         /**
          * @file main.c
          * @brief Main entry point for the application
@@ -964,8 +919,7 @@ class TestPersistenceIntegration:
                 printf("User: %s (ID: %d)\\n", users[i].name, users[i].id);
             }
         }
-        """
-        )
+        """)
 
         file_path = Path("/myproject/main.c")
         file_id = sqlite_store.store_file(
@@ -1012,8 +966,7 @@ class TestPerformance:
         # Generate a large C file
         code_parts = []
         for i in range(100):
-            code_parts.append(
-                f"""
+            code_parts.append(f"""
 typedef struct {{
     int field1;
     int field2;
@@ -1029,8 +982,7 @@ int function{i}(Struct{i}* s, int x) {{
 
 #define CONSTANT_{i} {i}
 #define MACRO_{i}(x) ((x) + CONSTANT_{i})
-"""
-            )
+""")
 
         large_code = "\n".join(code_parts)
 

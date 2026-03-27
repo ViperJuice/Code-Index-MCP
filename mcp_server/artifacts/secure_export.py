@@ -69,16 +69,12 @@ class SecureIndexExporter:
             if pattern.endswith("/"):
                 if any(part == pattern[:-1] for part in path.parts):
                     return True
-            elif fnmatch.fnmatch(str(path), pattern) or fnmatch.fnmatch(
-                path.name, pattern
-            ):
+            elif fnmatch.fnmatch(str(path), pattern) or fnmatch.fnmatch(path.name, pattern):
                 return True
 
         return False
 
-    def create_filtered_database(
-        self, source_db: str, target_db: str
-    ) -> Tuple[int, int]:
+    def create_filtered_database(self, source_db: str, target_db: str) -> Tuple[int, int]:
         shutil.copy2(source_db, target_db)
 
         conn = sqlite3.connect(target_db)
@@ -108,9 +104,7 @@ class SecureIndexExporter:
 
             if ids_to_delete:
                 placeholders = ",".join("?" * len(ids_to_delete))
-                cursor.execute(
-                    f"DELETE FROM files WHERE id IN ({placeholders})", ids_to_delete
-                )
+                cursor.execute(f"DELETE FROM files WHERE id IN ({placeholders})", ids_to_delete)
                 cursor.execute(
                     f"DELETE FROM symbols WHERE file_id IN ({placeholders})",
                     ids_to_delete,
@@ -130,9 +124,7 @@ class SecureIndexExporter:
             if excluded_files:
                 log_path = Path("excluded_files.log")
                 with log_path.open("w", encoding="utf-8") as handle:
-                    handle.write(
-                        f"Excluded {len(excluded_files)} files from index export:\n\n"
-                    )
+                    handle.write(f"Excluded {len(excluded_files)} files from index export:\n\n")
                     for file_path in sorted(excluded_files):
                         handle.write(f"{file_path}\n")
         finally:
@@ -140,9 +132,7 @@ class SecureIndexExporter:
 
         return total_count - excluded_count, excluded_count
 
-    def filter_qdrant_vectors(
-        self, source_dir: Path, target_dir: Path
-    ) -> Tuple[int, int]:
+    def filter_qdrant_vectors(self, source_dir: Path, target_dir: Path) -> Tuple[int, int]:
         """Copy a Qdrant directory and remove points for gitignored files.
 
         Returns (included_count, excluded_count).
@@ -224,9 +214,7 @@ class SecureIndexExporter:
             source_db = Path("code_index.db")
             if source_db.exists():
                 target_db = temp_path / "code_index.db"
-                included, excluded = self.create_filtered_database(
-                    str(source_db), str(target_db)
-                )
+                included, excluded = self.create_filtered_database(str(source_db), str(target_db))
                 stats["files_included"] = included
                 stats["files_excluded"] = excluded
                 stats["components"].append("code_index.db")

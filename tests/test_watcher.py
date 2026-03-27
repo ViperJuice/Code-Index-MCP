@@ -241,9 +241,7 @@ class TestFileWatcher:
             dispatcher_with_mock.index_file.assert_called()
 
             # Check the path matches
-            indexed_paths = [
-                call[0][0] for call in dispatcher_with_mock.index_file.call_args_list
-            ]
+            indexed_paths = [call[0][0] for call in dispatcher_with_mock.index_file.call_args_list]
             assert any(str(test_file) in str(path) for path in indexed_paths)
 
         finally:
@@ -290,14 +288,11 @@ class TestFileWatcher:
 
             # Verify correct files were indexed
             indexed_paths = [
-                str(call[0][0])
-                for call in dispatcher_with_mock.index_file.call_args_list
+                str(call[0][0]) for call in dispatcher_with_mock.index_file.call_args_list
             ]
 
             # Should have indexed Python and JS files
-            assert any(
-                "test.py" in path or "renamed.py" in path for path in indexed_paths
-            )
+            assert any("test.py" in path or "renamed.py" in path for path in indexed_paths)
             assert any("app.js" in path for path in indexed_paths)
 
             # Should not have indexed png file
@@ -406,9 +401,7 @@ class TestEdgeCases:
 
             # Last call should be with final content
             if dispatcher_with_mock.index_file.call_count > 0:
-                last_call_path = dispatcher_with_mock.index_file.call_args_list[-1][0][
-                    0
-                ]
+                last_call_path = dispatcher_with_mock.index_file.call_args_list[-1][0][0]
                 assert str(last_call_path) == str(test_file)
 
         finally:
@@ -515,9 +508,7 @@ class TestPerformance:
 
     @pytest.mark.benchmark
     @pytest.mark.slow
-    def test_large_directory_performance(
-        self, tmp_path, dispatcher_with_mock, benchmark_results
-    ):
+    def test_large_directory_performance(self, tmp_path, dispatcher_with_mock, benchmark_results):
         """Test watcher performance with large directory."""
         # Create a large directory structure
         for i in range(10):
@@ -546,9 +537,7 @@ class TestPerformance:
             watcher.stop()
 
     @pytest.mark.benchmark
-    def test_event_processing_speed(
-        self, tmp_path, dispatcher_with_mock, benchmark_results
-    ):
+    def test_event_processing_speed(self, tmp_path, dispatcher_with_mock, benchmark_results):
         """Test speed of event processing."""
         # Mock fast indexing
         dispatcher_with_mock.index_file.return_value = None
@@ -591,8 +580,7 @@ class TestIntegration:
         try:
             # Create a Python file
             test_file = tmp_path / "integration_test.py"
-            test_file.write_text(
-                """
+            test_file.write_text("""
 def integration_function():
     '''This is an integration test function.'''
     return "Integration test"
@@ -600,8 +588,7 @@ def integration_function():
 class IntegrationClass:
     '''Integration test class.'''
     pass
-"""
-            )
+""")
 
             # Wait for indexing
             time.sleep(1)

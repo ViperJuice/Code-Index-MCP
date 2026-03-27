@@ -1037,9 +1037,7 @@ Deep learning with neural networks provides powerful pattern recognition.
         for i in range(50):
             section_content = f"""## Section {i}
 
-This is section {i} with substantial content. """ + (
-                "Lorem ipsum dolor sit amet. " * 20
-            )
+This is section {i} with substantial content. """ + ("Lorem ipsum dolor sit amet. " * 20)
             sections.append(section_content)
 
         large_content = "# Large Document\n\n" + "\n\n".join(sections)

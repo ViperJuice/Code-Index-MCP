@@ -149,17 +149,13 @@ def _normalize_search_result(raw_result: Any) -> SearchResult:
         or 1
     )
     end_line = (
-        getattr(raw_result, "end_line", None)
-        or getattr(raw_result, "line_end", None)
-        or start_line
+        getattr(raw_result, "end_line", None) or getattr(raw_result, "line_end", None) or start_line
     )
     start_line = int(start_line)
     end_line = int(end_line)
 
     snippet_value = (
-        getattr(raw_result, "snippet", None)
-        or getattr(raw_result, "context", None)
-        or ""
+        getattr(raw_result, "snippet", None) or getattr(raw_result, "context", None) or ""
     )
 
     snippet_lines = str(snippet_value).split("\n")
@@ -189,23 +185,7 @@ setup_metrics_middleware(app, enable_detailed_metrics=True)
 @app.on_event("startup")
 async def startup_event():
     """Initialize the dispatcher and register plugins on startup."""
-    global \
-        dispatcher, \
-        sqlite_store, \
-        file_watcher, \
-        plugin_manager, \
-        plugin_loader, \
-        auth_manager, \
-        security_config, \
-        cache_manager, \
-        query_cache, \
-        bm25_indexer, \
-        hybrid_search, \
-        fuzzy_indexer, \
-        semantic_indexer, \
-        profile_hydration_status, \
-        semantic_setup_status, \
-        language_detection_status
+    global dispatcher, sqlite_store, file_watcher, plugin_manager, plugin_loader, auth_manager, security_config, cache_manager, query_cache, bm25_indexer, hybrid_search, fuzzy_indexer, semantic_indexer, profile_hydration_status, semantic_setup_status, language_detection_status
 
     try:
         preflight_result = run_startup_preflight()
@@ -223,9 +203,7 @@ async def startup_event():
                 "your-super-secret-jwt-key-change-in-production-min-32-chars",
             ),
             jwt_algorithm="HS256",
-            access_token_expire_minutes=int(
-                os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
-            ),
+            access_token_expire_minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")),
             refresh_token_expire_days=int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7")),
             password_min_length=int(os.getenv("PASSWORD_MIN_LENGTH", "8")),
             max_login_attempts=int(os.getenv("MAX_LOGIN_ATTEMPTS", "5")),
@@ -256,16 +234,12 @@ async def startup_event():
 
         # Set up security middleware
         logger.info("Setting up security middleware...")
-        security_middleware = SecurityMiddlewareStack(
-            app, security_config, auth_manager
-        )
+        security_middleware = SecurityMiddlewareStack(app, security_config, auth_manager)
         try:
             security_middleware.setup_middleware()
         except RuntimeError as exc:
             if "Cannot add middleware after an application has started" in str(exc):
-                logger.warning(
-                    "Skipping late middleware registration on this runtime: %s", exc
-                )
+                logger.warning("Skipping late middleware registration on this runtime: %s", exc)
             else:
                 raise
         logger.info("Security middleware configured successfully")
@@ -283,9 +257,7 @@ async def startup_event():
                 )
                 logger.info("Using Redis cache backend")
             except Exception as e:
-                logger.warning(
-                    f"Failed to initialize Redis cache, falling back to memory: {e}"
-                )
+                logger.warning(f"Failed to initialize Redis cache, falling back to memory: {e}")
                 cache_manager = CacheManagerFactory.create_memory_cache()
         elif cache_backend_type == "hybrid":
             try:
@@ -297,9 +269,7 @@ async def startup_event():
                 )
                 logger.info("Using hybrid cache backend")
             except Exception as e:
-                logger.warning(
-                    f"Failed to initialize hybrid cache, falling back to memory: {e}"
-                )
+                logger.warning(f"Failed to initialize hybrid cache, falling back to memory: {e}")
                 cache_manager = CacheManagerFactory.create_memory_cache()
         else:
             cache_manager = CacheManagerFactory.create_memory_cache(
@@ -414,9 +384,7 @@ async def startup_event():
                 for profile_id, profile in profile_registry.list().items()
             }
         except Exception as exc:
-            logger.warning(
-                "Failed to load semantic profile registry for hydration: %s", exc
-            )
+            logger.warning("Failed to load semantic profile registry for hydration: %s", exc)
 
         selected_index_path = (
             discovery.get_local_index_path() if discovery.is_index_enabled() else None
@@ -493,9 +461,7 @@ async def startup_event():
             with open(config_path, "r") as f:
                 plugin_config = yaml.safe_load(f)
 
-            enabled_languages = plugin_config.get(
-                "enabled_languages", list(discovered.keys())
-            )
+            enabled_languages = plugin_config.get("enabled_languages", list(discovered.keys()))
             logger.info(
                 "Auto-detect disabled; loading plugins from plugins.yaml: %s",
                 enabled_languages,
@@ -574,9 +540,7 @@ async def startup_event():
         if semantic_setup_report.overall_ready:
             logger.info("Semantic preflight passed")
         else:
-            logger.warning(
-                "Semantic preflight warnings: %s", semantic_setup_report.warnings
-            )
+            logger.warning("Semantic preflight warnings: %s", semantic_setup_report.warnings)
 
         if settings.semantic_strict_mode and not semantic_setup_report.overall_ready:
             raise RuntimeError(
@@ -656,9 +620,7 @@ async def startup_event():
             logger.info("Starting file watcher...")
             file_watcher = FileWatcher(Path("."), dispatcher, query_cache)
             file_watcher.start()
-            logger.info(
-                "File watcher started for current directory with cache invalidation"
-            )
+            logger.info("File watcher started for current directory with cache invalidation")
 
         # Store in app.state for potential future use
         app.state.dispatcher = dispatcher
@@ -751,9 +713,7 @@ async def shutdown_event():
             if shutdown_result.success:
                 logger.info("Plugin manager shutdown successfully")
             else:
-                logger.error(
-                    f"Plugin manager shutdown failed: {shutdown_result.error.message}"
-                )
+                logger.error(f"Plugin manager shutdown failed: {shutdown_result.error.message}")
                 logger.error(f"Shutdown error details: {shutdown_result.error.details}")
         except Exception as e:
             logger.error(f"Error shutting down plugin manager: {e}", exc_info=True)
@@ -857,9 +817,7 @@ async def get_current_user_info(
         "permissions": [p.value for p in current_user.permissions],
         "is_active": current_user.is_active,
         "created_at": current_user.created_at.isoformat(),
-        "last_login": (
-            current_user.last_login.isoformat() if current_user.last_login else None
-        ),
+        "last_login": (current_user.last_login.isoformat() if current_user.last_login else None),
     }
 
 
@@ -979,9 +937,7 @@ async def component_health_check(component: str) -> Dict[str, Any]:
             "details": result.details,
         }
     except Exception as e:
-        logger.error(
-            f"Component health check failed for {component}: {e}", exc_info=True
-        )
+        logger.error(f"Component health check failed for {component}: {e}", exc_info=True)
         raise HTTPException(500, f"Health check failed: {str(e)}")
 
 
@@ -1034,9 +990,7 @@ def get_prometheus_metrics() -> Response:
 
         # Generate metrics
         metrics = prometheus_exporter.generate_metrics()
-        return Response(
-            content=metrics, media_type=prometheus_exporter.get_content_type()
-        )
+        return Response(content=metrics, media_type=prometheus_exporter.get_content_type())
     except Exception as e:
         logger.error(f"Failed to generate Prometheus metrics: {e}", exc_info=True)
         raise HTTPException(500, f"Failed to generate metrics: {str(e)}")
@@ -1062,9 +1016,7 @@ def get_metrics_json(
 
 
 @app.get("/symbol", response_model=SymbolDef | None)
-async def symbol(
-    symbol: str, current_user: User = Depends(require_permission(Permission.READ))
-):
+async def symbol(symbol: str, current_user: User = Depends(require_permission(Permission.READ))):
     if dispatcher is None:
         logger.error("Symbol lookup attempted but dispatcher not ready")
         raise HTTPException(503, "Dispatcher not ready")
@@ -1094,9 +1046,7 @@ async def symbol(
 
         # Cache the result if available
         if query_cache and query_cache.config.enabled and result:
-            await query_cache.cache_result(
-                QueryType.SYMBOL_LOOKUP, result, symbol=symbol
-            )
+            await query_cache.cache_result(QueryType.SYMBOL_LOOKUP, result, symbol=symbol)
 
         # Record business metrics
         duration = time.time() - start_time
@@ -1179,9 +1129,7 @@ async def search(
         cached_results = None
         if query_cache and query_cache.config.enabled:
             query_type = (
-                QueryType.SEMANTIC_SEARCH
-                if effective_mode == "semantic"
-                else QueryType.SEARCH
+                QueryType.SEMANTIC_SEARCH if effective_mode == "semantic" else QueryType.SEARCH
             )
             cached_results = await query_cache.get_cached_result(
                 query_type, q=q, semantic=(effective_mode == "semantic"), limit=limit
@@ -1189,9 +1137,7 @@ async def search(
 
         if cached_results is not None:
             cached_results = [_normalize_search_result(r) for r in cached_results]
-            logger.debug(
-                f"Found cached search results for: '{q}' ({len(cached_results)} results)"
-            )
+            logger.debug(f"Found cached search results for: '{q}' ({len(cached_results)} results)")
             duration = time.time() - start_time
             business_metrics.record_search_performed(
                 query=q,
@@ -1207,9 +1153,7 @@ async def search(
         if effective_mode == "hybrid" and hybrid_search:
             # Use hybrid search
             with metrics_collector.time_function("search", labels={"mode": "hybrid"}):
-                hybrid_results = await hybrid_search.search(
-                    query=q, filters=filters, limit=limit
-                )
+                hybrid_results = await hybrid_search.search(query=q, filters=filters, limit=limit)
                 results = [_normalize_search_result(r) for r in hybrid_results]
 
         elif effective_mode == "bm25" and bm25_indexer:
@@ -1217,9 +1161,7 @@ async def search(
             with metrics_collector.time_function("search", labels={"mode": "bm25"}):
                 bm25_results = bm25_indexer.search(q, limit=limit, **filters)
                 if not bm25_results and sqlite_store:
-                    bm25_results = sqlite_store.search_bm25(
-                        q, table="fts_code", limit=limit
-                    )
+                    bm25_results = sqlite_store.search_bm25(q, table="fts_code", limit=limit)
                 results = [_normalize_search_result(r) for r in bm25_results]
 
         elif effective_mode == "fuzzy" and fuzzy_indexer:
@@ -1234,9 +1176,7 @@ async def search(
         elif effective_mode == "semantic":
             # Use classic dispatcher with semantic=True
             if dispatcher:
-                with metrics_collector.time_function(
-                    "search", labels={"mode": "semantic"}
-                ):
+                with metrics_collector.time_function("search", labels={"mode": "semantic"}):
                     results = list(dispatcher.search(q, semantic=True, limit=limit))
                     results = [_normalize_search_result(r) for r in results]
             else:
@@ -1286,9 +1226,7 @@ async def search(
         else:
             # Classic search through dispatcher
             if dispatcher:
-                with metrics_collector.time_function(
-                    "search", labels={"mode": "classic"}
-                ):
+                with metrics_collector.time_function("search", labels={"mode": "classic"}):
                     results = list(dispatcher.search(q, semantic=False, limit=limit))
                     results = [_normalize_search_result(r) for r in results]
             else:
@@ -1298,9 +1236,7 @@ async def search(
         results = [_normalize_search_result(r) for r in results]
         if query_cache and query_cache.config.enabled and results:
             query_type = (
-                QueryType.SEMANTIC_SEARCH
-                if effective_mode == "semantic"
-                else QueryType.SEARCH
+                QueryType.SEMANTIC_SEARCH if effective_mode == "semantic" else QueryType.SEARCH
             )
             await query_cache.cache_result(
                 query_type,
@@ -1319,9 +1255,7 @@ async def search(
             duration=duration,
         )
 
-        logger.debug(
-            f"Search returned {len(results)} results using {effective_mode} mode"
-        )
+        logger.debug(f"Search returned {len(results)} results using {effective_mode} mode")
         return results
     except Exception as e:
         duration = time.time() - start_time
@@ -1337,9 +1271,7 @@ async def get_search_capabilities() -> Dict[str, Any]:
     """Get available search capabilities and configuration guidance."""
     voyage_key = os.environ.get("VOYAGE_API_KEY") or os.environ.get("VOYAGE_AI_API_KEY")
     openai_base = os.environ.get("OPENAI_API_BASE")
-    semantic_enabled = (
-        os.environ.get("SEMANTIC_SEARCH_ENABLED", "false").lower() == "true"
-    )
+    semantic_enabled = os.environ.get("SEMANTIC_SEARCH_ENABLED", "false").lower() == "true"
 
     return {
         "available_modes": {
@@ -1401,17 +1333,13 @@ async def get_status(
         # Try cache first if query cache is available
         cached_status = None
         if query_cache and query_cache.config.enabled:
-            cached_status = await query_cache.get_cached_result(
-                QueryType.PROJECT_STATUS
-            )
+            cached_status = await query_cache.get_cached_result(QueryType.PROJECT_STATUS)
 
         if cached_status is not None:
             return cached_status
 
         # Get plugin count
-        plugin_count = (
-            len(dispatcher._plugins) if hasattr(dispatcher, "_plugins") else 0
-        )
+        plugin_count = len(dispatcher._plugins) if hasattr(dispatcher, "_plugins") else 0
 
         # Get indexed files statistics
         indexed_stats = {"total": 0, "by_language": {}}
@@ -1423,9 +1351,7 @@ async def get_status(
                 if hasattr(plugin, "get_indexed_count"):
                     count = plugin.get_indexed_count()
                     indexed_stats["total"] += count
-                    lang = getattr(
-                        plugin, "language", getattr(plugin, "lang", "unknown")
-                    )
+                    lang = getattr(plugin, "language", getattr(plugin, "lang", "unknown"))
                     indexed_stats["by_language"][lang] = count
 
         # Add database statistics if available
@@ -1590,9 +1516,7 @@ async def reindex(
 
                                 # Track by file type
                                 suffix = file_path.suffix.lower()
-                                indexed_by_type[suffix] = (
-                                    indexed_by_type.get(suffix, 0) + 1
-                                )
+                                indexed_by_type[suffix] = indexed_by_type.get(suffix, 0) + 1
                                 break
                     except Exception as e:
                         # Log but continue with other files
@@ -1755,9 +1679,7 @@ async def clear_cache(
 
     try:
         count = await cache_manager.clear()
-        logger.info(
-            f"Cache cleared by admin user {current_user.username}: {count} entries"
-        )
+        logger.info(f"Cache cleared by admin user {current_user.username}: {count} entries")
 
         return {
             "status": "success",
@@ -1863,9 +1785,7 @@ async def warm_cache(
             return f"warmed_value_for_{key}"
 
         count = await cache_manager.warm_cache(keys, factory)
-        logger.info(
-            f"Cache warmed by admin user {current_user.username}: {count} entries"
-        )
+        logger.info(f"Cache warmed by admin user {current_user.username}: {count} entries")
 
         return {
             "status": "success",
@@ -2139,10 +2059,7 @@ async def rebuild_search_indexes(
 
         if index_type in ["all", "semantic"]:
             # Semantic index rebuild would go here if available
-            if (
-                hasattr(hybrid_search, "semantic_indexer")
-                and hybrid_search.semantic_indexer
-            ):
+            if hasattr(hybrid_search, "semantic_indexer") and hybrid_search.semantic_indexer:
                 results["semantic"] = "rebuild_not_implemented"
             else:
                 results["semantic"] = "not_available"
@@ -2389,9 +2306,7 @@ async def initialize_graph(
                 files = sqlite_store.get_all_files()
                 file_paths = [f["path"] for f in files]
             else:
-                raise HTTPException(
-                    400, "No file paths provided and no store available"
-                )
+                raise HTTPException(400, "No file paths provided and no store available")
 
         success = dispatcher._ensure_graph_initialized(file_paths)
 
@@ -2404,12 +2319,8 @@ async def initialize_graph(
         return {
             "status": "success",
             "message": f"Graph initialized from {len(file_paths)} files",
-            "nodes": len(dispatcher._graph_nodes)
-            if hasattr(dispatcher, "_graph_nodes")
-            else 0,
-            "edges": len(dispatcher._graph_edges)
-            if hasattr(dispatcher, "_graph_edges")
-            else 0,
+            "nodes": len(dispatcher._graph_nodes) if hasattr(dispatcher, "_graph_nodes") else 0,
+            "edges": len(dispatcher._graph_edges) if hasattr(dispatcher, "_graph_edges") else 0,
         }
     except Exception as e:
         logger.error(f"Error initializing graph: {e}")

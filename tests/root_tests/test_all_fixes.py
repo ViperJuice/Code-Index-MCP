@@ -117,8 +117,7 @@ async def test_all_fixes():
 
             # Create a Python file (uses semantic search)
             semantic_file = Path("semantic_test.py")
-            semantic_file.write_text(
-                '''
+            semantic_file.write_text('''
 class DataProcessor:
     def process(self, data):
         """Process data with semantic understanding."""
@@ -128,8 +127,7 @@ def main():
     processor = DataProcessor()
     result = processor.process([1, 2, 3])
     print(result)
-'''
-            )
+''')
 
             # Index the file - should handle connection refused gracefully
             dispatcher.index_file(semantic_file)

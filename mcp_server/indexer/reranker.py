@@ -636,8 +636,7 @@ class VoyageReranker:
         empty documents or any API error.
         """
         documents = [
-            c.get("_rerank_doc") or c.get("snippet") or c.get("file", "")
-            for c in candidates
+            c.get("_rerank_doc") or c.get("snippet") or c.get("file", "") for c in candidates
         ]
         if not any(documents):
             return candidates[:top_k]
@@ -665,6 +664,7 @@ class FlashRankReranker:
     def _load(self):
         if self._ranker is None:
             from flashrank import Ranker
+
             self._ranker = Ranker(model_name=self._model_name)
 
     def rerank(self, query: str, candidates: List[Dict], top_k: int) -> List[Dict]:
@@ -680,6 +680,7 @@ class FlashRankReranker:
             return candidates[:top_k]
         try:
             from flashrank import RerankRequest
+
             passages = [
                 {
                     "id": i,
@@ -709,6 +710,7 @@ class CrossEncoderReranker:
     def _load(self):
         if self._model is None:
             from sentence_transformers import CrossEncoder
+
             self._model = CrossEncoder(self._model_name)
 
     def rerank(self, query: str, candidates: List[Dict], top_k: int) -> List[Dict]:
@@ -725,17 +727,14 @@ class CrossEncoderReranker:
             return candidates[:top_k]
         try:
             docs = [
-                c.get("_rerank_doc") or c.get("snippet") or c.get("file", "")
-                for c in candidates
+                c.get("_rerank_doc") or c.get("snippet") or c.get("file", "") for c in candidates
             ]
             pairs = [(query, doc) for doc in docs]
             scores = self._model.predict(pairs)
             indexed = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)
             return [candidates[i] for i, _ in indexed[:top_k]]
         except Exception as e:
-            logger.warning(
-                f"CrossEncoderReranker.rerank() failed, using original order: {e}"
-            )
+            logger.warning(f"CrossEncoderReranker.rerank() failed, using original order: {e}")
             return candidates[:top_k]
 
 

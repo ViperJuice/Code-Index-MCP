@@ -103,8 +103,7 @@ class TestIndexEngine:
     def temp_file(self):
         """Create a temporary file for testing."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-            f.write(
-                '''
+            f.write('''
 def test_function():
     """A test function."""
     return "hello world"
@@ -114,8 +113,7 @@ class TestClass:
     
     def method(self):
         return 42
-'''
-            )
+''')
             temp_path = f.name
 
         yield temp_path

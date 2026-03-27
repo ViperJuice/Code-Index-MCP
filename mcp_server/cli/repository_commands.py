@@ -30,12 +30,8 @@ def repository():
 
 @repository.command()
 @click.argument("path", type=click.Path(exists=True))
-@click.option(
-    "--auto-sync/--no-auto-sync", default=True, help="Enable automatic synchronization"
-)
-@click.option(
-    "--artifacts/--no-artifacts", default=True, help="Enable artifact generation"
-)
+@click.option("--auto-sync/--no-auto-sync", default=True, help="Enable automatic synchronization")
+@click.option("--artifacts/--no-artifacts", default=True, help="Enable artifact generation")
 def register(path: str, auto_sync: bool, artifacts: bool):
     """Register a repository for tracking and indexing."""
     try:
@@ -51,17 +47,13 @@ def register(path: str, auto_sync: bool, artifacts: bool):
             raise ValueError(f"Failed to load registered repository: {repo_id}")
         repo_info = cast(Any, repo_info)
 
-        click.echo(
-            click.style(f"✓ Registered repository: {repo_info.name}", fg="green")
-        )
+        click.echo(click.style(f"✓ Registered repository: {repo_info.name}", fg="green"))
         click.echo(f"  ID: {repo_id}")
         click.echo(f"  Path: {repo_info.path}")
         click.echo(f"  Remote: {repo_info.url or 'None'}")
         click.echo(f"  Auto-sync: {'Yes' if auto_sync else 'No'}")
         click.echo(f"  Artifacts: {'Yes' if artifacts else 'No'}")
-        click.echo(
-            f"  Artifact backend: {repo_info.artifact_backend or 'local_workspace'}"
-        )
+        click.echo(f"  Artifact backend: {repo_info.artifact_backend or 'local_workspace'}")
         click.echo(f"  Artifact health: {repo_info.artifact_health or 'missing'}")
 
         # Check if index exists
@@ -75,9 +67,7 @@ def register(path: str, auto_sync: bool, artifacts: bool):
             )
 
     except Exception as e:
-        click.echo(
-            click.style(f"✗ Failed to register repository: {e}", fg="red"), err=True
-        )
+        click.echo(click.style(f"✗ Failed to register repository: {e}", fg="red"), err=True)
         sys.exit(1)
 
 
@@ -116,12 +106,8 @@ def list(verbose: bool):
                 click.echo(
                     f"  Artifacts: {'enabled' if repo_info.artifact_enabled else 'disabled'}"
                 )
-                click.echo(
-                    f"  Artifact backend: {repo_info.artifact_backend or 'local_workspace'}"
-                )
-                click.echo(
-                    f"  Artifact health: {repo_info.artifact_health or 'missing'}"
-                )
+                click.echo(f"  Artifact backend: {repo_info.artifact_backend or 'local_workspace'}")
+                click.echo(f"  Artifact health: {repo_info.artifact_health or 'missing'}")
                 click.echo(
                     "  Semantic profiles: "
                     + (
@@ -144,17 +130,13 @@ def list(verbose: bool):
                         click.echo(click.style("  Status: Ready", fg="green"))
                     else:
                         click.echo(
-                            click.style(
-                                "  Status: Missing local runtime state", fg="yellow"
-                            )
+                            click.style("  Status: Missing local runtime state", fg="yellow")
                         )
 
             click.echo()
 
     except Exception as e:
-        click.echo(
-            click.style(f"✗ Error listing repositories: {e}", fg="red"), err=True
-        )
+        click.echo(click.style(f"✗ Error listing repositories: {e}", fg="red"), err=True)
         sys.exit(1)
 
 
@@ -175,9 +157,7 @@ def unregister(repo_id: str):
                     break
 
         if not repo_info:
-            click.echo(
-                click.style(f"✗ Repository not found: {repo_id}", fg="red"), err=True
-            )
+            click.echo(click.style(f"✗ Repository not found: {repo_id}", fg="red"), err=True)
             sys.exit(1)
 
         # Confirm
@@ -185,13 +165,9 @@ def unregister(repo_id: str):
             return
 
         if registry.unregister_repository(repo_id):
-            click.echo(
-                click.style(f"✓ Unregistered repository: {repo_info.name}", fg="green")
-            )
+            click.echo(click.style(f"✓ Unregistered repository: {repo_info.name}", fg="green"))
         else:
-            click.echo(
-                click.style("✗ Failed to unregister repository", fg="red"), err=True
-            )
+            click.echo(click.style("✗ Failed to unregister repository", fg="red"), err=True)
             sys.exit(1)
 
     except Exception as e:
@@ -201,9 +177,7 @@ def unregister(repo_id: str):
 
 @repository.command()
 @click.option("--repo-id", help="Repository ID (default: current directory)")
-@click.option(
-    "--force-full", is_flag=True, help="Force full reindex instead of incremental"
-)
+@click.option("--force-full", is_flag=True, help="Force full reindex instead of incremental")
 @click.option("--all", "sync_all", is_flag=True, help="Sync all repositories")
 def sync(repo_id: Optional[str], force_full: bool, sync_all: bool):
     """Synchronize repository index with current git state."""
@@ -223,9 +197,7 @@ def sync(repo_id: Optional[str], force_full: bool, sync_all: bool):
                 if repo_info:
                     if result.action == "up_to_date":
                         click.echo(
-                            click.style(
-                                f"✓ {repo_info.name}: Already up to date", fg="green"
-                            )
+                            click.style(f"✓ {repo_info.name}: Already up to date", fg="green")
                         )
                     elif result.action == "indexed":
                         click.echo(
@@ -242,9 +214,7 @@ def sync(repo_id: Optional[str], force_full: bool, sync_all: bool):
                             )
                         )
                     else:
-                        click.echo(
-                            click.style(f"✗ {repo_info.name}: {result.error}", fg="red")
-                        )
+                        click.echo(click.style(f"✗ {repo_info.name}: {result.error}", fg="red"))
 
         else:
             # Sync single repository
@@ -290,9 +260,7 @@ def sync(repo_id: Optional[str], force_full: bool, sync_all: bool):
             result = index_manager.sync_repository_index(repo_id, force_full=force_full)
 
             if result.action == "up_to_date":
-                click.echo(
-                    click.style("✓ Repository is already up to date", fg="green")
-                )
+                click.echo(click.style("✓ Repository is already up to date", fg="green"))
             elif result.action == "indexed":
                 click.echo(
                     click.style(
@@ -306,9 +274,7 @@ def sync(repo_id: Optional[str], force_full: bool, sync_all: bool):
                     "  Next step: run 'mcp-index artifact reconcile-workspace' if you manage multiple local repositories."
                 )
             elif result.action == "failed":
-                click.echo(
-                    click.style(f"✗ Sync failed: {result.error}", fg="red"), err=True
-                )
+                click.echo(click.style(f"✗ Sync failed: {result.error}", fg="red"), err=True)
                 sys.exit(1)
 
     except Exception as e:
@@ -330,9 +296,7 @@ def status(repo_id: Optional[str]):
                 repo_id = repo_info.repository_id
             else:
                 click.echo(
-                    click.style(
-                        "✗ Current directory is not a registered repository", fg="red"
-                    ),
+                    click.style("✗ Current directory is not a registered repository", fg="red"),
                     err=True,
                 )
                 sys.exit(1)
@@ -405,9 +369,7 @@ def discover(search_paths: tuple, register: bool):
             if expanded.exists():
                 paths.append(str(expanded))
             else:
-                click.echo(
-                    click.style(f"Warning: Path does not exist: {path}", fg="yellow")
-                )
+                click.echo(click.style(f"Warning: Path does not exist: {path}", fg="yellow"))
 
         if not paths:
             click.echo(click.style("✗ No valid paths provided", fg="red"), err=True)
@@ -463,9 +425,7 @@ def discover(search_paths: tuple, register: bool):
 
 
 @repository.command()
-@click.option(
-    "--all", "watch_all", is_flag=True, help="Watch all registered repositories"
-)
+@click.option("--all", "watch_all", is_flag=True, help="Watch all registered repositories")
 @click.option("--daemon", is_flag=True, help="Run as background daemon")
 def watch(watch_all: bool, daemon: bool):
     """Start watching repositories for changes."""
@@ -474,9 +434,7 @@ def watch(watch_all: bool, daemon: bool):
 
         if not watch_all:
             click.echo(
-                click.style(
-                    "✗ Please specify --all to watch all repositories", fg="red"
-                ),
+                click.style("✗ Please specify --all to watch all repositories", fg="red"),
                 err=True,
             )
             click.echo("Individual repository watching coming soon")
@@ -523,9 +481,7 @@ def watch(watch_all: bool, daemon: bool):
 
 
 @repository.command()
-@click.option(
-    "--enable/--disable", "enable", default=True, help="Enable or disable git hooks"
-)
+@click.option("--enable/--disable", "enable", default=True, help="Enable or disable git hooks")
 def init_hooks(enable: bool):
     """Install git hooks for automatic index synchronization."""
     try:
@@ -563,11 +519,7 @@ def init_hooks(enable: bool):
 
                     click.echo(click.style(f"  ✓ Installed {hook_name}", fg="green"))
                 else:
-                    click.echo(
-                        click.style(
-                            f"  ⚠ Source hook not found: {hook_name}", fg="yellow"
-                        )
-                    )
+                    click.echo(click.style(f"  ⚠ Source hook not found: {hook_name}", fg="yellow"))
 
             click.echo("\nGit hooks installed. Index will now sync automatically on:")
             click.echo("  - commit: Update index incrementally")

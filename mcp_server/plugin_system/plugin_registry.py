@@ -21,9 +21,7 @@ class PluginRegistry(IPluginRegistry):
         self._language_map: Dict[str, List[str]] = {}  # language -> plugin names
         self._extension_map: Dict[str, List[str]] = {}  # extension -> plugin names
 
-    def register_plugin(
-        self, plugin_info: PluginInfo, plugin_class: Type[IPlugin]
-    ) -> None:
+    def register_plugin(self, plugin_info: PluginInfo, plugin_class: Type[IPlugin]) -> None:
         """Register a plugin with its metadata."""
         plugin_name = plugin_info.name
 

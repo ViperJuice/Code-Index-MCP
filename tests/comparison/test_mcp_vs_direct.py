@@ -782,8 +782,7 @@ def create_test_repository() -> Path:
     test_dir = Path(tempfile.mkdtemp(prefix="mcp_comparison_test_"))
 
     # Create Python files
-    (test_dir / "main.py").write_text(
-        """
+    (test_dir / "main.py").write_text("""
 def calculate_sum(a: int, b: int) -> int:
     \"\"\"Calculate the sum of two numbers.\"\"\"
     return a + b
@@ -806,12 +805,10 @@ async def fetch_data(url: str) -> dict:
     \"\"\"Fetch data from a URL asynchronously.\"\"\"
     # Simulated async operation
     return {"url": url, "data": "sample"}
-"""
-    )
+""")
 
     # Create JavaScript files
-    (test_dir / "utils.js").write_text(
-        """
+    (test_dir / "utils.js").write_text("""
 function parseJSON(jsonString) {
     try {
         return JSON.parse(jsonString);
@@ -846,12 +843,10 @@ class DataProcessor {
 }
 
 module.exports = { parseJSON, DataProcessor };
-"""
-    )
+""")
 
     # Create Go file
-    (test_dir / "server.go").write_text(
-        """
+    (test_dir / "server.go").write_text("""
 package main
 
 import (
@@ -881,8 +876,7 @@ func main() {
     server := &Server{port: "8080"}
     server.Start()
 }
-"""
-    )
+""")
 
     return test_dir
 

@@ -43,14 +43,12 @@ def test_persistence():
         # Show some sample symbols
         if symbol_count > 0:
             print("\n📋 Sample symbols:")
-            cursor = conn.execute(
-                """
+            cursor = conn.execute("""
                 SELECT s.name, s.kind, f.path 
                 FROM symbols s 
                 JOIN files f ON s.file_id = f.id 
                 LIMIT 5
-            """
-            )
+            """)
             for row in cursor:
                 print(f"  - {row['name']} ({row['kind']}) in {row['path']}")
 
@@ -60,12 +58,10 @@ def test_persistence():
         print(f"\n✅ FTS5 symbols: {fts_count}")
 
         # Test fuzzy search
-        cursor = conn.execute(
-            """
+        cursor = conn.execute("""
             SELECT COUNT(DISTINCT symbol_id) as count 
             FROM symbol_trigrams
-        """
-        )
+        """)
         trigram_symbols = cursor.fetchone()["count"]
         print(f"✅ Symbols with trigrams: {trigram_symbols}")
 

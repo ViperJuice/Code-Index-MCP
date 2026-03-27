@@ -516,8 +516,7 @@ class BenchmarkRunner(IBenchmarkRunner):
 
     def _generate_html_report(self, result: BenchmarkResult) -> str:
         """Generate HTML benchmark report."""
-        template = Template(
-            """
+        template = Template("""
 <!DOCTYPE html>
 <html>
 <head>
@@ -617,8 +616,7 @@ class BenchmarkRunner(IBenchmarkRunner):
     {% endif %}
 </body>
 </html>
-        """
-        )
+        """)
 
         return template.render(
             result=result,

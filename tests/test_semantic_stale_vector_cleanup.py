@@ -61,9 +61,7 @@ def _build_indexer(repo_path: Path, qdrant: _FakeQdrantClient) -> SemanticIndexe
 def test_delete_stale_vectors_deletes_qdrant_points_and_mappings(tmp_path):
     repo_path = tmp_path / "repo"
     repo_path.mkdir()
-    store = SQLiteStore(
-        str(tmp_path / "index.db"), path_resolver=PathResolver(repo_path)
-    )
+    store = SQLiteStore(str(tmp_path / "index.db"), path_resolver=PathResolver(repo_path))
     qdrant = _FakeQdrantClient()
     indexer = _build_indexer(repo_path, qdrant)
 
@@ -87,9 +85,7 @@ def test_index_symbol_writes_mapping_for_chunk_metadata(tmp_path):
     source_file = repo_path / "doc.md"
     source_file.write_text("# title\nhello")
 
-    store = SQLiteStore(
-        str(tmp_path / "index.db"), path_resolver=PathResolver(repo_path)
-    )
+    store = SQLiteStore(str(tmp_path / "index.db"), path_resolver=PathResolver(repo_path))
     qdrant = _FakeQdrantClient()
     indexer = _build_indexer(repo_path, qdrant)
 
@@ -115,6 +111,4 @@ def test_index_symbol_writes_mapping_for_chunk_metadata(tmp_path):
     )
 
     assert qdrant.upserted
-    assert store.get_semantic_point_ids("test-profile", ["chunk-1"]) == [
-        expected_point_id
-    ]
+    assert store.get_semantic_point_ids("test-profile", ["chunk-1"]) == [expected_point_id]

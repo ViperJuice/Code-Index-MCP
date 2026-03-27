@@ -55,9 +55,7 @@ class PluginDiscovery(IPluginDiscovery):
                     plugin_info = self._load_plugin_info(plugin_dir)
                     if plugin_info and plugin_info not in discovered_plugins:
                         discovered_plugins.append(plugin_info)
-                        logger.info(
-                            f"Discovered plugin: {plugin_info.name} v{plugin_info.version}"
-                        )
+                        logger.info(f"Discovered plugin: {plugin_info.name} v{plugin_info.version}")
                 except Exception as e:
                     logger.error(f"Error loading plugin from {plugin_dir}: {e}")
 
@@ -67,9 +65,7 @@ class PluginDiscovery(IPluginDiscovery):
         """Scan a single directory for plugins."""
         return self.discover_plugins([directory])
 
-    def discover_plugins_safe(
-        self, plugin_dirs: List[Path]
-    ) -> Result[List[PluginInfo]]:
+    def discover_plugins_safe(self, plugin_dirs: List[Path]) -> Result[List[PluginInfo]]:
         """Discover plugins using Result pattern for error handling."""
         try:
             plugins = self.discover_plugins(plugin_dirs)
@@ -211,9 +207,7 @@ class PluginDiscovery(IPluginDiscovery):
 
             if not plugin_info:
                 # Fallback: create basic info from directory name
-                plugin_name = (
-                    plugin_path.name.replace("_plugin", "").replace("_", " ").title()
-                )
+                plugin_name = plugin_path.name.replace("_plugin", "").replace("_", " ").title()
                 language = plugin_path.name.replace("_plugin", "")
 
                 # Determine file extensions based on language

@@ -148,9 +148,7 @@ The plugin should handle various formatting patterns.
         content = """
 # Large Document
 
-""" + "\n".join(
-            [f"## Section {i}\nContent for section {i}." for i in range(100)]
-        )
+""" + "\n".join([f"## Section {i}\nContent for section {i}." for i in range(100)])
 
         start_time = time.time()
         result = markdown_plugin.extract_symbols(content, "large.md")

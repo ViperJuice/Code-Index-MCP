@@ -92,7 +92,8 @@ class MockPlugin(IPlugin):
                 results.append(
                     SearchResult(
                         path=symbol.path,
-                        start_line=symbol.line, end_line=symbol.line,
+                        start_line=symbol.line,
+                        end_line=symbol.line,
                         character=symbol.character,
                         snippet=symbol.definition,
                         score=1.0,
@@ -507,8 +508,7 @@ def test_benchmark_indexing_performance(benchmark, mock_plugins):
     suite = BenchmarkSuite(mock_plugins)
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-        f.write(
-            '''
+        f.write('''
 def benchmark_function():
     """Benchmark test function."""
     return 42
@@ -519,8 +519,7 @@ class BenchmarkClass:
     
     def calculate_result(self, input_value):
         return self.value * input_value
-'''
-        )
+''')
         f.flush()
 
         path = Path(f.name)

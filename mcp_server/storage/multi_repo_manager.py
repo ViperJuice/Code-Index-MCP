@@ -61,9 +61,7 @@ class RepositoryInfo:
 
         if self.index_location is None:
             # If index_path points to a file, use its parent directory as index location.
-            index_base = (
-                self.index_path.parent if self.index_path.suffix else self.index_path
-            )
+            index_base = self.index_path.parent if self.index_path.suffix else self.index_path
             self.index_location = str(index_base)
 
     @property
@@ -73,9 +71,7 @@ class RepositoryInfo:
 
     def needs_update(self) -> bool:
         """Return True if the current commit differs from the last indexed commit."""
-        return bool(
-            self.current_commit and self.current_commit != self.last_indexed_commit
-        )
+        return bool(self.current_commit and self.current_commit != self.last_indexed_commit)
 
 
 @dataclass
@@ -109,9 +105,7 @@ class MultiRepositoryManager:
             central_index_path: Path to central repository registry
             max_workers: Maximum parallel search workers
         """
-        self.central_index_path = (
-            central_index_path or self._get_default_registry_path()
-        )
+        self.central_index_path = central_index_path or self._get_default_registry_path()
         self.max_workers = max_workers
 
         # Repository registry
@@ -129,8 +123,7 @@ class MultiRepositoryManager:
         }
 
         logger.info(
-            f"Multi-repository manager initialized with "
-            f"registry at {self.central_index_path}"
+            f"Multi-repository manager initialized with " f"registry at {self.central_index_path}"
         )
 
     def _get_default_registry_path(self) -> Path:
@@ -226,14 +219,12 @@ class MultiRepositoryManager:
             cursor = conn.cursor()
 
             # Count files by language
-            cursor.execute(
-                """
+            cursor.execute("""
                 SELECT language, COUNT(*) 
                 FROM files 
                 WHERE is_deleted = 0 OR is_deleted IS NULL
                 GROUP BY language
-            """
-            )
+            """)
 
             for language, count in cursor:
                 if language:
@@ -241,12 +232,10 @@ class MultiRepositoryManager:
                     stats["total_files"] += count
 
             # Count symbols
-            cursor.execute(
-                """
+            cursor.execute("""
                 SELECT COUNT(*) FROM symbols
                 WHERE is_deleted = 0 OR is_deleted IS NULL
-            """
-            )
+            """)
             stats["total_symbols"] = cursor.fetchone()[0]
 
             conn.close()
@@ -353,9 +342,7 @@ class MultiRepositoryManager:
             logger.error(f"Failed to connect to repository {repository_id}: {e}")
             return None
 
-    def _normalize_symbol_result(
-        self, result: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    def _normalize_symbol_result(self, result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Normalize symbol search result fields for aggregation."""
         symbol_name = result.get("symbol") or result.get("name")
         if not symbol_name:
@@ -365,9 +352,7 @@ class MultiRepositoryManager:
         if not file_path and result.get("relative_path"):
             file_path = result["relative_path"]
 
-        line_number = (
-            result.get("line") or result.get("line_start") or result.get("line_number")
-        )
+        line_number = result.get("line") or result.get("line_start") or result.get("line_number")
 
         return {
             "symbol": symbol_name,
@@ -625,16 +610,12 @@ class MultiRepositoryManager:
 
             # First try bm25_content table
             try:
-                bm25_results = store.search_bm25(
-                    query, table="bm25_content", limit=limit
-                )
+                bm25_results = store.search_bm25(query, table="bm25_content", limit=limit)
             except Exception as e:
                 logger.debug(f"bm25_content search failed, trying fts_code: {e}")
                 # Fall back to fts_code table
                 try:
-                    bm25_results = store.search_bm25(
-                        query, table="fts_code", limit=limit
-                    )
+                    bm25_results = store.search_bm25(query, table="fts_code", limit=limit)
                 except Exception as e2:
                     logger.warning(f"Both BM25 tables failed for {repository_id}: {e2}")
 

@@ -22,20 +22,14 @@ logger = logging.getLogger(__name__)
 
 def _normalized_query_terms(query: str) -> List[str]:
     expanded = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", query)
-    return [
-        token
-        for token in re.findall(r"[a-z0-9_]+", expanded.lower())
-        if len(token) >= 3
-    ]
+    return [token for token in re.findall(r"[a-z0-9_]+", expanded.lower()) if len(token) >= 3]
 
 
 def _looks_like_symbol_precise_query(query: str) -> bool:
     normalized = query.strip()
     if not normalized:
         return False
-    if re.search(
-        r"\b(class|def|function|method|symbol)\s+[A-Za-z_][A-Za-z0-9_]*", normalized
-    ):
+    if re.search(r"\b(class|def|function|method|symbol)\s+[A-Za-z_][A-Za-z0-9_]*", normalized):
         return True
     if re.search(r"\b[A-Z][A-Za-z0-9_]{2,}\b", normalized):
         return True
@@ -56,9 +50,7 @@ def _bm25_score_adjustment(query: str, file_path: str) -> float:
     ):
         adjustment += 1.4
 
-    filename_matches = sum(
-        1 for term in terms if term.replace("-", "_") in filename_stem
-    )
+    filename_matches = sum(1 for term in terms if term.replace("-", "_") in filename_stem)
     path_matches = sum(1 for term in terms if term.replace("-", "_") in path_tokens)
     adjustment -= min(filename_matches, 3) * 0.45
     adjustment -= min(path_matches, 4) * 0.16
@@ -127,8 +119,7 @@ class BM25Indexer(IIndexer):
         """Initialize FTS5 tables for BM25 search."""
         with self.storage._get_connection() as conn:
             # Create main BM25 content table
-            conn.execute(
-                f"""
+            conn.execute(f"""
                 CREATE VIRTUAL TABLE IF NOT EXISTS {self.table_name} USING fts5(
                     file_id UNINDEXED,
                     filepath,
@@ -141,12 +132,10 @@ class BM25Indexer(IIndexer):
                     tokenize = 'porter unicode61',
                     prefix = '2 3'
                 )
-            """
-            )
+            """)
 
             # Create specialized tables for different content types
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE VIRTUAL TABLE IF NOT EXISTS bm25_symbols USING fts5(
                     symbol_id UNINDEXED,
                     name,
@@ -156,11 +145,9 @@ class BM25Indexer(IIndexer):
                     filepath,
                     tokenize = 'unicode61'
                 )
-            """
-            )
+            """)
 
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE VIRTUAL TABLE IF NOT EXISTS bm25_documents USING fts5(
                     file_id UNINDEXED,
                     filepath,
@@ -170,12 +157,10 @@ class BM25Indexer(IIndexer):
                     metadata,
                     tokenize = 'porter unicode61'
                 )
-            """
-            )
+            """)
 
             # Create tracking table for indexed files
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS bm25_index_status (
                     file_id INTEGER PRIMARY KEY,
                     filepath TEXT NOT NULL,
@@ -184,16 +169,13 @@ class BM25Indexer(IIndexer):
                     index_version TEXT DEFAULT '1.0',
                     FOREIGN KEY (file_id) REFERENCES files(id)
                 )
-            """
-            )
+            """)
 
             # Create index on filepath for fast lookups
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_bm25_status_filepath 
                 ON bm25_index_status(filepath)
-            """
-            )
+            """)
 
             logger.info("BM25 FTS5 tables initialized successfully")
 
@@ -216,9 +198,7 @@ class BM25Indexer(IIndexer):
             logger.error(f"Failed to index documents: {e}")
             return False
 
-    def add_document(
-        self, doc_id: str, content: str, metadata: Optional[Dict] = None
-    ) -> None:
+    def add_document(self, doc_id: str, content: str, metadata: Optional[Dict] = None) -> None:
         """
         Add a document to the BM25 index.
 
@@ -231,9 +211,7 @@ class BM25Indexer(IIndexer):
             # Get or create file record
             file_record = self.storage.get_file(doc_id)
             if not file_record:
-                logger.warning(
-                    f"File record not found for {doc_id}, skipping BM25 indexing"
-                )
+                logger.warning(f"File record not found for {doc_id}, skipping BM25 indexing")
                 return
 
             file_id = file_record["id"]
@@ -393,9 +371,7 @@ class BM25Indexer(IIndexer):
                 break
         return merged
 
-    def _search_symbol_definitions(
-        self, query: str, limit: int
-    ) -> List[Dict[str, Any]]:
+    def _search_symbol_definitions(self, query: str, limit: int) -> List[Dict[str, Any]]:
         """Search stored symbol definitions for symbol-precise queries."""
         candidates = _symbol_query_candidates(query)
         if not candidates:
@@ -638,9 +614,7 @@ class BM25Indexer(IIndexer):
 
             logger.debug(f"Removed {doc_id} from BM25 index")
 
-    def update_document(
-        self, doc_id: str, content: str, metadata: Optional[Dict] = None
-    ) -> None:
+    def update_document(self, doc_id: str, content: str, metadata: Optional[Dict] = None) -> None:
         """
         Update a document in the BM25 index.
 
@@ -678,15 +652,13 @@ class BM25Indexer(IIndexer):
             indexed_files = cursor.fetchone()[0]
 
             # Get language distribution
-            cursor = conn.execute(
-                f"""
+            cursor = conn.execute(f"""
                 SELECT language, COUNT(*) as count 
                 FROM {self.table_name} 
                 WHERE language != ''
                 GROUP BY language 
                 ORDER BY count DESC
-            """
-            )
+            """)
             language_dist = {row[0]: row[1] for row in cursor}
 
             return {
@@ -707,17 +679,13 @@ class BM25Indexer(IIndexer):
         """Optimize the FTS5 index for better performance."""
         with self.storage._get_connection() as conn:
             # Optimize main content table
-            conn.execute(
-                f"INSERT INTO {self.table_name}({self.table_name}) VALUES('optimize')"
-            )
+            conn.execute(f"INSERT INTO {self.table_name}({self.table_name}) VALUES('optimize')")
 
             # Optimize symbol table
             conn.execute("INSERT INTO bm25_symbols(bm25_symbols) VALUES('optimize')")
 
             # Optimize document table
-            conn.execute(
-                "INSERT INTO bm25_documents(bm25_documents) VALUES('optimize')"
-            )
+            conn.execute("INSERT INTO bm25_documents(bm25_documents) VALUES('optimize')")
 
             logger.info("BM25 index optimized")
 
@@ -725,9 +693,7 @@ class BM25Indexer(IIndexer):
         """Rebuild the entire FTS5 index."""
         with self.storage._get_connection() as conn:
             # Rebuild main content table
-            conn.execute(
-                f"INSERT INTO {self.table_name}({self.table_name}) VALUES('rebuild')"
-            )
+            conn.execute(f"INSERT INTO {self.table_name}({self.table_name}) VALUES('rebuild')")
 
             # Rebuild symbol table
             conn.execute("INSERT INTO bm25_symbols(bm25_symbols) VALUES('rebuild')")

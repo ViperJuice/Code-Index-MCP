@@ -132,8 +132,7 @@ class BaseDocumentPlugin(SpecializedPluginBase):
         total_chunks = len(raw_chunks)
 
         return [
-            self._to_contract_chunk(chunk, str(resolved_path), total_chunks)
-            for chunk in raw_chunks
+            self._to_contract_chunk(chunk, str(resolved_path), total_chunks) for chunk in raw_chunks
         ]
 
     def _to_contract_chunk(
@@ -142,9 +141,9 @@ class BaseDocumentPlugin(SpecializedPluginBase):
         """Convert internal chunk objects to the shared interface type."""
         metadata = document_contracts.ChunkMetadata(
             document_path=document_path,
-            section_hierarchy=[chunk.metadata.get("section", "")]
-            if chunk.metadata.get("section")
-            else [],
+            section_hierarchy=(
+                [chunk.metadata.get("section", "")] if chunk.metadata.get("section") else []
+            ),
             chunk_index=chunk.chunk_index,
             total_chunks=total_chunks,
             has_code=bool(chunk.metadata.get("has_code", False)),
@@ -173,9 +172,7 @@ class BaseDocumentPlugin(SpecializedPluginBase):
         self, structure: DocumentStructure, metadata: DocumentMetadata
     ) -> document_contracts.DocumentStructure:
         """Convert internal structure data to the shared interface type."""
-        sections = [
-            self._to_contract_section(section) for section in structure.sections
-        ]
+        sections = [self._to_contract_section(section) for section in structure.sections]
         return document_contracts.DocumentStructure(
             title=metadata.title,
             sections=sections,
@@ -183,9 +180,7 @@ class BaseDocumentPlugin(SpecializedPluginBase):
             outline=sections[0] if sections else None,
         )
 
-    def _to_contract_section(
-        self, section: Dict[str, Any]
-    ) -> document_contracts.Section:
+    def _to_contract_section(self, section: Dict[str, Any]) -> document_contracts.Section:
         """Convert internal section dictionaries to the shared interface type."""
         return document_contracts.Section(
             id=str(section.get("title", "section")).lower().replace(" ", "-"),
@@ -219,9 +214,7 @@ class BaseDocumentPlugin(SpecializedPluginBase):
 
         return chunks
 
-    def _intelligent_chunk(
-        self, text: str, structure: DocumentStructure
-    ) -> List[DocumentChunk]:
+    def _intelligent_chunk(self, text: str, structure: DocumentStructure) -> List[DocumentChunk]:
         """Perform structure-aware chunking."""
         chunks = []
         chunk_index = 0
@@ -577,8 +570,7 @@ class BaseDocumentPlugin(SpecializedPluginBase):
                     references.append(
                         Reference(
                             file=file_path,
-                            line=chunk.chunk_index * 10
-                            + lines_before,  # Rough estimate
+                            line=chunk.chunk_index * 10 + lines_before,  # Rough estimate
                         )
                     )
 
@@ -591,9 +583,7 @@ class BaseDocumentPlugin(SpecializedPluginBase):
 
         if opts.get("semantic", False) and self.enable_semantic:
             # Use semantic search
-            semantic_results = self.semantic_indexer.search(
-                query, limit=opts.get("limit", 20)
-            )
+            semantic_results = self.semantic_indexer.search(query, limit=opts.get("limit", 20))
 
             for result in semantic_results:
                 if result.get("kind") == "chunk":
@@ -617,12 +607,8 @@ class BaseDocumentPlugin(SpecializedPluginBase):
                                     "section_hierarchy": chunk.metadata.get(
                                         "section_hierarchy", []
                                     ),
-                                    "document_title": chunk.metadata.get(
-                                        "document_title", ""
-                                    ),
-                                    "document_type": chunk.metadata.get(
-                                        "document_type", ""
-                                    ),
+                                    "document_title": chunk.metadata.get("document_title", ""),
+                                    "document_type": chunk.metadata.get("document_type", ""),
                                     "tags": chunk.metadata.get("document_tags", []),
                                     "chunk_index": chunk.chunk_index,
                                     "total_chunks": len(chunks),
@@ -631,13 +617,9 @@ class BaseDocumentPlugin(SpecializedPluginBase):
 
                             # Add surrounding context if available
                             if chunk.metadata.get("context_before"):
-                                search_result["context_before"] = chunk.metadata[
-                                    "context_before"
-                                ]
+                                search_result["context_before"] = chunk.metadata["context_before"]
                             if chunk.metadata.get("context_after"):
-                                search_result["context_after"] = chunk.metadata[
-                                    "context_after"
-                                ]
+                                search_result["context_after"] = chunk.metadata["context_after"]
 
                             results.append(search_result)
         else:
@@ -661,9 +643,7 @@ class BaseDocumentPlugin(SpecializedPluginBase):
 
         return results[: opts.get("limit", 20)]
 
-    def _extract_snippet(
-        self, content: str, query: str, context_chars: int = 100
-    ) -> str:
+    def _extract_snippet(self, content: str, query: str, context_chars: int = 100) -> str:
         """Extract a snippet around the query match."""
         query_lower = query.lower()
         content_lower = content.lower()
@@ -698,9 +678,7 @@ class BaseDocumentPlugin(SpecializedPluginBase):
         hash_input = f"{file_path}:{chunk_index}"
         return hashlib.sha256(hash_input.encode()).hexdigest()[:16]
 
-    def _extract_text_around_position(
-        self, content: str, position: int, radius: int = 100
-    ) -> str:
+    def _extract_text_around_position(self, content: str, position: int, radius: int = 100) -> str:
         """Extract text around a specific position."""
         start = max(0, position - radius)
         end = min(len(content), position + radius)

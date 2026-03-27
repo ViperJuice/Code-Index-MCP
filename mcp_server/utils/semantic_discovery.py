@@ -162,9 +162,7 @@ class SemanticDatabaseDiscovery:
 
                         # Analyze file paths to see if they match current codebase
                         file_paths = self._extract_file_paths(sample[0])
-                        match_score = self._calculate_match_score(
-                            file_paths, repo_patterns
-                        )
+                        match_score = self._calculate_match_score(file_paths, repo_patterns)
 
                         if match_score > 0.1:  # At least 10% match
                             metadata = {
@@ -179,9 +177,7 @@ class SemanticDatabaseDiscovery:
                             )
 
                     except Exception as e:
-                        logger.debug(
-                            f"Error sampling collection {collection.name}: {e}"
-                        )
+                        logger.debug(f"Error sampling collection {collection.name}: {e}")
 
             except Exception as e:
                 logger.warning(f"Error listing collections in {qdrant_path}: {e}")
@@ -283,9 +279,7 @@ class SemanticDatabaseDiscovery:
 
         return list(set(file_paths))  # Remove duplicates
 
-    def _calculate_match_score(
-        self, file_paths: List[str], repo_patterns: Set[str]
-    ) -> float:
+    def _calculate_match_score(self, file_paths: List[str], repo_patterns: Set[str]) -> float:
         """Calculate how well file paths match the current repository."""
         if not file_paths:
             return 0.0
@@ -314,9 +308,7 @@ class SemanticDatabaseDiscovery:
             return (qdrant_path, collection_name)
 
         # If no matches found, check if code-embeddings has data
-        logger.info(
-            "No specific collection found, checking code-embeddings fallback..."
-        )
+        logger.info("No specific collection found, checking code-embeddings fallback...")
         for qdrant_path in self.qdrant_paths:
             client = self._get_client(qdrant_path)
             if not client:
@@ -428,17 +420,13 @@ class SemanticDatabaseDiscovery:
                     "collection_name": collection_name,
                     "match_score": metadata["match_score"],
                     "sample_files": metadata["sample_files"],
-                    "recommendation": "primary"
-                    if metadata["match_score"] > 0.5
-                    else "secondary",
+                    "recommendation": "primary" if metadata["match_score"] > 0.5 else "secondary",
                 }
             )
 
         # Add recommendations
         if not matches:
-            summary["recommendations"].append(
-                "No existing collections found for this codebase"
-            )
+            summary["recommendations"].append("No existing collections found for this codebase")
             summary["recommendations"].append("Consider creating a new semantic index")
         else:
             best_match = matches[0]

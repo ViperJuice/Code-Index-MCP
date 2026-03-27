@@ -48,8 +48,7 @@ async def test_mcp_integration():
 
     # Create a test Go file
     test_file = Path("test_sample.go")
-    test_file.write_text(
-        """package main
+    test_file.write_text("""package main
 
 import "fmt"
 
@@ -65,8 +64,7 @@ func main() {
         fmt.Printf("F(%d) = %d\\n", i, fibonacci(i))
     }
 }
-"""
-    )
+""")
 
     try:
         # Index the file

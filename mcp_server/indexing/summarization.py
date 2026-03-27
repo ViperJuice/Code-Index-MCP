@@ -53,8 +53,7 @@ def _topological_order(chunks: List[Dict]) -> List[str]:
             children[pid].append(cid)
 
     in_degree = {
-        cid: (1 if parent_of.get(cid) and parent_of[cid] in chunk_map else 0)
-        for cid in chunk_map
+        cid: (1 if parent_of.get(cid) and parent_of[cid] in chunk_map else 0) for cid in chunk_map
     }
     queue: List[str] = [cid for cid, deg in in_degree.items() if deg == 0]
     order: List[str] = []
@@ -302,6 +301,7 @@ class ChunkWriter:
         if summary_text is None and os.environ.get("CEREBRAS_API_KEY"):
             try:
                 from mcp_server.indexing.baml_client.baml_client.async_client import b
+
                 result = await b.SummarizeChunkAlone(
                     language=language,
                     symbol=symbol or "unknown",
@@ -326,9 +326,7 @@ class ChunkWriter:
                 summary_text = await self._call_direct_api(_SYSTEM_PROMPT, api_prompt)
                 model_name = self._get_model_name()
             except Exception as exc:
-                logger.warning(
-                    "Direct API summarization failed for '%s': %s", symbol, exc
-                )
+                logger.warning("Direct API summarization failed for '%s': %s", symbol, exc)
 
         if summary_text is None:
             return None
@@ -429,9 +427,7 @@ class FileBatchSummarizer(ChunkWriter):
 
         for chunk_id in order:
             c = chunk_map[chunk_id]
-            symbol = (
-                symbol_map.get(c.get("symbol_id")) or c.get("node_type") or "unknown"
-            )
+            symbol = symbol_map.get(c.get("symbol_id")) or c.get("node_type") or "unknown"
 
             parent_context = ""
             pid = c.get("parent_chunk_id")
@@ -447,8 +443,7 @@ class FileBatchSummarizer(ChunkWriter):
                     else "parent"
                 )
                 parent_context = (
-                    f"Context from enclosing scope ({parent_sym}): "
-                    f"{stored_summaries[pid]}\n\n"
+                    f"Context from enclosing scope ({parent_sym}): " f"{stored_summaries[pid]}\n\n"
                 )
 
             try:
@@ -532,9 +527,7 @@ class FileBatchSummarizer(ChunkWriter):
                     c = chunk_lookup.get(s.chunk_id)
                     if c is None:
                         continue
-                    sym = (
-                        symbol_map.get(c.get("symbol_id")) or c.get("node_type") or "unknown"
-                    )
+                    sym = symbol_map.get(c.get("symbol_id")) or c.get("node_type") or "unknown"
                     conn.execute(
                         """INSERT INTO chunk_summaries
                            (chunk_hash, file_id, chunk_start, chunk_end, symbol,
@@ -672,9 +665,7 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
             except Exception as exc:
                 logger.error("Failed to summarize file %s: %s", file_path, exc)
 
-        logger.info(
-            "ComprehensiveChunkWriter: stored %d/%d summaries", count, len(rows)
-        )
+        logger.info("ComprehensiveChunkWriter: stored %d/%d summaries", count, len(rows))
         return count
 
 

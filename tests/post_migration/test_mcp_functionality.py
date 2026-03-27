@@ -2,6 +2,7 @@
 """
 Post-migration test to verify MCP functionality still works correctly.
 """
+
 import os
 import subprocess
 import sys

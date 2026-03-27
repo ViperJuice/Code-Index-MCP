@@ -39,12 +39,7 @@ class IncrementalStats:
 
     def total_operations(self) -> int:
         """Get total number of operations performed."""
-        return (
-            self.files_indexed
-            + self.files_removed
-            + self.files_moved
-            + self.files_skipped
-        )
+        return self.files_indexed + self.files_removed + self.files_moved + self.files_skipped
 
 
 class IncrementalIndexer:
@@ -152,9 +147,7 @@ class IncrementalIndexer:
                 stats.errors += 1
 
         # Process additions and modifications
-        for change in changes_by_type.get("added", []) + changes_by_type.get(
-            "modified", []
-        ):
+        for change in changes_by_type.get("added", []) + changes_by_type.get("modified", []):
             result = self._index_file(change.path)
             if result == "indexed":
                 stats.files_indexed += 1
@@ -177,9 +170,7 @@ class IncrementalIndexer:
 
         return stats
 
-    def _group_changes_by_type(
-        self, changes: List[FileChange]
-    ) -> Dict[str, List[FileChange]]:
+    def _group_changes_by_type(self, changes: List[FileChange]) -> Dict[str, List[FileChange]]:
         """Group changes by their type.
 
         Args:
@@ -257,9 +248,7 @@ class IncrementalIndexer:
                 self.dispatcher.move_file(old_full_path, new_full_path, content_hash)
             else:
                 # Direct database operation
-                old_relative = self.path_resolver.normalize_path(
-                    self.repo_path / old_path
-                )
+                old_relative = self.path_resolver.normalize_path(self.repo_path / old_path)
                 new_relative = self.path_resolver.normalize_path(new_full_path)
                 repo_id = self._get_repository_id()
 
@@ -323,9 +312,7 @@ class IncrementalIndexer:
             logger.error(f"Failed to index file {path}: {e}")
             return "error"
 
-    def _needs_reindex(
-        self, file_path: Path, stored_file: Optional[Dict] = None
-    ) -> bool:
+    def _needs_reindex(self, file_path: Path, stored_file: Optional[Dict] = None) -> bool:
         """Check if a file needs to be reindexed.
 
         Args:
@@ -343,9 +330,7 @@ class IncrementalIndexer:
             relative_path = self.path_resolver.normalize_path(file_path)
             repo_id = self._get_repository_id()
 
-            stored_file = stored_file or self.store.get_file_by_path(
-                relative_path, repo_id
-            )
+            stored_file = stored_file or self.store.get_file_by_path(relative_path, repo_id)
             if not stored_file:
                 # File not in index
                 return True

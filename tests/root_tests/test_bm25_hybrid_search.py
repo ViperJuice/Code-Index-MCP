@@ -45,12 +45,10 @@ class TestBM25Indexer:
 
         # Check that FTS5 tables were created
         with self.storage._get_connection() as conn:
-            cursor = conn.execute(
-                """
+            cursor = conn.execute("""
                 SELECT name FROM sqlite_master 
                 WHERE type='table' AND name LIKE 'bm25_%'
-            """
-            )
+            """)
             tables = [row[0] for row in cursor]
             assert "bm25_content" in tables
             assert "bm25_symbols" in tables

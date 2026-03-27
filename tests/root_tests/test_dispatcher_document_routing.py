@@ -29,8 +29,7 @@ class TestDispatcherDocumentRouting(BaseDocumentTest):
 
         # Documentation files
         files["readme"] = workspace / "README.md"
-        files["readme"].write_text(
-            """# My Project
+        files["readme"].write_text("""# My Project
 
 ## Installation
 
@@ -48,13 +47,11 @@ Import and use:
 from myproject import main
 main()
 ```
-"""
-        )
+""")
 
         files["api_docs"] = workspace / "docs" / "api.md"
         files["api_docs"].parent.mkdir(exist_ok=True)
-        files["api_docs"].write_text(
-            """# API Reference
+        files["api_docs"].write_text("""# API Reference
 
 ## Classes
 
@@ -65,14 +62,12 @@ A class that does something useful.
 Methods:
 - process(data): Process the input data
 - validate(input): Validate input parameters
-"""
-        )
+""")
 
         # Code files
         files["main_py"] = workspace / "src" / "main.py"
         files["main_py"].parent.mkdir(exist_ok=True)
-        files["main_py"].write_text(
-            '''"""Main module for the project."""
+        files["main_py"].write_text('''"""Main module for the project."""
 
 def main():
     """Main entry point."""
@@ -88,18 +83,15 @@ class MyClass:
     def validate(self, input):
         """Validate input parameters."""
         return True
-'''
-        )
+''')
 
         files["config"] = workspace / "config.txt"
-        files["config"].write_text(
-            """Configuration Settings
+        files["config"].write_text("""Configuration Settings
 
 Database URL: postgresql://localhost/mydb
 Cache TTL: 3600
 Max Connections: 100
-"""
-        )
+""")
 
         return files
 
@@ -205,8 +197,7 @@ Max Connections: 100
         docs_dir.mkdir(exist_ok=True)
 
         # Create files with different relevance levels
-        (docs_dir / "installation.md").write_text(
-            """# Installation Guide
+        (docs_dir / "installation.md").write_text("""# Installation Guide
 
 ## Requirements
 
@@ -218,19 +209,16 @@ Max Connections: 100
 1. Clone the repository
 2. Run pip install -r requirements.txt
 3. Configure settings
-"""
-        )
+""")
 
-        (docs_dir / "troubleshooting.md").write_text(
-            """# Troubleshooting
+        (docs_dir / "troubleshooting.md").write_text("""# Troubleshooting
 
 ## Common Installation Issues
 
 If pip install fails, try:
 - Updating pip: python -m pip install --upgrade pip
 - Using virtual environment
-"""
-        )
+""")
 
         (self.workspace / "notes.txt").write_text("""Random notes about pip and installation.""")
 
@@ -249,16 +237,14 @@ If pip install fails, try:
         # Add a test file
         test_file = temp_workspace / "tests" / "test_main.py"
         test_file.parent.mkdir(exist_ok=True)
-        test_file.write_text(
-            '''"""Tests for main module."""
+        test_file.write_text('''"""Tests for main module."""
 
 def test_myclass_process():
     """Test MyClass.process method as documented in API."""
     from src.main import MyClass
     obj = MyClass()
     assert obj.process("data") == "data"
-'''
-        )
+''')
 
         # Index everything
         dispatcher.index(temp_workspace)

@@ -23,9 +23,7 @@ from ...utils.treesitter_wrapper import TreeSitterWrapper
 class Plugin(IPlugin):
     lang = "python"
 
-    def __init__(
-        self, sqlite_store: Optional[SQLiteStore] = None, preindex: bool = True
-    ) -> None:
+    def __init__(self, sqlite_store: Optional[SQLiteStore] = None, preindex: bool = True) -> None:
         self._ts = TreeSitterWrapper()
         self._indexer = FuzzyIndexer(sqlite_store=sqlite_store)
         self._sqlite_store = sqlite_store
@@ -37,15 +35,25 @@ class Plugin(IPlugin):
                 str(Path.cwd()), Path.cwd().name, {"language": "python"}
             )
 
-        if (
-            preindex
-            and os.getenv("MCP_SKIP_PLUGIN_PREINDEX", "false").lower() != "true"
-        ):
+        if preindex and os.getenv("MCP_SKIP_PLUGIN_PREINDEX", "false").lower() != "true":
             self._preindex()
 
     # ------------------------------------------------------------------
+    _EXCLUDED_DIRS = {
+        "htmlcov",
+        ".venv",
+        "venv",
+        "node_modules",
+        "__pycache__",
+        ".git",
+        "dist",
+        "build",
+    }
+
     def _preindex(self) -> None:
         for path in Path(".").rglob("*.py"):
+            if any(part in self._EXCLUDED_DIRS for part in path.parts):
+                continue
             try:
                 text = path.read_text()
                 self._indexer.add_file(str(path), text)
@@ -88,7 +96,7 @@ class Plugin(IPlugin):
             name_node = child.child_by_field_name("name")
             if name_node is None:
                 continue
-            name = content[name_node.start_byte : name_node.end_byte]
+            name = name_node.text.decode("utf-8")
 
             start_line = child.start_point[0] + 1
             end_line = child.end_point[0] + 1
@@ -161,9 +169,7 @@ class Plugin(IPlugin):
             try:
                 source = path.read_text()
                 script = jedi.Script(code=source, path=str(path))
-                names = script.get_names(
-                    all_scopes=True, definitions=True, references=False
-                )
+                names = script.get_names(all_scopes=True, definitions=True, references=False)
                 for name in names:
                     if name.name == symbol and name.type in ("function", "class"):
                         defs = name.goto()
@@ -202,9 +208,7 @@ class Plugin(IPlugin):
         return refs
 
     # ------------------------------------------------------------------
-    def search(
-        self, query: str, opts: SearchOpts | None = None
-    ) -> Iterable[SearchResult]:
+    def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:
         limit = 20
         if opts and "limit" in opts:
             limit = opts["limit"]

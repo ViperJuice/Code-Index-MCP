@@ -87,9 +87,7 @@ class CrossRepositorySearchCoordinator:
         self._repo_capabilities_cache: Dict[str, Set[str]] = {}
         self._last_cache_update = datetime.now()
 
-        logger.info(
-            f"CrossRepositorySearchCoordinator initialized with {max_workers} workers"
-        )
+        logger.info(f"CrossRepositorySearchCoordinator initialized with {max_workers} workers")
 
     async def search_symbol(
         self, symbol: str, scope: Optional[SearchScope] = None
@@ -123,14 +121,10 @@ class CrossRepositorySearchCoordinator:
             )
 
         # Execute parallel searches
-        search_results = await self._execute_parallel_symbol_search(
-            symbol, target_repos, scope
-        )
+        search_results = await self._execute_parallel_symbol_search(symbol, target_repos, scope)
 
         # Aggregate and deduplicate results
-        aggregated = await self._aggregate_symbol_results(
-            symbol, search_results, start_time
-        )
+        aggregated = await self._aggregate_symbol_results(symbol, search_results, start_time)
 
         logger.info(
             f"Cross-repo symbol search completed: {aggregated.total_results} results from {aggregated.repositories_searched} repositories"
@@ -160,9 +154,7 @@ class CrossRepositorySearchCoordinator:
         scope = scope or SearchScope()
         limit = limit or self.default_result_limit
 
-        logger.info(
-            f"Starting cross-repo code search for: {query} (semantic={semantic})"
-        )
+        logger.info(f"Starting cross-repo code search for: {query} (semantic={semantic})")
 
         # Get target repositories
         target_repos = await self._get_target_repositories(scope)
@@ -183,26 +175,20 @@ class CrossRepositorySearchCoordinator:
         )
 
         # Aggregate and deduplicate results
-        aggregated = await self._aggregate_code_results(
-            query, search_results, start_time, limit
-        )
+        aggregated = await self._aggregate_code_results(query, search_results, start_time, limit)
 
         logger.info(
             f"Cross-repo code search completed: {aggregated.total_results} results from {aggregated.repositories_searched} repositories"
         )
         return aggregated
 
-    async def _get_target_repositories(
-        self, scope: SearchScope
-    ) -> List[RepositoryInfo]:
+    async def _get_target_repositories(self, scope: SearchScope) -> List[RepositoryInfo]:
         """Get list of repositories to search based on scope."""
         all_repos = self.multi_repo_manager.list_repositories(active_only=True)
 
         # Filter by specific repositories if specified
         if scope.repositories:
-            all_repos = [
-                repo for repo in all_repos if repo.repository_id in scope.repositories
-            ]
+            all_repos = [repo for repo in all_repos if repo.repository_id in scope.repositories]
 
         # Filter by languages if specified
         if scope.languages:
@@ -245,9 +231,7 @@ class CrossRepositorySearchCoordinator:
             futures = []
 
             for repo in repositories:
-                future = executor.submit(
-                    self._search_symbol_in_repository, symbol, repo, scope
-                )
+                future = executor.submit(self._search_symbol_in_repository, symbol, repo, scope)
                 futures.append(future)
 
             results = []

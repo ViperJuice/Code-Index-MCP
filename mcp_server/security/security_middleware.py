@@ -52,9 +52,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.auth_manager = auth_manager
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         """Process request with rate limiting."""
         client_ip = self._get_client_ip(request)
 
@@ -94,13 +92,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
     def __init__(self, app: FastAPI, security_headers: Optional[Dict[str, str]] = None):
         super().__init__(app)
-        self.security_headers = (
-            security_headers or SecurityHeaders.get_default_headers()
-        )
+        self.security_headers = security_headers or SecurityHeaders.get_default_headers()
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         """Add security headers to response."""
         response = await call_next(request)
 
@@ -133,9 +127,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             "/api/v1/auth/refresh",
         ]
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         """Process request with authentication."""
         # Skip authentication for excluded paths
         if self._is_excluded_path(request.url.path):
@@ -209,9 +201,7 @@ class AuthorizationMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.auth_manager = auth_manager
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         """Process request with authorization."""
         # Skip authorization if not authenticated
         if not hasattr(request.state, "user_id"):
@@ -301,9 +291,7 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.max_request_size = max_request_size
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         """Validate and sanitize incoming requests."""
         # Check request size
         content_length = request.headers.get("content-length")
@@ -374,15 +362,11 @@ def get_current_user(request: Request) -> TokenData:
     # Fallback for runtimes where middleware registration occurred too late
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
     token = auth_header.split(" ", 1)[1].strip()
     if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
     logger.warning(
         "Using fallback auth path from Authorization header because request.state.token_data is missing"
@@ -447,9 +431,7 @@ def require_role(role: UserRole):
                     detail=f"Role '{role.value}' or higher required",
                 )
         except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="Invalid role"
-            )
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid role")
 
         return current_user
 
@@ -490,9 +472,7 @@ class SecurityMiddlewareStack:
         self.app.add_middleware(AuthorizationMiddleware, auth_manager=self.auth_manager)
 
         # Add authentication middleware last (executes first)
-        self.app.add_middleware(
-            AuthenticationMiddleware, auth_manager=self.auth_manager
-        )
+        self.app.add_middleware(AuthenticationMiddleware, auth_manager=self.auth_manager)
 
     def add_security_routes(self):
         """Add security-related routes."""

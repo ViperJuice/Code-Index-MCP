@@ -153,9 +153,7 @@ class TestRepositoryOperations:
         repo_id1 = sqlite_store.create_repository("/test/path", "repo1")
 
         # Create with same path
-        repo_id2 = sqlite_store.create_repository(
-            "/test/path", "repo2", {"updated": True}
-        )
+        repo_id2 = sqlite_store.create_repository("/test/path", "repo2", {"updated": True})
 
         assert repo_id1 == repo_id2  # Same ID
 
@@ -257,9 +255,7 @@ class TestFileOperations:
             "complexity": 5.2,
         }
 
-        file_id = sqlite_store.store_file(
-            repo_id, "/repo/file.py", "file.py", metadata=metadata
-        )
+        file_id = sqlite_store.store_file(repo_id, "/repo/file.py", "file.py", metadata=metadata)
 
         file_info = sqlite_store.get_file("/repo/file.py")
         stored_metadata = json.loads(file_info["metadata"])
@@ -284,15 +280,10 @@ class TestSemanticPointMappings:
         sqlite_store.upsert_semantic_point("profile-a", "chunk-1", 101, "code-index-a")
         sqlite_store.upsert_semantic_point("profile-a", "chunk-2", 202, "code-index-a")
 
-        deleted = sqlite_store.delete_semantic_point_mappings(
-            "profile-a", ["chunk-1", "chunk-2"]
-        )
+        deleted = sqlite_store.delete_semantic_point_mappings("profile-a", ["chunk-1", "chunk-2"])
 
         assert deleted == 2
-        assert (
-            sqlite_store.get_semantic_point_ids("profile-a", ["chunk-1", "chunk-2"])
-            == []
-        )
+        assert sqlite_store.get_semantic_point_ids("profile-a", ["chunk-1", "chunk-2"]) == []
 
 
 class TestSymbolOperations:
@@ -414,9 +405,7 @@ class TestReferenceOperations:
         use1_id = sqlite_store.store_file(repo_id, "/repo/use1.py", "use1.py")
         use2_id = sqlite_store.store_file(repo_id, "/repo/use2.py", "use2.py")
 
-        symbol_id = sqlite_store.store_symbol(
-            def_file_id, "SharedClass", "class", 10, 50
-        )
+        symbol_id = sqlite_store.store_symbol(def_file_id, "SharedClass", "class", 10, 50)
 
         # Store references
         sqlite_store.store_reference(symbol_id, use1_id, 15, 10, "import")
@@ -588,9 +577,7 @@ class TestFuzzyIndexPersistence:
         file_id = sqlite_store.store_file(repo_id, "/repo/file.py", "file.py")
 
         # Store symbol with trigrams
-        symbol_id = sqlite_store.store_symbol(
-            file_id, "example_func", "function", 1, 10
-        )
+        symbol_id = sqlite_store.store_symbol(file_id, "example_func", "function", 1, 10)
 
         # Load fuzzy index
         index_data = sqlite_store.load_fuzzy_index()
@@ -856,12 +843,8 @@ class TestSQLiteStoreHealthCheck:
         ]
 
         for table in core_tables:
-            assert table in health["tables"], (
-                f"Table {table} not checked in health_check"
-            )
-            assert health["tables"][table] is True, (
-                f"Table {table} should exist in fresh database"
-            )
+            assert table in health["tables"], f"Table {table} not checked in health_check"
+            assert health["tables"][table] is True, f"Table {table} should exist in fresh database"
 
     def test_health_check_fts5_support(self, tmp_path):
         """Verify health check reports FTS5 support."""

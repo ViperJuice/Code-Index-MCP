@@ -125,8 +125,7 @@ def temp_code_directory(tmp_path: Path) -> Path:
     code_dir.mkdir()
 
     # Create Python files
-    (code_dir / "sample.py").write_text(
-        """
+    (code_dir / "sample.py").write_text("""
 def hello_world():
     '''Say hello to the world.'''
     print("Hello, World!")
@@ -142,12 +141,10 @@ class Calculator:
 
 if __name__ == "__main__":
     hello_world()
-"""
-    )
+""")
 
     # Create JavaScript file
-    (code_dir / "app.js").write_text(
-        """
+    (code_dir / "app.js").write_text("""
 function greet(name) {
     return `Hello, ${name}!`;
 }
@@ -163,13 +160,11 @@ class UserManager {
 }
 
 module.exports = { greet, UserManager };
-"""
-    )
+""")
 
     # Create nested directory structure
     (code_dir / "src").mkdir()
-    (code_dir / "src" / "utils.py").write_text(
-        """
+    (code_dir / "src" / "utils.py").write_text("""
 import os
 from typing import List
 
@@ -181,8 +176,7 @@ def process_files(paths: List[str]) -> None:
 class FileHandler:
     def __init__(self, base_path: str):
         self.base_path = base_path
-"""
-    )
+""")
 
     return code_dir
 

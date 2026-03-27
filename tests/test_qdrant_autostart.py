@@ -13,13 +13,9 @@ def test_ensure_qdrant_running_reports_missing_docker(monkeypatch, tmp_path: Pat
         qdrant_compose_file=str(tmp_path / "docker-compose.qdrant.yml"),
         semantic_preflight_timeout_seconds=1,
     )
-    (tmp_path / "docker-compose.qdrant.yml").write_text(
-        "services: {}", encoding="utf-8"
-    )
+    (tmp_path / "docker-compose.qdrant.yml").write_text("services: {}", encoding="utf-8")
 
-    monkeypatch.setattr(
-        "mcp_server.setup.qdrant_autostart.is_docker_available", lambda: False
-    )
+    monkeypatch.setattr("mcp_server.setup.qdrant_autostart.is_docker_available", lambda: False)
 
     result = ensure_qdrant_running(settings)
     assert result.started is False
@@ -34,9 +30,7 @@ def test_ensure_qdrant_running_reports_missing_compose_file(monkeypatch):
         semantic_preflight_timeout_seconds=1,
     )
 
-    monkeypatch.setattr(
-        "mcp_server.setup.qdrant_autostart.is_docker_available", lambda: True
-    )
+    monkeypatch.setattr("mcp_server.setup.qdrant_autostart.is_docker_available", lambda: True)
 
     result = ensure_qdrant_running(settings)
     assert result.started is False

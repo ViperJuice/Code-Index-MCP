@@ -86,10 +86,7 @@ class _Handler(FileSystemEventHandler):
     def handle_file_move(self, old_path: Path, new_path: Path):
         """Handle file move operations efficiently."""
         try:
-            if (
-                old_path.suffix in self.code_extensions
-                and new_path.suffix in self.code_extensions
-            ):
+            if old_path.suffix in self.code_extensions and new_path.suffix in self.code_extensions:
                 # Compute content hash to check if file actually changed
                 if new_path.exists():
                     content_hash = self.path_resolver.compute_content_hash(new_path)

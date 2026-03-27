@@ -30,13 +30,11 @@ class TestPhase1Foundation:
         # Test with bm25_content table
         db1 = tmp_path / "bm25.db"
         conn = sqlite3.connect(str(db1))
-        conn.execute(
-            """
+        conn.execute("""
             CREATE VIRTUAL TABLE bm25_content USING fts5(
                 filepath, content, language
             )
-        """
-        )
+        """)
         conn.execute(
             "INSERT INTO bm25_content VALUES (?, ?, ?)", ("/test.py", "def hello(): pass", "python")
         )

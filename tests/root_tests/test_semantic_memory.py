@@ -100,8 +100,7 @@ def test_plugin_integration():
 
         # Create a test file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-            f.write(
-                """
+            f.write("""
 def factorial(n):
     '''Calculate factorial of a number recursively.'''
     if n == 0:
@@ -114,8 +113,7 @@ class MathOperations:
     def power(self, base, exp):
         '''Calculate base raised to exponent.'''
         return base ** exp
-"""
-            )
+""")
             test_file = f.name
 
         # Index the file

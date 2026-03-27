@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Simple test for Java plugin."""
 
-
 from mcp_server.plugins.java_plugin import Plugin
 
 

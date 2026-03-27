@@ -42,9 +42,7 @@ profiles:
       embed_schema_version: 1
 """.strip()
 
-    (tmp_path / "code-index-mcp.profiles.yaml").write_text(
-        yaml_content, encoding="utf-8"
-    )
+    (tmp_path / "code-index-mcp.profiles.yaml").write_text(yaml_content, encoding="utf-8")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         Settings,
@@ -67,14 +65,8 @@ profiles:
     assert profiles["oss_high"]["provider"] == "openai_compatible"
     assert profiles["oss_high"]["vector_dimension"] == 4096
     assert profiles["oss_high"]["normalization_policy"] == "l2"
-    assert (
-        profiles["oss_high"]["build_metadata"]["openai_api_base"]
-        == settings.openai_api_base
-    )
-    assert (
-        profiles["oss_high"]["build_metadata"]["collection_name"]
-        == "code_index__oss_high__v1"
-    )
+    assert profiles["oss_high"]["build_metadata"]["openai_api_base"] == settings.openai_api_base
+    assert profiles["oss_high"]["build_metadata"]["collection_name"] == "code_index__oss_high__v1"
 
 
 def test_default_profile_resolves_first_yaml_profile_when_legacy_default(
@@ -93,9 +85,7 @@ profiles:
       distance: dot
 """.strip()
 
-    (tmp_path / "code-index-mcp.profiles.yaml").write_text(
-        yaml_content, encoding="utf-8"
-    )
+    (tmp_path / "code-index-mcp.profiles.yaml").write_text(yaml_content, encoding="utf-8")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         Settings,
@@ -107,9 +97,7 @@ profiles:
     assert settings.get_semantic_default_profile() == "commercial_high"
 
 
-def test_default_profile_validation_fails_when_profile_missing(
-    monkeypatch, tmp_path: Path
-):
+def test_default_profile_validation_fails_when_profile_missing(monkeypatch, tmp_path: Path):
     """Explicit default must exist in configured profile map."""
     yaml_content = """
 profiles:
@@ -123,9 +111,7 @@ profiles:
       distance: dot
 """.strip()
 
-    (tmp_path / "code-index-mcp.profiles.yaml").write_text(
-        yaml_content, encoding="utf-8"
-    )
+    (tmp_path / "code-index-mcp.profiles.yaml").write_text(yaml_content, encoding="utf-8")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         Settings,

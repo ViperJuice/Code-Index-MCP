@@ -25,19 +25,16 @@ dist/
     (root / ".gitignore").write_text(gitignore)
 
     # Python file (should index)
-    (root / "app.py").write_text(
-        """
+    (root / "app.py").write_text("""
 def main():
     print("Hello Python")
     
 class Application:
     pass
-"""
-    )
+""")
 
     # JavaScript file (should index)
-    (root / "index.js").write_text(
-        """
+    (root / "index.js").write_text("""
 function main() {
     console.log("Hello JavaScript");
 }
@@ -45,12 +42,10 @@ function main() {
 class App {
     constructor() {}
 }
-"""
-    )
+""")
 
     # Go file (should index)
-    (root / "main.go").write_text(
-        """
+    (root / "main.go").write_text("""
 package main
 
 import "fmt"
@@ -62,12 +57,10 @@ func main() {
 type Server struct {
     port int
 }
-"""
-    )
+""")
 
     # Rust file (should index)
-    (root / "lib.rs").write_text(
-        """
+    (root / "lib.rs").write_text("""
 fn main() {
     println!("Hello Rust");
 }
@@ -75,23 +68,19 @@ fn main() {
 struct Calculator {
     value: i32,
 }
-"""
-    )
+""")
 
     # Java file (should index)
-    (root / "Main.java").write_text(
-        """
+    (root / "Main.java").write_text("""
 public class Main {
     public static void main(String[] args) {
         System.out.println("Hello Java");
     }
 }
-"""
-    )
+""")
 
     # TypeScript file (should index)
-    (root / "app.ts").write_text(
-        """
+    (root / "app.ts").write_text("""
 interface User {
     name: string;
     age: number;
@@ -100,12 +89,10 @@ interface User {
 function greet(user: User): void {
     console.log(`Hello ${user.name}`);
 }
-"""
-    )
+""")
 
     # C++ file (should index)
-    (root / "main.cpp").write_text(
-        """
+    (root / "main.cpp").write_text("""
 #include <iostream>
 
 class Vector {
@@ -117,12 +104,10 @@ int main() {
     std::cout << "Hello C++" << std::endl;
     return 0;
 }
-"""
-    )
+""")
 
     # Ruby file (should index)
-    (root / "app.rb").write_text(
-        """
+    (root / "app.rb").write_text("""
 class Application
   def initialize
     @name = "MyApp"
@@ -132,12 +117,10 @@ class Application
     puts "Hello Ruby"
   end
 end
-"""
-    )
+""")
 
     # Markdown file (should index)
-    (root / "README.md").write_text(
-        """
+    (root / "README.md").write_text("""
 # Test Project
 
 This is a test project for multi-language indexing.
@@ -145,8 +128,7 @@ This is a test project for multi-language indexing.
 ## Features
 - Multiple languages
 - Ignore patterns
-"""
-    )
+""")
 
     # Files that should be ignored
     (root / ".env").write_text("SECRET_KEY=12345")

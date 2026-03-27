@@ -118,9 +118,7 @@ def run_preflight() -> PreflightResult:
         detector, changes = _get_local_drift()
         if changes:
             mode = (
-                "incremental reconcile"
-                if detector.should_use_incremental(changes)
-                else "rebuild"
+                "incremental reconcile" if detector.should_use_incremental(changes) else "rebuild"
             )
             checks.append(
                 PreflightCheck(

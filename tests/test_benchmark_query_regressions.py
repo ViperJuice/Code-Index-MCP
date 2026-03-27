@@ -293,14 +293,10 @@ def test_index_file_uses_chunker_retrieval_metadata(monkeypatch, tmp_path):
             captured["collection_name"] = collection_name
             captured["points"] = points
 
-    monkeypatch.setattr(
-        semantic_indexer_module, "chunk_file", lambda *args, **kwargs: [fake_chunk]
-    )
+    monkeypatch.setattr(semantic_indexer_module, "chunk_file", lambda *args, **kwargs: [fake_chunk])
 
     indexer = object.__new__(SemanticIndexer)
-    indexer.path_resolver = cast(
-        Any, SimpleNamespace(normalize_path=lambda _: "tmp/example.py")
-    )
+    indexer.path_resolver = cast(Any, SimpleNamespace(normalize_path=lambda _: "tmp/example.py"))
     indexer.collection = "test-collection"
     indexer._qdrant_available = True
     indexer.qdrant = cast(Any, _QdrantStub())
@@ -329,10 +325,7 @@ def test_index_file_uses_chunker_retrieval_metadata(monkeypatch, tmp_path):
     assert "file tmp/example.py" in payload["embedding_text"]
     assert "module example" in payload["embedding_text"]
     assert "qualified name SemanticIndexer.index_file" in payload["embedding_text"]
-    assert (
-        "imports from .treesitter_wrapper import TreeSitterWrapper"
-        in payload["embedding_text"]
-    )
+    assert "imports from .treesitter_wrapper import TreeSitterWrapper" in payload["embedding_text"]
     assert embed_calls[0] == payload["embedding_text"]
     assert len(embed_calls) == 2
     assert "symbols index_file" in embed_calls[1]
@@ -360,9 +353,7 @@ def test_index_file_splits_oversize_embedding_units(monkeypatch, tmp_path):
     )
 
     monkeypatch.setenv("SEMANTIC_MAX_EMBED_CHARS", "1200")
-    monkeypatch.setattr(
-        semantic_indexer_module, "chunk_file", lambda *args, **kwargs: [fake_chunk]
-    )
+    monkeypatch.setattr(semantic_indexer_module, "chunk_file", lambda *args, **kwargs: [fake_chunk])
 
     captured = {}
 
@@ -388,18 +379,14 @@ def test_index_file_splits_oversize_embedding_units(monkeypatch, tmp_path):
     SemanticIndexer.index_file(indexer, Path(file_path))
 
     payloads = [point.payload for point in captured["points"]]
-    chunk_payloads = [
-        payload for payload in payloads if payload["kind"] != "file_summary"
-    ]
+    chunk_payloads = [payload for payload in payloads if payload["kind"] != "file_summary"]
 
     assert len(chunk_payloads) > 1
     assert all(len(payload["embedding_text"]) <= 1200 for payload in chunk_payloads)
     assert [payload["subchunk_index"] for payload in chunk_payloads] == list(
         range(1, len(chunk_payloads) + 1)
     )
-    assert all(
-        payload["subchunk_total"] == len(chunk_payloads) for payload in chunk_payloads
-    )
+    assert all(payload["subchunk_total"] == len(chunk_payloads) for payload in chunk_payloads)
     assert all(payload["source_chunk_id"] == "chunk-1" for payload in chunk_payloads)
     assert any("chunk part 1 of" in text for text in embedded)
     assert payloads[-1]["kind"] == "file_summary"
@@ -424,10 +411,7 @@ def test_build_chunk_embedding_text_adds_symbol_extraction_summary(monkeypatch):
     )
 
     assert "extract symbols from python files" in embedding_text
-    assert (
-        "semantic indexer extracts symbols from python using treesitter"
-        in embedding_text
-    )
+    assert "semantic indexer extracts symbols from python using treesitter" in embedding_text
 
 
 def test_build_file_embedding_text_adds_semantic_indexer_summary(monkeypatch):
@@ -449,19 +433,12 @@ def test_build_file_embedding_text_adds_semantic_indexer_summary(monkeypatch):
     )
 
     assert "symbols index_file" in embedding_text
-    assert (
-        "semantic indexer extracts symbols from python using treesitter"
-        in embedding_text
-    )
+    assert "semantic indexer extracts symbols from python using treesitter" in embedding_text
 
 
-def test_index_file_falls_back_to_text_chunks_for_unknown_language(
-    monkeypatch, tmp_path
-):
+def test_index_file_falls_back_to_text_chunks_for_unknown_language(monkeypatch, tmp_path):
     file_path = tmp_path / "NOTES.md"
-    file_path.write_text(
-        "# Notes\n\nFirst paragraph.\n\nSecond paragraph.", encoding="utf-8"
-    )
+    file_path.write_text("# Notes\n\nFirst paragraph.\n\nSecond paragraph.", encoding="utf-8")
 
     def _raise_chunk_error(*args, **kwargs):
         raise RuntimeError("no grammar available")
@@ -475,15 +452,11 @@ def test_index_file_falls_back_to_text_chunks_for_unknown_language(
             captured["points"] = points
 
     indexer = object.__new__(SemanticIndexer)
-    indexer.path_resolver = cast(
-        Any, SimpleNamespace(normalize_path=lambda _: "tmp/NOTES.md")
-    )
+    indexer.path_resolver = cast(Any, SimpleNamespace(normalize_path=lambda _: "tmp/NOTES.md"))
     indexer.collection = "test-collection"
     indexer._qdrant_available = True
     indexer.qdrant = cast(Any, _QdrantStub())
-    indexer._embed_texts = lambda texts, input_type="document": [
-        [0.1, 0.2, 0.3] for _ in texts
-    ]
+    indexer._embed_texts = lambda texts, input_type="document": [[0.1, 0.2, 0.3] for _ in texts]
 
     result = SemanticIndexer.index_file(indexer, Path(file_path))
 
@@ -800,8 +773,7 @@ def test_hybrid_post_process_prefers_delta_resolver_over_delta_artifacts(temp_db
             filepath="mcp_server/artifacts/delta_resolver.py",
             score=0.82,
             snippet=(
-                "resolve delta chain base_commit target_commit for artifact pull "
-                "resolution"
+                "resolve delta chain base_commit target_commit for artifact pull " "resolution"
             ),
             metadata={},
             source="bm25",
@@ -889,23 +861,15 @@ def test_hybrid_post_process_symbol_precise_demotes_tests(temp_db_path):
 
 def test_collect_files_excludes_generated_dirs_and_prioritizes_source(tmp_path):
     (tmp_path / "mcp_server").mkdir()
-    (tmp_path / "mcp_server" / "core.py").write_text(
-        "print('core')\n", encoding="utf-8"
-    )
+    (tmp_path / "mcp_server" / "core.py").write_text("print('core')\n", encoding="utf-8")
     (tmp_path / "scripts").mkdir()
-    (tmp_path / "scripts" / "runner.py").write_text(
-        "print('runner')\n", encoding="utf-8"
-    )
+    (tmp_path / "scripts" / "runner.py").write_text("print('runner')\n", encoding="utf-8")
     (tmp_path / "docs").mkdir()
     (tmp_path / "docs" / "guide.md").write_text("# Guide\n", encoding="utf-8")
     (tmp_path / "docs" / "benchmarks").mkdir(parents=True)
-    (tmp_path / "docs" / "benchmarks" / "report.md").write_text(
-        "# Report\n", encoding="utf-8"
-    )
+    (tmp_path / "docs" / "benchmarks" / "report.md").write_text("# Report\n", encoding="utf-8")
     (tmp_path / "analysis_archive").mkdir()
-    (tmp_path / "analysis_archive" / "notes.md").write_text(
-        "# Notes\n", encoding="utf-8"
-    )
+    (tmp_path / "analysis_archive" / "notes.md").write_text("# Notes\n", encoding="utf-8")
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests" / "test_core.py").write_text(
         "def test_core():\n    pass\n", encoding="utf-8"
@@ -923,9 +887,5 @@ def test_collect_files_excludes_generated_dirs_and_prioritizes_source(tmp_path):
     assert "docs/benchmarks/report.md" not in relative_paths
     assert "analysis_archive/notes.md" not in relative_paths
     assert "htmlcov/status.json" not in relative_paths
-    assert relative_paths.index("mcp_server/core.py") < relative_paths.index(
-        "docs/guide.md"
-    )
-    assert relative_paths.index("docs/guide.md") < relative_paths.index(
-        "tests/test_core.py"
-    )
+    assert relative_paths.index("mcp_server/core.py") < relative_paths.index("docs/guide.md")
+    assert relative_paths.index("docs/guide.md") < relative_paths.index("tests/test_core.py")

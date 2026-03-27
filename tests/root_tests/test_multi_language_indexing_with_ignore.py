@@ -88,8 +88,7 @@ temp/
     files_created = {"should_index": [], "should_ignore": []}
 
     # Python files
-    (root / "src" / "main.py").write_text(
-        """
+    (root / "src" / "main.py").write_text("""
 def main():
     print("Hello from Python!")
     
@@ -99,34 +98,28 @@ class Application:
         
     def run(self):
         print(f"Running {self.name}")
-"""
-    )
+""")
     files_created["should_index"].append("src/main.py")
 
-    (root / "src" / "utils" / "helpers.py").write_text(
-        """
+    (root / "src" / "utils" / "helpers.py").write_text("""
 def calculate_sum(a: int, b: int) -> int:
     return a + b
     
 def format_string(text: str) -> str:
     return text.strip().lower()
-"""
-    )
+""")
     files_created["should_index"].append("src/utils/helpers.py")
 
     # Should be ignored - test file
-    (root / "tests" / "test_main.py").write_text(
-        """
+    (root / "tests" / "test_main.py").write_text("""
 import pytest
 def test_main():
     assert True
-"""
-    )
+""")
     files_created["should_ignore"].append("tests/test_main.py")
 
     # JavaScript/TypeScript files
-    (root / "src" / "components" / "Button.jsx").write_text(
-        """
+    (root / "src" / "components" / "Button.jsx").write_text("""
 import React from 'react';
 
 export const Button = ({ onClick, children }) => {
@@ -136,12 +129,10 @@ export const Button = ({ onClick, children }) => {
         </button>
     );
 };
-"""
-    )
+""")
     files_created["should_index"].append("src/components/Button.jsx")
 
-    (root / "src" / "services" / "api.ts").write_text(
-        """
+    (root / "src" / "services" / "api.ts").write_text("""
 interface ApiResponse<T> {
     data: T;
     status: number;
@@ -154,23 +145,19 @@ export async function fetchData<T>(url: string): Promise<ApiResponse<T>> {
         status: response.status
     };
 }
-"""
-    )
+""")
     files_created["should_index"].append("src/services/api.ts")
 
     # Should be ignored - test file
-    (root / "src" / "Button.test.js").write_text(
-        """
+    (root / "src" / "Button.test.js").write_text("""
 test('Button renders', () => {
     expect(true).toBe(true);
 });
-"""
-    )
+""")
     files_created["should_ignore"].append("src/Button.test.js")
 
     # Go file
-    (root / "lib" / "server.go").write_text(
-        """
+    (root / "lib" / "server.go").write_text("""
 package main
 
 import (
@@ -186,13 +173,11 @@ func main() {
 func handler(w http.ResponseWriter, r *http.Request) {
     fmt.Fprintf(w, "Hello from Go!")
 }
-"""
-    )
+""")
     files_created["should_index"].append("lib/server.go")
 
     # Rust file
-    (root / "lib" / "helpers" / "math.rs").write_text(
-        """
+    (root / "lib" / "helpers" / "math.rs").write_text("""
 pub fn add(a: i32, b: i32) -> i32 {
     a + b
 }
@@ -206,13 +191,11 @@ impl Calculator {
         Calculator { value: 0 }
     }
 }
-"""
-    )
+""")
     files_created["should_index"].append("lib/helpers/math.rs")
 
     # Java file
-    (root / "src" / "Application.java").write_text(
-        """
+    (root / "src" / "Application.java").write_text("""
 public class Application {
     private String name;
     
@@ -229,13 +212,11 @@ public class Application {
         app.run();
     }
 }
-"""
-    )
+""")
     files_created["should_index"].append("src/Application.java")
 
     # C++ file
-    (root / "src" / "utils" / "vector.cpp").write_text(
-        """
+    (root / "src" / "utils" / "vector.cpp").write_text("""
 #include <iostream>
 #include <vector>
 
@@ -249,13 +230,11 @@ public:
         return sqrt(x*x + y*y + z*z);
     }
 };
-"""
-    )
+""")
     files_created["should_index"].append("src/utils/vector.cpp")
 
     # Ruby file
-    (root / "lib" / "helpers.rb").write_text(
-        """
+    (root / "lib" / "helpers.rb").write_text("""
 class Helper
   def self.format_name(first, last)
     "#{first} #{last}".strip
@@ -265,13 +244,11 @@ class Helper
     items.sum { |item| item[:price] }
   end
 end
-"""
-    )
+""")
     files_created["should_index"].append("lib/helpers.rb")
 
     # Configuration files (should be indexed)
-    (root / "config" / "app.yaml").write_text(
-        """
+    (root / "config" / "app.yaml").write_text("""
 application:
   name: TestApp
   version: 1.0.0
@@ -279,17 +256,14 @@ application:
 database:
   host: localhost
   port: 5432
-"""
-    )
+""")
     files_created["should_index"].append("config/app.yaml")
 
     # Should be ignored - secrets
-    (root / ".env").write_text(
-        """
+    (root / ".env").write_text("""
 API_KEY=secret123
 DATABASE_PASSWORD=password456
-"""
-    )
+""")
     files_created["should_ignore"].append(".env")
 
     (root / "config" / "secret.key").write_text("SUPER_SECRET_KEY")
@@ -313,8 +287,7 @@ DATABASE_PASSWORD=password456
     files_created["should_ignore"].append("temp/cache.tmp")
 
     # Markdown documentation (should be indexed)
-    (root / "README.md").write_text(
-        """
+    (root / "README.md").write_text("""
 # Test Repository
 
 This is a test repository for multi-language indexing.
@@ -323,20 +296,17 @@ This is a test repository for multi-language indexing.
 - Multi-language support
 - Ignore patterns
 - Security filtering
-"""
-    )
+""")
     files_created["should_index"].append("README.md")
 
-    (root / "docs" / "api.md").write_text(
-        """
+    (root / "docs" / "api.md").write_text("""
 # API Documentation
 
 ## Endpoints
 
 ### GET /api/data
 Returns data from the API.
-"""
-    )
+""")
     files_created["should_index"].append("docs/api.md")
 
     return files_created

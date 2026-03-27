@@ -59,9 +59,7 @@ class IGraphBuilder(ABC):
     """Interface for building code graphs."""
 
     @abstractmethod
-    def build_graph(
-        self, file_paths: List[str]
-    ) -> tuple[List[GraphNode], List[GraphEdge]]:
+    def build_graph(self, file_paths: List[str]) -> tuple[List[GraphNode], List[GraphEdge]]:
         """
         Build a code graph from the given files.
 
@@ -78,9 +76,7 @@ class IGraphAnalyzer(ABC):
     """Interface for analyzing code graphs."""
 
     @abstractmethod
-    def find_dependencies(
-        self, node_id: str, max_depth: int = 3
-    ) -> List[GraphNode]:
+    def find_dependencies(self, node_id: str, max_depth: int = 3) -> List[GraphNode]:
         """
         Find all dependencies of a node.
 
@@ -94,9 +90,7 @@ class IGraphAnalyzer(ABC):
         pass
 
     @abstractmethod
-    def find_dependents(
-        self, node_id: str, max_depth: int = 3
-    ) -> List[GraphNode]:
+    def find_dependents(self, node_id: str, max_depth: int = 3) -> List[GraphNode]:
         """
         Find all nodes that depend on this node.
 
@@ -110,9 +104,7 @@ class IGraphAnalyzer(ABC):
         pass
 
     @abstractmethod
-    def find_path(
-        self, source_id: str, target_id: str
-    ) -> Optional[List[GraphNode]]:
+    def find_path(self, source_id: str, target_id: str) -> Optional[List[GraphNode]]:
         """
         Find shortest path between two nodes.
 

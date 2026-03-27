@@ -29,20 +29,14 @@ def setup():
     default=None,
     help="Override strict semantic readiness behavior for this run.",
 )
-@click.option(
-    "--qdrant-url", default=None, help="Override Qdrant URL (http://host:6333)."
-)
+@click.option("--qdrant-url", default=None, help="Override Qdrant URL (http://host:6333).")
 @click.option(
     "--openai-api-base",
     default=None,
     help="Override OpenAI-compatible embeddings base URL.",
 )
-@click.option(
-    "--profile", default=None, help="Target semantic profile ID for validation."
-)
-@click.option(
-    "--timeout", default=None, type=float, help="Preflight timeout in seconds."
-)
+@click.option("--profile", default=None, help="Target semantic profile ID for validation.")
+@click.option("--timeout", default=None, type=float, help="Preflight timeout in seconds.")
 @click.option("--dry-run", is_flag=True, help="Run checks without starting containers.")
 @click.option("--json", "json_output", is_flag=True, help="Emit JSON output.")
 def setup_semantic(
@@ -118,15 +112,9 @@ def setup_semantic(
         click.echo("=" * 22)
         click.echo(f"Overall ready: {'yes' if report.overall_ready else 'no'}")
         click.echo(f"Strict mode: {'on' if report.strict_mode else 'off'}")
-        click.echo(
-            f"Profile check: {report.profiles.status.value} ({report.profiles.message})"
-        )
-        click.echo(
-            f"Embedding check: {report.embedding.status.value} ({report.embedding.message})"
-        )
-        click.echo(
-            f"Qdrant check: {report.qdrant.status.value} ({report.qdrant.message})"
-        )
+        click.echo(f"Profile check: {report.profiles.status.value} ({report.profiles.message})")
+        click.echo(f"Embedding check: {report.embedding.status.value} ({report.embedding.message})")
+        click.echo(f"Qdrant check: {report.qdrant.status.value} ({report.qdrant.message})")
 
         if qdrant_start is not None:
             click.echo(f"Qdrant autostart: {qdrant_start.message}")
@@ -138,12 +126,8 @@ def setup_semantic(
 
         if not report.overall_ready:
             click.echo("Next steps:")
-            click.echo(
-                "- Verify OPENAI_API_BASE or VOYAGE_API_KEY for the selected profile"
-            )
-            click.echo(
-                "- Ensure QDRANT_URL is reachable or rerun setup with autostart enabled"
-            )
+            click.echo("- Verify OPENAI_API_BASE or VOYAGE_API_KEY for the selected profile")
+            click.echo("- Ensure QDRANT_URL is reachable or rerun setup with autostart enabled")
 
     if strict and not report.overall_ready:
         raise click.ClickException("Strict semantic setup failed")

@@ -41,9 +41,7 @@ def test_preflight_warns_when_behind_remote(monkeypatch):
     monkeypatch.setattr(
         "mcp_server.cli.preflight_commands._get_local_drift",
         lambda: (
-            type(
-                "Detector", (), {"should_use_incremental": lambda self, changes: True}
-            )(),
+            type("Detector", (), {"should_use_incremental": lambda self, changes: True})(),
             [],
         ),
     )
@@ -102,9 +100,7 @@ def test_preflight_warns_when_artifact_differs_from_head(monkeypatch):
     monkeypatch.setattr(
         "mcp_server.cli.preflight_commands._get_local_drift",
         lambda: (
-            type(
-                "Detector", (), {"should_use_incremental": lambda self, changes: True}
-            )(),
+            type("Detector", (), {"should_use_incremental": lambda self, changes: True})(),
             [],
         ),
     )
@@ -137,9 +133,7 @@ def test_preflight_handles_no_remote(monkeypatch):
     monkeypatch.setattr(
         "mcp_server.cli.preflight_commands._get_local_drift",
         lambda: (
-            type(
-                "Detector", (), {"should_use_incremental": lambda self, changes: True}
-            )(),
+            type("Detector", (), {"should_use_incremental": lambda self, changes: True})(),
             [],
         ),
     )

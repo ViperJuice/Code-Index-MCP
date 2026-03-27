@@ -333,8 +333,7 @@ Deep nesting example.
         # Create a large document
         sections = []
         for i in range(20):
-            sections.append(
-                f"""## Section {i}
+            sections.append(f"""## Section {i}
 
 This is the content for section {i}. It contains multiple paragraphs
 to simulate a real document with substantial content.
@@ -342,8 +341,7 @@ to simulate a real document with substantial content.
 Here's another paragraph with more details about topic {i}.
 It includes various technical terms and explanations.
 
-"""
-            )
+""")
 
         large_content = "# Large Document\n\n" + "\n".join(sections)
 

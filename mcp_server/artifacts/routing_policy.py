@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional, Sequence
 
-
 _SENSITIVE_PROFILE_TYPES = {
     "sensitive",
     "confidential",
@@ -86,9 +85,7 @@ class ArtifactRoutingPolicy:
             )
 
         if is_private or is_large:
-            reasons = [
-                "private/sensitive profile or large artifact requires durable backend"
-            ]
+            reasons = ["private/sensitive profile or large artifact requires durable backend"]
             if self.s3_configured:
                 reasons.append("s3 is configured")
                 reasons.append("default route: s3")

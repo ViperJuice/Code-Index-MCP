@@ -166,9 +166,7 @@ class FuzzyIndexer:
                     if key in seen:
                         continue
                     seen.add(key)
-                    results.append(
-                        {"file": file, "line": line_no, "snippet": text.strip()}
-                    )
+                    results.append({"file": file, "line": line_no, "snippet": text.strip()})
                     if len(results) >= limit:
                         return results
         return results
@@ -237,9 +235,7 @@ class FuzzyIndexer:
                         conn.execute("DELETE FROM fts_code")
                     elif self._schema_type == "bm25_content":
                         # For BM25, we don't clear the table as it's managed elsewhere
-                        logger.debug(
-                            "BM25 content table managed by indexer, not clearing"
-                        )
+                        logger.debug("BM25 content table managed by indexer, not clearing")
             except Exception as e:
                 logger.error(f"Failed to clear search index: {e}")
 

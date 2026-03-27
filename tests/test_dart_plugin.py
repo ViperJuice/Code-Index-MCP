@@ -113,14 +113,12 @@ class TestNewInterfaceImplementation:
     def test_index_interface(self):
         """Test the new index method that returns Result[IndexedFile]."""
         plugin = DartPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         /// A simple class for testing
         class TestClass {
           void method() {}
         }
-        """
-        )
+        """)
 
         # Test successful indexing
         result = plugin.index("test.dart", code)
@@ -143,14 +141,12 @@ class TestNewInterfaceImplementation:
     def test_get_definition_interface(self):
         """Test the new get_definition method with Result pattern."""
         plugin = DartPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         /// A target function to find.
         void targetFunction() {
           print('Found me!');
         }
-        """
-        )
+        """)
 
         # Index first
         plugin.index("test.dart", code)
@@ -171,8 +167,7 @@ class TestNewInterfaceImplementation:
     def test_get_references_interface(self):
         """Test the new get_references method with Result pattern."""
         plugin = DartPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         void targetFunction() {
           print('Hello');
         }
@@ -180,8 +175,7 @@ class TestNewInterfaceImplementation:
         void caller() {
           targetFunction();
         }
-        """
-        )
+        """)
 
         # Index first
         plugin.index("test.dart", code)
@@ -203,12 +197,10 @@ class TestNewInterfaceImplementation:
     def test_search_interface(self):
         """Test the new search method with Result pattern."""
         plugin = DartPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         void calculateSum() {}
         void calculateProduct() {}
-        """
-        )
+        """)
 
         # Index first
         plugin.index("test.dart", code)
@@ -259,8 +251,7 @@ class TestNewInterfaceImplementation:
     def test_parse_flutter_widgets_interface(self):
         """Test the parse_flutter_widgets method."""
         plugin = DartPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         import 'package:flutter/material.dart';
         
         class MyWidget extends StatelessWidget {
@@ -268,8 +259,7 @@ class TestNewInterfaceImplementation:
             return Text('Hello');
           }
         }
-        """
-        )
+        """)
 
         result = plugin.parse_flutter_widgets(code)
 
@@ -291,12 +281,10 @@ class TestNewInterfaceImplementation:
 
         # Create a temporary file with package imports
         test_file = Path("test_file.dart")
-        code = dedent(
-            """
+        code = dedent("""
         import 'package:flutter/material.dart';
         import 'package:http/http.dart';
-        """
-        )
+        """)
 
         # Write the file temporarily
         with patch("pathlib.Path.read_text") as mock_read:
@@ -315,15 +303,13 @@ class TestNewInterfaceImplementation:
     def test_language_analyzer_interface(self):
         """Test ILanguageAnalyzer interface methods."""
         plugin = DartPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         import 'package:flutter/material.dart';
         import 'dart:async';
         
         void testFunction() {}
         class TestClass {}
-        """
-        )
+        """)
 
         # Test parse_imports
         imports_result = plugin.parse_imports(code)
@@ -356,8 +342,7 @@ class TestSymbolExtraction:
     def test_extract_simple_class(self):
         """Test extracting simple class definitions."""
         plugin = DartPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         class SimpleClass {
           String name;
           int age;
@@ -368,8 +353,7 @@ class TestSymbolExtraction:
             print('Hello, $name!');
           }
         }
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.dart"), code)
 
@@ -385,8 +369,7 @@ class TestSymbolExtraction:
     def test_extract_flutter_widget(self):
         """Test extracting Flutter widget definitions."""
         plugin = DartPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         import 'package:flutter/material.dart';
         
         class MyWidget extends StatelessWidget {
@@ -421,8 +404,7 @@ class TestSymbolExtraction:
             );
           }
         }
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.dart"), code)
         symbols = result["symbols"]
@@ -447,8 +429,7 @@ class TestSymbolExtraction:
     def test_extract_enum(self):
         """Test extracting enum definitions."""
         plugin = DartPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         enum Color {
           red,
           green,
@@ -460,8 +441,7 @@ class TestSymbolExtraction:
           approved,
           rejected,
         }
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.dart"), code)
         symbols = result["symbols"]
@@ -476,8 +456,7 @@ class TestSymbolExtraction:
     def test_extract_mixin(self):
         """Test extracting mixin definitions."""
         plugin = DartPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         mixin Flyable {
           void fly() {
             print('Flying!');
@@ -489,8 +468,7 @@ class TestSymbolExtraction:
             print('Swimming!');
           }
         }
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.dart"), code)
         symbols = result["symbols"]
@@ -508,8 +486,7 @@ class TestSymbolExtraction:
     def test_extract_extension(self):
         """Test extracting extension definitions."""
         plugin = DartPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         extension StringExtension on String {
           String get reversed => split('').reversed.join('');
           
@@ -519,8 +496,7 @@ class TestSymbolExtraction:
         extension on int {
           bool get isEven => this % 2 == 0;
         }
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.dart"), code)
         symbols = result["symbols"]
@@ -535,8 +511,7 @@ class TestSymbolExtraction:
     def test_extract_functions(self):
         """Test extracting function definitions."""
         plugin = DartPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         void main() {
           print('Hello, World!');
         }
@@ -554,8 +529,7 @@ class TestSymbolExtraction:
         int calculate(int a, int b, {int multiplier = 1}) {
           return (a + b) * multiplier;
         }
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.dart"), code)
         symbols = result["symbols"]
@@ -575,8 +549,7 @@ class TestSymbolExtraction:
     def test_extract_variables_and_constants(self):
         """Test extracting variable and constant definitions."""
         plugin = DartPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         const String APP_NAME = 'My App';
         const int VERSION = 1;
         
@@ -585,8 +558,7 @@ class TestSymbolExtraction:
         
         String? userName;
         late int userId;
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.dart"), code)
         symbols = result["symbols"]
@@ -602,13 +574,11 @@ class TestSymbolExtraction:
     def test_extract_typedef(self):
         """Test extracting typedef definitions."""
         plugin = DartPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         typedef IntCallback = void Function(int value);
         typedef JsonMap = Map<String, dynamic>;
         typedef StringList = List<String>;
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.dart"), code)
         symbols = result["symbols"]
@@ -627,8 +597,7 @@ class TestImportTracking:
     def test_extract_imports(self):
         """Test extracting various import statements."""
         plugin = DartPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         import 'dart:io';
         import 'dart:async';
         import 'dart:convert' as convert;
@@ -641,8 +610,7 @@ class TestImportTracking:
         
         import 'package:my_app/constants.dart' show API_URL, APP_NAME;
         import 'package:my_app/utils.dart' hide internalFunction;
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.dart"), code)
         imports = result.get("imports", [])
@@ -672,13 +640,11 @@ class TestImportTracking:
     def test_extract_exports(self):
         """Test extracting export statements."""
         plugin = DartPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         export 'models/user.dart';
         export 'models/product.dart' show Product, ProductType;
         export 'utils/helpers.dart' hide privateHelper;
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.dart"), code)
         imports = result.get("imports", [])  # Exports are included in imports with type
@@ -693,8 +659,7 @@ class TestErrorHandling:
     def test_syntax_error_handling(self):
         """Test handling of syntax errors in code."""
         plugin = DartPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         class ValidClass {
           void validMethod() {
             print('Hello');
@@ -711,8 +676,7 @@ class TestErrorHandling:
             print('World');
           }
         }
-        """
-        )
+        """)
 
         # Should not raise exception
         result = plugin.indexFile(Path("test.dart"), code)
@@ -727,8 +691,7 @@ class TestErrorHandling:
     def test_unicode_handling(self):
         """Test handling of Unicode in code."""
         plugin = DartPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         // Unicode in comments: 你好世界
         
         class 用户 {
@@ -741,8 +704,7 @@ class TestErrorHandling:
             print('你好, $姓名!');
           }
         }
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.dart"), code)
         symbols = result["symbols"]
@@ -763,8 +725,7 @@ class TestErrorHandling:
     def test_comment_only_file(self):
         """Test file with only comments."""
         plugin = DartPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         // This file contains only comments
         // No actual code here
         
@@ -772,8 +733,7 @@ class TestErrorHandling:
         /// but it's not associated with any code
         
         /* Block comment */
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("comments.dart"), code)
 
@@ -800,8 +760,7 @@ class TestSearchFunctionality:
         plugin = DartPlugin(sqlite_store=sqlite_store)
 
         # Index a file first
-        code = dedent(
-            """
+        code = dedent("""
         /// A target function to find.
         void targetFunction() {
           print('Found me!');
@@ -811,8 +770,7 @@ class TestSearchFunctionality:
         class TargetClass {
           void method() {}
         }
-        """
-        )
+        """)
 
         # Create repository and file in store
         repo_id = sqlite_store.create_repository("/test", "test")
@@ -927,8 +885,7 @@ class TestFlutterSpecificFeatures:
     def test_widget_hierarchy(self):
         """Test detection of Flutter widget hierarchy."""
         plugin = DartPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         import 'package:flutter/material.dart';
         
         class MyApp extends StatelessWidget {
@@ -968,8 +925,7 @@ class TestFlutterSpecificFeatures:
             );
           }
         }
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.dart"), code)
         symbols = result["symbols"]
@@ -989,8 +945,7 @@ class TestFlutterSpecificFeatures:
     def test_state_management_patterns(self):
         """Test detection of state management patterns."""
         plugin = DartPlugin()
-        code = dedent(
-            """
+        code = dedent("""
         import 'package:flutter/material.dart';
         
         class CounterProvider extends ChangeNotifier {
@@ -1024,8 +979,7 @@ class TestFlutterSpecificFeatures:
             _counterController.close();
           }
         }
-        """
-        )
+        """)
 
         result = plugin.indexFile(Path("test.dart"), code)
         symbols = result["symbols"]
@@ -1050,8 +1004,7 @@ class TestPersistenceIntegration:
         repo_id = sqlite_store.create_repository("/myproject", "myproject")
 
         # Index a complex Dart file
-        code = dedent(
-            """
+        code = dedent("""
         /// Main app entry point
         import 'package:flutter/material.dart';
         
@@ -1097,8 +1050,7 @@ class TestPersistenceIntegration:
             );
           }
         }
-        """
-        )
+        """)
 
         file_path = Path("/myproject/main.dart")
         file_id = sqlite_store.store_file(
@@ -1142,8 +1094,7 @@ class TestPerformanceAndScalability:
         # Generate a large file with many symbols
         classes = []
         for i in range(100):
-            classes.append(
-                f"""
+            classes.append(f"""
 class TestClass{i} {{
   String property{i} = 'value{i}';
   
@@ -1155,8 +1106,7 @@ class TestClass{i} {{
     return x * {i};
   }}
 }}
-"""
-            )
+""")
 
         large_code = "\n".join(classes)
 

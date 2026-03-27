@@ -66,8 +66,7 @@ class TestDocumentStorage(BaseDocumentTest):
         conn = sqlite3.connect(sqlite_store.db_path)
         try:
             # Create document chunks table if not exists
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS document_chunks (
                     id TEXT PRIMARY KEY,
                     file_path TEXT NOT NULL,
@@ -84,12 +83,10 @@ class TestDocumentStorage(BaseDocumentTest):
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            """
-            )
+            """)
 
             # Create FTS table for document search
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE VIRTUAL TABLE IF NOT EXISTS document_chunks_fts
                 USING fts5(
                     id UNINDEXED,
@@ -98,8 +95,7 @@ class TestDocumentStorage(BaseDocumentTest):
                     content=document_chunks,
                     content_rowid=rowid
                 )
-            """
-            )
+            """)
 
             # Insert chunks
             for chunk in chunks:
@@ -141,13 +137,11 @@ class TestDocumentStorage(BaseDocumentTest):
             assert len(retrieved) == 2
 
             # Test FTS search
-            cursor = conn.execute(
-                """
+            cursor = conn.execute("""
                 SELECT id, content, section_hierarchy
                 FROM document_chunks_fts
                 WHERE content MATCH 'introduction'
-            """
-            )
+            """)
 
             search_results = cursor.fetchall()
             assert len(search_results) > 0
@@ -186,8 +180,7 @@ class TestDocumentStorage(BaseDocumentTest):
         conn = sqlite3.connect(sqlite_store.db_path)
         try:
             # Create documents table
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS documents (
                     file_path TEXT PRIMARY KEY,
                     title TEXT,
@@ -196,8 +189,7 @@ class TestDocumentStorage(BaseDocumentTest):
                     file_type TEXT,
                     last_indexed TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            """
-            )
+            """)
 
             # Insert document
             conn.execute(
@@ -257,8 +249,7 @@ class TestDocumentStorage(BaseDocumentTest):
         docs_dir.mkdir()
 
         readme = docs_dir / "README.md"
-        readme.write_text(
-            """# Project Documentation
+        readme.write_text("""# Project Documentation
 
 ## Overview
 
@@ -277,12 +268,10 @@ from dataprocessor import Process
 p = Process()
 p.run()
 ```
-"""
-        )
+""")
 
         api_doc = docs_dir / "api.md"
-        api_doc.write_text(
-            """# API Reference
+        api_doc.write_text("""# API Reference
 
 ## Classes
 
@@ -293,8 +282,7 @@ Main processing class.
 Methods:
 - run(): Execute the process
 - stop(): Stop execution
-"""
-        )
+""")
 
         # Create dispatcher and index
         dispatcher = EnhancedDispatcher(sqlite_store=self.store)
@@ -309,12 +297,10 @@ Methods:
             assert symbol_count > 0
 
             # Check if any document-specific data was stored
-            cursor = conn.execute(
-                """
+            cursor = conn.execute("""
                 SELECT DISTINCT file_path FROM symbols 
                 WHERE file_path LIKE '%.md'
-            """
-            )
+            """)
             md_files = cursor.fetchall()
             assert len(md_files) >= 2
 
@@ -516,12 +502,10 @@ def function_{i}():
         # Verify all documents were indexed
         conn = sqlite3.connect(self.store.db_path)
         try:
-            cursor = conn.execute(
-                """
+            cursor = conn.execute("""
                 SELECT COUNT(DISTINCT file_path) FROM symbols 
                 WHERE file_path LIKE '%concurrent_%'
-            """
-            )
+            """)
             count = cursor.fetchone()[0]
             assert count >= 15  # Most should succeed
 
@@ -534,8 +518,7 @@ def function_{i}():
         conn = sqlite3.connect(self.store.db_path)
         try:
             # Add a new table for testing
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS document_versions (
                     id INTEGER PRIMARY KEY,
                     file_path TEXT NOT NULL,
@@ -543,8 +526,7 @@ def function_{i}():
                     content_hash TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            """
-            )
+            """)
 
             # Insert test data
             conn.execute(
@@ -606,12 +588,10 @@ def function_{i}():
         # Verify all documents were indexed
         conn = sqlite3.connect(self.store.db_path)
         try:
-            cursor = conn.execute(
-                """
+            cursor = conn.execute("""
                 SELECT COUNT(DISTINCT file_path) FROM symbols
                 WHERE file_path LIKE '%bulk_%'
-            """
-            )
+            """)
             count = cursor.fetchone()[0]
             assert count >= 90  # Most should succeed
 
@@ -626,12 +606,10 @@ def function_{i}():
         conn = sqlite3.connect(self.store.db_path)
         try:
             # Check for indexes
-            cursor = conn.execute(
-                """
+            cursor = conn.execute("""
                 SELECT name, sql FROM sqlite_master 
                 WHERE type = 'index' AND tbl_name = 'symbols'
-            """
-            )
+            """)
             indexes = cursor.fetchall()
 
             # Should have indexes for common queries
@@ -664,26 +642,22 @@ def function_{i}():
             conn.execute("PRAGMA foreign_keys = ON")
 
             # Create test tables with constraints
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS test_documents (
                     id INTEGER PRIMARY KEY,
                     path TEXT UNIQUE NOT NULL,
                     checksum TEXT NOT NULL
                 )
-            """
-            )
+            """)
 
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS test_chunks (
                     id INTEGER PRIMARY KEY,
                     document_id INTEGER NOT NULL,
                     content TEXT NOT NULL,
                     FOREIGN KEY (document_id) REFERENCES test_documents(id)
                 )
-            """
-            )
+            """)
 
             # Insert valid data
             conn.execute(
@@ -746,8 +720,7 @@ def function_{i}():
         conn = sqlite3.connect(self.store.db_path)
         try:
             # Create table for compressed content
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS compressed_docs (
                     id INTEGER PRIMARY KEY,
                     path TEXT UNIQUE,
@@ -755,8 +728,7 @@ def function_{i}():
                     original_size INTEGER,
                     compressed_size INTEGER
                 )
-            """
-            )
+            """)
 
             # Store compressed data
             conn.execute(
@@ -889,12 +861,10 @@ API documentation.""",
         conn = sqlite3.connect(self.store.db_path)
         try:
             # Check if metadata is searchable
-            cursor = conn.execute(
-                """
+            cursor = conn.execute("""
                 SELECT DISTINCT file_path, content FROM symbols
                 WHERE content LIKE '%John Doe%' OR content LIKE '%Technical Guide%'
-            """
-            )
+            """)
 
             results = cursor.fetchall()
             assert len(results) > 0
@@ -915,14 +885,12 @@ API documentation.""",
             conn.execute("BEGIN TRANSACTION")
 
             # Create test table
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS transaction_test (
                     id INTEGER PRIMARY KEY,
                     value TEXT
                 )
-            """
-            )
+            """)
 
             # Insert data
             for i in range(10):
@@ -942,12 +910,10 @@ API documentation.""",
             conn.execute("ROLLBACK")
 
             # Verify rollback worked
-            cursor = conn.execute(
-                """
+            cursor = conn.execute("""
                 SELECT COUNT(*) FROM sqlite_master 
                 WHERE type='table' AND name='transaction_test'
-            """
-            )
+            """)
             table_exists = cursor.fetchone()[0]
 
             if table_exists:

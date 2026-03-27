@@ -157,21 +157,13 @@ def _build_semantic_baseline(
     )
     profile_ids = list(registry.list().keys())
     if selected_profiles:
-        missing = [
-            profile for profile in selected_profiles if profile not in profile_ids
-        ]
+        missing = [profile for profile in selected_profiles if profile not in profile_ids]
         if missing:
-            raise RuntimeError(
-                "Unknown semantic profile(s): " + ", ".join(sorted(missing))
-            )
-        profile_ids = [
-            profile for profile in profile_ids if profile in selected_profiles
-        ]
+            raise RuntimeError("Unknown semantic profile(s): " + ", ".join(sorted(missing)))
+        profile_ids = [profile for profile in profile_ids if profile in selected_profiles]
     qdrant_path = os.getenv("QDRANT_PATH", "vector_index.qdrant")
     target_collections = {
-        _get_profile_collection_name(
-            registry.get(profile_id), settings.semantic_collection_name
-        )
+        _get_profile_collection_name(registry.get(profile_id), settings.semantic_collection_name)
         for profile_id in profile_ids
     }
 
@@ -218,9 +210,7 @@ def _build_semantic_baseline(
             click.echo(f"  -> Building semantic profile: {profile_id}")
             profile = registry.get(profile_id)
             indexer = SemanticIndexer(
-                collection=_get_profile_collection_name(
-                    profile, settings.semantic_collection_name
-                ),
+                collection=_get_profile_collection_name(profile, settings.semantic_collection_name),
                 qdrant_path=qdrant_path,
                 profile_registry=registry,
                 semantic_profile=profile_id,
@@ -228,9 +218,7 @@ def _build_semantic_baseline(
             )
             indexed_count = 0
             error_count = 0
-            with click.progressbar(
-                python_files, label=f"Indexing files ({profile_id})"
-            ) as files:
+            with click.progressbar(python_files, label=f"Indexing files ({profile_id})") as files:
                 for file_path in files:
                     try:
                         result = indexer.index_file(Path(file_path))
@@ -282,9 +270,7 @@ def index():
 
 
 @index.command()
-@click.option(
-    "--detailed", "-d", is_flag=True, help="Show detailed compatibility information"
-)
+@click.option("--detailed", "-d", is_flag=True, help="Show detailed compatibility information")
 def check_compatibility(detailed: bool):
     """Check if current configuration is compatible with existing indexes."""
     try:
@@ -322,9 +308,7 @@ def check_compatibility(detailed: bool):
 
         # Display results
         click.echo("Index Compatibility Status:")
-        click.echo(
-            f"  SQLite index: {'✅ Compatible' if sqlite_compatible else '❌ Incompatible'}"
-        )
+        click.echo(f"  SQLite index: {'✅ Compatible' if sqlite_compatible else '❌ Incompatible'}")
         if not vector_available:
             click.echo("  Vector index: ⚠️ Not available (semantic deps not installed)")
         else:
@@ -338,9 +322,7 @@ def check_compatibility(detailed: bool):
 
         if detailed and metadata:
             click.echo("\nMetadata details:")
-            click.echo(
-                f"  Embedding model: {metadata.get('embedding_model', 'unknown')}"
-            )
+            click.echo(f"  Embedding model: {metadata.get('embedding_model', 'unknown')}")
             click.echo(f"  Created: {metadata.get('created_at', 'unknown')}")
             click.echo(f"  Git commit: {metadata.get('git_commit', 'unknown')}")
 
@@ -348,9 +330,7 @@ def check_compatibility(detailed: bool):
         overall_compatible = sqlite_compatible and metadata_exists
         if vector_available:
             overall_compatible = overall_compatible and vector_compatible
-        click.echo(
-            f"\nOverall: {'✅ All compatible' if overall_compatible else '❌ Issues found'}"
-        )
+        click.echo(f"\nOverall: {'✅ All compatible' if overall_compatible else '❌ Issues found'}")
 
         sys.exit(0 if overall_compatible else 1)
 
@@ -390,9 +370,7 @@ def rebuild(
             if indexer:
                 compatible = indexer.check_compatibility()
                 if compatible and os.path.exists("code_index.db"):
-                    click.echo(
-                        "Indexes appear compatible. Use --force to rebuild anyway."
-                    )
+                    click.echo("Indexes appear compatible. Use --force to rebuild anyway.")
                     return
         except Exception:
             pass  # Proceed with rebuild if check fails
@@ -502,9 +480,7 @@ def status():
     if vector_status:
         try:
             click.echo("Vector Index:")
-            click.echo(
-                f"  🔌 Backend: {vector_status['backend']} ({vector_status['location']})"
-            )
+            click.echo(f"  🔌 Backend: {vector_status['backend']} ({vector_status['location']})")
             click.echo(f"  💾 Storage size: {vector_status['size_mb']:.1f} MB")
             collections = vector_status.get("collections") or []
             if collections:
@@ -534,19 +510,12 @@ def status():
                 metadata = json.load(f)
 
             click.echo("Metadata:")
-            click.echo(
-                f"  🤖 Embedding model: {metadata.get('embedding_model', 'unknown')}"
-            )
+            click.echo(f"  🤖 Embedding model: {metadata.get('embedding_model', 'unknown')}")
             click.echo(f"  📅 Created: {metadata.get('created_at', 'unknown')}")
-            click.echo(
-                f"  🔗 Git commit: {metadata.get('git_commit', 'unknown')[:8]}..."
-            )
+            click.echo(f"  🔗 Git commit: {metadata.get('git_commit', 'unknown')[:8]}...")
             semantic_profiles = metadata.get("semantic_profiles") or {}
             if isinstance(semantic_profiles, dict) and semantic_profiles:
-                click.echo(
-                    "  🧩 Semantic profiles: "
-                    + ", ".join(sorted(semantic_profiles.keys()))
-                )
+                click.echo("  🧩 Semantic profiles: " + ", ".join(sorted(semantic_profiles.keys())))
                 for profile_id in sorted(semantic_profiles.keys()):
                     profile_meta = semantic_profiles.get(profile_id) or {}
                     collection = profile_meta.get("collection_name", "unknown")
@@ -668,9 +637,7 @@ def check_semantic():
     click.echo("=" * 40)
     click.echo(f"Overall ready: {'✅' if report.overall_ready else '❌'}")
     click.echo(f"Profiles: {report.profiles.status.value} - {report.profiles.message}")
-    click.echo(
-        f"Embedding: {report.embedding.status.value} - {report.embedding.message}"
-    )
+    click.echo(f"Embedding: {report.embedding.status.value} - {report.embedding.message}")
     click.echo(f"Qdrant: {report.qdrant.status.value} - {report.qdrant.message}")
 
     if report.warnings:

@@ -48,6 +48,7 @@ except ImportError:  # pragma: no cover - optional dependency
     def generate_latest(registry: CollectorRegistry | None = None) -> bytes:
         return b""
 
+
 logger = logging.getLogger(__name__)
 
 

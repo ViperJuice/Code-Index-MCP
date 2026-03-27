@@ -32,13 +32,9 @@ class GraphAnalyzer(IGraphAnalyzer):
             self._out_edges[edge.source_id].append(edge)
             self._in_edges[edge.target_id].append(edge)
 
-        logger.debug(
-            f"GraphAnalyzer initialized: {len(nodes)} nodes, {len(edges)} edges"
-        )
+        logger.debug(f"GraphAnalyzer initialized: {len(nodes)} nodes, {len(edges)} edges")
 
-    def find_dependencies(
-        self, node_id: str, max_depth: int = 3
-    ) -> List[GraphNode]:
+    def find_dependencies(self, node_id: str, max_depth: int = 3) -> List[GraphNode]:
         """
         Find all dependencies of a node using BFS.
 
@@ -85,9 +81,7 @@ class GraphAnalyzer(IGraphAnalyzer):
         )
         return dependencies
 
-    def find_dependents(
-        self, node_id: str, max_depth: int = 3
-    ) -> List[GraphNode]:
+    def find_dependents(self, node_id: str, max_depth: int = 3) -> List[GraphNode]:
         """
         Find all nodes that depend on this node using BFS.
 
@@ -129,14 +123,10 @@ class GraphAnalyzer(IGraphAnalyzer):
                 if edge.source_id not in visited:
                     queue.append((edge.source_id, depth + 1))
 
-        logger.debug(
-            f"Found {len(dependents)} dependents for {node_id} (max_depth={max_depth})"
-        )
+        logger.debug(f"Found {len(dependents)} dependents for {node_id} (max_depth={max_depth})")
         return dependents
 
-    def find_path(
-        self, source_id: str, target_id: str
-    ) -> Optional[List[GraphNode]]:
+    def find_path(self, source_id: str, target_id: str) -> Optional[List[GraphNode]]:
         """
         Find shortest path between two nodes using BFS.
 
@@ -196,9 +186,7 @@ class GraphAnalyzer(IGraphAnalyzer):
             node_degrees[node_id] = in_degree + out_degree
 
         # Sort by degree
-        sorted_nodes = sorted(
-            node_degrees.items(), key=lambda x: x[1], reverse=True
-        )
+        sorted_nodes = sorted(node_degrees.items(), key=lambda x: x[1], reverse=True)
 
         # Get top N nodes
         hotspots = []

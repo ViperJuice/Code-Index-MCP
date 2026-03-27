@@ -32,20 +32,14 @@ _LEXICAL_EXCLUDED_FILENAMES = {
 
 def _normalized_query_terms(query: str) -> List[str]:
     expanded = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", query)
-    return [
-        token
-        for token in re.findall(r"[a-z0-9_]+", expanded.lower())
-        if len(token) >= 3
-    ]
+    return [token for token in re.findall(r"[a-z0-9_]+", expanded.lower()) if len(token) >= 3]
 
 
 def _looks_like_symbol_precise_query(query: str) -> bool:
     normalized = query.strip()
     if not normalized:
         return False
-    if re.search(
-        r"\b(class|def|function|method|symbol)\s+[A-Za-z_][A-Za-z0-9_]*", normalized
-    ):
+    if re.search(r"\b(class|def|function|method|symbol)\s+[A-Za-z_][A-Za-z0-9_]*", normalized):
         return True
     if re.search(r"\b[A-Z][A-Za-z0-9_]{2,}\b", normalized):
         return True
@@ -66,9 +60,7 @@ def _fts_rank_adjustment(query: str, file_path: str) -> float:
     ):
         adjustment += 0.7
 
-    filename_matches = sum(
-        1 for term in terms if term.replace("-", "_") in filename_stem
-    )
+    filename_matches = sum(1 for term in terms if term.replace("-", "_") in filename_stem)
     path_matches = sum(1 for term in terms if term.replace("-", "_") in path_tokens)
     adjustment -= min(filename_matches, 3) * 0.22
     adjustment -= min(path_matches, 4) * 0.08
@@ -100,8 +92,7 @@ class SQLiteStore:
     def _ensure_semantic_points_table(self) -> None:
         """Ensure semantic point mapping table exists for stale vector cleanup."""
         with self._get_connection() as conn:
-            conn.executescript(
-                """
+            conn.executescript("""
                 CREATE TABLE IF NOT EXISTS semantic_points (
                     profile_id TEXT NOT NULL,
                     chunk_id TEXT NOT NULL,
@@ -117,8 +108,7 @@ class SQLiteStore:
                     ON semantic_points(profile_id, point_id);
                 CREATE INDEX IF NOT EXISTS idx_semantic_points_collection
                     ON semantic_points(collection);
-                """
-            )
+                """)
 
     def _init_database(self):
         """Initialize database and create schema if needed."""
@@ -246,9 +236,7 @@ class SQLiteStore:
             logger.warning(f"Could not check FTS5 support: {e}")
             return False
 
-    def _check_column_exists(
-        self, conn: sqlite3.Connection, table: str, column: str
-    ) -> bool:
+    def _check_column_exists(self, conn: sqlite3.Connection, table: str, column: str) -> bool:
         """Check if a column exists in a table."""
         try:
             cursor = conn.execute(f"PRAGMA table_info({table})")
@@ -261,8 +249,7 @@ class SQLiteStore:
     def _init_schema(self, conn: sqlite3.Connection):
         """Initialize the database schema."""
         # Create core tables
-        conn.executescript(
-            """
+        conn.executescript("""
             -- Schema Version
             CREATE TABLE IF NOT EXISTS schema_version (
                 version INTEGER PRIMARY KEY,
@@ -548,12 +535,10 @@ class SQLiteStore:
             -- Insert initial schema version
             INSERT INTO schema_version (version, description)
             VALUES (2, 'Initial schema creation with content tracking and soft delete support');
-        """
-        )
+        """)
 
         # Create triggers for FTS
-        conn.executescript(
-            """
+        conn.executescript("""
             -- Triggers to keep FTS in sync with symbols table
             CREATE TRIGGER IF NOT EXISTS symbols_ai AFTER INSERT ON symbols
             BEGIN
@@ -572,13 +557,10 @@ class SQLiteStore:
                 SET name = new.name, documentation = new.documentation
                 WHERE rowid = new.id;
             END;
-        """
-        )
+        """)
 
     # Repository operations
-    def create_repository(
-        self, path: str, name: str, metadata: Optional[Dict] = None
-    ) -> int:
+    def create_repository(self, path: str, name: str, metadata: Optional[Dict] = None) -> int:
         """Create a new repository entry."""
         with self._get_connection() as conn:
             cursor = conn.execute(
@@ -595,9 +577,7 @@ class SQLiteStore:
             else:
                 # If lastrowid is None, it means we updated an existing row
                 # Get the id of the existing repository
-                cursor = conn.execute(
-                    "SELECT id FROM repositories WHERE path = ?", (path,)
-                )
+                cursor = conn.execute("SELECT id FROM repositories WHERE path = ?", (path,))
                 return cursor.fetchone()[0]
 
     def get_repository(self, path: str) -> Optional[Dict]:
@@ -627,9 +607,7 @@ class SQLiteStore:
         resolved_path = Path(path or file_path_arg) if path or file_path_arg else None
 
         if not resolved_path and not relative_path:
-            raise ValueError(
-                "Either 'path' or 'relative_path' must be provided to store_file"
-            )
+            raise ValueError("Either 'path' or 'relative_path' must be provided to store_file")
 
         relative_path_str: Optional[str] = None
         if relative_path is not None:
@@ -661,20 +639,14 @@ class SQLiteStore:
             try:
                 file_hash = self.path_resolver.compute_file_hash(resolved_path)
             except Exception as exc:  # pragma: no cover - defensive
-                logger.warning(
-                    f"Failed to compute file hash for {resolved_path}: {exc}"
-                )
+                logger.warning(f"Failed to compute file hash for {resolved_path}: {exc}")
 
         content_hash_value = content_hash
         if content_hash_value is None and path_exists:
             try:
-                content_hash_value = self.path_resolver.compute_content_hash(
-                    resolved_path
-                )
+                content_hash_value = self.path_resolver.compute_content_hash(resolved_path)
             except Exception as exc:  # pragma: no cover - defensive
-                logger.warning(
-                    f"Failed to compute content hash for {resolved_path}: {exc}"
-                )
+                logger.warning(f"Failed to compute content hash for {resolved_path}: {exc}")
 
         last_modified_value = (
             datetime.fromtimestamp(resolved_path.stat().st_mtime, tz=timezone.utc)
@@ -804,9 +776,7 @@ class SQLiteStore:
             row = cursor.fetchone()
             return self._normalize_file_record(row) if row else None
 
-    def get_all_files(
-        self, repository_id: Optional[int] = None
-    ) -> List[Dict[str, Any]]:
+    def get_all_files(self, repository_id: Optional[int] = None) -> List[Dict[str, Any]]:
         """Get all non-deleted files with normalized paths and content hashes."""
         with self._get_connection() as conn:
             query = "SELECT * FROM files WHERE is_deleted = FALSE"
@@ -838,9 +808,7 @@ class SQLiteStore:
             record["path"] = normalized_path
             record["relative_path"] = normalized_path
             try:
-                record["absolute_path"] = str(
-                    self.path_resolver.resolve_path(normalized_path)
-                )
+                record["absolute_path"] = str(self.path_resolver.resolve_path(normalized_path))
             except Exception:
                 record["absolute_path"] = original_path or normalized_path
         else:
@@ -1021,9 +989,7 @@ class SQLiteStore:
                 )
                 return cursor.fetchone()[0]
 
-    def get_chunk_by_chunk_id(
-        self, chunk_id: str, file_id: Optional[int] = None
-    ) -> Optional[Dict]:
+    def get_chunk_by_chunk_id(self, chunk_id: str, file_id: Optional[int] = None) -> Optional[Dict]:
         """Get chunk by chunk_id, optionally filtered by file_id."""
         with self._get_connection() as conn:
             if file_id is not None:
@@ -1032,15 +998,11 @@ class SQLiteStore:
                     (chunk_id, file_id),
                 )
             else:
-                cursor = conn.execute(
-                    "SELECT * FROM code_chunks WHERE chunk_id = ?", (chunk_id,)
-                )
+                cursor = conn.execute("SELECT * FROM code_chunks WHERE chunk_id = ?", (chunk_id,))
             row = cursor.fetchone()
             return dict(row) if row else None
 
-    def get_chunk_by_node_id(
-        self, node_id: str, file_id: Optional[int] = None
-    ) -> Optional[Dict]:
+    def get_chunk_by_node_id(self, node_id: str, file_id: Optional[int] = None) -> Optional[Dict]:
         """Get chunk by node_id, optionally filtered by file_id."""
         with self._get_connection() as conn:
             if file_id is not None:
@@ -1049,9 +1011,7 @@ class SQLiteStore:
                     (node_id, file_id),
                 )
             else:
-                cursor = conn.execute(
-                    "SELECT * FROM code_chunks WHERE node_id = ?", (node_id,)
-                )
+                cursor = conn.execute("SELECT * FROM code_chunks WHERE node_id = ?", (node_id,))
             row = cursor.fetchone()
             return dict(row) if row else None
 
@@ -1090,9 +1050,7 @@ class SQLiteStore:
     def delete_chunks_for_file(self, file_id: int) -> int:
         """Delete all chunks for a file. Returns number of chunks deleted."""
         with self._get_connection() as conn:
-            cursor = conn.execute(
-                "DELETE FROM code_chunks WHERE file_id = ?", (file_id,)
-            )
+            cursor = conn.execute("DELETE FROM code_chunks WHERE file_id = ?", (file_id,))
             return cursor.rowcount
 
     def upsert_semantic_point(
@@ -1134,9 +1092,7 @@ class SQLiteStore:
             )
             return [row[0] for row in cursor.fetchall()]
 
-    def delete_semantic_point_mappings(
-        self, profile_id: str, chunk_ids: List[str]
-    ) -> int:
+    def delete_semantic_point_mappings(self, profile_id: str, chunk_ids: List[str]) -> int:
         """Delete semantic point mappings for the supplied chunks."""
         if not chunk_ids:
             return 0
@@ -1213,9 +1169,11 @@ class SQLiteStore:
                             chunk.get("symbol_hash"),
                             chunk.get("definition_id"),
                             chunk.get("token_count"),
-                            chunk.get("token_model") or "cl100k_base"
-                            if chunk.get("token_count") is not None
-                            else None,
+                            (
+                                chunk.get("token_model") or "cl100k_base"
+                                if chunk.get("token_count") is not None
+                                else None
+                            ),
                             chunk.get("chunk_type", "code"),
                             chunk.get("language"),
                             chunk.get("node_type"),
@@ -1227,9 +1185,7 @@ class SQLiteStore:
                     )
                     count += 1
                 except Exception as e:
-                    logger.warning(
-                        f"Failed to store chunk {chunk.get('chunk_id')}: {e}"
-                    )
+                    logger.warning(f"Failed to store chunk {chunk.get('chunk_id')}: {e}")
                     continue
 
             return count
@@ -1398,9 +1354,7 @@ class SQLiteStore:
         with self._get_connection() as conn:
             # Try relative_path first (most common), then path
             for col in ("relative_path", "path"):
-                cursor = conn.execute(
-                    f"SELECT id FROM files WHERE {col} = ? LIMIT 1", (file_path,)
-                )
+                cursor = conn.execute(f"SELECT id FROM files WHERE {col} = ? LIMIT 1", (file_path,))
                 row = cursor.fetchone()
                 if row:
                     return row[0]
@@ -1461,9 +1415,7 @@ class SQLiteStore:
         results.sort(key=lambda r: r["score"], reverse=True)
         return results[:limit]
 
-    def find_best_chunk_for_file(
-        self, file_id: int, query_words: List[str]
-    ) -> Optional[Dict]:
+    def find_best_chunk_for_file(self, file_id: int, query_words: List[str]) -> Optional[Dict]:
         """
         Find the best-matching code chunk for a file given query words.
 
@@ -1577,9 +1529,7 @@ class SQLiteStore:
             base_rank = float(result.get("rank", 0.0) or 0.0)
             result["adjusted_rank"] = base_rank + _fts_rank_adjustment(query, file_path)
 
-        results.sort(
-            key=lambda row: float(row.get("adjusted_rank", row.get("rank", 0.0)))
-        )
+        results.sort(key=lambda row: float(row.get("adjusted_rank", row.get("rank", 0.0))))
         return results[:limit]
 
     # Index operations for fuzzy_indexer.py integration
@@ -1615,12 +1565,10 @@ class SQLiteStore:
         index_data = {}
 
         with self._get_connection() as conn:
-            cursor = conn.execute(
-                """SELECT st.trigram, s.name, s.id, s.file_id, f.path
+            cursor = conn.execute("""SELECT st.trigram, s.name, s.id, s.file_id, f.path
                    FROM symbol_trigrams st
                    JOIN symbols s ON st.symbol_id = s.id
-                   JOIN files f ON s.file_id = f.id"""
-            )
+                   JOIN files f ON s.file_id = f.id""")
 
             for row in cursor:
                 trigram = row["trigram"]
@@ -1724,16 +1672,12 @@ class SQLiteStore:
                     try:
                         cursor = conn.execute("SELECT MAX(version) FROM schema_version")
                         version_row = cursor.fetchone()
-                        result["version"] = (
-                            version_row[0] if version_row and version_row[0] else 0
-                        )
+                        result["version"] = version_row[0] if version_row and version_row[0] else 0
                     except sqlite3.OperationalError:
                         result["version"] = 0
 
                 # Determine health status
-                missing_tables = [
-                    table for table, exists in result["tables"].items() if not exists
-                ]
+                missing_tables = [table for table, exists in result["tables"].items() if not exists]
                 if missing_tables:
                     if len(missing_tables) > 5:
                         result["status"] = "unhealthy"
@@ -1742,19 +1686,13 @@ class SQLiteStore:
                         )
                     else:
                         result["status"] = "degraded"
-                        result["error"] = (
-                            f"Some tables missing: {', '.join(missing_tables)}"
-                        )
+                        result["error"] = f"Some tables missing: {', '.join(missing_tables)}"
                 elif not result["fts5"]:
                     result["status"] = "degraded"
-                    result["error"] = (
-                        "FTS5 support not available - search functionality limited"
-                    )
+                    result["error"] = "FTS5 support not available - search functionality limited"
                 elif not result["wal"]:
                     result["status"] = "degraded"
-                    result["error"] = (
-                        "WAL mode not enabled - concurrency may be affected"
-                    )
+                    result["error"] = "WAL mode not enabled - concurrency may be affected"
 
         except Exception as e:
             result["status"] = "unhealthy"
@@ -1960,10 +1898,7 @@ class SQLiteStore:
                     continue
 
                 file_path = Path(path_value)
-                if (
-                    not file_path.exists()
-                    or file_path.name in _LEXICAL_EXCLUDED_FILENAMES
-                ):
+                if not file_path.exists() or file_path.name in _LEXICAL_EXCLUDED_FILENAMES:
                     continue
 
                 try:
@@ -1984,9 +1919,7 @@ class SQLiteStore:
 
             return inserted
 
-    def get_bm25_term_statistics(
-        self, term: str, table: str = "fts_code"
-    ) -> Dict[str, Any]:
+    def get_bm25_term_statistics(self, term: str, table: str = "fts_code") -> Dict[str, Any]:
         """
         Get term statistics for BM25 tuning.
 
@@ -2013,11 +1946,9 @@ class SQLiteStore:
             total_docs = cursor.fetchone()[0]
 
             # Get average document length (approximation)
-            cursor = conn.execute(
-                f"""
+            cursor = conn.execute(f"""
                 SELECT AVG(LENGTH(content)) FROM {table}
-            """
-            )
+            """)
             avg_doc_length = cursor.fetchone()[0] or 0
 
             return {
@@ -2040,12 +1971,10 @@ class SQLiteStore:
         """Optimize all FTS5 tables for better performance."""
         with self._get_connection() as conn:
             # Get all FTS5 tables
-            cursor = conn.execute(
-                """
+            cursor = conn.execute("""
                 SELECT name FROM sqlite_master 
                 WHERE type='table' AND sql LIKE '%USING fts5%'
-            """
-            )
+            """)
 
             fts_tables = [row[0] for row in cursor]
 
@@ -2060,12 +1989,10 @@ class SQLiteStore:
         """Rebuild all FTS5 tables."""
         with self._get_connection() as conn:
             # Get all FTS5 tables
-            cursor = conn.execute(
-                """
+            cursor = conn.execute("""
                 SELECT name FROM sqlite_master 
                 WHERE type='table' AND sql LIKE '%USING fts5%'
-            """
-            )
+            """)
 
             fts_tables = [row[0] for row in cursor]
 
@@ -2077,9 +2004,7 @@ class SQLiteStore:
                     logger.warning(f"Could not rebuild {table}: {e}")
 
     # New file operation methods for path management
-    def get_file_by_content_hash(
-        self, content_hash: str, repository_id: int
-    ) -> Optional[Dict]:
+    def get_file_by_content_hash(self, content_hash: str, repository_id: int) -> Optional[Dict]:
         """Get file by content hash."""
         with self._get_connection() as conn:
             cursor = conn.execute(
@@ -2127,9 +2052,7 @@ class SQLiteStore:
 
             logger.info(f"Removed file and all associated data: {relative_path}")
 
-    def move_file(
-        self, old_path: str, new_path: str, repository_id: int, content_hash: str
-    ):
+    def move_file(self, old_path: str, new_path: str, repository_id: int, content_hash: str):
         """Record a file move operation."""
         with self._get_connection() as conn:
             # Update the file path
@@ -2175,9 +2098,7 @@ class SQLiteStore:
                     # Use remove_file for thorough cleanup
                     self.remove_file(path, repository_id=0)
 
-                logger.info(
-                    f"Cleaned up {count} deleted files older than {days_old} days"
-                )
+                logger.info(f"Cleaned up {count} deleted files older than {days_old} days")
 
     def store_chunk_summary(
         self,
@@ -2275,9 +2196,7 @@ class SQLiteStore:
                 for row in cursor.fetchall()
             ]
 
-    def find_chunk_at_line(
-        self, file_path: str, line: int
-    ) -> Optional[Dict[str, Any]]:
+    def find_chunk_at_line(self, file_path: str, line: int) -> Optional[Dict[str, Any]]:
         """Return the tightest code chunk that covers *line* in *file_path*.
 
         Returns ``None`` when no matching chunk is found.  The dict keys

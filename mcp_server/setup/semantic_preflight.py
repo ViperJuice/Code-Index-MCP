@@ -191,9 +191,7 @@ def run_semantic_preflight(
 ) -> SemanticPreflightReport:
     """Run semantic preflight checks and return structured report."""
     timeout = float(
-        timeout_s
-        if timeout_s is not None
-        else settings.semantic_preflight_timeout_seconds
+        timeout_s if timeout_s is not None else settings.semantic_preflight_timeout_seconds
     )
     if not settings.semantic_search_enabled:
         disabled = CheckResult(
@@ -207,9 +205,7 @@ def run_semantic_preflight(
             qdrant=disabled,
             embedding=disabled,
             profiles=disabled,
-            warnings=[
-                "Enable SEMANTIC_SEARCH_ENABLED=true to initialize semantic search"
-            ],
+            warnings=["Enable SEMANTIC_SEARCH_ENABLED=true to initialize semantic search"],
             effective_config={
                 "semantic_enabled": False,
                 "strict_mode": strict,
@@ -223,19 +219,13 @@ def run_semantic_preflight(
     provider = str(profile_payload.get("provider", "voyage")).lower()
 
     if provider in {"openai_compatible", "openai-compatible", "openai", "qwen", "vllm"}:
-        metadata_base = (profile_payload.get("build_metadata") or {}).get(
-            "openai_api_base"
-        )
-        base_url = str(
-            settings.openai_api_base or metadata_base or "http://localhost:8001/v1"
-        )
+        metadata_base = (profile_payload.get("build_metadata") or {}).get("openai_api_base")
+        base_url = str(settings.openai_api_base or metadata_base or "http://localhost:8001/v1")
         embedding_check = check_openai_compatible(base_url, timeout_s=timeout)
     else:
         embedding_check = check_voyage_key_present()
 
-    qdrant_url = os.getenv(
-        "QDRANT_URL", f"http://{settings.qdrant_host}:{settings.qdrant_port}"
-    )
+    qdrant_url = os.getenv("QDRANT_URL", f"http://{settings.qdrant_host}:{settings.qdrant_port}")
     qdrant_check = check_qdrant(qdrant_url, timeout_s=timeout)
 
     warnings: List[str] = []
@@ -243,13 +233,9 @@ def run_semantic_preflight(
         if not check.ok:
             warnings.append(check.message)
 
-    overall_ready = all(
-        check.ok for check in [profile_check, embedding_check, qdrant_check]
-    )
+    overall_ready = all(check.ok for check in [profile_check, embedding_check, qdrant_check])
     if strict and not overall_ready:
-        warnings.append(
-            "Strict semantic mode enabled: startup/setup should fail until checks pass"
-        )
+        warnings.append("Strict semantic mode enabled: startup/setup should fail until checks pass")
 
     return SemanticPreflightReport(
         overall_ready=overall_ready,

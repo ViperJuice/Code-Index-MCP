@@ -1,23 +1,27 @@
 {
   "mcpServers": {
     "code-index-mcp": {
-      "command": "python3",
+      "command": "/home/viperjuice/code/Code-Index-MCP/.venv/bin/python3",
       "args": [
-        "/workspaces/Code-Index-MCP/scripts/cli/mcp_server_cli.py"
+        "/home/viperjuice/code/Code-Index-MCP/scripts/cli/mcp_server_cli.py"
       ],
-      "cwd": "/workspaces/Code-Index-MCP",
+      "cwd": "/home/viperjuice/code/Code-Index-MCP",
       "env": {
-        "PYTHONPATH": "/workspaces/Code-Index-MCP",
-        "MCP_WORKSPACE_ROOT": "/workspaces/Code-Index-MCP",
-        "MCP_INDEX_STORAGE_PATH": "/workspaces/Code-Index-MCP/.indexes",
-        "MCP_REPO_REGISTRY": "/workspaces/Code-Index-MCP/.indexes/repository_registry.json",
+        "PYTHONPATH": "/home/viperjuice/code/Code-Index-MCP",
+        "MCP_WORKSPACE_ROOT": "/home/viperjuice/code/Code-Index-MCP",
+        "MCP_INDEX_STORAGE_PATH": "/home/viperjuice/code/Code-Index-MCP/.indexes",
+        "MCP_REPO_REGISTRY": "/home/viperjuice/code/Code-Index-MCP/.indexes/repository_registry.json",
+        "MCP_INDEX_PATHS": "/home/viperjuice/code/Code-Index-MCP",
         "MCP_ENABLE_MULTI_REPO": "true",
         "MCP_ENABLE_MULTI_PATH": "true",
         "SEMANTIC_SEARCH_ENABLED": "true",
-        "VOYAGE_AI_API_KEY": "",
-        "MCP_LOG_PATH": "/home/vscode/.mcp/logs",
+        "VOYAGE_AI_API_KEY": "pa-kB_U6_PsSUjRsQeWXp7YD4h9a-VdezSX3FzxxBd92Do",
+        "OPENAI_API_KEY": "local",
+        "CEREBRAS_API_KEY": "csk-feymxm84xhmfrrp86wcer4vn4rwey8rtvexrckm9ewm93fwf",
+        "CEREBRAS_MODEL": "gpt-oss-120b",
+        "MCP_LOG_PATH": "/home/viperjuice/.mcp/logs",
         "MCP_TEMP_PATH": "/tmp",
-        "MCP_DATA_PATH": "/workspaces/Code-Index-MCP/data"
+        "MCP_DATA_PATH": "/home/viperjuice/code/Code-Index-MCP/data"
       }
     }
   }

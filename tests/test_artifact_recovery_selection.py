@@ -5,9 +5,7 @@ from mcp_server.artifacts.artifact_download import IndexArtifactDownloader
 
 def test_find_best_artifact_prefers_default_branch_over_pr(monkeypatch):
     """Default branch artifacts should be preferred over PR artifacts."""
-    monkeypatch.setattr(
-        IndexArtifactDownloader, "_detect_repository", lambda self: "owner/repo"
-    )
+    monkeypatch.setattr(IndexArtifactDownloader, "_detect_repository", lambda self: "owner/repo")
     downloader = IndexArtifactDownloader(repo=None)
 
     artifacts = [
@@ -30,9 +28,7 @@ def test_find_best_artifact_prefers_default_branch_over_pr(monkeypatch):
 
 def test_find_recovery_artifact_prefers_promoted(monkeypatch):
     """Recovery selection should prefer promoted artifacts among matches."""
-    monkeypatch.setattr(
-        IndexArtifactDownloader, "_detect_repository", lambda self: "owner/repo"
-    )
+    monkeypatch.setattr(IndexArtifactDownloader, "_detect_repository", lambda self: "owner/repo")
     downloader = IndexArtifactDownloader(repo=None)
 
     artifacts = [
@@ -50,8 +46,6 @@ def test_find_recovery_artifact_prefers_promoted(monkeypatch):
         },
     ]
 
-    selected = downloader.find_recovery_artifact(
-        artifacts, branch="main", commit="1234abcd"
-    )
+    selected = downloader.find_recovery_artifact(artifacts, branch="main", commit="1234abcd")
     assert selected is not None
     assert selected["id"] == 11

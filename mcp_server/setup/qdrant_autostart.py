@@ -103,9 +103,7 @@ def wait_for_qdrant_ready(
 def ensure_qdrant_running(settings: Settings) -> QdrantStartResult:
     """Ensure Qdrant is running; attempt docker autostart when unreachable."""
     qdrant_url = f"http://{settings.qdrant_host}:{settings.qdrant_port}"
-    current = check_qdrant(
-        qdrant_url, timeout_s=settings.semantic_preflight_timeout_seconds
-    )
+    current = check_qdrant(qdrant_url, timeout_s=settings.semantic_preflight_timeout_seconds)
     if current.status == ServiceStatus.READY:
         return QdrantStartResult(
             started=True,

@@ -119,7 +119,8 @@ class MCPRerankingTester:
             search_results.append(
                 ISearchResult(
                     file_path=r.get("file", ""),
-                    start_line=r.get("line", 1), end_line=r.get("line", 1),
+                    start_line=r.get("line", 1),
+                    end_line=r.get("line", 1),
                     column=0,
                     snippet=r.get("snippet", ""),
                     match_type="mcp",
@@ -199,7 +200,8 @@ class MCPRerankingTester:
                         search_results.append(
                             ISearchResult(
                                 file_path=r.get("file", ""),
-                                start_line=r.get("line", 1), end_line=r.get("line", 1),
+                                start_line=r.get("line", 1),
+                                end_line=r.get("line", 1),
                                 column=0,
                                 snippet=r.get("snippet", ""),
                                 match_type="mcp",

@@ -32,30 +32,25 @@ def main():
     print("\n📁 Creating test files...")
 
     # Create .gitignore
-    Path(".gitignore").write_text(
-        """
+    Path(".gitignore").write_text("""
 .env
 *.key
 node_modules/
 __pycache__/
 build/
-"""
-    )
+""")
 
     # Create sensitive files that should be indexed but not shared
-    Path(".env").write_text(
-        """
+    Path(".env").write_text("""
 DATABASE_URL=postgresql://user:password@localhost/db
 API_KEY=super-secret-key-12345
 AWS_SECRET_ACCESS_KEY=aws-secret-123
-"""
-    )
+""")
 
     Path("private.key").write_text("-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkq...")
 
     # Create normal files
-    Path("app.py").write_text(
-        """
+    Path("app.py").write_text("""
 import os
 
 def get_api_key():
@@ -64,8 +59,7 @@ def get_api_key():
 class Application:
     def __init__(self):
         self.db_url = os.getenv('DATABASE_URL')
-"""
-    )
+""")
 
     Path("README.md").write_text("# Test Project\n\nThis is a test.")
 

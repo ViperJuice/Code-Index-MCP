@@ -46,9 +46,7 @@ class IPluginDiscovery(ABC):
         """
 
     @abstractmethod
-    def discover_plugins_safe(
-        self, plugin_dirs: List[Path]
-    ) -> Result[List["PluginInfo"]]:
+    def discover_plugins_safe(self, plugin_dirs: List[Path]) -> Result[List["PluginInfo"]]:
         """Discover plugins using Result pattern for error handling."""
         ...
 
@@ -108,9 +106,7 @@ class IPluginRegistry(ABC):
     """Interface for managing plugin registration and metadata."""
 
     @abstractmethod
-    def register_plugin(
-        self, plugin_info: "PluginInfo", plugin_class: Type[IPlugin]
-    ) -> None:
+    def register_plugin(self, plugin_info: "PluginInfo", plugin_class: Type[IPlugin]) -> None:
         """Register a plugin with its metadata.
 
         Args:
@@ -252,9 +248,7 @@ class IPluginManager(ABC):
         """
 
     @abstractmethod
-    def load_plugins_safe(
-        self, config_path: Optional[Path] = None
-    ) -> Result[List[Any]]:
+    def load_plugins_safe(self, config_path: Optional[Path] = None) -> Result[List[Any]]:
         """Load plugins using Result-style error handling."""
         ...
 

@@ -41,9 +41,7 @@ class ContextSelector(IContextSelector):
         self.edges = edges
         self._node_map: Dict[str, GraphNode] = {n.id: n for n in nodes}
 
-        logger.debug(
-            f"ContextSelector initialized: {len(nodes)} nodes, {len(edges)} edges"
-        )
+        logger.debug(f"ContextSelector initialized: {len(nodes)} nodes, {len(edges)} edges")
 
     def select_context(
         self,
@@ -138,9 +136,7 @@ class ContextSelector(IContextSelector):
         )
 
         # Convert results back to our format
-        selected_nodes = [
-            self._node_map[nid] for nid in selected_ids if nid in self._node_map
-        ]
+        selected_nodes = [self._node_map[nid] for nid in selected_ids if nid in self._node_map]
 
         induced_edges = []
         for raw_edge in induced_edges_raw:
@@ -169,9 +165,7 @@ class ContextSelector(IContextSelector):
             execution_time_ms=0.0,  # Will be set by caller
         )
 
-    def _select_with_bfs(
-        self, seeds: List[str], radius: int, budget: int
-    ) -> GraphCutResult:
+    def _select_with_bfs(self, seeds: List[str], radius: int, budget: int) -> GraphCutResult:
         """
         Fallback BFS-based context selection.
 
@@ -285,9 +279,7 @@ class ContextSelector(IContextSelector):
                 seed_nodes.append(node.id)
 
         if not seed_nodes:
-            logger.warning(
-                f"No graph nodes found for {len(result_files)} result files"
-            )
+            logger.warning(f"No graph nodes found for {len(result_files)} result files")
             return []
 
         # Use graph cut to select context

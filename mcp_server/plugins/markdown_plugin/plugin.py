@@ -57,9 +57,7 @@ class MarkdownPlugin(BaseDocumentPlugin):
     def chunk_document(self, content: str, file_path: Path) -> List[DocumentChunk]:
         """Override to use Markdown-specific chunking."""
         # Parse frontmatter
-        frontmatter, content_without_frontmatter = self.frontmatter_parser.parse(
-            content
-        )
+        frontmatter, content_without_frontmatter = self.frontmatter_parser.parse(content)
 
         # Parse Markdown AST
         ast = self.parser.parse(content_without_frontmatter)
@@ -86,8 +84,7 @@ class MarkdownPlugin(BaseDocumentPlugin):
 
         lightweight_mode = (
             os.getenv("MCP_LIGHTWEIGHT_DOC_INDEX", "false").lower() == "true"
-            or len(content.encode("utf-8", errors="ignore"))
-            > _LIGHTWEIGHT_MARKDOWN_BYTES
+            or len(content.encode("utf-8", errors="ignore")) > _LIGHTWEIGHT_MARKDOWN_BYTES
         )
 
         if lightweight_mode:
@@ -161,9 +158,7 @@ class MarkdownPlugin(BaseDocumentPlugin):
     def extract_structure(self, content: str, file_path: Path) -> DocumentStructure:
         """Extract document structure (headings, sections, etc)."""
         # Parse frontmatter
-        frontmatter, content_without_frontmatter = self.frontmatter_parser.parse(
-            content
-        )
+        frontmatter, content_without_frontmatter = self.frontmatter_parser.parse(content)
 
         # Parse Markdown AST
         ast = self.parser.parse(content_without_frontmatter)
@@ -333,9 +328,7 @@ class MarkdownPlugin(BaseDocumentPlugin):
                     }
                 )
             elif node_type == "table":
-                structure["tables"].append(
-                    {"rows": len(node.get("children", [])), "depth": depth}
-                )
+                structure["tables"].append({"rows": len(node.get("children", [])), "depth": depth})
             elif node_type == "link":
                 structure["links"].append(
                     {
@@ -360,9 +353,7 @@ class MarkdownPlugin(BaseDocumentPlugin):
         traverse(ast)
         return structure
 
-    def _extract_symbols(
-        self, ast: Dict[str, Any], file_path: str
-    ) -> List[Dict[str, Any]]:
+    def _extract_symbols(self, ast: Dict[str, Any], file_path: str) -> List[Dict[str, Any]]:
         """Extract symbols from Markdown AST."""
         symbols = []
 

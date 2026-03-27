@@ -9,7 +9,6 @@ from typing import Optional
 
 from dotenv import load_dotenv
 
-
 _DOTENV_LOADED = False
 
 
@@ -150,9 +149,7 @@ def get_environment_prefix() -> str:
     return prefixes[env]
 
 
-def get_env_var(
-    key: str, default: Optional[str] = None, required: bool = False
-) -> Optional[str]:
+def get_env_var(key: str, default: Optional[str] = None, required: bool = False) -> Optional[str]:
     """
     Get environment variable with environment-specific prefix support.
 
@@ -188,8 +185,6 @@ def get_env_var(
 
     # Check if required
     if required and value is None:
-        raise ValueError(
-            f"Required environment variable not found: {prefixed_key} or {key}"
-        )
+        raise ValueError(f"Required environment variable not found: {prefixed_key} or {key}")
 
     return value

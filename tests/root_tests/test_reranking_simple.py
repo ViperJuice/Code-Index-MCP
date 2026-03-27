@@ -23,7 +23,8 @@ async def test_tfidf_reranker():
     search_results = [
         SearchResult(
             file_path="/app/mcp_server/auth/login.py",
-            start_line=42, end_line=42,
+            start_line=42,
+            end_line=42,
             column=0,
             snippet="def authenticate_user(username: str, password: str) -> User:",
             match_type="exact",
@@ -32,7 +33,8 @@ async def test_tfidf_reranker():
         ),
         SearchResult(
             file_path="/app/docs/auth_guide.md",
-            start_line=15, end_line=15,
+            start_line=15,
+            end_line=15,
             column=0,
             snippet="## User Authentication\n\nThe authentication system uses JWT tokens...",
             match_type="semantic",
@@ -41,7 +43,8 @@ async def test_tfidf_reranker():
         ),
         SearchResult(
             file_path="/app/mcp_server/models/user.py",
-            start_line=10, end_line=10,
+            start_line=10,
+            end_line=10,
             column=0,
             snippet="class User(BaseModel):\n    username: str\n    email: str",
             match_type="exact",
@@ -50,7 +53,8 @@ async def test_tfidf_reranker():
         ),
         SearchResult(
             file_path="/app/tests/test_auth.py",
-            start_line=25, end_line=25,
+            start_line=25,
+            end_line=25,
             column=0,
             snippet="def test_user_login():\n    # Test user authentication",
             match_type="fuzzy",
@@ -59,7 +63,8 @@ async def test_tfidf_reranker():
         ),
         SearchResult(
             file_path="/app/mcp_server/utils/password.py",
-            start_line=5, end_line=5,
+            start_line=5,
+            end_line=5,
             column=0,
             snippet="def hash_password(password: str) -> str:",
             match_type="exact",
@@ -117,7 +122,8 @@ async def test_reranking_quality():
         # Highly relevant but low initial score
         SearchResult(
             file_path="/app/src/auth/user_authentication_flow.py",
-            start_line=1, end_line=1,
+            start_line=1,
+            end_line=1,
             column=0,
             snippet="class UserAuthenticationFlow:\n    '''Handles complete user authentication flow'''",
             match_type="fuzzy",
@@ -127,7 +133,8 @@ async def test_reranking_quality():
         # Medium relevance, high initial score
         SearchResult(
             file_path="/app/src/models/database.py",
-            start_line=50, end_line=50,
+            start_line=50,
+            end_line=50,
             column=0,
             snippet="def get_user_by_id(user_id: int):",
             match_type="exact",
@@ -137,7 +144,8 @@ async def test_reranking_quality():
         # High relevance, medium score
         SearchResult(
             file_path="/app/src/auth/login_handler.py",
-            start_line=20, end_line=20,
+            start_line=20,
+            end_line=20,
             column=0,
             snippet="async def handle_user_login(request):\n    '''Process user authentication request'''",
             match_type="semantic",
@@ -147,7 +155,8 @@ async def test_reranking_quality():
         # Low relevance, medium score
         SearchResult(
             file_path="/app/src/utils/logger.py",
-            start_line=10, end_line=10,
+            start_line=10,
+            end_line=10,
             column=0,
             snippet="logger.info('User logged in successfully')",
             match_type="fuzzy",
@@ -222,7 +231,8 @@ async def benchmark_reranking():
             results.append(
                 SearchResult(
                     file_path=f"/app/file_{i}.py",
-                    start_line=i, end_line=i,
+                    start_line=i,
+                    end_line=i,
                     column=0,
                     snippet=f"Sample code snippet {i} with some keywords",
                     match_type="fuzzy",

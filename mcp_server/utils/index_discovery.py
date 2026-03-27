@@ -102,9 +102,7 @@ class IndexDiscovery:
         # Determine storage strategy
         if storage_strategy is None:
             config = self.get_index_config()
-            storage_strategy = (
-                config.get("storage_strategy", "inline") if config else "inline"
-            )
+            storage_strategy = config.get("storage_strategy", "inline") if config else "inline"
 
         self.storage_strategy = storage_strategy
         self.index_manager = IndexManager(storage_strategy=storage_strategy)
@@ -151,9 +149,7 @@ class IndexDiscovery:
             logger.error(f"Failed to load index metadata: {e}")
             return None
 
-    def _read_index_metadata_for_path(
-        self, index_path: Optional[Path]
-    ) -> Optional[Dict[str, Any]]:
+    def _read_index_metadata_for_path(self, index_path: Optional[Path]) -> Optional[Dict[str, Any]]:
         """Read index metadata colocated with a discovered SQLite index."""
         if index_path:
             metadata_path = index_path.parent / ".index_metadata.json"
@@ -161,9 +157,7 @@ class IndexDiscovery:
                 try:
                     return json.loads(metadata_path.read_text())
                 except Exception as exc:
-                    logger.warning(
-                        "Failed to load index metadata at %s: %s", metadata_path, exc
-                    )
+                    logger.warning("Failed to load index metadata at %s: %s", metadata_path, exc)
 
         return self.get_index_metadata()
 
@@ -177,13 +171,9 @@ class IndexDiscovery:
         lexical_available: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """Return profile hydration state using lexical-first fallback semantics."""
-        effective_index_path = (
-            index_path if index_path is not None else self.get_local_index_path()
-        )
+        effective_index_path = index_path if index_path is not None else self.get_local_index_path()
         effective_lexical = (
-            lexical_available
-            if lexical_available is not None
-            else effective_index_path is not None
+            lexical_available if lexical_available is not None else effective_index_path is not None
         )
 
         metadata = self._read_index_metadata_for_path(effective_index_path)
@@ -228,8 +218,7 @@ class IndexDiscovery:
             return None
 
         require_selection = bool(
-            requested_schema_version is not None
-            or requested_embedding_model is not None
+            requested_schema_version is not None or requested_embedding_model is not None
         )
         candidates: List[Dict[str, Any]] = []
         search_paths: List[Path] = []
@@ -242,18 +231,14 @@ class IndexDiscovery:
                 return None
 
             if require_selection:
-                candidates.append(
-                    {"path": db_path, "manifest": self.read_index_manifest(db_path)}
-                )
+                candidates.append({"path": db_path, "manifest": self.read_index_manifest(db_path)})
                 return None
 
             return db_path
 
         # Try centralized storage first if enabled
         if self.storage_strategy == "centralized":
-            centralized_path = self.index_manager.get_current_index_path(
-                self.workspace_root
-            )
+            centralized_path = self.index_manager.get_current_index_path(self.workspace_root)
             candidate = _record_candidate(centralized_path)
             if candidate:
                 return candidate
@@ -288,12 +273,8 @@ class IndexDiscovery:
 
         # Log detailed information about search failure
         if self.enable_multi_path:
-            logger.warning(
-                f"No valid index found after searching {len(search_paths)} paths"
-            )
-            validation = self.path_config.validate_paths(
-                self._get_repository_identifier()
-            )
+            logger.warning(f"No valid index found after searching {len(search_paths)} paths")
+            validation = self.path_config.validate_paths(self._get_repository_identifier())
             existing_paths = [str(p) for p, exists in validation.items() if exists]
             if existing_paths:
                 logger.info(f"Existing search paths: {existing_paths}")
@@ -311,9 +292,7 @@ class IndexDiscovery:
                         compatible_candidates.append(candidate)
 
                 if not compatible_candidates:
-                    logger.warning(
-                        "No compatible local index candidates found in strict mode"
-                    )
+                    logger.warning("No compatible local index candidates found in strict mode")
                     return None
 
                 candidates = compatible_candidates
@@ -485,9 +464,7 @@ class IndexDiscovery:
     def _is_gh_cli_available(self) -> bool:
         """Check if GitHub CLI is available"""
         try:
-            result = subprocess.run(
-                ["gh", "--version"], capture_output=True, check=False
-            )
+            result = subprocess.run(["gh", "--version"], capture_output=True, check=False)
             return result.returncode == 0
         except FileNotFoundError:
             return False
@@ -568,9 +545,7 @@ class IndexDiscovery:
         """Find artifact by branch/commit criteria for recovery."""
         try:
             provider = ArtifactProviderFactory.create(repo)
-            artifacts = [
-                r.to_dict() for r in provider.list_artifacts(("mcp-index-", "index-"))
-            ]
+            artifacts = [r.to_dict() for r in provider.list_artifacts(("mcp-index-", "index-"))]
 
             if branch:
                 artifacts = [a for a in artifacts if branch in a.get("name", "")]
@@ -587,9 +562,7 @@ class IndexDiscovery:
                 promoted = [a for a in artifacts if "-promoted" in a.get("name", "")]
                 return promoted[0] if promoted else artifacts[0]
         except Exception as exc:
-            logger.debug(
-                "Artifact provider recovery lookup failed, using gh fallback: %s", exc
-            )
+            logger.debug("Artifact provider recovery lookup failed, using gh fallback: %s", exc)
 
         try:
             result = subprocess.run(
@@ -670,9 +643,7 @@ class IndexDiscovery:
 
         artifact = self._find_recovery_artifact(repo, branch, commit)
         if not artifact:
-            logger.error(
-                "No recovery artifact found for branch=%s commit=%s", branch, commit
-            )
+            logger.error("No recovery artifact found for branch=%s commit=%s", branch, commit)
             return False
 
         logger.info("Recovering index from artifact: %s", artifact.get("name"))
@@ -700,16 +671,12 @@ class IndexDiscovery:
                 downloaded = False
                 try:
                     provider = ArtifactProviderFactory.create(repo)
-                    provider_zip_path = provider.download_artifact(
-                        str(artifact_id), Path(tmpdir)
-                    )
+                    provider_zip_path = provider.download_artifact(str(artifact_id), Path(tmpdir))
                     if provider_zip_path != zip_path:
                         shutil.copy2(provider_zip_path, zip_path)
                     downloaded = True
                 except Exception as exc:
-                    logger.debug(
-                        "Artifact provider download failed, using gh fallback: %s", exc
-                    )
+                    logger.debug("Artifact provider download failed, using gh fallback: %s", exc)
 
                 if not downloaded:
                     result = subprocess.run(
@@ -749,9 +716,7 @@ class IndexDiscovery:
 
                 metadata_error = self._validate_artifact_metadata(metadata)
                 if metadata_error:
-                    logger.error(
-                        "Artifact metadata validation failed: %s", metadata_error
-                    )
+                    logger.error("Artifact metadata validation failed: %s", metadata_error)
                     return False
 
                 # Verify checksum (required)
@@ -805,9 +770,7 @@ class IndexDiscovery:
                     requested_embedding_model=requested_embedding_model,
                     strict=strict_compatibility,
                 ):
-                    logger.error(
-                        "Extracted artifact index failed runtime compatibility checks"
-                    )
+                    logger.error("Extracted artifact index failed runtime compatibility checks")
                     return False
 
                 # Replace index directory atomically from staged files
@@ -947,14 +910,10 @@ class IndexDiscovery:
 
         manifest = self.read_index_manifest(index_path)
         actual_schema = (
-            manifest.schema_version
-            if manifest
-            else self._read_schema_version(index_path)
+            manifest.schema_version if manifest else self._read_schema_version(index_path)
         )
         actual_model = (
-            manifest.embedding_model
-            if manifest
-            else self._read_embedding_model(index_path)
+            manifest.embedding_model if manifest else self._read_embedding_model(index_path)
         )
 
         if requested_schema_version:
@@ -1071,9 +1030,7 @@ class IndexDiscovery:
             # Include search paths if multi-path is enabled
             if self.enable_multi_path and self.path_config:
                 repo_id = self._get_repository_identifier()
-                info["search_paths"] = [
-                    str(p) for p in self.path_config.get_search_paths(repo_id)
-                ]
+                info["search_paths"] = [str(p) for p in self.path_config.get_search_paths(repo_id)]
 
         return info
 

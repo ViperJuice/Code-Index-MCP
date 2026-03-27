@@ -75,13 +75,9 @@ class RepositoryRegistry:
 
                 # Convert datetime
                 if "indexed_at" in repo_data:
-                    repo_data["indexed_at"] = datetime.fromisoformat(
-                        repo_data["indexed_at"]
-                    )
+                    repo_data["indexed_at"] = datetime.fromisoformat(repo_data["indexed_at"])
                 if "last_indexed" in repo_data and repo_data["last_indexed"]:
-                    repo_data["last_indexed"] = datetime.fromisoformat(
-                        repo_data["last_indexed"]
-                    )
+                    repo_data["last_indexed"] = datetime.fromisoformat(repo_data["last_indexed"])
 
                 self._registry[repo_id] = repo_data
 
@@ -106,16 +102,12 @@ class RepositoryRegistry:
                     repo_data["index_path"] = str(repo_data["index_path"])
 
                     # Convert datetime to ISO format
-                    if "indexed_at" in repo_data and hasattr(
-                        repo_data["indexed_at"], "isoformat"
-                    ):
+                    if "indexed_at" in repo_data and hasattr(repo_data["indexed_at"], "isoformat"):
                         repo_data["indexed_at"] = repo_data["indexed_at"].isoformat()
                     if "last_indexed" in repo_data and hasattr(
                         repo_data["last_indexed"], "isoformat"
                     ):
-                        repo_data["last_indexed"] = repo_data[
-                            "last_indexed"
-                        ].isoformat()
+                        repo_data["last_indexed"] = repo_data["last_indexed"].isoformat()
 
                     if "index_location" in repo_data:
                         repo_data["index_location"] = str(repo_data["index_location"])
@@ -152,9 +144,7 @@ class RepositoryRegistry:
             # Save to disk
             self.save()
 
-            logger.info(
-                f"Registered repository: {repo_info.name} ({repo_info.repository_id})"
-            )
+            logger.info(f"Registered repository: {repo_info.name} ({repo_info.repository_id})")
 
     def unregister(self, repository_id: str):
         """
@@ -327,9 +317,7 @@ class RepositoryRegistry:
         if isinstance(repo_dict.get("indexed_at"), str):
             repo_dict["indexed_at"] = datetime.fromisoformat(repo_dict["indexed_at"])
         if isinstance(repo_dict.get("last_indexed"), str):
-            repo_dict["last_indexed"] = datetime.fromisoformat(
-                repo_dict["last_indexed"]
-            )
+            repo_dict["last_indexed"] = datetime.fromisoformat(repo_dict["last_indexed"])
 
         return RepositoryInfo(**repo_dict)
 
@@ -634,9 +622,7 @@ class RepositoryRegistry:
                 "total_symbols": total_symbols,
                 "languages": all_languages,
                 "registry_size_bytes": (
-                    self.registry_path.stat().st_size
-                    if self.registry_path.exists()
-                    else 0
+                    self.registry_path.stat().st_size if self.registry_path.exists() else 0
                 ),
             }
 
@@ -653,9 +639,7 @@ class RepositoryRegistry:
 
                 if not index_path or not index_path.exists():
                     to_remove.append(repo_id)
-                    logger.warning(
-                        f"Repository {repo_id} has missing index, marking for removal"
-                    )
+                    logger.warning(f"Repository {repo_id} has missing index, marking for removal")
 
             # Remove invalid entries
             for repo_id in to_remove:

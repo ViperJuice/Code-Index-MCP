@@ -11,12 +11,8 @@ class _FakeReport:
     def __init__(self, overall_ready: bool = True):
         self.overall_ready = overall_ready
         self.strict_mode = False
-        self.profiles = SimpleNamespace(
-            status=SimpleNamespace(value="ready"), message="ok"
-        )
-        self.embedding = SimpleNamespace(
-            status=SimpleNamespace(value="ready"), message="ok"
-        )
+        self.profiles = SimpleNamespace(status=SimpleNamespace(value="ready"), message="ok")
+        self.embedding = SimpleNamespace(status=SimpleNamespace(value="ready"), message="ok")
         self.qdrant = SimpleNamespace(
             status=SimpleNamespace(value="ready"), message="ok", ok=overall_ready
         )

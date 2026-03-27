@@ -8,7 +8,7 @@ from typing import Optional, Tuple
 
 
 class QueryIntent(IntEnum):
-    SYMBOL = 1   # Class/function/identifier lookup → route to symbols table
+    SYMBOL = 1  # Class/function/identifier lookup → route to symbols table
     LEXICAL = 2  # Keyword / multi-word text → BM25
 
 
