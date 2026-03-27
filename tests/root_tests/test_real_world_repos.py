@@ -297,7 +297,7 @@ async def run_comprehensive_test():
         print(f"  ✓ Repositories tested: {successful_repos}/{len(TEST_REPOSITORIES)}")
         print(f"  ✓ Total files indexed: {total_files_indexed}")
         print(f"  ✓ Total indexing time: {total_indexing_time:.2f}s")
-        print(f"  ✓ Average time per file: {total_indexing_time/max(total_files_indexed,1):.3f}s")
+        print(f"  ✓ Average time per file: {total_indexing_time/max(total_files_indexed, 1):.3f}s")
 
         print("\nLanguage Coverage:")
         all_languages = set()
