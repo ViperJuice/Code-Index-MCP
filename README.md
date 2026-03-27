@@ -1053,37 +1053,25 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 | Code Search | <500ms (p95) | ✅ Achieved - BM25 search < 50ms |
 | File Indexing | 10K files/min | ✅ Achieved - 152K files indexed |
 
-### Full-Repo E2E Rerun (2026-03-05)
+### Matrix Benchmark (2026-03-19)
 
-Latest rerun indexed the full `Code-Index-MCP` repository using:
-- Qwen embeddings via Fireworks (`fireworks/qwen3-embedding-8b`)
-- Voyage embeddings (`voyage-code-3`)
-- Local Qwen embeddings (`Qwen/Qwen3-Embedding-8B` via tailnet endpoint)
-- BM25, fuzzy, classic FTS, and hybrid retrieval
+| Metric | BM25-only | voyage-code-3 |
+|---|:---:|:---:|
+| Top-1 pass rate | 10/17 (58.8%) | 14/17 (82.4%) |
+| Top-3 pass rate | 13/17 (76.5%) | 17/17 (100%) |
+| Native tools pass rate (`rg`/`grep`/`glob`) | 7/68 (ripgrep 3/17, grep 4/17, glob/sed 0/17) | — |
+| BM25 symbol query latency p50 | ~1–5 ms | — |
+| BM25 text query latency p50 | ~35–55 ms | — |
+| Semantic query latency p50 | — | ~115–350 ms |
 
-| Metric | Result |
-|---|---:|
-| Files indexed | 1282 |
-| Semantic-skipped files (oversized) | 1 |
-| MCP query suite Top-1 pass rate | 33.3% |
-| MCP query suite Top-3 pass rate | 64.4% |
-| Native tools pass rate (`rg`/`grep`/`glob`) | 44.4% |
-| Semantic Qwen latency p50 (single query, top-5) | 238.5 ms |
-| Semantic Voyage latency p50 (single query, top-5) | 116.68 ms |
-| Semantic Local Qwen latency p50 (single query, top-5) | 49.22 ms |
-| BM25 latency p50 (single query, top-5) | 46.45 ms |
-| Fuzzy latency p50 (single query, top-5) | 10.11 ms |
-| Hybrid semantic-intent latency p50 (single query, top-5) | 5093.14 ms |
-
-Known gaps from this rerun:
-- `classic` mode still surfaces benchmark/doc artifacts for the semantic-preflight probe.
-- `hybrid` mode still has high tail latency and low Top-1 on intent/persistence probes.
-- Top-3 improved materially, but Top-1 remains a ranking problem.
+Known gaps from this run:
+- `classic` mode still surfaces artifacts for the `semantic preflight` probe.
+- `def _symbol_route` appears in top-3 but not top-1 (class methods not indexed at top level).
+- Semantic intent queries (`symbol routing`) reach top-3 but not top-1 on BM25-only config.
 
 Benchmark artifacts:
-- `docs/benchmarks/e2e_retrieval_validation_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.json`
-- `docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.json`
-- `docs/benchmarks/fullrepo-benchmark-analysis.md`
+- `docs/benchmarks/matrix_benchmark.md`
+- `docs/benchmarks/matrix_benchmark.json`
 
 ## 🏗️ Architecture Overview
 

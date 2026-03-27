@@ -27,6 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Resolved merge conflicts in treesitter_wrapper.py
 - Fixed Python plugin implementation issues
+- Tree-sitter byte-offset/char-offset mismatch in Python plugin: symbol names were corrupted in files
+  containing multi-byte characters (e.g. em-dashes in docstrings) before the first class/function
+  definition. Fixed by using `node.text.decode("utf-8")` in `plugin.py` and `plugin_semantic.py`.
+- BM25/FTS path was bypassed when `semantic=True` but no Qdrant indexer was initialized. Fixed in
+  `dispatcher_enhanced.py` so the FTS path runs whenever the semantic indexer is absent.
+- Python plugin `_preindex()` now excludes `htmlcov`, `.venv`, `venv`, `node_modules`, `__pycache__`,
+  `.git`, `dist`, `build` directories to prevent junk results from polluting in-memory indexes.
 
 ### Security
 - Added input validation for file paths
