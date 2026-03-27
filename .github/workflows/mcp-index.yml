@@ -76,53 +76,11 @@ jobs:
 
       - name: Build Index
         if: steps.check_index.outputs.found == 'false' && steps.download.outputs.downloaded == 'false'
-        env:
-          QDRANT_USE_SERVER: 'false'
-          QDRANT_PATH: .mcp-index/vector_index.qdrant
-          OPENAI_API_BASE: ${{ vars.OPENAI_API_BASE || 'http://127.0.0.1:8001/v1' }}
-          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
-          VOYAGE_AI_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
         run: |
-          # Create index directory
-          mkdir -p .mcp-index
-
-          python <<'PY'
-          from pathlib import Path
-
-          from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
-          from mcp_server.storage.sqlite_store import SQLiteStore
-
-          repo_root = Path.cwd()
-          index_path = repo_root / '.mcp-index' / 'code_index.db'
-
-          store = SQLiteStore(str(index_path))
-          dispatcher = EnhancedDispatcher(
-              sqlite_store=store,
-              enable_advanced_features=True,
-              use_plugin_factory=True,
-              lazy_load=False,
-              semantic_search_enabled=False,
-              memory_aware=False,
-              multi_repo_enabled=False,
-          )
-
-          echo "Skipping CI index rebuild. Artifacts should be pushed via local machine."
           # Lexical and semantic rebuild is intentionally skipped in CI.
-          # We rely on mcp-index artifact push from the local machine.
-          # python <<'PY'
-          # from pathlib import Path
-          # from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
-          # from mcp_server.storage.sqlite_store import SQLiteStore
-          # repo_root = Path.cwd()
-          # index_path = repo_root / '.mcp-index' / 'code_index.db'
-          # store = SQLiteStore(str(index_path))
-          # dispatcher = EnhancedDispatcher(sqlite_store=store, enable_advanced_features=True, use_plugin_factory=True, lazy_load=False, semantic_search_enabled=False, memory_aware=False, multi_repo_enabled=False)
-          # stats = dispatcher.index_directory(repo_root, recursive=True)
-          # print(f"Indexed files: {stats.get('indexed_files', 0)}")
-          # print(f"Failed files: {stats.get('failed_files', 0)}")
-          # PY
-          # mcp-index index rebuild --vector-only --force --sample-size 0
-
+          # Index artifacts are pushed from the local machine.
+          echo "Skipping CI index rebuild. Artifacts should be pushed via local machine."
+          mkdir -p .mcp-index
           if [ -f ".index_metadata.json" ]; then
             cp .index_metadata.json .mcp-index/.index_metadata.json
           fi
