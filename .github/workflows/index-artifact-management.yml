@@ -41,9 +41,7 @@ on:
         required: false
         default: '7'
         type: number
-    secrets:
-      GITHUB_TOKEN:
-        required: true
+    # GITHUB_TOKEN is reserved and auto-provided; callers do not need to pass it.
 
 env:
   COMPRESSION_LEVEL: '9'

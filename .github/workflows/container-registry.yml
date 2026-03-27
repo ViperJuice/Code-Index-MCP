@@ -83,6 +83,11 @@ jobs:
             org.opencontainers.image.vendor=Your Organization
             maintainer=your-email@example.com
 
+      - name: Set safe platform name
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: echo "PLATFORM_SAFE=${PLATFORM//\//-}" >> $GITHUB_ENV
+
       - name: Build container image
         uses: docker/build-push-action@v5
         with:
@@ -94,7 +99,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.platform }}
           cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
-          outputs: type=docker,dest=/tmp/image-${{ matrix.platform }}.tar
+          outputs: type=docker,dest=/tmp/image-${{ env.PLATFORM_SAFE }}.tar
           build-args: |
             BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
             VCS_REF=${{ github.sha }}
@@ -103,8 +108,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: image-${{ strategy.job-index }}
-          path: /tmp/image-${{ matrix.platform }}.tar
+          name: image-${{ env.PLATFORM_SAFE }}
+          path: /tmp/image-${{ env.PLATFORM_SAFE }}.tar
           retention-days: 1
 
   security-scan:
@@ -121,51 +126,56 @@ jobs:
           - linux/arm64
     
     steps:
+      - name: Set safe platform name
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: echo "PLATFORM_SAFE=${PLATFORM//\//-}" >> $GITHUB_ENV
+
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: image-${{ strategy.job-index }}
+          name: image-${{ env.PLATFORM_SAFE }}
           path: /tmp
 
       - name: Load Docker image
         run: |
-          docker load --input /tmp/image-${{ matrix.platform }}.tar
+          docker load --input /tmp/image-${{ env.PLATFORM_SAFE }}.tar
           docker image ls -a
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          input: /tmp/image-${{ matrix.platform }}.tar
+          input: /tmp/image-${{ env.PLATFORM_SAFE }}.tar
           format: 'sarif'
-          output: 'trivy-results-${{ matrix.platform }}.sarif'
+          output: trivy-results-${{ env.PLATFORM_SAFE }}.sarif
           severity: 'CRITICAL,HIGH,MEDIUM'
           vuln-type: 'os,library'
 
       - name: Upload Trivy scan results
         uses: github/codeql-action/upload-sarif@v2
         with:
-          sarif_file: 'trivy-results-${{ matrix.platform }}.sarif'
-          category: 'trivy-${{ matrix.platform }}'
+          sarif_file: trivy-results-${{ env.PLATFORM_SAFE }}.sarif
+          category: trivy-${{ env.PLATFORM_SAFE }}
 
       - name: Run Grype vulnerability scanner
         uses: anchore/scan-action@v3
         with:
-          path: /tmp/image-${{ matrix.platform }}.tar
+          path: /tmp/image-${{ env.PLATFORM_SAFE }}.tar
           fail-build: false
           output-format: sarif
-          
+
       - name: Generate SBOM with Syft
         uses: anchore/sbom-action@v0
         with:
-          path: /tmp/image-${{ matrix.platform }}.tar
+          path: /tmp/image-${{ env.PLATFORM_SAFE }}.tar
           format: spdx-json
-          output-file: sbom-${{ matrix.platform }}.spdx.json
+          output-file: sbom-${{ env.PLATFORM_SAFE }}.spdx.json
 
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
         with:
-          name: sbom-${{ strategy.job-index }}
-          path: sbom-${{ matrix.platform }}.spdx.json
+          name: sbom-${{ env.PLATFORM_SAFE }}
+          path: sbom-${{ env.PLATFORM_SAFE }}.spdx.json
 
   push-manifests:
     name: Push Multi-Platform Manifests
