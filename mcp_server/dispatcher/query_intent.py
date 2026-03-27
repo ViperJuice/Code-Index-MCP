@@ -41,7 +41,6 @@ def classify(query: str) -> Tuple[QueryIntent, str, Optional[str]]:
     # Multi-word queries with no leading keyword are always LEXICAL
     # ("semantic preflight", "qdrant docker compose autostart", etc.)
     tokens = q.split()
-    first = tokens[0].lower()
 
     # --- Explicit keyword-prefixed patterns ---
     for pattern, kind in _KIND_PREFIX_PATTERNS:

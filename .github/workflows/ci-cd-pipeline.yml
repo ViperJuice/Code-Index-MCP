@@ -114,7 +114,7 @@ jobs:
 
       - name: Install tree-sitter grammars
         run: |
-          python -c "from mcp_server.utils.treesitter_wrapper import TreeSitterWrapper; TreeSitterWrapper.setup_all_languages()"
+          python -c "import tree_sitter_languages; print('tree-sitter grammars available')"
 
       - name: Validate index artifacts
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'

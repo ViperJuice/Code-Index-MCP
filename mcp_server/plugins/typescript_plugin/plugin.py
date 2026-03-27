@@ -75,8 +75,6 @@ class Plugin(IPlugin):
         # Initialize semantic indexer only if Voyage API key is available
         self._semantic_indexer = None
         try:
-            import os
-
             if os.getenv("VOYAGE_API_KEY") or os.getenv("VOYAGE_API_KEY_PATH"):
                 self._semantic_indexer = SemanticIndexer(collection=f"typescript-{id(self)}")
                 logger.info("Semantic indexing enabled for TypeScript plugin")

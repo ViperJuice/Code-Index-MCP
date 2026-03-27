@@ -26,7 +26,7 @@ except ImportError:  # pragma: no cover - optional dependency
         def __init__(self, *args: Any, **kwargs: Any) -> None:
             pass
 
-        def labels(self, *args: Any, **kwargs: Any) -> "._NoOpMetric":
+        def labels(self, *args: Any, **kwargs: Any) -> "_NoOpMetric":
             return self
 
         def observe(self, *args: Any, **kwargs: Any) -> None:

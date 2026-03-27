@@ -138,7 +138,7 @@ class GraphAnalyzer(IGraphAnalyzer):
             List of nodes forming the path, or None if no path exists
         """
         if source_id not in self._node_map or target_id not in self._node_map:
-            logger.warning(f"Source or target node not found")
+            logger.warning("Source or target node not found")
             return None
 
         if source_id == target_id:

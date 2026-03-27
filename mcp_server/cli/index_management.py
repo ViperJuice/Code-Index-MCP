@@ -83,7 +83,6 @@ def _get_vector_backend_status() -> Dict[str, Any]:
             client = QdrantClient(url=server_url, timeout=5)
             collection_descriptions = list(client.get_collections().collections)
             details = []
-            total_size_bytes = 0
             for collection_meta in collection_descriptions:
                 info = client.get_collection(collection_meta.name)
                 vectors = info.config.params.vectors
@@ -162,11 +161,6 @@ def _build_semantic_baseline(
             raise RuntimeError("Unknown semantic profile(s): " + ", ".join(sorted(missing)))
         profile_ids = [profile for profile in profile_ids if profile in selected_profiles]
     qdrant_path = os.getenv("QDRANT_PATH", "vector_index.qdrant")
-    target_collections = {
-        _get_profile_collection_name(registry.get(profile_id), settings.semantic_collection_name)
-        for profile_id in profile_ids
-    }
-
     if qdrant_path == "vector_index.qdrant" and os.path.exists(qdrant_path):
         import shutil
 
