@@ -66,9 +66,7 @@ class IndexArtifactUploader:
             stats = exporter.create_secure_archive(str(output_path))
             checksum = self._calculate_checksum(output_path)
             size = output_path.stat().st_size
-            print(
-                f"✅ Secure archive created: {output_path} ({size / 1024 / 1024:.1f} MB)"
-            )
+            print(f"✅ Secure archive created: {output_path} ({size / 1024 / 1024:.1f} MB)")
             print(f"   Files included: {stats['files_included']}")
             print(f"   Files excluded: {stats['files_excluded']}")
             print(f"   Checksum: {checksum}")
@@ -152,9 +150,7 @@ class IndexArtifactUploader:
 
     def _build_compatibility_metadata(self, schema_version: str) -> Dict[str, Any]:
         index_metadata = self._read_index_metadata()
-        profile_id, primary_profile = get_primary_semantic_profile_metadata(
-            index_metadata
-        )
+        profile_id, primary_profile = get_primary_semantic_profile_metadata(index_metadata)
         semantic_profiles = extract_semantic_profile_metadata(index_metadata)
         settings = get_settings()
 
@@ -202,13 +198,9 @@ class IndexArtifactUploader:
                 )
                 if cursor.fetchone() is None:
                     return os.environ.get("INDEX_SCHEMA_VERSION", "2")
-                value = conn.execute(
-                    "SELECT MAX(version) FROM schema_version"
-                ).fetchone()[0]
+                value = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()[0]
                 return (
-                    str(value)
-                    if value is not None
-                    else os.environ.get("INDEX_SCHEMA_VERSION", "2")
+                    str(value) if value is not None else os.environ.get("INDEX_SCHEMA_VERSION", "2")
                 )
             finally:
                 conn.close()
@@ -256,9 +248,7 @@ class IndexArtifactUploader:
         metadata_path = Path("artifact-metadata.json")
         metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
         print("✅ Files prepared for upload:")
-        print(
-            f"   - {archive_path} ({archive_path.stat().st_size / 1024 / 1024:.1f} MB)"
-        )
+        print(f"   - {archive_path} ({archive_path.stat().st_size / 1024 / 1024:.1f} MB)")
         print(f"   - {metadata_path}")
         print("\nTo complete upload, run this in GitHub Actions:")
         print("  uses: actions/upload-artifact@v4")
@@ -270,19 +260,13 @@ class IndexArtifactUploader:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Upload index files to GitHub Actions Artifacts"
-    )
+    parser = argparse.ArgumentParser(description="Upload index files to GitHub Actions Artifacts")
     parser.add_argument("--method", choices=["workflow", "direct"], default="workflow")
     parser.add_argument(
         "--repo", help="GitHub repository (owner/name). Auto-detected if not specified."
     )
-    parser.add_argument(
-        "--output", default="index-archive.tar.gz", help="Output archive filename"
-    )
-    parser.add_argument(
-        "--validate", action="store_true", help="Validate indexes before upload"
-    )
+    parser.add_argument("--output", default="index-archive.tar.gz", help="Output archive filename")
+    parser.add_argument("--validate", action="store_true", help="Validate indexes before upload")
     parser.add_argument(
         "--no-secure",
         action="store_true",
@@ -300,9 +284,7 @@ def run_cli(args: argparse.Namespace) -> int:
         print("✅ Validation passed")
 
     secure = not args.no_secure
-    archive_path, checksum, size = uploader.compress_indexes(
-        Path(args.output), secure=secure
-    )
+    archive_path, checksum, size = uploader.compress_indexes(Path(args.output), secure=secure)
     if size > 500 * 1024 * 1024:
         print(f"❌ Archive too large: {size / 1024 / 1024:.1f} MB > 500 MB")
         print("   Consider cleaning up old data or using incremental updates.")

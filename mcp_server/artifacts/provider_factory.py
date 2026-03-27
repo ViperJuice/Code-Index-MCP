@@ -46,9 +46,7 @@ class ArtifactProviderFactory:
         if provider == "github_actions":
             return GitHubActionsArtifactProvider(repo)
         if provider == "local_fs":
-            return LocalFilesystemArtifactProvider(
-                Path(settings.artifact_local_cache_dir)
-            )
+            return LocalFilesystemArtifactProvider(Path(settings.artifact_local_cache_dir))
         if provider == "s3":
             if not settings.artifact_s3_bucket:
                 raise ValueError("ARTIFACT_S3_BUCKET is required for s3 provider")
@@ -112,9 +110,7 @@ class ArtifactProviderFactory:
             artifact_size_bytes=(
                 artifact_size_bytes
                 if artifact_size_bytes is not None
-                else getattr(
-                    settings, "artifact_routing_default_artifact_size_bytes", 0
-                )
+                else getattr(settings, "artifact_routing_default_artifact_size_bytes", 0)
             ),
             profile_type=profile_type
             or getattr(settings, "artifact_routing_default_profile_type", "standard"),

@@ -204,8 +204,8 @@ jobs:
       - name: Load Docker images
         run: |
           for platform in linux/amd64 linux/arm64; do
-            platform_safe=$(echo $platform | tr '/' '-')
-            docker load --input /tmp/artifacts/image-${platform}/image-${platform}.tar
+            platform_safe=$(echo "$platform" | tr '/' '-')
+            docker load --input /tmp/artifacts/image-${platform_safe}/image-${platform_safe}.tar
           done
           docker image ls -a
 

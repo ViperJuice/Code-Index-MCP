@@ -63,15 +63,11 @@ class ArtifactManifestV2:
             seen_ids.add(unit.unit_id)
 
             if unit.size_bytes < 0:
-                raise ValueError(
-                    f"Invalid unit size for {unit.unit_id}: {unit.size_bytes}"
-                )
+                raise ValueError(f"Invalid unit size for {unit.unit_id}: {unit.size_bytes}")
 
             if unit.unit_type == "semantic_profile":
                 if not unit.profile_id:
-                    raise ValueError(
-                        f"semantic_profile unit missing profile_id: {unit.unit_id}"
-                    )
+                    raise ValueError(f"semantic_profile unit missing profile_id: {unit.unit_id}")
                 if not unit.compatibility_fingerprint:
                     raise ValueError(
                         f"semantic_profile unit missing compatibility_fingerprint: {unit.unit_id}"

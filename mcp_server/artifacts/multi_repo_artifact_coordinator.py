@@ -41,9 +41,7 @@ def _pushd(path: Path):
 class MultiRepoArtifactCoordinator:
     """Coordinate artifact lifecycle across registered repositories."""
 
-    def __init__(
-        self, multi_repo_manager: Optional[MultiRepositoryManager] = None
-    ) -> None:
+    def __init__(self, multi_repo_manager: Optional[MultiRepositoryManager] = None) -> None:
         self.multi_repo_manager = multi_repo_manager or MultiRepositoryManager()
 
     def _iter_repositories(
@@ -81,8 +79,7 @@ class MultiRepoArtifactCoordinator:
                     "last_recovered_commit": repo.last_recovered_commit,
                     "artifact_backend": repo.artifact_backend,
                     "artifact_health": repo.artifact_health,
-                    "available_semantic_profiles": repo.available_semantic_profiles
-                    or [],
+                    "available_semantic_profiles": repo.available_semantic_profiles or [],
                 }
             )
 
@@ -114,8 +111,7 @@ class MultiRepoArtifactCoordinator:
                         "last_recovered_commit": repo.last_recovered_commit,
                         "artifact_backend": repo.artifact_backend,
                         "artifact_health": repo.artifact_health,
-                        "available_semantic_profiles": repo.available_semantic_profiles
-                        or [],
+                        "available_semantic_profiles": repo.available_semantic_profiles or [],
                     },
                 )
             )
@@ -182,9 +178,7 @@ class MultiRepoArtifactCoordinator:
                     output_dir = Path("artifact_download")
                     output_dir.mkdir(exist_ok=True)
                     try:
-                        result = downloader.download_latest(
-                            output_dir=output_dir, backup=True
-                        )
+                        result = downloader.download_latest(output_dir=output_dir, backup=True)
                     finally:
                         import shutil
 
@@ -194,9 +188,7 @@ class MultiRepoArtifactCoordinator:
                 profiles = self._read_local_profiles(repo.path)
                 self.multi_repo_manager.registry.update_artifact_state(
                     repo.repository_id,
-                    last_recovered_commit=artifact.get("workflow_run", {}).get(
-                        "head_sha"
-                    )
+                    last_recovered_commit=artifact.get("workflow_run", {}).get("head_sha")
                     or artifact.get("head_sha")
                     or repo.current_commit,
                     artifact_backend=repo.artifact_backend or "github_actions",
@@ -213,9 +205,7 @@ class MultiRepoArtifactCoordinator:
                             "profiles": profiles,
                             "artifact_name": artifact.get("name"),
                             "artifact_id": artifact.get("id"),
-                            "recovered_commit": artifact.get("workflow_run", {}).get(
-                                "head_sha"
-                            )
+                            "recovered_commit": artifact.get("workflow_run", {}).get("head_sha")
                             or artifact.get("head_sha")
                             or repo.current_commit,
                         },
@@ -258,9 +248,7 @@ class MultiRepoArtifactCoordinator:
                         "current_commit": repo.current_commit,
                         "last_published_commit": repo.last_published_commit,
                         "last_recovered_commit": repo.last_recovered_commit,
-                        "available_semantic_profiles": self._read_local_profiles(
-                            repo.path
-                        ),
+                        "available_semantic_profiles": self._read_local_profiles(repo.path),
                     },
                 )
             )

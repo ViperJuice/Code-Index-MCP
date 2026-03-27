@@ -61,8 +61,7 @@ class ProfileHydrationReport:
             "branch": self.branch,
             "commit": self.commit,
             "profiles": {
-                profile_id: status.to_dict()
-                for profile_id, status in sorted(self.profiles.items())
+                profile_id: status.to_dict() for profile_id, status in sorted(self.profiles.items())
             },
         }
 
@@ -191,22 +190,14 @@ class ProfileHydrationCoordinator:
                     discovered[profile_id] = None
 
         legacy_profile = index_metadata.get("semantic_profile")
-        if (
-            isinstance(legacy_profile, str)
-            and legacy_profile
-            and legacy_profile not in discovered
-        ):
+        if isinstance(legacy_profile, str) and legacy_profile and legacy_profile not in discovered:
             fingerprint = index_metadata.get("compatibility_fingerprint")
-            discovered[legacy_profile] = (
-                fingerprint if isinstance(fingerprint, str) else None
-            )
+            discovered[legacy_profile] = fingerprint if isinstance(fingerprint, str) else None
 
         return discovered
 
     @staticmethod
-    def _coerce_str(
-        metadata: Optional[Mapping[str, object]], key: str
-    ) -> Optional[str]:
+    def _coerce_str(metadata: Optional[Mapping[str, object]], key: str) -> Optional[str]:
         if not metadata:
             return None
         value = metadata.get(key)
