@@ -1,8 +1,9 @@
-import pytest
 import time
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
+
+import pytest
 
 from mcp_server.indexer.bm25_indexer import BM25Indexer
 from mcp_server.indexer.hybrid_search import HybridSearch, HybridSearchConfig

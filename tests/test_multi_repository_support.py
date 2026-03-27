@@ -1,8 +1,8 @@
 """Tests for current multi-repository support surfaces."""
 
+import asyncio
 import sqlite3
 import tempfile
-import asyncio
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch

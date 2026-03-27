@@ -16,11 +16,11 @@ import click
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from mcp_server.storage.sqlite_store import SQLiteStore  # noqa: E402
 from mcp_server.artifacts.semantic_profiles import SemanticProfileRegistry  # noqa: E402
-from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher  # noqa: E402
 from mcp_server.config.settings import reload_settings  # noqa: E402
+from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher  # noqa: E402
 from mcp_server.setup.semantic_preflight import run_semantic_preflight  # noqa: E402
+from mcp_server.storage.sqlite_store import SQLiteStore  # noqa: E402
 from mcp_server.utils import get_semantic_indexer  # noqa: E402
 
 

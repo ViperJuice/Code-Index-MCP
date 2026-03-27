@@ -216,21 +216,23 @@ jobs:
 
       - name: Load, retag, and push platform images
         run: |
+          IMAGE_LOWER="${IMAGE_NAME,,}"
           for arch in amd64 arm64; do
             platform_safe="linux-${arch}"
             LOADED=$(docker load --input /tmp/artifacts/image-${platform_safe}/image-${platform_safe}.tar 2>&1 \
               | grep "Loaded image" | head -1 | sed 's/Loaded image: //' | tr -d '[:space:]')
-            docker tag "$LOADED" "${REGISTRY}/${IMAGE_NAME}:${arch}"
-            docker push "${REGISTRY}/${IMAGE_NAME}:${arch}"
+            docker tag "$LOADED" "${REGISTRY}/${IMAGE_LOWER}:${arch}"
+            docker push "${REGISTRY}/${IMAGE_LOWER}:${arch}"
           done
 
       - name: Create and push manifest with imagetools
         run: |
+          IMAGE_LOWER="${IMAGE_NAME,,}"
           echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
             if [ -n "$tag" ]; then
               docker buildx imagetools create -t "$tag" \
-                "${REGISTRY}/${IMAGE_NAME}:amd64" \
-                "${REGISTRY}/${IMAGE_NAME}:arm64"
+                "${REGISTRY}/${IMAGE_LOWER}:amd64" \
+                "${REGISTRY}/${IMAGE_LOWER}:arm64"
             fi
           done
 

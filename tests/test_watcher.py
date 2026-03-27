@@ -10,9 +10,9 @@ Tests cover:
 - Performance under load
 """
 
+import os
 import threading
 import time
-import os
 from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import Mock

@@ -11,8 +11,8 @@ logger = logging.getLogger(__name__)
 # Check if TreeSitter Chunker is available
 CHUNKER_AVAILABLE = False
 try:
-    from chunker.graph.xref import build_xref
     from chunker import chunk_file
+    from chunker.graph.xref import build_xref
 
     CHUNKER_AVAILABLE = True
     logger.info("TreeSitter Chunker graph module available")

@@ -8,6 +8,9 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
+from ..artifacts.semantic_profiles import SemanticProfileRegistry
+from ..config.settings import reload_settings
+from ..core.ignore_patterns import IgnorePatternManager
 from ..graph import (
     CHUNKER_AVAILABLE,
     ContextSelector,
@@ -17,8 +20,6 @@ from ..graph import (
     XRefAdapter,
 )
 from ..plugin_base import IPlugin, SearchResult, SymbolDef
-from ..config.settings import reload_settings
-from ..artifacts.semantic_profiles import SemanticProfileRegistry
 from ..plugins.language_registry import get_all_extensions, get_language_by_extension
 from ..plugins.memory_aware_manager import MemoryAwarePluginManager
 from ..plugins.plugin_factory import PluginFactory
@@ -31,14 +32,13 @@ from ..storage.multi_repo_manager import MultiRepositoryManager
 from ..storage.sqlite_store import SQLiteStore
 from ..utils.semantic_indexer import SemanticIndexer
 from .plugin_router import FileTypeMatcher, PluginCapability, PluginRouter
-from .query_intent import QueryIntent, classify as classify_query_intent
+from .query_intent import QueryIntent
+from .query_intent import classify as classify_query_intent
 from .result_aggregator import (
     AggregatedResult,
     RankingCriteria,
     ResultAggregator,
 )
-
-from ..core.ignore_patterns import IgnorePatternManager
 
 logger = logging.getLogger(__name__)
 

@@ -12,15 +12,13 @@
 
 import os
 import typing
-import typing_extensions
 
 import baml_py
+import typing_extensions
 
-from . import types, stream_types, type_builder
-from .globals import (
-    DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIME as __runtime__,
-    DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_CTX as __ctx__manager__,
-)
+from . import stream_types, type_builder, types
+from .globals import DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_CTX as __ctx__manager__
+from .globals import DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIME as __runtime__
 
 
 class BamlCallOptions(typing.TypedDict, total=False):
@@ -363,6 +361,7 @@ class DoNotUseDirectlyCallManager:
 
 def disassemble(function: typing.Callable) -> None:
     import inspect
+
     from . import b
 
     if not callable(function):

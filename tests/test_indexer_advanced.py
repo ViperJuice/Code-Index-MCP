@@ -14,6 +14,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from mcp_server.core.path_resolver import PathResolver
 from mcp_server.indexer.index_engine import (
     BatchIndexResult,
     IndexEngine,
@@ -33,7 +34,6 @@ from mcp_server.indexer.query_optimizer import (
     QueryType,
     SearchPlan,
 )
-from mcp_server.core.path_resolver import PathResolver
 from mcp_server.plugin_system.interfaces import IPluginManager
 from mcp_server.storage.sqlite_store import SQLiteStore
 from mcp_server.utils.fuzzy_indexer import FuzzyIndexer

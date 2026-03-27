@@ -16,10 +16,10 @@ from mcp_server.artifacts.artifact_download import (
     IndexArtifactDownloader,
     format_artifact_table,
 )
+from mcp_server.artifacts.artifact_upload import IndexArtifactUploader
 from mcp_server.artifacts.multi_repo_artifact_coordinator import (
     MultiRepoArtifactCoordinator,
 )
-from mcp_server.artifacts.artifact_upload import IndexArtifactUploader
 from mcp_server.artifacts.semantic_profiles import extract_semantic_profile_metadata
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from mcp_server.indexing.change_detector import ChangeDetector, FileChange

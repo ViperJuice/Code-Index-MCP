@@ -1,19 +1,17 @@
 from pathlib import Path
 
 from mcp_server.document_processing import BaseDocumentPlugin
-from mcp_server.document_processing.document_interfaces import ProcessedDocument
-from mcp_server.interfaces.plugin_interfaces import PluginRuntimeInfo
-from mcp_server.interfaces.shared_interfaces import PluginStatus
-from mcp_server.plugin_system.plugin_manager import PluginManager
-from mcp_server.plugin_system.interfaces import (
-    IPluginManager as PluginSystemManagerContract,
-)
 from mcp_server.document_processing.base_document_plugin import (
     DocumentMetadata as BaseDocumentMetadata,
 )
 from mcp_server.document_processing.base_document_plugin import (
     DocumentStructure as BaseDocumentStructure,
 )
+from mcp_server.document_processing.document_interfaces import ProcessedDocument
+from mcp_server.interfaces.plugin_interfaces import PluginRuntimeInfo
+from mcp_server.interfaces.shared_interfaces import PluginStatus
+from mcp_server.plugin_system.interfaces import IPluginManager as PluginSystemManagerContract
+from mcp_server.plugin_system.plugin_manager import PluginManager
 
 
 class _ContractDocumentPlugin(BaseDocumentPlugin):

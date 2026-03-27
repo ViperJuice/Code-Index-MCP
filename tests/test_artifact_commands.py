@@ -2,7 +2,7 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from mcp_server.cli.artifact_commands import artifact, _run_incremental_reconcile
+from mcp_server.cli.artifact_commands import _run_incremental_reconcile, artifact
 from mcp_server.indexing.change_detector import FileChange
 
 

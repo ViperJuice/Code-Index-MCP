@@ -27,8 +27,6 @@ from .metrics.middleware import get_business_metrics, setup_metrics_middleware
 from .metrics.prometheus_exporter import get_prometheus_exporter
 from .plugin_base import SearchResult, SymbolDef
 from .plugin_system import PluginManager
-from .setup.qdrant_autostart import ensure_qdrant_running
-from .setup.semantic_preflight import run_semantic_preflight
 from .security import (
     AuthCredentials,
     AuthManager,
@@ -41,6 +39,8 @@ from .security import (
     require_permission,
     require_role,
 )
+from .setup.qdrant_autostart import ensure_qdrant_running
+from .setup.semantic_preflight import run_semantic_preflight
 from .storage.sqlite_store import SQLiteStore
 from .utils.fuzzy_indexer import FuzzyIndexer
 from .utils.index_discovery import IndexDiscovery
