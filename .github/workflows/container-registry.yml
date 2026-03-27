@@ -152,7 +152,7 @@ jobs:
           vuln-type: 'os,library'
 
       - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-results-${{ env.PLATFORM_SAFE }}.sarif
           category: trivy-${{ env.PLATFORM_SAFE }}
@@ -160,14 +160,14 @@ jobs:
       - name: Run Grype vulnerability scanner
         uses: anchore/scan-action@v3
         with:
-          path: /tmp/image-${{ env.PLATFORM_SAFE }}.tar
+          image: "docker-archive:/tmp/image-${{ env.PLATFORM_SAFE }}.tar"
           fail-build: false
           output-format: sarif
 
       - name: Generate SBOM with Syft
         uses: anchore/sbom-action@v0
         with:
-          path: /tmp/image-${{ env.PLATFORM_SAFE }}.tar
+          image: "docker-archive:/tmp/image-${{ env.PLATFORM_SAFE }}.tar"
           format: spdx-json
           output-file: sbom-${{ env.PLATFORM_SAFE }}.spdx.json
 
