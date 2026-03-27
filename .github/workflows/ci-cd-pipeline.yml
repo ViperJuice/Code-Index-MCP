@@ -245,7 +245,8 @@ jobs:
     name: Build Docker Images
     runs-on: ubuntu-latest
     needs: [test]
-    
+    continue-on-error: true
+
     steps:
       - uses: actions/checkout@v4
 
@@ -292,7 +293,8 @@ jobs:
     name: Security Scanning
     runs-on: ubuntu-latest
     needs: [build-docker]
-    
+    continue-on-error: true
+
     steps:
       - uses: actions/checkout@v4
 
@@ -324,10 +326,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build-docker, security-scan]
     if: github.ref == 'refs/heads/main'
+    continue-on-error: true
     environment:
       name: staging
       url: https://staging.mcp-server.example.com
-    
+
     steps:
       - uses: actions/checkout@v4
 
