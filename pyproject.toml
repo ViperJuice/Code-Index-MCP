@@ -112,20 +112,6 @@ exclude = '''
 profile = "black"
 line_length = 100
 
-[tool.flake8]
-max-line-length = 100
-extend-ignore = E501,W293,W291,E203
-exclude = [
-    ".git", "__pycache__", "build", "dist", ".eggs", ".venv", "venv",
-    "node_modules", "data", "logs",
-    "mcp_server/indexing/baml_client",
-]
-per-file-ignores = [
-    "*/__init__.py:F401",
-    "test_*.py:F401,F811,F821,F841,E402,W605",
-    "conftest.py:F401,F811,F821,F841,E402,W605",
-    "base_comparison.py:F821",
-]
 
 [tool.mypy]
 python_version = "3.12"

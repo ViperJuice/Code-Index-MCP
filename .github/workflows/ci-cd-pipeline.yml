@@ -157,6 +157,7 @@ jobs:
           "
 
       - name: Run tests with coverage
+        shell: bash
         run: |
           pytest tests/ \
             --cov=mcp_server \
@@ -221,8 +222,8 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const fs = require('fs');
-            const results = JSON.parse(fs.readFileSync('benchmarks/indexing_speed_benchmark_results.json'));
+            const { readFileSync } = await import('node:fs');
+            const results = JSON.parse(readFileSync('benchmarks/indexing_speed_benchmark_results.json'));
             const comment = `## Performance Benchmark Results
             
             - **Files/minute**: ${results.single_threaded.files_per_minute.toFixed(0)}
