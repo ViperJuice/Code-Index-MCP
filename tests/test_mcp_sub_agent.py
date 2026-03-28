@@ -294,6 +294,7 @@ class TestMCPToolRegistryPropagator:
         assert "tool1" in deserialized
 
 
+@pytest.mark.integration
 class TestIntegration:
     """Integration tests for the full sub-agent flow."""
 
@@ -347,11 +348,6 @@ class TestIntegration:
         # Clean up
         propagator.restore_environment()
 
-
-@pytest.mark.integration
-class TestRealWorldScenarios:
-    """Test real-world scenarios that were failing."""
-
     def test_task_agent_mcp_access(self, full_setup):
         """Test the specific scenario where Task agents couldn't access MCP tools."""
         # Simulate main agent setting up environment
@@ -373,3 +369,8 @@ class TestRealWorldScenarios:
         # Clean up
         propagator.restore_environment()
         del os.environ["CLAUDE_AGENT_TYPE"]
+
+
+@pytest.mark.integration
+class TestRealWorldScenarios:
+    """Test real-world scenarios that were failing."""

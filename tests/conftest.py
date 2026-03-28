@@ -238,7 +238,7 @@ def mock_plugin() -> Mock:
 @pytest.fixture
 def python_plugin(sqlite_store: SQLiteStore) -> PythonPlugin:
     """Create a Python plugin instance with SQLite store."""
-    return PythonPlugin(sqlite_store=sqlite_store)
+    return PythonPlugin(sqlite_store=sqlite_store, preindex=False)
 
 
 @pytest.fixture
@@ -272,7 +272,8 @@ def test_client() -> TestClient:
     """Create a test client for the FastAPI app."""
     if app is None:
         pytest.skip(f"FastAPI app unavailable: {gateway_import_error}")
-    return TestClient(app)
+    # Include a bearer token so the fallback auth path in get_current_user grants access
+    return TestClient(app, headers={"Authorization": "Bearer test-token"})
 
 
 @pytest.fixture
@@ -290,6 +291,10 @@ def test_client_with_dispatcher(
 
     monkeypatch.setattr(gateway, "dispatcher", dispatcher_with_plugins)
     monkeypatch.setattr(gateway, "sqlite_store", sqlite_store)
+    # Clear search-mode globals so tests that mock dispatcher.search use classic mode
+    for _attr in ("bm25_indexer", "hybrid_search", "fuzzy_indexer", "semantic_indexer", "query_cache"):
+        if hasattr(gateway, _attr):
+            monkeypatch.setattr(gateway, _attr, None)
 
     # Also set in app.state
     test_client.app.state.dispatcher = dispatcher_with_plugins
@@ -312,12 +317,15 @@ def event_loop():
 def sample_symbol_def() -> SymbolDef:
     """Sample SymbolDef for testing."""
     return SymbolDef(
-        name="sample_function",
+        symbol="sample_function",
         kind="function",
-        path="/test/sample.py",
-        line=10,
+        language="python",
         signature="def sample_function(x: int) -> str",
-        documentation="A sample function for testing",
+        doc="A sample function for testing",
+        defined_in="/test/sample.py",
+        start_line=10,
+        end_line=12,
+        span=(10, 12),
     )
 
 
@@ -325,9 +333,9 @@ def sample_symbol_def() -> SymbolDef:
 def sample_search_results() -> List[SearchResult]:
     """Sample search results for testing."""
     return [
-        SearchResult(name="function_one", kind="function", path="/test/file1.py", score=0.95),
-        SearchResult(name="function_two", kind="function", path="/test/file2.py", score=0.85),
-        SearchResult(name="ClassOne", kind="class", path="/test/file3.py", score=0.75),
+        SearchResult(file="/test/file1.py", start_line=1, end_line=1, snippet="function_one"),
+        SearchResult(file="/test/file2.py", start_line=1, end_line=1, snippet="function_two"),
+        SearchResult(file="/test/file3.py", start_line=1, end_line=1, snippet="ClassOne"),
     ]
 
 
@@ -338,6 +346,14 @@ def test_environment(monkeypatch):
     monkeypatch.setenv("MCP_TEST_MODE", "1")
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    monkeypatch.setenv("MCP_SKIP_PLUGIN_PREINDEX", "true")
+    # Clear .env.native workspace-specific vars that cause /workspaces permission errors
+    for _var in (
+        "MCP_REPO_REGISTRY",
+        "MCP_INDEX_STORAGE_PATH",
+        "MCP_WORKSPACE_ROOT",
+    ):
+        monkeypatch.delenv(_var, raising=False)
 
 
 # Cleanup fixtures
@@ -435,6 +451,33 @@ def test_main():
 def test_data_builder():
     """Provide test data builder to tests."""
     return TestDataBuilder
+
+
+@pytest.fixture
+def temp_workspace(tmp_path: Path) -> Path:
+    """Create a temporary workspace directory."""
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    return workspace
+
+
+@pytest.fixture
+def create_test_index():
+    """Return a callable that creates a minimal valid SQLite index at a given path."""
+    import sqlite3
+
+    def _create(db_path: Path) -> Path:
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(str(db_path))
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS files "
+            "(id INTEGER PRIMARY KEY, path TEXT, language TEXT)"
+        )
+        conn.commit()
+        conn.close()
+        return db_path
+
+    return _create
 
 
 # Performance helpers

@@ -7,6 +7,8 @@ on:
       - 'v*'
   pull_request:
     branches: [ main ]
+  schedule:
+    - cron: '0 3 * * *'  # Nightly at 03:00 UTC (for test-extended job)
   workflow_dispatch:
     inputs:
       deploy_environment:
@@ -69,41 +71,36 @@ jobs:
         run: flake8 mcp_server tests
 
       - name: Run mypy
-        run: mypy mcp_server --ignore-missing-imports || true
+        run: mypy mcp_server --ignore-missing-imports --exclude mcp_server/benchmarks
 
       - name: Run pylint
-        run: pylint mcp_server --exit-zero
+        run: pylint mcp_server --fail-under=7.0
 
       - name: Security check with bandit
-        run: bandit -r mcp_server -ll || true
+        run: bandit -r mcp_server -ll
 
       - name: Check dependencies with safety
-        run: safety check --json || true
+        run: safety check --json
 
-  # Run tests
+  # Run tests (Ubuntu gate — must pass before build)
   test:
-    name: Test Suite
-    runs-on: ${{ matrix.os }}
-    continue-on-error: true
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ['3.12']
+    name: Test Suite (Ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      MCP_SKIP_PLUGIN_PREINDEX: "true"
 
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install system dependencies (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential libffi-dev
@@ -118,57 +115,61 @@ jobs:
         run: |
           python -c "import tree_sitter_languages; print('tree-sitter grammars available')"
 
-      - name: Validate index artifacts
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        run: |
-          python -c "
-          import os
-          from mcp_server.utils.semantic_indexer import SemanticIndexer
-          from mcp_server.storage.sqlite_store import SQLiteStore
-          
-          print('=== Index Validation ===')
-          
-          # Check SQLite index
-          if os.path.exists('code_index.db'):
-              try:
-                  store = SQLiteStore('code_index.db')
-                  with store._get_connection() as conn:
-                      cursor = conn.execute('SELECT COUNT(*) FROM symbols')
-                      count = cursor.fetchone()[0]
-                      print(f'✓ SQLite index valid: {count} symbols')
-              except Exception as e:
-                  print(f'✗ SQLite index error: {e}')
-          else:
-              print('ℹ No SQLite index found (will be created on first run)')
-          
-          # Check vector index compatibility
-          try:
-              indexer = SemanticIndexer()
-              compatible = indexer.check_compatibility()
-              print(f'✓ Vector index compatibility: {compatible}')
-          except Exception as e:
-              print(f'⚠ Vector index check failed: {e}')
-          
-          # Check metadata
-          if os.path.exists('.index_metadata.json'):
-              print('✓ Index metadata found')
-          else:
-              print('ℹ No index metadata (will be created)')
-          
-          print('=== Validation Complete ===')
-          "
-
       - name: Run tests with coverage
         shell: bash
         run: |
           pytest tests/ \
+            --ignore=tests/test_git_integration.py \
             --cov=mcp_server \
             --cov-report=xml \
             --cov-report=html \
             --cov-report=term \
             -n auto \
-            --timeout=300 \
+            --timeout=60 \
             --benchmark-skip
+
+  # Cross-platform smoke tests (informational, non-blocking)
+  test-cross-platform:
+    name: Test Suite (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    env:
+      MCP_SKIP_PLUGIN_PREINDEX: "true"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest-xdist pytest-timeout pytest-benchmark
+
+      - name: Install tree-sitter grammars
+        run: |
+          python -c "import tree_sitter_languages; print('tree-sitter grammars available')"
+
+      - name: Run tests
+        shell: bash
+        run: |
+          pytest tests/ \
+            --ignore=tests/test_git_integration.py \
+            -n auto \
+            --timeout=60 \
+            --benchmark-skip \
+            --no-cov
 
       - name: Upload coverage reports
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
@@ -188,7 +189,75 @@ jobs:
             coverage.xml
             htmlcov/
 
-  # Performance benchmarks
+  # Integration tests (git repos, real plugin loading) — runs in parallel with test
+  test-integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      MCP_SKIP_PLUGIN_PREINDEX: "true"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libffi-dev
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest-timeout
+
+      - name: Run integration tests
+        run: |
+          pytest tests/ -m "integration or slow" \
+            --timeout=120 \
+            --no-cov \
+            --benchmark-skip \
+            -v
+
+  # Extended tests — nightly and manual trigger only
+  test-extended:
+    name: Extended Tests (real-world + performance)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    env:
+      MCP_SKIP_PLUGIN_PREINDEX: "true"
+      RUN_REAL_WORLD_TESTS: "1"
+      RUN_PERFORMANCE_TESTS: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest-timeout
+
+      - name: Run real-world tests
+        run: pytest tests/real_world/ --timeout=300 --no-cov -v
+
+      - name: Run performance tests
+        run: pytest tests/performance/ --timeout=300 --no-cov -v
+
+  # Performance benchmarks (informational)
   benchmark:
     name: Performance Benchmarks
     runs-on: ubuntu-latest
@@ -211,30 +280,30 @@ jobs:
 
       - name: Run performance benchmarks
         run: |
-          timeout 180 python benchmarks/symbol_lookup_benchmark.py || true
-          timeout 180 python benchmarks/semantic_search_benchmark.py || true
-          timeout 180 python benchmarks/indexing_speed_benchmark.py || true
+          timeout 180 python benchmarks/symbol_lookup_benchmark.py
+          timeout 180 python benchmarks/semantic_search_benchmark.py
+          timeout 180 python benchmarks/indexing_speed_benchmark.py
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-results
-          path: benchmarks/*_results.json
+          path: "*_results.json"
 
       - name: Comment benchmark results on PR
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && hashFiles('indexing_speed_benchmark_results.json') != ''
         uses: actions/github-script@v6
         with:
           script: |
             const { readFileSync } = await import('node:fs');
-            const results = JSON.parse(readFileSync('benchmarks/indexing_speed_benchmark_results.json'));
+            const results = JSON.parse(readFileSync('indexing_speed_benchmark_results.json'));
             const comment = `## Performance Benchmark Results
-            
+
             - **Files/minute**: ${results.single_threaded.files_per_minute.toFixed(0)}
             - **p95 Symbol Lookup**: < 100ms ✅
             - **p95 Semantic Search**: < 500ms ✅
             `;
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -246,7 +315,7 @@ jobs:
   build-docker:
     name: Build Docker Images
     runs-on: ubuntu-latest
-    needs: [test]
+    needs: [test, test-integration]
     continue-on-error: true
 
     steps:
@@ -327,8 +396,7 @@ jobs:
     name: Deploy to Staging
     runs-on: ubuntu-latest
     needs: [build-docker, security-scan]
-    if: github.ref == 'refs/heads/main'
-    continue-on-error: true
+    if: github.ref == 'refs/heads/main' && secrets.STAGING_KUBECONFIG != ''
     environment:
       name: staging
       url: https://staging.mcp-server.example.com
@@ -382,7 +450,7 @@ jobs:
     name: Deploy to Production
     runs-on: ubuntu-latest
     needs: [deploy-staging]
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') && secrets.PRODUCTION_KUBECONFIG != ''
     environment:
       name: production
       url: https://mcp-server.example.com
@@ -461,6 +529,7 @@ jobs:
           DEPLOYMENT_URL="https://mcp-server.example.com" pytest tests/integration/
 
       - name: Performance validation
+        if: hashFiles('scripts/validate_production_performance.py') != ''
         run: |
           # Run performance tests against production
           python scripts/validate_production_performance.py
@@ -469,11 +538,12 @@ jobs:
         run: |
           # Check Prometheus metrics
           curl -s https://mcp-server.example.com/metrics | grep -E "mcp_.*"
-          
+
           # Validate key metrics
           python scripts/validate_metrics.py
 
       - name: Update deployment status
+        if: github.event.deployment != null
         uses: actions/github-script@v6
         with:
           script: |
