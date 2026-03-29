@@ -253,7 +253,11 @@ class TestSubAgentToolBridge:
         # Add a mock process
         mock_proc = MagicMock()
         mock_proc.returncode = None
-        mock_proc.wait = asyncio.coroutine(lambda: None)
+
+        async def _wait():
+            pass
+
+        mock_proc.wait = _wait
         bridge.server_processes["test-server"] = mock_proc
 
         await bridge.cleanup()

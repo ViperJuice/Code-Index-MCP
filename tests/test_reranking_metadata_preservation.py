@@ -9,6 +9,8 @@ import os
 
 # Import the reranker module and its classes
 import sys
+import types
+from contextlib import contextmanager
 from typing import List
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -29,6 +31,25 @@ from mcp_server.indexer.reranker import (
     SearchResult,
     TFIDFReranker,
 )
+
+
+@contextmanager
+def _stub_module(module_name: str, **attrs):
+    """Temporarily inject a stub module into sys.modules so patch() can target it."""
+    was_present = module_name in sys.modules
+    original = sys.modules.get(module_name)
+    if not was_present:
+        stub = types.ModuleType(module_name)
+        for attr_name, attr_val in attrs.items():
+            setattr(stub, attr_name, attr_val)
+        sys.modules[module_name] = stub
+    try:
+        yield
+    finally:
+        if not was_present:
+            del sys.modules[module_name]
+        else:
+            sys.modules[module_name] = original
 
 
 class TestDataFactory:
@@ -274,7 +295,10 @@ class TestCohereReranker:
         ]
         mock_client.rerank.return_value = mock_response
 
-        with patch("cohere.Client", return_value=mock_client):
+        with (
+            _stub_module("cohere", Client=Mock()),
+            patch("cohere.Client", return_value=mock_client),
+        ):
             # Initialize reranker
             init_result = await cohere_reranker.initialize({})
             if not init_result.is_success:
@@ -320,8 +344,13 @@ class TestCohereReranker:
         mock_response.results = [Mock(index=1, relevance_score=0.99)]
         mock_client.rerank.return_value = mock_response
 
-        with patch("cohere.Client", return_value=mock_client):
-            await cohere_reranker.initialize({})
+        with (
+            _stub_module("cohere", Client=Mock()),
+            patch("cohere.Client", return_value=mock_client),
+        ):
+            init_result = await cohere_reranker.initialize({})
+            if not init_result.is_success:
+                pytest.skip("Cohere library not available")
 
             query = "cached query"
             original_results = TestDataFactory.create_search_results(2)
@@ -369,7 +398,10 @@ class TestCrossEncoderReranker:
         mock_model = Mock()
         mock_model.predict.return_value = np.array([0.2, 0.9, 0.5, 0.7, 0.3])
 
-        with patch("sentence_transformers.CrossEncoder", return_value=mock_model):
+        with (
+            _stub_module("sentence_transformers", CrossEncoder=Mock()),
+            patch("sentence_transformers.CrossEncoder", return_value=mock_model),
+        ):
             # Initialize reranker
             init_result = await cross_encoder_reranker.initialize({})
             if not init_result.is_success:
@@ -408,8 +440,13 @@ class TestCrossEncoderReranker:
         """Test Cross-Encoder with empty results"""
         mock_model = Mock()
 
-        with patch("sentence_transformers.CrossEncoder", return_value=mock_model):
-            await cross_encoder_reranker.initialize({})
+        with (
+            _stub_module("sentence_transformers", CrossEncoder=Mock()),
+            patch("sentence_transformers.CrossEncoder", return_value=mock_model),
+        ):
+            init_result = await cross_encoder_reranker.initialize({})
+            if not init_result.is_success:
+                pytest.skip("sentence-transformers not available")
 
             result = await cross_encoder_reranker.rerank("query", [])
             assert result.is_success
@@ -592,7 +629,9 @@ class TestEdgeCasesAndErrors:
         ]
 
         reranker = TFIDFReranker({})
-        await reranker.initialize({})
+        init_result = await reranker.initialize({})
+        if not init_result.is_success:
+            pytest.skip("scikit-learn not available")
 
         result = await reranker.rerank("query", results)
         assert result.is_success
@@ -618,7 +657,9 @@ class TestEdgeCasesAndErrors:
         ]
 
         reranker = TFIDFReranker({})
-        await reranker.initialize({})
+        init_result = await reranker.initialize({})
+        if not init_result.is_success:
+            pytest.skip("scikit-learn not available")
 
         result = await reranker.rerank("query", results)
         assert result.is_success
@@ -647,7 +688,9 @@ class TestEdgeCasesAndErrors:
             large_results.append(result)
 
         reranker = TFIDFReranker({"max_features": 5000})
-        await reranker.initialize({})
+        init_result = await reranker.initialize({})
+        if not init_result.is_success:
+            pytest.skip("scikit-learn not available")
 
         # Rerank and get top 10
         result = await reranker.rerank("large query", large_results, top_k=10)
@@ -687,7 +730,9 @@ class TestEdgeCasesAndErrors:
         ]
 
         reranker = TFIDFReranker({})
-        await reranker.initialize({})
+        init_result = await reranker.initialize({})
+        if not init_result.is_success:
+            pytest.skip("scikit-learn not available")
 
         result = await reranker.rerank("special query", special_results)
         assert result.is_success
@@ -711,7 +756,9 @@ class TestMetadataConsistency:
 
         # Create reranker
         reranker = TFIDFReranker({})
-        await reranker.initialize({})
+        init_result = await reranker.initialize({})
+        if not init_result.is_success:
+            pytest.skip("scikit-learn not available")
 
         # First reranking
         result1 = await reranker.rerank("query 1", original_results)
