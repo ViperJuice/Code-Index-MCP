@@ -40,8 +40,16 @@ fi
 # Upload artifact if index is not already current for this commit
 echo -e "${GREEN}📤 MCP Index: Uploading artifact for commit ${COMMIT:0:7}...${NC}"
 
-if command -v mcp-index &> /dev/null; then
-    mcp-index artifact push --skip-if-current 2>&1 | while read line; do
+# Resolve CLI: prefer venv-local binary, fall back to PATH
+MCP_CLI=""
+if [ -f ".venv/bin/mcp-index" ]; then
+    MCP_CLI=".venv/bin/mcp-index"
+elif command -v mcp-index &> /dev/null; then
+    MCP_CLI="mcp-index"
+fi
+
+if [ -n "$MCP_CLI" ]; then
+    $MCP_CLI artifact push --skip-if-current 2>&1 | while read line; do
         echo -e "${GREEN}   $line${NC}"
     done || {
         echo -e "${YELLOW}⚠️  MCP Index: Upload failed, but continuing with push${NC}"
