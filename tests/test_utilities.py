@@ -362,8 +362,8 @@ class TestRepositoryBuilder:
         if init_git:
             # Initialize git
             cls.run_git_command("git init", repo_path)
-            cls.run_git_command("git config user.name 'Test User'", repo_path)
-            cls.run_git_command("git config user.email 'test@example.com'", repo_path)
+            cls.run_git_command('git config user.name "Test User"', repo_path)
+            cls.run_git_command('git config user.email "test@example.com"', repo_path)
 
         # Create initial files based on language
         if language in TEST_FILE_TEMPLATES:

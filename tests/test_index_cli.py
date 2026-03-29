@@ -426,7 +426,7 @@ class TestSyncIndexCommand:
                 assert result.data["files_added"] == 5
                 assert result.data["files_updated"] == 3
                 assert result.data["files_removed"] == 1
-                assert result.data["duration_seconds"] > 0
+                assert result.data["duration_seconds"] >= 0
 
     @pytest.mark.asyncio
     async def test_sync_incremental(self, command, existing_index, tmp_path):

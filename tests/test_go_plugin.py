@@ -241,4 +241,4 @@ func IntPtr(i int) *int {
 
         # Test internal import
         internal_path = plugin.module_resolver.resolve_import("example.com/testapp/pkg/utils")
-        assert "pkg/utils" in internal_path
+        assert str(Path("pkg") / "utils") in internal_path

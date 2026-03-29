@@ -1087,7 +1087,8 @@ class IndexDiscovery:
 
     def _classify_location(self, path: Path) -> str:
         """Classify the type of location for an index."""
-        path_str = str(path)
+        # Normalize to forward slashes for cross-platform string matching
+        path_str = str(path).replace("\\", "/")
         if "test_indexes" in path_str:
             return "test"
         elif "/.indexes/" in path_str or path_str.endswith(".indexes"):
@@ -1096,7 +1097,7 @@ class IndexDiscovery:
             return "legacy"
         elif "/tmp/" in path_str:
             return "temporary"
-        elif path_str.startswith(str(Path.home())):
+        elif path_str.startswith(str(Path.home()).replace("\\", "/")):
             return "user"
         elif "/workspaces/" in path_str:
             return "docker"
