@@ -40,15 +40,15 @@ fi
 # Upload artifact if index is not already current for this commit
 echo -e "${GREEN}📤 MCP Index: Uploading artifact for commit ${COMMIT:0:7}...${NC}"
 
-if [ -f "mcp_cli.py" ]; then
-    python mcp_cli.py artifact push --skip-if-current 2>&1 | while read line; do
+if command -v mcp-index &> /dev/null; then
+    mcp-index artifact push --skip-if-current 2>&1 | while read line; do
         echo -e "${GREEN}   $line${NC}"
     done || {
         echo -e "${YELLOW}⚠️  MCP Index: Upload failed, but continuing with push${NC}"
-        echo -e "${YELLOW}   You can manually upload later with: python mcp_cli.py artifact push${NC}"
+        echo -e "${YELLOW}   You can manually upload later with: mcp-index artifact push${NC}"
     }
 else
-    echo -e "${YELLOW}⚠️  MCP Index: mcp_cli.py not found, skipping upload${NC}"
+    echo -e "${YELLOW}⚠️  MCP Index: mcp-index CLI not found, skipping upload${NC}"
 fi
 
 echo -e "${GREEN}✓ MCP Index: Ready to push${NC}"
