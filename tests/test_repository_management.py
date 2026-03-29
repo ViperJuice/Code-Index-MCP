@@ -164,9 +164,9 @@ class TestRepositoryManagement:
         info2 = registry2.get_repository(repo2_id)
 
         assert info1 is not None
-        assert str(info1.path) == str(repo1.path)
+        assert Path(str(info1.path)).resolve() == Path(str(repo1.path)).resolve()
         assert info2 is not None
-        assert str(info2.path) == str(repo2.path)
+        assert Path(str(info2.path)).resolve() == Path(str(repo2.path)).resolve()
 
     def test_repository_status_tracking(self, test_env, registry):
         """Test tracking repository status and git state."""
