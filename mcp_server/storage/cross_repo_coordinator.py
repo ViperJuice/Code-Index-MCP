@@ -472,7 +472,7 @@ class CrossRepositorySearchCoordinator:
         relative_path = file_path.split("/")[-3:] if "/" in file_path else [file_path]
         signature_data = f"{symbol}::{'/'.join(relative_path)}::{line_number}"
 
-        return hashlib.md5(signature_data.encode()).hexdigest()
+        return hashlib.md5(signature_data.encode(), usedforsecurity=False).hexdigest()
 
     def _create_content_hash(self, result: Dict[str, Any]) -> str:
         """Create a hash for content deduplication."""
@@ -483,7 +483,7 @@ class CrossRepositorySearchCoordinator:
         relative_path = file_path.split("/")[-2:] if "/" in file_path else [file_path]
         hash_data = f"{content[:200]}::{'/'.join(relative_path)}"
 
-        return hashlib.md5(hash_data.encode()).hexdigest()
+        return hashlib.md5(hash_data.encode(), usedforsecurity=False).hexdigest()
 
     async def get_search_statistics(self) -> Dict[str, Any]:
         """Get statistics about cross-repository search capabilities."""

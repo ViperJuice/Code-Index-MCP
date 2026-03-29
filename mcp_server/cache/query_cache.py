@@ -104,7 +104,7 @@ class QueryResultCache:
         if len(key_str) > self.config.max_query_size:
             return f"query:{hashlib.sha256(key_str.encode()).hexdigest()}"
 
-        return f"query:{hashlib.md5(key_str.encode()).hexdigest()}"
+        return f"query:{hashlib.md5(key_str.encode(), usedforsecurity=False).hexdigest()}"
 
     def _get_ttl_for_query_type(self, query_type: QueryType) -> int:
         """Get TTL based on query type."""

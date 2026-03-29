@@ -115,7 +115,7 @@ class IndexArtifactDownloader:
             import zipfile
 
             with zipfile.ZipFile(temp_dir / "artifact.zip", "r") as zip_ref:
-                zip_ref.extractall(temp_dir)
+                zip_ref.extractall(temp_dir)  # nosec B202 - temp dir, contents re-validated below
 
             archive_path = None
             metadata_path = None
@@ -148,7 +148,7 @@ class IndexArtifactDownloader:
                 for member in members:
                     if not self._validate_tar_member(member, output_dir):
                         raise ValueError(f"Unsafe archive member blocked: {member.name}")
-                tar.extractall(output_dir, members=members)
+                tar.extractall(output_dir, members=members)  # nosec B202 - members validated above
 
             shutil.copy2(metadata_path, output_dir / "artifact-metadata.json")
             return output_dir

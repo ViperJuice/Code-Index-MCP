@@ -1000,7 +1000,7 @@ class HybridSearch:
         if filters:
             key_parts.extend(f"{k}:{v}" for k, v in sorted(filters.items()))
         key_string = "|".join(key_parts)
-        return hashlib.md5(key_string.encode()).hexdigest()
+        return hashlib.md5(key_string.encode(), usedforsecurity=False).hexdigest()
 
     def _cleanup_cache(self):
         """Clean up cache if it gets too large."""

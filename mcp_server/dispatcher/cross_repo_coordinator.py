@@ -305,7 +305,7 @@ class CrossRepositoryCoordinator:
             # Generic hash
             key = str(result)
 
-        return hashlib.md5(key.encode()).hexdigest()
+        return hashlib.md5(key.encode(), usedforsecurity=False).hexdigest()
 
     def _score_results(
         self, results: List[AggregatedResult], scorer: Callable, context: SearchContext

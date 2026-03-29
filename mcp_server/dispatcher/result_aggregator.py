@@ -938,14 +938,14 @@ class ResultAggregator(IResultAggregator):
 
         for plugin, results in sorted_plugins:
             plugin_key = getattr(plugin, "lang", str(plugin))
-            results_hash = hashlib.md5(str(results).encode()).hexdigest()[:8]
+            results_hash = hashlib.md5(str(results).encode(), usedforsecurity=False).hexdigest()[:8]
             key_parts.append(f"{plugin_key}:{results_hash}")
 
         key_parts.append(f"limit:{limit}")
         key_parts.append(f"strategy:{type(self.strategy).__name__}")
 
         cache_key = "|".join(key_parts)
-        return hashlib.md5(cache_key.encode()).hexdigest()
+        return hashlib.md5(cache_key.encode(), usedforsecurity=False).hexdigest()
 
     def _get_cached_result(
         self, cache_key: str

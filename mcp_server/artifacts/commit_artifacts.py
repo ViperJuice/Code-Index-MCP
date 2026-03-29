@@ -149,9 +149,12 @@ class CommitArtifactManager:
             # Create target directory
             target_path.mkdir(parents=True, exist_ok=True)
 
-            # Extract artifact
+            # Extract artifact (validate members to prevent path traversal)
             with tarfile.open(artifact_path, "r:gz") as tar:
-                tar.extractall(target_path)
+                safe_members = [
+                    m for m in tar.getmembers() if not m.name.startswith("/") and ".." not in m.name
+                ]
+                tar.extractall(target_path, members=safe_members)  # nosec B202
 
             logger.info(f"Extracted artifact: {artifact.artifact_name}")
             return True

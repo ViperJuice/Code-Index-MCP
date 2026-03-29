@@ -1128,7 +1128,7 @@ class SemanticIndexer:
         else:
             id_str = f"{relative_path}:{name}:{line}"
 
-        h = hashlib.sha1(id_str.encode("utf-8")).digest()[:8]
+        h = hashlib.sha1(id_str.encode("utf-8"), usedforsecurity=False).digest()[:8]
         return int.from_bytes(h, "big", signed=False)
 
     def _looks_like_code_intent(self, query: str) -> bool:
@@ -2304,7 +2304,9 @@ class SemanticIndexer:
 
     def _document_section_id(self, file: str, section: str, line: int) -> int:
         """Generate unique ID for document section."""
-        h = hashlib.sha1(f"doc:{file}:{section}:{line}".encode("utf-8")).digest()[:8]
+        h = hashlib.sha1(
+            f"doc:{file}:{section}:{line}".encode("utf-8"), usedforsecurity=False
+        ).digest()[:8]
         return int.from_bytes(h, "big", signed=False)
 
     def query_natural_language(

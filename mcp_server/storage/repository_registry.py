@@ -563,7 +563,9 @@ class RepositoryRegistry:
         """Generate stable repository ID for a path."""
         import hashlib
 
-        digest = hashlib.sha1(str(repo_path).encode("utf-8")).hexdigest()[:12]
+        digest = hashlib.sha1(str(repo_path).encode("utf-8"), usedforsecurity=False).hexdigest()[
+            :12
+        ]
         return f"{repo_path.name}-{digest}"
 
     def update_git_state(self, repository_id: str) -> Optional[Dict[str, str]]:

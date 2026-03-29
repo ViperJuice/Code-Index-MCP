@@ -583,7 +583,7 @@ class IndexEngine:
         """Calculate MD5 hash of a file."""
         try:
             with open(file_path, "rb") as f:
-                file_hash = hashlib.md5(f.read()).hexdigest()
+                file_hash = hashlib.md5(f.read(), usedforsecurity=False).hexdigest()
                 # Cache the hash
                 self._file_cache[file_path] = {"hash": file_hash}
                 return file_hash

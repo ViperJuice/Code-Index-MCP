@@ -166,8 +166,11 @@ class PathUtils:
             return env_path
 
         # Try common locations
+        import subprocess
+
         for python in ["python3", "python", "/usr/local/bin/python"]:
-            if os.system(f"which {python} > /dev/null 2>&1") == 0:
+            result = subprocess.run(["which", python], capture_output=True, check=False)
+            if result.returncode == 0:
                 return python
 
         # Fall back to sys.executable

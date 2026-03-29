@@ -225,7 +225,7 @@ class BM25Indexer(IIndexer):
             comments = " ".join(metadata.get("comments", [])) if metadata else ""
 
             # Calculate content hash
-            content_hash = hashlib.md5(content.encode()).hexdigest()
+            content_hash = hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()
 
             # Check if already indexed with same content
             cursor = conn.execute(
