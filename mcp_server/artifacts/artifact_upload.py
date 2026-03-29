@@ -238,25 +238,51 @@ class IndexArtifactUploader:
         return stats
 
     def trigger_workflow(self, archive_path: Path, metadata: Dict[str, Any]) -> None:
-        print("\n🚀 Workflow trigger mode selected")
-        print("⚠️  GitHub workflow_dispatch cannot upload local files directly.")
-        print("   Switching to safe direct-upload preparation mode.")
+        # GitHub workflow_dispatch cannot upload local files; use release upload instead
         self.upload_direct(archive_path, metadata)
 
     def upload_direct(self, archive_path: Path, metadata: Dict[str, Any]) -> None:
-        print("\n📤 Uploading to GitHub Actions Artifacts...")
         metadata_path = Path("artifact-metadata.json")
         metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
-        print("✅ Files prepared for upload:")
-        print(f"   - {archive_path} ({archive_path.stat().st_size / 1024 / 1024:.1f} MB)")
-        print(f"   - {metadata_path}")
-        print("\nTo complete upload, run this in GitHub Actions:")
-        print("  uses: actions/upload-artifact@v4")
-        print("  with:")
-        print("    name: index-{{ github.sha }}")
-        print("    path: |")
-        print(f"      {archive_path}")
-        print(f"      {metadata_path}")
+
+        # Verify gh CLI is available
+        try:
+            subprocess.run(["gh", "--version"], capture_output=True, check=True)
+        except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+            raise RuntimeError(
+                "gh CLI is required for artifact upload. "
+                "Install from https://cli.github.com"
+            ) from exc
+
+        tag = "index-latest"
+        commit = metadata.get("commit", "")[:8]
+
+        # Create the release if it doesn't exist (ignore failure if it already exists)
+        subprocess.run(
+            [
+                "gh", "release", "create", tag,
+                "--repo", self.repo,
+                "--title", f"Index: latest ({commit})",
+                "--notes", f"Auto-updated index artifact. Commit: {metadata.get('commit', 'unknown')}",
+            ],
+            capture_output=True,
+        )
+
+        # Upload (overwrite) the archive and metadata assets
+        subprocess.run(
+            [
+                "gh", "release", "upload", tag,
+                "--repo", self.repo,
+                "--clobber",
+                str(archive_path),
+                str(metadata_path),
+            ],
+            check=True,
+        )
+
+        size_mb = archive_path.stat().st_size / 1024 / 1024
+        print(f"✅ Uploaded {archive_path.name} ({size_mb:.1f} MB) to "
+              f"https://github.com/{self.repo}/releases/tag/{tag}")
 
 
 def build_parser() -> argparse.ArgumentParser:

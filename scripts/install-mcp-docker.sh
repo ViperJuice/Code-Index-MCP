@@ -280,7 +280,13 @@ main() {
     
     # Create .mcp.json template
     setup_mcp_json
-    
+
+    # Activate committed git hooks
+    if [ -d ".git" ] && [ -d "mcp-index-kit/hooks" ]; then
+        git config core.hooksPath mcp-index-kit/hooks
+        print_info "Git hooks activated (core.hooksPath = mcp-index-kit/hooks)"
+    fi
+
     # Print next steps
     print_next_steps
 }

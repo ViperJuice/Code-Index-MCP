@@ -117,20 +117,55 @@ class BenchConfig:
     semantic_enabled: bool
     reranker_type: str
     embedding_label: str = ""
+    semantic_profile: str = ""
 
     def __post_init__(self):
         if not self.embedding_label:
-            self.embedding_label = "voyage-code-3" if self.semantic_enabled else "BM25-only"
+            if self.semantic_profile:
+                self.embedding_label = self.semantic_profile
+            elif self.semantic_enabled:
+                self.embedding_label = "voyage-code-3"
+            else:
+                self.embedding_label = "BM25-only"
 
 
-CONFIGS: List[BenchConfig] = [
-    BenchConfig("BM25-only / no-reranker",        semantic_enabled=False, reranker_type="none"),
-    BenchConfig("BM25-only / flashrank",           semantic_enabled=False, reranker_type="flashrank"),
-    BenchConfig("voyage-code-3 / no-reranker",     semantic_enabled=True,  reranker_type="none"),
-    BenchConfig("voyage-code-3 / flashrank",       semantic_enabled=True,  reranker_type="flashrank"),
-    BenchConfig("voyage-code-3 / voyage-reranker", semantic_enabled=True,  reranker_type="voyage"),
-    BenchConfig("voyage-code-3 / cross-encoder",   semantic_enabled=True,  reranker_type="cross-encoder"),
-]
+def _load_configs_from_metadata() -> List[BenchConfig]:
+    """Auto-discover benchmark configs from .index_metadata.json semantic profiles."""
+    try:
+        meta = json.loads(Path(".index_metadata.json").read_text(encoding="utf-8"))
+        profiles = meta.get("semantic_profiles", {})
+    except Exception:
+        profiles = {}
+
+    configs: List[BenchConfig] = [
+        BenchConfig("BM25-only / no-reranker", semantic_enabled=False, reranker_type="none"),
+        BenchConfig("BM25-only / flashrank",   semantic_enabled=False, reranker_type="flashrank"),
+    ]
+
+    for pid, pdata in sorted(profiles.items()):
+        model = pdata.get("embedding_model", pid)
+        provider = pdata.get("embedding_provider", "")
+        for reranker in ["none", "flashrank", "cross-encoder"]:
+            configs.append(BenchConfig(
+                f"{model} / {reranker}",
+                semantic_enabled=True,
+                reranker_type=reranker,
+                semantic_profile=pid,
+                embedding_label=model,
+            ))
+        if provider == "voyage":
+            configs.append(BenchConfig(
+                f"{model} / voyage-reranker",
+                semantic_enabled=True,
+                reranker_type="voyage",
+                semantic_profile=pid,
+                embedding_label=model,
+            ))
+
+    return configs
+
+
+CONFIGS: List[BenchConfig] = _load_configs_from_metadata()
 
 
 # ---------------------------------------------------------------------------
@@ -306,62 +341,69 @@ def _run_config(
     from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 
     use_qdrant = cfg.semantic_enabled and bool(qdrant_str)
-    dispatcher = EnhancedDispatcher(
-        sqlite_store=store,
-        semantic_search_enabled=use_qdrant,
-        reranker_type=cfg.reranker_type,
-    )
-
-    rows = []
-    for case in QUERY_SUITE:
-        semantic = case.mode in _SEMANTIC_MODES
-        fuzzy = case.mode == "fuzzy"
-        latencies: List[float] = []
-        top_file = ""
-        top1_hits = 0
-        top3_hits = 0
-        result_count = 0
-
-        for i in range(iterations):
-            t0 = perf_counter()
-            results = list(dispatcher.search(
-                query=case.query, limit=limit, semantic=semantic, fuzzy=fuzzy
-            ))
-            elapsed = (perf_counter() - t0) * 1000.0
-            latencies.append(elapsed)
-            if i == 0:
-                top_file = _top_file(results)
-                result_count = len(results)
-            if _in_top_k(results, case.expected, 1):
-                top1_hits += 1
-            if _in_top_k(results, case.expected, 3):
-                top3_hits += 1
-
-        rows.append({
-            "config": cfg.label,
-            "embedding": cfg.embedding_label,
-            "reranker": cfg.reranker_type,
-            "mode": case.mode,
-            "category": case.category,
-            "query": case.query,
-            "expected": case.expected,
-            "top_file": top_file,
-            "result_count": result_count,
-            "latency_p50_ms": round(_percentile(latencies, 0.5), 2),
-            "latency_p95_ms": round(_percentile(latencies, 0.95), 2),
-            "pass": top1_hits > 0,
-            "pass_top3": top3_hits > 0,
-        })
-
-    # Cleanup dispatcher resources
+    if cfg.semantic_profile:
+        os.environ["SEMANTIC_DEFAULT_PROFILE"] = cfg.semantic_profile
     try:
-        if hasattr(dispatcher, '_semantic_indexer') and dispatcher._semantic_indexer:
-            try:
-                dispatcher._semantic_indexer.qdrant.close()
-            except Exception:
-                pass
-    except Exception:
-        pass
+        dispatcher = EnhancedDispatcher(
+            sqlite_store=store,
+            semantic_search_enabled=use_qdrant,
+            reranker_type=cfg.reranker_type,
+        )
+
+        rows = []
+        for case in QUERY_SUITE:
+            semantic = case.mode in _SEMANTIC_MODES
+            fuzzy = case.mode == "fuzzy"
+            latencies: List[float] = []
+            top_file = ""
+            top1_hits = 0
+            top3_hits = 0
+            result_count = 0
+
+            for i in range(iterations):
+                t0 = perf_counter()
+                results = list(dispatcher.search(
+                    query=case.query, limit=limit, semantic=semantic, fuzzy=fuzzy
+                ))
+                elapsed = (perf_counter() - t0) * 1000.0
+                latencies.append(elapsed)
+                if i == 0:
+                    top_file = _top_file(results)
+                    result_count = len(results)
+                if _in_top_k(results, case.expected, 1):
+                    top1_hits += 1
+                if _in_top_k(results, case.expected, 3):
+                    top3_hits += 1
+
+            rows.append({
+                "config": cfg.label,
+                "embedding": cfg.embedding_label,
+                "reranker": cfg.reranker_type,
+                "mode": case.mode,
+                "category": case.category,
+                "query": case.query,
+                "expected": case.expected,
+                "top_file": top_file,
+                "result_count": result_count,
+                "latency_p50_ms": round(_percentile(latencies, 0.5), 2),
+                "latency_p95_ms": round(_percentile(latencies, 0.95), 2),
+                "pass": top1_hits > 0,
+                "pass_top3": top3_hits > 0,
+            })
+
+        # Cleanup dispatcher resources
+        try:
+            if hasattr(dispatcher, '_semantic_indexer') and dispatcher._semantic_indexer:
+                try:
+                    dispatcher._semantic_indexer.qdrant.close()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    finally:
+        if cfg.semantic_profile:
+            os.environ.pop("SEMANTIC_DEFAULT_PROFILE", None)
 
     return rows
 

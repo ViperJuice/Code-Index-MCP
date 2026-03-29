@@ -253,9 +253,30 @@ def artifact():
 @click.option("--validate", is_flag=True, help="Validate indexes before upload")
 @click.option("--compress-only", is_flag=True, help="Only compress, do not upload")
 @click.option("--no-secure", is_flag=True, help="Disable secure export (include all files)")
-def push(validate: bool, compress_only: bool, no_secure: bool):
+@click.option(
+    "--skip-if-current",
+    is_flag=True,
+    default=False,
+    help="No-op if .index_metadata.json git_commit matches HEAD",
+)
+def push(validate: bool, compress_only: bool, no_secure: bool, skip_if_current: bool):
     """Upload local indexes to GitHub Actions Artifacts."""
     try:
+        if skip_if_current:
+            meta_path = Path(".index_metadata.json")
+            if meta_path.exists():
+                try:
+                    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                    head = subprocess.run(
+                        ["git", "rev-parse", "HEAD"],
+                        capture_output=True, text=True,
+                    ).stdout.strip()
+                    if meta.get("git_commit") == head:
+                        click.echo("Index is current. Skipping upload.")
+                        return
+                except Exception:
+                    pass
+
         # Check if indexes exist
         if not Path("code_index.db").exists():
             click.echo("❌ No code_index.db found. Run indexing first.")

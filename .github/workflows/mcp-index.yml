@@ -56,9 +56,19 @@ jobs:
         if: steps.check_index.outputs.found == 'false'
         id: download
         run: |
-          echo "Checking for available index artifacts..."
-          # This would download from artifacts - simplified for now
-          echo "downloaded=false" >> $GITHUB_OUTPUT
+          if gh release download index-latest \
+              --repo ${{ github.repository }} \
+              --pattern "mcp-index-archive.tar.gz" \
+              --dir /tmp/mcp-index-dl 2>/dev/null; then
+            mkdir -p .mcp-index
+            tar -xzf /tmp/mcp-index-dl/mcp-index-archive.tar.gz -C .mcp-index/
+            echo "downloaded=true" >> $GITHUB_OUTPUT
+          else
+            echo "No existing release artifact found, will build."
+            echo "downloaded=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
         if: steps.check_index.outputs.found == 'false' && steps.download.outputs.downloaded == 'false'
@@ -212,6 +222,40 @@ jobs:
           PY
           sed -i "s/__CHECKSUM__/$CHECKSUM/g" artifact-metadata.json
       
+      - name: Validate metadata matches Qdrant collections
+        run: |
+          python <<'PY'
+          import json, sys
+          from pathlib import Path
+          meta_path = Path(".mcp-index/.index_metadata.json")
+          qdrant_meta = (
+              Path(".mcp-index/vector_index.qdrant/meta.json")
+              if Path(".mcp-index/vector_index.qdrant/meta.json").exists()
+              else Path("vector_index.qdrant/meta.json")
+          )
+          if not meta_path.exists():
+              print("No index metadata — skipping validation (fresh build)")
+              sys.exit(0)
+          meta = json.loads(meta_path.read_text())
+          profiles = meta.get("available_semantic_profiles", [])
+          if not profiles:
+              sys.exit(0)
+          if not qdrant_meta.exists():
+              print("No Qdrant meta — vector index not present")
+              sys.exit(0)
+          qdrant = json.loads(qdrant_meta.read_text())
+          collections = set(qdrant.get("collections", {}).keys())
+          missing = []
+          for pid in profiles:
+              col = meta["semantic_profiles"][pid]["collection_name"]
+              if col not in collections:
+                  missing.append(f"{pid} → {col}")
+          if missing:
+              print(f"FAIL: profiles in metadata but missing from Qdrant: {missing}")
+              sys.exit(1)
+          print(f"OK: all {len(profiles)} profiles have Qdrant collections")
+          PY
+
       - name: Upload index artifact
         uses: actions/upload-artifact@v4
         with:
