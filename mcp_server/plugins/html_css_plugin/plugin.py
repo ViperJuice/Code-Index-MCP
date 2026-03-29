@@ -53,9 +53,7 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
         self._css_parser = Parser()
 
         # Load language grammars
-        lib_path = Path(tree_sitter_languages.__path__[0]) / (
-            "languages.pyd" if os.name == "nt" else "languages.so"
-        )
+        lib_path = next(Path(tree_sitter_languages.__path__[0]).glob("languages.*"))
         self._lib = ctypes.CDLL(str(lib_path))
 
         # Configure HTML
