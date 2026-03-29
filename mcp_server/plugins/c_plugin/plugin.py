@@ -28,7 +28,9 @@ class Plugin(IPlugin):
 
     def __init__(self, sqlite_store: Optional[SQLiteStore] = None) -> None:
         # Initialize Tree-sitter parser for C
-        lib_path = Path(tree_sitter_languages.__path__[0]) / ("languages.pyd" if os.name == "nt" else "languages.so")
+        lib_path = Path(tree_sitter_languages.__path__[0]) / (
+            "languages.pyd" if os.name == "nt" else "languages.so"
+        )
         self._lib = ctypes.CDLL(str(lib_path))
         self._lib.tree_sitter_c.restype = ctypes.c_void_p
 
