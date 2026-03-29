@@ -7,6 +7,8 @@ import sys
 
 import pytest
 
+pytest.importorskip("matplotlib", reason="matplotlib not installed; skipping comparison tests")
+
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -77,14 +79,14 @@ class TestComparisonBase:
     """Test base comparison functionality."""
 
     def test_comparison_result_structure(self):
-        metrics = PerformanceMetrics(execution_time=1.5, cpu_usage=25.0, memory_usage_mb=100.0)
+        metrics = PerformanceMetrics(execution_time=1.5, cpu_usage=25.0, memory_usage=100.0)
 
         result = ComparisonResult(
-            success=True, performance_metrics=metrics, quality_scores={"accuracy": 0.95}
+            name="test", success=True, metrics=metrics, quality_scores={"accuracy": 0.95}
         )
 
         assert result.success
-        assert result.performance_metrics.execution_time == 1.5
+        assert result.metrics.execution_time == 1.5
         assert "accuracy" in result.quality_scores
 
         # Test serialization

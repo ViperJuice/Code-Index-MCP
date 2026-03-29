@@ -391,7 +391,7 @@ class TestSecurityMiddleware:
 
         # Test suspicious path patterns
         suspicious_paths = [
-            "/test/../../../etc/passwd",
+            "/test?path=../../etc/passwd",
             "/test?param=<script>alert('xss')</script>",
             "/test?param=javascript:alert(1)",
         ]

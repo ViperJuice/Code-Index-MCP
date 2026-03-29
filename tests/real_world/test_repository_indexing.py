@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from mcp_server.dispatcher.dispatcher import Dispatcher
+from mcp_server.dispatcher import Dispatcher
 from mcp_server.interfaces.shared_interfaces import Result
 from mcp_server.plugin_system.plugin_manager import PluginManager
 from mcp_server.storage.sqlite_store import SQLiteStore

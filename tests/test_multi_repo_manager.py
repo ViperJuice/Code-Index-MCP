@@ -125,8 +125,9 @@ class TestMultiRepositoryManager:
         assert isinstance(manager.registry, RepositoryRegistry)
         assert len(manager._connections) == 0
 
-    def test_default_registry_path(self):
+    def test_default_registry_path(self, monkeypatch):
         """Test default registry path generation."""
+        monkeypatch.delenv("MCP_REPO_REGISTRY", raising=False)
         manager = MultiRepositoryManager()
         expected = Path.home() / ".mcp" / "repository_registry.json"
         assert manager.central_index_path == expected
@@ -138,7 +139,7 @@ class TestMultiRepositoryManager:
             repo_path = Path(temp_dir)
             index_dir = repo_path / ".mcp-index"
             index_dir.mkdir()
-            index_path = index_dir / "index.db"
+            index_path = index_dir / "code_index.db"
 
             # Create minimal SQLite index
             conn = sqlite3.connect(str(index_path))
@@ -565,8 +566,9 @@ class TestRepositoryRegistry:
 class TestSingletonManager:
     """Test singleton manager functionality."""
 
-    def test_singleton_instance(self):
+    def test_singleton_instance(self, monkeypatch):
         """Test that get_multi_repo_manager returns singleton."""
+        monkeypatch.delenv("MCP_REPO_REGISTRY", raising=False)
         # Clear any existing instance
         import mcp_server.storage.multi_repo_manager as module
 

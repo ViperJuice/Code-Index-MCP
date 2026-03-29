@@ -1,6 +1,18 @@
 """Compatibility tests for TreeSitter Chunker adapter behavior."""
 
-from chunker import chunk_text
+import sys
+
+import pytest
+
+pytestmark = pytest.mark.skipif(
+    sys.version_info < (3, 11),
+    reason="chunker package requires Python 3.11+ (uses datetime.UTC)",
+)
+
+try:
+    from chunker import chunk_text
+except ImportError:
+    chunk_text = None  # type: ignore[assignment]
 
 from mcp_server.utils.chunker_adapter import get_adapter
 

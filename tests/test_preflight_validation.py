@@ -81,14 +81,20 @@ class TestPreFlightValidator:
         os.environ["MCP_SUB_AGENT_ACCESS"] = "true"
         os.environ["MCP_INHERIT_CONFIG"] = "false"
 
-        result = await validator._validate_mcp_tools()
+        try:
+            result = await validator._validate_mcp_tools()
 
-        assert result["status"] == "failed"
-        assert "Sub-agent detected but inheritance not enabled" in result["issues"]
+            assert result["status"] == "failed"
+            assert "Sub-agent detected but inheritance not enabled" in result["issues"]
+        finally:
+            os.environ.pop("MCP_SUB_AGENT_ACCESS", None)
+            os.environ.pop("MCP_INHERIT_CONFIG", None)
 
     @pytest.mark.asyncio
     async def test_validate_index_availability(self, validator, tmp_path):
         """Test index availability validation."""
+        from unittest.mock import MagicMock
+
         # Create test index
         index_dir = tmp_path / ".mcp-index"
         index_dir.mkdir()
@@ -105,7 +111,15 @@ class TestPreFlightValidator:
         config_file = tmp_path / ".mcp-index.json"
         config_file.write_text(json.dumps({"enabled": True}))
 
-        with patch("mcp_server.utils.index_discovery.Path.cwd", return_value=tmp_path):
+        mock_settings = MagicMock()
+        mock_settings.index_schema_version = None
+        mock_settings.semantic_embedding_model = None
+        mock_settings.strict_index_compatibility = False
+
+        with (
+            patch("mcp_server.core.preflight_validator.Path.cwd", return_value=tmp_path),
+            patch("mcp_server.config.settings.get_settings", return_value=mock_settings),
+        ):
             result = await validator._validate_index_availability()
 
         assert result["status"] == "passed"
@@ -244,13 +258,17 @@ class TestMCPHealthCheck:
         index_dir = tmp_path / ".mcp-index"
         index_dir.mkdir()
         index_path = index_dir / "code_index.db"
-        index_path.touch()
+
+        conn = sqlite3.connect(str(index_path))
+        conn.execute("CREATE TABLE files (id INTEGER PRIMARY KEY, path TEXT)")
+        conn.commit()
+        conn.close()
 
         # Create config
         config_file = tmp_path / ".mcp-index.json"
         config_file.write_text(json.dumps({"enabled": True}))
 
-        with patch("mcp_server.utils.index_discovery.Path.cwd", return_value=tmp_path):
+        with patch("mcp_server.core.preflight_validator.Path.cwd", return_value=tmp_path):
             available, message = await MCPHealthCheck.check_index_available()
 
         assert available is True
@@ -364,6 +382,7 @@ class TestIntegration:
         # Set up environment
         os.environ["MCP_INHERIT_CONFIG"] = "true"
         os.environ["MCP_PROPAGATE_TOOLS"] = "true"
+        os.environ["MCP_SERVER_TEST_COMMAND"] = "test"
 
         # Create config files
         mcp_config = {
@@ -387,8 +406,18 @@ class TestIntegration:
         conn.execute("CREATE TABLE files (id INTEGER PRIMARY KEY)")
         conn.close()
 
-        # Run validation
-        with patch("pathlib.Path.cwd", return_value=tmp_path):
+        # Run validation — disable strict compatibility so test index is accepted
+        from unittest.mock import MagicMock
+
+        mock_settings = MagicMock()
+        mock_settings.index_schema_version = None
+        mock_settings.semantic_embedding_model = None
+        mock_settings.strict_index_compatibility = False
+
+        with (
+            patch("pathlib.Path.cwd", return_value=tmp_path),
+            patch("mcp_server.config.settings.get_settings", return_value=mock_settings),
+        ):
             validator = PreFlightValidator()
             results = await validator.validate_all()
 
@@ -399,3 +428,4 @@ class TestIntegration:
         # Clean up
         del os.environ["MCP_INHERIT_CONFIG"]
         del os.environ["MCP_PROPAGATE_TOOLS"]
+        del os.environ["MCP_SERVER_TEST_COMMAND"]

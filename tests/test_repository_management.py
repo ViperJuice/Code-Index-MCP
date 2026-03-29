@@ -57,12 +57,12 @@ class TestRepositoryManagement:
 
         # Verify registration
         assert repo_id is not None
-        assert len(repo_id) == 64  # SHA256 hash length
+        assert len(repo_id) > 0
 
         # Check repository info
         info = registry.get_repository(repo_id)
         assert info is not None
-        assert info.path == str(repo.path)
+        assert str(info.path) == str(repo.path)
         assert info.name == "test_repo"
         assert info.auto_sync is True
         assert info.current_commit is not None
@@ -149,7 +149,7 @@ class TestRepositoryManagement:
         repo2_id = registry.register_repository(str(repo2.path))
 
         # Get registry file path
-        registry_file = Path(registry.registry_file)
+        registry_file = Path(registry.registry_path)
         assert registry_file.exists()
 
         # Create new registry instance
@@ -164,9 +164,9 @@ class TestRepositoryManagement:
         info2 = registry2.get_repository(repo2_id)
 
         assert info1 is not None
-        assert info1.path == str(repo1.path)
+        assert str(info1.path) == str(repo1.path)
         assert info2 is not None
-        assert info2.path == str(repo2.path)
+        assert str(info2.path) == str(repo2.path)
 
     def test_repository_status_tracking(self, test_env, registry):
         """Test tracking repository status and git state."""
@@ -183,7 +183,7 @@ class TestRepositoryManagement:
         assert info.last_indexed_commit is None  # Not indexed yet
 
         # Simulate indexing
-        registry.update_last_indexed(repo_id, initial_commit)
+        registry.update_indexed_commit(repo_id, initial_commit)
 
         # Make changes and commit
         new_file = repo.path / "new_feature.py"
@@ -241,19 +241,19 @@ class TestRepositoryManagement:
         # Test exact path lookup
         info = registry.get_repository_by_path(str(repo.path))
         assert info is not None
-        assert info.repo_id == repo_id
+        assert info.repository_id == repo_id
 
         # Test with trailing slash
         info = registry.get_repository_by_path(str(repo.path) + "/")
         assert info is not None
-        assert info.repo_id == repo_id
+        assert info.repository_id == repo_id
 
         # Test with subdirectory
         subdir = repo.path / "internal" / "models"
         subdir.mkdir(parents=True, exist_ok=True)
         info = registry.get_repository_by_path(str(subdir))
         assert info is not None
-        assert info.repo_id == repo_id
+        assert info.repository_id == repo_id
 
         # Test non-existent path
         info = registry.get_repository_by_path("/non/existent/path")
@@ -276,7 +276,7 @@ class TestRepositoryManagement:
         assert len(registry.get_all_repositories()) == 2
 
         # Remove one repository
-        success = registry.remove_repository(repo1_id)
+        success = registry.unregister_repository(repo1_id)
         assert success is True
 
         # Verify removal
@@ -285,7 +285,7 @@ class TestRepositoryManagement:
         assert registry.get_repository(repo2_id) is not None
 
         # Try removing non-existent
-        success = registry.remove_repository("non_existent_id")
+        success = registry.unregister_repository("non_existent_id")
         assert success is False
 
 

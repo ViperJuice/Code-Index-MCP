@@ -49,42 +49,47 @@ class TestCreateIndexCommand:
     async def test_create_index_success(self, command, temp_repo):
         """Test successful index creation."""
         with patch("asyncio.create_subprocess_exec") as mock_subprocess:
-            # Mock successful indexing
-            mock_proc = AsyncMock()
-            mock_proc.returncode = 0
-            mock_proc.communicate.return_value = (b"Success", b"")
-            mock_subprocess.return_value = mock_proc
+            with patch.object(command, "_get_repo_hash", return_value="abc123"):
+                # Mock successful indexing
+                mock_proc = AsyncMock()
+                mock_proc.returncode = 0
+                mock_proc.communicate.return_value = (b"Success", b"")
+                mock_subprocess.return_value = mock_proc
 
-            # Create mock index file
-            index_dir = Path.cwd() / ".indexes" / "abc123"
-            index_dir.mkdir(parents=True, exist_ok=True)
-            index_path = index_dir / "code_index.db"
+                # Create mock index file
+                index_dir = Path.cwd() / ".indexes" / "abc123"
+                index_dir.mkdir(parents=True, exist_ok=True)
+                index_path = index_dir / "code_index.db"
 
-            # Create minimal SQLite database
-            conn = sqlite3.connect(str(index_path))
-            conn.execute("CREATE TABLE files (id INTEGER PRIMARY KEY, path TEXT)")
-            conn.execute("INSERT INTO files (path) VALUES ('test.py')")
-            conn.execute("CREATE TABLE symbols (id INTEGER PRIMARY KEY, name TEXT)")
-            conn.commit()
-            conn.close()
+                # Remove any stale database from previous runs
+                if index_path.exists():
+                    index_path.unlink()
 
-            result = await command.execute(
-                repo="test_repo", path=str(temp_repo), languages=["python", "javascript"]
-            )
+                # Create minimal SQLite database
+                conn = sqlite3.connect(str(index_path))
+                conn.execute("CREATE TABLE files (id INTEGER PRIMARY KEY, path TEXT)")
+                conn.execute("INSERT INTO files (path) VALUES ('test.py')")
+                conn.execute("CREATE TABLE symbols (id INTEGER PRIMARY KEY, name TEXT)")
+                conn.commit()
+                conn.close()
 
-            assert result.success is True
-            assert result.data["file_count"] == 1
-            assert "index_path" in result.data
-            assert "repo_hash" in result.data
+                result = await command.execute(
+                    repo="test_repo", path=str(temp_repo), languages=["python", "javascript"]
+                )
 
-            # Verify metadata was created
-            metadata_path = index_dir / "metadata.json"
-            assert metadata_path.exists()
+                assert result.success is True
+                assert result.data["file_count"] == 1
+                assert "index_path" in result.data
+                assert "repo_hash" in result.data
 
-            with open(metadata_path) as f:
-                metadata = json.load(f)
-                assert metadata["repo"] == "test_repo"
-                assert metadata["languages"] == ["python", "javascript"]
+                # Verify metadata was created
+                metadata_path = index_dir / "metadata.json"
+                assert metadata_path.exists()
+
+                with open(metadata_path) as f:
+                    metadata = json.load(f)
+                    assert metadata["repo"] == "test_repo"
+                    assert metadata["languages"] == ["python", "javascript"]
 
     @pytest.mark.asyncio
     async def test_create_index_invalid_path(self, command):
@@ -472,6 +477,7 @@ class TestIntegration:
         with patch("asyncio.create_subprocess_exec") as mock_subprocess:
             mock_proc = AsyncMock()
             mock_proc.returncode = 0
+            mock_proc.communicate.return_value = (b"", b"")
             mock_subprocess.return_value = mock_proc
 
             # Create index
@@ -482,13 +488,18 @@ class TestIntegration:
             index_dir.mkdir(parents=True, exist_ok=True)
             index_path = index_dir / "code_index.db"
 
+            # Remove any stale database from previous runs
+            if index_path.exists():
+                index_path.unlink()
+
             conn = sqlite3.connect(str(index_path))
             conn.execute("CREATE TABLE files (id INTEGER PRIMARY KEY, path TEXT)")
             conn.execute("INSERT INTO files (path) VALUES ('test.py')")
             conn.commit()
             conn.close()
 
-            result = await create_cmd.execute(repo="integration_test", path=str(repo_path))
+            with patch.object(create_cmd, "_get_repo_hash", return_value="test123"):
+                result = await create_cmd.execute(repo="integration_test", path=str(repo_path))
             assert result.success is True
 
             # Validate index

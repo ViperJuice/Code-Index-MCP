@@ -13,9 +13,12 @@ from typing import Dict
 
 import psutil
 import pytest
-from memory_profiler import memory_usage
 
-from mcp_server.dispatcher.dispatcher import Dispatcher
+memory_usage = pytest.importorskip(
+    "memory_profiler", reason="memory_profiler not installed; skipping memory tests"
+).memory_usage
+
+from mcp_server.dispatcher import Dispatcher
 from mcp_server.interfaces.shared_interfaces import Result
 from mcp_server.plugin_system.plugin_manager import PluginManager
 from mcp_server.storage.sqlite_store import SQLiteStore

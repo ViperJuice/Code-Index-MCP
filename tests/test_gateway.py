@@ -9,6 +9,9 @@ This module tests all API endpoints including:
 - Reindexing operations
 """
 
+import os
+import time
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -17,20 +20,29 @@ import pytest
 from mcp_server.plugin_base import SearchResult, SymbolDef
 
 
+@contextmanager
+def measure_time(test_name: str, benchmark_results: dict):
+    """Context manager to measure test execution time."""
+    start = time.time()
+    yield
+    elapsed = time.time() - start
+    if test_name not in benchmark_results:
+        benchmark_results[test_name] = []
+    benchmark_results[test_name].append(elapsed)
+
+
 class TestGatewayStartupShutdown:
     """Test server startup and shutdown events."""
 
     @patch("mcp_server.gateway.format_preflight_report")
     @patch("mcp_server.gateway.run_startup_preflight")
     @patch("mcp_server.gateway.SQLiteStore")
-    @patch("mcp_server.gateway.PythonPlugin")
-    @patch("mcp_server.gateway.Dispatcher")
+    @patch("mcp_server.gateway.EnhancedDispatcher")
     @patch("mcp_server.gateway.FileWatcher")
     def test_startup_success(
         self,
         mock_watcher,
         mock_dispatcher,
-        mock_plugin,
         mock_store,
         mock_run_preflight,
         mock_format_preflight,
@@ -46,7 +58,6 @@ class TestGatewayStartupShutdown:
             # Verify components were initialized
             mock_run_preflight.assert_called_once()
             mock_store.assert_called_once()
-            mock_plugin.assert_called_once()
             mock_dispatcher.assert_called_once()
             mock_watcher.assert_called_once()
 
@@ -59,17 +70,17 @@ class TestGatewayStartupShutdown:
             with test_client:
                 pass
 
-    def test_shutdown_stops_watcher(self, test_client_with_dispatcher):
+    @patch("mcp_server.gateway.FileWatcher")
+    def test_shutdown_stops_watcher(self, mock_watcher_class, test_client_with_dispatcher):
         """Test that shutdown stops the file watcher."""
-        # Mock the file watcher
         mock_watcher = Mock()
-        test_client_with_dispatcher.app.state.file_watcher = mock_watcher
+        mock_watcher_class.return_value = mock_watcher
 
-        # Trigger shutdown by exiting context
+        # Trigger startup+shutdown via context manager
         with test_client_with_dispatcher:
             pass
 
-        # Watcher stop should have been called
+        # Watcher stop should have been called during shutdown
         mock_watcher.stop.assert_called_once()
 
 
@@ -87,10 +98,10 @@ class TestSymbolEndpoint:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["name"] == "sample_function"
+        assert data["symbol"] == "sample_function"
         assert data["kind"] == "function"
-        assert data["path"] == "/test/sample.py"
-        assert data["line"] == 10
+        assert data["defined_in"] == "/test/sample.py"
+        assert data["start_line"] == 10
 
     def test_symbol_lookup_not_found(self, test_client_with_dispatcher):
         """Test symbol lookup when symbol doesn't exist."""
@@ -101,11 +112,11 @@ class TestSymbolEndpoint:
         assert response.status_code == 200
         assert response.json() is None
 
-    def test_symbol_lookup_no_dispatcher(self, test_client):
+    def test_symbol_lookup_no_dispatcher(self, test_client, monkeypatch):
         """Test symbol lookup when dispatcher is not initialized."""
         import mcp_server.gateway as gateway
 
-        gateway.dispatcher = None
+        monkeypatch.setattr(gateway, "dispatcher", None)
 
         response = test_client.get("/symbol?symbol=test")
 
@@ -135,13 +146,23 @@ class TestSymbolEndpoint:
     )
     def test_symbol_lookup_various_names(self, test_client_with_dispatcher, symbol_name):
         """Test symbol lookup with various name formats."""
-        mock_symbol = SymbolDef(name=symbol_name, kind="function", path="/test.py", line=1)
+        mock_symbol = SymbolDef(
+            symbol=symbol_name,
+            kind="function",
+            language="python",
+            signature="def f()",
+            doc=None,
+            defined_in="/test.py",
+            start_line=1,
+            end_line=1,
+            span=(1, 1),
+        )
         test_client_with_dispatcher.app.state.dispatcher.lookup = Mock(return_value=mock_symbol)
 
         response = test_client_with_dispatcher.get(f"/symbol?symbol={symbol_name}")
 
         assert response.status_code == 200
-        assert response.json()["name"] == symbol_name
+        assert response.json()["symbol"] == symbol_name
 
 
 class TestSearchEndpoint:
@@ -158,8 +179,7 @@ class TestSearchEndpoint:
         assert response.status_code == 200
         results = response.json()
         assert len(results) == 3
-        assert results[0]["name"] == "function_one"
-        assert results[0]["score"] == 0.95
+        assert results[0]["file"] == "/test/file1.py"
 
     def test_search_semantic(self, test_client_with_dispatcher):
         """Test semantic search."""
@@ -224,8 +244,10 @@ class TestSearchEndpoint:
 
         assert response.status_code == 200
         payload = response.json()
-        assert payload[0] == {"file": "a.py", "line": 1, "snippet": "hello"}
-        assert payload[1] == {"file": "b.py", "line": 4, "snippet": "world"}
+        assert payload[0]["file"] == "a.py"
+        assert payload[0]["start_line"] == 1
+        assert payload[1]["file"] == "b.py"
+        assert payload[1]["start_line"] == 4
 
     def test_search_with_limit(self, test_client_with_dispatcher):
         """Test search with custom limit."""
@@ -247,16 +269,20 @@ class TestSearchEndpoint:
         assert response.status_code == 200
         assert response.json() == []
 
-    def test_search_no_dispatcher(self, test_client):
+    def test_search_no_dispatcher(self, test_client, monkeypatch):
         """Test search when dispatcher is not initialized."""
         import mcp_server.gateway as gateway
 
-        gateway.dispatcher = None
+        monkeypatch.setattr(gateway, "dispatcher", None)
+        for _attr in ("bm25_indexer", "hybrid_search", "fuzzy_indexer"):
+            if hasattr(gateway, _attr):
+                monkeypatch.setattr(gateway, _attr, None)
 
-        response = test_client.get("/search?q=test")
+        response = test_client.get("/search?q=test&mode=classic")
 
         assert response.status_code == 503
-        assert "Dispatcher not ready" in response.json()["detail"]
+        detail = response.json()["detail"]
+        assert "not ready" in detail or "not available" in detail
 
     def test_search_error(self, test_client_with_dispatcher):
         """Test search with internal error."""
@@ -281,7 +307,7 @@ class TestSearchEndpoint:
     def test_search_various_queries(self, test_client_with_dispatcher, query, expected_results):
         """Test search with various query types."""
         results = [
-            SearchResult(name=f"result_{i}", kind="function", path=f"/file{i}.py", score=1.0)
+            SearchResult(file=f"/file{i}.py", start_line=1, end_line=1, snippet=f"result_{i}")
             for i in range(expected_results)
         ]
         test_client_with_dispatcher.app.state.dispatcher.search = Mock(return_value=results)
@@ -297,10 +323,10 @@ class TestStatusEndpoint:
 
     def test_status_operational(self, test_client_with_dispatcher, populated_sqlite_store):
         """Test status endpoint when server is operational."""
-        # Mock dispatcher statistics
-        test_client_with_dispatcher.app.state.dispatcher.get_statistics = Mock(
-            return_value={"total": 10, "by_language": {"python": 10}}
-        )
+        dispatcher = test_client_with_dispatcher.app.state.dispatcher
+        # Mock dispatcher statistics and plugin list
+        dispatcher.get_statistics = Mock(return_value={"total": 10, "by_language": {"python": 10}})
+        dispatcher._plugins = [Mock()]  # 1 plugin
         test_client_with_dispatcher.app.state.sqlite_store = populated_sqlite_store
 
         response = test_client_with_dispatcher.get("/status")
@@ -313,11 +339,11 @@ class TestStatusEndpoint:
         assert "database" in data
         assert data["version"] == "0.1.0"
 
-    def test_status_no_dispatcher(self, test_client):
+    def test_status_no_dispatcher(self, test_client, monkeypatch):
         """Test status when dispatcher is not initialized."""
         import mcp_server.gateway as gateway
 
-        gateway.dispatcher = None
+        monkeypatch.setattr(gateway, "dispatcher", None)
 
         response = test_client.get("/status")
 
@@ -341,9 +367,7 @@ class TestStatusEndpoint:
 
     def test_status_plugin_statistics(self, test_client_with_dispatcher):
         """Test status with plugin-level statistics."""
-        # Remove get_statistics method to test fallback
-        delattr(test_client_with_dispatcher.app.state.dispatcher, "get_statistics")
-
+        # SimpleDispatcher has no get_statistics, so fallback to _plugins is used
         # Mock plugin with statistics
         mock_plugin = Mock()
         mock_plugin.get_indexed_count.return_value = 5
@@ -361,21 +385,24 @@ class TestStatusEndpoint:
 class TestPluginsEndpoint:
     """Test /plugins endpoint."""
 
-    def test_plugins_list(self, test_client_with_dispatcher):
+    def test_plugins_list(self, test_client_with_dispatcher, monkeypatch):
         """Test listing loaded plugins."""
-        # Mock plugins
-        mock_py_plugin = Mock()
-        mock_py_plugin.__class__.__name__ = "PythonPlugin"
-        mock_py_plugin.language = "python"
+        import mcp_server.gateway as gateway
 
-        mock_js_plugin = Mock()
-        mock_js_plugin.__class__.__name__ = "JavaScriptPlugin"
-        mock_js_plugin.lang = "javascript"
-
-        test_client_with_dispatcher.app.state.dispatcher._plugins = [
-            mock_py_plugin,
-            mock_js_plugin,
-        ]
+        # Build mock plugin_manager using the actual structure expected by the endpoint
+        # Note: Mock(name=...) sets the mock's display name, not .name attribute
+        mock_py_info = Mock(
+            version="1.0", description="", author="", language="python", file_extensions=[".py"]
+        )
+        mock_py_info.name = "PythonPlugin"
+        mock_js_info = Mock(
+            version="1.0", description="", author="", language="javascript", file_extensions=[".js"]
+        )
+        mock_js_info.name = "JavaScriptPlugin"
+        mock_pm = Mock()
+        mock_pm._registry.list_plugins.return_value = [mock_py_info, mock_js_info]
+        mock_pm.get_plugin_status.return_value = {}
+        monkeypatch.setattr(gateway, "plugin_manager", mock_pm)
 
         response = test_client_with_dispatcher.get("/plugins")
 
@@ -387,23 +414,24 @@ class TestPluginsEndpoint:
         assert plugins[1]["name"] == "JavaScriptPlugin"
         assert plugins[1]["language"] == "javascript"
 
-    def test_plugins_no_dispatcher(self, test_client):
-        """Test plugins endpoint when dispatcher is not initialized."""
+    def test_plugins_no_dispatcher(self, test_client, monkeypatch):
+        """Test plugins endpoint when plugin manager is not initialized."""
         import mcp_server.gateway as gateway
 
-        gateway.dispatcher = None
+        monkeypatch.setattr(gateway, "plugin_manager", None)
 
         response = test_client.get("/plugins")
 
         assert response.status_code == 503
-        assert "Dispatcher not ready" in response.json()["detail"]
+        assert "not ready" in response.json()["detail"]
 
-    def test_plugins_error(self, test_client_with_dispatcher):
+    def test_plugins_error(self, test_client_with_dispatcher, monkeypatch):
         """Test plugins endpoint with internal error."""
-        # Make _plugins attribute raise an error
-        type(test_client_with_dispatcher.app.state.dispatcher)._plugins = property(
-            lambda self: (_ for _ in ()).throw(Exception("Plugin error"))
-        )
+        import mcp_server.gateway as gateway
+
+        mock_pm = Mock()
+        mock_pm._registry.list_plugins.side_effect = Exception("Plugin error")
+        monkeypatch.setattr(gateway, "plugin_manager", mock_pm)
 
         response = test_client_with_dispatcher.get("/plugins")
 
@@ -417,7 +445,10 @@ class TestReindexEndpoint:
     @pytest.mark.asyncio
     async def test_reindex_all(self, test_client_with_dispatcher, temp_code_directory):
         """Test reindexing all files."""
-        # Mock index_file method
+        # Mock index_file method and _plugins (SimpleDispatcher lacks _plugins by default)
+        mock_plugin = Mock()
+        mock_plugin.supports.side_effect = lambda p: Path(p).suffix == ".py"
+        test_client_with_dispatcher.app.state.dispatcher._plugins = [mock_plugin]
         test_client_with_dispatcher.app.state.dispatcher.index_file = Mock()
 
         # Change to temp directory for testing
@@ -431,7 +462,8 @@ class TestReindexEndpoint:
             data = response.json()
             assert data["status"] == "completed"
             assert "Reindexed" in data["message"]
-            assert "Python files" in data["message"]
+            # endpoint formats as ".py files", not "Python files"
+            assert ".py files" in data["message"]
 
             # Verify index_file was called for Python files
             assert test_client_with_dispatcher.app.state.dispatcher.index_file.call_count >= 2
@@ -496,13 +528,16 @@ class TestReindexEndpoint:
         assert "Dispatcher not ready" in response.json()["detail"]
 
     @pytest.mark.asyncio
-    async def test_reindex_error(self, test_client_with_dispatcher):
+    async def test_reindex_error(self, test_client_with_dispatcher, tmp_path):
         """Test reindex with internal error."""
         test_client_with_dispatcher.app.state.dispatcher.index_file = Mock(
             side_effect=Exception("Index error")
         )
+        # Create a real file so the existence check passes
+        test_file = tmp_path / "test.py"
+        test_file.write_text("def foo(): pass")
 
-        response = test_client_with_dispatcher.post("/reindex?path=/tmp/test.py")
+        response = test_client_with_dispatcher.post(f"/reindex?path={test_file}")
 
         assert response.status_code == 500
         assert "Reindexing failed" in response.json()["detail"]
@@ -573,7 +608,17 @@ class TestPerformance:
     def test_symbol_lookup_performance(self, test_client_with_dispatcher, benchmark_results):
         """Benchmark symbol lookup performance."""
         test_client_with_dispatcher.app.state.dispatcher.lookup = Mock(
-            return_value=SymbolDef(name="test", kind="function", path="/test.py", line=1)
+            return_value=SymbolDef(
+                symbol="test",
+                kind="function",
+                language="python",
+                signature="def test()",
+                doc=None,
+                defined_in="/test.py",
+                start_line=1,
+                end_line=1,
+                span=(1, 1),
+            )
         )
 
         with measure_time("symbol_lookup", benchmark_results):
@@ -586,7 +631,7 @@ class TestPerformance:
         """Benchmark search performance."""
         test_client_with_dispatcher.app.state.dispatcher.search = Mock(
             return_value=[
-                SearchResult(name=f"result_{i}", kind="function", path=f"/file{i}.py", score=1.0)
+                SearchResult(file=f"/file{i}.py", start_line=1, end_line=1, snippet=f"result_{i}")
                 for i in range(20)
             ]
         )

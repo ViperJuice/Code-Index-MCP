@@ -16,6 +16,7 @@ from textwrap import dedent
 import pytest
 
 from mcp_server.plugins.c_plugin.plugin import Plugin as CPlugin
+from tests.conftest import measure_time
 
 
 class TestPluginInitialization:

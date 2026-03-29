@@ -642,7 +642,7 @@ class TestCppPluginNewInterface:
         # Index first
         plugin.indexFile(temp_cpp_file, content)
 
-        result = plugin.search("MyClass", {"limit": 10})
+        result = plugin.search_with_result("MyClass", {"limit": 10})
         assert result.success
         search_results = result.value
         assert isinstance(search_results, list)

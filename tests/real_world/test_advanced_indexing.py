@@ -1009,25 +1009,28 @@ class TestAdvancedIndexingIntegration:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
 
-                try:
-                    # Index files in batches
+                async def _run_batches():
                     for i in range(0, len(python_files), options.batch_size):
                         batch = python_files[i : i + options.batch_size]
-
                         tasks = [engine.index_file(str(f), options) for f in batch]
-                        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-                        for j, result in enumerate(results):
+                        batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+                        for j, result in enumerate(batch_results):
                             if isinstance(result, Exception):
                                 errors.append(f"{batch[j]}: {result}")
                             elif result.success:
-                                indexed_count += 1
-                                total_symbols += result.symbols_count
+                                indexed_count.append(1)
+                                total_symbols.append(result.symbols_count)
                             else:
                                 errors.append(f"{batch[j]}: {result.error}")
 
+                indexed_count = []
+                total_symbols = []
+                try:
+                    loop.run_until_complete(_run_batches())
                 finally:
                     loop.close()
+                indexed_count = len(indexed_count)
+                total_symbols = sum(total_symbols)
 
                 duration = time.time() - start_time
 

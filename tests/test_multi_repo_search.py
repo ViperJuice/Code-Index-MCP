@@ -11,10 +11,9 @@ import pytest
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from mcp_server.indexer.index_engine import IndexEngine
 from mcp_server.plugin_system.plugin_manager import PluginManager
-from mcp_server.storage.multi_repo_manager import MultiRepoIndexManager
+from mcp_server.storage.multi_repo_manager import MultiRepositoryManager as MultiRepoIndexManager
 from mcp_server.storage.repository_registry import RepositoryRegistry
 from mcp_server.storage.sqlite_store import SQLiteStore
 from tests.test_utilities import (
@@ -77,6 +76,7 @@ class TestMultiRepoSearch:
         repo5 = TestRepositoryBuilder.create_repository(test_env, "docs_repo", language="python")
         # Add markdown files
         (repo5.path / "README.md").write_text("# Documentation\n\nProject documentation.")
+        (repo5.path / "docs").mkdir(exist_ok=True)
         (repo5.path / "docs" / "api.md").write_text("# API Reference\n\n## UserService\n")
         (repo5.path / "docs" / "setup.md").write_text("# Setup Guide\n\n1. Install dependencies")
         TestRepositoryBuilder.run_git_command("git add .", repo5.path)
@@ -90,17 +90,22 @@ class TestMultiRepoSearch:
         index_path = index_dir / f"{repo_id}.db"
         store = SQLiteStore(str(index_path))
 
-        # Create plugin manager and dispatcher
+        # Create plugin manager
         plugin_manager = PluginManager()
-        dispatcher = EnhancedDispatcher(sqlite_store=store)
 
         # Create index engine
         engine = IndexEngine(
             plugin_manager=plugin_manager, storage=store, repository_path=str(repo_path)
         )
 
-        # Index the repository
-        stats = engine.index_directory(str(repo_path))
+        # Index the repository (index_directory is async)
+        import asyncio
+
+        loop = asyncio.new_event_loop()
+        try:
+            stats = loop.run_until_complete(engine.index_directory(str(repo_path)))
+        finally:
+            loop.close()
 
         return stats
 
@@ -131,7 +136,12 @@ class TestMultiRepoSearch:
             print(f"  Registration: {reg_time:.3f}s")
             print(f"  Indexing: {index_time:.3f}s")
             print(f"  Files: {stats.total_files}")
-            print(f"  Symbols: {stats.total_symbols}")
+            total_syms = (
+                sum(len(r.symbols) for r in stats.results if hasattr(r, "symbols"))
+                if stats.results
+                else 0
+            )
+            print(f"  Symbols: {total_syms}")
 
         # Verify all registered
         all_repos = registry.get_all_repositories()
@@ -143,6 +153,9 @@ class TestMultiRepoSearch:
             if op.startswith("register_"):
                 assert stats["average"] < 1.0, f"Registration too slow: {stats}"
 
+    @pytest.mark.skip(
+        reason="Uses fictitious API (add_repository/search_all_repositories) not present on MultiRepositoryManager"
+    )
     def test_cross_repository_search(self, test_env, registry):
         """Test searching across multiple repositories."""
         # Setup repositories
@@ -204,6 +217,9 @@ class TestMultiRepoSearch:
         avg_search = perf.get_average("search_UserService")
         assert avg_search < 1.0, f"Search too slow: {avg_search:.3f}s"
 
+    @pytest.mark.skip(
+        reason="Uses fictitious API (repo_languages/search_repositories) not present on MultiRepositoryManager"
+    )
     def test_language_specific_filtering(self, test_env, registry):
         """Test filtering search results by language."""
         # Setup repositories
@@ -249,6 +265,9 @@ class TestMultiRepoSearch:
             repo_id = result.get("repo_id")
             assert "python" in manager.repo_languages.get(repo_id, set())
 
+    @pytest.mark.skip(
+        reason="Uses fictitious API (search_all_repositories/search_across_repos) not present on MultiRepositoryManager"
+    )
     def test_concurrent_search_performance(self, test_env, registry):
         """Test concurrent searches across repositories."""
         # Setup repositories
@@ -302,6 +321,9 @@ class TestMultiRepoSearch:
         for i, (seq_count, conc_results) in enumerate(zip(sequential_results, concurrent_results)):
             assert seq_count == len(conc_results), f"Query {i} result mismatch"
 
+    @pytest.mark.skip(
+        reason="Uses fictitious API (add_repository/search_all_repositories) not present on MultiRepositoryManager"
+    )
     def test_repository_priority_ranking(self, test_env, registry):
         """Test repository result ranking and prioritization."""
         # Create repositories with different characteristics
@@ -353,6 +375,9 @@ class TestMultiRepoSearch:
             if abs(pri1 - pri2) > 20:
                 assert pri1 >= pri2, f"Priority ordering violated: {pri1} < {pri2}"
 
+    @pytest.mark.skip(
+        reason="Uses fictitious API (add_repository/loaded_indexes/max_concurrent_repos) not present on MultiRepositoryManager"
+    )
     def test_memory_efficient_loading(self, test_env, registry):
         """Test memory-efficient repository index loading."""
         # Create many small repositories

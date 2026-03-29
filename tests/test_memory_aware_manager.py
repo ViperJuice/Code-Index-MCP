@@ -7,13 +7,14 @@ plugin loading, eviction, and memory limits.
 
 import gc
 import os
+import weakref
 from datetime import datetime
 from unittest.mock import Mock, patch
 
 import pytest
 
-from mcp_server.plugin_system.models import LoadedPlugin
 from mcp_server.plugins.memory_aware_manager import (
+    LoadedPlugin,
     MemoryAwarePluginManager,
     PluginMemoryInfo,
     get_memory_aware_manager,
