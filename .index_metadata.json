@@ -7,11 +7,11 @@
   "normalization_policy": "l2",
   "chunk_schema_version": "1",
   "created_at": "2026-03-05T05:10:02.226505",
-  "updated_at": "2026-03-29T14:25:48.848543",
+  "updated_at": "2026-03-29T16:34:39.505568",
   "qdrant_path": "vector_index.qdrant",
   "collection_name": "code_index__oss_high__v1",
   "compatibility_hash": "0dd4ae03e82143510fee8bfe1912f364",
-  "git_commit": "1427b3bdfc0835c5a838da817f32206b4efe0bc1",
+  "git_commit": "49a6084f637c0cac0bfdda26033efb3f88e4ce17",
   "semantic_profile": "oss_high",
   "compatibility_fingerprint": "0dd4ae03e82143510fee8bfe1912f364",
   "semantic_profiles": {
@@ -29,7 +29,7 @@
       "collection_name": "code_index__commercial_high__v1",
       "qdrant_path": "vector_index.qdrant",
       "created_at": "2026-03-27T15:39:12.135184",
-      "updated_at": "2026-03-29T14:25:10.562358"
+      "updated_at": "2026-03-29T16:34:27.633356"
     },
     "oss_high": {
       "profile_id": "oss_high",
@@ -45,7 +45,7 @@
       "collection_name": "code_index__oss_high__v1",
       "qdrant_path": "vector_index.qdrant",
       "created_at": "2026-03-27T15:39:12.135184",
-      "updated_at": "2026-03-29T14:25:48.848543"
+      "updated_at": "2026-03-29T16:34:39.505568"
     }
   },
   "available_semantic_profiles": [

@@ -233,6 +233,14 @@ def run_semantic_preflight(
         if not check.ok:
             warnings.append(check.message)
 
+    try:
+        import flashrank  # noqa: F401
+    except ImportError:
+        warnings.append(
+            "flashrank not installed — reranking disabled. "
+            "Install with: pip install flashrank  (or pip install -r requirements-semantic.txt)"
+        )
+
     overall_ready = all(check.ok for check in [profile_check, embedding_check, qdrant_check])
     if strict and not overall_ready:
         warnings.append("Strict semantic mode enabled: startup/setup should fail until checks pass")

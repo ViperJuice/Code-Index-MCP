@@ -90,8 +90,8 @@ _INDEX_EXCLUDED_SUFFIXES = {
 # Path segment penalties for lexical (BM25/fuzzy) results.
 # FTS5 scores are negative; adding a positive penalty degrades rank.
 _PATH_PENALTY_RULES: List[Tuple[str, float]] = [
-    ("htmlcov/", 3.0),  # coverage HTML — matches every string literally
-    ("docs/benchmarks/", 2.0),  # benchmark JSON files contain literal query strings
+    ("htmlcov/", 10.0),  # coverage HTML — matches every string literally
+    ("docs/benchmarks/", 10.0),  # benchmark JSON files contain literal query strings
     ("/tests/", 0.3),  # test files reference queries as test data
 ]
 _JSON_PENALTY = 0.5  # generic .json data files are lower signal than source code

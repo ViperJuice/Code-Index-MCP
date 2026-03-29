@@ -46,7 +46,7 @@ class QueryCase:
 
 QUERY_SUITE: List[QueryCase] = [
     # --- Original 9 queries ---
-    QueryCase("classic",  "semantic preflight",
+    QueryCase("classic",  "semantic preflight checks implementation",
               "semantic_preflight.py",  "semantic"),
     QueryCase("bm25",     "qdrant docker compose autostart",
               "qdrant_autostart.py",    "symbol_precise"),
@@ -554,6 +554,10 @@ def main() -> int:
     parser.add_argument("--configs", default="", help="Comma-separated config labels to run (default: all)")
     parser.add_argument("--json-out", default="docs/benchmarks/matrix_benchmark.json")
     parser.add_argument("--md-out",   default="docs/benchmarks/matrix_benchmark.md")
+    parser.add_argument("--bm25-only", action="store_true",
+                        help="Run only BM25 configs (no embedding server required)")
+    parser.add_argument("--fail-below", type=float, default=0.0,
+                        help="Exit non-zero if overall Top-1 accuracy is below this threshold (0.0-1.0)")
     args = parser.parse_args()
 
     repo = Path(args.repo).resolve()
@@ -583,6 +587,9 @@ def main() -> int:
 
     # Filter configs
     configs_to_run = CONFIGS
+    if args.bm25_only:
+        configs_to_run = [c for c in configs_to_run if not c.semantic_enabled]
+        print(f"--bm25-only: running {len(configs_to_run)} BM25 config(s).")
     if args.configs:
         requested = {c.strip() for c in args.configs.split(",")}
         configs_to_run = [c for c in CONFIGS if c.label in requested]
@@ -665,6 +672,13 @@ def main() -> int:
     for cfg_label, rows in by_config.items():
         top1 = sum(1 for r in rows if r["pass"])
         print(f"  {cfg_label:45s}  {top1}/{len(rows)}")
+
+    if args.fail_below > 0.0 and all_mcp_rows:
+        overall_top1 = sum(1 for r in all_mcp_rows if r["pass"]) / len(all_mcp_rows)
+        print(f"\nOverall Top-1 accuracy: {overall_top1:.1%} (threshold: {args.fail_below:.1%})")
+        if overall_top1 < args.fail_below:
+            print(f"FAIL: accuracy {overall_top1:.1%} is below --fail-below {args.fail_below:.1%}")
+            return 1
 
     return 0
 

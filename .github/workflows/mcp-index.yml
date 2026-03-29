@@ -277,6 +277,53 @@ jobs:
             artifact-metadata.json
           retention-days: 7
 
+  benchmark-smoke:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    needs: check-enabled
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-semantic.txt
+          pip install flashrank
+
+      - name: Download latest index
+        id: download_index
+        run: |
+          if gh release download index-latest \
+              --repo ${{ github.repository }} \
+              --pattern "mcp-index-archive.tar.gz" \
+              --dir /tmp/mcp-index-dl 2>/dev/null; then
+            mkdir -p .mcp-index
+            tar -xzf /tmp/mcp-index-dl/mcp-index-archive.tar.gz -C .mcp-index/
+            echo "downloaded=true" >> $GITHUB_OUTPUT
+          else
+            echo "No index artifact found — skipping benchmark."
+            echo "downloaded=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run BM25 smoke benchmark
+        if: steps.download_index.outputs.downloaded == 'true'
+        run: |
+          PYTHONPATH=. python scripts/run_matrix_benchmark.py \
+            --bm25-only \
+            --fail-below 0.55 \
+            --no-native \
+            --db .mcp-index/code_index.db \
+            --json-out /tmp/benchmark-smoke.json \
+            --md-out /tmp/benchmark-smoke.md
+
   cleanup-old-artifacts:
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule'

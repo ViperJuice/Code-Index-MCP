@@ -40,6 +40,11 @@ __tests__/
 # docs/
 # *.md
 
+# Benchmark artifacts (contain literal query strings that pollute BM25)
+docs/benchmarks/
+coverage.xml
+htmlcov/
+
 # Large files
 *.zip
 *.tar.gz

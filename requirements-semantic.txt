@@ -14,6 +14,7 @@ qdrant-client>=1.7.0
 
 # Reranking
 cohere>=4.0.0
+flashrank>=0.3.0
 
 # AI/LLM
 anthropic>=0.18.0

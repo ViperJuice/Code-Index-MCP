@@ -65,7 +65,8 @@ typing-extensions==4.13.2     # Extended typing support
 
 # Optional: Advanced search capabilities
 # Uncomment if semantic search is enabled
-# sentence-transformers==3.2.1
+sentence-transformers>=2.0.0
+flashrank>=0.3.0
 # faiss-cpu==1.9.0
 # numpy==2.2.1
 
