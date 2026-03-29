@@ -372,7 +372,7 @@ class TestIntegration:
 
         # Clean up
         propagator.restore_environment()
-        del os.environ["CLAUDE_AGENT_TYPE"]
+        os.environ.pop("CLAUDE_AGENT_TYPE", None)
 
 
 @pytest.mark.integration
