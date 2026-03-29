@@ -210,16 +210,8 @@ class TestSearchEndpoint:
         gateway.hybrid_search = FakeHybrid()
         gateway.query_cache = None
 
-        login_response = test_client_with_dispatcher.post(
-            "/api/v1/auth/login",
-            json={"username": "admin", "password": "admin123!"},
-        )
-        token = login_response.json()["access_token"]
-
-        response = test_client_with_dispatcher.get(
-            "/search?q=test&semantic=true",
-            headers={"Authorization": f"Bearer {token}"},
-        )
+        # Use default test-token auth (fallback path grants ADMIN access without startup)
+        response = test_client_with_dispatcher.get("/search?q=test&semantic=true")
 
         assert response.status_code == 200
         payload = response.json()
