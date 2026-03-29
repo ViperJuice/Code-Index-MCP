@@ -62,7 +62,7 @@ class TestRepositoryManagement:
         # Check repository info
         info = registry.get_repository(repo_id)
         assert info is not None
-        assert str(info.path) == str(repo.path)
+        assert Path(str(info.path)).resolve() == Path(str(repo.path)).resolve()
         assert info.name == "test_repo"
         assert info.auto_sync is True
         assert info.current_commit is not None

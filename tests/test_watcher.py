@@ -11,6 +11,7 @@ Tests cover:
 """
 
 import os
+import sys
 import threading
 import time
 from contextlib import contextmanager
@@ -332,6 +333,10 @@ class TestFileWatcher:
 class TestEdgeCases:
     """Test edge cases and error conditions."""
 
+    @pytest.mark.skipif(
+        sys.platform == "darwin",
+        reason="FSEventsObserver on macOS silently ignores nonexistent directories",
+    )
     def test_watcher_on_nonexistent_directory(self, dispatcher_with_mock):
         """Test creating watcher on non-existent directory."""
         nonexistent = Path("/this/does/not/exist")

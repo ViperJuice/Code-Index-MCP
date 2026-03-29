@@ -1,7 +1,8 @@
 """Authentication and authorization manager."""
 
 import fnmatch
-from datetime import datetime, timedelta
+import time
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import jwt
@@ -281,7 +282,8 @@ class AuthManager(IAuthenticator, IAuthorizer):
 
     async def create_access_token(self, user: User) -> str:
         """Create JWT access token for user."""
-        now = datetime.utcnow()
+        now_ts = int(time.time())
+        now = datetime.fromtimestamp(now_ts, tz=timezone.utc)
         expires_at = now + timedelta(minutes=self.config.access_token_expire_minutes)
 
         token_data = TokenData(
@@ -289,8 +291,8 @@ class AuthManager(IAuthenticator, IAuthorizer):
             username=user.username,
             role=user.role,
             permissions=user.permissions,
-            issued_at=now,
-            expires_at=expires_at,
+            issued_at=now.replace(tzinfo=None),
+            expires_at=expires_at.replace(tzinfo=None),
         )
 
         payload = {
@@ -298,7 +300,7 @@ class AuthManager(IAuthenticator, IAuthorizer):
             "username": token_data.username,
             "role": token_data.role.value,
             "permissions": [p.value for p in token_data.permissions],
-            "iat": int(now.timestamp()),
+            "iat": now_ts,
             "exp": int(expires_at.timestamp()),
             "type": "access",
         }
@@ -311,7 +313,8 @@ class AuthManager(IAuthenticator, IAuthorizer):
 
     async def create_refresh_token(self, user: User) -> str:
         """Create refresh token for user."""
-        now = datetime.utcnow()
+        now_ts = int(time.time())
+        now = datetime.fromtimestamp(now_ts, tz=timezone.utc).replace(tzinfo=None)
         expires_at = now + timedelta(days=self.config.refresh_token_expire_days)
 
         refresh_data = RefreshTokenData(user_id=user.id, issued_at=now, expires_at=expires_at)
@@ -321,8 +324,13 @@ class AuthManager(IAuthenticator, IAuthorizer):
         payload = {
             "token_id": refresh_data.token_id,
             "user_id": refresh_data.user_id,
-            "iat": int(now.timestamp()),
-            "exp": int(expires_at.timestamp()),
+            "iat": now_ts,
+            "exp": int(
+                (
+                    datetime.fromtimestamp(now_ts, tz=timezone.utc)
+                    + timedelta(days=self.config.refresh_token_expire_days)
+                ).timestamp()
+            ),
             "type": "refresh",
         }
 

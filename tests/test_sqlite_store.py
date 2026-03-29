@@ -596,17 +596,17 @@ class TestCacheOperations:
     def test_clear_expired_cache(self, sqlite_store):
         """Test clearing expired cache entries."""
         with sqlite_store._get_connection() as conn:
-            # Insert expired entry
-            past = datetime.now() - timedelta(hours=1)
+            # Insert expired entry (use UTC to match SQLite's CURRENT_TIMESTAMP)
+            past = datetime.utcnow() - timedelta(hours=1)
             conn.execute(
-                """INSERT INTO query_cache 
+                """INSERT INTO query_cache
                    (query_hash, query_text, result, expires_at)
                    VALUES (?, ?, ?, ?)""",
                 ("hash1", "old query", '{"results": []}', past),
             )
 
             # Insert valid entry
-            future = datetime.now() + timedelta(hours=1)
+            future = datetime.utcnow() + timedelta(hours=1)
             conn.execute(
                 """INSERT INTO query_cache 
                    (query_hash, query_text, result, expires_at)
