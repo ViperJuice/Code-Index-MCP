@@ -9,6 +9,7 @@ tree as an S-expression string.
 from __future__ import annotations
 
 import ctypes
+import sys
 from pathlib import Path
 
 import tree_sitter_languages
@@ -23,7 +24,8 @@ class TreeSitterWrapper:
         # ``tree_sitter_languages`` package ships a ``languages.so`` file with
         # functions such as ``tree_sitter_python`` which return ``TSLanguage``
         # pointers.  These can be wrapped with :class:`Language`.
-        lib_path = Path(tree_sitter_languages.__path__[0]) / "languages.so"
+        _lib_ext = ".pyd" if sys.platform == "win32" else ".so"
+        lib_path = Path(tree_sitter_languages.__path__[0]) / f"languages{_lib_ext}"
         self._lib = ctypes.CDLL(str(lib_path))
         # Configure the return type for the Python language function so that
         # ``ctypes`` returns a ``void*`` pointer compatible with

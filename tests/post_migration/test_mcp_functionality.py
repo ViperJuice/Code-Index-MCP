@@ -9,9 +9,11 @@ import sys
 import time
 from pathlib import Path
 
+import pytest
 import requests
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="pkill not available on Windows")
 def test_mcp_server_startup():
     """Test that the MCP server can start successfully."""
     print("Testing MCP server startup...")
