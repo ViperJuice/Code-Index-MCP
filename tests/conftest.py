@@ -292,7 +292,13 @@ def test_client_with_dispatcher(
     monkeypatch.setattr(gateway, "dispatcher", dispatcher_with_plugins)
     monkeypatch.setattr(gateway, "sqlite_store", sqlite_store)
     # Clear search-mode globals so tests that mock dispatcher.search use classic mode
-    for _attr in ("bm25_indexer", "hybrid_search", "fuzzy_indexer", "semantic_indexer", "query_cache"):
+    for _attr in (
+        "bm25_indexer",
+        "hybrid_search",
+        "fuzzy_indexer",
+        "semantic_indexer",
+        "query_cache",
+    ):
         if hasattr(gateway, _attr):
             monkeypatch.setattr(gateway, _attr, None)
 
@@ -470,8 +476,7 @@ def create_test_index():
         db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(db_path))
         conn.execute(
-            "CREATE TABLE IF NOT EXISTS files "
-            "(id INTEGER PRIMARY KEY, path TEXT, language TEXT)"
+            "CREATE TABLE IF NOT EXISTS files " "(id INTEGER PRIMARY KEY, path TEXT, language TEXT)"
         )
         conn.commit()
         conn.close()
