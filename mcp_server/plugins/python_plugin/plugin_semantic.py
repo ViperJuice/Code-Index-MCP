@@ -3,11 +3,19 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Iterable, Optional
 
 import jedi
-from chunker import chunk_text
+
+try:
+    from chunker import chunk_text as chunk_text
+
+    _CHUNKER_AVAILABLE = True
+except Exception:
+    chunk_text = None  # type: ignore[assignment]
+    _CHUNKER_AVAILABLE = False
 
 from ...plugin_base import (
     IndexShard,
@@ -50,7 +58,8 @@ class PythonPluginSemantic(PluginWithSemanticSearch):
                 logger.warning(f"Failed to create repository: {e}")
                 self._repository_id = None
 
-        self._preindex()
+        if os.getenv("MCP_SKIP_PLUGIN_PREINDEX", "false").lower() != "true":
+            self._preindex()
 
     def _preindex(self) -> None:
         """Pre-index Python files in the current directory."""

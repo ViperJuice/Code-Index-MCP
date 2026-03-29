@@ -7,7 +7,13 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
-from chunker import chunk_text
+try:
+    from chunker import chunk_text as chunk_text
+
+    _CHUNKER_AVAILABLE = True
+except Exception:
+    chunk_text = None  # type: ignore[assignment]
+    _CHUNKER_AVAILABLE = False
 
 from ..plugin_base import (
     IndexShard,
@@ -72,10 +78,23 @@ class GenericTreeSitterPlugin(PluginWithSemanticSearch):
         if os.getenv("MCP_SKIP_PLUGIN_PREINDEX", "false").lower() != "true":
             self._preindex()
 
+    _EXCLUDED_DIRS = {
+        "htmlcov",
+        ".venv",
+        "venv",
+        "node_modules",
+        "__pycache__",
+        ".git",
+        "dist",
+        "build",
+    }
+
     def _preindex(self) -> None:
         """Pre-index files for this language in the current directory."""
         for ext in self.file_extensions:
             for path in Path(".").rglob(f"*{ext}"):
+                if any(part in self._EXCLUDED_DIRS for part in path.parts):
+                    continue
                 try:
                     text = path.read_text(encoding="utf-8")
                     self._indexer.add_file(str(path), text)

@@ -15,10 +15,11 @@ Tests cover:
 - Performance benchmarks
 """
 
-import pytest
 from pathlib import Path
 from textwrap import dedent
 from unittest.mock import patch
+
+import pytest
 
 from mcp_server.interfaces.plugin_interfaces import (
     IndexedFile,

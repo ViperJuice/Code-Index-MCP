@@ -3,6 +3,7 @@ from __future__ import annotations
 import ctypes
 import hashlib
 import logging
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -87,7 +88,8 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
             )
 
         # Pre-index existing files
-        self._preindex()
+        if os.getenv("MCP_SKIP_PLUGIN_PREINDEX", "false").lower() != "true":
+            self._preindex()
 
     # ========================================
     # IPlugin Interface Implementation

@@ -13,7 +13,7 @@ from typing import Any, Dict, Tuple
 
 import httpx
 
-from ..dispatcher.dispatcher import Dispatcher
+from ..dispatcher import Dispatcher
 from ..indexer.bm25_indexer import BM25Indexer
 from ..indexer.hybrid_search import HybridSearch, HybridSearchConfig
 from ..plugin_system import PluginManager

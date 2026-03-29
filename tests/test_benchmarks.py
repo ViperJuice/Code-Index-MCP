@@ -30,7 +30,7 @@ from mcp_server.benchmarks import (
 from mcp_server.interfaces.indexing_interfaces import IBenchmarkRunner
 from mcp_server.interfaces.metrics_interfaces import IPerformanceMonitor
 from mcp_server.interfaces.shared_interfaces import Result
-from mcp_server.plugin_base import IPlugin, IndexShard, Reference, SearchResult, SymbolDef
+from mcp_server.plugin_base import IndexShard, IPlugin, Reference, SearchResult, SymbolDef
 
 
 class MockPlugin(IPlugin):

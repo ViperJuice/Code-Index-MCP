@@ -307,10 +307,7 @@ class SimpleAggregationStrategy(IAggregationStrategy):
             confidence = min(1.0, len(sources) / 3.0)  # Max confidence with 3+ sources
 
             # Calculate rank score
-            rank_score = self._calculate_rank_score(group, criteria)
-
-            # Extract ranking metadata from primary result if available
-            ranking_metadata = primary_result.get("ranking_metadata", {})
+            rank_score, ranking_metadata = self._calculate_rank_score(group, criteria)
 
             aggregated_result = AggregatedResult(
                 primary_result=primary_result,
@@ -381,7 +378,6 @@ class SimpleAggregationStrategy(IAggregationStrategy):
 
         rank_score *= boost_factor
 
-        # Store ranking metadata in primary result for debugging
         ranking_metadata = {
             "relevance_score": relevance_score,
             "confidence_score": confidence_score,
@@ -394,11 +390,7 @@ class SimpleAggregationStrategy(IAggregationStrategy):
             "final_rank_score": min(1.0, rank_score),
         }
 
-        # Store metadata back in result
-        if "ranking_metadata" not in primary_result:
-            primary_result["ranking_metadata"] = ranking_metadata
-
-        return min(1.0, rank_score)
+        return min(1.0, rank_score), ranking_metadata
 
 
 class SmartAggregationStrategy(IAggregationStrategy):
@@ -449,13 +441,10 @@ class SmartAggregationStrategy(IAggregationStrategy):
             confidence = min(1.0, base_confidence + similarity_bonus)
 
             # Calculate enhanced rank score
-            rank_score = self._calculate_enhanced_rank_score(group, criteria)
+            rank_score, ranking_metadata = self._calculate_enhanced_rank_score(group, criteria)
 
             # Merge context from similar results
             context_lines = self._merge_context(group)
-
-            # Extract ranking metadata from primary result if available
-            ranking_metadata = primary_result.get("ranking_metadata", {})
 
             aggregated_result = AggregatedResult(
                 primary_result=primary_result,
@@ -701,11 +690,7 @@ class SmartAggregationStrategy(IAggregationStrategy):
             "final_rank_score": min(1.0, rank_score),
         }
 
-        # Store metadata back in result
-        if "ranking_metadata" not in primary_result:
-            primary_result["ranking_metadata"] = ranking_metadata
-
-        return min(1.0, rank_score)
+        return min(1.0, rank_score), ranking_metadata
 
     def _merge_context(self, group: List[Tuple[IPlugin, SearchResult]]) -> List[str]:
         """Merge context lines from similar results."""
@@ -923,13 +908,13 @@ class ResultAggregator(IResultAggregator):
         unique_references = []
 
         for ref in all_references:
-            key = (ref.file, ref.line)
+            key = (ref.file, ref.start_line)
             if key not in seen:
                 seen.add(key)
                 unique_references.append(ref)
 
         # Sort by file and line
-        unique_references.sort(key=lambda r: (r.file, r.line))
+        unique_references.sort(key=lambda r: (r.file, r.start_line))
 
         logger.debug(
             f"Aggregated {len(unique_references)} unique references from "

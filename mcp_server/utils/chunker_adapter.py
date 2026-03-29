@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Mapping
 
-from chunker import CodeChunk
+try:
+    from chunker import CodeChunk
+except Exception:
+    CodeChunk = None  # type: ignore[assignment,misc]
 
 from ..plugin_base import IndexShard, SymbolDef
 
@@ -16,6 +19,8 @@ class ChunkerAdapter:
 
     def _get_symbol_name(self, chunk: CodeChunk) -> str:
         """Extract a stable symbol name across chunker metadata versions."""
+        import re
+
         metadata: Mapping[str, Any] = chunk.metadata or {}
 
         name = metadata.get("name")
@@ -28,11 +33,26 @@ class ChunkerAdapter:
             if isinstance(signature_name, str) and signature_name:
                 return signature_name
 
+        # Some languages (e.g. Go) store the exported name in 'exports' list
+        exports = metadata.get("exports")
+        if isinstance(exports, list) and exports:
+            first = exports[0]
+            if isinstance(first, str) and first:
+                return first
+
         first_line = chunk.content.split("\n", 1)[0].strip()
         if first_line:
             if first_line.startswith(("def ", "class ")):
                 head = first_line.split()[1]
                 return head.split("(")[0].split(":")[0]
+            # Go method: func (recv Type) MethodName(...)
+            m = re.match(r"func\s+\([^)]+\)\s+(\w+)\s*\(", first_line)
+            if m:
+                return m.group(1)
+            # Go function: func FuncName(...)
+            m = re.match(r"func\s+(\w+)\s*\(", first_line)
+            if m:
+                return m.group(1)
 
         return chunk.node_type
 
@@ -62,11 +82,17 @@ class ChunkerAdapter:
         """Normalize chunk kinds for internal symbol consumers."""
         metadata: Mapping[str, Any] = chunk.metadata or {}
         raw_kind = metadata.get("kind") or metadata.get("type") or chunk.node_type
-        if raw_kind == "function_definition":
-            return "function"
-        if raw_kind == "class_definition":
-            return "class"
-        return str(raw_kind)
+        _KIND_MAP = {
+            "function_definition": "function",
+            "function_declaration": "function",
+            "method_declaration": "method",
+            "class_definition": "class",
+            "class_declaration": "class",
+            "type_declaration": "type",
+            "type_spec": "type",
+            "interface_type": "interface",
+        }
+        return _KIND_MAP.get(str(raw_kind), str(raw_kind))
 
     def chunk_to_symbol_dict(self, chunk: CodeChunk) -> Dict:
         """Convert a CodeChunk to the symbol dictionary format.

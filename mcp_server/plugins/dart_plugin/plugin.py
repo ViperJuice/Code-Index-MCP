@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -72,6 +73,9 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
         # Current file context
         self._current_file: Optional[Path] = None
 
+        # In-memory indexed content for reference search
+        self._indexed_content: Dict[str, str] = {}
+
         # Create or get repository if SQLite is enabled
         if self._sqlite_store:
             self._repository_id = self._sqlite_store.create_repository(
@@ -79,7 +83,8 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
             )
 
         # Pre-index existing files
-        self._preindex()
+        if os.getenv("MCP_SKIP_PLUGIN_PREINDEX", "false").lower() != "true":
+            self._preindex()
 
     # ========================================
     # IDartPlugin Interface Implementation
@@ -357,6 +362,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
 
         self._current_file = path
         self._indexer.add_file(str(path), content)
+        self._indexed_content[str(path)] = content
 
         # Store file in SQLite if available
         file_id = None
@@ -367,7 +373,11 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
             file_id = self._sqlite_store.store_file(
                 self._repository_id,
                 str(path),
-                str(path.relative_to(Path.cwd())),
+                str(
+                    path.relative_to(Path.cwd())
+                    if path.is_absolute() and path.is_relative_to(Path.cwd())
+                    else path
+                ),
                 language="dart",
                 size=len(content),
                 hash=file_hash,
@@ -401,8 +411,8 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
                 "signature": sym_def.signature or "",
                 "doc": sym_def.docstring,
                 "defined_in": sym_def.file_path,
-                "line": sym_def.line,
-                "span": (sym_def.line, sym_def.line + 5),
+                "line": sym_def.start_line,
+                "span": (sym_def.start_line, sym_def.end_line),
             }
         return None
 
@@ -410,7 +420,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
         """Find all references to a symbol (legacy interface)"""
         result = self.get_references(symbol, {})
         if result.success and result.value:
-            return [Reference(file=ref.file_path, line=ref.line) for ref in result.value]
+            return [Reference(file=ref.file_path, line=ref.start_line) for ref in result.value]
         return []
 
     def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:
@@ -533,7 +543,8 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
             symbol = SymbolDefinition(
                 symbol=class_name,
                 file_path=file_path,
-                line=line_no,
+                start_line=line_no,
+                end_line=line_no,
                 column=match_text.find(class_name),
                 symbol_type=symbol_type,
                 signature=signature,
@@ -602,7 +613,8 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
             symbol = SymbolDefinition(
                 symbol=f"{class_name}.{method_name}",
                 file_path=file_path,
-                line=line_no,
+                start_line=line_no,
+                end_line=line_no,
                 column=match.group(0).find(method_name),
                 symbol_type=symbol_type,
                 signature=signature,
@@ -637,7 +649,8 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
             symbol = SymbolDefinition(
                 symbol=f"{class_name}.{prop_name}",
                 file_path=file_path,
-                line=line_no,
+                start_line=line_no,
+                end_line=line_no,
                 column=match.group(0).find(prop_name),
                 symbol_type="property",
                 signature=signature,
@@ -661,7 +674,8 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
             symbol = SymbolDefinition(
                 symbol=enum_name,
                 file_path=file_path,
-                line=line_no,
+                start_line=line_no,
+                end_line=line_no,
                 column=match.group(0).find(enum_name),
                 symbol_type="enum",
                 signature=f"enum {enum_name}",
@@ -690,7 +704,8 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
             symbol = SymbolDefinition(
                 symbol=mixin_name,
                 file_path=file_path,
-                line=line_no,
+                start_line=line_no,
+                end_line=line_no,
                 column=match.group(0).find(mixin_name),
                 symbol_type="mixin",
                 signature=signature,
@@ -717,7 +732,8 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
             symbol = SymbolDefinition(
                 symbol=extension_name,
                 file_path=file_path,
-                line=line_no,
+                start_line=line_no,
+                end_line=line_no,
                 column=match.group(0).find("extension"),
                 symbol_type="extension",
                 signature=signature,
@@ -781,7 +797,8 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
             symbol = SymbolDefinition(
                 symbol=function_name,
                 file_path=file_path,
-                line=line_no,
+                start_line=line_no,
+                end_line=line_no,
                 column=match.group(0).find(function_name),
                 symbol_type=symbol_type,
                 signature=signature,
@@ -831,7 +848,8 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
             symbol = SymbolDefinition(
                 symbol=var_name,
                 file_path=file_path,
-                line=line_no,
+                start_line=line_no,
+                end_line=line_no,
                 column=match.group(0).find(var_name),
                 symbol_type=symbol_type,
                 signature=signature,
@@ -858,7 +876,8 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
             symbol = SymbolDefinition(
                 symbol=typedef_name,
                 file_path=file_path,
-                line=line_no,
+                start_line=line_no,
+                end_line=line_no,
                 column=match.group(0).find(typedef_name),
                 symbol_type="typedef",
                 signature=signature,
@@ -899,7 +918,8 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
                 widget = SymbolDefinition(
                     symbol=class_name,
                     file_path="temp_file.dart",  # Will be overridden by caller
-                    line=line_no,
+                    start_line=line_no,
+                    end_line=line_no,
                     column=match.group(0).find(class_name),
                     symbol_type="widget",
                     signature=f"class {class_name} extends {extends_class}",
@@ -962,7 +982,19 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
 
     def _find_symbol_definition(self, symbol: str) -> Optional[SymbolDefinition]:
         """Find the definition of a symbol across all files"""
-        # Search in all Dart files
+        # Check in-memory indexed content first
+        if self._indexed_content:
+            for path_str, content in self._indexed_content.items():
+                try:
+                    symbols = self._extract_all_symbols(content, path_str)
+                    for sym_def in symbols:
+                        if sym_def.symbol == symbol or sym_def.symbol.endswith(f".{symbol}"):
+                            return sym_def
+                except Exception:
+                    continue
+            return None
+
+        # Fall back to filesystem scan
         for path in Path(".").rglob("*.dart"):
             try:
                 # Skip build and cache directories
@@ -987,7 +1019,36 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
         references = []
         seen = set()
 
-        # Search in all Dart files
+        def _search_content(path_str: str, content: str) -> None:
+            lines = content.splitlines()
+            for i, line in enumerate(lines):
+                pattern = r"\b" + re.escape(symbol) + r"\b"
+                for match in re.finditer(pattern, line):
+                    line_no = i + 1
+                    column = match.start()
+                    key = (path_str, line_no, column)
+                    if key not in seen:
+                        ref = SymbolReference(
+                            symbol=symbol,
+                            file_path=path_str,
+                            start_line=line_no,
+                            end_line=line_no,
+                            column=column,
+                            context=line.strip(),
+                        )
+                        references.append(ref)
+                        seen.add(key)
+
+        # Use in-memory indexed content if available
+        if self._indexed_content:
+            for path_str, content in self._indexed_content.items():
+                try:
+                    _search_content(path_str, content)
+                except Exception:
+                    continue
+            return references
+
+        # Fall back to filesystem scan
         for path in Path(".").rglob("*.dart"):
             try:
                 # Skip build and cache directories
@@ -1011,7 +1072,8 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
                             ref = SymbolReference(
                                 symbol=symbol,
                                 file_path=str(path),
-                                line=line_no,
+                                start_line=line_no,
+                                end_line=line_no,
                                 column=column,
                                 context=line.strip(),
                             )
@@ -1032,7 +1094,8 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
         for result in fuzzy_results:
             search_result = SearchResultInterface(
                 file_path=result["file"],
-                line=result["line"],
+                start_line=result["line"],
+                end_line=result["line"],
                 column=0,
                 snippet=result["snippet"],
                 match_type="fuzzy",
@@ -1190,7 +1253,7 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
                 # This is a simplified implementation
                 # In a real implementation, you'd parse the context to determine
                 # if this is a call site or a definition
-                hierarchy["called_by"].append(f"{ref.file_path}:{ref.line}")
+                hierarchy["called_by"].append(f"{ref.file_path}:{ref.start_line}")
 
         except Exception:
             pass
@@ -1348,8 +1411,8 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
                 "symbol": sym.symbol,
                 "kind": sym.symbol_type,
                 "signature": sym.signature or "",
-                "line": sym.line,
-                "span": (sym.line, sym.line + 5),  # Approximate span
+                "line": sym.start_line,
+                "span": (sym.start_line, sym.end_line),
             }
 
             # Add any additional fields based on symbol type
@@ -1364,14 +1427,14 @@ class Plugin(IPlugin, IDartPlugin, ILanguageAnalyzer):
                     file_id,
                     sym.symbol,
                     sym.symbol_type,
-                    sym.line,
-                    legacy_symbol["span"][1],
+                    sym.start_line,
+                    sym.end_line,
                     signature=sym.signature,
                 )
                 self._indexer.add_symbol(
                     sym.symbol,
                     str(self._current_file),
-                    sym.line,
+                    sym.start_line,
                     {"symbol_id": symbol_id, "file_id": file_id},
                 )
 

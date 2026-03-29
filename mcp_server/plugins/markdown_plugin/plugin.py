@@ -78,9 +78,11 @@ class MarkdownPlugin(BaseDocumentPlugin):
 
         return chunks
 
-    def indexFile(self, path: str | Path, content: str) -> IndexShard:
+    def indexFile(self, path: str | Path, content: str | None = None) -> IndexShard:
         """Override to handle Markdown-specific indexing."""
         path = Path(path)
+        if content is None:
+            content = path.read_text(encoding="utf-8", errors="replace")
 
         lightweight_mode = (
             os.getenv("MCP_LIGHTWEIGHT_DOC_INDEX", "false").lower() == "true"
@@ -102,7 +104,13 @@ class MarkdownPlugin(BaseDocumentPlugin):
                     },
                 }
             ]
-            return {"file": str(path), "symbols": symbols, "language": self.lang}
+            return {
+                "file": str(path),
+                "symbols": symbols,
+                "language": self.lang,
+                "chunks": [],
+                "metadata": metadata.__dict__,
+            }
 
         # Extract metadata
         metadata = self.extract_metadata(content, path)
@@ -153,7 +161,13 @@ class MarkdownPlugin(BaseDocumentPlugin):
         ):
             self._index_chunks_semantically(str(path), chunks, metadata)
 
-        return {"file": str(path), "symbols": symbols, "language": self.lang}
+        return {
+            "file": str(path),
+            "symbols": symbols,
+            "language": self.lang,
+            "chunks": [chunk.__dict__ for chunk in chunks],
+            "metadata": metadata.__dict__,
+        }
 
     def extract_structure(self, content: str, file_path: Path) -> DocumentStructure:
         """Extract document structure (headings, sections, etc)."""

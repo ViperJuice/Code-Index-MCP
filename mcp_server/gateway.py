@@ -1257,6 +1257,8 @@ async def search(
 
         logger.debug(f"Search returned {len(results)} results using {effective_mode} mode")
         return results
+    except HTTPException:
+        raise
     except Exception as e:
         duration = time.time() - start_time
         business_metrics.record_search_performed(

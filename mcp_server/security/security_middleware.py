@@ -3,6 +3,7 @@
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
+from urllib.parse import unquote
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -310,8 +311,11 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     content={"detail": "Unsupported media type"},
                 )
 
-        # Check for suspicious patterns in URL
-        if self._has_suspicious_patterns(request.url.path):
+        # Check for suspicious patterns in URL path and query string (decode URL encoding)
+        raw_path = request.scope.get("path", request.url.path)
+        query = unquote(str(request.url.query)) if request.url.query else ""
+        full_url_check = raw_path + "?" + query if query else raw_path
+        if self._has_suspicious_patterns(full_url_check):
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={"detail": "Invalid request format"},

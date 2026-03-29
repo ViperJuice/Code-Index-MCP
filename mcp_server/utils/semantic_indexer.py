@@ -13,7 +13,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Union
 
-from chunker.core import chunk_file
+try:
+    from chunker.core import chunk_file as chunk_file
+except Exception:
+    chunk_file = None  # type: ignore[assignment]
 from qdrant_client import QdrantClient, models
 from qdrant_client.http.models import FieldCondition, Filter, MatchValue
 

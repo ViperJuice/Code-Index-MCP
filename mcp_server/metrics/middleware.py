@@ -159,10 +159,8 @@ class MetricsMiddleware(BaseHTTPMiddleware):
                 continue
 
             # Replace UUIDs, IDs, and other variable parts
-            if self._looks_like_id(part):
+            if self._looks_like_id(part) or part.isdigit():
                 normalized_parts.append("{id}")
-            elif part.isdigit():
-                normalized_parts.append("{number}")
             else:
                 normalized_parts.append(part)
 

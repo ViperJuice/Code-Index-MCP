@@ -36,7 +36,12 @@ class TokenCounter:
     output_tokens: int = field(default=0)
     token_history: list = field(default_factory=list)
 
-    def count_tokens(self, text: str, model: str = "gpt-4") -> int:
+    @property
+    def total_tokens(self) -> int:
+        return self.input_tokens + self.output_tokens
+
+    @staticmethod
+    def count_tokens(text: str, model: str = "gpt-4") -> int:
         """
         Count tokens in text using character-based estimation.
 
@@ -51,7 +56,7 @@ class TokenCounter:
             return 0
 
         # Basic character-based estimation
-        token_count = len(text) // self.CHARS_PER_TOKEN
+        token_count = len(text) // TokenCounter.CHARS_PER_TOKEN
 
         # Account for whitespace and special characters (slight adjustment)
         whitespace_count = text.count(" ") + text.count("\n") + text.count("\t")
@@ -238,3 +243,48 @@ def compare_model_costs(text: str, is_output: bool = False) -> Dict[str, float]:
         costs[model] = cost
 
     return costs
+
+
+@dataclass
+class TokenMetrics:
+    """Aggregated token usage metrics."""
+
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+    @property
+    def total_tokens(self) -> int:
+        return self.input_tokens + self.output_tokens
+
+    def to_dict(self) -> Dict:
+        return {
+            "input_tokens": self.input_tokens,
+            "output_tokens": self.output_tokens,
+            "total_tokens": self.total_tokens,
+        }
+
+
+class TokenUsageTracker:
+    """Tracks token usage for a specific model."""
+
+    def __init__(self, model: str = "generic"):
+        self.model = model
+        self._counter = TokenCounter()
+
+    def add_input(self, text: str) -> int:
+        return self._counter.add_input_tokens(text, self.model)
+
+    def add_output(self, text: str) -> int:
+        return self._counter.add_output_tokens(text, self.model)
+
+    @property
+    def metrics(self) -> TokenMetrics:
+        return TokenMetrics(
+            input_tokens=self._counter.input_tokens,
+            output_tokens=self._counter.output_tokens,
+        )
+
+    def reset(self) -> None:
+        self._counter.input_tokens = 0
+        self._counter.output_tokens = 0
+        self._counter.token_history.clear()

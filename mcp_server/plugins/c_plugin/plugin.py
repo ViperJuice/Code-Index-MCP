@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ctypes
 import logging
+import os
 from pathlib import Path
 from typing import Iterable, Optional
 
@@ -49,12 +50,27 @@ class Plugin(IPlugin):
                 str(Path.cwd()), Path.cwd().name, {"language": "c"}
             )
 
-        self._preindex()
+        if os.getenv("MCP_SKIP_PLUGIN_PREINDEX", "false").lower() != "true":
+            self._preindex()
+
+    _EXCLUDED_DIRS = {
+        "htmlcov",
+        ".venv",
+        "venv",
+        "node_modules",
+        "__pycache__",
+        ".git",
+        "dist",
+        "build",
+        "test_workspace",
+    }
 
     def _preindex(self) -> None:
         """Pre-index all C/H files in the current directory."""
         for ext in ["*.c", "*.h"]:
             for path in Path(".").rglob(ext):
+                if any(part in self._EXCLUDED_DIRS for part in path.parts):
+                    continue
                 try:
                     text = path.read_text()
                     self._indexer.add_file(str(path), text)
@@ -88,10 +104,15 @@ class Plugin(IPlugin):
             import hashlib
 
             file_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+            rel_path = str(
+                path.relative_to(Path.cwd())
+                if path.is_absolute() and path.is_relative_to(Path.cwd())
+                else path
+            )
             file_id = self._sqlite_store.store_file(
                 self._repository_id,
                 str(path),
-                str(path.relative_to(Path.cwd())),
+                rel_path,
                 language="c",
                 size=len(content),
                 hash=file_hash,
@@ -167,10 +188,9 @@ class Plugin(IPlugin):
                         {"symbol_id": symbol_id, "file_id": file_id},
                     )
 
-        # Extract typedefs
+        # Extract typedefs (returns a list per node)
         for node in self._find_nodes(root, "type_definition"):
-            symbol_info = self._extract_typedef(node, content)
-            if symbol_info:
+            for symbol_info in self._extract_typedef(node, content):
                 symbols.append(symbol_info)
 
                 if self._sqlite_store and file_id:
@@ -235,7 +255,12 @@ class Plugin(IPlugin):
 
         # Extract includes
         includes = self._extract_includes(root, content)
-        if self._sqlite_store and file_id and includes:
+        if (
+            self._sqlite_store
+            and file_id
+            and includes
+            and hasattr(self._sqlite_store, "store_import")
+        ):
             for include in includes:
                 # Store includes as imports
                 self._sqlite_store.store_import(
@@ -264,8 +289,10 @@ class Plugin(IPlugin):
         if not declarator:
             return None
 
-        # Handle function declarators, which may be wrapped in pointer declarators
+        # Count pointer levels while unwrapping (e.g. char* get_string(void))
+        ptr_stars = ""
         while declarator and declarator.type == "pointer_declarator":
+            ptr_stars += "*"
             declarator = declarator.child_by_field_name("declarator")
 
         if not declarator or declarator.type != "function_declarator":
@@ -279,18 +306,33 @@ class Plugin(IPlugin):
         if not name_node or name_node.type != "identifier":
             return None
 
-        name = content[name_node.start_byte : name_node.end_byte]
+        name = name_node.text.decode("utf-8")
 
-        # Extract return type
+        # Extract return type (include any qualifiers before type node)
         type_node = node.child_by_field_name("type")
-        return_type = content[type_node.start_byte : type_node.end_byte] if type_node else "void"
+        return_type = type_node.text.decode("utf-8") if type_node else "void"
+
+        # Collect any type qualifiers (static, inline, const, etc.) before the type node
+        qualifiers = []
+        for child in node.children:
+            if child == type_node:
+                break
+            if child.is_named and child.type in (
+                "storage_class_specifier",
+                "type_qualifier",
+                "function_specifier",
+            ):
+                qualifiers.append(child.text.decode("utf-8"))
+
+        if qualifiers:
+            return_type = " ".join(qualifiers) + " " + return_type
 
         # Extract parameters
         params_node = declarator.child_by_field_name("parameters")
-        params = content[params_node.start_byte : params_node.end_byte] if params_node else "()"
+        params = params_node.text.decode("utf-8") if params_node else "()"
 
-        # Build signature
-        signature = f"{return_type} {name}{params}"
+        # Build signature: return_type + pointer_stars + space + name + params
+        signature = f"{return_type}{ptr_stars} {name}{params}"
 
         return {
             "symbol": name,
@@ -306,7 +348,7 @@ class Plugin(IPlugin):
         if not name_node:
             return None
 
-        name = content[name_node.start_byte : name_node.end_byte]
+        name = name_node.text.decode("utf-8")
 
         return {
             "symbol": name,
@@ -322,7 +364,7 @@ class Plugin(IPlugin):
         if not name_node:
             return None
 
-        name = content[name_node.start_byte : name_node.end_byte]
+        name = name_node.text.decode("utf-8")
 
         return {
             "symbol": name,
@@ -332,36 +374,67 @@ class Plugin(IPlugin):
             "span": (node.start_point[0] + 1, node.end_point[0] + 1),
         }
 
+    def _resolve_typedef_name(self, declarator):
+        """Walk a typedef declarator chain and return the type_identifier node, or None."""
+        while declarator:
+            t = declarator.type
+            if t == "type_identifier":
+                return declarator
+            elif t in ("pointer_declarator", "array_declarator"):
+                declarator = declarator.child_by_field_name("declarator")
+            elif t == "function_declarator":
+                # e.g. typedef int (*CompareFunc)(...) — look inside parenthesized_declarator
+                inner = declarator.child_by_field_name("declarator")
+                if inner and inner.type == "parenthesized_declarator":
+                    declarator = inner
+                else:
+                    return None
+            elif t == "parenthesized_declarator":
+                # named children: pointer_declarator, etc.
+                for child in declarator.named_children:
+                    result = self._resolve_typedef_name(child)
+                    if result:
+                        return result
+                return None
+            else:
+                return None
+        return None
+
     def _extract_typedef(self, node, content):
-        """Extract typedef information from a type_definition node."""
-        declarator = node.child_by_field_name("declarator")
-        if not declarator:
-            return None
+        """Extract typedef information from a type_definition node. Returns a list."""
+        results = []
 
-        # Handle various declarator types
-        while declarator and declarator.type in [
-            "pointer_declarator",
-            "array_declarator",
-        ]:
-            declarator = declarator.child_by_field_name("declarator")
+        # Get the full typedef signature (bytes-safe)
+        sig_bytes = node.text
+        if sig_bytes:
+            signature = sig_bytes.decode("utf-8").strip()
+            if signature.endswith(";"):
+                signature = signature[:-1]
+        else:
+            signature = "typedef ..."
 
-        if not declarator or declarator.type != "type_identifier":
-            return None
+        line = node.start_point[0] + 1
+        span = (line, node.end_point[0] + 1)
 
-        name = content[declarator.start_byte : declarator.end_byte]
+        # Collect all declarator children (typedef may have multiple, e.g. "Node, *NodePtr")
+        for i, child in enumerate(node.children):
+            field = node.field_name_for_child(i)
+            if field != "declarator":
+                continue
+            ident = self._resolve_typedef_name(child)
+            if ident:
+                name = ident.text.decode("utf-8")
+                results.append(
+                    {
+                        "symbol": name,
+                        "kind": "typedef",
+                        "signature": signature,
+                        "line": line,
+                        "span": span,
+                    }
+                )
 
-        # Get the full typedef statement
-        signature = content[node.start_byte : node.end_byte].strip()
-        if signature.endswith(";"):
-            signature = signature[:-1]
-
-        return {
-            "symbol": name,
-            "kind": "typedef",
-            "signature": signature,
-            "line": node.start_point[0] + 1,
-            "span": (node.start_point[0] + 1, node.end_point[0] + 1),
-        }
+        return results
 
     def _extract_macro(self, node, content):
         """Extract macro information from preprocessor definition nodes."""
@@ -369,7 +442,7 @@ class Plugin(IPlugin):
         if not name_node:
             return None
 
-        name = content[name_node.start_byte : name_node.end_byte]
+        name = name_node.text.decode("utf-8")
 
         # Build signature
         signature = f"#define {name}"
@@ -378,7 +451,7 @@ class Plugin(IPlugin):
         if node.type == "preproc_function_def":
             params_node = node.child_by_field_name("parameters")
             if params_node:
-                params = content[params_node.start_byte : params_node.end_byte]
+                params = params_node.text.decode("utf-8")
                 signature += params
 
         return {
@@ -389,12 +462,35 @@ class Plugin(IPlugin):
             "span": (node.start_point[0] + 1, node.end_point[0] + 1),
         }
 
+    def _unwrap_declarator_name(self, declarator):
+        """Walk a variable declarator chain and return the identifier node, or None."""
+        while declarator:
+            t = declarator.type
+            if t == "identifier":
+                return declarator
+            elif t in ("pointer_declarator", "array_declarator"):
+                declarator = declarator.child_by_field_name("declarator")
+            elif t == "function_declarator":
+                # array/pointer of function pointers: int (*ops[4])(...)
+                inner = declarator.child_by_field_name("declarator")
+                if inner and inner.type == "parenthesized_declarator":
+                    for child in inner.named_children:
+                        result = self._unwrap_declarator_name(child)
+                        if result:
+                            return result
+                return None
+            elif t == "parenthesized_declarator":
+                for child in declarator.named_children:
+                    result = self._unwrap_declarator_name(child)
+                    if result:
+                        return result
+                return None
+            else:
+                return None
+        return None
+
     def _extract_global_variables(self, node, content):
         """Extract global variable declarations."""
-        # Skip function declarations and definitions
-        if any(child.type == "function_declarator" for child in node.children):
-            return []
-
         # Skip if inside a function body
         parent = node.parent
         while parent:
@@ -404,36 +500,46 @@ class Plugin(IPlugin):
 
         variables = []
 
-        # Find all declarators in this declaration
-        declarators = self._find_nodes(node, "init_declarator")
-        if not declarators:
-            # Try direct declarators
-            declarators = [child for child in node.children if child.type == "identifier"]
-
         type_node = node.child_by_field_name("type")
         if not type_node:
-            # Find the type by looking at the first non-declarator child
             for child in node.children:
-                if child.type not in ["init_declarator", "identifier", ",", ";"]:
+                if child.is_named and child.type not in (
+                    "init_declarator",
+                    "identifier",
+                    "pointer_declarator",
+                    "array_declarator",
+                    "function_declarator",
+                    "parenthesized_declarator",
+                ):
                     type_node = child
                     break
 
         if not type_node:
             return variables
 
-        var_type = content[type_node.start_byte : type_node.end_byte]
+        var_type = type_node.text.decode("utf-8")
 
-        for declarator in declarators:
-            # Handle init_declarator
+        # Collect all declarators (direct children that aren't the type or punctuation)
+        skip_types = {type_node.type, ",", ";", "typedef"}
+        declarator_nodes = []
+        for child in node.children:
+            if not child.is_named:
+                continue
+            if child.type in skip_types or child == type_node:
+                continue
+            declarator_nodes.append(child)
+
+        if not declarator_nodes:
+            return variables
+
+        for declarator in declarator_nodes:
+            # Unwrap init_declarator
             if declarator.type == "init_declarator":
                 declarator = declarator.child_by_field_name("declarator")
 
-            # Handle pointer declarators
-            while declarator and declarator.type == "pointer_declarator":
-                declarator = declarator.child_by_field_name("declarator")
-
-            if declarator and declarator.type == "identifier":
-                name = content[declarator.start_byte : declarator.end_byte]
+            ident = self._unwrap_declarator_name(declarator) if declarator else None
+            if ident:
+                name = ident.text.decode("utf-8")
                 variables.append(
                     {
                         "symbol": name,
@@ -452,7 +558,7 @@ class Plugin(IPlugin):
         for node in self._find_nodes(root, "preproc_include"):
             path_node = node.child_by_field_name("path")
             if path_node:
-                include_path = content[path_node.start_byte : path_node.end_byte]
+                include_path = path_node.text.decode("utf-8")
                 includes.append(
                     {
                         "path": include_path.strip('"<>'),
@@ -469,6 +575,8 @@ class Plugin(IPlugin):
             results = self._sqlite_store.search_symbols_fuzzy(symbol, limit=1)
             if results and results[0]["name"] == symbol:
                 result = results[0]
+                line = result.get("line_start") or result.get("line", 0)
+                end_line = result.get("line_end") or result.get("end_line", line)
                 return {
                     "symbol": result["name"],
                     "kind": result["kind"],
@@ -476,9 +584,11 @@ class Plugin(IPlugin):
                     "signature": result.get("signature", ""),
                     "doc": None,  # C doesn't have docstrings like Python
                     "defined_in": result["file_path"],
-                    "line": result["line"],
-                    "span": (result["line"], result.get("end_line", result["line"])),
+                    "line": line,
+                    "span": (line, end_line),
                 }
+            # SQLite is authoritative when available — no filesystem fallback
+            return None
 
         # Fall back to searching through parsed files
         for path in Path(".").rglob("*.c"):
@@ -506,7 +616,6 @@ class Plugin(IPlugin):
                 for node_type, extractor, kind in [
                     ("struct_specifier", self._extract_struct, "struct"),
                     ("enum_specifier", self._extract_enum, "enum"),
-                    ("type_definition", self._extract_typedef, "typedef"),
                     (
                         ["preproc_def", "preproc_function_def"],
                         self._extract_macro,
@@ -519,6 +628,21 @@ class Plugin(IPlugin):
                             return {
                                 "symbol": symbol,
                                 "kind": kind,
+                                "language": self.lang,
+                                "signature": info["signature"],
+                                "doc": None,
+                                "defined_in": str(path),
+                                "line": info["line"],
+                                "span": info["span"],
+                            }
+
+                # Typedef extraction returns a list
+                for node in self._find_nodes(root, "type_definition"):
+                    for info in self._extract_typedef(node, content):
+                        if info["symbol"] == symbol:
+                            return {
+                                "symbol": symbol,
+                                "kind": "typedef",
                                 "language": self.lang,
                                 "signature": info["signature"],
                                 "doc": None,
@@ -564,45 +688,66 @@ class Plugin(IPlugin):
         refs = []
         seen = set()
 
-        # Search all C and H files
-        for ext in ["*.c", "*.h"]:
-            for path in Path(".").rglob(ext):
+        def _search_in(path_str: str, content: str, tree) -> None:
+            root = tree.root_node
+            for node in self._find_nodes(root, "identifier"):
+                if node.text.decode("utf-8") == symbol:
+                    line = node.start_point[0] + 1
+                    key = (path_str, line)
+                    if key not in seen:
+                        refs.append(Reference(file=path_str, line=line))
+                        seen.add(key)
+            for node in self._find_nodes(root, "type_identifier"):
+                if node.text.decode("utf-8") == symbol:
+                    line = node.start_point[0] + 1
+                    key = (path_str, line)
+                    if key not in seen:
+                        refs.append(Reference(file=path_str, line=line))
+                        seen.add(key)
+
+        if self._parsed_files:
+            # Use already-parsed files (avoids filesystem scan in tests and after indexing)
+            for path_str, (content, tree) in self._parsed_files.items():
                 try:
-                    content = path.read_text()
-                    tree = self._parser.parse(content.encode("utf-8"))
-                    root = tree.root_node
-
-                    # Find all identifier nodes that match the symbol
-                    for node in self._find_nodes(root, "identifier"):
-                        if content[node.start_byte : node.end_byte] == symbol:
-                            line = node.start_point[0] + 1
-                            key = (str(path), line)
-                            if key not in seen:
-                                refs.append(Reference(file=str(path), line=line))
-                                seen.add(key)
-
-                    # Also check type_identifier nodes (for typedefs)
-                    for node in self._find_nodes(root, "type_identifier"):
-                        if content[node.start_byte : node.end_byte] == symbol:
-                            line = node.start_point[0] + 1
-                            key = (str(path), line)
-                            if key not in seen:
-                                refs.append(Reference(file=str(path), line=line))
-                                seen.add(key)
-
+                    _search_in(path_str, content, tree)
                 except Exception as e:
-                    logger.error(f"Error finding references in {path}: {e}")
-                    continue
+                    logger.error(f"Error finding references in {path_str}: {e}")
+        else:
+            # Fall back to filesystem scan
+            for ext in ["*.c", "*.h"]:
+                for path in Path(".").rglob(ext):
+                    try:
+                        content = path.read_text()
+                        tree = self._parser.parse(content.encode("utf-8"))
+                        _search_in(str(path), content, tree)
+                    except Exception as e:
+                        logger.error(f"Error finding references in {path}: {e}")
 
         return refs
 
     def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:
-        """Search for code snippets matching a query."""
+        """Search for symbols matching a query."""
         limit = 20
         if opts and "limit" in opts:
             limit = opts["limit"]
         if opts and opts.get("semantic"):
             return []  # Semantic search not supported yet
+
+        # When SQLite is available, use symbol search for better precision
+        if self._sqlite_store:
+            raw = self._indexer.search_symbols(query, limit=limit)
+            results = []
+            for r in raw:
+                results.append(
+                    {
+                        "symbol": r.get("name") or r.get("symbol", ""),
+                        "file": r.get("file_path", ""),
+                        "line": r.get("line_start") or r.get("line", 0),
+                        "snippet": r.get("signature", ""),
+                    }
+                )
+            return results
+
         return self._indexer.search(query, limit=limit)
 
     def get_indexed_count(self) -> int:

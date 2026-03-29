@@ -339,7 +339,10 @@ class GoPackageAnalyzer:
                 # It's a method, extract receiver type
                 receiver_type = self._extract_receiver_type(receiver)
                 if receiver_type and receiver_type in package_info.types:
-                    package_info.types[receiver_type].methods.append(func_name)
+                    if func_name not in package_info.types[receiver_type].methods:
+                        package_info.types[receiver_type].methods.append(func_name)
+                # Also store FunctionInfo so interface_checker can find the signature
+                package_info.functions[func_name] = func_info
             else:
                 # Regular function
                 package_info.functions[func_name] = func_info

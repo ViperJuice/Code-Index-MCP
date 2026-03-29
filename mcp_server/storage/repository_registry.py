@@ -230,11 +230,18 @@ class RepositoryRegistry:
             }
 
     def get_repository_by_path(self, repo_path: str) -> Optional[Any]:
-        """Return repository info for a registered path."""
-        repo_id = self.find_by_path(Path(repo_path).resolve())
-        if not repo_id:
-            return None
-        return self.get(repo_id)
+        """Return repository info for a registered path or any subdirectory of one."""
+        search_path = Path(repo_path.rstrip("/")).resolve()
+        # First try exact match
+        repo_id = self.find_by_path(search_path)
+        if repo_id:
+            return self.get(repo_id)
+        # Then try parent directories (subdirectory lookup)
+        for parent in search_path.parents:
+            repo_id = self.find_by_path(parent)
+            if repo_id:
+                return self.get(repo_id)
+        return None
 
     def set_artifact_enabled(self, repository_id: str, enabled: bool) -> bool:
         """Enable or disable artifact support for a repository."""
@@ -536,6 +543,21 @@ class RepositoryRegistry:
         if "master" in branches:
             return "main"
         return current
+
+    def discover_repositories(self, search_paths: List[str]) -> List[str]:
+        """Discover git repositories under the given search paths.
+
+        Returns a list of repository root paths (as strings).
+        """
+        found = []
+        for search_root in search_paths:
+            root = Path(search_root)
+            if not root.exists():
+                continue
+            for git_dir in root.rglob(".git"):
+                if git_dir.is_dir():
+                    found.append(str(git_dir.parent))
+        return found
 
     def _generate_repo_id(self, repo_path: Path) -> str:
         """Generate stable repository ID for a path."""

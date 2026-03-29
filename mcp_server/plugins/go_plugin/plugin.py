@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
@@ -67,7 +68,8 @@ class Plugin(PluginWithSemanticSearch):
                 self._repository_id = None
 
         # Pre-index existing files
-        self._preindex()
+        if os.getenv("MCP_SKIP_PLUGIN_PREINDEX", "false").lower() != "true":
+            self._preindex()
 
     def _init_treesitter(self):
         """Initialize tree-sitter for Go parsing."""
@@ -144,12 +146,23 @@ class Plugin(PluginWithSemanticSearch):
         if self._ts_plugin:
             try:
                 shard = self._ts_plugin.indexFile(path, content)
-                symbols = shard["symbols"]
+                # Filter out symbols with empty names (generic fallback produces ''
+                # for receiver methods like "func (s *Server) Run()")
+                ts_symbols = [s for s in shard["symbols"] if s.get("symbol", "").strip()]
             except Exception as e:
                 logger.error(f"Tree-sitter parsing failed for {path}: {e}")
-                symbols = self._extract_symbols_basic(content)
+                ts_symbols = []
         else:
-            symbols = self._extract_symbols_basic(content)
+            ts_symbols = []
+
+        # Always supplement with Go-specific basic extraction to catch receiver
+        # methods that the generic tree-sitter fallback misparses
+        basic_symbols = self._extract_symbols_basic(content)
+        ts_names = {s["symbol"] for s in ts_symbols}
+        for bs in basic_symbols:
+            if bs.get("symbol") and bs["symbol"] not in ts_names:
+                ts_symbols.append(bs)
+        symbols = ts_symbols
 
         # Enhance symbols with Go-specific information
         symbols = self._enhance_symbols(path, content, symbols)
@@ -237,13 +250,13 @@ class Plugin(PluginWithSemanticSearch):
         symbols = []
         lines = content.split("\n")
 
+        import re
+
         for i, line in enumerate(lines):
             line = line.strip()
 
             # Function declarations
             if line.startswith("func "):
-                import re
-
                 func_match = re.match(r"func\s+(?:\(([^)]+)\)\s+)?(\w+)\s*\(([^)]*)\)", line)
                 if func_match:
                     receiver = func_match.group(1)
@@ -280,12 +293,7 @@ class Plugin(PluginWithSemanticSearch):
 
     def getDefinition(self, symbol: str) -> SymbolDef | None:
         """Get definition with Go tools integration."""
-        # Try using go tools first
-        definition = self._get_definition_with_go_tools(symbol)
-        if definition:
-            return definition
-
-        # Fallback to tree-sitter/basic search
+        # Search local source files first for accurate file/line info
         for path in Path(".").rglob("*.go"):
             try:
                 content = path.read_text(encoding="utf-8")
@@ -310,7 +318,8 @@ class Plugin(PluginWithSemanticSearch):
             except Exception:
                 continue
 
-        return None
+        # Fallback: use go tools for stdlib/external symbols
+        return self._get_definition_with_go_tools(symbol)
 
     def _get_definition_with_go_tools(self, symbol: str) -> Optional[SymbolDef]:
         """Use go tools to get symbol definition."""
@@ -327,9 +336,25 @@ class Plugin(PluginWithSemanticSearch):
                     signature = lines[0]
                     doc = "\n".join(lines[1:]) if len(lines) > 1 else None
 
+                    # Infer kind from the signature prefix
+                    first = signature.strip()
+                    if first.startswith("func "):
+                        # Check for method receiver: func (recv T) Name(...)
+                        import re as _re
+
+                        kind = "method" if _re.match(r"func\s+\(", first) else "function"
+                    elif first.startswith("type "):
+                        kind = "type"
+                    elif first.startswith("var "):
+                        kind = "variable"
+                    elif first.startswith("const "):
+                        kind = "constant"
+                    else:
+                        kind = "unknown"
+
                     return SymbolDef(
                         symbol=symbol,
-                        kind="unknown",  # go doc doesn't provide kind
+                        kind=kind,
                         language=self.lang,
                         signature=signature,
                         doc=doc,
@@ -391,7 +416,9 @@ class Plugin(PluginWithSemanticSearch):
                         if re.search(r"\b" + re.escape(symbol) + r"\b", line):
                             key = (str(path), i + 1)
                             if key not in seen:
-                                refs.append(Reference(file=str(path), line=i + 1))
+                                refs.append(
+                                    Reference(file=str(path), start_line=i + 1, end_line=i + 1)
+                                )
                                 seen.add(key)
 
                     # Look for qualified references

@@ -29,6 +29,10 @@ class SearchResult:
     score: float
     context: Optional[str] = None
 
+    @property
+    def line(self) -> int:
+        return self.start_line
+
 
 # Define RerankItem to wrap original SearchResult
 @dc
@@ -329,6 +333,22 @@ class LocalCrossEncoderReranker(BaseReranker):
             return Result.ok(rerank_result)
 
         try:
+            # Early return for empty results
+            if not results:
+                return Result.ok(
+                    RerankResult(
+                        results=[],
+                        metadata={
+                            "reranker": "cross-encoder",
+                            "model": self.model_name,
+                            "device": self.device,
+                            "from_cache": False,
+                            "total_results": 0,
+                            "returned_results": 0,
+                        },
+                    )
+                )
+
             # Prepare query-document pairs
             pairs = []
             for result in results:

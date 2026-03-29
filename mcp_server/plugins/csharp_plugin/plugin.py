@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
@@ -59,7 +60,8 @@ class Plugin(PluginWithSemanticSearch):
                 self._repository_id = None
 
         # Pre-index existing files
-        self._preindex()
+        if os.getenv("MCP_SKIP_PLUGIN_PREINDEX", "false").lower() != "true":
+            self._preindex()
 
     def _preindex(self) -> None:
         """Pre-index C# files and analyze projects."""

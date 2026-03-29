@@ -415,12 +415,13 @@ class BenchmarkRunner(IBenchmarkRunner):
     def _save_result(self, result: BenchmarkResult):
         """Save benchmark result to history."""
         # Convert to serializable format
+        raw_validations = getattr(result, "validations", {})
         result_dict = {
             "suite_name": result.suite_name,
             "timestamp": result.start_time.isoformat(),
             "duration_seconds": result.duration_seconds,
             "metrics": {},
-            "validations": getattr(result, "validations", {}),
+            "validations": {k: bool(v) for k, v in raw_validations.items()},
             "errors": result.errors,
         }
 
@@ -428,12 +429,12 @@ class BenchmarkRunner(IBenchmarkRunner):
             result_dict["metrics"][name] = {
                 "operation": metric.operation,
                 "count": metric.count,
-                "mean": metric.mean,
-                "median": metric.median,
-                "p95": metric.p95,
-                "p99": metric.p99,
-                "min": metric.min,
-                "max": metric.max,
+                "mean": float(metric.mean),
+                "median": float(metric.median),
+                "p95": float(metric.p95),
+                "p99": float(metric.p99),
+                "min": float(metric.min),
+                "max": float(metric.max),
                 "memory_usage_mb": metric.memory_usage_mb,
                 "cpu_percent": metric.cpu_percent,
             }
@@ -693,16 +694,14 @@ class BenchmarkRunner(IBenchmarkRunner):
         if output_file is None:
             output_file = self.output_dir / "ci_metrics.json"
 
+        raw_validations = getattr(result, "validations", {})
+        validations = {k: bool(v) for k, v in raw_validations.items()}
         ci_data = {
             "timestamp": result.start_time.isoformat(),
             "duration_seconds": result.duration_seconds,
             "metrics": {},
-            "validations": getattr(result, "validations", {}),
-            "passed": (
-                all(getattr(result, "validations", {}).values())
-                if hasattr(result, "validations")
-                else True
-            ),
+            "validations": validations,
+            "passed": bool(all(validations.values())) if validations else True,
             "summary": {
                 "total_tests": len(result.metrics),
                 "errors": len(result.errors),
@@ -712,8 +711,8 @@ class BenchmarkRunner(IBenchmarkRunner):
         # Add key metrics for CI
         for name, metric in result.metrics.items():
             ci_data["metrics"][name] = {
-                "p95_ms": metric.p95,
-                "p99_ms": metric.p99,
+                "p95_ms": float(metric.p95),
+                "p99_ms": float(metric.p99),
                 "samples": metric.count,
             }
 

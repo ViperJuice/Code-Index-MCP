@@ -1,6 +1,7 @@
 """Skip document performance tests unless explicitly opted in via environment variable."""
 
 import os
+
 import pytest
 
 

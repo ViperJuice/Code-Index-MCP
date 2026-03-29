@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ctypes
 import logging
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -70,6 +71,9 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
         # Symbol cache for faster lookups
         self._symbol_cache: Dict[str, List[SymbolDef]] = {}
 
+        # Content cache for reference lookup (avoids filesystem scan)
+        self._indexed_content: Dict[str, str] = {}
+
         # Create or get repository if SQLite is enabled
         if self._sqlite_store:
             self._repository_id = self._sqlite_store.create_repository(
@@ -77,7 +81,8 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
             )
 
         # Pre-index existing files
-        self._preindex()
+        if os.getenv("MCP_SKIP_PLUGIN_PREINDEX", "false").lower() != "true":
+            self._preindex()
 
     def _preindex(self) -> None:
         """Pre-index all supported files in the current directory."""
@@ -92,24 +97,28 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
             "*.h++",
             "*.hxx",
         ]
+        _excluded = {
+            "htmlcov",
+            ".venv",
+            "venv",
+            "node_modules",
+            "__pycache__",
+            ".git",
+            "dist",
+            "build",
+            "cmake-build",
+            "out",
+            "bin",
+            "obj",
+            ".vscode",
+            ".idea",
+            "test_workspace",
+        }
         for pattern in patterns:
             for path in Path(".").rglob(pattern):
+                if any(part in _excluded for part in path.parts):
+                    continue
                 try:
-                    # Skip common build directories
-                    if any(
-                        part in path.parts
-                        for part in [
-                            "build",
-                            "cmake-build",
-                            "out",
-                            "bin",
-                            "obj",
-                            ".vscode",
-                            ".idea",
-                        ]
-                    ):
-                        continue
-
                     text = path.read_text(encoding="utf-8")
                     self._indexer.add_file(str(path), text)
                 except Exception as e:
@@ -139,10 +148,15 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
             import hashlib
 
             file_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+            rel_path = str(
+                path.relative_to(Path.cwd())
+                if path.is_absolute() and path.is_relative_to(Path.cwd())
+                else path
+            )
             file_id = self._sqlite_store.store_file(
                 self._repository_id,
                 str(path),
-                str(path.relative_to(Path.cwd())),
+                rel_path,
                 language="cpp",
                 size=len(content),
                 hash=file_hash,
@@ -153,11 +167,12 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
         self._namespace_stack = []
         self._extract_symbols(root, content, symbols, file_id)
 
-        # Cache symbols for quick lookup
+        # Cache symbols and content for quick lookup
         cache_key = str(path)
         self._symbol_cache[cache_key] = [
             self._symbol_to_def(s, str(path), content) for s in symbols
         ]
+        self._indexed_content[cache_key] = content
 
         return {"file": str(path), "symbols": symbols, "language": self.lang}
 
@@ -942,8 +957,32 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
         refs: List[Reference] = []
         seen: Set[Tuple[str, int]] = set()
 
-        # Search in all supported files
-        patterns = [
+        def _search_in(path_str: str, content: str) -> None:
+            lines = content.splitlines()
+            for i, line in enumerate(lines):
+                patterns_to_check = [symbol]
+                if "::" in symbol:
+                    patterns_to_check.append(symbol.split("::")[-1])
+                for pattern_str in patterns_to_check:
+                    pat = r"\b" + re.escape(pattern_str) + r"\b"
+                    if re.search(pat, line):
+                        line_no = i + 1
+                        key = (path_str, line_no)
+                        if key not in seen:
+                            refs.append(Reference(file=path_str, line=line_no))
+                            seen.add(key)
+                        break
+
+        if self._indexed_content:
+            for path_str, content in self._indexed_content.items():
+                try:
+                    _search_in(path_str, content)
+                except Exception:
+                    continue
+            return refs
+
+        # Fall back to filesystem scan when no files have been indexed
+        file_patterns = [
             "*.cpp",
             "*.cc",
             "*.cxx",
@@ -954,36 +993,15 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
             "*.h++",
             "*.hxx",
         ]
-        for pattern in patterns:
+        for pattern in file_patterns:
             for path in Path(".").rglob(pattern):
                 try:
-                    # Skip build directories
                     if any(
                         part in path.parts for part in ["build", "cmake-build", "out", "bin", "obj"]
                     ):
                         continue
-
                     content = path.read_text(encoding="utf-8")
-
-                    # Simple text search for references
-                    lines = content.splitlines()
-                    for i, line in enumerate(lines):
-                        # Look for whole word matches
-                        # Handle qualified names
-                        patterns_to_check = [symbol]
-                        if "::" in symbol:
-                            # Also check for just the last part
-                            patterns_to_check.append(symbol.split("::")[-1])
-
-                        for pattern_str in patterns_to_check:
-                            pattern = r"\b" + re.escape(pattern_str) + r"\b"
-                            if re.search(pattern, line):
-                                line_no = i + 1
-                                key = (str(path), line_no)
-                                if key not in seen:
-                                    refs.append(Reference(file=str(path), line=line_no))
-                                    seen.add(key)
-                                    break
+                    _search_in(str(path), content)
                 except Exception:
                     continue
 
@@ -1042,10 +1060,13 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
             # Convert to IndexedFile format
             symbols = []
             for symbol_data in shard["symbols"]:
+                _line = symbol_data.get("line", 1)
+                _span = symbol_data.get("span", (_line, _line))
                 symbol_def = SymbolDefinition(
                     symbol=symbol_data["symbol"],
                     file_path=file_path,
-                    line=symbol_data.get("line", 1),
+                    start_line=_line,
+                    end_line=_span[1] if isinstance(_span, tuple) else _line,
                     column=0,  # Tree-sitter doesn't provide column easily
                     symbol_type=symbol_data["kind"],
                     signature=symbol_data.get("signature"),
@@ -1083,10 +1104,13 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
             if definition is None:
                 return Result.success_result(None)
 
+            _def_line = definition["line"]
+            _def_span = definition.get("span", (_def_line, _def_line))
             symbol_def = SymbolDefinition(
                 symbol=definition["symbol"],
                 file_path=definition["defined_in"],
-                line=definition["line"],
+                start_line=_def_line,
+                end_line=_def_span[1] if isinstance(_def_span, tuple) else _def_line,
                 column=0,
                 symbol_type=definition["kind"],
                 signature=definition["signature"],
@@ -1113,7 +1137,8 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
                 SymbolReference(
                     symbol=symbol,
                     file_path=ref.file,
-                    line=ref.line,
+                    start_line=ref.start_line,
+                    end_line=ref.end_line,
                     column=0,
                     context=None,
                 )
@@ -1329,10 +1354,12 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
                                     params_node.start_byte : params_node.end_byte
                                 ]
 
+                            _tline = node.start_point[0] + 1
                             symbol_def = SymbolDefinition(
                                 symbol=name,
                                 file_path="",  # Will be set by caller
-                                line=node.start_point[0] + 1,
+                                start_line=_tline,
+                                end_line=node.end_point[0] + 1,
                                 column=node.start_point[1],
                                 symbol_type="template",
                                 signature=f"template{template_params} {content[decl_node.start_byte:decl_node.end_byte][:100]}...",
@@ -1406,7 +1433,8 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
                 SymbolDefinition(
                     symbol=s["symbol"],
                     file_path="",  # Will be set by caller
-                    line=s.get("line", 1),
+                    start_line=s.get("line", 1),
+                    end_line=s.get("span", (s.get("line", 1), s.get("line", 1)))[1],
                     column=0,
                     symbol_type=s["kind"],
                     signature=s.get("signature"),
@@ -1470,7 +1498,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
             references = self.findReferences(symbol)
             for ref in references:
                 # This is a simplified approach
-                called_by.append(f"{ref.file}:{ref.line}")
+                called_by.append(f"{ref.file}:{ref.start_line}")
 
             # For calls_to, we'd need more sophisticated analysis
             # This would require parsing the function body and finding function calls

@@ -62,6 +62,9 @@ class Plugin(IPlugin):
         self._module_type: Optional[str] = None
         self._current_file: Optional[Path] = None
 
+        # In-memory indexed content for reference search
+        self._indexed_content: Dict[str, str] = {}
+
         # Symbol cache for faster lookups
         self._symbol_cache: Dict[str, List[SymbolDef]] = {}
 
@@ -114,6 +117,7 @@ class Plugin(IPlugin):
 
         self._current_file = path
         self._indexer.add_file(str(path), content)
+        self._indexed_content[str(path)] = content
 
         # Choose parser based on file extension
         parser = self._get_parser(path)
@@ -132,7 +136,11 @@ class Plugin(IPlugin):
             file_id = self._sqlite_store.store_file(
                 self._repository_id,
                 str(path),
-                str(path.relative_to(Path.cwd())),
+                str(
+                    path.relative_to(Path.cwd())
+                    if path.is_absolute() and path.is_relative_to(Path.cwd())
+                    else path
+                ),
                 language=(
                     "javascript" if path.suffix in {".js", ".jsx", ".mjs", ".cjs"} else "typescript"
                 ),
@@ -201,14 +209,22 @@ class Plugin(IPlugin):
             imports.extend(self._extract_imports(node, content))
             exports.extend(self._extract_exports(node, content))
 
-        # Function declarations
-        if node.type in ["function_declaration", "function"]:
+        # Function declarations (including generators)
+        if node.type in [
+            "function_declaration",
+            "function",
+            "generator_function_declaration",
+            "generator_function",
+        ]:
             name_node = node.child_by_field_name("name")
             if name_node:
                 name = content[name_node.start_byte : name_node.end_byte]
                 params = self._extract_parameters(node, content)
                 is_async = self._is_async_function(node, content)
-                is_generator = self._is_generator_function(node, content)
+                is_generator = node.type in [
+                    "generator_function_declaration",
+                    "generator_function",
+                ] or self._is_generator_function(node, content)
 
                 kind = "function"
                 if is_generator:
@@ -572,15 +588,17 @@ class Plugin(IPlugin):
 
     def _extract_superclass(self, node: Node, content: str) -> Optional[str]:
         """Extract the superclass name from a class declaration."""
-        heritage = node.child_by_field_name("heritage")
-        if heritage:
-            # Look for extends clause
-            for child in heritage.named_children:
-                if child.type == "extends_clause":
-                    # Get the first identifier after extends
-                    for subchild in child.named_children:
-                        if subchild.type == "identifier":
-                            return content[subchild.start_byte : subchild.end_byte]
+        # In tree-sitter-javascript, class_heritage is an unnamed child of class_declaration
+        for child in node.children:
+            if child.type == "class_heritage":
+                # The value field holds the superclass expression
+                value_node = child.child_by_field_name("value")
+                if value_node:
+                    return content[value_node.start_byte : value_node.end_byte]
+                # Fallback: look for first identifier/member_expression
+                for subchild in child.named_children:
+                    if subchild.type in ["identifier", "member_expression"]:
+                        return content[subchild.start_byte : subchild.end_byte]
         return None
 
     def _extract_imports(self, root: Node, content: str) -> List[Dict[str, Any]]:
@@ -873,10 +891,32 @@ class Plugin(IPlugin):
 
     def findReferences(self, symbol: str) -> list[Reference]:
         """Find all references to a symbol."""
+        import re as _re
+
         refs: List[Reference] = []
         seen: Set[Tuple[str, int]] = set()
 
-        # Search in all supported files
+        def _search_content(path_str: str, content: str) -> None:
+            lines = content.splitlines()
+            for i, line in enumerate(lines):
+                pat = r"\b" + _re.escape(symbol) + r"\b"
+                if _re.search(pat, line):
+                    line_no = i + 1
+                    key = (path_str, line_no)
+                    if key not in seen:
+                        refs.append(Reference(file=path_str, line=line_no))
+                        seen.add(key)
+
+        # Use in-memory indexed content if available
+        if self._indexed_content:
+            for path_str, content in self._indexed_content.items():
+                try:
+                    _search_content(path_str, content)
+                except Exception:
+                    continue
+            return refs
+
+        # Fall back to filesystem scan
         for pattern in ["*.js", "*.jsx", "*.ts", "*.tsx", "*.mjs", "*.cjs"]:
             for path in Path(".").rglob(pattern):
                 try:

@@ -371,9 +371,11 @@ class BaseDocumentPlugin(SpecializedPluginBase):
         path = Path(path)
         return path.suffix.lower() in self.supported_extensions
 
-    def indexFile(self, path: str | Path, content: str) -> IndexShard:
+    def indexFile(self, path: str | Path, content: str | None = None) -> IndexShard:
         """Index a document file."""
         path = Path(path)
+        if content is None:
+            content = path.read_text(encoding="utf-8", errors="replace")
 
         # Extract metadata
         metadata = self.extract_metadata(content, path)
@@ -418,7 +420,13 @@ class BaseDocumentPlugin(SpecializedPluginBase):
         if self._enable_semantic and hasattr(self, "_semantic_indexer"):
             self._index_chunks_semantically(str(path), chunks, metadata)
 
-        return {"file": str(path), "symbols": symbols, "language": self.lang}
+        return {
+            "file": str(path),
+            "symbols": symbols,
+            "language": self.lang,
+            "chunks": [chunk.__dict__ for chunk in chunks],
+            "metadata": metadata.__dict__,
+        }
 
     def _index_chunks_semantically(
         self, file_path: str, chunks: List[DocumentChunk], metadata: DocumentMetadata

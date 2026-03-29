@@ -290,7 +290,7 @@ void test_method_{idx}(TestStruct{idx}* s) {{
                     plugin = self.dispatcher._match_plugin(file_path)
                     content = file_path.read_text()
 
-                    _, duration_ms = self._measure_time(plugin.index, file_path, content)
+                    _, duration_ms = self._measure_time(plugin.indexFile, file_path, content)
                     metric.add_sample(duration_ms)
                     indexed_count += 1
                 except Exception as e:
@@ -317,9 +317,10 @@ void test_method_{idx}(TestStruct{idx}* s) {{
             # Reset state
             self.dispatcher._file_cache.clear()
             if hasattr(self, "store"):
-                self.store._conn.execute("DELETE FROM files")
-                self.store._conn.execute("DELETE FROM symbols")
-                self.store._conn.commit()
+                with self.store._get_connection() as conn:
+                    conn.execute("DELETE FROM files")
+                    conn.execute("DELETE FROM symbols")
+                    conn.commit()
 
             # Force garbage collection
             import gc
@@ -337,7 +338,7 @@ void test_method_{idx}(TestStruct{idx}* s) {{
                     try:
                         plugin = self.dispatcher._match_plugin(file_path)
                         content = file_path.read_text()
-                        plugin.index(file_path, content)
+                        plugin.indexFile(file_path, content)
                     except Exception as e:
                         logger.error(f"Memory benchmark error: {e}")
 
@@ -361,7 +362,7 @@ void test_method_{idx}(TestStruct{idx}* s) {{
                 try:
                     plugin = self.dispatcher._match_plugin(file_path)
                     content = file_path.read_text()
-                    plugin.index(file_path, content)
+                    plugin.indexFile(file_path, content)
                 except Exception:
                     pass
 

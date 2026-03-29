@@ -156,6 +156,11 @@ class CreateIndexCommand(BaseIndexCommand):
             stats = self._get_index_stats(index_path)
 
             # Create metadata file
+            stats_serializable = dict(stats)
+            if isinstance(stats_serializable.get("last_modified"), datetime):
+                stats_serializable["last_modified"] = stats_serializable[
+                    "last_modified"
+                ].isoformat()
             metadata = {
                 "repo": repo,
                 "repo_hash": repo_hash,
@@ -163,7 +168,7 @@ class CreateIndexCommand(BaseIndexCommand):
                 "source_path": str(repo_path),
                 "languages": languages,
                 "exclude_patterns": exclude,
-                "stats": stats,
+                "stats": stats_serializable,
             }
 
             metadata_path = index_dir / "metadata.json"
@@ -206,7 +211,13 @@ class ValidateIndexCommand(BaseIndexCommand):
             index_path = discovery.get_local_index_path()
 
             if not index_path:
-                return CommandResult(False, error=f"No index found for {repo}")
+                # get_local_index_path rejects corrupted databases; check legacy path
+                # directly so we can validate and report issues with corrupted indexes
+                fallback = discovery.index_dir / "code_index.db"
+                if fallback.exists():
+                    index_path = fallback
+                else:
+                    return CommandResult(False, error=f"No index found for {repo}")
 
             validation = {"valid": True, "issues": [], "file_count": 0, "symbol_count": 0}
 
@@ -477,15 +488,16 @@ class MigrateIndexCommand(BaseIndexCommand):
             if filter_repo and filter_repo != repo_name:
                 return
 
-            # Determine target path
-            target_path = Path(
+            # Determine target path (absolute, using Path.cwd() so test mocks work)
+            target_rel = (
                 target_template.replace("{repo_hash}", repo_hash)
                 .replace("{repo}", repo_name)
                 .replace("{project}", repo_name)
             )
+            target_path = Path.cwd() / Path(target_rel)
 
             # Create target directory
-            target_path.parent.mkdir(parents=True, exist_ok=True)
+            target_path.mkdir(parents=True, exist_ok=True)
 
             # Copy index
             shutil.copy2(db_path, target_path / "code_index.db")

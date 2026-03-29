@@ -450,7 +450,11 @@ class MultiRepositoryManager:
         start_time = datetime.now()
 
         # Get connection
-        store = self._get_connection(repository_id)
+        try:
+            store = self._get_connection(repository_id)
+        except Exception as e:
+            logger.error(f"Failed to get connection for {repository_id}: {e}")
+            return None
         if not store:
             return None
 

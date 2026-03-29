@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
@@ -51,7 +52,8 @@ class JsPluginSemantic(PluginWithSemanticSearch):
                 logger.warning(f"Failed to create repository: {e}")
                 self._repository_id = None
 
-        self._preindex()
+        if os.getenv("MCP_SKIP_PLUGIN_PREINDEX", "false").lower() != "true":
+            self._preindex()
 
     def _preindex(self) -> None:
         """Pre-index JavaScript/TypeScript files in the current directory."""

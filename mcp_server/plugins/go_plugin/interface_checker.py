@@ -203,8 +203,18 @@ class GoInterfaceChecker:
         """Parse a method signature into components."""
         import re
 
-        # Extract method name, params, and returns
-        match = re.search(r"(\w+)\s*\(([^)]*)\)(?:\s*\(([^)]*)\))?(?:\s+(.+))?", signature)
+        # Strip leading "func " and optional receiver "(recv Type) " to get to the method name
+        sig = signature.strip()
+        if sig.startswith("func "):
+            sig = sig[5:].lstrip()
+            # Skip receiver if present: (recv Type)
+            if sig.startswith("("):
+                end = sig.find(")")
+                if end != -1:
+                    sig = sig[end + 1 :].lstrip()
+
+        # Now sig should be: MethodName(params) returns
+        match = re.match(r"(\w+)\s*\(([^)]*)\)(?:\s*\(([^)]*)\))?(?:\s+(.+))?", sig)
         if match:
             method_name = match.group(1)
             params = match.group(2) or ""

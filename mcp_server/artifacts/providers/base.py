@@ -19,8 +19,13 @@ class ArtifactRecord:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert record to dictionary compatible with existing callers."""
+        # Preserve numeric IDs as integers for API compatibility
+        try:
+            artifact_id: Any = int(self.artifact_id)
+        except (ValueError, TypeError):
+            artifact_id = self.artifact_id
         return {
-            "id": self.artifact_id,
+            "id": artifact_id,
             "name": self.name,
             "created_at": self.created_at,
             "size_in_bytes": self.size_bytes,

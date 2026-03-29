@@ -119,9 +119,16 @@ class RateLimiter:
 
         if identifier not in self.rate_limits:
             self.rate_limits[identifier] = RateLimitInfo(identifier=identifier)
-            return False
 
         rate_limit = self.rate_limits[identifier]
+
+        # Check if window has expired (takes priority over block status)
+        window_end = rate_limit.window_start + timedelta(minutes=self.window_minutes)
+        if now > window_end:
+            rate_limit.requests_count = 0
+            rate_limit.window_start = now
+            rate_limit.is_blocked = False
+            rate_limit.blocked_until = None
 
         # Check if currently blocked
         if rate_limit.is_blocked and rate_limit.blocked_until:
@@ -133,12 +140,6 @@ class RateLimiter:
                 rate_limit.blocked_until = None
                 rate_limit.requests_count = 0
                 rate_limit.window_start = now
-
-        # Check if window has expired
-        window_end = rate_limit.window_start + timedelta(minutes=self.window_minutes)
-        if now > window_end:
-            rate_limit.requests_count = 0
-            rate_limit.window_start = now
 
         # Check rate limit
         if rate_limit.requests_count >= self.max_requests:

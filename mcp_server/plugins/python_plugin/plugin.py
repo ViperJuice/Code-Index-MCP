@@ -5,7 +5,14 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 import jedi
-from chunker import chunk_text
+
+try:
+    from chunker import chunk_text as chunk_text
+
+    _CHUNKER_AVAILABLE = True
+except Exception:
+    chunk_text = None  # type: ignore[assignment]
+    _CHUNKER_AVAILABLE = False
 
 from ...plugin_base import (
     IndexShard,
@@ -79,10 +86,15 @@ class Plugin(IPlugin):
             import hashlib
 
             file_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+            rel_path = str(
+                path.relative_to(Path.cwd())
+                if path.is_absolute() and path.is_relative_to(Path.cwd())
+                else path
+            )
             file_id = self._sqlite_store.store_file(
                 self._repository_id,
                 str(path),
-                str(path.relative_to(Path.cwd())),
+                rel_path,
                 language="python",
                 size=len(content),
                 hash=file_hash,
@@ -165,6 +177,26 @@ class Plugin(IPlugin):
 
     # ------------------------------------------------------------------
     def getDefinition(self, symbol: str) -> SymbolDef | None:
+        # First try SQLite if available
+        if self._sqlite_store:
+            results = self._sqlite_store.search_symbols_fuzzy(symbol, limit=1)
+            if results and results[0]["name"] == symbol:
+                result = results[0]
+                line = result.get("line_start") or result.get("line", 0)
+                end_line = result.get("line_end") or result.get("end_line", line)
+                return {
+                    "symbol": result["name"],
+                    "kind": result["kind"],
+                    "language": self.lang,
+                    "signature": result.get("signature", ""),
+                    "doc": None,
+                    "defined_in": result["file_path"],
+                    "line": line,
+                    "span": (line, end_line),
+                }
+            # SQLite is authoritative when available — no filesystem fallback
+            return None
+
         for path in Path(".").rglob("*.py"):
             try:
                 source = path.read_text()

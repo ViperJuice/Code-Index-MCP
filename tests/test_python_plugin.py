@@ -791,7 +791,7 @@ class TestPersistenceIntegration:
                 return item * CONSTANT
         """)
 
-        file_path = Path("/myproject/main.py")
+        file_path = Path("main.py")
         file_id = sqlite_store.store_file(
             repository_id=repo_id, file_path=str(file_path), language="python", size=len(code)
         )

@@ -176,13 +176,11 @@ class IHealthCheck(ABC):
 from .health_check import ComponentHealthChecker  # noqa: E402
 
 # Import implementations
-from .metrics_collector import PrometheusMetricsCollector  # noqa: E402
-
-
-# Factory functions
-def get_metrics_collector() -> IMetricsCollector:
-    """Get the default metrics collector instance."""
-    return PrometheusMetricsCollector()
+from .metrics_collector import (  # noqa: E402
+    PrometheusMetricsCollector,
+    get_metrics_collector,
+    set_metrics_collector,
+)
 
 
 def get_health_checker() -> IHealthCheck:
@@ -201,5 +199,6 @@ __all__ = [
     "PrometheusMetricsCollector",
     "ComponentHealthChecker",
     "get_metrics_collector",
+    "set_metrics_collector",
     "get_health_checker",
 ]
