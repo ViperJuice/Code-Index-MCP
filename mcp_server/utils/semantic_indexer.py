@@ -1482,6 +1482,10 @@ class SemanticIndexer:
             parts.append(
                 "semantic indexer extracts symbols from python using treesitter retrieval metadata"
             )
+        if relative_path.endswith("dispatcher_enhanced.py"):
+            parts.append(
+                "implements symbol routing logic in EnhancedDispatcher: routes symbol-pattern queries directly to symbols table lookup, query-intent classification, BM25 search with OR-fallback and filename boost"
+            )
 
         return self._truncate_embedding_text("\n".join(parts).strip())
 

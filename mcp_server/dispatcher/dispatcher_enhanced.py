@@ -93,6 +93,7 @@ _PATH_PENALTY_RULES: List[Tuple[str, float]] = [
     ("htmlcov/", 10.0),  # coverage HTML — matches every string literally
     ("docs/benchmarks/", 10.0),  # benchmark JSON files contain literal query strings
     ("/tests/", 0.3),  # test files reference queries as test data
+    ("makefile", 0.5),  # build files are lower signal than source code
 ]
 _JSON_PENALTY = 0.5  # generic .json data files are lower signal than source code
 
@@ -110,6 +111,20 @@ def _path_score_penalty(file_path: str) -> float:
     if p.endswith(".json"):
         return _JSON_PENALTY
     return 0.0
+
+
+def _filename_token_boost(query: str, file_path: str) -> float:
+    """Return a negative BM25 adjustment (rank improvement) when query terms
+    appear in the filename stem.
+
+    FTS5 bm25() scores are negative; a negative return value promotes the result.
+    Mirrors the _fts_rank_adjustment logic in sqlite_store.py.
+    """
+    stem = Path(file_path).stem.lower()
+    terms = set(re.findall(r"[a-z0-9_]+", query.lower()))
+    stem_tokens = set(re.findall(r"[a-z0-9]+", stem))
+    overlap = len(terms & stem_tokens)
+    return -min(overlap, 3) * 0.6
 
 
 class EnhancedDispatcher:
@@ -315,6 +330,9 @@ class EnhancedDispatcher:
                     logger.warning(f"Unknown reranker_type '{reranker_type}', disabling reranker")
             except Exception as e:
                 logger.warning(f"Failed to initialize reranker: {e}")
+        # Text-based rerankers degrade pure vector results; skip them on the semantic path.
+        # VoyageReranker ("voyage") is consistent with Voyage embeddings so it is allowed.
+        self._reranker_skips_semantic = reranker_type in ("flashrank", "cross-encoder")
 
         # Initialize plugins
         if plugins:
@@ -1032,16 +1050,28 @@ class EnhancedDispatcher:
             logger.warning(f"Symbol route failed for '{name}': {e}")
             return []
 
-    def _apply_reranker(self, query: str, candidates: List[Dict], limit: int) -> List[Dict]:
+    def _apply_reranker(
+        self,
+        query: str,
+        candidates: List[Dict],
+        limit: int,
+        semantic_source: bool = False,
+    ) -> List[Dict]:
         """Enrich candidates with chunk text and apply the reranker if configured.
 
         Returns ``candidates[:limit]`` unchanged when no reranker is set or on error.
+
+        When ``semantic_source=True`` and the configured reranker is text-based
+        (flashrank / cross-encoder), skip reranking — text rerankers degrade the
+        ordering produced by semantic vector search.
 
         Pre-filters high-penalty paths (``docs/benchmarks/``, ``htmlcov/``) before
         reranking — those files contain literal query strings and would be
         incorrectly promoted by a text-based reranker.
         """
         if self._reranker is None:
+            return candidates[:limit]
+        if semantic_source and self._reranker_skips_semantic:
             return candidates[:limit]
         # Exclude paths with penalty >= 1.0 (benchmark/coverage noise files).
         filtered = [c for c in candidates if _path_score_penalty(c.get("file", "")) < 1.0]
@@ -1129,19 +1159,48 @@ class EnhancedDispatcher:
                             results = self._sqlite_store.search_bm25(
                                 query, table=table, limit=fetch_limit
                             )
+                            if len(results) < fetch_limit:
+                                # AND logic found fewer results than the fetch limit —
+                                # supplement with OR results so that files matching
+                                # some-but-not-all query terms (e.g. a file named
+                                # "semantic_preflight.py" lacking the word
+                                # "implementation") can enter the candidate pool.
+                                or_query = " OR ".join(
+                                    t for t in query.split()
+                                    if re.match(r"[a-zA-Z0-9_]", t)
+                                )
+                                if or_query != query:
+                                    or_results = self._sqlite_store.search_bm25(
+                                        or_query, table=table, limit=fetch_limit
+                                    )
+                                    and_paths = {
+                                        r.get("filepath") or r.get("file_path", "")
+                                        for r in results
+                                    }
+                                    for r in or_results:
+                                        fp = r.get("filepath") or r.get("file_path", "")
+                                        if fp not in and_paths:
+                                            results.append(r)
                             if results:
-                                # Apply path-based score penalty, re-sort, truncate.
+                                # Apply path-based score penalty and filename token
+                                # boost, re-sort, truncate.
                                 # FTS5 bm25() scores are negative; adding a positive
-                                # penalty degrades rank for non-source paths.
+                                # penalty degrades rank for non-source paths; a
+                                # negative boost from _filename_token_boost improves it.
                                 scored = []
                                 for result in results:
                                     file_path = result.get("filepath") or result.get(
                                         "file_path", ""
                                     )
                                     raw = result.get("score", 0.0)
-                                    adjusted = raw + _path_score_penalty(file_path)
+                                    adjusted = (
+                                        raw
+                                        + _path_score_penalty(file_path)
+                                        + _filename_token_boost(query, file_path)
+                                    )
                                     scored.append((adjusted, file_path, result))
                                 scored.sort(key=lambda t: t[0])
+                                bm25_candidates = []
                                 for adjusted, file_path, result in scored[:limit]:
                                     chunk = None
                                     file_id = result.get("file_id")
@@ -1152,17 +1211,26 @@ class EnhancedDispatcher:
                                             )
                                         except Exception:
                                             chunk = None
-                                    yield {
-                                        "file": file_path,
-                                        "line": (
-                                            chunk["line_start"] if chunk else result.get("line", 1)
-                                        ),
-                                        "line_end": chunk["line_end"] if chunk else None,
-                                        "symbol": chunk["symbol"] if chunk else None,
-                                        "snippet": result.get("snippet", ""),
-                                        "score": adjusted,
-                                        "language": result.get("language", "unknown"),
-                                    }
+                                    bm25_candidates.append(
+                                        {
+                                            "file": file_path,
+                                            "line": (
+                                                chunk["line_start"]
+                                                if chunk
+                                                else result.get("line", 1)
+                                            ),
+                                            "line_end": chunk["line_end"] if chunk else None,
+                                            "symbol": chunk["symbol"] if chunk else None,
+                                            "snippet": result.get("snippet", ""),
+                                            "score": adjusted,
+                                            "language": result.get("language", "unknown"),
+                                        }
+                                    )
+                                bm25_candidates = self._apply_reranker(
+                                    query, bm25_candidates, limit
+                                )
+                                for item in bm25_candidates:
+                                    yield {k: v for k, v in item.items() if k != "_rerank_doc"}
                                 self._operation_stats["searches"] += 1
                                 self._operation_stats["total_time"] += time.time() - start_time
                                 return
@@ -1192,16 +1260,27 @@ class EnhancedDispatcher:
                             or result.get("filepath")
                             or ""
                         )
+                        raw_score = result.get("score", 0.0)
+                        # Apply a mild penalty for artifact support paths in semantic results.
+                        # The artifacts/ directory holds secondary routing/policy helpers, not
+                        # primary implementations, so demote them relative to core code.
+                        fp_lower = file_value.replace("\\", "/").lower()
+                        if "/artifacts/" in fp_lower:
+                            raw_score *= 0.85
                         candidates.append(
                             {
                                 "file": file_value,
                                 "line": result.get("line", 1),
                                 "snippet": snippet,
-                                "score": result.get("score", 0.0),
+                                "score": raw_score,
                                 "language": result.get("metadata", {}).get("language", "unknown"),
                             }
                         )
-                    candidates = self._apply_reranker(query, candidates, limit)
+                    # Re-sort by adjusted score so penalties take effect before reranking.
+                    candidates.sort(key=lambda c: c["score"], reverse=True)
+                    candidates = self._apply_reranker(
+                        query, candidates, limit, semantic_source=True
+                    )
                     for item in candidates:
                         yield {k: v for k, v in item.items() if k != "_rerank_doc"}
                     self._operation_stats["searches"] += 1

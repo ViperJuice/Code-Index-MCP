@@ -152,6 +152,49 @@ class PythonPluginSemantic(PluginWithSemanticSearch):
                 }
             )
 
+            # Index class methods
+            if child.type == "class_definition":
+                body = child.child_by_field_name("body")
+                if body:
+                    for method_node in body.named_children:
+                        if method_node.type != "function_definition":
+                            continue
+                        method_name_node = method_node.child_by_field_name("name")
+                        if method_name_node is None:
+                            continue
+                        method_name = method_name_node.text.decode("utf-8")
+                        method_start = method_node.start_point[0] + 1
+                        method_end = method_node.end_point[0] + 1
+                        method_sig = self._extract_function_signature(method_node, content)
+                        method_doc = self._extract_docstring(method_node, content)
+                        if self._sqlite_store and file_id:
+                            method_id = self._sqlite_store.store_symbol(
+                                file_id,
+                                method_name,
+                                "method",
+                                method_start,
+                                method_end,
+                                signature=method_sig,
+                                metadata={"parent_class": name},
+                            )
+                            self._indexer.add_symbol(
+                                method_name,
+                                str(path),
+                                method_start,
+                                {"symbol_id": method_id, "file_id": file_id, "parent_class": name},
+                            )
+                        symbols.append(
+                            {
+                                "symbol": method_name,
+                                "kind": "method",
+                                "signature": method_sig,
+                                "line": method_start,
+                                "end_line": method_end,
+                                "span": [method_start, method_end],
+                                "doc": method_doc,
+                            }
+                        )
+
         # Store chunks in SQLite (delete old ones first since chunk_id uses temp path)
         if self._sqlite_store and file_id:
             _chunks = []
