@@ -41,7 +41,7 @@ profiles:
       enabled: true
       mode: lazy
       provider: openai_compatible
-      model_name: o3-mini
+      model_name: gpt-5.4-nano
       base_url: "https://api.openai.com/v1"
       api_key_env: OPENAI_API_KEY
       prompt_template: "Describe this code chunk's inputs, outputs, and purpose in 2 concise sentences. Do not output code."
@@ -87,3 +87,12 @@ profiles:
     metadata:
       chunk_schema_version: 1
       embed_schema_version: 1
+
+    summarization:
+      enabled: true
+      mode: lazy
+      provider: openai_compatible
+      model_name: google/gemma-3-4b-it
+      base_url: "http://ai:8002/v1"
+      api_key_env: OPENAI_API_KEY
+      prompt_template: "Describe this code chunk's inputs, outputs, and purpose in 2 concise sentences. Do not output code."

@@ -310,6 +310,32 @@ class LoggingSettings(BaseModel):
             )
 
 
+class SummarizationSettings(BaseModel):
+    """LLM model defaults for chunk summarization fallback chain."""
+
+    # Cerebras OSS fallback — Qwen 3 235B (preview) is the most modern model available on Cerebras
+    cerebras_model: str = Field(default="qwen-3-235b-a22b-instruct-2507", description="Cerebras model for OSS fallback")
+
+    # Anthropic fallback — claude-haiku-4-5 is the current lightweight model
+    anthropic_model: str = Field(
+        default="claude-haiku-4-5-20251001", description="Anthropic model for commercial fallback"
+    )
+
+    # OpenAI fallback — gpt-5.4-nano is cheapest/fastest for short summaries
+    openai_model: str = Field(
+        default="gpt-5.4-nano", description="OpenAI model for commercial fallback"
+    )
+
+    @classmethod
+    def from_environment(cls) -> "SummarizationSettings":
+        """Create summarization settings from environment variables."""
+        return cls(
+            cerebras_model=get_env_var("CEREBRAS_MODEL", "qwen-3-235b-a22b-instruct-2507"),
+            anthropic_model=get_env_var("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001"),
+            openai_model=get_env_var("OPENAI_CHAT_MODEL", "gpt-5.4-nano"),
+        )
+
+
 class RerankingSettings(BaseModel):
     """Reranking configuration for search result optimization."""
 
@@ -413,6 +439,9 @@ class Settings(BaseModel):
     metrics: MetricsSettings = Field(default_factory=MetricsSettings.from_environment)
     logging: LoggingSettings = Field(default_factory=LoggingSettings.from_environment)
     reranking: RerankingSettings = Field(default_factory=RerankingSettings.from_environment)
+    summarization: SummarizationSettings = Field(
+        default_factory=SummarizationSettings.from_environment
+    )
 
     # Feature Flags
     dynamic_plugin_loading: bool = Field(default=True)
@@ -444,7 +473,7 @@ class Settings(BaseModel):
     semantic_embedding_model: str = Field(default="voyage-code-3")
     semantic_collection_name: str = Field(default="code-embeddings")
     semantic_profiles_json: Optional[str] = Field(default=None)
-    semantic_default_profile: str = Field(default="legacy-default")
+    semantic_default_profile: str = Field(default="oss_high")
     semantic_autostart_qdrant: bool = Field(default=True)
     semantic_strict_mode: bool = Field(default=False)
     semantic_preflight_timeout_seconds: int = Field(default=10)
@@ -503,7 +532,7 @@ class Settings(BaseModel):
             semantic_embedding_model=get_env_var("SEMANTIC_EMBEDDING_MODEL", "voyage-code-3"),
             semantic_collection_name=get_env_var("SEMANTIC_COLLECTION_NAME", "code-embeddings"),
             semantic_profiles_json=get_env_var("SEMANTIC_PROFILES_JSON"),
-            semantic_default_profile=get_env_var("SEMANTIC_DEFAULT_PROFILE", "legacy-default"),
+            semantic_default_profile=get_env_var("SEMANTIC_DEFAULT_PROFILE", "oss_high"),
             semantic_autostart_qdrant=get_env_var("SEMANTIC_AUTOSTART_QDRANT", "true").lower()
             == "true",
             semantic_strict_mode=get_env_var("SEMANTIC_STRICT_MODE", "false").lower() == "true",
@@ -646,6 +675,29 @@ class Settings(BaseModel):
                 f"Configured SEMANTIC_DEFAULT_PROFILE '{configured}' not found in profile set"
             )
         return next(iter(profiles.keys()))
+
+    def get_profile_summarization_config(self, profile_id: str) -> Dict[str, Any]:
+        """Return summarization config for a profile merged with settings-level fallback models.
+
+        Always returns a dict. The ``base_url`` key is only present when the profile
+        defines a primary summarization endpoint. Fallback model names are always
+        included so ``ChunkWriter`` can use them without reading env vars directly.
+        """
+        profile_cfg: Dict[str, Any] = {}
+        yaml_path = "code-index-mcp.profiles.yaml"
+        if os.path.exists(yaml_path):
+            with open(yaml_path, "r", encoding="utf-8") as fh:
+                payload = yaml.safe_load(fh) or {}
+            profile_map = payload.get("profiles") or {}
+            profile_cfg = (profile_map.get(profile_id) or {}).get("summarization") or {}
+
+        return {
+            **profile_cfg,
+            # Settings-controlled fallback models (env vars override defaults)
+            "cerebras_model": self.summarization.cerebras_model,
+            "anthropic_model": self.summarization.anthropic_model,
+            "openai_model": self.summarization.openai_model,
+        }
 
     def _detect_treesitter_chunker_version(self) -> str:
         """Return installed treesitter-chunker version label for metadata."""

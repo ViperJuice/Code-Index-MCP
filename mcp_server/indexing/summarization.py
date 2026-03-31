@@ -87,11 +87,13 @@ class ChunkWriter:
         qdrant_client: Any,
         session: Any = None,
         client_name: Optional[str] = None,
+        summarization_config: Optional[Dict[str, Any]] = None,
     ):
         self.db_path = db_path
         self.qdrant_client = qdrant_client
         self.session = session
         self.client_name = client_name
+        self.summarization_config = summarization_config or {}
 
     def _has_sampling_capability(self) -> bool:
         """Return True if the connected MCP client supports sampling/createMessage."""
@@ -105,7 +107,9 @@ class ChunkWriter:
             return False
 
     def _has_direct_api(self) -> bool:
-        """Return True if any direct LLM API key is configured."""
+        """Return True if any direct LLM API key or profile endpoint is configured."""
+        if self.summarization_config.get("base_url"):
+            return True
         return bool(
             os.environ.get("CEREBRAS_API_KEY")
             or os.environ.get("ANTHROPIC_API_KEY")
@@ -120,7 +124,7 @@ class ChunkWriter:
         """Call Cerebras inference API via the openai SDK (OpenAI-compatible)."""
         from openai import AsyncOpenAI
 
-        model = os.environ.get("CEREBRAS_MODEL", "gpt-oss-120b")
+        model = self.summarization_config.get("cerebras_model", "llama3.1-8b")
         client = AsyncOpenAI(
             api_key=os.environ["CEREBRAS_API_KEY"],
             base_url="https://api.cerebras.ai/v1",
@@ -149,7 +153,7 @@ class ChunkWriter:
                     "content-type": "application/json",
                 },
                 json={
-                    "model": "claude-haiku-4-5-20251001",
+                    "model": self.summarization_config.get("anthropic_model", "claude-haiku-4-5-20251001"),
                     "max_tokens": 150,
                     "system": system,
                     "messages": [{"role": "user", "content": prompt}],
@@ -166,7 +170,27 @@ class ChunkWriter:
 
         client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
         response = await client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=self.summarization_config.get("openai_model", "gpt-5.4-nano"),
+            max_tokens=150,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        return response.choices[0].message.content
+
+    async def _call_profile_api(self, system: str, prompt: str) -> str:
+        """Call the profile-configured OpenAI-compatible endpoint."""
+        from openai import AsyncOpenAI
+
+        cfg = self.summarization_config
+        base_url = cfg["base_url"]
+        model = cfg.get("model_name", "gpt-4o-mini")
+        api_key_env = cfg.get("api_key_env", "OPENAI_API_KEY")
+        api_key = os.environ.get(api_key_env) or "vllm-local"
+        client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+        response = await client.chat.completions.create(
+            model=model,
             max_tokens=150,
             messages=[
                 {"role": "system", "content": system},
@@ -176,7 +200,16 @@ class ChunkWriter:
         return response.choices[0].message.content
 
     async def _call_direct_api(self, system: str, prompt: str) -> Optional[str]:
-        """Try Cerebras first, then Anthropic, then OpenAI."""
+        """Try profile endpoint first, then Cerebras, Anthropic, OpenAI."""
+        if self.summarization_config.get("base_url"):
+            try:
+                return await self._call_profile_api(system, prompt)
+            except Exception as exc:
+                logger.warning(
+                    "Profile summarization endpoint %s failed, falling back to env API: %s",
+                    self.summarization_config["base_url"],
+                    exc,
+                )
         if os.environ.get("CEREBRAS_API_KEY"):
             return await self._call_cerebras_api(system, prompt)
         elif os.environ.get("ANTHROPIC_API_KEY"):
@@ -186,11 +219,13 @@ class ChunkWriter:
         return None
 
     def _get_model_name(self) -> str:
+        if self.summarization_config.get("model_name"):
+            return self.summarization_config["model_name"]
         if os.environ.get("CEREBRAS_API_KEY"):
-            return os.environ.get("CEREBRAS_MODEL", "gpt-oss-120b")
+            return self.summarization_config.get("cerebras_model", "llama3.1-8b")
         if os.environ.get("ANTHROPIC_API_KEY"):
-            return "claude-haiku-4-5-20251001"
-        return "gpt-4o-mini"
+            return self.summarization_config.get("anthropic_model", "claude-haiku-4-5-20251001")
+        return self.summarization_config.get("openai_model", "gpt-5.4-nano")
 
     async def summarize_chunk(
         self,

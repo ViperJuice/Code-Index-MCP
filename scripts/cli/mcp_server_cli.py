@@ -513,11 +513,15 @@ async def call_tool(
         logger.debug("request_ctx not available: %s", _e)
 
     if lazy_summarizer is None:
+        _settings = get_settings()
         lazy_summarizer = LazyChunkWriter(
             db_path=sqlite_store.db_path if sqlite_store else "code_index.db",
             qdrant_client=None,  # Passed inside SemanticIndexer
             session=_current_session,
             client_name=_client_name,
+            summarization_config=_settings.get_profile_summarization_config(
+                _settings.semantic_default_profile
+            ),
         )
         lazy_summarizer.start()
     else:
@@ -1138,11 +1142,15 @@ async def call_tool(
                 limit_arg = int((arguments or {}).get("limit", 500))
                 model_used = lazy_summarizer._get_model_name()
 
+                _settings = get_settings()
                 writer = ComprehensiveChunkWriter(
                     db_path=db_path,
                     qdrant_client=None,
                     session=_current_session,
                     client_name=_client_name,
+                    summarization_config=_settings.get_profile_summarization_config(
+                        _settings.semantic_default_profile
+                    ),
                 )
                 chunks_written = await writer.process_all(limit=limit_arg)
 
