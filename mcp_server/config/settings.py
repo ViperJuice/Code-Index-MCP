@@ -619,7 +619,7 @@ class Settings(BaseModel):
                         "vllm",
                         "qwen",
                     }:
-                        openai_base = str(self.openai_api_base or openai_base)
+                        openai_base = str(openai_base or self.openai_api_base)
 
                     converted[str(profile_id)] = {
                         "provider": provider,

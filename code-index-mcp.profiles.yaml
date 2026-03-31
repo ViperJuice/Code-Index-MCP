@@ -60,10 +60,10 @@ profiles:
     serving:
       default_backend: vllm
       vllm:
-        base_url: "http://127.0.0.1:8001/v1"
+        base_url: "http://ai:8001/v1"
         embeddings_path: "/v1/embeddings"
         model_id: "Qwen/Qwen3-Embedding-8B"
-        tensor_parallel_size: 2
+        tensor_parallel_size: 1
       ollama:
         base_url: "http://127.0.0.1:11434"
         embed_path: "/api/embed"
