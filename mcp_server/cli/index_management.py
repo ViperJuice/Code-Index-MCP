@@ -171,24 +171,13 @@ def _build_semantic_baseline(
     try:
         import glob
 
-        python_files = glob.glob("**/*.py", recursive=True)
+        from mcp_server.core.ignore_patterns import IgnorePatternManager
+
+        ignore_manager = IgnorePatternManager(Path(".").resolve())
         python_files = [
             f
-            for f in python_files
-            if not any(
-                exclude in f
-                for exclude in [
-                    "test_repos",
-                    ".git",
-                    "__pycache__",
-                    ".venv",
-                    "htmlcov",
-                    ".mcp-index",
-                    "vector_index.qdrant",
-                    "qdrant_storage",
-                    "code_index_mcp.egg-info",
-                ]
-            )
+            for f in glob.glob("**/*.py", recursive=True)
+            if not ignore_manager.should_ignore(Path(f))
         ]
         if sample_size > 0:
             python_files = python_files[:sample_size]

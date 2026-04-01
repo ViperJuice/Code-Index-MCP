@@ -67,6 +67,7 @@ class IgnorePatternManager:
 
         # Default patterns if file doesn't exist
         default_patterns = [
+            # Security
             "*.env",
             ".env*",
             "*.key",
@@ -78,6 +79,7 @@ class IgnorePatternManager:
             "config/secrets/*",
             ".aws/*",
             ".ssh/*",
+            # Build / cache
             "*.pyc",
             "__pycache__/*",
             "node_modules/*",
@@ -86,6 +88,16 @@ class IgnorePatternManager:
             "*.tmp",
             "*.temp",
             "*.cache",
+            # External fixture repos
+            "test_workspace/",
+            "test_repos/",
+            "testdata/",
+            "vendor/",
+            "third_party/",
+            # Generated code
+            "baml_client/",
+            "*_pb2.py",
+            "*_pb2_grpc.py",
         ]
 
         if ignore_path.exists():

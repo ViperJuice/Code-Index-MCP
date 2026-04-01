@@ -30,11 +30,9 @@ target/
 .DS_Store
 Thumbs.db
 
-# Test files (optional - remove if you want to index tests)
-test/
-tests/
-spec/
-__tests__/
+# External fixture repos (not project source)
+test_workspace/
+baml_client/
 
 # Documentation (optional - remove if you want to index docs)
 # docs/
