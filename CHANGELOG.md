@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Query-intent routing: symbol-pattern queries (`class Foo`, `def bar`, CamelCase,
+  `snake_case`) route directly to the symbols table, bypassing BM25. Fixes retrieval for
+  class/function lookups that previously returned wrong files.
+  (`mcp_server/dispatcher/query_intent.py`, `dispatcher_enhanced.py`)
+- `FlashRankReranker` and `CrossEncoderReranker` (OSS, lazy-loaded); all three rerankers
+  share a unified sync interface. Configured via `RERANKER_TYPE` env var.
+  (`mcp_server/dispatcher/reranker.py`)
+- Matrix benchmark: 17-query suite covering all mode × embedding × reranker combinations.
+  (`scripts/run_matrix_benchmark.py`)
+- LLM chunk summarization: `ChunkWriter` / `LazyChunkWriter` / `ComprehensiveChunkWriter`;
+  per-profile config via `summarization:` block in `code-index-mcp.profiles.yaml`.
+  (`mcp_server/indexing/summarization.py`)
 - Initial project structure with plugin-based architecture
 - FastAPI-based MCP server implementation
 - Python plugin with Jedi integration for advanced code analysis
@@ -25,6 +37,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated project documentation and README
 
 ### Fixed
+- Semantic rebuild (`_build_semantic_baseline`) now uses `IgnorePatternManager`, respecting
+  `.gitignore` and `.mcp-index-ignore`. Previously indexed `test_workspace/` (20,803 Django
+  fixture files), causing 7-hour rebuilds. (`mcp_server/cli/index_management.py`)
+- Default ignore patterns expanded: `test_workspace/`, `test_repos/`, `vendor/`,
+  `third_party/`, `baml_client/`, `*_pb2.py`, `*_pb2_grpc.py`.
+  (`mcp_server/core/ignore_patterns.py`)
+- `code-index-mcp.profiles.yaml` `base_url` now takes precedence over `OPENAI_API_BASE`
+  env default (was reversed, routing oss_high embeddings to wrong endpoint).
+  (`mcp_server/config/settings.py`)
+- Corrected `oss_high` vLLM `base_url` from `127.0.0.1:8001` to `ai:8001`.
+  (`code-index-mcp.profiles.yaml`)
 - Resolved merge conflicts in treesitter_wrapper.py
 - Fixed Python plugin implementation issues
 - Tree-sitter byte-offset/char-offset mismatch in Python plugin: symbol names were corrupted in files

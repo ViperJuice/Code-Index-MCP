@@ -23,6 +23,11 @@ Configuration precedence:
 4. `SEMANTIC_PROFILES_JSON`
 5. Built-in defaults
 
+> **Tip**: For multi-profile setups, set `base_url` directly in
+> `code-index-mcp.profiles.yaml` rather than via `OPENAI_API_BASE`. The YAML value
+> takes precedence for profile URLs and avoids accidentally routing all profiles to the
+> same endpoint.
+
 ## Key Environment Variables
 
 - `SEMANTIC_SEARCH_ENABLED=true`
@@ -31,7 +36,7 @@ Configuration precedence:
 - `SEMANTIC_PREFLIGHT_TIMEOUT_SECONDS=10`
 - `QDRANT_URL=http://localhost:6333`
 - `QDRANT_COMPOSE_FILE=docker-compose.qdrant.yml`
-- `OPENAI_API_BASE=http://localhost:8001/v1`
+- `OPENAI_API_BASE=http://localhost:8001/v1`  # fallback only; prefer profiles.yaml base_url
 - `OPENAI_API_KEY=vllm-local`
 - `VOYAGE_API_KEY` (or `VOYAGE_AI_API_KEY`)
 
@@ -55,7 +60,7 @@ python scripts/cli/mcp_cli.py setup semantic --profile commercial_high
 
 ```bash
 curl http://localhost:6333/collections
-curl http://localhost:8001/v1/models
+curl http://ai:8001/v1/models   # oss_high vLLM (adjust hostname to your setup)
 ```
 
 ## Troubleshooting

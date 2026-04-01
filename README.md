@@ -24,6 +24,7 @@ Modular, extensible local-first code indexer designed to enhance Claude Code and
 - **📦 Portable Index Management**: Zero-cost index sharing via GitHub Artifacts
 - **🔄 Automatic Index Sync**: Pull indexes on clone, push on changes
 - **🎯 Smart Result Reranking**: Multi-strategy reranking for improved relevance
+- **🎯 Query-Intent Routing**: Symbol-pattern queries (`class Foo`, `def bar`, CamelCase) bypass BM25 and hit the symbols table directly for sub-5ms lookups
 - **🔒 Security-Aware Export**: Automatic filtering of sensitive files from shared indexes
 - **🔍 Hybrid Search**: BM25 + semantic search with configurable fusion
 - **🔐 Index Everything Locally**: Search .env files and secrets on your machine
@@ -408,27 +409,42 @@ Control how your code index is shared:
 
 ### Search Result Reranking
 
-The system includes multiple reranking strategies to improve search relevance:
+Three rerankers are available, configured via the `RERANKER_TYPE` environment variable:
 
-```python
-# Configure reranking in your searches
-from mcp_server.indexer.reranker import RerankConfig, TFIDFReranker
+| Value | Reranker | Notes |
+|---|---|---|
+| `flashrank` | FlashRank | OSS, local, fast (~1–5 ms overhead) |
+| `cross-encoder` | Cross-Encoder | OSS, local, highest quality |
+| `voyage` | Voyage Reranker | Cloud API, requires `VOYAGE_API_KEY` |
+| `none` | Disabled | Default |
 
-config = RerankConfig(
-    enabled=True,
-    reranker=TFIDFReranker(),  # Or CohereReranker(), CrossEncoderReranker()
-    top_k=20
-)
-
-# Search with reranking
-results = await search_engine.search(query, rerank_config=config)
+```bash
+export RERANKER_TYPE=flashrank   # or cross-encoder, voyage, none
 ```
 
-**Available Rerankers:**
-- **TF-IDF**: Fast, local reranking using term frequency
-- **Cohere**: Cloud-based neural reranking (requires API key)
-- **Cross-Encoder**: Local transformer-based reranking
-- **Hybrid**: Combines multiple rerankers with fallback
+Reranking applies only to the semantic retrieval path. BM25/FTS results are not reranked.
+Implementation: `mcp_server/dispatcher/reranker.py`.
+
+### LLM Chunk Summarization
+
+Semantic chunks can be augmented with LLM-generated summaries before embedding, improving
+retrieval of intent-based queries. Configured per-profile in `code-index-mcp.profiles.yaml`:
+
+```yaml
+summarization:
+  enabled: true
+  mode: lazy           # lazy (on first query) | comprehensive (at index time)
+  provider: openai_compatible
+  model_name: gpt-4o-mini
+  base_url: "https://api.openai.com/v1"
+  api_key_env: OPENAI_API_KEY
+  prompt_template: "Describe this code chunk's inputs, outputs, and purpose in 2 concise sentences."
+```
+
+> ⚠️ **Security**: Do not summarize untrusted code with cloud LLMs. Hidden instructions in
+> comments can be executed by the summarizer. See the [Security Notes](#-security-notes) section.
+
+Implementation: `mcp_server/indexing/summarization.py`
 
 ### Security-Aware Index Sharing
 
@@ -743,9 +759,9 @@ mcp-index index restore my_backup
 ### Embedding Model Compatibility
 
 The system tracks embedding model versions to ensure compatibility:
-- **Current model**: `voyage-code-3` (1024 dimensions)
-- **Distance metric**: Cosine similarity
-- **Auto-detection**: System checks compatibility before download
+- **`commercial_high`**: `voyage-code-3` — 2048 dimensions, dot product, float32
+- **`oss_high`**: `Qwen/Qwen3-Embedding-8B` — 4096 dimensions, dot product, l2-normalized
+- **Auto-detection**: System checks profile compatibility before download
 
 Multi-profile semantic config can be provided in either:
 - `SEMANTIC_PROFILES_JSON` (environment variable), or
@@ -1053,25 +1069,18 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 | Code Search | <500ms (p95) | ✅ Achieved - BM25 search < 50ms |
 | File Indexing | 10K files/min | ✅ Achieved - 152K files indexed |
 
-### Matrix Benchmark (2026-03-19)
+### Matrix Benchmark (2026-04-01)
 
-| Metric | BM25-only | voyage-code-3 |
-|---|:---:|:---:|
-| Top-1 pass rate | 10/17 (58.8%) | 14/17 (82.4%) |
-| Top-3 pass rate | 13/17 (76.5%) | 17/17 (100%) |
-| Native tools pass rate (`rg`/`grep`/`glob`) | 7/68 (ripgrep 3/17, grep 4/17, glob/sed 0/17) | — |
-| BM25 symbol query latency p50 | ~1–5 ms | — |
-| BM25 text query latency p50 | ~35–55 ms | — |
-| Semantic query latency p50 | — | ~115–350 ms |
+| Metric | BM25-only | voyage-code-3 | Qwen3-Embedding-8B |
+|---|:---:|:---:|:---:|
+| Top-1 (no reranker) | 12/17 (70.6%) | **17/17 (100%)** | **17/17 (100%)** |
+| Top-1 (flashrank)   | 13/17 (76.5%) | **17/17 (100%)** | **17/17 (100%)** |
+| Top-1 (cross-encoder) | — | **17/17 (100%)** | **17/17 (100%)** |
+| Top-1 (voyage-reranker) | — | 15/17 (88.2%) | — |
+| BM25 symbol query p50 | ~1–5 ms | — | — |
+| Semantic query p50 (hybrid) | — | ~50–400 ms | ~50–280 ms |
 
-Known gaps from this run:
-- `classic` mode still surfaces artifacts for the `semantic preflight` probe.
-- `def _symbol_route` appears in top-3 but not top-1 (class methods not indexed at top level).
-- Semantic intent queries (`symbol routing`) reach top-3 but not top-1 on BM25-only config.
-
-Benchmark artifacts:
-- `docs/benchmarks/matrix_benchmark.md`
-- `docs/benchmarks/matrix_benchmark.json`
+Full results: `docs/benchmarks/matrix_benchmark.md` / `.json`
 
 ## 🏗️ Architecture Overview
 

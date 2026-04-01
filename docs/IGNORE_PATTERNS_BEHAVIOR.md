@@ -6,18 +6,23 @@ The MCP Indexer uses an **"index everything, filter on share"** approach to prov
 
 ## How It Works
 
-### 🔍 Local Indexing (Your Machine)
-**ALL files are indexed**, including:
+### 🔍 Local BM25/FTS5 Index (SQLite)
+**ALL files are indexed** for lexical search, including:
 - `.env` files with environment variables and secrets
 - API keys and credentials (`.key`, `.pem` files)
 - Private configuration files
 - Files listed in `.gitignore`
-- Files listed in `.mcp-index-ignore`
 - Build outputs, node_modules, etc.
 
 This gives you full search capabilities across your entire codebase locally.
 
 **Example**: You can search for `DATABASE_PASSWORD` and find it in your `.env` file.
+
+### 🧠 Semantic Index (Qdrant vectors)
+The semantic (vector) index **respects `.gitignore` and `.mcp-index-ignore`** at build
+time. Files matching those patterns are not embedded into Qdrant. This prevents large
+external fixture directories (e.g. `test_workspace/`) from polluting vector search results
+and causing unnecessary embedding API spend during rebuilds.
 
 ### 🔒 Sharing/Exporting (GitHub Artifacts)
 **Sensitive files are automatically filtered out** before sharing:
@@ -52,11 +57,15 @@ dist/
 ### `.mcp-index-ignore`  
 Additional patterns specifically for MCP index sharing:
 ```
-# Test files (optional - uncomment to exclude from shared indexes)
-# test/
-# tests/
-# *.test.js
-# *.spec.py
+# External fixture repos (excluded from semantic index at build time)
+test_workspace/
+test_repos/
+vendor/
+third_party/
+
+# Generated code
+baml_client/
+*_pb2.py
 
 # Large files
 *.zip
@@ -67,7 +76,8 @@ Additional patterns specifically for MCP index sharing:
 temp/
 ```
 
-**Note**: These patterns do NOT affect local indexing - you can still search these files locally!
+**Note**: These patterns do NOT affect BM25/FTS5 local indexing — you can still search
+these files lexically. They only exclude files from the Qdrant semantic (vector) index.
 
 ## Security Guarantees
 

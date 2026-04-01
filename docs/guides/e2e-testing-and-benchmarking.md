@@ -100,7 +100,25 @@ Benchmark compares:
 - `grep` pass-rate and latency
 - `glob` filename-oriented baseline
 
-## 3) Interpreting Results
+## 3) Matrix Benchmark (Rerankers × Embeddings × Modes)
+
+Runs 17 curated queries across all embedding configs, retrieval modes, and rerankers:
+
+```bash
+VOYAGE_API_KEY=$VOYAGE_API_KEY SEMANTIC_SEARCH_ENABLED=true \
+  python scripts/run_matrix_benchmark.py \
+    --md-out docs/benchmarks/matrix_benchmark.md \
+    --json-out docs/benchmarks/matrix_benchmark.json
+```
+
+Outputs:
+- `docs/benchmarks/matrix_benchmark.md` — results table
+- `docs/benchmarks/matrix_benchmark.json` — for CI regression checks
+
+Current results (2026-04-01): voyage-code-3 and Qwen3-Embedding-8B both hit **17/17**
+top-1 pass rate with semantic search enabled. BM25-only achieves 12–13/17.
+
+## 4) Interpreting Results
 
 - If lexical pass-rate regresses: inspect BM25/FTS indexing and symbol upserts.
 - If semantic pass-rate regresses: inspect embedding endpoint, profile dimensions, and vector collection.
