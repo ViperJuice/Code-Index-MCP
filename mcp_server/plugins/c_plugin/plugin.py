@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import ctypes
 import logging
 import os
 from pathlib import Path
 from typing import Iterable, Optional
 
-import tree_sitter_languages
 from tree_sitter import Language, Parser
+from tree_sitter_language_pack import get_language as _get_ts_language
 
 from ...plugin_base import (
     IndexShard,
@@ -28,11 +27,7 @@ class Plugin(IPlugin):
 
     def __init__(self, sqlite_store: Optional[SQLiteStore] = None) -> None:
         # Initialize Tree-sitter parser for C
-        lib_path = next(Path(tree_sitter_languages.__path__[0]).glob("languages.*"))
-        self._lib = ctypes.CDLL(str(lib_path))
-        self._lib.tree_sitter_c.restype = ctypes.c_void_p
-
-        self._language = Language(self._lib.tree_sitter_c())
+        self._language = _get_ts_language("c")
         self._parser = Parser()
         self._parser.language = self._language
 

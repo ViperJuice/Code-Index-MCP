@@ -29,7 +29,8 @@ dependencies = [
     "treesitter-chunker==2.2.21",
     # Legacy tree-sitter deps (for backward compatibility during migration)
     "tree-sitter>=0.20.0",
-    "tree-sitter-languages>=1.7.0",
+    "tree-sitter-language-pack>=0.13.0",
+    "tree-sitter-languages>=1.7.0; sys_platform=='linux'",
     "jedi>=0.19.0",
     "watchdog>=3.0.0",
     "click>=8.1.0",
@@ -54,10 +55,10 @@ semantic = [
     "sentence-transformers>=2.0.0",
     "cohere>=4.0.0",
     "anthropic>=0.18.0",
-    "flashrank>=0.3.0",
+    "flashrank>=0.2.0",
 ]
 rerank = [
-    "flashrank>=0.3.0",
+    "flashrank>=0.2.0",
 ]
 dev = [
     "pytest>=7.4.0",

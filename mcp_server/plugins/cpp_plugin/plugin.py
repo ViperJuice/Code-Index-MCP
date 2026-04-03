@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ctypes
 import logging
 import os
 import re
@@ -8,8 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
-import tree_sitter_languages
 from tree_sitter import Language, Node, Parser
+from tree_sitter_language_pack import get_language as _get_ts_language
 
 from ...interfaces.plugin_interfaces import (
     ICppPlugin,
@@ -51,12 +50,7 @@ class Plugin(IPlugin, ICppPlugin, ILanguageAnalyzer):
         self._parser = Parser()
 
         # Load C++ language grammar
-        lib_path = next(Path(tree_sitter_languages.__path__[0]).glob("languages.*"))
-        self._lib = ctypes.CDLL(str(lib_path))
-
-        # Configure C++
-        self._lib.tree_sitter_cpp.restype = ctypes.c_void_p
-        self._language = Language(self._lib.tree_sitter_cpp())
+        self._language = _get_ts_language("cpp")
         self._parser.language = self._language
 
         # Initialize indexer and storage

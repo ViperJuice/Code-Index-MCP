@@ -113,7 +113,7 @@ jobs:
 
       - name: Install tree-sitter grammars
         run: |
-          python -c "import tree_sitter_languages; print('tree-sitter grammars available')"
+          python -c "from tree_sitter_language_pack import get_language; get_language('python'); print('tree-sitter grammars available')"
 
       - name: Run tests with coverage
         shell: bash
@@ -159,7 +159,7 @@ jobs:
 
       - name: Install tree-sitter grammars
         run: |
-          python -c "import tree_sitter_languages; print('tree-sitter grammars available')"
+          python -c "from tree_sitter_language_pack import get_language; get_language('python'); print('tree-sitter grammars available')"
 
       - name: Run tests
         shell: bash

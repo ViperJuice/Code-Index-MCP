@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ctypes
 import hashlib
 import logging
 import os
@@ -9,8 +8,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
-import tree_sitter_languages
 from tree_sitter import Language, Node, Parser
+from tree_sitter_language_pack import get_language as _get_ts_language
 
 from ...interfaces.plugin_interfaces import (
     IHtmlCssPlugin,
@@ -53,17 +52,10 @@ class Plugin(IPlugin, IHtmlCssPlugin, ILanguageAnalyzer):
         self._css_parser = Parser()
 
         # Load language grammars
-        lib_path = next(Path(tree_sitter_languages.__path__[0]).glob("languages.*"))
-        self._lib = ctypes.CDLL(str(lib_path))
-
-        # Configure HTML
-        self._lib.tree_sitter_html.restype = ctypes.c_void_p
-        self._html_language = Language(self._lib.tree_sitter_html())
+        self._html_language = _get_ts_language("html")
         self._html_parser.language = self._html_language
 
-        # Configure CSS
-        self._lib.tree_sitter_css.restype = ctypes.c_void_p
-        self._css_language = Language(self._lib.tree_sitter_css())
+        self._css_language = _get_ts_language("css")
         self._css_parser.language = self._css_language
 
         # Initialize indexer and storage

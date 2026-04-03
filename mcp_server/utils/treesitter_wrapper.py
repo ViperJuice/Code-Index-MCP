@@ -8,29 +8,17 @@ tree as an S-expression string.
 
 from __future__ import annotations
 
-import ctypes
 from pathlib import Path
 
-import tree_sitter_languages
 from tree_sitter import Language, Parser
+from tree_sitter_language_pack import get_language as _get_ts_language
 
 
 class TreeSitterWrapper:
     """Utility class around :mod:`tree_sitter` for parsing Python files."""
 
     def __init__(self) -> None:
-        # Locate the shared library containing the bundled grammars.  The
-        # ``tree_sitter_languages`` package ships a ``languages.so`` file with
-        # functions such as ``tree_sitter_python`` which return ``TSLanguage``
-        # pointers.  These can be wrapped with :class:`Language`.
-        lib_path = next(Path(tree_sitter_languages.__path__[0]).glob("languages.*"))
-        self._lib = ctypes.CDLL(str(lib_path))
-        # Configure the return type for the Python language function so that
-        # ``ctypes`` returns a ``void*`` pointer compatible with
-        # ``tree_sitter.Language``'s constructor.
-        self._lib.tree_sitter_python.restype = ctypes.c_void_p
-
-        self._language = Language(self._lib.tree_sitter_python())
+        self._language = _get_ts_language("python")
 
         self._parser = Parser()
         self._parser.language = self._language

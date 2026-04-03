@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import ctypes
 import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
-import tree_sitter_languages
 from tree_sitter import Language, Node, Parser
+from tree_sitter_language_pack import get_language as _get_ts_language
 
 from ...plugin_base import (
     IndexShard,
@@ -39,17 +38,10 @@ class Plugin(IPlugin):
         self._ts_parser = Parser()
 
         # Load language grammars
-        lib_path = next(Path(tree_sitter_languages.__path__[0]).glob("languages.*"))
-        self._lib = ctypes.CDLL(str(lib_path))
-
-        # Configure JavaScript
-        self._lib.tree_sitter_javascript.restype = ctypes.c_void_p
-        self._js_language = Language(self._lib.tree_sitter_javascript())
+        self._js_language = _get_ts_language("javascript")
         self._js_parser.language = self._js_language
 
-        # Configure TypeScript
-        self._lib.tree_sitter_typescript.restype = ctypes.c_void_p
-        self._ts_language = Language(self._lib.tree_sitter_typescript())
+        self._ts_language = _get_ts_language("typescript")
         self._ts_parser.language = self._ts_language
 
         # Initialize indexer and storage
