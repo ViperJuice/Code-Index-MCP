@@ -4,6 +4,7 @@ import hashlib
 import logging
 import os
 import re
+import threading
 import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
@@ -246,6 +247,7 @@ class EnhancedDispatcher:
 
         # Cache for file hashes to avoid re-indexing unchanged files
         self._file_cache = {}  # path -> (mtime, size, content_hash)
+        self._file_cache_lock = threading.RLock()
 
         # Advanced components
         if self._enable_advanced:
@@ -636,11 +638,12 @@ class EnhancedDispatcher:
     def _should_reindex(self, path: Path, content: str) -> bool:
         """Return True if the file needs to be (re-)indexed."""
         key = str(path)
-        if key not in self._file_cache:
-            return True
+        with self._file_cache_lock:
+            if key not in self._file_cache:
+                return True
+            cached_mtime, cached_size, cached_hash = self._file_cache[key]
         try:
             stat = path.stat()
-            cached_mtime, cached_size, cached_hash = self._file_cache[key]
             if stat.st_mtime == cached_mtime and stat.st_size == cached_size:
                 return False
             return self._get_file_hash(content) != cached_hash
@@ -1584,11 +1587,12 @@ class EnhancedDispatcher:
             # Update file cache after successful indexing
             try:
                 stat = path.stat()
-                self._file_cache[str(path)] = (
-                    stat.st_mtime,
-                    stat.st_size,
-                    self._get_file_hash(content),
-                )
+                with self._file_cache_lock:
+                    self._file_cache[str(path)] = (
+                        stat.st_mtime,
+                        stat.st_size,
+                        self._get_file_hash(content),
+                    )
             except OSError:
                 pass
 
@@ -1621,13 +1625,15 @@ class EnhancedDispatcher:
         """Get statistics about indexed files and languages."""
         try:
             by_language: Dict[str, int] = {}
-            for file_path in self._file_cache:
+            with self._file_cache_lock:
+                cached_paths = list(self._file_cache.keys())
+            for file_path in cached_paths:
                 for lang, plugin in self._by_lang.items():
                     if plugin.supports(Path(file_path)):
                         by_language[lang] = by_language.get(lang, 0) + 1
                         break
             return {
-                "total": len(self._file_cache),
+                "total": len(cached_paths),
                 "by_language": by_language,
             }
         except Exception:
@@ -1895,6 +1901,10 @@ class EnhancedDispatcher:
         """
         path = Path(path).resolve()
         logger.info(f"Removing file from index: {path}")
+
+        # Evict from skip cache so a subsequent index_file() call is not skipped
+        with self._file_cache_lock:
+            self._file_cache.pop(str(path), None)
 
         try:
             # Remove from SQLite if available

@@ -27,10 +27,12 @@ from mcp.server.stdio import stdio_server
 
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher
+from mcp_server.watcher import FileWatcher
 from mcp_server.plugin_system import PluginManager
 from mcp_server.storage.sqlite_store import SQLiteStore
 from mcp_server.utils.index_discovery import IndexDiscovery
 from mcp_server.config.index_paths import IndexPathConfig
+from mcp_server.config.settings import Settings
 from pathlib import Path
 import logging
 import signal
@@ -51,12 +53,24 @@ logger = logging.getLogger(__name__)
 
 # Initialize the MCP server
 server = Server("code-index-mcp-fast-search")
+server.instructions = (
+    "This server provides a pre-built code index (BM25 + semantic vector search). "
+    "ALWAYS use search_code and symbol_lookup BEFORE grep, glob, or find. "
+    "search_code: pattern/keyword/natural-language search, <500ms, ranked results with line numbers. "
+    "symbol_lookup: exact class/function/method lookup by name, <100ms. "
+    "Fall back to native tools ONLY if a search returns 0 results."
+)
 
 # Global instances
 dispatcher: EnhancedDispatcher | SimpleDispatcher | None = None
 plugin_manager: PluginManager | None = None
 sqlite_store: SQLiteStore | None = None
 initialization_error: str | None = None
+_file_watcher: FileWatcher | None = None
+_indexing_thread: threading.Thread | None = None
+_fts_rebuild_thread: threading.Thread | None = None
+_indexing_total_files: int = 0
+_indexing_started_at: float | None = None
 
 # Configuration from environment
 USE_SIMPLE_DISPATCHER = (
@@ -88,6 +102,7 @@ def timeout(seconds):
 async def initialize_services():
     """Initialize all services needed for the MCP server."""
     global dispatcher, plugin_manager, sqlite_store, initialization_error
+    _auto_index = False
 
     try:
         # Use multi-path discovery to find index
@@ -101,10 +116,13 @@ async def initialize_services():
         index_info = discovery.get_index_info()
 
         if not index_info["enabled"]:
-            logger.error("MCP indexing is not enabled for this repository")
-            raise RuntimeError(
-                "MCP indexing not enabled. Create .mcp-index.json to enable."
-            )
+            # Respect explicit opt-outs; allow auto-init for repos with no config yet
+            if os.getenv("MCP_INDEX_ENABLED", "").lower() == "false":
+                raise RuntimeError("MCP indexing disabled via MCP_INDEX_ENABLED=false")
+            explicit_config = discovery.get_index_config()
+            if explicit_config is not None and explicit_config.get("enabled") is False:
+                raise RuntimeError("MCP indexing disabled in .mcp-index.json")
+            logger.info("No MCP index config found — will auto-initialize index on first use")
 
         # Find the index
         index_path = discovery.get_local_index_path()
@@ -125,6 +143,25 @@ async def initialize_services():
             else:
                 logger.info(f"Index validation passed: {validation_result['stats']}")
 
+            # Auto-heal: if files are tracked but BM25 FTS is empty, rebuild in background
+            _vstats = validation_result.get("stats", {})
+            if _vstats.get("bm25_documents", 1) == 0 and _vstats.get("total_files", 0) > 0:
+                global _fts_rebuild_thread
+                _heal_store = sqlite_store
+
+                def _rebuild_fts():
+                    logger.info("Rebuilding BM25 FTS content (was empty despite indexed files)...")
+                    try:
+                        rows = _heal_store.rebuild_fts_code()
+                        logger.info(f"BM25 FTS rebuild complete: {rows} documents")
+                    except Exception as _fts_err:
+                        logger.warning(f"BM25 FTS rebuild failed (non-fatal): {_fts_err}")
+
+                _fts_rebuild_thread = threading.Thread(
+                    target=_rebuild_fts, daemon=True, name="mcp-fts-rebuild"
+                )
+                _fts_rebuild_thread.start()
+
             # Log search paths that were checked
             if enable_multi_path and index_info.get("search_paths"):
                 logger.debug(f"Searched {len(index_info['search_paths'])} paths:")
@@ -135,28 +172,32 @@ async def initialize_services():
                         f"  ... and {len(index_info['search_paths']) - 5} more"
                     )
         else:
-            # No index found - provide detailed help
-            logger.error("No index found after searching all configured paths")
+            # No index found — create one automatically and index in background
+            index_dir = current_dir / ".mcp-index"
+            index_dir.mkdir(exist_ok=True)
+            index_path = index_dir / "code_index.db"
+            logger.info(f"No index found — creating new index at {index_path}")
+            sqlite_store = SQLiteStore(str(index_path))
+            _auto_index = True
 
-            # Show what paths were searched
-            if enable_multi_path and index_info.get("search_paths"):
-                logger.error(f"Searched {len(index_info['search_paths'])} locations:")
-                path_config = IndexPathConfig()
-                validation = path_config.validate_paths(
-                    discovery._get_repository_identifier()
-                )
-
-                for path, exists in list(validation.items())[:5]:
-                    status = "EXISTS" if exists else "missing"
-                    logger.error(f"  - {path} [{status}]")
-
-            logger.error("\nTo create an index:")
-            logger.error("  1. Run: mcp-index index")
-            logger.error("  2. Or copy an existing index to one of the search paths")
-            logger.error("\nTo customize search paths:")
-            logger.error("  export MCP_INDEX_PATHS=path1:path2:path3")
-
-            raise FileNotFoundError("No index found in any configured location")
+            # Ensure SQLite WAL sidecar files and the DB itself are gitignored
+            gitignore_path = current_dir / ".gitignore"
+            gitignore_entries = [
+                ".mcp-index/code_index.db",
+                ".mcp-index/code_index.db-shm",
+                ".mcp-index/code_index.db-wal",
+                ".mcp-index/.index_metadata.json",
+            ]
+            try:
+                existing = gitignore_path.read_text(encoding="utf-8") if gitignore_path.exists() else ""
+                missing = [e for e in gitignore_entries if e not in existing]
+                if missing:
+                    with gitignore_path.open("a", encoding="utf-8") as _gf:
+                        _gf.write("\n# MCP Index files\n")
+                        _gf.write("\n".join(missing) + "\n")
+                    logger.info(f"Added {len(missing)} MCP index entries to .gitignore")
+            except Exception as _gi_err:
+                logger.debug(f"Could not update .gitignore (non-fatal): {_gi_err}")
 
         # Check if we should use simple dispatcher
         if USE_SIMPLE_DISPATCHER:
@@ -223,6 +264,91 @@ async def initialize_services():
             f"Languages: {', '.join(supported_languages[:10])}{'...' if len(supported_languages) > 10 else ''}"
         )
 
+        # Qdrant / semantic-search availability — log clearly so users know what mode they're in
+        if isinstance(dispatcher, EnhancedDispatcher) and getattr(dispatcher, "_semantic_indexer", None) is None:
+            logger.info(
+                "Semantic search (Qdrant) not available — running in BM25-only mode. "
+                "Ensure Qdrant is running and QDRANT_URL is set, or set "
+                "MCP_USE_SIMPLE_DISPATCHER=true to suppress this message."
+            )
+
+        # Start filesystem watcher so the index stays current automatically.
+        # Only for EnhancedDispatcher — SimpleDispatcher is read-only BM25 mode.
+        # When _auto_index is True we defer .start() until after the initial index
+        # completes to avoid concurrent SQLite writes during the bulk index pass.
+        global _file_watcher
+        if _file_watcher is None and isinstance(dispatcher, EnhancedDispatcher):
+            try:
+                _file_watcher = FileWatcher(root=current_dir, dispatcher=dispatcher)
+                if not _auto_index:
+                    _file_watcher.start()
+                    logger.info(f"FileWatcher started, watching {current_dir}")
+                # else: started inside _run_initial_index() after indexing completes
+            except Exception as _fw_err:
+                logger.warning(f"FileWatcher failed to start (non-fatal): {_fw_err}")
+
+        # Guard: skip auto-index for very large repos to avoid hours of startup I/O.
+        # MCP_AUTO_INDEX_MAX_FILES controls the threshold (default 100 000 files).
+        if _auto_index:
+            _max_files = int(os.getenv("MCP_AUTO_INDEX_MAX_FILES", "100000"))
+            _file_count = 0
+            for _root, _dirs, _files in os.walk(current_dir):
+                _dirs[:] = [
+                    d for d in _dirs
+                    if d not in {".git", "node_modules", "__pycache__", ".venv", "venv"}
+                ]
+                _file_count += len(_files)
+                if _file_count > _max_files:
+                    break
+            if _file_count > _max_files:
+                logger.warning(
+                    f"Repository has >{_max_files} files — skipping auto-index to avoid "
+                    f"a long blocking startup. Set MCP_AUTO_INDEX_MAX_FILES to raise the "
+                    f"limit, or run the 'reindex' MCP tool manually when ready."
+                )
+                _auto_index = False
+
+        # If no index existed, kick off a full background reindex now.
+        # Set MCP_AUTO_INDEX=false to disable for large repos and run reindex manually.
+        # Tools return partial/empty results until it completes — server stays responsive.
+        global _indexing_thread
+        if (
+            _auto_index
+            and _indexing_thread is None
+            and isinstance(dispatcher, EnhancedDispatcher)
+            and os.getenv("MCP_AUTO_INDEX", "true").lower() != "false"
+        ):
+            _captured_dir = current_dir
+            _captured_store = sqlite_store
+
+            def _run_initial_index():
+                logger.info("Background initial index started...")
+                try:
+                    stats = dispatcher.index_directory(_captured_dir, recursive=True)
+                    if _captured_store:
+                        _captured_store.rebuild_fts_code()
+                    logger.info(f"Background initial index complete: {stats}")
+                except Exception as _idx_err:
+                    logger.error(f"Background initial index failed: {_idx_err}")
+                finally:
+                    # Start the watcher now that the initial index is complete
+                    if _file_watcher is not None:
+                        try:
+                            _file_watcher.start()
+                            logger.info(f"FileWatcher started after initial index, watching {_captured_dir}")
+                        except Exception as _fw_err:
+                            logger.warning(f"FileWatcher failed to start (non-fatal): {_fw_err}")
+
+            global _indexing_total_files, _indexing_started_at
+            _indexing_total_files = _file_count
+            _indexing_started_at = time.time()
+
+            _indexing_thread = threading.Thread(
+                target=_run_initial_index, daemon=True, name="mcp-initial-index"
+            )
+            _indexing_thread.start()
+            logger.info(f"Indexing {_captured_dir} in background — search results will populate shortly")
+
     except Exception as e:
         logger.error(f"Failed to initialize services: {e}", exc_info=True)
         initialization_error = str(e)
@@ -236,7 +362,7 @@ async def list_tools() -> list[types.Tool]:
     return [
         types.Tool(
             name="symbol_lookup",
-            description="[MCP-FIRST] Look up symbol definitions. ALWAYS use this before grep/find for symbol searches. Returns exact file location with line number. Usage: offset=(line-1) for direct navigation.",
+            description="[USE BEFORE GREP] Look up any class, function, or method definition. 100x faster than grep. Returns file + line number. Fall back to Grep ONLY if this returns not_found.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -250,7 +376,7 @@ async def list_tools() -> list[types.Tool]:
         ),
         types.Tool(
             name="search_code",
-            description="[MCP-FIRST] Search code patterns. ALWAYS use this before grep/find for content searches. Returns snippets with line numbers. Usage: offset=(line-1) for context.",
+            description="[USE BEFORE GREP] Search code by pattern, keyword, or natural language (semantic=true). Indexed, <500ms, returns ranked results with line numbers and last_indexed timestamp. Fall back to Grep ONLY if this returns 0 results.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -513,7 +639,7 @@ async def call_tool(
         logger.debug("request_ctx not available: %s", _e)
 
     if lazy_summarizer is None:
-        _settings = get_settings()
+        _settings = Settings.from_environment()
         lazy_summarizer = LazyChunkWriter(
             db_path=sqlite_store.db_path if sqlite_store else "code_index.db",
             qdrant_client=None,  # Passed inside SemanticIndexer
@@ -550,7 +676,11 @@ async def call_tool(
             error_response = {
                 "error": "MCP server initialization failed",
                 "details": initialization_error,
-                "suggestion": "Check index exists at ~/.mcp/indexes/{repo_id}/current.db",
+                "suggestion": (
+                    "No index found. Run 'mcp-index index' or "
+                    "'python scripts/reindex_current_repo.py' in your repository root. "
+                    "Check server logs for the exact paths searched."
+                ),
             }
             response = [
                 types.TextContent(type="text", text=ensure_response(error_response))
@@ -875,6 +1005,7 @@ async def call_tool(
                         "line_end": r.get("line_end"),
                         "symbol": r.get("symbol"),
                         "snippet": r.get("snippet"),
+                        "last_indexed": r.get("last_modified"),
                     }
 
                     # Add navigation hint if line number is available
@@ -915,17 +1046,33 @@ async def call_tool(
                         )
                     ]
                 else:
+                    _indexing_active = _indexing_thread is not None and _indexing_thread.is_alive()
+                    if _indexing_active:
+                        search_response = {
+                            "results": results_data,
+                            "indexing_in_progress": True,
+                            "note": "Initial index is still building — results may be incomplete",
+                        }
+                    else:
+                        search_response = results_data
                     response = [
                         types.TextContent(
-                            type="text", text=ensure_response(results_data)
+                            type="text", text=ensure_response(search_response)
                         )
                     ]
             else:
+                _indexing_active = _indexing_thread is not None and _indexing_thread.is_alive()
                 response_data = {
                     "results": [],
                     "query": query,
-                    "message": "No results found in index",
+                    "message": (
+                        "No results yet — initial index is still building"
+                        if _indexing_active
+                        else "No results found in index"
+                    ),
                 }
+                if _indexing_active:
+                    response_data["indexing_in_progress"] = True
                 response = [
                     types.TextContent(type="text", text=ensure_response(response_data))
                 ]
@@ -962,9 +1109,25 @@ async def call_tool(
                     "dynamic_loading": getattr(dispatcher, "_use_factory", False),
                     "lazy_loading": getattr(dispatcher, "_lazy_load", False),
                     "semantic_search": getattr(dispatcher, "_semantic_enabled", False),
+                    "semantic_available": (
+                        isinstance(dispatcher, EnhancedDispatcher)
+                        and getattr(dispatcher, "_semantic_indexer", None) is not None
+                    ),
                     "semantic_indexer_active": getattr(dispatcher, "_semantic_indexer", None) is not None,
                     "advanced_features": getattr(dispatcher, "_enable_advanced", False),
-                    "timeout_protection": True,  # All dispatchers now have timeout protection
+                    "timeout_protection": True,
+                    "file_watcher": _file_watcher is not None,
+                    "initial_index_running": _indexing_thread is not None and _indexing_thread.is_alive(),
+                    "indexing_elapsed_seconds": (
+                        int(time.time() - _indexing_started_at)
+                        if (_indexing_thread is not None and _indexing_thread.is_alive() and _indexing_started_at)
+                        else None
+                    ),
+                    "indexing_estimated_files": (
+                        _indexing_total_files
+                        if (_indexing_thread is not None and _indexing_thread.is_alive() and _indexing_total_files)
+                        else None
+                    ),
                 },
                 "languages": {
                     "supported": stats.get("supported_languages", 0),
@@ -1078,6 +1241,7 @@ async def call_tool(
 
                     response_data = {
                         "path": str(target_path),
+                        "mode": "merge",
                         "indexed_files": stats["indexed_files"],
                         "ignored_files": stats["ignored_files"],
                         "failed_files": stats["failed_files"],
@@ -1088,6 +1252,10 @@ async def call_tool(
                         "semantic_failed": stats.get("semantic_failed"),
                         "semantic_skipped": stats.get("semantic_skipped"),
                         "total_embedding_units": stats.get("total_embedding_units"),
+                        "merge_note": (
+                            "Changed/new files updated; deleted files are not purged — "
+                            "FileWatcher handles those on next change, or reindex again after deletions."
+                        ),
                     }
 
                     response = [
@@ -1102,6 +1270,7 @@ async def call_tool(
 
                 response_data = {
                     "path": ".",
+                    "mode": "merge",
                     "indexed_files": stats["indexed_files"],
                     "ignored_files": stats["ignored_files"],
                     "failed_files": stats["failed_files"],
@@ -1115,6 +1284,10 @@ async def call_tool(
                     "semantic_error": stats.get("semantic_error"),
                     "semantic_paths_queued": stats.get("semantic_paths_queued"),
                     "semantic_indexer_present": stats.get("semantic_indexer_present"),
+                    "merge_note": (
+                        "Changed/new files updated; deleted files are not purged — "
+                        "FileWatcher handles those on next change, or reindex again after deletions."
+                    ),
                 }
 
                 response = [
@@ -1142,7 +1315,7 @@ async def call_tool(
                 limit_arg = int((arguments or {}).get("limit", 500))
                 model_used = lazy_summarizer._get_model_name()
 
-                _settings = get_settings()
+                _settings = Settings.from_environment()
                 writer = ComprehensiveChunkWriter(
                     db_path=db_path,
                     qdrant_client=None,
@@ -1405,10 +1578,15 @@ async def main():
     # embedded Qdrant client blocks the event loop indefinitely on startup.
 
     # Run the stdio server
-    async with stdio_server() as (read_stream, write_stream):
-        await server.run(
-            read_stream, write_stream, server.create_initialization_options()
-        )
+    try:
+        async with stdio_server() as (read_stream, write_stream):
+            await server.run(
+                read_stream, write_stream, server.create_initialization_options()
+            )
+    finally:
+        if _file_watcher is not None:
+            _file_watcher.stop()
+            logger.info("FileWatcher stopped")
 
 
 if __name__ == "__main__":

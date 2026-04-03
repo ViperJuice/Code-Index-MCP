@@ -721,8 +721,9 @@ class LazyChunkWriter(ChunkWriter):
         qdrant_client: Any,
         session: Any = None,
         client_name: Optional[str] = None,
+        summarization_config: Optional[Dict[str, Any]] = None,
     ):
-        super().__init__(db_path, qdrant_client, session, client_name)
+        super().__init__(db_path, qdrant_client, session, client_name, summarization_config)
         self.queue: asyncio.Queue = asyncio.Queue()
         self._task: Optional[asyncio.Task] = None
 

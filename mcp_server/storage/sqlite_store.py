@@ -1741,13 +1741,14 @@ class SQLiteStore:
                 # Support both integer file_id references and legacy path-style file_id values.
                 cursor = conn.execute(
                     """
-                    SELECT 
+                    SELECT
                         fts.content,
                         fts.file_id,
                         COALESCE(f.path, f.relative_path, CAST(fts.file_id AS TEXT)) as filepath,
                         f.relative_path,
                         bm25(fts_code) as score,
-                        snippet(fts_code, 0, '<mark>', '</mark>', '...', 32) as snippet
+                        snippet(fts_code, 0, '<mark>', '</mark>', '...', 32) as snippet,
+                        f.last_modified
                     FROM fts_code fts
                     LEFT JOIN files f ON fts.file_id = f.id
                         OR CAST(fts.file_id AS TEXT) = f.path
@@ -2042,11 +2043,26 @@ class SQLiteStore:
 
             file_id = row[0]
 
+            # Look up absolute path before deletion — fts_code may store path strings
+            # rather than integer file IDs depending on how the plugin indexed the file.
+            path_row = conn.execute("SELECT path FROM files WHERE id = ?", (file_id,)).fetchone()
+            absolute_path = path_row[0] if path_row else None
+
             # Delete all associated data (cascade should handle most)
             conn.execute("DELETE FROM symbol_references WHERE file_id = ?", (file_id,))
             conn.execute("DELETE FROM imports WHERE file_id = ?", (file_id,))
             conn.execute("DELETE FROM embeddings WHERE file_id = ?", (file_id,))
-            conn.execute("DELETE FROM fts_code WHERE file_id = ?", (file_id,))
+            # fts_code.file_id may be stored as an integer, an absolute path, or a
+            # relative path depending on the indexing plugin — delete all three forms.
+            conn.execute(
+                "DELETE FROM fts_code WHERE file_id = ? OR file_id = ? OR file_id = ?",
+                (str(file_id), absolute_path or relative_path, relative_path),
+            )
+            conn.execute(
+                "DELETE FROM symbol_trigrams WHERE symbol_id IN "
+                "(SELECT id FROM symbols WHERE file_id = ?)",
+                (file_id,),
+            )
             conn.execute("DELETE FROM symbols WHERE file_id = ?", (file_id,))
             conn.execute("DELETE FROM files WHERE id = ?", (file_id,))
 

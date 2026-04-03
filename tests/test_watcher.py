@@ -62,7 +62,11 @@ class TestHandlerEventHandling:
         test_path = Path("/test/file.py")
         handler.trigger_reindex(test_path)
 
+        dispatcher_with_mock.remove_file.assert_called_once_with(test_path)
         dispatcher_with_mock.index_file.assert_called_once_with(test_path)
+        # remove_file must precede index_file so stale chunks are cleared first
+        names = [c[0] for c in dispatcher_with_mock.method_calls]
+        assert names.index("remove_file") < names.index("index_file")
 
     def test_trigger_reindex_unsupported_file(self, dispatcher_with_mock):
         """Test triggering reindex for unsupported file."""
@@ -83,6 +87,7 @@ class TestHandlerEventHandling:
         # Should not raise, just log error
         handler.trigger_reindex(test_path)
 
+        dispatcher_with_mock.remove_file.assert_called_once_with(test_path)
         dispatcher_with_mock.index_file.assert_called_once()
 
     def test_on_created_event(self, dispatcher_with_mock, tmp_path):
@@ -564,6 +569,97 @@ class TestPerformance:
 
         finally:
             watcher.stop()
+
+
+class TestReindexIntegration:
+    """Integration tests verifying correct SQLite DB state after file changes via the watcher path."""
+
+    def _setup(self, tmp_path, monkeypatch):
+        from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
+        from mcp_server.plugins.python_plugin.plugin import Plugin as PythonPlugin
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        monkeypatch.chdir(tmp_path)
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        dispatcher = Dispatcher([PythonPlugin(sqlite_store=store)], sqlite_store=store)
+        handler = _Handler(dispatcher)
+        return store, dispatcher, handler
+
+    @pytest.mark.integration
+    def test_file_modification_updates_line_numbers(self, tmp_path, monkeypatch):
+        """After an edit that shifts a function's line position, trigger_reindex must
+        clear stale chunks and store new chunks with correct line_start/line_end."""
+        store, dispatcher, handler = self._setup(tmp_path, monkeypatch)
+
+        test_file = tmp_path / "mod_test.py"
+
+        # v1: foo at line 1
+        test_file.write_text("def foo():\n    pass\n")
+        dispatcher.index_file(test_file)
+
+        file_id = store.get_file_id_by_path(test_file.name)
+        assert file_id is not None, "file not indexed"
+        chunks_v1 = store.get_chunks_for_file(file_id)
+        assert any(c["line_start"] == 1 for c in chunks_v1), "expected chunk at line 1 in v1"
+
+        # v2: two blank lines prepended — foo now at line 3
+        test_file.write_text("\n\ndef foo():\n    pass\n")
+        handler.trigger_reindex(test_file)
+
+        file_id2 = store.get_file_id_by_path(test_file.name)
+        assert file_id2 is not None, "file missing from index after reindex"
+        chunks_v2 = store.get_chunks_for_file(file_id2)
+        assert not any(c["line_start"] == 1 for c in chunks_v2), "stale line-1 chunk persisted"
+        assert any(c["line_start"] == 3 for c in chunks_v2), "expected chunk at line 3 in v2"
+
+    @pytest.mark.integration
+    def test_file_deletion_clears_all_index_rows(self, tmp_path, monkeypatch):
+        """After remove_file_from_index, the file must have no row in files,
+        no chunks in code_chunks, and no hits in BM25 search."""
+        store, dispatcher, handler = self._setup(tmp_path, monkeypatch)
+
+        test_file = tmp_path / "del_test.py"
+        test_file.write_text("def bar():\n    return 1\n")
+        dispatcher.index_file(test_file)
+
+        file_id = store.get_file_id_by_path(test_file.name)
+        assert file_id is not None, "file not indexed"
+        assert len(store.get_chunks_for_file(file_id)) > 0, "no chunks after indexing"
+
+        test_file.unlink()
+        handler.remove_file_from_index(test_file)
+
+        assert store.get_file_id_by_path(test_file.name) is None, "file row not removed"
+        bm25_hits = store.search_bm25("bar")
+        assert not any(
+            (r.get("filepath") or r.get("relative_path") or "").endswith("del_test.py")
+            for r in bm25_hits
+        ), "stale BM25 entry remained after deletion"
+
+    @pytest.mark.integration
+    def test_file_creation_populates_correct_line_numbers(self, tmp_path, monkeypatch):
+        """Indexing a new file must store chunks with correct line_start/line_end
+        and make the content findable via BM25 search."""
+        store, dispatcher, handler = self._setup(tmp_path, monkeypatch)
+
+        test_file = tmp_path / "create_test.py"
+        # baz() is at line 3 (two-line preamble before the def)
+        test_file.write_text("# header\n\ndef baz():\n    pass\n")
+        dispatcher.index_file(test_file)
+
+        file_id = store.get_file_id_by_path(test_file.name)
+        assert file_id is not None, "file not indexed"
+        chunks = store.get_chunks_for_file(file_id)
+        assert len(chunks) > 0, "no chunks stored"
+        assert any(
+            c["line_start"] <= 3 <= c["line_end"] for c in chunks
+        ), "no chunk spans line 3 where baz() is defined"
+
+        bm25_hits = store.search_bm25("baz")
+        assert any(
+            (r.get("filepath") or r.get("relative_path") or "").endswith("create_test.py")
+            for r in bm25_hits
+        ), "baz not findable via BM25 after indexing"
 
 
 class TestIntegration:

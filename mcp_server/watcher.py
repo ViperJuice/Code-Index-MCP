@@ -43,6 +43,7 @@ class _Handler(FileSystemEventHandler):
         try:
             if path.suffix in self.code_extensions:
                 logger.info(f"Triggering re-index for {path}")
+                self.dispatcher.remove_file(path)
                 self.dispatcher.index_file(path)
 
                 # Invalidate cache entries for this file

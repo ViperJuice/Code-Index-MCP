@@ -65,7 +65,7 @@ profiles:
     assert profiles["oss_high"]["provider"] == "openai_compatible"
     assert profiles["oss_high"]["vector_dimension"] == 4096
     assert profiles["oss_high"]["normalization_policy"] == "l2"
-    assert profiles["oss_high"]["build_metadata"]["openai_api_base"] == settings.openai_api_base
+    assert profiles["oss_high"]["build_metadata"]["openai_api_base"] == "http://127.0.0.1:8000"
     assert profiles["oss_high"]["build_metadata"]["collection_name"] == "code_index__oss_high__v1"
 
 
@@ -93,7 +93,7 @@ profiles:
         lambda self: "treesitter-chunker@2.2.4",
     )
 
-    settings = Settings()
+    settings = Settings(semantic_default_profile="legacy-default")
     assert settings.get_semantic_default_profile() == "commercial_high"
 
 

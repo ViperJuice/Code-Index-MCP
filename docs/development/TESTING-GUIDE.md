@@ -336,61 +336,90 @@ class Calculator:
 
 ### File System Integration
 
+The watcher integration tests drive `_Handler` and `EnhancedDispatcher` against a real
+`SQLiteStore` to verify DB state after file create/modify/delete. They are marked
+`@pytest.mark.integration` and excluded from CI by default (see `pytest.ini` addopts).
+
+Run them locally with:
+
+```bash
+.venv/bin/python -m pytest tests/test_watcher.py::TestReindexIntegration -v \
+    --override-ini="addopts="
+```
+
+Example test structure (see `tests/test_watcher.py::TestReindexIntegration` for full source):
+
 ```python
-# tests/integration/test_file_sync.py
+# tests/test_watcher.py  (TestReindexIntegration class)
 import pytest
-import asyncio
 from pathlib import Path
-import tempfile
-from mcp_server.watcher import FileWatcher
-from mcp_server.sync import FileSynchronizer
+from mcp_server.watcher import _Handler
+from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher as Dispatcher
+from mcp_server.plugins.python_plugin.plugin import Plugin as PythonPlugin
+from mcp_server.storage.sqlite_store import SQLiteStore
 
 @pytest.mark.integration
-class TestFileSync:
-    @pytest.fixture
-    def temp_workspace(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            yield Path(tmpdir)
-    
-    @pytest.fixture
-    async def watcher(self, temp_workspace):
-        watcher = FileWatcher(temp_workspace)
-        await watcher.start()
-        yield watcher
-        await watcher.stop()
-    
-    async def test_file_creation_detection(self, watcher, temp_workspace):
-        """Test detecting new file creation."""
-        events = []
-        watcher.on_created = lambda path: events.append(("created", path))
-        
-        # Create new file
-        test_file = temp_workspace / "new_file.py"
-        test_file.write_text("def new_function(): pass")
-        
-        # Wait for event
-        await asyncio.sleep(0.1)
-        
-        assert len(events) == 1
-        assert events[0][0] == "created"
-        assert events[0][1].name == "new_file.py"
-    
-    async def test_file_modification_detection(self, watcher, temp_workspace):
-        """Test detecting file modifications."""
-        test_file = temp_workspace / "test.py"
-        test_file.write_text("def original(): pass")
-        
-        events = []
-        watcher.on_modified = lambda path: events.append(("modified", path))
-        
-        # Modify file
-        test_file.write_text("def modified(): pass")
-        
-        # Wait for event
-        await asyncio.sleep(0.1)
-        
-        assert len(events) == 1
-        assert events[0][0] == "modified"
+class TestReindexIntegration:
+    def _setup(self, tmp_path):
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        dispatcher = Dispatcher([PythonPlugin(sqlite_store=store)], sqlite_store=store)
+        handler = _Handler(dispatcher)
+        return store, dispatcher, handler
+
+    def test_file_modification_updates_line_numbers(self, tmp_path, monkeypatch):
+        """After an edit that shifts line positions, stale chunks are gone and
+        new chunks reflect the correct line numbers."""
+        monkeypatch.chdir(tmp_path)
+        store, dispatcher, handler = self._setup(tmp_path)
+
+        test_file = tmp_path / "shift_test.py"
+        test_file.write_text("def foo():\n    pass\n")
+        dispatcher.index_file(test_file)
+
+        # Prepend two blank lines — foo moves from line 1 to line 3
+        test_file.write_text("\n\ndef foo():\n    pass\n")
+        handler.trigger_reindex(test_file)
+
+        file_id = store.get_file_id_by_path(test_file.name)
+        chunks = store.get_chunks_for_file(file_id)
+        assert all(c["line_start"] != 1 for c in chunks), "stale line-1 chunk persists"
+        assert any(c["line_start"] == 3 for c in chunks), "expected chunk at line 3"
+
+    def test_file_deletion_clears_all_index_rows(self, tmp_path, monkeypatch):
+        """After remove_file_from_index(), no files/chunks/BM25 rows remain."""
+        monkeypatch.chdir(tmp_path)
+        store, dispatcher, handler = self._setup(tmp_path)
+
+        test_file = tmp_path / "del_test.py"
+        test_file.write_text("def bar(): return 1\n")
+        dispatcher.index_file(test_file)
+
+        test_file.unlink()
+        handler.remove_file_from_index(test_file)
+
+        assert store.get_file_id_by_path(test_file.name) is None
+        results = store.search_bm25("bar")
+        assert all(not r["filepath"].endswith(test_file.name) for r in results)
+```
+
+**Key construction detail**: pass `sqlite_store=store` to **both** the plugin and the
+dispatcher, otherwise `remove_file()` skips SQLite cleanup silently.
+
+**FileWatcher constructor** (sync, not async):
+
+```python
+from mcp_server.watcher import FileWatcher
+from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
+
+watcher = FileWatcher(
+    root=workspace_path,        # Path
+    dispatcher=dispatcher,      # EnhancedDispatcher
+    query_cache=None,           # optional
+    path_resolver=None,         # optional
+)
+watcher.start()   # sync
+# ... watchdog observes the filesystem ...
+watcher.stop()    # sync
 ```
 
 ## Plugin Testing
@@ -910,7 +939,9 @@ pytest --cov=mcp_server --cov-report=html --cov-report=term
 
 # Run specific test categories with coverage
 pytest -m unit --cov=mcp_server
-pytest -m integration --cov=mcp_server
+# Integration tests are excluded from CI by default (pytest.ini addopts).
+# Run locally with --override-ini to bypass the exclusion:
+pytest tests/test_watcher.py::TestReindexIntegration --override-ini="addopts=" -v
 pytest -m plugin --cov=mcp_server
 
 # Generate detailed HTML report
@@ -982,11 +1013,10 @@ jobs:
     
     - name: Run unit tests
       run: |
-        pytest -m unit -v --cov=mcp_server --cov-report=xml
-    
-    - name: Run integration tests
-      run: |
-        pytest -m integration -v --cov=mcp_server --cov-append --cov-report=xml
+        pytest -v --cov=mcp_server --cov-report=xml
+        # Note: pytest.ini addopts excludes @pytest.mark.integration and @pytest.mark.slow
+        # by default. Integration tests are run locally only (they require a full
+        # filesystem and SQLite environment, not available in CI).
     
     - name: Run plugin tests
       run: |

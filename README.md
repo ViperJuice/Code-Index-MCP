@@ -229,6 +229,31 @@ The setup script creates the appropriate `.mcp.json` for your environment. Manua
 }
 ```
 
+## 🌍 Using in Another Repo
+
+To index a different repository, point the server's `cwd` at that repo in your Claude Code MCP configuration (`~/.claude/settings.json` or `.mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "code-index-mcp": {
+      "command": "/abs/path/to/Code-Index-MCP/.venv/bin/python",
+      "args": ["/abs/path/to/Code-Index-MCP/scripts/cli/mcp_server_cli.py"],
+      "cwd": "/abs/path/to/your-repo"
+    }
+  }
+}
+```
+
+The `cwd` field controls which repository is indexed. On first use the server automatically builds the index in a background thread — the server is immediately responsive while indexing progresses, and `search_code` responses include `"indexing_in_progress": true` until the initial build completes.
+
+**Options:**
+- Set `MCP_AUTO_INDEX=false` in the server environment to skip background auto-indexing and call the `reindex` MCP tool manually (recommended for very large repos).
+- Add `{"enabled": false}` to `.mcp-index.json` in the target repo to disable indexing for that repo entirely.
+- After a full reindex or code changes, call the `reindex` MCP tool to rebuild the index on demand.
+
+**Semantic profiles:** BM25 search requires no extra config. For semantic (vector) search, the server automatically loads `code-index-mcp.profiles.yaml` from its own installation directory — no need to copy it to each repo. To override with a custom profile file, set `MCP_PROFILES_PATH=/abs/path/to/your-profiles.yaml` in the server environment. To override individual endpoint URLs without editing the YAML, use the env vars referenced in the file (e.g. `VLLM_EMBEDDING_BASE_URL`, `VLLM_SUMMARIZATION_BASE_URL`).
+
 ### 💰 Costs & Features
 | Feature | Minimal | Standard | Full | Cost |
 |---------|---------|----------|------|------|
@@ -519,6 +544,15 @@ MCP_PLUGIN_LAZY_LOAD=true        # Load plugins on-demand
 # Performance tuning
 MCP_BM25_BYPASS_ENABLED=true     # Enable direct BM25 bypass
 MCP_MAX_PLUGIN_MEMORY=1024       # Max memory for plugins (MB)
+
+# Auto-indexing (cross-repo use)
+MCP_AUTO_INDEX=true               # Set false to skip background auto-index on first run
+MCP_AUTO_INDEX_MAX_FILES=100000   # Skip auto-index if repo exceeds this file count
+MCP_PROFILES_PATH=                # Absolute path to a custom profiles YAML (overrides built-in)
+
+# Endpoint overrides (no need to edit profiles.yaml)
+VLLM_EMBEDDING_BASE_URL=          # Override vLLM embedding endpoint (default: http://ai:8001/v1)
+VLLM_SUMMARIZATION_BASE_URL=      # Override summarization endpoint (default: http://win:8002/v1)
 ```
 
 ## 🗂️ Index Management

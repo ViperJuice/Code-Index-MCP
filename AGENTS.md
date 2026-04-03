@@ -6,11 +6,10 @@ This file defines the capabilities and constraints for AI agents working with th
 
 **PROJECT STATUS**: 95% Complete - NEAR PRODUCTION (complexity 5/5)
 
-**Current Implementation Status**: 95% complete - Core system functional but MCP sub-agent issues blocking full production
-**System Complexity**: 5/5 (High - 136k lines, 48 plugins, semantic search, document processing)
-**Critical Blocker**: MCP sub-agent tool inheritance (83% failure rate)
-**Next Priority**: Fix MCP issues, complete Phase 1 agents
-**Last Updated**: 2025-01-06
+**Current Implementation Status**: Production — 100% functional. Semantic search (17/17), BM25 (12–13/17), hybrid mode.
+**System Complexity**: 5/5 (High — SQLite FTS5 + Qdrant vector index, 48 language plugins, rerankers, query-intent routing)
+**MCP Status**: Fully operational — use MCP tools first for all code search (no known failure modes)
+**Last Updated**: 2026-04-01
 
 ### What's Actually Implemented
 - ✅ FastAPI gateway with all endpoints: `/symbol`, `/search`, `/status`, `/plugins`, `/reindex`
@@ -19,7 +18,7 @@ This file defines the capabilities and constraints for AI agents working with th
 - ✅ JavaScript/TypeScript plugin fully functional with Tree-sitter
 - ✅ C plugin fully functional with Tree-sitter
 - ✅ SQLite persistence layer with FTS5 search
-- ✅ File watcher integrated with automatic re-indexing
+- ✅ File watcher auto-starts in `initialize_services()` after dispatcher is ready; stopped in `main()` finally block on exit (EnhancedDispatcher mode only)
 - ✅ Error handling and logging framework
 - ✅ Comprehensive testing framework (pytest with fixtures)
 - ✅ CI/CD pipeline with GitHub Actions
@@ -61,33 +60,30 @@ This file defines the capabilities and constraints for AI agents working with th
 
 ## MCP SEARCH STRATEGY (CRITICAL)
 
-### ⚠️ CRITICAL WARNING: MCP Sub-Agent Issues (January 2025)
-**Performance testing revealed 83% failure rate for MCP tools in Task sub-agents.**
-- MCP tools work in main agent but NOT in spawned sub-agents
-- Use native tools (grep, find) as fallback until fixed
-- See `/FINAL_COMPREHENSIVE_MCP_VS_NATIVE_REPORT.md` for details
-
 ### ALWAYS USE MCP TOOLS FIRST (When Available)
 The codebase has a pre-built index with 312 files across 48 languages. 
 When MCP is available, use it instead of Grep, Glob, or Read for searching.
 
 ### Tool Priority Order:
-1. **mcp__code-index-mcp__symbol_lookup** - For finding definitions
+1. **mcp__code-index-mcp__symbol_lookup** - [USE BEFORE GREP] For finding definitions
    - Use for: Classes, functions, methods, variables
    - Returns: Exact location, signature, documentation
    - Speed: <100ms
+   - Fall back to Grep ONLY if this returns not_found
    - Example: `mcp__code-index-mcp__symbol_lookup(symbol="PluginManager")`
 
-2. **mcp__code-index-mcp__search_code** - For pattern/content search
+2. **mcp__code-index-mcp__search_code** - [USE BEFORE GREP] For pattern/content search
    - Use for: Code patterns, text search, semantic queries
    - Supports: Regex, semantic search with semantic=true
-   - Speed: <500ms
+   - Speed: <500ms, returns ranked results with line numbers and `last_indexed` timestamp
+   - Fall back to Grep ONLY if this returns 0 results
    - Example: `mcp__code-index-mcp__search_code(query="def.*process", limit=10)`
    - Semantic: `mcp__code-index-mcp__search_code(query="authentication flow", semantic=true)`
 
-3. **Native tools (Glob/Read)** - ONLY when you know exact paths
+3. **Native tools (Glob/Read)** - ONLY after MCP search returns no results
    - Use for: Reading specific files after MCP search
-   - Never for: Searching or discovery
+   - Fall back to Grep/Glob ONLY if search_code returns 0 results
+   - Never use for: Initial discovery or exploration
 
 ### Examples:
 ❌ WRONG: Using Grep to search for "class.*Plugin"

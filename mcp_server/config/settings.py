@@ -4,8 +4,10 @@ Comprehensive settings management for production deployments.
 
 import json
 import os
+import re
 import secrets
 from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
@@ -13,6 +15,35 @@ import yaml
 from pydantic import BaseModel, Field, model_validator, validator
 
 from .environment import Environment, get_env_var, get_environment, is_production
+
+
+def _find_profiles_yaml() -> Optional[str]:
+    """Return the first existing code-index-mcp.profiles.yaml path.
+
+    Search order:
+    1. MCP_PROFILES_PATH env var (explicit override)
+    2. CWD/code-index-mcp.profiles.yaml (per-repo override)
+    3. <package-root>/code-index-mcp.profiles.yaml (server installation fallback)
+    """
+    env_path = os.getenv("MCP_PROFILES_PATH")
+    if env_path and os.path.exists(env_path):
+        return env_path
+    cwd_path = Path.cwd() / "code-index-mcp.profiles.yaml"
+    if cwd_path.exists():
+        return str(cwd_path)
+    pkg_path = Path(__file__).parent.parent.parent / "code-index-mcp.profiles.yaml"
+    if pkg_path.exists():
+        return str(pkg_path)
+    return None
+
+
+def _expand_env_vars(value: str) -> str:
+    """Expand ${VAR} and ${VAR:default} patterns in *value* using os.environ."""
+    def _replace(m: re.Match) -> str:
+        var, _, default = m.group(1).partition(":")
+        return os.environ.get(var, default)
+    return re.sub(r"\$\{([^}]+)\}", _replace, value)
+
 
 
 class DatabaseSettings(BaseModel):
@@ -593,8 +624,8 @@ class Settings(BaseModel):
             return parsed
 
         chunker_version = self._detect_treesitter_chunker_version()
-        yaml_path = "code-index-mcp.profiles.yaml"
-        if os.path.exists(yaml_path):
+        yaml_path = _find_profiles_yaml()
+        if yaml_path:
             with open(yaml_path, "r", encoding="utf-8") as handle:
                 payload = yaml.safe_load(handle) or {}
 
@@ -611,7 +642,8 @@ class Settings(BaseModel):
                     normalization = config.get("normalization") or {}
 
                     provider = str(config.get("provider", "voyage"))
-                    openai_base = str(vllm.get("base_url") or self.openai_api_base)
+                    _raw_base = vllm.get("base_url") or self.openai_api_base
+                    openai_base = _expand_env_vars(str(_raw_base)) if _raw_base else ""
                     if provider in {
                         "openai_compatible",
                         "openai-compatible",
@@ -684,12 +716,14 @@ class Settings(BaseModel):
         included so ``ChunkWriter`` can use them without reading env vars directly.
         """
         profile_cfg: Dict[str, Any] = {}
-        yaml_path = "code-index-mcp.profiles.yaml"
-        if os.path.exists(yaml_path):
+        yaml_path = _find_profiles_yaml()
+        if yaml_path:
             with open(yaml_path, "r", encoding="utf-8") as fh:
                 payload = yaml.safe_load(fh) or {}
             profile_map = payload.get("profiles") or {}
-            profile_cfg = (profile_map.get(profile_id) or {}).get("summarization") or {}
+            profile_cfg = dict((profile_map.get(profile_id) or {}).get("summarization") or {})
+            if "base_url" in profile_cfg:
+                profile_cfg["base_url"] = _expand_env_vars(str(profile_cfg["base_url"]))
 
         return {
             **profile_cfg,

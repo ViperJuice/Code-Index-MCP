@@ -370,6 +370,8 @@ main() {
     if ! grep -q "^.mcp-index/code_index.db" .gitignore 2>/dev/null; then
         echo -e "\n# MCP Index (tracked for fast setup)" >> .gitignore
         echo ".mcp-index/code_index.db" >> .gitignore
+        echo ".mcp-index/code_index.db-shm" >> .gitignore
+        echo ".mcp-index/code_index.db-wal" >> .gitignore
         echo ".mcp-index/.index_metadata.json" >> .gitignore
         print_info "Updated .gitignore"
     fi

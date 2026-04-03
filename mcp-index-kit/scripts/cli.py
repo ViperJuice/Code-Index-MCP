@@ -62,6 +62,13 @@ def init(force: bool, branch: Optional[str]):
         sys.exit(1)
     
     click.echo(click.style('✓ MCP Index Kit initialized successfully!', fg='green'))
+    click.echo()
+    click.echo('Next steps:')
+    click.echo('  1. Configure your MCP client to point at this repository.')
+    click.echo('  2. On first tool use, the server will automatically build the index')
+    click.echo('     in the background — initial search results may be sparse.')
+    click.echo('  3. To trigger an immediate full reindex, call the reindex tool:')
+    click.echo('     mcp__code-index-mcp__reindex()')
 
 
 @cli.command()
