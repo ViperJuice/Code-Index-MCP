@@ -230,7 +230,7 @@ jobs:
         if: steps.check_index.outputs.found == 'false' && steps.download.outputs.downloaded == 'false'
         run: |
           # Download the portable MCP indexer
-          curl -L https://github.com/yourusername/Code-Index-MCP/releases/latest/download/mcp-portable-indexer.pyz -o mcp-indexer.pyz
+          curl -L https://github.com/ViperJuice/Code-Index-MCP/releases/latest/download/mcp-portable-indexer.pyz -o mcp-indexer.pyz
           chmod +x mcp-indexer.pyz
       
       - name: Build Index

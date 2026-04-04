@@ -26,6 +26,7 @@ env:
   NODE_VERSION: '18'
   DOCKER_REGISTRY: ghcr.io
   DOCKER_IMAGE_NAME: ${{ github.repository }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # Code quality checks
@@ -370,7 +371,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
           format: 'sarif'
@@ -383,7 +384,7 @@ jobs:
 
       - name: Run Snyk security scan
         if: ${{ env.SNYK_TOKEN != '' }}
-        uses: snyk/actions/docker@master
+        uses: snyk/actions/docker@0.4.0
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}

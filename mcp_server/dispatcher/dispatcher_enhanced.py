@@ -1920,14 +1920,21 @@ class EnhancedDispatcher:
                 except Exception as e:
                     logger.error(f"Error removing from SQLite: {e}")
 
-            # Remove from semantic index if available
+            # Remove from plugin fuzzy index if available
             try:
                 plugin = self._match_plugin(path)
                 if plugin and hasattr(plugin, "_indexer") and plugin._indexer:
                     plugin._indexer.remove_file(path)
-                    logger.info(f"Removed from semantic index: {path}")
             except Exception as e:
-                logger.warning(f"Error removing from semantic index: {e}")
+                logger.warning(f"Error removing from plugin index: {e}")
+
+            # Remove from Qdrant semantic index if available
+            if self._semantic_indexer is not None:
+                try:
+                    self._semantic_indexer.remove_file(path)
+                    logger.info("Removed %s from semantic index", path)
+                except Exception as e:
+                    logger.warning("Failed to remove %s from semantic index: %s", path, e)
 
             # Update statistics
             self._operation_stats["deletions"] = self._operation_stats.get("deletions", 0) + 1

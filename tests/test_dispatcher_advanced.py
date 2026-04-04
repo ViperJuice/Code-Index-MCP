@@ -643,3 +643,56 @@ class TestIntegration:
         stats = plugin_router.get_plugin_stats()
         assert python_plugin in stats["plugin_performance"]
         assert stats["plugin_performance"][python_plugin] > 0
+
+
+class TestRemoveFileSemanticCleanup:
+    """Verify EnhancedDispatcher.remove_file() cleans up the Qdrant semantic index."""
+
+    def _make_dispatcher(self, tmp_path, semantic_indexer=None):
+        """Build a minimal EnhancedDispatcher without calling __init__."""
+        import threading
+        from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
+
+        d = EnhancedDispatcher.__new__(EnhancedDispatcher)
+        d._sqlite_store = None
+        d._file_cache = {}
+        d._file_cache_lock = threading.Lock()
+        d._operation_stats = {}
+        d._semantic_indexer = semantic_indexer
+        d._plugins = []
+        return d
+
+    def test_remove_file_calls_semantic_indexer(self, tmp_path):
+        """remove_file() must call semantic_indexer.remove_file() when one is present."""
+        from unittest.mock import MagicMock
+
+        mock_semantic = MagicMock()
+        dispatcher = self._make_dispatcher(tmp_path, semantic_indexer=mock_semantic)
+
+        target = tmp_path / "foo.py"
+        target.write_text("x = 1")
+        dispatcher.remove_file(target)
+
+        mock_semantic.remove_file.assert_called_once()
+
+    def test_remove_file_no_semantic_indexer_does_not_raise(self, tmp_path):
+        """remove_file() must not raise when _semantic_indexer is None."""
+        dispatcher = self._make_dispatcher(tmp_path, semantic_indexer=None)
+
+        target = tmp_path / "bar.py"
+        target.write_text("y = 2")
+        dispatcher.remove_file(target)  # must not raise
+
+    def test_remove_file_semantic_indexer_exception_is_swallowed(self, tmp_path):
+        """remove_file() must not propagate exceptions from the semantic indexer."""
+        from unittest.mock import MagicMock
+
+        mock_semantic = MagicMock()
+        mock_semantic.remove_file.side_effect = RuntimeError("qdrant unavailable")
+        dispatcher = self._make_dispatcher(tmp_path, semantic_indexer=mock_semantic)
+
+        target = tmp_path / "baz.py"
+        target.write_text("z = 3")
+        dispatcher.remove_file(target)  # must not raise despite indexer error
+
+        mock_semantic.remove_file.assert_called_once()

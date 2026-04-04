@@ -213,8 +213,6 @@ class IncrementalIndexer:
                 # Remove from SQLite
                 self.store.remove_file(relative_path, repo_id)
 
-                # TODO: Also remove from vector store if available
-
             logger.debug(f"Removed file from index: {path}")
             return True
 
@@ -254,8 +252,6 @@ class IncrementalIndexer:
 
                 # Move in SQLite
                 self.store.move_file(old_relative, new_relative, repo_id, content_hash)
-
-                # TODO: Also update vector store if available
 
             logger.debug(f"Moved file in index: {old_path} -> {new_path}")
             return True
