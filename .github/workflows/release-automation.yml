@@ -61,8 +61,9 @@ jobs:
           if [ "${{ inputs.release_type }}" == "custom" ]; then
             VERSION="${{ inputs.version }}"
           else
-            # Get latest tag
-            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+            # Get latest semver tag (ignore non-semver tags like index-latest)
+            LATEST_TAG=$(git tag --list 'v[0-9]*' --sort=-version:refname | head -1 || true)
+            [ -z "$LATEST_TAG" ] && LATEST_TAG="v0.0.0"
             
             # Extract version numbers
             VERSION_MAJOR=$(echo $LATEST_TAG | sed 's/v//' | cut -d. -f1)
