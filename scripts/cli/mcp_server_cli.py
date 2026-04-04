@@ -266,10 +266,10 @@ async def initialize_services():
 
         # Qdrant / semantic-search availability — log clearly so users know what mode they're in
         if isinstance(dispatcher, EnhancedDispatcher) and getattr(dispatcher, "_semantic_indexer", None) is None:
-            logger.info(
-                "Semantic search (Qdrant) not available — running in BM25-only mode. "
-                "Ensure Qdrant is running and QDRANT_URL is set, or set "
-                "MCP_USE_SIMPLE_DISPATCHER=true to suppress this message."
+            logger.warning(
+                "Semantic search not available — running in BM25-only mode. "
+                "Set VOYAGE_API_KEY (Voyage AI) or configure a vLLM endpoint in "
+                "code-index-mcp.profiles.yaml to enable semantic (vector) search."
             )
 
         # Start filesystem watcher so the index stays current automatically.

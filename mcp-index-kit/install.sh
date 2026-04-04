@@ -175,6 +175,7 @@ on:
 
 env:
   MCP_INDEX_ENABLED: \${{ vars.MCP_INDEX_ENABLED || 'true' }}
+  # Optional: add VOYAGE_API_KEY to repository secrets to enable semantic (vector) search
 
 jobs:
   check-enabled:
@@ -226,24 +227,16 @@ jobs:
         with:
           python-version: '3.11'
       
-      - name: Download MCP Indexer
+      - name: Install MCP Indexer
         if: steps.check_index.outputs.found == 'false' && steps.download.outputs.downloaded == 'false'
-        run: |
-          # Download the portable MCP indexer
-          curl -L https://github.com/ViperJuice/Code-Index-MCP/releases/latest/download/mcp-portable-indexer.pyz -o mcp-indexer.pyz
-          chmod +x mcp-indexer.pyz
-      
+        run: pip install index-it-mcp
+
       - name: Build Index
         if: steps.check_index.outputs.found == 'false' && steps.download.outputs.downloaded == 'false'
         run: |
-          # Create index directory
           mkdir -p .mcp-index
-          
-          # Run the indexer
-          python mcp-indexer.pyz build \
-            --config .mcp-index.json \
-            --output .mcp-index/code_index.db \
-            --ignore-file .mcp-index-ignore
+          mcp-index index rebuild --sqlite-only
+          mv code_index.db .mcp-index/code_index.db
       
       - name: Create index metadata
         if: steps.check_index.outputs.found == 'false' && steps.download.outputs.downloaded == 'false'
@@ -260,6 +253,7 @@ jobs:
       
       - name: Compress index for artifact
         run: |
+          test -f .mcp-index/code_index.db || { echo "::error::Index build failed — no index file produced"; exit 1; }
           cd .mcp-index
           tar -czf ../mcp-index-archive.tar.gz .
           cd ..

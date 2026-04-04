@@ -33,7 +33,7 @@ echo -e "${YELLOW}🔍 MCP Index: Processing commit $COMMIT...${NC}"
 # Check if mcp-index CLI is available
 if command -v mcp-index &> /dev/null; then
     # Use mcp-index CLI
-    mcp-index update --repo "$REPO_PATH" --commit "$COMMIT" --incremental 2>&1 | while read line; do
+    mcp-index repository sync 2>&1 | while read line; do
         echo -e "${GREEN}   $line${NC}"
     done
 elif [ -f "mcp_cli.py" ]; then
