@@ -1,1 +1,0 @@
-{"initial_version":null,"version":5322,"config":{"vector_data":{"":{"size":2048,"distance":"Dot","storage_type":"InRamChunkedMmap","index":{"type":"plain","options":{}},"quantization_config":null}},"payload_storage_type":{"type":"mmap"}}}

@@ -353,6 +353,9 @@ def test_environment(monkeypatch):
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
     monkeypatch.setenv("MCP_SKIP_PLUGIN_PREINDEX", "true")
+    # Prevent tests from loading the local 3.6GB production vector store.
+    # The dispatcher skips Qdrant init when QDRANT_PATH doesn't exist.
+    monkeypatch.setenv("QDRANT_PATH", "/tmp/_qdrant_test_no_such_dir_")
     # Clear .env.native workspace-specific vars that cause /workspaces permission errors
     for _var in (
         "MCP_REPO_REGISTRY",
