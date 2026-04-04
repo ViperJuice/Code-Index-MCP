@@ -153,7 +153,9 @@ class ChunkWriter:
                     "content-type": "application/json",
                 },
                 json={
-                    "model": self.summarization_config.get("anthropic_model", "claude-haiku-4-5-20251001"),
+                    "model": self.summarization_config.get(
+                        "anthropic_model", "claude-haiku-4-5-20251001"
+                    ),
                     "max_tokens": 150,
                     "system": system,
                     "messages": [{"role": "user", "content": prompt}],

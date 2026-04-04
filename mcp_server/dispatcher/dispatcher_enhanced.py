@@ -1169,16 +1169,14 @@ class EnhancedDispatcher:
                                 # "semantic_preflight.py" lacking the word
                                 # "implementation") can enter the candidate pool.
                                 or_query = " OR ".join(
-                                    t for t in query.split()
-                                    if re.match(r"[a-zA-Z0-9_]", t)
+                                    t for t in query.split() if re.match(r"[a-zA-Z0-9_]", t)
                                 )
                                 if or_query != query:
                                     or_results = self._sqlite_store.search_bm25(
                                         or_query, table=table, limit=fetch_limit
                                     )
                                     and_paths = {
-                                        r.get("filepath") or r.get("file_path", "")
-                                        for r in results
+                                        r.get("filepath") or r.get("file_path", "") for r in results
                                     }
                                     for r in or_results:
                                         fp = r.get("filepath") or r.get("file_path", "")

@@ -269,7 +269,8 @@ def push(validate: bool, compress_only: bool, no_secure: bool, skip_if_current: 
                     meta = json.loads(meta_path.read_text(encoding="utf-8"))
                     head = subprocess.run(
                         ["git", "rev-parse", "HEAD"],
-                        capture_output=True, text=True,
+                        capture_output=True,
+                        text=True,
                     ).stdout.strip()
                     if meta.get("git_commit") == head:
                         click.echo("Index is current. Skipping upload.")

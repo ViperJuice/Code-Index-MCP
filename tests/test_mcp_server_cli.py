@@ -2,6 +2,7 @@
 Tests for mcp_server_cli.py — auto-index, deferred FileWatcher, MCP_AUTO_INDEX
 escape hatch, indexing_in_progress response flag, and WAL gitignore writes.
 """
+
 import asyncio
 import importlib.util
 import json
@@ -42,6 +43,7 @@ def _reset_globals(mod):
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_discovery_mock(index_path=None, enabled=True):
     """Return a mock IndexDiscovery that optionally has an existing index."""
@@ -95,8 +97,9 @@ def _std_patches(cli, mock_disc, mock_watcher):
         patch.object(cli, "SQLiteStore", return_value=MagicMock()),
         patch.object(cli, "EnhancedDispatcher", _FakeEnhancedDispatcher),
         patch.object(cli, "FileWatcher", return_value=mock_watcher),
-        patch.object(cli, "validate_index",
-                     return_value={"valid": True, "stats": {}, "issues": []}),
+        patch.object(
+            cli, "validate_index", return_value={"valid": True, "stats": {}, "issues": []}
+        ),
         patch.object(cli, "PluginManager", return_value=MagicMock()),
     ]
 
@@ -112,6 +115,7 @@ def _apply_patches(patches, extra=None):
 # ---------------------------------------------------------------------------
 # 1. Gitignore WAL entries written on auto-init
 # ---------------------------------------------------------------------------
+
 
 class TestAutoInitGitignore:
     """WAL sidecar entries must be added to .gitignore when a new index is created."""
@@ -188,6 +192,7 @@ class TestAutoInitGitignore:
 # 2. MCP_AUTO_INDEX=false escape hatch
 # ---------------------------------------------------------------------------
 
+
 class TestMcpAutoIndexEscapeHatch:
     """MCP_AUTO_INDEX=false must prevent the background indexing thread from starting."""
 
@@ -259,6 +264,7 @@ class TestMcpAutoIndexEscapeHatch:
 # ---------------------------------------------------------------------------
 # 3. Deferred FileWatcher start
 # ---------------------------------------------------------------------------
+
 
 class TestDeferredFileWatcher:
     """FileWatcher.start() must be deferred until after initial indexing completes."""
@@ -340,6 +346,7 @@ class TestDeferredFileWatcher:
 # 4. indexing_in_progress flag in search_code responses
 # ---------------------------------------------------------------------------
 
+
 class TestIndexingInProgressFlag:
     """search_code responses include indexing_in_progress when the thread is alive."""
 
@@ -407,9 +414,9 @@ class TestIndexingInProgressFlag:
     @pytest.mark.asyncio
     async def test_non_empty_results_include_flag_when_thread_alive(self):
         """Even with results, indexing_in_progress must appear while indexing."""
-        cli = self._make_cli_with_dispatcher([
-            {"file": "/tmp/foo.py", "line": 1, "snippet": "def foo(): pass", "symbol": "foo"}
-        ])
+        cli = self._make_cli_with_dispatcher(
+            [{"file": "/tmp/foo.py", "line": 1, "snippet": "def foo(): pass", "symbol": "foo"}]
+        )
         cli._indexing_thread = self._alive_thread()
 
         data = await self._call_search(cli, query="foo")
@@ -419,9 +426,9 @@ class TestIndexingInProgressFlag:
     @pytest.mark.asyncio
     async def test_non_empty_results_no_flag_when_no_thread(self):
         """Results with no indexing thread must NOT include indexing_in_progress."""
-        cli = self._make_cli_with_dispatcher([
-            {"file": "/tmp/foo.py", "line": 1, "snippet": "def foo(): pass", "symbol": "foo"}
-        ])
+        cli = self._make_cli_with_dispatcher(
+            [{"file": "/tmp/foo.py", "line": 1, "snippet": "def foo(): pass", "symbol": "foo"}]
+        )
         cli._indexing_thread = None
 
         data = await self._call_search(cli, query="foo")
@@ -436,21 +443,16 @@ class TestIndexingInProgressFlag:
 # 5. End-to-end: real SQLiteStore + real EnhancedDispatcher on a tiny repo
 # ---------------------------------------------------------------------------
 
+
 class TestFreshRepoEndToEnd:
     """BM25 content must be populated and searchable after the auto-index thread runs."""
 
     @pytest.mark.asyncio
-    async def test_bm25_populated_and_searchable_after_initial_index(
-        self, tmp_path, monkeypatch
-    ):
+    async def test_bm25_populated_and_searchable_after_initial_index(self, tmp_path, monkeypatch):
         """After the background index thread finishes, search_code returns real results."""
         # --- Create a tiny real repo ---
-        (tmp_path / "greet.py").write_text(
-            "def greet_world():\n    return 'hello world'\n"
-        )
-        (tmp_path / "math_utils.py").write_text(
-            "def add_numbers(a, b):\n    return a + b\n"
-        )
+        (tmp_path / "greet.py").write_text("def greet_world():\n    return 'hello world'\n")
+        (tmp_path / "math_utils.py").write_text("def add_numbers(a, b):\n    return a + b\n")
 
         monkeypatch.chdir(tmp_path)
         monkeypatch.setenv("MCP_AUTO_INDEX", "true")

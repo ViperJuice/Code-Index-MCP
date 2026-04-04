@@ -39,11 +39,12 @@ def _find_profiles_yaml() -> Optional[str]:
 
 def _expand_env_vars(value: str) -> str:
     """Expand ${VAR} and ${VAR:default} patterns in *value* using os.environ."""
+
     def _replace(m: re.Match) -> str:
         var, _, default = m.group(1).partition(":")
         return os.environ.get(var, default)
-    return re.sub(r"\$\{([^}]+)\}", _replace, value)
 
+    return re.sub(r"\$\{([^}]+)\}", _replace, value)
 
 
 class DatabaseSettings(BaseModel):
@@ -345,7 +346,9 @@ class SummarizationSettings(BaseModel):
     """LLM model defaults for chunk summarization fallback chain."""
 
     # Cerebras OSS fallback — Qwen 3 235B (preview) is the most modern model available on Cerebras
-    cerebras_model: str = Field(default="qwen-3-235b-a22b-instruct-2507", description="Cerebras model for OSS fallback")
+    cerebras_model: str = Field(
+        default="qwen-3-235b-a22b-instruct-2507", description="Cerebras model for OSS fallback"
+    )
 
     # Anthropic fallback — claude-haiku-4-5 is the current lightweight model
     anthropic_model: str = Field(

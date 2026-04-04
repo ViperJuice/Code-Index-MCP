@@ -250,8 +250,7 @@ class IndexArtifactUploader:
             subprocess.run(["gh", "--version"], capture_output=True, check=True)
         except (FileNotFoundError, subprocess.CalledProcessError) as exc:
             raise RuntimeError(
-                "gh CLI is required for artifact upload. "
-                "Install from https://cli.github.com"
+                "gh CLI is required for artifact upload. " "Install from https://cli.github.com"
             ) from exc
 
         tag = "index-latest"
@@ -260,10 +259,16 @@ class IndexArtifactUploader:
         # Create the release if it doesn't exist (ignore failure if it already exists)
         subprocess.run(
             [
-                "gh", "release", "create", tag,
-                "--repo", self.repo,
-                "--title", f"Index: latest ({commit})",
-                "--notes", f"Auto-updated index artifact. Commit: {metadata.get('commit', 'unknown')}",
+                "gh",
+                "release",
+                "create",
+                tag,
+                "--repo",
+                self.repo,
+                "--title",
+                f"Index: latest ({commit})",
+                "--notes",
+                f"Auto-updated index artifact. Commit: {metadata.get('commit', 'unknown')}",
             ],
             capture_output=True,
         )
@@ -271,8 +276,12 @@ class IndexArtifactUploader:
         # Upload (overwrite) the archive and metadata assets
         subprocess.run(
             [
-                "gh", "release", "upload", tag,
-                "--repo", self.repo,
+                "gh",
+                "release",
+                "upload",
+                tag,
+                "--repo",
+                self.repo,
                 "--clobber",
                 str(archive_path),
                 str(metadata_path),
@@ -281,8 +290,10 @@ class IndexArtifactUploader:
         )
 
         size_mb = archive_path.stat().st_size / 1024 / 1024
-        print(f"✅ Uploaded {archive_path.name} ({size_mb:.1f} MB) to "
-              f"https://github.com/{self.repo}/releases/tag/{tag}")
+        print(
+            f"✅ Uploaded {archive_path.name} ({size_mb:.1f} MB) to "
+            f"https://github.com/{self.repo}/releases/tag/{tag}"
+        )
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -1,4 +1,5 @@
 """Tests for mcp_server/indexing/summarization.py — ChunkWriter and LazyChunkWriter."""
+
 import asyncio
 
 import pytest

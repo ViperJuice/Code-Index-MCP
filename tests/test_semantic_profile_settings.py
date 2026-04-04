@@ -172,6 +172,7 @@ def test_find_profiles_yaml_returns_none_when_nothing_found(monkeypatch, tmp_pat
 
     # Patch Path.exists so the package-dir fallback also reports missing
     original_exists = Path.exists
+
     def fake_exists(self):
         if self.name == "code-index-mcp.profiles.yaml":
             return False

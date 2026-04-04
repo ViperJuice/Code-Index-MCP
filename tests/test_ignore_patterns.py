@@ -1,4 +1,5 @@
 """Tests for mcp_server/core/ignore_patterns.py — IgnorePatternManager."""
+
 from pathlib import Path
 
 import pytest
