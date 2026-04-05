@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from typing import Iterable, Optional
 
-from tree_sitter import Language, Parser
+from tree_sitter import Parser
 from tree_sitter_language_pack import get_language as _get_ts_language
 
 from ...plugin_base import (

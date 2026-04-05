@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tree_sitter import Language, Parser
+from tree_sitter import Parser
 from tree_sitter_language_pack import get_language as _get_ts_language
 
 

@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
-from tree_sitter import Language, Node, Parser
+from tree_sitter import Node, Parser
 from tree_sitter_language_pack import get_language as _get_ts_language
 
 from ...interfaces.plugin_interfaces import (
