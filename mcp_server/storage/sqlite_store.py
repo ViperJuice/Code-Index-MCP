@@ -623,7 +623,7 @@ class SQLiteStore:
             raise ValueError("Relative path could not be determined for file storage")
 
         # Normalize stored path string
-        stored_path = str(resolved_path) if resolved_path else relative_path_str
+        stored_path = str(resolved_path).replace("\\", "/") if resolved_path else relative_path_str
 
         # Determine filesystem metadata when available
         path_exists = resolved_path.exists() if resolved_path else False
