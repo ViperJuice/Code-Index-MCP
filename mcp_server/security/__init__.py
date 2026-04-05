@@ -82,6 +82,6 @@ __all__ = [
 ]
 
 # Version information
-__version__ = "1.0.0"
+__version__ = "2.15.0-alpha.1"
 __author__ = "Code Index MCP"
 __description__ = "Security layer with authentication and authorization capabilities"
