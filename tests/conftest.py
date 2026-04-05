@@ -365,6 +365,15 @@ def test_environment(monkeypatch):
         monkeypatch.delenv(_var, raising=False)
 
 
+# CWD fixtures
+@pytest.fixture(autouse=True)
+def restore_cwd():
+    """Restore working directory after each test to prevent CWD leakage between tests."""
+    original = os.getcwd()
+    yield
+    os.chdir(original)
+
+
 # Cleanup fixtures
 @pytest.fixture(autouse=True)
 def cleanup_logs(tmp_path):

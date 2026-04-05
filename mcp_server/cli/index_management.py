@@ -399,8 +399,14 @@ def rebuild(
     if not vector_only:
         click.echo("Rebuilding SQLite index...")
         try:
-            # Remove old SQLite index
+            # Remove old SQLite index (auto-backup first so users can restore if needed)
             if os.path.exists("code_index.db"):
+                import shutil as _shutil
+                from datetime import datetime as _datetime
+
+                _bak = f"code_index.db.{_datetime.now().strftime('%Y%m%dT%H%M%S')}.bak"
+                _shutil.copy2("code_index.db", _bak)
+                click.echo(f"📦 Backed up existing index to {_bak}")
                 os.remove("code_index.db")
 
             sqlite_stats = _build_sqlite_baseline()

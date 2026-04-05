@@ -138,7 +138,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        include:
+          - os: macos-latest
+            workers: auto
+          - os: windows-latest
+            workers: 0
     env:
       MCP_SKIP_PLUGIN_PREINDEX: "true"
 
@@ -167,7 +171,7 @@ jobs:
         run: |
           pytest tests/ \
             --ignore=tests/test_git_integration.py \
-            -n auto \
+            -n ${{ matrix.workers }} \
             --timeout=60 \
             --benchmark-skip \
             --no-cov

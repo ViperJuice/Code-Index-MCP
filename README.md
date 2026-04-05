@@ -6,7 +6,7 @@ Modular, extensible local-first code indexer designed to enhance Claude Code and
 **Version**: 1.0.0 (MVP Release)
 **Core Features**: Stable - Local indexing, symbol/text search, 48-language support
 **Optional Features**: Semantic search (requires Voyage AI), Index sync (beta)
-**Performance**: Sub-100ms queries, <10s indexing for cached repositories
+**Performance**: Sub-100ms queries, <10s indexing for cached repositories (benchmarked on this codebase; results vary by repo size and language mix)
 
 > **New to Code-Index-MCP?** Check out our [Getting Started Guide](docs/GETTING_STARTED.md) for a quick walkthrough.
 
@@ -139,11 +139,11 @@ docker run -it -v $(pwd):/workspace ghcr.io/code-index-mcp/mcp-index:minimal
 
 #### Option 2: AI-Powered Search
 ```bash
-# Set your API key (get one at https://voyageai.com)
-export VOYAGE_AI_API_KEY=your-key
+# Set your API key (get one at https://www.voyageai.com — free tier available)
+export VOYAGE_API_KEY=your-key
 
 # Run with semantic search
-docker run -it -v $(pwd):/workspace -e VOYAGE_AI_API_KEY ghcr.io/code-index-mcp/mcp-index:standard
+docker run -it -v $(pwd):/workspace -e VOYAGE_API_KEY ghcr.io/code-index-mcp/mcp-index:standard
 ```
 
 ### 💻 Environment-Specific Setup
@@ -254,6 +254,25 @@ The `cwd` field controls which repository is indexed. On first use the server au
 
 **Semantic profiles:** BM25 search requires no extra config. For semantic (vector) search, the server automatically loads `code-index-mcp.profiles.yaml` from its own installation directory — no need to copy it to each repo. To override with a custom profile file, set `MCP_PROFILES_PATH=/abs/path/to/your-profiles.yaml` in the server environment. To override individual endpoint URLs without editing the YAML, use the env vars referenced in the file (e.g. `VLLM_EMBEDDING_BASE_URL`, `VLLM_SUMMARIZATION_BASE_URL`).
 
+### ⚡ Enable Semantic Search
+
+BM25 keyword search works with zero configuration. To add vector (semantic) search, choose one path:
+
+**Option A — Voyage AI (recommended):**
+```bash
+export VOYAGE_API_KEY=your-key   # free tier available at voyageai.com
+```
+The `commercial_high` profile activates automatically. Restart the MCP server — the startup log will confirm semantic search is active.
+
+**Option B — Local OSS (Qwen3-Embedding-8B via vLLM, no API key needed):**
+```bash
+export VLLM_EMBEDDING_BASE_URL=http://localhost:8000/v1
+# Start vLLM (requires ~20GB VRAM or shared CPU with --dtype float32):
+docker run -p 8000:8000 vllm/vllm-openai --model Qwen/Qwen3-Embedding-8B
+```
+
+Both profiles and their collection names are defined in `code-index-mcp.profiles.yaml` and can be customized.
+
 ### 💰 Costs & Features
 | Feature | Minimal | Standard | Full | Cost |
 |---------|---------|----------|------|------|
@@ -335,8 +354,8 @@ curl -X POST http://localhost:8000/search \
 Create a `.env` file for configuration:
 
 ```env
-# Semantic profile setup
-VOYAGE_AI_API_KEY=your_api_key_here
+# Semantic profile setup — set VOYAGE_API_KEY (free tier at voyageai.com) to enable vector search
+VOYAGE_API_KEY=your_api_key_here
 # Use 127.0.0.1 for local inference, or a Tailscale/SSH tunnel IP for remote GPUs
 OPENAI_API_BASE=http://127.0.0.1:8001/v1
 QDRANT_PATH=vector_index.qdrant
