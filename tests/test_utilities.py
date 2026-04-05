@@ -376,7 +376,7 @@ class TestRepositoryBuilder:
             # Initial commit
             cls.run_git_command("git add .", repo_path)
             returncode, stdout, stderr = cls.run_git_command(
-                "git commit -m 'Initial commit'", repo_path
+                'git commit -m "Initial commit"', repo_path
             )
             if returncode == 0:
                 commit_hash = cls.run_git_command("git rev-parse HEAD", repo_path)[1].strip()
@@ -443,7 +443,7 @@ class TestRepositoryBuilder:
 
         # Commit the additions
         cls.run_git_command("git add .", repo.path)
-        cls.run_git_command("git commit -m 'Add frontend and backend code'", repo.path)
+        cls.run_git_command('git commit -m "Add frontend and backend code"', repo.path)
 
         commit_hash = cls.run_git_command("git rev-parse HEAD", repo.path)[1].strip()
         repo.commit_history.append(commit_hash)

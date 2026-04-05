@@ -81,7 +81,11 @@ PLUGIN_LOAD_TIMEOUT = int(os.getenv("MCP_PLUGIN_TIMEOUT", "5"))
 
 @contextmanager
 def timeout(seconds):
-    """Context manager for timeout operations."""
+    """Context manager for timeout operations (Unix only; no-op on Windows)."""
+    if not hasattr(signal, "SIGALRM"):
+        # Windows does not support SIGALRM; run without timeout protection
+        yield
+        return
 
     def timeout_handler(signum, frame):
         raise TimeoutError(f"Operation timed out after {seconds} seconds")

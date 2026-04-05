@@ -181,7 +181,7 @@ class TestRepositoryManagement:
         new_file = repo.path / "new_feature.py"
         new_file.write_text("def new_feature():\n    pass\n")
         TestRepositoryBuilder.run_git_command("git add .", repo.path)
-        TestRepositoryBuilder.run_git_command("git commit -m 'Add new feature'", repo.path)
+        TestRepositoryBuilder.run_git_command('git commit -m "Add new feature"', repo.path)
 
         # Update current commit
         registry.update_current_commit(repo_id)

@@ -80,7 +80,7 @@ class TestMultiRepoSearch:
         (repo5.path / "docs" / "api.md").write_text("# API Reference\n\n## UserService\n")
         (repo5.path / "docs" / "setup.md").write_text("# Setup Guide\n\n1. Install dependencies")
         TestRepositoryBuilder.run_git_command("git add .", repo5.path)
-        TestRepositoryBuilder.run_git_command("git commit -m 'Add docs'", repo5.path)
+        TestRepositoryBuilder.run_git_command('git commit -m "Add docs"', repo5.path)
         repos.append(repo5)
 
         return repos
