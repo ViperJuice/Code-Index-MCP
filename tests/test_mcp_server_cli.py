@@ -8,11 +8,11 @@ import importlib.util
 import json
 import os
 import threading
+from contextlib import ExitStack
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from contextlib import ExitStack
 
 # ---------------------------------------------------------------------------
 # Module loading helpers

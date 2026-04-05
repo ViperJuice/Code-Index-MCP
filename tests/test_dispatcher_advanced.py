@@ -651,6 +651,7 @@ class TestRemoveFileSemanticCleanup:
     def _make_dispatcher(self, tmp_path, semantic_indexer=None):
         """Build a minimal EnhancedDispatcher without calling __init__."""
         import threading
+
         from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 
         d = EnhancedDispatcher.__new__(EnhancedDispatcher)
