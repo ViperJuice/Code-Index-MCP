@@ -266,15 +266,16 @@ Invalid inputs return empty results.
                     # Create plugin and index
                     plugin = PluginFactory.create_plugin(language, self.store)
                     content = file_path.read_text()
-                    result = plugin.extract_symbols(content, str(file_path))
+                    shard = plugin.indexFile(str(file_path), content)
 
                     file_id = self.store.store_file(
                         repo_id, str(file_path), str(file_path), language=language
                     )
-                    for symbol in result.symbols:
+                    for symbol in shard.get("symbols", []):
+                        line = symbol.get("line", 1)
                         self.store.store_symbol(
-                            file_id, symbol.name, symbol.symbol_type,
-                            symbol.line, symbol.line + 1
+                            file_id, symbol.get("name", ""), symbol.get("kind", "function"),
+                            line, line + 1
                         )
 
                     files_indexed += 1

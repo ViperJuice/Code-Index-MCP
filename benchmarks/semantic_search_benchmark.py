@@ -182,13 +182,14 @@ public class CacheManager<K, V> {
 
             # Create plugin and extract symbols
             plugin = PluginFactory.create_plugin(lang, self.store)
-            result = plugin.extract_symbols(content, filepath)
+            shard = plugin.indexFile(filepath, content)
 
             # Store symbols
-            for symbol in result.symbols:
+            for symbol in shard.get("symbols", []):
+                line = symbol.get("line", 1)
                 self.store.store_symbol(
-                    file_id, symbol.name, symbol.symbol_type,
-                    symbol.line, symbol.line + 1,
+                    file_id, symbol.get("name", ""), symbol.get("kind", "function"),
+                    line, line + 1,
                     metadata={'language': lang, 'content': content[:200]}
                 )
 
