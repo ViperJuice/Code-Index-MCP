@@ -14,7 +14,6 @@ from typing import List, Dict, Any
 from pathlib import Path
 
 from mcp_server.storage.sqlite_store import SQLiteStore
-from mcp_server.utils.semantic_indexer import SemanticIndexer
 from mcp_server.plugins.plugin_factory import PluginFactory
 
 
@@ -160,41 +159,39 @@ public class CacheManager<K, V> {
             self.db_path = tmp.name
         
         self.store = SQLiteStore(self.db_path)
-        self.semantic_indexer = SemanticIndexer(enable_voyage_ai=False)  # Mock mode
-        
+        repo_id = self.store.create_repository("/benchmark", "benchmark")
+
         print(f"Generating {num_files} files with semantic content...")
-        
+
         languages = list(self.sample_code_snippets.keys())
-        
+
+        file_cache = {}
         for i in range(num_files):
             lang = random.choice(languages)
             ext = {'python': '.py', 'javascript': '.js', 'java': '.java'}[lang]
             filepath = f"src/module_{i}/file_{i}{ext}"
-            
+
             # Select random code snippet
             content = random.choice(self.sample_code_snippets[lang])
-            
+
+            if filepath not in file_cache:
+                file_cache[filepath] = self.store.store_file(
+                    repo_id, f"/benchmark/{filepath}", filepath, language=lang
+                )
+            file_id = file_cache[filepath]
+
             # Create plugin and extract symbols
             plugin = PluginFactory.create_plugin(lang, self.store)
             result = plugin.extract_symbols(content, filepath)
-            
-            # Store symbols with semantic embeddings
+
+            # Store symbols
             for symbol in result.symbols:
-                # Generate mock embedding for testing
-                embedding = [random.random() for _ in range(256)]
-                
-                self.store.add_symbol(
-                    file_path=filepath,
-                    symbol_name=symbol.name,
-                    symbol_type=symbol.symbol_type,
-                    line_number=symbol.line,
-                    metadata={
-                        'language': lang,
-                        'embedding': embedding,
-                        'content': content[:200]  # Store snippet
-                    }
+                self.store.store_symbol(
+                    file_id, symbol.name, symbol.symbol_type,
+                    symbol.line, symbol.line + 1,
+                    metadata={'language': lang, 'content': content[:200]}
                 )
-        
+
         print(f"Generated semantic index for {num_files} files")
     
     def run_natural_language_queries(self) -> List[float]:

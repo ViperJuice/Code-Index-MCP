@@ -30,13 +30,15 @@ class SymbolLookupBenchmark:
             self.db_path = tmp.name
         
         self.store = SQLiteStore(self.db_path)
-        
+        repo_id = self.store.create_repository("/benchmark", "benchmark")
+
         # Generate sample symbols for multiple languages
         languages = ['python', 'javascript', 'java', 'go', 'rust', 'c', 'cpp']
         symbol_types = ['function', 'class', 'variable', 'interface', 'method']
-        
+
         print(f"Generating {num_files} files with symbols...")
-        
+
+        file_cache = {}
         for i in range(num_files):
             lang = random.choice(languages)
             ext = {
@@ -48,27 +50,23 @@ class SymbolLookupBenchmark:
                 'c': '.c',
                 'cpp': '.cpp'
             }[lang]
-            
+
             filepath = f"src/module_{i}/file_{i}{ext}"
-            
+
+            if filepath not in file_cache:
+                file_cache[filepath] = self.store.store_file(
+                    repo_id, f"/benchmark/{filepath}", filepath, language=lang
+                )
+            file_id = file_cache[filepath]
+
             # Add 10-50 symbols per file
             num_symbols = random.randint(10, 50)
             for j in range(num_symbols):
                 symbol_type = random.choice(symbol_types)
                 symbol_name = f"{symbol_type}_{i}_{j}"
-                
-                self.store.add_symbol(
-                    file_path=filepath,
-                    symbol_name=symbol_name,
-                    symbol_type=symbol_type,
-                    line_number=random.randint(1, 1000),
-                    metadata={
-                        'language': lang,
-                        'visibility': random.choice(['public', 'private', 'protected']),
-                        'complexity': random.randint(1, 10)
-                    }
-                )
-        
+                line = random.randint(1, 1000)
+                self.store.store_symbol(file_id, symbol_name, symbol_type, line, line + 5)
+
         print(f"Generated approximately {num_files * 30} symbols")
     
     def run_benchmark(self, num_queries: int = 1000):

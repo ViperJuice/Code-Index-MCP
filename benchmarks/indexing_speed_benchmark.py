@@ -17,7 +17,6 @@ import multiprocessing as mp
 
 from mcp_server.storage.sqlite_store import SQLiteStore
 from mcp_server.plugins.plugin_factory import PluginFactory
-from mcp_server.watcher import FileWatcher
 
 
 class IndexingSpeedBenchmark:
@@ -241,10 +240,11 @@ Invalid inputs return empty results.
     def benchmark_single_threaded(self, num_files: int) -> Dict[str, Any]:
         """Benchmark single-threaded indexing."""
         print("\nRunning single-threaded indexing benchmark...")
-        
+
+        repo_id = self.store.create_repository(self.temp_dir, "benchmark")
         files_indexed = 0
         start_time = time.time()
-        
+
         # Index all files
         for file_path in Path(self.temp_dir).rglob("*"):
             if file_path.is_file():
@@ -261,28 +261,27 @@ Invalid inputs return empty results.
                     '.md': 'markdown',
                     '.txt': 'plaintext'
                 }.get(ext, 'plaintext')
-                
+
                 try:
                     # Create plugin and index
                     plugin = PluginFactory.create_plugin(language, self.store)
                     content = file_path.read_text()
                     result = plugin.extract_symbols(content, str(file_path))
-                    
-                    # Store symbols
+
+                    file_id = self.store.store_file(
+                        repo_id, str(file_path), str(file_path), language=language
+                    )
                     for symbol in result.symbols:
-                        self.store.add_symbol(
-                            file_path=str(file_path),
-                            symbol_name=symbol.name,
-                            symbol_type=symbol.symbol_type,
-                            line_number=symbol.line,
-                            metadata=symbol.metadata
+                        self.store.store_symbol(
+                            file_id, symbol.name, symbol.symbol_type,
+                            symbol.line, symbol.line + 1
                         )
-                    
+
                     files_indexed += 1
-                    
+
                     if files_indexed % 100 == 0:
                         print(f"  Indexed {files_indexed} files...")
-                        
+
                 except Exception as e:
                     print(f"  Error indexing {file_path}: {e}")
         
@@ -328,10 +327,11 @@ Invalid inputs return empty results.
     
     def _index_file_chunk(self, files: List[Path]) -> int:
         """Index a chunk of files (for multiprocessing)."""
-        # Create new store for this process
+        # Create new store for this process (create_repository is idempotent)
         store = SQLiteStore(self.db_path)
+        repo_id = store.create_repository(self.temp_dir, "benchmark")
         indexed = 0
-        
+
         for file_path in files:
             ext = file_path.suffix.lower()
             language = {
@@ -345,25 +345,25 @@ Invalid inputs return empty results.
                 '.md': 'markdown',
                 '.txt': 'plaintext'
             }.get(ext, 'plaintext')
-            
+
             try:
                 plugin = PluginFactory.create_plugin(language, store)
                 content = file_path.read_text()
                 result = plugin.extract_symbols(content, str(file_path))
-                
+
+                file_id = store.store_file(
+                    repo_id, str(file_path), str(file_path), language=language
+                )
                 for symbol in result.symbols:
-                    store.add_symbol(
-                        file_path=str(file_path),
-                        symbol_name=symbol.name,
-                        symbol_type=symbol.symbol_type,
-                        line_number=symbol.line,
-                        metadata=symbol.metadata
+                    store.store_symbol(
+                        file_id, symbol.name, symbol.symbol_type,
+                        symbol.line, symbol.line + 1
                     )
-                
+
                 indexed += 1
             except Exception:
                 pass
-        
+
         store.close()
         return indexed
     
