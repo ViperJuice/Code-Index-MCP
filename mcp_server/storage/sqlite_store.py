@@ -710,7 +710,7 @@ class SQLiteStore:
                 # Get the id of the existing file
                 cursor = conn.execute(
                     "SELECT id FROM files WHERE repository_id = ? AND relative_path = ?",
-                    (repository_id, relative_path),
+                    (repository_id, relative_path_str),
                 )
                 return cursor.fetchone()[0]
 

@@ -35,17 +35,9 @@ class TestRepositoryManagement:
         registry_path = test_env / ".mcp" / "test_registry.json"
         registry_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Temporarily override the registry path
-        original_home = os.environ.get("HOME")
-        os.environ["HOME"] = str(test_env)
-
-        registry = RepositoryRegistry()
+        registry = RepositoryRegistry(registry_path=registry_path)
 
         yield registry
-
-        # Restore original home
-        if original_home:
-            os.environ["HOME"] = original_home
 
     def test_register_single_repository(self, test_env, registry):
         """Test registering a single repository."""
@@ -152,8 +144,8 @@ class TestRepositoryManagement:
         registry_file = Path(registry.registry_path)
         assert registry_file.exists()
 
-        # Create new registry instance
-        registry2 = RepositoryRegistry()
+        # Create new registry instance pointing at the same file (cross-platform safe)
+        registry2 = RepositoryRegistry(registry_path=registry.registry_path)
 
         # Verify repositories are loaded
         all_repos = registry2.get_all_repositories()

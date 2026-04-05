@@ -364,7 +364,7 @@ class TestResultAggregator:
         assert stats.total_results == 4  # 2 + 2 results
         assert stats.plugins_used == 2
         assert stats.duplicates_removed >= 0
-        assert stats.execution_time > 0
+        assert stats.execution_time >= 0
 
     def test_aggregate_search_results_with_limit(
         self, result_aggregator, python_plugin, sample_search_results

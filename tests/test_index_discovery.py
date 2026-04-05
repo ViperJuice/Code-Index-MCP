@@ -74,8 +74,8 @@ class TestIndexPathConfig:
         paths = config.get_search_paths("test-repo")
 
         # Should have paths with substitutions
-        assert any("/abs/path" in str(p) for p in paths)
-        assert any("repos/test-repo/db" in str(p) for p in paths)
+        assert any("/abs/path" in p.as_posix() for p in paths)
+        assert any("repos/test-repo/db" in p.as_posix() for p in paths)
 
     def test_repo_hash_detection(self):
         """Test repository hash detection."""
