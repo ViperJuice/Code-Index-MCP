@@ -1,0 +1,5 @@
+site_name: Code-Index-MCP
+site_description: Local-first code indexer with 48-language support and MCP integration
+docs_dir: docs
+plugins:
+  - techdocs-core

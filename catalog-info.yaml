@@ -1,0 +1,20 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: code-index-mcp
+  description: Local-first code indexer with 48-language tree-sitter support, semantic search, and MCP integration
+  annotations:
+    github.com/project-slug: ViperJuice/Code-Index-MCP
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - mcp
+    - indexer
+    - ai-tooling
+    - python
+spec:
+  type: service
+  lifecycle: production
+  owner: frontier-strategies
+  system: fs-toolchain
+  dependsOn:
+    - component:treesitter-chunker

@@ -1,0 +1,16 @@
+version: v1
+name: code-index-mcp
+type: service
+business_unit: frontier-strategies
+system: fs-toolchain
+upstream: github.com/ViperJuice/Code-Index-MCP
+description: "Local-first code indexer with 48-language support, tree-sitter integration, and MCP integration"
+depends_on:
+  - treesitter-chunker
+specs:
+  active: specs/active/
+  archive: specs/archive/
+prompts:
+  source: baml_src/
+generated:
+  output: generated/
