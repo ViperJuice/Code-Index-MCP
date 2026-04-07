@@ -1,0 +1,34 @@
+name: Consiliency Maintenance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+jobs:
+  notify-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify maintenance worker
+        continue-on-error: true
+        env:
+          WORKER_URL: ${{ vars.CONSILIENCY_WORKER_URL }}
+          WORKER_API_KEY: ${{ secrets.CONSILIENCY_WORKER_API_KEY }}
+          EVENT_TYPE: ${{ github.event_name }}
+          REPO: ${{ github.repository }}
+          REF: ${{ github.ref }}
+          SHA: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -z "$WORKER_URL" ]; then
+            echo "CONSILIENCY_WORKER_URL not set, skipping"
+            exit 0
+          fi
+          PR_VAL="null"
+          if [ -n "$PR_NUMBER" ]; then PR_VAL="$PR_NUMBER"; fi
+          curl -sf --max-time 30 -X POST "$WORKER_URL/events/github" \
+            -H "Authorization: Bearer $WORKER_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"event_type\":\"$EVENT_TYPE\",\"repo\":\"$REPO\",\"ref\":\"$REF\",\"sha\":\"$SHA\",\"pr_number\":$PR_VAL,\"actor\":\"$ACTOR\"}"
