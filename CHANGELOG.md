@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-04-14
+
+### Security
+- **#40** Removed hardcoded `JWT_SECRET_KEY` and `DEFAULT_ADMIN_PASSWORD` defaults from
+  `gateway.py`. Server now raises `RuntimeError` at startup if either env var is unset,
+  preventing silent production deployments with known-weak credentials.
+  `docker-compose.yml` and `.env.example` updated to use env var substitution with no
+  insecure literal fallbacks. (`mcp_server/gateway.py`, `docker-compose.yml`, `.env.example`)
+
+### Fixed
+- **#41** `get_index_status()` `symbols_count` field now returns the actual number of
+  symbols stored for the file (was always `0`). Added `SQLiteStore.count_symbols_for_file()`
+  and wired it into `IndexEngine.get_index_status()`.
+  (`mcp_server/storage/sqlite_store.py`, `mcp_server/indexer/index_engine.py`)
+- **#41** Reference storage in `_store_parse_result()` now calls `get_symbol()` +
+  `store_reference()` instead of silently passing; references are persisted in
+  `symbol_references` and queryable via `get_references()`.
+  (`mcp_server/indexer/index_engine.py`)
+- **#42** Removed broken `curl .../install-mcp.sh` line from README (script does not
+  exist). Replaced silent TODO in `watcher_multi_repo._create_and_upload_artifact()` with
+  an explicit `logger.warning` directing users to the CI workflow for artifact upload.
+  (`README.md`, `mcp_server/watcher_multi_repo.py`)
+- Windows CI compatibility: forward-slash path normalization in `SQLiteStore.store_file()`,
+  `signal.SIGALRM` guard in `mcp_server_cli.py`, double-quoted git commit messages in
+  tests, `>= 0` timing assertions for low-resolution Windows clocks.
+  (`mcp_server/storage/sqlite_store.py`, `scripts/cli/mcp_server_cli.py`,
+  `tests/test_utilities.py`, `tests/test_repository_management.py`,
+  `tests/test_multi_repo_search.py`, `tests/test_dispatcher_advanced.py`)
+- Benchmark scripts updated to current SQLiteStore/plugin API: replaced removed
+  `store.add_symbol()` with `create_repository` + `store_file` + `store_symbol`, and
+  replaced obsolete `plugin.extract_symbols()` with `plugin.indexFile()` with
+  `IndexShard` dict-style access.
+  (`benchmarks/symbol_lookup_benchmark.py`, `benchmarks/semantic_search_benchmark.py`,
+  `benchmarks/indexing_speed_benchmark.py`)
+
+### Added
+- Backstage catalog registration (`catalog-info.yaml`) and standard repo layout
+  (`docs/`, `mkdocs.yml`). (`04ea8ff`)
+- Consiliency maintenance worker trigger workflow for scheduled index health checks.
+  (`.github/workflows/`, `72f15a5`)
+
 ### Added
 - Query-intent routing: symbol-pattern queries (`class Foo`, `def bar`, CamelCase,
   `snake_case`) route directly to the symbols table, bypassing BM25. Fixes retrieval for
