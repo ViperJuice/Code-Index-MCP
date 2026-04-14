@@ -17,6 +17,10 @@ from fastapi.testclient import TestClient
 
 from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher as Dispatcher
 
+# Provide required security env vars for tests so gateway startup doesn't raise RuntimeError
+os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-exactly-32chars!")
+os.environ.setdefault("DEFAULT_ADMIN_PASSWORD", "test-admin-password-123!")
+
 # Import our modules
 gateway_import_error = None
 try:
