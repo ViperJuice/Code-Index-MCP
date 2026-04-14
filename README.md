@@ -632,10 +632,6 @@ Enable portable index management in any repository with zero GitHub compute cost
 #### Quick Install
 
 ```bash
-# One-line install
-curl -sSL https://raw.githubusercontent.com/ViperJuice/Code-Index-MCP/main/scripts/install-mcp.sh | bash
-
-# Or via npm
 npm install -g mcp-index-kit
 mcp-index init
 ```

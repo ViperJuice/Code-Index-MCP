@@ -899,6 +899,14 @@ class SQLiteStore:
                 )
             return [dict(row) for row in cursor.fetchall()]
 
+    def count_symbols_for_file(self, file_id: int) -> int:
+        """Return the number of symbols stored for a given file."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "SELECT COUNT(*) FROM symbols WHERE file_id = ?", (file_id,)
+            )
+            return cursor.fetchone()[0]
+
     # Code Chunk operations
     def store_chunk(
         self,

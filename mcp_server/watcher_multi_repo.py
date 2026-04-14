@@ -317,7 +317,14 @@ class MultiRepositoryWatcher:
             if artifact_path:
                 logger.info(f"Created artifact for {repo_id} commit {commit[:8]}")
 
-                # TODO: Upload to GitHub artifacts
+                # Artifact upload via watcher is not yet implemented.
+                # To upload indexes to GitHub Artifacts, use the CI workflow
+                # (.github/workflows/index-management.yml) which calls
+                # scripts/index-artifact-upload.py.
+                logger.warning(
+                    f"Artifact created locally for {repo_id} but not uploaded. "
+                    "Run the CI workflow to upload indexes to GitHub Artifacts."
+                )
 
                 # Clean up old artifacts
                 removed = self.artifact_manager.cleanup_old_artifacts(repo_id, keep_last=5)

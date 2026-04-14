@@ -354,7 +354,7 @@ class IndexEngine:
                     "last_indexed": file_record.get("indexed_at"),
                     "file_hash": file_record.get("hash"),
                     "language": file_record.get("language"),
-                    "symbols_count": 0,  # TODO: Count symbols
+                    "symbols_count": self.storage.count_symbols_for_file(file_record["id"]),
                 }
             else:
                 return {"indexed": False}
@@ -544,9 +544,17 @@ class IndexEngine:
 
             # Store references
             for ref in parse_result.get("references", []):
-                # TODO: Implement reference storage
-                # This requires linking references to symbols
-                pass
+                symbol_name = ref.get("symbol", "")
+                if not symbol_name:
+                    continue
+                matches = self.storage.get_symbol(symbol_name)
+                if matches:
+                    self.storage.store_reference(
+                        symbol_id=matches[0]["id"],
+                        file_id=file_id,
+                        line_number=ref.get("line", 1),
+                        reference_kind=ref.get("type"),
+                    )
 
         except Exception as e:
             logger.error(f"Error storing parse result for {file_path}: {e}")

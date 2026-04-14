@@ -197,11 +197,14 @@ async def startup_event():
 
         # Initialize security configuration
         logger.info("Initializing security configuration...")
+        jwt_secret_key = os.getenv("JWT_SECRET_KEY")
+        if not jwt_secret_key:
+            raise RuntimeError(
+                "JWT_SECRET_KEY env var must be set. "
+                "Generate one with: openssl rand -base64 32"
+            )
         security_config = SecurityConfig(
-            jwt_secret_key=os.getenv(
-                "JWT_SECRET_KEY",
-                "your-super-secret-jwt-key-change-in-production-min-32-chars",
-            ),
+            jwt_secret_key=jwt_secret_key,
             jwt_algorithm="HS256",
             access_token_expire_minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")),
             refresh_token_expire_days=int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7")),
@@ -222,7 +225,12 @@ async def startup_event():
         # Create default admin user if it doesn't exist
         admin_user = await auth_manager.get_user_by_username("admin")
         if not admin_user:
-            admin_password = os.getenv("DEFAULT_ADMIN_PASSWORD", "admin123!")
+            admin_password = os.getenv("DEFAULT_ADMIN_PASSWORD")
+            if not admin_password:
+                raise RuntimeError(
+                    "DEFAULT_ADMIN_PASSWORD env var must be set. "
+                    "Choose a strong password for the admin account."
+                )
             logger.info("Creating default admin user...")
             await auth_manager.create_user(
                 username="admin",

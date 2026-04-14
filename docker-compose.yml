@@ -33,7 +33,8 @@ services:
       # - VOYAGE_AI_API_KEY=your-voyage-ai-key  # Uncomment and set when enabling
       
       # Security configuration
-      - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production-min-32-chars
+      # JWT_SECRET_KEY=  # Required: generate with: openssl rand -base64 32
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - ACCESS_TOKEN_EXPIRE_MINUTES=30
       - REFRESH_TOKEN_EXPIRE_DAYS=7
       - PASSWORD_MIN_LENGTH=12
@@ -48,7 +49,8 @@ services:
       - CORS_ORIGINS=*
       
       # Admin user
-      - DEFAULT_ADMIN_PASSWORD=admin123!
+      # DEFAULT_ADMIN_PASSWORD=  # Required: set a strong password
+      - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD}
       - DEFAULT_ADMIN_EMAIL=admin@localhost
       
       # Indexing performance
