@@ -1,3 +1,5 @@
+> **Historical artifact — as-of 2026-04-18, may not reflect current behavior**
+
 # Comprehensive Test Report
 
 This document consolidates all test reports and validation results from the MCP Server project.

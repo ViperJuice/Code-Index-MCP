@@ -1,3 +1,5 @@
+> **Historical artifact — as-of 2026-04-18, may not reflect current behavior**
+
 # System Validation Report
 
 This document consolidates all validation reports for the MCP Server project.

@@ -1,3 +1,5 @@
+> **Historical artifact — as-of 2026-04-18, may not reflect current behavior**
+
 # Debug and Fix Plan for MCP Server Issues
 
 ## Issue Analysis

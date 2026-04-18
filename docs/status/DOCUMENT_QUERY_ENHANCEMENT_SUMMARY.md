@@ -1,3 +1,5 @@
+> **Historical artifact — as-of 2026-04-18, may not reflect current behavior**
+
 # Document Processing Enhancement Implementation Summary
 
 ## Overview
