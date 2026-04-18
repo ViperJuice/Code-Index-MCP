@@ -4,9 +4,6 @@ This file defines the capabilities and constraints for AI agents working with th
 
 ## Current State
 
-**PROJECT STATUS**: 95% Complete - NEAR PRODUCTION (complexity 5/5)
-
-**Current Implementation Status**: Production — 100% functional. Semantic search (17/17), BM25 (12–13/17), hybrid mode.
 **System Complexity**: 5/5 (High — SQLite FTS5 + Qdrant vector index, 48 language plugins, rerankers, query-intent routing)
 **MCP Status**: Fully operational — use MCP tools first for all code search (no known failure modes)
 **Last Updated**: 2026-04-01
@@ -32,11 +29,6 @@ This file defines the capabilities and constraints for AI agents working with th
 - ✅ Production-ready Docker and Kubernetes configurations
 - ✅ Cache management and query optimization
 - ✅ Real-world repository testing validation
-
-### All Implementation Complete (100%)
-- ✅ Document processing validation (COMPLETED - comprehensive validation completed)
-- ✅ Performance benchmark result publishing (COMPLETED - benchmarks published in docs/)
-- ✅ Production deployment automation (COMPLETED - full CI/CD with automated deployment)
 
 ## Agent Capabilities
 
@@ -115,7 +107,7 @@ These commands enforce MCP-first searching and are available in `.claude/command
 ## Agent Constraints
 
 1. **Implementation Gaps**
-   - ~~Be aware that most components are not functional~~ (OUTDATED - System is 100% functional)
+   - Most core components are operational (SQLite, FTS5, dispatcher, file watcher, 48-language plugins)
    - ~~The dispatcher doesn't route to plugins properly~~ (FIXED - Enhanced dispatcher working)
    - ~~No actual indexing or storage occurs~~ (FIXED - SQLite + optional Qdrant storage)
    - ~~Search functionality returns empty results~~ (FIXED - Full MCP search operational)
@@ -139,6 +131,41 @@ These commands enforce MCP-first searching and are available in `.claude/command
    - Consider indexing speed in future implementations
    - Plan for efficient memory usage
    - Design efficient file watching
+
+## Multi-Repo Operation
+
+### Repo Identity
+
+`compute_repo_id()` (`mcp_server/storage/repo_identity.py`) uses `git rev-parse --git-common-dir` (Tier 1) to derive a stable `repo_id`. All worktrees of the same repository share a single `repo_id`; switching branches does NOT change `repo_id`. The result is stored in a `RepoContext` frozen dataclass (`mcp_server/core/repo_context.py`) that captures all per-repo runtime state.
+
+### Default-Branch Policy
+
+`RepositoryRegistry.register_repository()` (`mcp_server/storage/repository_registry.py`) infers the default branch from `origin/HEAD` or falls back to `main`. Non-default branches are NOT indexed automatically — `MultiRepositoryWatcher` (`mcp_server/watcher_multi_repo.py`) runs a `RefPoller` (`mcp_server/watcher/ref_poller.py`) per registered repo at a 30-second cadence that only tracks the recorded default branch.
+
+### Path Sandbox
+
+Set `MCP_ALLOWED_ROOTS=/path/a:/path/b` (colon-separated) to restrict which paths the server may index or read. Tools `search_code`, `symbol_lookup`, `summarize_sample`, and `reindex` reject any path outside the allowlist with uniform error code `path_outside_allowed_roots`. Registered repo *names* (not paths) bypass the path check.
+
+### Client Auth (Optional)
+
+Set `MCP_CLIENT_SECRET=<shared-secret>` to require a `handshake` tool call before any other tool. `HandshakeGate` (`mcp_server/cli/handshake.py`) uses `hmac.compare_digest` for constant-time comparison. When `MCP_CLIENT_SECRET` is unset the server logs `running unauthenticated — MCP_CLIENT_SECRET not set` at startup.
+
+### Components
+
+| Component | Path | Role |
+|---|---|---|
+| `RepoContext` | `mcp_server/core/repo_context.py` | Frozen per-repo runtime state |
+| `StoreRegistry` | `mcp_server/storage/store_registry.py` | Thread-safe per-repo SQLite store cache |
+| `MultiRepositoryWatcher` | `mcp_server/watcher_multi_repo.py` | Orchestrates `RefPoller` per registered repo |
+| `initialize_stateless_services()` | `mcp_server/cli/bootstrap.py:25-64` | In-process boot helper; returns `(StoreRegistry, RepoResolver, dispatcher, RepositoryRegistry, GitAwareIndexManager)` |
+
+### Setup Steps
+
+1. Set `MCP_ALLOWED_ROOTS` to include all repo parent directories.
+2. Optionally set `MCP_CLIENT_SECRET` for authentication.
+3. Start the server: `op run --env-file=.mcp.env -- python -m mcp_server.cli.server_commands`
+4. Register each repo: `mcp-index repository register <path>`
+5. Pass `repository=<name>` to `search_code` / `symbol_lookup` to scope queries per repo.
 
 ## ESSENTIAL_COMMANDS
 
@@ -188,19 +215,6 @@ mcp__code-index-mcp__list_plugins()
 ## Development Priorities
 
 ### 🔴 CRITICAL_PRIORITIES (Immediate, Complexity 5)
-**Phase 1 Status: 100% Complete (8/8 agents implemented) ✅**
-
-#### All Phase 1 Agents Completed:
-1. ✅ **Agent 1: MCP Sub-Agent Tool Inheritance** - Config propagator implemented
-2. ✅ **Agent 2: Multi-Path Index Discovery** - Enhanced discovery system created
-3. ✅ **Agent 3: Pre-Flight Validation System** - Comprehensive validation framework
-4. ✅ **Agent 4: Index Management CLI** - Full CLI tool with all commands
-5. ✅ **Agent 5: Repository-Aware Plugin Loading** - Dynamic plugin selection (repository_plugin_loader.py)
-6. ✅ **Agent 6: Multi-Repository Search Support** - Cross-repo search capability (multi_repo_manager.py)
-7. ✅ **Agent 7: Memory-Aware Plugin Management** - LRU cache with 1GB limit (memory_aware_manager.py)
-8. ✅ **Agent 8: Cross-Repository Search Coordinator** - Unified search interface (cross_repo_coordinator.py)
-
-**Note**: While implementation is complete, the 83% MCP failure rate in sub-agents prevents production deployment.
 
 ### IMMEDIATE_PRIORITIES (This Week, Complexity 3-4)
 1. **Document processing validation** - Complete testing and documentation (BLOCKING: production claims)
