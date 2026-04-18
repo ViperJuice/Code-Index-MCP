@@ -9,7 +9,9 @@
         "--env-file=/path/to/Code-Index-MCP/.mcp.env",
         "--",
         "/path/to/Code-Index-MCP/.venv/bin/python3",
-        "/path/to/Code-Index-MCP/scripts/cli/mcp_server_cli.py"
+        "-m",
+        "mcp_server.cli",
+        "stdio"
       ],
       "cwd": "/path/to/Code-Index-MCP",
       "env": {

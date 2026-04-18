@@ -3,7 +3,9 @@
     "code-index-mcp": {
       "command": "${MCP_PYTHON_PATH:-python}",
       "args": [
-        "${MCP_WORKSPACE_ROOT:-.}/scripts/cli/mcp_server_cli.py"
+        "-m",
+        "mcp_server.cli",
+        "stdio"
       ],
       "cwd": "${MCP_WORKSPACE_ROOT:-.}",
       "env": {

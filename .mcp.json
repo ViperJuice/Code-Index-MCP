@@ -8,7 +8,9 @@
         "--env-file=/home/viperjuice/code/Code-Index-MCP/.mcp.env",
         "--",
         "/home/viperjuice/code/Code-Index-MCP/.venv/bin/python3",
-        "/home/viperjuice/code/Code-Index-MCP/scripts/cli/mcp_server_cli.py"
+        "-m",
+        "mcp_server.cli",
+        "stdio"
       ],
       "cwd": "/home/viperjuice/code/Code-Index-MCP",
       "env": {

@@ -2,7 +2,7 @@
   "mcpServers": {
     "code-index-native": {
       "command": "python",
-      "args": ["scripts/cli/mcp_server_cli.py"],
+      "args": ["-m", "mcp_server.cli", "stdio"],
       "cwd": "${workspace}",
       "env": {
         "PYTHONPATH": "${workspace}",

@@ -6,8 +6,10 @@
         "exec", 
         "-i", 
         "mcp-sidecar",
-        "python", 
-        "/app/scripts/cli/mcp_server_cli.py"
+        "python",
+        "-m",
+        "mcp_server.cli",
+        "stdio"
       ],
       "env": {
         "MCP_WORKSPACE_ROOT": "/workspace",

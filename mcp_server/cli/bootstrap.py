@@ -1,32 +1,187 @@
-"""P2B bootstrap entry — IF-0-P2B-4 stub.
+"""P2B bootstrap entry — IF-0-P2B-4 implementation.
 
-SL-2 fills in the body. SL-0 only freezes the signature so dispatcher/CLI
-lanes can import it without a circular wait.
+Constructs the process-wide service pool: StoreRegistry + RepoResolver + dispatcher.
+No cwd capture, no preloaded sqlite_store.
 
-Contract: ``initialize_stateless_services()`` constructs the process-wide
-service pool (``StoreRegistry`` + ``RepoResolver``) and a dispatcher that
-takes no per-repo state at init time. Every subsequent MCP tool call
-resolves a ``RepoContext`` per-request and threads it through dispatcher
-methods. No cwd capture, no preloaded ``sqlite_store``.
+Every MCP tool call resolves a RepoContext per-request via RepoResolver.
 """
 from __future__ import annotations
 
-from typing import Tuple
+import os
+import signal
+import sqlite3
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Optional, Tuple
 
 from mcp_server.core.repo_resolver import RepoResolver
 from mcp_server.dispatcher.protocol import DispatcherProtocol
+from mcp_server.storage.repository_registry import RepositoryRegistry
 from mcp_server.storage.store_registry import StoreRegistry
 
 
-def initialize_stateless_services() -> Tuple[StoreRegistry, RepoResolver, DispatcherProtocol]:
+def initialize_stateless_services(
+    registry_path: Optional[Path] = None,
+) -> Tuple[StoreRegistry, RepoResolver, DispatcherProtocol]:
     """Construct the process-wide service pool.
 
-    Returns a triple of (store registry, repo resolver, dispatcher). The
-    dispatcher instance holds no per-repo state; every public method takes
-    ``ctx: RepoContext`` — see :class:`DispatcherProtocol`.
-
-    Raises ``NotImplementedError`` until SL-2 lands.
+    Returns (StoreRegistry, RepoResolver, dispatcher). The dispatcher holds no
+    per-repo state; every public method takes ``ctx: RepoContext``.
+    ``registry_path`` overrides the default registry location (mainly for tests).
     """
-    raise NotImplementedError(
-        "initialize_stateless_services() is an SL-0 stub; SL-2 implements the body."
-    )
+    import os
+
+    from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
+    from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher
+
+    # Build registry + store registry
+    resolved_registry_path = registry_path or _default_registry_path()
+    repo_registry = RepositoryRegistry(registry_path=resolved_registry_path)
+    store_registry = StoreRegistry.for_registry(repo_registry)
+    repo_resolver = RepoResolver(registry=repo_registry, store_registry=store_registry)
+
+    # Construct dispatcher — no sqlite_store, no cwd
+    use_simple = os.getenv("MCP_USE_SIMPLE_DISPATCHER", "false").lower() == "true"
+    if use_simple:
+        dispatcher: DispatcherProtocol = SimpleDispatcher()
+    else:
+        _explicit = os.getenv("RERANKER_TYPE", "").strip().lower()
+        reranker_type = _explicit if _explicit else "none"
+        dispatcher = EnhancedDispatcher(
+            enable_advanced_features=True,
+            use_plugin_factory=True,
+            lazy_load=True,
+            semantic_search_enabled=True,
+            memory_aware=True,
+            multi_repo_enabled=None,
+            reranker_type=reranker_type,
+        )
+
+    return store_registry, repo_resolver, dispatcher
+
+
+def _default_registry_path() -> Path:
+    env_path = os.environ.get("MCP_REPO_REGISTRY")
+    if env_path:
+        return Path(env_path)
+    return Path.home() / ".mcp" / "repository_registry.json"
+
+
+def _allowed_roots() -> list[Path]:
+    """Resolve the list of directories that reindex/read tools may touch.
+
+    Precedence: MCP_ALLOWED_ROOTS (comma-separated) > MCP_WORKSPACE_ROOT > cwd.
+    """
+    raw = os.environ.get("MCP_ALLOWED_ROOTS", "").strip()
+    if raw:
+        roots = []
+        for entry in raw.split(","):
+            entry = entry.strip()
+            if not entry:
+                continue
+            try:
+                roots.append(Path(entry).expanduser().resolve())
+            except Exception:
+                continue
+        if roots:
+            return roots
+    ws = os.environ.get("MCP_WORKSPACE_ROOT", "").strip()
+    if ws:
+        try:
+            return [Path(ws).expanduser().resolve()]
+        except Exception:
+            pass
+    return [Path.cwd().resolve()]
+
+
+def _path_within_allowed(target: Path, roots: list[Path]) -> bool:
+    """True when target's resolved path lies within one of roots."""
+    try:
+        resolved = target.expanduser().resolve()
+    except Exception:
+        return False
+    for root in roots:
+        try:
+            resolved.relative_to(root)
+            return True
+        except ValueError:
+            continue
+    return False
+
+
+def validate_index(store, repo_path: Path) -> dict:
+    """Validate that the index is up-to-date and accessible."""
+    issues = []
+    stats = {}
+
+    try:
+        conn = sqlite3.connect(store.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT COUNT(*) FROM files")
+        total_files = cursor.fetchone()[0]
+        stats["total_files"] = total_files
+
+        cursor.execute("SELECT COUNT(*) FROM bm25_content")
+        bm25_count = cursor.fetchone()[0]
+        stats["bm25_documents"] = bm25_count
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM bm25_content WHERE filepath LIKE ?",
+            (f"{repo_path}%",),
+        )
+        current_repo_files = cursor.fetchone()[0]
+        stats["current_repo_files"] = current_repo_files
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM bm25_content WHERE filepath LIKE 'PathUtils.get_workspace_root() / %'"
+        )
+        docker_files = cursor.fetchone()[0]
+        stats["docker_files"] = docker_files
+
+        if total_files == 0:
+            issues.append("Index is empty - no files indexed")
+        if bm25_count == 0:
+            issues.append("No BM25 documents in index")
+        if current_repo_files == 0 and docker_files > 0:
+            issues.append(
+                f"Index contains {docker_files} Docker paths but no files from current repo"
+            )
+
+        cursor.execute("SELECT filepath FROM bm25_content LIMIT 10")
+        sample_paths = cursor.fetchall()
+        inaccessible_count = 0
+        for (path,) in sample_paths:
+            if not Path(path).exists():
+                inaccessible_count += 1
+
+        if inaccessible_count > len(sample_paths) * 0.5:
+            issues.append(
+                f"{inaccessible_count}/{len(sample_paths)} sampled paths are inaccessible"
+            )
+
+        conn.close()
+
+    except Exception as e:
+        issues.append(f"Database error: {str(e)}")
+
+    return {"valid": len(issues) == 0, "issues": issues, "stats": stats}
+
+
+@contextmanager
+def timeout(seconds):
+    """Context manager for timeout (Unix only; no-op on Windows)."""
+    if not hasattr(signal, "SIGALRM"):
+        yield
+        return
+
+    def timeout_handler(signum, frame):
+        raise TimeoutError(f"Operation timed out after {seconds} seconds")
+
+    original_handler = signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, original_handler)

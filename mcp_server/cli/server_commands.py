@@ -38,3 +38,11 @@ def serve(host: str, port: int, reload: bool) -> None:
 
     click.echo(f"Starting MCP server on http://{host}:{port}")
     uvicorn.run("mcp_server.gateway:app", host=host, port=port, reload=reload)
+
+
+@click.command("stdio")
+def stdio() -> None:
+    """Start the MCP stdio server (JSON-RPC over stdin/stdout)."""
+    from mcp_server.cli.stdio_runner import run
+
+    run()
