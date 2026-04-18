@@ -8,12 +8,15 @@ registration information for cross-repository search.
 import json
 import logging
 import os
+import sqlite3
 import subprocess
 import threading
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+from mcp_server.storage.repo_identity import compute_repo_id, resolve_tracked_branch
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +61,7 @@ class RepositoryRegistry:
         return home / ".mcp" / "repository_registry.json"
 
     def _load(self):
-        """Load registry from disk."""
+        """Load registry from disk, migrating legacy entries to new id scheme."""
         if not self.registry_path.exists():
             logger.info("No existing registry found, starting fresh")
             return
@@ -67,25 +70,102 @@ class RepositoryRegistry:
             with open(self.registry_path, "r") as f:
                 data = json.load(f)
 
-            # Convert back to proper types
+            raw: Dict[str, Any] = {}
             for repo_id, repo_data in data.items():
-                # Convert paths
                 repo_data["path"] = Path(repo_data["path"])
                 repo_data["index_path"] = Path(repo_data["index_path"])
-
-                # Convert datetime
                 if "indexed_at" in repo_data:
                     repo_data["indexed_at"] = datetime.fromisoformat(repo_data["indexed_at"])
                 if "last_indexed" in repo_data and repo_data["last_indexed"]:
                     repo_data["last_indexed"] = datetime.fromisoformat(repo_data["last_indexed"])
+                raw[repo_id] = repo_data
 
-                self._registry[repo_id] = repo_data
+            needs_save = self._migrate_registry(raw)
 
+            self._registry = raw
             logger.info(f"Loaded {len(self._registry)} repositories from registry")
+
+            if needs_save:
+                self.save()
 
         except Exception as e:
             logger.error(f"Failed to load registry: {e}")
             self._registry = {}
+
+    def _migrate_registry(self, raw: Dict[str, Any]) -> bool:
+        """Re-key any legacy entries and back-fill new fields. Returns True if changes made."""
+        changed = False
+        renames: Dict[str, str] = {}
+
+        for old_id, repo_dict in list(raw.items()):
+            repo_path = Path(repo_dict.get("path", ""))
+            if not repo_path.exists():
+                continue
+            try:
+                identity = compute_repo_id(repo_path)
+            except Exception as exc:
+                logger.warning(f"compute_repo_id failed for {repo_path}: {exc}")
+                continue
+
+            new_id = identity.repo_id
+
+            # Back-fill tracked_branch and git_common_dir if missing
+            if not repo_dict.get("tracked_branch"):
+                try:
+                    branch = resolve_tracked_branch(identity.git_common_dir)
+                    repo_dict["tracked_branch"] = branch if branch else None
+                    changed = True
+                except Exception as exc:
+                    logger.warning(f"resolve_tracked_branch failed for {repo_path}: {exc}")
+
+            if not repo_dict.get("git_common_dir") and identity.git_common_dir:
+                repo_dict["git_common_dir"] = str(identity.git_common_dir)
+                changed = True
+
+            if new_id != old_id:
+                renames[old_id] = new_id
+                changed = True
+
+        for old_id, new_id in renames.items():
+            repo_dict = raw.pop(old_id)
+            repo_dict["repository_id"] = new_id
+            raw[new_id] = repo_dict
+            self._migrate_sqlite(repo_dict, old_id, new_id)
+
+        return changed
+
+    def _migrate_sqlite(self, repo_dict: Dict[str, Any], old_id: str, new_id: str) -> None:
+        """Update repository_id text FK columns in the per-repo SQLite index."""
+        index_path = repo_dict.get("index_path")
+        if index_path is None:
+            return
+        db_path = str(index_path)
+        try:
+            conn = sqlite3.connect(db_path)
+            conn.execute("PRAGMA foreign_keys=OFF")
+            cursor = conn.cursor()
+            for table in ("files", "symbols", "bm25_content", "imports"):
+                cursor.execute(f"PRAGMA table_info({table})")
+                cols = [row[1] for row in cursor.fetchall()]
+                if "repository_id" not in cols:
+                    logger.debug(
+                        f"Table {table} in {db_path} has no repository_id column, skipping"
+                    )
+                    continue
+                cursor.execute(
+                    f"UPDATE {table} SET repository_id=? WHERE repository_id=?",
+                    (new_id, old_id),
+                )
+                logger.debug(
+                    f"Migrated {cursor.rowcount} rows in {table} "
+                    f"({old_id} → {new_id})"
+                )
+            conn.commit()
+            conn.close()
+        except Exception as exc:
+            logger.warning(
+                f"SQLite migration failed for {db_path} ({old_id} → {new_id}): {exc}"
+            )
 
     def save(self):
         """Save registry to disk."""
@@ -181,7 +261,9 @@ class RepositoryRegistry:
         # Import locally to avoid circular imports
         from mcp_server.storage.multi_repo_manager import RepositoryInfo
 
-        repo_id = self._generate_repo_id(path)
+        identity = compute_repo_id(path)
+        repo_id = identity.repo_id
+        tracked = resolve_tracked_branch(identity.git_common_dir)
         index_base = path / ".mcp-index"
         index_db = index_base / "current.db"
 
@@ -207,6 +289,8 @@ class RepositoryRegistry:
             artifact_backend="local_workspace",
             artifact_health="missing",
             available_semantic_profiles=[],
+            tracked_branch=tracked if tracked else None,
+            git_common_dir=str(identity.git_common_dir) if identity.git_common_dir else None,
         )
 
         self.register(repo_info)
@@ -533,16 +617,9 @@ class RepositoryRegistry:
 
     def _get_preferred_branch(self, repo_path: Path) -> Optional[str]:
         """Return preferred baseline branch when available."""
-        current = self._get_git_branch(repo_path)
-        if current in {"main", "master"}:
-            return current
-
-        branches = set(self._list_git_branches(repo_path))
-        if "main" in branches:
-            return "main"
-        if "master" in branches:
-            return "main"
-        return current
+        identity = compute_repo_id(repo_path)
+        branch = resolve_tracked_branch(identity.git_common_dir)
+        return branch if branch else None
 
     def discover_repositories(self, search_paths: List[str]) -> List[str]:
         """Discover git repositories under the given search paths.
@@ -558,15 +635,6 @@ class RepositoryRegistry:
                 if git_dir.is_dir():
                     found.append(str(git_dir.parent))
         return found
-
-    def _generate_repo_id(self, repo_path: Path) -> str:
-        """Generate stable repository ID for a path."""
-        import hashlib
-
-        digest = hashlib.sha1(str(repo_path).encode("utf-8"), usedforsecurity=False).hexdigest()[
-            :12
-        ]
-        return f"{repo_path.name}-{digest}"
 
     def update_git_state(self, repository_id: str) -> Optional[Dict[str, str]]:
         """Refresh both current commit and branch for a repository."""

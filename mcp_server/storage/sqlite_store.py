@@ -206,6 +206,20 @@ class SQLiteStore:
                         else:
                             raise
 
+        self._add_repo_identity_columns()
+
+    def _add_repo_identity_columns(self) -> None:
+        """Additive migration: ensure repositories has tracked_branch and git_common_dir."""
+        with self._get_connection() as conn:
+            for col in ("tracked_branch", "git_common_dir"):
+                try:
+                    conn.execute(
+                        f"ALTER TABLE repositories ADD COLUMN {col} TEXT"
+                    )
+                    logger.debug(f"Added column repositories.{col}")
+                except sqlite3.OperationalError:
+                    pass  # column already exists
+
     @contextmanager
     def _get_connection(self):
         """Get a database connection with proper error handling."""

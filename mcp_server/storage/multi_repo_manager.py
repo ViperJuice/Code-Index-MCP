@@ -15,6 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from mcp_server.storage.repo_identity import compute_repo_id
 from mcp_server.storage.repository_registry import RepositoryRegistry
 from mcp_server.storage.sqlite_store import SQLiteStore
 from mcp_server.utils.index_discovery import IndexDiscovery
@@ -50,6 +51,8 @@ class RepositoryInfo:
     available_semantic_profiles: Optional[List[str]] = None
     artifact_backend: Optional[str] = None
     artifact_health: Optional[str] = None
+    tracked_branch: Optional[str] = None   # pinned default branch; never auto-mutates
+    git_common_dir: Optional[str] = None   # str for JSON-safety; __post_init__ coerces Path→str
 
     def __post_init__(self) -> None:
         """Normalize paths and derived fields."""
@@ -58,6 +61,9 @@ class RepositoryInfo:
 
         if isinstance(self.index_path, str):
             self.index_path = Path(self.index_path)
+
+        if isinstance(self.git_common_dir, Path):
+            self.git_common_dir = str(self.git_common_dir)
 
         if self.index_location is None:
             # If index_path points to a file, use its parent directory as index location.
@@ -192,23 +198,7 @@ class MultiRepositoryManager:
 
     def _generate_repository_id(self, repository_path: Path) -> str:
         """Generate unique ID for repository."""
-        # Try to get git remote URL
-        try:
-            import subprocess
-
-            result = subprocess.run(
-                ["git", "config", "--get", "remote.origin.url"],
-                cwd=repository_path,
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            url = result.stdout.strip()
-            return hashlib.sha256(url.encode()).hexdigest()[:16]
-        except Exception:
-            # Fall back to path hash
-            path_str = str(repository_path.absolute())
-            return hashlib.sha256(path_str.encode()).hexdigest()[:16]
+        return compute_repo_id(repository_path).repo_id
 
     def _analyze_repository(self, index_path: Path) -> Dict[str, Any]:
         """Analyze repository index for statistics."""
@@ -252,11 +242,8 @@ class MultiRepositoryManager:
 
         Accepts any of:
           - a 16-char lowercase hex repo_id (returned unchanged)
-          - a git remote URL (hashed)
-          - a filesystem path (git remote looked up, else path hash)
-
-        The hashing scheme matches `_generate_repository_id` so repos registered
-        by path resolve to the same id here.
+          - a git remote URL (hashed via compute_repo_id abs-path fallback)
+          - a filesystem path (delegated to compute_repo_id)
         """
         if not repository:
             raise ValueError("repository must be a non-empty string")
@@ -267,33 +254,14 @@ class MultiRepositoryManager:
         if len(candidate) == 16 and all(c in "0123456789abcdef" for c in candidate.lower()):
             return candidate.lower()
 
-        # Git URL?
+        # Git URL fast-path (no local path to resolve)
         url_prefixes = ("git@", "http://", "https://", "ssh://", "git://")
         if candidate.startswith(url_prefixes):
             return hashlib.sha256(candidate.encode()).hexdigest()[:16]
 
-        # Filesystem path: try git remote first, fall back to path hash.
+        # Filesystem path: delegate to compute_repo_id
         path = Path(candidate).expanduser()
-        if path.exists():
-            try:
-                import subprocess
-
-                result = subprocess.run(
-                    ["git", "config", "--get", "remote.origin.url"],
-                    cwd=path,
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                )
-                url = result.stdout.strip()
-                if url:
-                    return hashlib.sha256(url.encode()).hexdigest()[:16]
-            except Exception:
-                pass
-            return hashlib.sha256(str(path.absolute()).encode()).hexdigest()[:16]
-
-        # Last resort: treat the input as an opaque string and hash it.
-        return hashlib.sha256(candidate.encode()).hexdigest()[:16]
+        return compute_repo_id(path).repo_id
 
     def is_repo_authorized(self, repository_id: str) -> bool:
         """
