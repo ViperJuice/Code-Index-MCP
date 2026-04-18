@@ -46,7 +46,8 @@ from .storage.sqlite_store import SQLiteStore
 from .utils.fuzzy_indexer import FuzzyIndexer
 from .utils.index_discovery import IndexDiscovery
 from .utils.language_detector import detect_repository_languages
-from .watcher import FileWatcher
+from .watcher_multi_repo import MultiRepositoryWatcher
+from .watcher.ref_poller import RefPoller
 
 # Set up logging
 setup_logging(log_level="INFO")
@@ -83,7 +84,8 @@ app = FastAPI(
 dispatcher: EnhancedDispatcher | None = None
 repo_resolver: RepoResolver | None = None
 sqlite_store: SQLiteStore | None = None
-file_watcher: FileWatcher | None = None
+multi_watcher: MultiRepositoryWatcher | None = None
+ref_poller: RefPoller | None = None
 plugin_manager: PluginManager | None = None
 plugin_loader = None  # Dynamic plugin loader
 auth_manager: AuthManager | None = None
@@ -267,7 +269,7 @@ setup_metrics_middleware(app, enable_detailed_metrics=True)
 @app.on_event("startup")
 async def startup_event():
     """Initialize the dispatcher and register plugins on startup."""
-    global dispatcher, repo_resolver, sqlite_store, file_watcher, plugin_manager, plugin_loader, auth_manager, security_config, cache_manager, query_cache, bm25_indexer, hybrid_search, fuzzy_indexer, semantic_indexer, profile_hydration_status, semantic_setup_status, language_detection_status
+    global dispatcher, repo_resolver, sqlite_store, multi_watcher, ref_poller, plugin_manager, plugin_loader, auth_manager, security_config, cache_manager, query_cache, bm25_indexer, hybrid_search, fuzzy_indexer, semantic_indexer, profile_hydration_status, semantic_setup_status, language_detection_status
 
     try:
         preflight_result = run_startup_preflight()
@@ -723,20 +725,40 @@ async def startup_event():
             f"Hybrid Search initialized (BM25: {hybrid_config.enable_bm25}, Semantic: {hybrid_config.enable_semantic}, Fuzzy: {hybrid_config.enable_fuzzy})"
         )
 
-        # Initialize file watcher with dispatcher and query cache
+        # Initialize multi-repo watcher + ref poller
         if settings.mcp_fast_startup:
-            logger.info("MCP fast startup enabled: skipping file watcher start")
-            file_watcher = None
+            logger.info("MCP fast startup enabled: skipping watcher start")
+            multi_watcher = None
+            ref_poller = None
         else:
-            logger.info("Starting file watcher...")
-            file_watcher = FileWatcher(Path("."), dispatcher, query_cache)
-            file_watcher.start()
-            logger.info("File watcher started for current directory with cache invalidation")
+            logger.info("Starting MultiRepositoryWatcher and RefPoller...")
+            try:
+                from .storage.git_index_manager import GitAwareIndexManager
+                _git_index_manager = GitAwareIndexManager(registry=_repo_registry, dispatcher=dispatcher)
+                multi_watcher = MultiRepositoryWatcher(
+                    registry=_repo_registry,
+                    dispatcher=dispatcher,
+                    index_manager=_git_index_manager,
+                    repo_resolver=repo_resolver,
+                )
+                ref_poller = RefPoller(
+                    registry=_repo_registry,
+                    git_index_manager=_git_index_manager,
+                    dispatcher=dispatcher,
+                    repo_resolver=repo_resolver,
+                )
+                multi_watcher.start_watching_all()
+                ref_poller.start()
+                logger.info("MultiRepositoryWatcher and RefPoller started")
+            except Exception as _watcher_err:
+                logger.warning("MultiRepositoryWatcher failed to start: %s", _watcher_err)
+                multi_watcher = None
+                ref_poller = None
 
         # Store in app.state for potential future use
         app.state.dispatcher = dispatcher
         app.state.sqlite_store = sqlite_store
-        app.state.file_watcher = file_watcher
+        app.state.file_watcher = multi_watcher
         app.state.plugin_manager = plugin_manager
         app.state.auth_manager = auth_manager
         app.state.security_config = security_config
@@ -811,12 +833,19 @@ async def shutdown_event():
     """Clean up resources on shutdown."""
     # These globals are only read, not assigned, so no 'global' declaration needed
 
-    if file_watcher:
+    if multi_watcher:
         try:
-            file_watcher.stop()
-            logger.info("File watcher stopped successfully")
+            multi_watcher.stop_watching_all()
+            logger.info("MultiRepositoryWatcher stopped successfully")
         except Exception as e:
-            logger.error(f"Error stopping file watcher: {e}", exc_info=True)
+            logger.error(f"Error stopping MultiRepositoryWatcher: {e}", exc_info=True)
+
+    if ref_poller:
+        try:
+            ref_poller.stop()
+            logger.info("RefPoller stopped successfully")
+        except Exception as e:
+            logger.error(f"Error stopping RefPoller: {e}", exc_info=True)
 
     if plugin_manager:
         try:
@@ -1093,10 +1122,8 @@ def get_prometheus_metrics() -> Response:
                     plugin=plugin.__class__.__name__, language=lang
                 ).set(1)
 
-        # Update file watcher metrics
-        if file_watcher:
-            # This would need to be implemented in FileWatcher
-            # prometheus_exporter.set_files_watched(file_watcher.get_watched_count())
+        # Update watcher metrics (placeholder — MultiRepositoryWatcher has no get_watched_count yet)
+        if multi_watcher:
             pass
 
         # Generate metrics

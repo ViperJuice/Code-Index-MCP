@@ -19,20 +19,24 @@ import pytest
 class TestInitializeStatelessServices:
     """initialize_stateless_services() contract tests."""
 
-    def test_returns_tuple_of_three(self, tmp_path):
-        """Returns (StoreRegistry, RepoResolver, dispatcher) — no captured cwd."""
+    def test_returns_tuple_of_five(self, tmp_path):
+        """Returns (StoreRegistry, RepoResolver, dispatcher, RepositoryRegistry, GitAwareIndexManager)."""
         from mcp_server.cli.bootstrap import initialize_stateless_services
         from mcp_server.core import RepoResolver
         from mcp_server.storage import StoreRegistry
+        from mcp_server.storage.git_index_manager import GitAwareIndexManager
+        from mcp_server.storage.repository_registry import RepositoryRegistry
 
         registry_path = tmp_path / "registry.json"
         result = initialize_stateless_services(registry_path=registry_path)
 
         assert isinstance(result, tuple), "Must return a tuple"
-        assert len(result) == 3, "Tuple must have 3 elements"
-        store_registry, repo_resolver, dispatcher = result
+        assert len(result) == 5, "Tuple must have 5 elements"
+        store_registry, repo_resolver, dispatcher, repo_registry, git_index_manager = result
         assert isinstance(store_registry, StoreRegistry)
         assert isinstance(repo_resolver, RepoResolver)
+        assert isinstance(repo_registry, RepositoryRegistry)
+        assert isinstance(git_index_manager, GitAwareIndexManager)
         # Dispatcher must have the core protocol methods
         assert callable(getattr(dispatcher, "search", None)), "dispatcher must have search()"
         assert callable(getattr(dispatcher, "lookup", None)), "dispatcher must have lookup()"
@@ -53,15 +57,15 @@ class TestInitializeStatelessServices:
         result2 = initialize_stateless_services(registry_path=registry_path)
 
         # Both calls should succeed — no crash from different cwd
-        assert len(result1) == 3
-        assert len(result2) == 3
+        assert len(result1) == 5
+        assert len(result2) == 5
 
     def test_no_preloaded_sqlite_store(self, tmp_path):
         """The returned dispatcher must NOT have a pre-loaded per-repo sqlite_store."""
         from mcp_server.cli.bootstrap import initialize_stateless_services
 
         registry_path = tmp_path / "registry.json"
-        _, _, dispatcher = initialize_stateless_services(registry_path=registry_path)
+        _, _, dispatcher, _, _ = initialize_stateless_services(registry_path=registry_path)
 
         # Dispatcher should not have an _sqlite_store bound at init time
         assert not hasattr(dispatcher, "_sqlite_store") or getattr(dispatcher, "_sqlite_store", None) is None

@@ -1,6 +1,7 @@
 """P2B bootstrap entry — IF-0-P2B-4 implementation.
 
-Constructs the process-wide service pool: StoreRegistry + RepoResolver + dispatcher.
+Constructs the process-wide service pool: StoreRegistry + RepoResolver + dispatcher +
+RepositoryRegistry + GitAwareIndexManager.
 No cwd capture, no preloaded sqlite_store.
 
 Every MCP tool call resolves a RepoContext per-request via RepoResolver.
@@ -16,17 +17,18 @@ from typing import Optional, Tuple
 
 from mcp_server.core.repo_resolver import RepoResolver
 from mcp_server.dispatcher.protocol import DispatcherProtocol
+from mcp_server.storage.git_index_manager import GitAwareIndexManager
 from mcp_server.storage.repository_registry import RepositoryRegistry
 from mcp_server.storage.store_registry import StoreRegistry
 
 
 def initialize_stateless_services(
     registry_path: Optional[Path] = None,
-) -> Tuple[StoreRegistry, RepoResolver, DispatcherProtocol]:
+) -> Tuple[StoreRegistry, RepoResolver, DispatcherProtocol, RepositoryRegistry, GitAwareIndexManager]:
     """Construct the process-wide service pool.
 
-    Returns (StoreRegistry, RepoResolver, dispatcher). The dispatcher holds no
-    per-repo state; every public method takes ``ctx: RepoContext``.
+    Returns (StoreRegistry, RepoResolver, dispatcher, RepositoryRegistry, GitAwareIndexManager).
+    The dispatcher holds no per-repo state; every public method takes ``ctx: RepoContext``.
     ``registry_path`` overrides the default registry location (mainly for tests).
     """
     import os
@@ -57,7 +59,9 @@ def initialize_stateless_services(
             reranker_type=reranker_type,
         )
 
-    return store_registry, repo_resolver, dispatcher
+    git_index_manager = GitAwareIndexManager(registry=repo_registry, dispatcher=dispatcher)
+
+    return store_registry, repo_resolver, dispatcher, repo_registry, git_index_manager
 
 
 def _default_registry_path() -> Path:

@@ -20,6 +20,8 @@ from mcp.server.stdio import stdio_server
 
 from mcp_server.cli.bootstrap import initialize_stateless_services, timeout
 from mcp_server.cli import tool_handlers
+from mcp_server.watcher_multi_repo import MultiRepositoryWatcher
+from mcp_server.watcher.ref_poller import RefPoller
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +133,6 @@ async def _serve(registry_path=None) -> None:
     from mcp_server.plugin_system import PluginManager
     from mcp_server.storage.sqlite_store import SQLiteStore
     from mcp_server.utils.index_discovery import IndexDiscovery
-    from mcp_server.watcher import FileWatcher
 
     load_dotenv()
 
@@ -148,15 +149,40 @@ async def _serve(registry_path=None) -> None:
     logger.info("=" * 60)
 
     # Process-wide service pool — stateless, no cwd capture
-    store_registry, repo_resolver, dispatcher = initialize_stateless_services(
+    store_registry, repo_resolver, dispatcher, repo_registry, git_index_manager = initialize_stateless_services(
         registry_path=registry_path
     )
 
-    # Per-process mutable state for lazy indexing/watcher
+    # Start multi-repo watcher + ref poller eagerly, after registries are ready
+    multi_watcher: Optional[MultiRepositoryWatcher] = None
+    ref_poller: Optional[RefPoller] = None
+    try:
+        from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher as _ED
+        if isinstance(dispatcher, _ED):
+            multi_watcher = MultiRepositoryWatcher(
+                registry=repo_registry,
+                dispatcher=dispatcher,
+                index_manager=git_index_manager,
+                repo_resolver=repo_resolver,
+            )
+            ref_poller = RefPoller(
+                registry=repo_registry,
+                git_index_manager=git_index_manager,
+                dispatcher=dispatcher,
+                repo_resolver=repo_resolver,
+            )
+            multi_watcher.start_watching_all()
+            ref_poller.start()
+            logger.info("MultiRepositoryWatcher and RefPoller started")
+    except Exception as _watcher_err:
+        logger.warning(f"MultiRepositoryWatcher failed to start: {_watcher_err}")
+        multi_watcher = None
+        ref_poller = None
+
+    # Per-process mutable state for lazy indexing
     plugin_manager: Optional[PluginManager] = None
     sqlite_store: Optional[SQLiteStore] = None
     initialization_error: Optional[str] = None
-    file_watcher: Optional[Any] = None
     indexing_thread: Optional[threading.Thread] = None
     fts_rebuild_thread: Optional[threading.Thread] = None
     indexing_total_files: int = 0
@@ -166,7 +192,7 @@ async def _serve(registry_path=None) -> None:
 
     async def lazy_initialize():
         nonlocal dispatcher, plugin_manager, sqlite_store, initialization_error
-        nonlocal file_watcher, indexing_thread, fts_rebuild_thread
+        nonlocal indexing_thread, fts_rebuild_thread
         nonlocal indexing_total_files, indexing_started_at
         _auto_index = False
 
@@ -239,16 +265,6 @@ async def _serve(registry_path=None) -> None:
                 except Exception as _gi_err:
                     logger.debug(f"Could not update .gitignore: {_gi_err}")
 
-            # Start watcher for EnhancedDispatcher
-            if file_watcher is None and isinstance(dispatcher, EnhancedDispatcher):
-                try:
-                    file_watcher = FileWatcher(root=current_dir, dispatcher=dispatcher)
-                    if not _auto_index:
-                        file_watcher.start()
-                        logger.info(f"FileWatcher started, watching {current_dir}")
-                except Exception as _fw_err:
-                    logger.warning(f"FileWatcher failed to start: {_fw_err}")
-
             if _auto_index:
                 _max_files = int(os.getenv("MCP_AUTO_INDEX_MAX_FILES", "100000"))
                 _file_count = 0
@@ -280,13 +296,6 @@ async def _serve(registry_path=None) -> None:
                         logger.info(f"Background initial index complete: {stats}")
                     except Exception as _idx_err:
                         logger.error(f"Background initial index failed: {_idx_err}")
-                    finally:
-                        if file_watcher is not None:
-                            try:
-                                file_watcher.start()
-                                logger.info(f"FileWatcher started after initial index")
-                            except Exception as _fw_err:
-                                logger.warning(f"FileWatcher failed: {_fw_err}")
 
                 indexing_total_files = _file_count
                 indexing_started_at = time.time()
@@ -383,7 +392,7 @@ async def _serve(registry_path=None) -> None:
                 response = await tool_handlers.handle_get_status(
                     **common_kwargs,
                     sqlite_store=sqlite_store,
-                    file_watcher=file_watcher,
+                    file_watcher=multi_watcher,
                     indexing_thread=indexing_thread,
                     indexing_started_at=indexing_started_at,
                     indexing_total_files=indexing_total_files,
@@ -452,9 +461,18 @@ async def _serve(registry_path=None) -> None:
                 read_stream, write_stream, server.create_initialization_options()
             )
     finally:
-        if file_watcher is not None:
-            file_watcher.stop()
-            logger.info("FileWatcher stopped")
+        if multi_watcher is not None:
+            try:
+                multi_watcher.stop_watching_all()
+                logger.info("MultiRepositoryWatcher stopped")
+            except Exception as _e:
+                logger.warning(f"MultiRepositoryWatcher stop error: {_e}")
+        if ref_poller is not None:
+            try:
+                ref_poller.stop()
+                logger.info("RefPoller stopped")
+            except Exception as _e:
+                logger.warning(f"RefPoller stop error: {_e}")
 
 
 def run() -> None:
