@@ -5,11 +5,14 @@ This file defines the capabilities and constraints for AI agents working with th
 ## Current State
 
 **System Complexity**: 5/5 (High — SQLite FTS5 + Qdrant vector index, 48 language plugins, rerankers, query-intent routing)
-**MCP Status**: Fully operational — use MCP tools first for all code search (no known failure modes)
-**Last Updated**: 2026-04-01
+**MCP Status**: Use MCP tools first for all code search; STDIO is the primary surface
+**Last Updated**: 2026-04-18
+
+> **Beta status**: Multi-repo support and the STDIO interface are in beta. STDIO is the primary surface for LLM tool calls; FastAPI is a secondary admin surface for diagnostics and manual operations. Expect API surface changes before stable release.
 
 ### What's Actually Implemented
-- ✅ FastAPI gateway with all endpoints: `/symbol`, `/search`, `/status`, `/plugins`, `/reindex`
+- ✅ STDIO transport (`search_code`, `symbol_lookup`, `summarize_sample`, `reindex` MCP tools)
+- ✅ FastAPI admin surface with endpoints: `/symbol`, `/search`, `/status`, `/plugins`, `/reindex`
 - ✅ Dispatcher with caching and auto-initialization
 - ✅ Python plugin fully functional with Tree-sitter + Jedi
 - ✅ JavaScript/TypeScript plugin fully functional with Tree-sitter
@@ -26,7 +29,7 @@ This file defines the capabilities and constraints for AI agents working with th
 - ✅ Advanced metrics collection with Prometheus
 - ✅ Security layer with JWT authentication
 - ✅ Comprehensive testing framework with parallel execution
-- ✅ Production-ready Docker and Kubernetes configurations
+- ✅ Docker and Kubernetes configurations (beta hardening in progress)
 - ✅ Cache management and query optimization
 - ✅ Real-world repository testing validation
 
@@ -307,10 +310,11 @@ class LanguagePlugin(PluginBase):
     def getDefinition(self, symbol: str, context: Dict) -> Dict
     def getReferences(self, symbol: str, context: Dict) -> List[Dict]
 
-# FastAPI Gateway: Standardized tool interface
-@app.get("/symbol")
-@app.get("/search") 
-@app.get("/status")
+# MCP STDIO tools — primary surface for LLM tool calls
+# search_code(query, repository=None) -> list[SearchResult]
+# symbol_lookup(symbol, repository=None) -> SymbolResult
+# summarize_sample(path) -> str
+# reindex(repository=None) -> ReindexResult
 
 # Tree-sitter Integration: Use TreeSitterWrapper for parsing
 from mcp_server.utils.treesitter_wrapper import TreeSitterWrapper

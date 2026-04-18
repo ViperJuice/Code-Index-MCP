@@ -83,6 +83,10 @@ C4Component
         Component(cloud_sync, "Cloud Sync", "class", "Handles artifact upload/download (Needs Implementation)")
     }
 
+    Container_Boundary(watchers, "File Watching") {
+        Component(multi_repo_watcher, "MultiRepositoryWatcher", "Python Class", "Coordinates per-repo watchers across all registered repositories")
+    }
+
     Rel(enhanced_dispatcher, plugin_factory, "Requests plugins")
     Rel(plugin_factory, language_plugins, "Instantiates")
     Rel(language_plugins, parser, "Uses")
@@ -93,6 +97,8 @@ C4Component
     Rel(enhanced_dispatcher, repo_context, "Resolves per-repo context")
     Rel(repo_context, store_registry, "Looks up store by repo ID")
     Rel(repo_context, repository_registry, "Validates repo root")
+    Rel(enhanced_dispatcher, multi_repo_watcher, "Observes file changes")
+    Rel(multi_repo_watcher, store_registry, "Invalidates on change")
 ```
 
 ## Dependability Notes
