@@ -6,5 +6,10 @@
   "P4": "Phase 4 — Default-Branch-Only Indexing & Multi-Repo Watcher",
   "P5": "Phase 5 — STDIO Hardening & Multi-Repo Integration Tests",
   "P6A": "Phase 6A — Dependency Hygiene",
-  "P6B": "Phase 6B — Documentation Alignment"
+  "P6B": "Phase 6B — Documentation Alignment",
+  "P7":  "Phase 7 — Doc Truth: Agent & Machine Audiences",
+  "P8":  "Phase 8 — Doc Truth: Customer Audience & Historical Artifact Sweep",
+  "P9":  "Phase 9 — Operational Scoping Completion",
+  "P10": "Phase 10 — Production Hardening",
+  "P11": "Phase 11 — Dispatcher Dependability"
 }
