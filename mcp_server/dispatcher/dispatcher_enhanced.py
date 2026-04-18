@@ -1669,7 +1669,8 @@ class EnhancedDispatcher:
         if recursive:
 
             def iter_files() -> Iterable[Path]:
-                for current_root, dirnames, filenames in os.walk(directory):
+                # followlinks=False (default, made explicit) keeps us cycle-safe.
+                for current_root, dirnames, filenames in os.walk(directory, followlinks=False):
                     dirnames[:] = [d for d in dirnames if d not in _INDEX_EXCLUDED_DIRS]
                     root_path = Path(current_root)
                     for filename in filenames:

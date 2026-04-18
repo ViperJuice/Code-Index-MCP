@@ -71,12 +71,85 @@ _indexing_thread: threading.Thread | None = None
 _fts_rebuild_thread: threading.Thread | None = None
 _indexing_total_files: int = 0
 _indexing_started_at: float | None = None
+_init_lock: asyncio.Lock | None = None
+
+# Resolved at import time so a malicious caller can't shift it by chdir later.
+_STARTUP_CWD: Path = Path.cwd().resolve()
+
+# Server version from package metadata (fallback to "unknown" when the package
+# is not installed, e.g., running directly from a source checkout without `pip install -e .`).
+try:
+    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import version as _pkg_version
+
+    try:
+        _SERVER_VERSION = _pkg_version("index-it-mcp")
+    except PackageNotFoundError:
+        _SERVER_VERSION = "unknown"
+except Exception:
+    _SERVER_VERSION = "unknown"
 
 # Configuration from environment
 USE_SIMPLE_DISPATCHER = (
     os.getenv("MCP_USE_SIMPLE_DISPATCHER", "false").lower() == "true"
 )
 PLUGIN_LOAD_TIMEOUT = int(os.getenv("MCP_PLUGIN_TIMEOUT", "5"))
+
+
+def _allowed_roots() -> list[Path]:
+    """Resolve the list of directories that reindex/read tools may touch.
+
+    Precedence: MCP_ALLOWED_ROOTS (comma-separated) > MCP_WORKSPACE_ROOT > startup cwd.
+    """
+    raw = os.environ.get("MCP_ALLOWED_ROOTS", "").strip()
+    if raw:
+        roots = []
+        for entry in raw.split(","):
+            entry = entry.strip()
+            if not entry:
+                continue
+            try:
+                roots.append(Path(entry).expanduser().resolve())
+            except Exception:
+                continue
+        if roots:
+            return roots
+    ws = os.environ.get("MCP_WORKSPACE_ROOT", "").strip()
+    if ws:
+        try:
+            return [Path(ws).expanduser().resolve()]
+        except Exception:
+            pass
+    return [_STARTUP_CWD]
+
+
+def _path_within_allowed(target: Path, roots: list[Path]) -> bool:
+    """True when `target`'s resolved path lies within one of `roots`."""
+    try:
+        resolved = target.expanduser().resolve()
+    except Exception:
+        return False
+    for root in roots:
+        try:
+            resolved.relative_to(root)
+            return True
+        except ValueError:
+            continue
+    return False
+
+
+def _require_sqlite_store_db_path() -> str:
+    """Return the active sqlite_store's db_path, or raise if the store isn't initialized.
+
+    Replaces a previous `"code_index.db"` fallback that silently created a junk DB
+    in whatever directory the server happened to be running from.
+    """
+    if sqlite_store is None:
+        raise RuntimeError(
+            "sqlite_store is not initialized; this tool cannot run before "
+            "initialize_services() has completed successfully."
+        )
+    return sqlite_store.db_path
 
 
 @contextmanager
@@ -296,7 +369,8 @@ async def initialize_services():
         if _auto_index:
             _max_files = int(os.getenv("MCP_AUTO_INDEX_MAX_FILES", "100000"))
             _file_count = 0
-            for _root, _dirs, _files in os.walk(current_dir):
+            # followlinks=False (default, made explicit) keeps us cycle-safe.
+            for _root, _dirs, _files in os.walk(current_dir, followlinks=False):
                 _dirs[:] = [
                     d for d in _dirs
                     if d not in {".git", "node_modules", "__pycache__", ".venv", "venv"}
@@ -622,7 +696,7 @@ async def call_tool(
     name: str, arguments: dict | None
 ) -> Sequence[types.TextContent | types.ImageContent | types.EmbeddedResource]:
     """Handle tool calls."""
-    global dispatcher, lazy_summarizer
+    global dispatcher, lazy_summarizer, initialization_error, _init_lock
 
     # Resolve the current MCP session so the lazy summarizer can issue
     # sampling/createMessage requests back to the client.
@@ -645,7 +719,7 @@ async def call_tool(
     if lazy_summarizer is None:
         _settings = Settings.from_environment()
         lazy_summarizer = LazyChunkWriter(
-            db_path=sqlite_store.db_path if sqlite_store else "code_index.db",
+            db_path=_require_sqlite_store_db_path(),
             qdrant_client=None,  # Passed inside SemanticIndexer
             session=_current_session,
             client_name=_client_name,
@@ -673,7 +747,15 @@ async def call_tool(
 
     try:
         if dispatcher is None:
-            await initialize_services()
+            # Serialize concurrent tool calls racing to cold-init the dispatcher.
+            # Also clears any prior initialization_error so we actually retry instead
+            # of staying stuck forever after a transient failure.
+            if _init_lock is None:
+                _init_lock = asyncio.Lock()
+            async with _init_lock:
+                if dispatcher is None:
+                    initialization_error = None
+                    await initialize_services()
 
         # Check if initialization failed
         if initialization_error:
@@ -785,9 +867,9 @@ async def call_tool(
                 and dispatcher._multi_repo_manager
             ):
                 try:
-                    from ..storage.multi_repo_manager import MultiRepoIndexManager
+                    from mcp_server.storage.multi_repo_manager import MultiRepositoryManager
 
-                    repo_id = MultiRepoIndexManager.resolve_repo_id(repository)
+                    repo_id = MultiRepositoryManager.resolve_repo_id(repository)
 
                     # Check authorization
                     if not dispatcher._multi_repo_manager.is_repo_authorized(repo_id):
@@ -1104,35 +1186,43 @@ async def call_tool(
                 }
                 health = {"status": "unknown"}
 
+            # Build a features block that only lists features the active dispatcher
+            # actually implements — SimpleDispatcher shouldn't advertise
+            # enhanced-only knobs as "False".
+            _is_enhanced = isinstance(dispatcher, EnhancedDispatcher)
+            _indexing_alive = _indexing_thread is not None and _indexing_thread.is_alive()
+            features: dict[str, Any] = {
+                "timeout_protection": True,
+                "file_watcher": _file_watcher is not None,
+                "initial_index_running": _indexing_alive,
+                "indexing_elapsed_seconds": (
+                    int(time.time() - _indexing_started_at)
+                    if (_indexing_alive and _indexing_started_at)
+                    else None
+                ),
+                "indexing_estimated_files": (
+                    _indexing_total_files if (_indexing_alive and _indexing_total_files) else None
+                ),
+            }
+            if _is_enhanced:
+                features.update(
+                    {
+                        "dynamic_loading": getattr(dispatcher, "_use_factory", False),
+                        "lazy_loading": getattr(dispatcher, "_lazy_load", False),
+                        "advanced_features": getattr(dispatcher, "_enable_advanced", False),
+                        "semantic_search_enabled": getattr(dispatcher, "_semantic_enabled", False),
+                        "semantic_indexer_active": (
+                            getattr(dispatcher, "_semantic_indexer", None) is not None
+                        ),
+                    }
+                )
+
             status_data = {
                 "status": health.get("status", "operational"),
-                "version": "0.2.0",
+                "version": _SERVER_VERSION,
                 "dispatcher_type": dispatcher.__class__.__name__,
                 "dispatcher_mode": "simple" if USE_SIMPLE_DISPATCHER else "enhanced",
-                "features": {
-                    "dynamic_loading": getattr(dispatcher, "_use_factory", False),
-                    "lazy_loading": getattr(dispatcher, "_lazy_load", False),
-                    "semantic_search": getattr(dispatcher, "_semantic_enabled", False),
-                    "semantic_available": (
-                        isinstance(dispatcher, EnhancedDispatcher)
-                        and getattr(dispatcher, "_semantic_indexer", None) is not None
-                    ),
-                    "semantic_indexer_active": getattr(dispatcher, "_semantic_indexer", None) is not None,
-                    "advanced_features": getattr(dispatcher, "_enable_advanced", False),
-                    "timeout_protection": True,
-                    "file_watcher": _file_watcher is not None,
-                    "initial_index_running": _indexing_thread is not None and _indexing_thread.is_alive(),
-                    "indexing_elapsed_seconds": (
-                        int(time.time() - _indexing_started_at)
-                        if (_indexing_thread is not None and _indexing_thread.is_alive() and _indexing_started_at)
-                        else None
-                    ),
-                    "indexing_estimated_files": (
-                        _indexing_total_files
-                        if (_indexing_thread is not None and _indexing_thread.is_alive() and _indexing_total_files)
-                        else None
-                    ),
-                },
+                "features": features,
                 "languages": {
                     "supported": stats.get("supported_languages", 0),
                     "loaded": len(stats.get("loaded_languages", [])),
@@ -1212,68 +1302,93 @@ async def call_tool(
 
         elif name == "reindex":
             path = arguments.get("path") if arguments else None
+            allowed = _allowed_roots()
 
-            if path:
-                # Reindex specific path
-                target_path = Path(path)
-                if not target_path.exists():
+            # Default target is the first allowed root (not cwd — prevents surprise
+            # reindexing of whatever directory the client process happens to be in).
+            target_path = Path(path).expanduser() if path else allowed[0]
+
+            if not target_path.exists():
+                response = [
+                    types.TextContent(
+                        type="text",
+                        text=ensure_response(
+                            {
+                                "error": "Path not found",
+                                "path": str(target_path),
+                            }
+                        ),
+                    )
+                ]
+                return response
+
+            if not _path_within_allowed(target_path, allowed):
+                response = [
+                    types.TextContent(
+                        type="text",
+                        text=ensure_response(
+                            {
+                                "error": "Path outside allowed roots",
+                                "path": str(target_path.resolve()),
+                                "allowed_roots": [str(r) for r in allowed],
+                                "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
+                            }
+                        ),
+                    )
+                ]
+                return response
+
+            if path and target_path.is_file():
+                # Single file - use index_file
+                try:
+                    dispatcher.index_file(target_path)
                     return [
                         types.TextContent(
-                            type="text", text=f"Error: Path not found: {path}"
+                            type="text", text=f"Reindexed file: {path}"
                         )
                     ]
-
-                if target_path.is_file():
-                    # Single file - use index_file
-                    try:
-                        dispatcher.index_file(target_path)
-                        return [
-                            types.TextContent(
-                                type="text", text=f"Reindexed file: {path}"
-                            )
-                        ]
-                    except Exception as e:
-                        return [
-                            types.TextContent(
-                                type="text", text=f"Error reindexing {path}: {str(e)}"
-                            )
-                        ]
-                else:
-                    # Directory - use index_directory which handles ignore patterns
-                    stats = dispatcher.index_directory(target_path, recursive=True)
-                    lexical_rows = sqlite_store.rebuild_fts_code() if sqlite_store else 0
-
-                    response_data = {
-                        "path": str(target_path),
-                        "mode": "merge",
-                        "indexed_files": stats["indexed_files"],
-                        "ignored_files": stats["ignored_files"],
-                        "failed_files": stats["failed_files"],
-                        "total_files": stats["total_files"],
-                        "by_language": stats["by_language"],
-                        "lexical_rows": lexical_rows,
-                        "semantic_indexed": stats.get("semantic_indexed"),
-                        "semantic_failed": stats.get("semantic_failed"),
-                        "semantic_skipped": stats.get("semantic_skipped"),
-                        "total_embedding_units": stats.get("total_embedding_units"),
-                        "merge_note": (
-                            "Changed/new files updated; deleted files are not purged — "
-                            "FileWatcher handles those on next change, or reindex again after deletions."
-                        ),
-                    }
-
-                    response = [
+                except Exception as e:
+                    return [
                         types.TextContent(
-                            type="text", text=ensure_response(response_data)
+                            type="text", text=f"Error reindexing {path}: {str(e)}"
                         )
                     ]
-            else:
-                # Reindex all files in current directory
-                stats = dispatcher.index_directory(Path("."), recursive=True)
+            elif path:
+                # Directory - use index_directory which handles ignore patterns
+                stats = dispatcher.index_directory(target_path, recursive=True)
                 lexical_rows = sqlite_store.rebuild_fts_code() if sqlite_store else 0
 
                 response_data = {
-                    "path": ".",
+                    "path": str(target_path),
+                    "mode": "merge",
+                    "indexed_files": stats["indexed_files"],
+                    "ignored_files": stats["ignored_files"],
+                    "failed_files": stats["failed_files"],
+                    "total_files": stats["total_files"],
+                    "by_language": stats["by_language"],
+                    "lexical_rows": lexical_rows,
+                    "semantic_indexed": stats.get("semantic_indexed"),
+                    "semantic_failed": stats.get("semantic_failed"),
+                    "semantic_skipped": stats.get("semantic_skipped"),
+                    "total_embedding_units": stats.get("total_embedding_units"),
+                    "merge_note": (
+                        "Changed/new files updated; deleted files are not purged — "
+                        "FileWatcher handles those on next change, or reindex again after deletions."
+                    ),
+                }
+
+                response = [
+                    types.TextContent(
+                        type="text", text=ensure_response(response_data)
+                    )
+                ]
+            else:
+                # Reindex the default allowed root
+                stats = dispatcher.index_directory(target_path, recursive=True)
+                lexical_rows = sqlite_store.rebuild_fts_code() if sqlite_store else 0
+
+                response_data = {
+                    "path": str(target_path),
                     "mode": "merge",
                     "indexed_files": stats["indexed_files"],
                     "ignored_files": stats["ignored_files"],
@@ -1315,7 +1430,7 @@ async def call_tool(
                     )
                 ]
             else:
-                db_path = sqlite_store.db_path if sqlite_store else "code_index.db"
+                db_path = _require_sqlite_store_db_path()
                 limit_arg = int((arguments or {}).get("limit", 500))
                 model_used = lazy_summarizer._get_model_name()
 
@@ -1367,7 +1482,7 @@ async def call_tool(
                 n_arg = int((arguments or {}).get("n", 3))
                 persist_flag = bool((arguments or {}).get("persist", False))
 
-                db_path = sqlite_store.db_path if sqlite_store else "code_index.db"
+                db_path = _require_sqlite_store_db_path()
                 model_used = lazy_summarizer._get_model_name()
 
                 # Resolve file rows.

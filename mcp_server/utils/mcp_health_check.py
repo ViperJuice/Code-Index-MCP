@@ -12,6 +12,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from mcp_server.core.path_utils import PathUtils
+
 logger = logging.getLogger(__name__)
 
 
@@ -120,7 +122,7 @@ class MCPDiagnostics:
             config_locations = [
                 Path.cwd() / ".mcp.json",
                 Path.home() / ".mcp.json",
-                Path("PathUtils.get_workspace_root()/.mcp.json"),
+                PathUtils.get_workspace_root() / ".mcp.json",
             ]
 
             config_path = None

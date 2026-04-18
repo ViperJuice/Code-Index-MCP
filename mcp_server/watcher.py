@@ -1,4 +1,7 @@
+import asyncio
 import logging
+import threading
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -9,13 +12,70 @@ from .core.path_resolver import PathResolver
 from .dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from .plugins.language_registry import get_all_extensions
 
-# Note: We've removed ignore pattern checks - ALL files are indexed locally
-# from .core.ignore_patterns import should_ignore_file
-
 logger = logging.getLogger(__name__)
+
+# Directory names whose contents we never want to reindex. Matching is done
+# against the path parts, so a nested ".git/objects/…" is skipped just as
+# reliably as a top-level ".git/…".
+_EXCLUDED_DIR_PARTS: frozenset[str] = frozenset(
+    {
+        ".git",
+        "node_modules",
+        "__pycache__",
+        ".venv",
+        "venv",
+        ".mcp-index",
+        ".indexes",
+        ".tox",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".mypy_cache",
+        "dist",
+        "build",
+        ".next",
+        ".nuxt",
+        "target",          # rust
+        ".gradle",
+        ".idea",
+        ".vscode",
+        "coverage",
+        "htmlcov",
+    }
+)
+
+
+def _is_excluded(path: Path) -> bool:
+    """Return True when `path` lies under a directory we should ignore."""
+    try:
+        parts = path.parts
+    except Exception:
+        return True
+    return any(part in _EXCLUDED_DIR_PARTS for part in parts)
+
+
+def _swallow_task_exception(task: asyncio.Task) -> None:
+    """Surface asyncio.create_task failures instead of silently dropping them."""
+    try:
+        exc = task.exception()
+    except asyncio.CancelledError:
+        return
+    except Exception:
+        return
+    if exc is not None:
+        logger.error("Background cache-invalidation task failed", exc_info=exc)
 
 
 class _Handler(FileSystemEventHandler):
+    """Watchdog handler with path-level debouncing.
+
+    Every file event is coalesced into a per-path "pending action" that fires
+    after a quiet window. This prevents rebase/checkout/merge storms from
+    generating thousands of dispatcher calls.
+    """
+
+    DEBOUNCE_SECONDS = 0.5
+    DRAIN_TICK_SECONDS = 0.1
+
     def __init__(
         self,
         dispatcher: EnhancedDispatcher,
@@ -25,118 +85,143 @@ class _Handler(FileSystemEventHandler):
         self.dispatcher = dispatcher
         self.query_cache = query_cache
         self.path_resolver = path_resolver or PathResolver()
-        # Track supported file extensions - dynamically get all supported extensions
         self.code_extensions = get_all_extensions()
 
-    async def invalidate_cache_for_file(self, path: Path):
-        """Invalidate cache entries that depend on the changed file."""
-        if self.query_cache:
-            try:
-                count = await self.query_cache.invalidate_file_queries(str(path))
-                if count > 0:
-                    logger.debug(f"Invalidated {count} cache entries for file {path}")
-            except Exception as e:
-                logger.error(f"Error invalidating cache for {path}: {e}")
+        # Pending per-path action: path -> (due_monotonic, action, extra)
+        # actions: "reindex", "remove", "move" (extra = destination Path)
+        self._pending: dict[Path, tuple[float, str, Optional[Path]]] = {}
+        self._lock = threading.Lock()
+        self._stop_event = threading.Event()
+        self._worker = threading.Thread(
+            target=self._drain_loop, daemon=True, name="mcp-watcher-debounce"
+        )
+        self._worker.start()
 
-    def trigger_reindex(self, path: Path):
-        """Trigger re-indexing of a single file through the dispatcher."""
+    # ------------------------------------------------------------------
+    # Debounce queue
+
+    def _enqueue(self, path: Path, action: str, extra: Optional[Path] = None) -> None:
+        if _is_excluded(path) or (extra is not None and _is_excluded(extra)):
+            return
+        with self._lock:
+            self._pending[path] = (
+                time.monotonic() + self.DEBOUNCE_SECONDS,
+                action,
+                extra,
+            )
+
+    def _drain_loop(self) -> None:
+        while not self._stop_event.is_set():
+            now = time.monotonic()
+            ready: list[tuple[Path, str, Optional[Path]]] = []
+            with self._lock:
+                # Iterate over a copy so we can delete as we go.
+                for path, (due_at, action, extra) in list(self._pending.items()):
+                    if due_at <= now:
+                        ready.append((path, action, extra))
+                        del self._pending[path]
+
+            for path, action, extra in ready:
+                try:
+                    if action == "reindex":
+                        self._trigger_reindex(path)
+                    elif action == "remove":
+                        self._remove_file_from_index(path)
+                    elif action == "move" and extra is not None:
+                        self._handle_file_move(path, extra)
+                except Exception:
+                    logger.exception(
+                        "watcher drain failed for %s (action=%s)", path, action
+                    )
+            self._stop_event.wait(self.DRAIN_TICK_SECONDS)
+
+    def stop(self) -> None:
+        """Stop the debounce worker. Idempotent."""
+        self._stop_event.set()
+        self._worker.join(timeout=2)
+
+    # ------------------------------------------------------------------
+    # Dispatcher-side actions (run on the worker thread)
+
+    async def _invalidate_cache_for_file(self, path: Path) -> None:
+        if not self.query_cache:
+            return
         try:
-            if path.suffix in self.code_extensions:
-                logger.info(f"Triggering re-index for {path}")
-                self.dispatcher.remove_file(path)
-                self.dispatcher.index_file(path)
+            count = await self.query_cache.invalidate_file_queries(str(path))
+            if count > 0:
+                logger.debug("Invalidated %d cache entries for %s", count, path)
+        except Exception:
+            logger.exception("Cache invalidation failed for %s", path)
 
-                # Invalidate cache entries for this file
-                if self.query_cache:
-                    import asyncio
-
-                    try:
-                        # Run cache invalidation in background
-                        loop = asyncio.get_event_loop()
-                        if loop.is_running():
-                            asyncio.create_task(self.invalidate_cache_for_file(path))
-                        else:
-                            asyncio.run(self.invalidate_cache_for_file(path))
-                    except Exception as e:
-                        logger.warning(f"Failed to invalidate cache for {path}: {e}")
-        except Exception as e:
-            logger.error(f"Error re-indexing {path}: {e}")
-
-    def remove_file_from_index(self, path: Path):
-        """Remove a file from all indexes."""
+    def _kick_cache_invalidation(self, path: Path) -> None:
+        if not self.query_cache:
+            return
         try:
-            if path.suffix in self.code_extensions:
-                logger.info(f"Removing file from index: {path}")
-                self.dispatcher.remove_file(path)
-
-                # Invalidate cache entries for this file
-                if self.query_cache:
-                    import asyncio
-
-                    try:
-                        loop = asyncio.get_event_loop()
-                        if loop.is_running():
-                            asyncio.create_task(self.invalidate_cache_for_file(path))
-                        else:
-                            asyncio.run(self.invalidate_cache_for_file(path))
-                    except Exception as e:
-                        logger.warning(f"Failed to invalidate cache for {path}: {e}")
-        except Exception as e:
-            logger.error(f"Error removing {path} from index: {e}")
-
-    def handle_file_move(self, old_path: Path, new_path: Path):
-        """Handle file move operations efficiently."""
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = None
         try:
-            if old_path.suffix in self.code_extensions and new_path.suffix in self.code_extensions:
-                # Compute content hash to check if file actually changed
-                if new_path.exists():
-                    content_hash = self.path_resolver.compute_content_hash(new_path)
-                    logger.info(f"Moving file in index: {old_path} -> {new_path}")
-                    self.dispatcher.move_file(old_path, new_path, content_hash)
-                else:
-                    # New path doesn't exist, just remove old
-                    self.remove_file_from_index(old_path)
-        except Exception as e:
-            logger.error(f"Error handling file move {old_path} -> {new_path}: {e}")
+            if loop is not None and loop.is_running():
+                task = asyncio.ensure_future(self._invalidate_cache_for_file(path), loop=loop)
+                task.add_done_callback(_swallow_task_exception)
+            else:
+                asyncio.run(self._invalidate_cache_for_file(path))
+        except Exception:
+            logger.exception("Failed to schedule cache invalidation for %s", path)
 
-    def on_any_event(self, event):
-        """Handle any file system event and trigger re-indexing for code files."""
+    def _trigger_reindex(self, path: Path) -> None:
+        if path.suffix not in self.code_extensions:
+            return
+        if not path.exists():
+            return
+        logger.info("Re-indexing %s", path)
+        self.dispatcher.remove_file(path)
+        self.dispatcher.index_file(path)
+        self._kick_cache_invalidation(path)
+
+    def _remove_file_from_index(self, path: Path) -> None:
+        if path.suffix not in self.code_extensions:
+            return
+        logger.info("Removing from index: %s", path)
+        self.dispatcher.remove_file(path)
+        self._kick_cache_invalidation(path)
+
+    def _handle_file_move(self, old_path: Path, new_path: Path) -> None:
+        if (
+            old_path.suffix not in self.code_extensions
+            or new_path.suffix not in self.code_extensions
+        ):
+            return
+        if not new_path.exists():
+            self._remove_file_from_index(old_path)
+            return
+        content_hash = self.path_resolver.compute_content_hash(new_path)
+        logger.info("Moving in index: %s -> %s", old_path, new_path)
+        self.dispatcher.move_file(old_path, new_path, content_hash)
+        self._kick_cache_invalidation(new_path)
+
+    # ------------------------------------------------------------------
+    # Watchdog event entry point
+
+    def on_any_event(self, event) -> None:
         if event.is_directory:
             return
 
-        path = Path(event.src_path)
+        src = Path(event.src_path)
+        if _is_excluded(src):
+            return
 
-        # For creation and modification events, trigger re-indexing
-        if event.event_type in ("created", "modified"):
-            if path.suffix in self.code_extensions and path.exists():
-                self.trigger_reindex(path)
-
-        # For move events, handle both source and destination
-        elif event.event_type == "moved":
-            old_path = Path(event.src_path)
-            new_path = Path(event.dest_path)
-            self.handle_file_move(old_path, new_path)
-
-        # For deletion events, remove from index
-        elif event.event_type == "deleted":
-            if path.suffix in self.code_extensions:
-                self.remove_file_from_index(path)
-
-    def on_modified(self, event):
-        """Handle file modification events."""
-        # Let on_any_event handle this
-
-    def on_deleted(self, event):
-        """Handle file deletion events."""
-        # Let on_any_event handle this
-
-    def on_moved(self, event):
-        """Handle file move events."""
-        # Let on_any_event handle this
-
-    def on_created(self, event):
-        """Handle file creation events."""
-        # Let on_any_event handle this
+        etype = event.event_type
+        if etype in ("created", "modified"):
+            if src.suffix in self.code_extensions:
+                self._enqueue(src, "reindex")
+        elif etype == "moved":
+            dest = Path(event.dest_path)
+            if src.suffix in self.code_extensions or dest.suffix in self.code_extensions:
+                self._enqueue(src, "move", extra=dest)
+        elif etype == "deleted":
+            if src.suffix in self.code_extensions:
+                self._enqueue(src, "remove")
 
 
 class FileWatcher:
@@ -148,13 +233,13 @@ class FileWatcher:
         path_resolver: Optional[PathResolver] = None,
     ):
         self._observer = Observer()
-        self._observer.schedule(
-            _Handler(dispatcher, query_cache, path_resolver), str(root), recursive=True
-        )
+        self._handler = _Handler(dispatcher, query_cache, path_resolver)
+        self._observer.schedule(self._handler, str(root), recursive=True)
 
-    def start(self):
+    def start(self) -> None:
         self._observer.start()
 
-    def stop(self):
+    def stop(self) -> None:
         self._observer.stop()
         self._observer.join(timeout=5)
+        self._handler.stop()

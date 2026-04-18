@@ -12,6 +12,8 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from mcp_server.core.path_utils import PathUtils
+
 logger = logging.getLogger(__name__)
 
 
@@ -34,7 +36,7 @@ class MCPConfigPropagator:
         search_paths = [
             Path.cwd() / ".mcp.json",
             Path.home() / ".mcp.json",
-            Path("PathUtils.get_workspace_root()/.mcp.json"),
+            PathUtils.get_workspace_root() / ".mcp.json",
         ]
 
         for path in search_paths:

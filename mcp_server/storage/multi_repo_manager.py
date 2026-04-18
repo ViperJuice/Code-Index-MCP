@@ -105,7 +105,7 @@ class MultiRepositoryManager:
             central_index_path: Path to central repository registry
             max_workers: Maximum parallel search workers
         """
-        self.central_index_path = central_index_path or self._get_default_registry_path()
+        self.central_index_path = Path(central_index_path) if central_index_path else self._get_default_registry_path()
         self.max_workers = max_workers
 
         # Repository registry
@@ -244,6 +244,87 @@ class MultiRepositoryManager:
             logger.error(f"Error analyzing repository: {e}")
 
         return stats
+
+    @classmethod
+    def resolve_repo_id(cls, repository: str) -> str:
+        """
+        Canonicalize a repository identifier (id / URL / filesystem path) to a repo_id.
+
+        Accepts any of:
+          - a 16-char lowercase hex repo_id (returned unchanged)
+          - a git remote URL (hashed)
+          - a filesystem path (git remote looked up, else path hash)
+
+        The hashing scheme matches `_generate_repository_id` so repos registered
+        by path resolve to the same id here.
+        """
+        if not repository:
+            raise ValueError("repository must be a non-empty string")
+
+        candidate = repository.strip()
+
+        # Already a repo_id?
+        if len(candidate) == 16 and all(c in "0123456789abcdef" for c in candidate.lower()):
+            return candidate.lower()
+
+        # Git URL?
+        url_prefixes = ("git@", "http://", "https://", "ssh://", "git://")
+        if candidate.startswith(url_prefixes):
+            return hashlib.sha256(candidate.encode()).hexdigest()[:16]
+
+        # Filesystem path: try git remote first, fall back to path hash.
+        path = Path(candidate).expanduser()
+        if path.exists():
+            try:
+                import subprocess
+
+                result = subprocess.run(
+                    ["git", "config", "--get", "remote.origin.url"],
+                    cwd=path,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                url = result.stdout.strip()
+                if url:
+                    return hashlib.sha256(url.encode()).hexdigest()[:16]
+            except Exception:
+                pass
+            return hashlib.sha256(str(path.absolute()).encode()).hexdigest()[:16]
+
+        # Last resort: treat the input as an opaque string and hash it.
+        return hashlib.sha256(candidate.encode()).hexdigest()[:16]
+
+    def is_repo_authorized(self, repository_id: str) -> bool:
+        """
+        Check whether a repository may be queried.
+
+        Policy:
+          - Repo must be present in the registry (and active).
+          - If MCP_REFERENCE_REPOS is set, the repo_id must also appear in that
+            comma-separated allowlist (entries may be repo_ids, paths, or URLs;
+            each is normalized via resolve_repo_id).
+          - If MCP_REFERENCE_REPOS is unset or empty, any registered repo is allowed.
+        """
+        repo = self.registry.get(repository_id)
+        if not repo or not repo.active:
+            return False
+
+        allowlist_raw = os.environ.get("MCP_REFERENCE_REPOS", "").strip()
+        if not allowlist_raw:
+            return True
+
+        allowed_ids = set()
+        for entry in allowlist_raw.split(","):
+            entry = entry.strip()
+            if not entry:
+                continue
+            try:
+                allowed_ids.add(self.resolve_repo_id(entry))
+            except Exception:
+                continue
+
+        return repository_id in allowed_ids
 
     def unregister_repository(self, repository_id: str):
         """
