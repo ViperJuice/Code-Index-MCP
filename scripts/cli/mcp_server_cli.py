@@ -25,6 +25,7 @@ import mcp.types as types
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 
+from mcp_server.core.ignore_patterns import build_walker_filter
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher
 from mcp_server.watcher import FileWatcher
@@ -369,12 +370,10 @@ async def initialize_services():
         if _auto_index:
             _max_files = int(os.getenv("MCP_AUTO_INDEX_MAX_FILES", "100000"))
             _file_count = 0
+            _is_excluded = build_walker_filter(current_dir)
             # followlinks=False (default, made explicit) keeps us cycle-safe.
             for _root, _dirs, _files in os.walk(current_dir, followlinks=False):
-                _dirs[:] = [
-                    d for d in _dirs
-                    if d not in {".git", "node_modules", "__pycache__", ".venv", "venv"}
-                ]
+                _dirs[:] = [d for d in _dirs if not _is_excluded(Path(_root) / d)]
                 _file_count += len(_files)
                 if _file_count > _max_files:
                     break

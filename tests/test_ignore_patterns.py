@@ -196,8 +196,8 @@ class TestWalkerIntegration:
     """Integration: EnhancedDispatcher.index_directory respects the walker filter."""
 
     def test_log_files_not_indexed(self, tmp_path):
-        import os
         from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
+        from mcp_server.storage.sqlite_store import SQLiteStore
 
         # Create a minimal git-like structure
         (tmp_path / "src").mkdir()
@@ -205,7 +205,8 @@ class TestWalkerIntegration:
         (tmp_path / "app.log").write_text("log line\n")
         (tmp_path / ".gitignore").write_text("*.log\n")
 
-        dispatcher = EnhancedDispatcher(tmp_path)
+        store = SQLiteStore(str(tmp_path / "test_index.db"))
+        dispatcher = EnhancedDispatcher(sqlite_store=store)
         stats = dispatcher.index_directory(tmp_path, recursive=True)
 
         # .log file should be ignored (by gitignore) — indexed_files should not include it

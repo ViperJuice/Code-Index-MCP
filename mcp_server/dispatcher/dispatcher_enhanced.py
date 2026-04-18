@@ -11,7 +11,11 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from ..artifacts.semantic_profiles import SemanticProfileRegistry
 from ..config.settings import reload_settings
-from ..core.ignore_patterns import IgnorePatternManager
+from ..core.ignore_patterns import (
+    IgnorePatternManager,
+    build_walker_filter,
+    EXCLUDED_DIR_PARTS as _INDEX_EXCLUDED_DIRS,
+)
 from ..graph import (
     CHUNKER_AVAILABLE,
     ContextSelector,
@@ -43,25 +47,6 @@ from .result_aggregator import (
 
 logger = logging.getLogger(__name__)
 
-_INDEX_EXCLUDED_DIRS = {
-    ".git",
-    ".hg",
-    ".svn",
-    ".venv",
-    "venv",
-    "node_modules",
-    "dist",
-    "build",
-    "htmlcov",
-    "__pycache__",
-    ".mypy_cache",
-    ".pytest_cache",
-    ".indexes",
-    ".mcp-index",
-    "qdrant_storage",
-    "vector_index.qdrant",
-    "code_index_mcp.egg-info",
-}
 
 _INDEX_EXCLUDED_FILENAMES = {
     "full_indexing_log.txt",
@@ -1665,6 +1650,8 @@ class EnhancedDispatcher:
             "by_language": {},
         }
 
+        is_excluded = build_walker_filter(directory)
+
         # Walk directory while pruning excluded directories early.
         if recursive:
 
@@ -1686,9 +1673,6 @@ class EnhancedDispatcher:
         # Collect paths that were successfully indexed for batch semantic embedding
         semantically_indexed_paths: List[Path] = []
 
-        # Instantiate once per index_directory call to avoid stale root between reindex calls
-        ignore_mgr = IgnorePatternManager(directory)
-
         for path in iter_files():
             if not path.is_file():
                 continue
@@ -1698,10 +1682,7 @@ class EnhancedDispatcher:
             relative_parts = (
                 path.relative_to(directory).parts if path.is_relative_to(directory) else path.parts
             )
-            if any(
-                part in _INDEX_EXCLUDED_DIRS or part.endswith(".egg-info")
-                for part in relative_parts
-            ):
+            if any(part.endswith(".egg-info") for part in relative_parts):
                 stats["ignored_files"] += 1
                 continue
 
@@ -1713,7 +1694,7 @@ class EnhancedDispatcher:
                 stats["ignored_files"] += 1
                 continue
 
-            if ignore_mgr.should_ignore(path):
+            if is_excluded(path):
                 stats["ignored_files"] += 1
                 continue
 

@@ -5,13 +5,70 @@ Utility module for handling ignore patterns from .gitignore and .mcp-index-ignor
 import fnmatch
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 logger = logging.getLogger(__name__)
 
+# Union of _EXCLUDED_DIR_PARTS from watcher.py and _INDEX_EXCLUDED_DIRS from dispatcher_enhanced.py.
+# Nested .gitignore traversal is intentionally out of scope for P1 — future work.
+EXCLUDED_DIR_PARTS: frozenset[str] = frozenset(
+    {
+        # From watcher.py _EXCLUDED_DIR_PARTS
+        ".git",
+        "node_modules",
+        "__pycache__",
+        ".venv",
+        "venv",
+        ".mcp-index",
+        ".indexes",
+        ".tox",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".mypy_cache",
+        "dist",
+        "build",
+        ".next",
+        ".nuxt",
+        "target",
+        ".gradle",
+        ".idea",
+        ".vscode",
+        "coverage",
+        "htmlcov",
+        # From dispatcher_enhanced.py _INDEX_EXCLUDED_DIRS (additions)
+        ".hg",
+        ".svn",
+        "qdrant_storage",
+        "vector_index.qdrant",
+        "code_index_mcp.egg-info",
+    }
+)
+
+
+def build_walker_filter(root: Path) -> Callable[[Path], bool]:
+    """Return a filter function that returns True when a path should be skipped during walking.
+
+    Checks EXCLUDED_DIR_PARTS membership on path parts and delegates to IgnorePatternManager
+    for .gitignore / .mcp-index-ignore patterns. Only root-level .gitignore is read; nested
+    .gitignore traversal is future work.
+    """
+    ignore_mgr = IgnorePatternManager(root)
+
+    def filter_fn(path: Path) -> bool:
+        if any(part in EXCLUDED_DIR_PARTS for part in path.parts):
+            return True
+        return ignore_mgr.should_ignore(path)
+
+    return filter_fn
+
 
 class IgnorePatternManager:
-    """Manages ignore patterns from various sources."""
+    """Manages ignore patterns from .gitignore and .mcp-index-ignore at the repo root.
+
+    Only the root-level .gitignore is read. Nested .gitignore files are not traversed —
+    this is a deliberate P1 scope limitation. Support for nested .gitignore requires
+    adding a pathspec dependency and is tracked as future work.
+    """
 
     def __init__(self, root_path: Path = None):
         """
