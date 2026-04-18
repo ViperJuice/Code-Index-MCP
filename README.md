@@ -229,23 +229,39 @@ The setup script creates the appropriate `.mcp.json` for your environment. Manua
 }
 ```
 
-## 🌍 Using in Another Repo
+## Using Against Many Repos
 
-To index a different repository, point the server's `cwd` at that repo in your Claude Code MCP configuration (`~/.claude/settings.json` or `.mcp.json`):
+Index multiple repositories from a single running server instance.
 
-```json
-{
-  "mcpServers": {
-    "code-index-mcp": {
-      "command": "/abs/path/to/Code-Index-MCP/.venv/bin/python",
-      "args": ["/abs/path/to/Code-Index-MCP/scripts/cli/mcp_server_cli.py"],
-      "cwd": "/abs/path/to/your-repo"
-    }
-  }
-}
+**Prerequisites**: set `MCP_ALLOWED_ROOTS` to a colon-separated list of absolute directory paths that the server is allowed to index before starting the server:
+
+```bash
+export MCP_ALLOWED_ROOTS=/abs/a:/abs/b
 ```
 
-The `cwd` field controls which repository is indexed. On first use the server automatically builds the index in a background thread — the server is immediately responsive while indexing progresses, and `search_code` responses include `"indexing_in_progress": true` until the initial build completes.
+**Start the server** (with secrets via `op run` or plain `python`):
+
+```bash
+op run --env-file=.mcp.env -- python -m mcp_server.cli.server_commands
+```
+
+**Register each repo** — links the repo's worktree to a stable `repo_id` (Tier 1: `git rev-parse --git-common-dir`, so all worktrees of the same repo share one index):
+
+```bash
+mcp-index repository register /abs/a
+mcp-index repository register /abs/b
+```
+
+**Scope queries per repo** — pass `repository=<name>` (registered name or path) to `search_code` / `symbol_lookup`:
+
+```
+search_code(query="def parse", repository="my-repo")
+symbol_lookup(symbol="Parser", repository="my-repo")
+```
+
+**Index tracking**: each repo's default branch is tracked by `MultiRepositoryWatcher` (`RefPoller` every 30 s). Non-default branches and worktrees of the same repo use the same index as the main checkout — `repo_id` is stable across worktree switches.
+
+**Path sandbox**: tools `search_code`, `symbol_lookup`, `summarize_sample`, and `reindex` reject paths outside `MCP_ALLOWED_ROOTS` with error code `path_outside_allowed_roots`. Registered repo names bypass the check.
 
 **Options:**
 - Set `MCP_AUTO_INDEX=false` in the server environment to skip background auto-indexing and call the `reindex` MCP tool manually (recommended for very large repos).
@@ -393,20 +409,13 @@ The generated index files are not meant to live in git history. The repo tracks
 the code, workflow, and configuration needed to build/publish them; GitHub
 artifacts distribute the actual runtime baseline that MCP restores locally.
 
-### Same-Machine Multi-Repo Workflow
-
-For open source users, the recommended multi-repo model is local-first on one
-machine:
+### Local Workspace Management
 
 ```bash
-# Register each local repository once
-mcp-index repository register /path/to/repo-a
-mcp-index repository register /path/to/repo-b
-
-# Inspect repository-level readiness details
+# Inspect all registered repositories and their readiness
 mcp-index repository list -v
 
-# Inspect all registered repositories and their local artifact/runtime readiness
+# Check all registered repos and their local artifact/runtime readiness
 mcp-index artifact workspace-status
 
 # Refresh readiness after restoring or rebuilding local indexes
@@ -415,14 +424,6 @@ mcp-index artifact reconcile-workspace
 # Prepare per-repo local artifact payloads without requiring remote publication
 mcp-index artifact publish-workspace
 ```
-
-Recommended pattern:
-
-1. register each repo checkout once with `mcp-index repository register <path>`
-2. keep each repo checkout self-contained
-3. restore or rebuild local runtime files per repo as needed
-4. use `mcp-index repository list -v` and workspace status/reconcile to see which repos are ready or stale
-5. only use GitHub artifact publication when you actually want to share a repo baseline
 
 ### 🔐 Privacy & GitHub Artifact Sync
 
