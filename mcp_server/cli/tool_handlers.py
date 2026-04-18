@@ -25,6 +25,22 @@ logger = logging.getLogger(__name__)
 DEBUG_MODE = os.getenv("MCP_DEBUG", "0") == "1"
 
 
+def _looks_like_path(x: str) -> bool:
+    """True when x is path-shaped (contains separator or resolves to existing entity).
+
+    Returns False for plain repo names/aliases with no path separators.
+    Contract consumed verbatim by SL-3.
+    """
+    if not x:
+        return False
+    if "/" in x or "\\" in x:
+        return True
+    try:
+        return Path(x).exists()
+    except Exception:
+        return False
+
+
 def _ensure_response(data: Any) -> str:
     """Ensure response is never empty and always valid JSON."""
     if data is None:
@@ -94,7 +110,19 @@ async def handle_symbol_lookup(
             {"error": "Missing parameter", "details": "'symbol' parameter is required"}
         ))]
 
-    ctx = _resolve_ctx(repo_resolver, (arguments or {}).get("repository"))
+    repository = (arguments or {}).get("repository")
+    if repository and _looks_like_path(repository):
+        allowed = _allowed_roots()
+        if not _path_within_allowed(Path(repository), allowed):
+            return [types.TextContent(type="text", text=_ensure_response({
+                "error": "Path outside allowed roots",
+                "code": "path_outside_allowed_roots",
+                "path": str(Path(repository).resolve()),
+                "allowed_roots": [str(r) for r in allowed],
+                "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
+            }))]
+
+    ctx = _resolve_ctx(repo_resolver, repository)
 
     try:
         if ctx is not None:
@@ -158,6 +186,17 @@ async def handle_search_code(
     fuzzy = (arguments or {}).get("fuzzy", False)
     limit = (arguments or {}).get("limit", 20)
     repository = (arguments or {}).get("repository")
+
+    if repository and _looks_like_path(repository):
+        allowed = _allowed_roots()
+        if not _path_within_allowed(Path(repository), allowed):
+            return [types.TextContent(type="text", text=_ensure_response({
+                "error": "Path outside allowed roots",
+                "code": "path_outside_allowed_roots",
+                "path": str(Path(repository).resolve()),
+                "allowed_roots": [str(r) for r in allowed],
+                "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
+            }))]
 
     # Resolve ctx via RepoResolver (replaces old multi-repo bypass)
     ctx = _resolve_ctx(repo_resolver, repository)
@@ -548,6 +587,18 @@ async def handle_summarize_sample(
     persist_flag = bool((arguments or {}).get("persist", False))
     db_path = sqlite_store.db_path
     model_used = lazy_summarizer._get_model_name()
+
+    if paths_arg:
+        allowed = _allowed_roots()
+        for p in paths_arg:
+            if _looks_like_path(p) and not _path_within_allowed(Path(p), allowed):
+                return [types.TextContent(type="text", text=_ensure_response({
+                    "error": "Path outside allowed roots",
+                    "code": "path_outside_allowed_roots",
+                    "path": str(Path(p).resolve()),
+                    "allowed_roots": [str(r) for r in allowed],
+                    "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
+                }))]
 
     with _sqlite3.connect(db_path) as _conn:
         if paths_arg:
