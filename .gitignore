@@ -177,4 +177,5 @@ coverage.xml
 
 # execute-phase artifacts
 .worktrees/
+.claude/worktrees/
 .claude/execute-phase-state.json
