@@ -1,8 +1,11 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Iterable
+from typing import TYPE_CHECKING, Iterable
 
 from typing_extensions import TypedDict
+
+if TYPE_CHECKING:
+    from mcp_server.core.repo_context import RepoContext
 
 
 class IndexShard(TypedDict):
@@ -84,6 +87,17 @@ class IPlugin(ABC):
     def language(self) -> str:
         """Return the language identifier."""
         return self.lang
+
+    def bind(self, ctx: "RepoContext") -> None:  # type: ignore[name-defined]
+        """P3 IF-0-P3-3: attach a RepoContext to this plugin instance.
+
+        Default no-op. Plugins that need per-repo state (store, cache, etc.)
+        override this; ``PluginFactory.create_plugin`` calls it post-construction
+        iff the caller passed a context. Kept as a method rather than a
+        constructor change so legacy fixtures that build plugins with no args
+        keep working.
+        """
+        return None
 
     @abstractmethod
     def supports(self, path: str | Path) -> bool: ...

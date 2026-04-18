@@ -13,11 +13,14 @@ tree-sitter based plugins for languages without specific implementations.
 
 import logging
 from pathlib import Path
-from typing import Callable, Dict, Optional, Type, Union
+from typing import TYPE_CHECKING, Callable, Dict, Optional, Type, Union
 
 from ..storage.sqlite_store import SQLiteStore
 from .generic_treesitter_plugin import GenericTreeSitterPlugin
 from .language_registry import LANGUAGE_CONFIGS, get_language_by_extension
+
+if TYPE_CHECKING:
+    from ..core.repo_context import RepoContext
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +151,8 @@ class PluginFactory:
         language: str,
         sqlite_store: Optional[SQLiteStore] = None,
         enable_semantic: bool = True,
+        *,
+        ctx: Optional["RepoContext"] = None,
     ):
         """Create appropriate plugin for the language.
 
@@ -155,6 +160,10 @@ class PluginFactory:
             language: Language code (e.g., 'python', 'go', 'rust')
             sqlite_store: Optional SQLite storage
             enable_semantic: Whether to enable semantic search
+            ctx: P3 IF-0-P3-5 — optional RepoContext. When provided, the factory
+                calls ``plugin.bind(ctx)`` post-construction so the plugin can
+                attach per-repo state. SL-1/SL-3/SL-5 preserve this hook through
+                their rewrites.
 
         Returns:
             Plugin instance
@@ -165,6 +174,8 @@ class PluginFactory:
         # Normalize language name
         language = language.lower().replace("-", "_")
 
+        plugin = None
+
         # Check for language-specific implementation first
         if language in SPECIFIC_PLUGINS:
             logger.info(f"Using specific plugin for {language}")
@@ -172,24 +183,28 @@ class PluginFactory:
             # Check if it's a callable (factory function) or a class
             if callable(plugin_class_or_factory) and not isinstance(plugin_class_or_factory, type):
                 # It's a factory function
-                return plugin_class_or_factory(
+                plugin = plugin_class_or_factory(
                     sqlite_store=sqlite_store, enable_semantic=enable_semantic
                 )
             else:
                 # It's a class
-                return plugin_class_or_factory(sqlite_store=sqlite_store)
-
+                plugin = plugin_class_or_factory(sqlite_store=sqlite_store)
         # Check if language is supported by generic plugin
-        if language in LANGUAGE_CONFIGS:
+        elif language in LANGUAGE_CONFIGS:
             logger.info(f"Using generic plugin for {language}")
             config = LANGUAGE_CONFIGS[language]
-            return GenericTreeSitterPlugin(config, sqlite_store, enable_semantic)
+            plugin = GenericTreeSitterPlugin(config, sqlite_store, enable_semantic)
+        else:
+            # Language not supported
+            supported = sorted(list(SPECIFIC_PLUGINS.keys()) + list(LANGUAGE_CONFIGS.keys()))
+            raise ValueError(
+                f"Unsupported language: {language}. " f"Supported languages: {', '.join(supported)}"
+            )
 
-        # Language not supported
-        supported = sorted(list(SPECIFIC_PLUGINS.keys()) + list(LANGUAGE_CONFIGS.keys()))
-        raise ValueError(
-            f"Unsupported language: {language}. " f"Supported languages: {', '.join(supported)}"
-        )
+        # IF-0-P3-5 post-construction hook
+        if ctx is not None and hasattr(plugin, "bind"):
+            plugin.bind(ctx)
+        return plugin
 
     @classmethod
     def get_plugin(

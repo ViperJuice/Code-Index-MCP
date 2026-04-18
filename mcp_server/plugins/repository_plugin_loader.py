@@ -8,6 +8,7 @@ reducing memory usage by loading only required language plugins.
 import logging
 import os
 import sqlite3
+import threading
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
@@ -70,6 +71,10 @@ class RepositoryPluginLoader:
 
         # Repository profiles cache
         self._profiles: Dict[str, RepositoryProfile] = {}
+        # IF-0-P3-5 — SL-2 wraps _profiles reads/writes under this per-key lock map
+        # (currently unused by SL-0; declared up-front so SL-2 and any concurrent
+        # consumer agree on the attribute name).
+        self._profiles_lock = threading.Lock()
         self._loaded_plugins: Dict[str, Any] = {}
 
         # Language to plugin mapping
