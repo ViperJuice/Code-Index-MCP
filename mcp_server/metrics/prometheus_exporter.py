@@ -4,7 +4,7 @@ Provides detailed metrics for monitoring and alerting.
 """
 
 import logging
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional, Tuple
 
 try:
     from prometheus_client import (  # type: ignore
@@ -15,6 +15,7 @@ try:
         Histogram,
         Info,
         generate_latest,
+        start_http_server,
     )
     from prometheus_client.core import GaugeMetricFamily  # type: ignore
 
@@ -48,8 +49,30 @@ except ImportError:  # pragma: no cover - optional dependency
     def generate_latest(registry: CollectorRegistry | None = None) -> bytes:
         return b""
 
+    def start_http_server(port: int, addr: str = "0.0.0.0", registry: Any = None) -> None:  # type: ignore
+        return None
+
 
 logger = logging.getLogger(__name__)
+
+# Module-level counter registered on the default registry so it is always
+# accessible regardless of which PrometheusExporter instance is active.
+mcp_tool_calls_total = Counter(
+    "mcp_tool_calls_total",
+    "MCP tool call counter",
+    ["tool", "status"],
+)
+
+
+def record_tool_call(tool: str, status: str) -> None:
+    """Increment mcp_tool_calls_total for the given tool/status label pair."""
+    if not PROMETHEUS_AVAILABLE:
+        logger.warning("prometheus_client unavailable; record_tool_call is a no-op")
+        return
+    try:
+        mcp_tool_calls_total.labels(tool=tool, status=status).inc()
+    except Exception as exc:  # pragma: no cover
+        logger.warning("record_tool_call failed: %s", exc)
 
 
 class PrometheusExporter:
@@ -63,6 +86,9 @@ class PrometheusExporter:
             registry: Prometheus collector registry
         """
         self.registry = registry or CollectorRegistry()
+        self._started_port: Optional[int] = None
+        self._server: Any = None
+        self._server_thread: Any = None
         if not PROMETHEUS_AVAILABLE:
             logger.warning("prometheus_client is not available; exporting metrics as no-ops")
         self._initialize_metrics()
@@ -233,6 +259,50 @@ class PrometheusExporter:
 
         # Info metric
         self.build_info = Info("mcp_build", "Build information", registry=self.registry)
+
+    def start(self, port: int) -> None:
+        """Start the Prometheus HTTP metrics server on the given port (idempotent)."""
+        if not PROMETHEUS_AVAILABLE:
+            logger.warning("prometheus_client unavailable; PrometheusExporter.start is a no-op")
+            return
+        if self._started_port is not None:
+            if self._started_port == port:
+                logger.debug("PrometheusExporter already started on port %d; no-op", port)
+            else:
+                logger.warning(
+                    "PrometheusExporter already started on port %d; ignoring request to bind %d",
+                    self._started_port,
+                    port,
+                )
+            return
+        try:
+            result = start_http_server(port, registry=self.registry)
+            if isinstance(result, tuple) and len(result) == 2:
+                self._server, self._server_thread = result
+            self._started_port = port
+            logger.info("PrometheusExporter HTTP server started on port %d", port)
+        except OSError as exc:
+            logger.warning("PrometheusExporter could not bind port %d: %s", port, exc)
+
+    def stop(self) -> None:
+        """Stop the Prometheus HTTP metrics server (best-effort)."""
+        if not PROMETHEUS_AVAILABLE:
+            logger.warning("prometheus_client unavailable; PrometheusExporter.stop is a no-op")
+            return
+        if self._started_port is None:
+            return
+        try:
+            if self._server is not None:
+                self._server.shutdown()
+            if self._server_thread is not None:
+                self._server_thread.join(timeout=5)
+        except Exception as exc:  # pragma: no cover
+            logger.warning("PrometheusExporter.stop encountered an error: %s", exc)
+        finally:
+            self._server = None
+            self._server_thread = None
+            self._started_port = None
+            logger.info("PrometheusExporter HTTP server stopped")
 
     def record_request(self, method: str, endpoint: str, status: int, duration: float):
         """Record HTTP request metrics."""
