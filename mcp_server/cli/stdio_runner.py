@@ -20,6 +20,7 @@ from mcp.server.stdio import stdio_server
 
 from mcp_server.cli.bootstrap import initialize_stateless_services, timeout
 from mcp_server.cli import tool_handlers
+from mcp_server.cli.handshake import HandshakeGate
 from mcp_server.watcher_multi_repo import MultiRepositoryWatcher
 from mcp_server.watcher.ref_poller import RefPoller
 
@@ -120,6 +121,15 @@ def _build_tool_list() -> list[types.Tool]:
                 },
             },
         ),
+        types.Tool(
+            name="handshake",
+            description="Authenticate with the server using the configured secret. Required before other tools when MCP_CLIENT_SECRET is set.",
+            inputSchema={
+                "type": "object",
+                "properties": {"secret": {"type": "string"}},
+                "required": ["secret"],
+            },
+        ),
     ]
 
 
@@ -178,6 +188,12 @@ async def _serve(registry_path=None) -> None:
         logger.warning(f"MultiRepositoryWatcher failed to start: {_watcher_err}")
         multi_watcher = None
         ref_poller = None
+
+    # Optional client handshake gate — closure-scoped so each _serve() invocation
+    # gets a fresh instance (required for test isolation).
+    gate = HandshakeGate()
+    if not gate.enabled:
+        logger.warning("running unauthenticated \u2014 MCP_CLIENT_SECRET not set")
 
     # Per-process mutable state for lazy indexing
     plugin_manager: Optional[PluginManager] = None
@@ -366,6 +382,11 @@ async def _serve(registry_path=None) -> None:
         elif lazy_summarizer is not None and _current_session is not None:
             lazy_summarizer.update_session(_current_session)
 
+        # Gate check before logging to avoid leaking the handshake secret.
+        _gate_err = gate.check(name, arguments or {})
+        if _gate_err is not None:
+            return [types.TextContent(type="text", text=tool_handlers._ensure_response(_gate_err))]
+
         logger.info(f"=== MCP Tool Call: {name} args={arguments} ===")
         start_time = time.time()
 
@@ -376,7 +397,16 @@ async def _serve(registry_path=None) -> None:
         )
 
         try:
-            if name == "symbol_lookup":
+            if name == "handshake":
+                _secret = (arguments or {}).get("secret", "")
+                if gate.verify(_secret):
+                    response = [types.TextContent(type="text", text=tool_handlers._ensure_response({"authenticated": True}))]
+                else:
+                    response = [types.TextContent(type="text", text=tool_handlers._ensure_response({
+                        "error": "Invalid secret.",
+                        "code": "handshake_required",
+                    }))]
+            elif name == "symbol_lookup":
                 response = await tool_handlers.handle_symbol_lookup(
                     **common_kwargs,
                     sqlite_store=sqlite_store,
@@ -435,6 +465,7 @@ async def _serve(registry_path=None) -> None:
                     "available_tools": [
                         "symbol_lookup", "search_code", "get_status",
                         "list_plugins", "reindex", "write_summaries", "summarize_sample",
+                        "handshake",
                     ],
                 }))]
         except Exception as e:
