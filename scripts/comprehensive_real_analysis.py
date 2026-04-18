@@ -653,7 +653,7 @@ class ComprehensiveRealAnalyzer:
 
 def main():
     """Run comprehensive real analysis"""
-    workspace_path = Path("PathUtils.get_workspace_root()")
+    workspace_path = PathUtils.get_workspace_root()
     analyzer = ComprehensiveRealAnalyzer(workspace_path)
     
     print("Starting Comprehensive Real MCP vs Native Analysis")

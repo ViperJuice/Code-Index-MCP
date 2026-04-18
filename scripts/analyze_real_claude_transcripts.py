@@ -788,7 +788,7 @@ def main():
     parser.add_argument('--session-type', type=str, default="claude_code",
                        help='Session type identifier')
     parser.add_argument('--output-dir', type=Path, 
-                       default=Path("PathUtils.get_workspace_root()/enhanced_analysis_results"),
+                       default=PathUtils.get_workspace_root() / "enhanced_analysis_results",
                        help='Output directory for results')
     parser.add_argument('--legacy', action='store_true',
                        help='Use legacy analysis method')

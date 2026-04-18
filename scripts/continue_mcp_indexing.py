@@ -28,7 +28,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # MCP server path
-MCP_SERVER_PATH = Path("PathUtils.get_workspace_root()/scripts/cli/mcp_server_cli.py")
+MCP_SERVER_PATH = PathUtils.get_workspace_root() / "scripts/cli/mcp_server_cli.py"
 
 
 def load_indexing_status():
@@ -48,7 +48,7 @@ def save_indexing_status(status):
 
 def find_test_repositories() -> List[Dict[str, Any]]:
     """Find all test repositories."""
-    test_repos_dir = Path("PathUtils.get_workspace_root()/test_repos")
+    test_repos_dir = PathUtils.get_workspace_root() / "test_repos"
     repos = []
     
     for git_dir in sorted(test_repos_dir.rglob(".git")):

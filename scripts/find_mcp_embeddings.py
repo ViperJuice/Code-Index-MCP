@@ -22,7 +22,7 @@ def find_mcp_embeddings():
     ]
     
     # Add any Qdrant databases in data directory
-    data_path = Path("PathUtils.get_workspace_root()/data")
+    data_path = PathUtils.get_workspace_root() / "data"
     if data_path.exists():
         for root, dirs, files in os.walk(data_path):
             if "qdrant" in root:
@@ -111,7 +111,7 @@ def find_mcp_embeddings():
     
     # Also check if there are any index-specific Qdrant databases
     print("\n\nChecking index-specific Qdrant databases...")
-    indexes_path = Path("PathUtils.get_workspace_root()/.indexes")
+    indexes_path = PathUtils.get_workspace_root() / ".indexes"
     if indexes_path.exists():
         for index_dir in indexes_path.iterdir():
             if index_dir.is_dir() and index_dir.name != "qdrant":

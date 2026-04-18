@@ -263,7 +263,7 @@ def main():
                     print(f"    Error: {results['search_results']['error']}")
     
     # Save results
-    output_file = Path("PathUtils.get_workspace_root()/test_repository_validation.json")
+    output_file = PathUtils.get_workspace_root() / "test_repository_validation.json"
     with open(output_file, 'w') as f:
         json.dump({
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),

@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def create_repo_index():
     """Create an MCP index for the current repository."""
-    repo_root = Path("PathUtils.get_workspace_root()")
+    repo_root = PathUtils.get_workspace_root()
     index_dir = repo_root / ".mcp-index"
     index_dir.mkdir(exist_ok=True)
     

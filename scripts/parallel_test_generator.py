@@ -482,7 +482,7 @@ class ParallelTestGenerator:
 
 async def main():
     """Main entry point for parallel test generation"""
-    workspace = Path("PathUtils.get_workspace_root()")
+    workspace = PathUtils.get_workspace_root()
     
     # Optimized configuration for 4x speed improvement
     config = ParallelTestConfig(

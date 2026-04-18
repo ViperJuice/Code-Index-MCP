@@ -694,7 +694,7 @@ class ComprehensiveSemanticAnalyzer:
 
 def main():
     """Run comprehensive semantic analysis with real measurements"""
-    workspace_path = Path("PathUtils.get_workspace_root()")
+    workspace_path = PathUtils.get_workspace_root()
     analyzer = ComprehensiveSemanticAnalyzer(workspace_path)
     
     print("Starting Comprehensive Semantic Analysis")

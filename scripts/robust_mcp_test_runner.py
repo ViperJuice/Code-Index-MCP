@@ -25,7 +25,7 @@ class RobustMCPTester:
     
     def __init__(self, timeout: int = 5):
         self.timeout = timeout
-        self.workspace = Path("PathUtils.get_workspace_root()")
+        self.workspace = PathUtils.get_workspace_root()
         self.results = {
             "mcp": [],
             "native": [],

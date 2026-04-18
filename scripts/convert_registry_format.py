@@ -10,7 +10,7 @@ from mcp_server.core.path_utils import PathUtils
 
 def convert_registry():
     """Convert registry format."""
-    registry_path = Path("PathUtils.get_workspace_root()/PathUtils.get_repo_registry_path()")
+    registry_path = PathUtils.get_workspace_root() / "PathUtils.get_repo_registry_path()"
     
     # Read current registry
     with open(registry_path, 'r') as f:

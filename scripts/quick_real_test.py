@@ -184,7 +184,7 @@ def test_real_mcp_performance():
     }
     
     # Save real results
-    results_file = Path("PathUtils.get_workspace_root()/real_quick_results.json")
+    results_file = PathUtils.get_workspace_root() / "real_quick_results.json"
     with open(results_file, 'w') as f:
         json.dump(real_results, f, indent=2)
     

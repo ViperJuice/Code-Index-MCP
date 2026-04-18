@@ -452,7 +452,7 @@ def main():
     print("\n📈 Generating summary report...")
     summary = consolidator.generate_summary_report()
     
-    summary_path = Path("PathUtils.get_workspace_root()/consolidated_performance_summary.json")
+    summary_path = PathUtils.get_workspace_root() / "consolidated_performance_summary.json"
     with open(summary_path, 'w') as f:
         json.dump(summary, f, indent=2, default=str)
     

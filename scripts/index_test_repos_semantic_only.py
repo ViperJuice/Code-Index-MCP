@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 def find_test_repositories() -> List[Dict[str, str]]:
     """Find all test repositories and determine their languages."""
-    test_repos_dir = Path("PathUtils.get_workspace_root()/test_repos")
+    test_repos_dir = PathUtils.get_workspace_root() / "test_repos"
     repos = []
     
     # Define language patterns

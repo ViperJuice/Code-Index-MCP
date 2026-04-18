@@ -16,7 +16,7 @@ from mcp_server.indexer.bm25_indexer import BM25Indexer
 
 def main():
     # Repository path
-    repo_path = Path("PathUtils.get_workspace_root()")
+    repo_path = PathUtils.get_workspace_root()
     
     # Index path (same as used by MCP)
     index_db_path = repo_path / ".indexes" / "f7b49f5d0ae0" / "new_index.db"

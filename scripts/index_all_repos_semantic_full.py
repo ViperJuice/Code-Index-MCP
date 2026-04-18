@@ -211,7 +211,7 @@ def process_repository(repo_info: Dict[str, Any], qdrant_client: QdrantClient, v
 
 def find_test_repositories() -> List[Dict[str, str]]:
     """Find all test repositories."""
-    test_repos_dir = Path("PathUtils.get_workspace_root()/test_repos")
+    test_repos_dir = PathUtils.get_workspace_root() / "test_repos"
     repos = []
     
     # Define language patterns

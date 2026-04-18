@@ -388,12 +388,12 @@ def main():
     print("\n\n" + report)
     
     # Save results
-    results_path = Path("PathUtils.get_workspace_root()/mcp_performance_test_results.json")
+    results_path = PathUtils.get_workspace_root() / "mcp_performance_test_results.json"
     results_path.write_text(json.dumps(results, indent=2))
     print(f"\nDetailed results saved to: {results_path}")
     
     # Save report
-    report_path = Path("PathUtils.get_workspace_root()/MCP_PERFORMANCE_TEST_REPORT.md")
+    report_path = PathUtils.get_workspace_root() / "MCP_PERFORMANCE_TEST_REPORT.md"
     report_path.write_text(report)
     print(f"Report saved to: {report_path}")
 

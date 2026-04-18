@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 def find_test_repositories() -> List[Path]:
     """Find all test repositories."""
-    test_repos_dir = Path("PathUtils.get_workspace_root()/test_repos")
+    test_repos_dir = PathUtils.get_workspace_root() / "test_repos"
     repos = []
     
     # Find all .git directories
@@ -279,7 +279,7 @@ def main():
     print(f"Total semantic embeddings: {total_semantic_indexed}")
     
     # Save detailed results
-    report_path = Path("PathUtils.get_workspace_root()/mcp_indexing_results.json")
+    report_path = PathUtils.get_workspace_root() / "mcp_indexing_results.json"
     with open(report_path, 'w') as f:
         json.dump({
             "total": len(repos),
@@ -333,7 +333,7 @@ def main():
             }
     
     # Save mapping
-    mapping_path = Path("PathUtils.get_workspace_root()/mcp_repo_mapping.json")
+    mapping_path = PathUtils.get_workspace_root() / "mcp_repo_mapping.json"
     with open(mapping_path, 'w') as f:
         json.dump(mapping, f, indent=2)
     

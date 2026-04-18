@@ -349,7 +349,7 @@ def aggregate_results(results: List[Dict[str, Any]]) -> Dict[str, Any]:
 async def main():
     """Main entry point."""
     # Get repositories
-    index_base_path = Path("PathUtils.get_workspace_root()/test_indexes")
+    index_base_path = PathUtils.get_workspace_root() / "test_indexes"
     repositories = [
         d.name for d in index_base_path.iterdir() 
         if d.is_dir() and not d.name.startswith('.')

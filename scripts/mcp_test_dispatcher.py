@@ -19,7 +19,7 @@ class TestIndexDispatcher:
     def __init__(self, test_repo_name: Optional[str] = None):
         """Initialize dispatcher for a specific test repository."""
         self.test_repo_name = test_repo_name
-        self.test_indexes_dir = Path("PathUtils.get_workspace_root()/test_indexes")
+        self.test_indexes_dir = PathUtils.get_workspace_root() / "test_indexes"
         self._current_index = None
         self._operation_stats = {
             "searches": 0,

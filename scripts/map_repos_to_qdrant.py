@@ -84,7 +84,7 @@ def find_all_repositories():
     
     # Step 2: Find all SQL indexes
     print("\n\n2. FINDING ALL SQL INDEXES:")
-    indexes_dir = Path("PathUtils.get_workspace_root()/.indexes")
+    indexes_dir = PathUtils.get_workspace_root() / ".indexes"
     sql_indexes = {}
     
     if indexes_dir.exists():
@@ -182,7 +182,7 @@ def find_all_repositories():
     repo_mapping = {}
     
     # Check repository registry if it exists
-    registry_path = Path("PathUtils.get_workspace_root()/PathUtils.get_repo_registry_path()")
+    registry_path = PathUtils.get_workspace_root() / "PathUtils.get_repo_registry_path()"
     if registry_path.exists():
         print("\n📋 Found repository registry!")
         with open(registry_path) as f:
@@ -272,7 +272,7 @@ def find_all_repositories():
         }
     }
     
-    output_path = Path("PathUtils.get_workspace_root()/repo_db_mapping.json")
+    output_path = PathUtils.get_workspace_root() / "repo_db_mapping.json"
     with open(output_path, 'w') as f:
         json.dump(mapping, f, indent=2)
     
