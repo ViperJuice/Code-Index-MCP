@@ -168,11 +168,13 @@ class TestMcpJsonTemplates:
 class TestHandleSearchCodeResolvesViaRepoResolver:
     """handle_search_code resolves ctx via RepoResolver and calls dispatcher.search(ctx, ...)."""
 
-    def test_handle_search_code_uses_repo_resolver(self, tmp_path):
+    def test_handle_search_code_uses_repo_resolver(self, tmp_path, monkeypatch):
         import asyncio
 
         from mcp_server.cli.tool_handlers import handle_search_code
         from mcp_server.core.repo_context import RepoContext
+
+        monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
 
         mock_ctx = MagicMock(spec=RepoContext)
         mock_dispatcher = MagicMock()
