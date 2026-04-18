@@ -36,10 +36,7 @@ Both lanes have disjoint file ownership and no data dependency; they can execute
 ### SL-1 — Handler scoping + parity test
 
 - **Scope**: Add `repository=` support to the three operational handlers, route through `ctx.sqlite_store`, fail-loud on inconsistent `path`+`repository`, extend multi-repo integration tests, and add the schema-handler parity test.
-- **Owned files**:
-  - `mcp_server/cli/tool_handlers.py`
-  - `tests/integration/test_multi_repo_server.py`
-  - `tests/test_tool_schema_handler_parity.py` (new)
+- **Owned files**: `mcp_server/cli/tool_handlers.py`, `tests/integration/test_multi_repo_server.py`, `tests/test_tool_schema_handler_parity.py` (new)
 - **Interfaces provided**: IF-0-P9-1, IF-0-P9-2, IF-0-P9-3
 - **Interfaces consumed**:
   - `RepoContext.sqlite_store` — `mcp_server/core/repo_context.py:13-31` (frozen dataclass, `sqlite_store: SQLiteStore` field hydrated by resolver)
@@ -68,9 +65,7 @@ Both lanes have disjoint file ownership and no data dependency; they can execute
 ### SL-2 — tomllib Python 3.10 fallback + pyproject conditional dep
 
 - **Scope**: Replace bare `import tomllib` with a 3.10-compatible fallback, and declare `tomli` as a conditional test dep in `pyproject.toml`.
-- **Owned files**:
-  - `tests/test_requirements_consolidation.py`
-  - `pyproject.toml`
+- **Owned files**: `tests/test_requirements_consolidation.py`, `pyproject.toml`
 - **Interfaces provided**: IF-0-P9-4
 - **Interfaces consumed**: none
 - **Tasks**:
