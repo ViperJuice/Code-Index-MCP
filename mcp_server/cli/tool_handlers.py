@@ -291,6 +291,22 @@ async def handle_search_code(
         return [types.TextContent(type="text", text=_ensure_response(response_data))]
 
 
+def _build_repositories(repo_resolver: Any) -> list:
+    """Return a list of health rows for all registered repositories."""
+    from mcp_server.health.repo_status import build_health_row
+
+    if repo_resolver is None:
+        return []
+    registry = getattr(repo_resolver, "_registry", None)
+    if registry is None:
+        return []
+    try:
+        all_repos = registry.get_all_repositories()
+    except Exception:
+        return []
+    return [build_health_row(info) for info in all_repos.values()]
+
+
 async def handle_get_status(
     *,
     arguments: dict,
@@ -385,6 +401,7 @@ async def handle_get_status(
             "client": client_name,
             "session_available": current_session is not None,
         },
+        "repositories": _build_repositories(repo_resolver),
     }
     return [types.TextContent(type="text", text=_ensure_response(status_data))]
 
