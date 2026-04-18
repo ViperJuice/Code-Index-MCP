@@ -11,9 +11,11 @@ The factory will use specialized plugins when available, falling back to generic
 tree-sitter based plugins for languages without specific implementations.
 """
 
+import asyncio
 import logging
+from concurrent.futures import Future
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Dict, Optional, Type, Union
+from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple, Type, Union
 
 from ..storage.sqlite_store import SQLiteStore
 from .generic_treesitter_plugin import GenericTreeSitterPlugin
@@ -144,6 +146,53 @@ except ImportError:
 
 class PluginFactory:
     """Factory for creating language plugins."""
+
+    # Cache of in-flight/completed futures keyed by (language, repo_id).
+    # Prevents duplicate cold-starts for concurrent requests to the same plugin.
+    _async_cache: Dict[Tuple[str, str], "asyncio.Future"] = {}
+
+    @classmethod
+    async def create_plugin_async(
+        cls,
+        language: str,
+        ctx: "RepoContext",
+        sqlite_store: Optional[SQLiteStore] = None,
+        enable_semantic: bool = True,
+    ):
+        """Async plugin construction using the PluginLoader's ThreadPoolExecutor.
+
+        Submits the synchronous ``create_plugin`` body (which already calls
+        ``plugin.bind(ctx)``) to the shared executor so the event loop is never
+        blocked.  Concurrent requests for the same (language, repo_id) share a
+        single in-flight future.
+        """
+        language_norm = language.lower().replace("-", "_")
+        cache_key = (language_norm, ctx.repo_id)
+
+        loop = asyncio.get_event_loop()
+
+        if cache_key in cls._async_cache:
+            return await asyncio.shield(cls._async_cache[cache_key])
+
+        # Reuse the executor owned by the global PluginLoader (4 workers).
+        from ..plugin_system.loader import get_plugin_loader
+        executor = get_plugin_loader()._executor
+
+        fut: asyncio.Future = loop.run_in_executor(
+            executor,
+            lambda: cls.create_plugin(
+                language_norm,
+                sqlite_store=sqlite_store,
+                enable_semantic=enable_semantic,
+                ctx=ctx,
+            ),
+        )
+        cls._async_cache[cache_key] = fut
+        try:
+            return await fut
+        except Exception:
+            cls._async_cache.pop(cache_key, None)
+            raise
 
     @classmethod
     def create_plugin(
