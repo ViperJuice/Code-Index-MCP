@@ -2,6 +2,8 @@
 
 from .errors import ConfigError, IndexError, MCPError, PluginError
 from .logging import get_logger, setup_logging
+from .repo_context import RepoContext
+from .repo_resolver import RepoResolver
 
 __all__ = [
     "setup_logging",
@@ -10,4 +12,6 @@ __all__ = [
     "PluginError",
     "IndexError",
     "ConfigError",
+    "RepoContext",
+    "RepoResolver",
 ]
