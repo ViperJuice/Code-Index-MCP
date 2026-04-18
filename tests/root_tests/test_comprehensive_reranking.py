@@ -122,10 +122,10 @@ class ComprehensiveRerankingTester:
 
         # Initialize semantic indexer (if available)
         semantic_indexer = None
-        if os.getenv("VOYAGE_AI_API_KEY"):
+        if os.getenv("VOYAGE_API_KEY"):
             try:
                 semantic_indexer = SemanticIndexer(
-                    api_key=os.getenv("VOYAGE_AI_API_KEY"), model="voyage-code-3"
+                    api_key=os.getenv("VOYAGE_API_KEY"), model="voyage-code-3"
                 )
                 logger.info("Semantic indexer initialized")
             except Exception as e:

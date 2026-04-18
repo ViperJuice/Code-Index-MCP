@@ -686,7 +686,7 @@ Create or edit `.mcp.json` in your project root:
       "command": "uvicorn",
       "args": ["mcp_server.gateway:app", "--host", "0.0.0.0", "--port", "8000"],
       "env": {
-        "VOYAGE_AI_API_KEY": "your-voyage-ai-api-key-here",
+        "VOYAGE_API_KEY": "your-voyage-ai-api-key-here",
         "SEMANTIC_SEARCH_ENABLED": "true"
       }
     }
@@ -697,13 +697,13 @@ Create or edit `.mcp.json` in your project root:
 **Method 2: Claude Code CLI**
 
 ```bash
-claude mcp add code-index-mcp -e VOYAGE_AI_API_KEY=your_key -e SEMANTIC_SEARCH_ENABLED=true -- uvicorn mcp_server.gateway:app
+claude mcp add code-index-mcp -e VOYAGE_API_KEY=your_key -e SEMANTIC_SEARCH_ENABLED=true -- uvicorn mcp_server.gateway:app
 ```
 
 **Method 3: Environment Variables**
 
 ```bash
-export VOYAGE_AI_API_KEY=your_key
+export VOYAGE_API_KEY=your_key
 export SEMANTIC_SEARCH_ENABLED=true
 ```
 
@@ -712,7 +712,7 @@ export SEMANTIC_SEARCH_ENABLED=true
 Create a `.env` file in your project root:
 
 ```
-VOYAGE_AI_API_KEY=your_key
+VOYAGE_API_KEY=your_key
 SEMANTIC_SEARCH_ENABLED=true
 ```
 
@@ -869,7 +869,7 @@ When `MCP_AUTO_DETECT_LANGUAGES=true`, auto-detection takes precedence over `plu
 Set `MCP_AUTO_DETECT_LANGUAGES=false` to force `plugins.yaml` language selection.
 
 For a dual-profile setup (Voyage + local vLLM/Qwen), set:
-- `VOYAGE_API_KEY` (or `VOYAGE_AI_API_KEY`)
+- `VOYAGE_API_KEY`
 - `OPENAI_API_BASE` (for example `http://127.0.0.1:8000/v1`)
 - `OPENAI_API_KEY` (placeholder accepted for local vLLM setups)
 

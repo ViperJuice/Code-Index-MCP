@@ -25,8 +25,8 @@ class TestSemanticSearch:
     @pytest.fixture
     def setup_semantic_indexer(self):
         """Setup semantic indexer for testing."""
-        if not os.getenv("VOYAGE_AI_API_KEY"):
-            pytest.skip("VOYAGE_AI_API_KEY not set")
+        if not os.getenv("VOYAGE_API_KEY"):
+            pytest.skip("VOYAGE_API_KEY not set")
 
         try:
             from mcp_server.utils.semantic_indexer import SemanticIndexer
@@ -472,8 +472,8 @@ class TestSemanticSearchScaling:
     @pytest.fixture
     def setup_large_semantic_index(self):
         """Setup semantic indexer with larger dataset."""
-        if not os.getenv("VOYAGE_AI_API_KEY"):
-            pytest.skip("VOYAGE_AI_API_KEY not set")
+        if not os.getenv("VOYAGE_API_KEY"):
+            pytest.skip("VOYAGE_API_KEY not set")
 
         try:
             from mcp_server.utils.semantic_indexer import SemanticIndexer

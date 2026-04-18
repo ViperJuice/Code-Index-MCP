@@ -1,30 +1,28 @@
 {
+  "_comment": "Copy to .mcp.json and adjust paths. Secrets come from 1Password via `op run --env-file=.mcp.env`; see .mcp.env.example for the secret-reference format. Requires OP_SERVICE_ACCOUNT_TOKEN in the shell env.",
   "mcpServers": {
-    "gateway": {
-      "command": "uvx",
-      "args": ["pmcp", "-c", "/path/to/.pmcp.json"],
-      "env": {
-        "GROQ_API_KEY": "gsk_your_groq_api_key_here"
-      }
-    },
     "code-index-mcp": {
-      "command": "python3",
+      "command": "op",
       "args": [
-        "/workspaces/Code-Index-MCP/scripts/cli/mcp_server_cli.py"
+        "run",
+        "--no-masking",
+        "--env-file=/path/to/Code-Index-MCP/.mcp.env",
+        "--",
+        "/path/to/Code-Index-MCP/.venv/bin/python3",
+        "/path/to/Code-Index-MCP/scripts/cli/mcp_server_cli.py"
       ],
-      "cwd": "/workspaces/Code-Index-MCP",
+      "cwd": "/path/to/Code-Index-MCP",
       "env": {
-        "PYTHONPATH": "/workspaces/Code-Index-MCP",
-        "MCP_WORKSPACE_ROOT": "/workspaces/Code-Index-MCP",
-        "MCP_INDEX_STORAGE_PATH": "/workspaces/Code-Index-MCP/.indexes",
-        "MCP_REPO_REGISTRY": "/workspaces/Code-Index-MCP/.indexes/repository_registry.json",
+        "PYTHONPATH": "/path/to/Code-Index-MCP",
+        "MCP_WORKSPACE_ROOT": "/path/to/Code-Index-MCP",
+        "MCP_INDEX_STORAGE_PATH": "/path/to/Code-Index-MCP/.indexes",
+        "MCP_REPO_REGISTRY": "/path/to/Code-Index-MCP/.indexes/repository_registry.json",
         "MCP_ENABLE_MULTI_REPO": "true",
         "MCP_ENABLE_MULTI_PATH": "true",
         "SEMANTIC_SEARCH_ENABLED": "true",
-        "VOYAGE_AI_API_KEY": "",
-        "MCP_LOG_PATH": "/home/vscode/.mcp/logs",
+        "MCP_LOG_PATH": "~/.mcp/logs",
         "MCP_TEMP_PATH": "/tmp",
-        "MCP_DATA_PATH": "/workspaces/Code-Index-MCP/data"
+        "MCP_DATA_PATH": "/path/to/Code-Index-MCP/data"
       }
     }
   }

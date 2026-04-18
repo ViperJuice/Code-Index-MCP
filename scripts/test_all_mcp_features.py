@@ -123,7 +123,7 @@ class MCPFeatureTester:
         # Test if semantic search is available
         try:
             # First check if Voyage AI is configured
-            voyage_key = os.getenv("VOYAGE_AI_API_KEY") or os.getenv("VOYAGE_API_KEY")
+            voyage_key = os.getenv("VOYAGE_API_KEY")
             if not voyage_key:
                 self.issues.append("Semantic search unavailable: No Voyage AI API key")
                 return {

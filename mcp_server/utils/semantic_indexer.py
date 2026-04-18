@@ -2022,9 +2022,9 @@ class SemanticIndexer:
                 raise RuntimeError(
                     f"Semantic indexing failed due to API key issue: {e}\n"
                     "Configure Voyage AI API key using:\n"
-                    "1. .mcp.json with env.VOYAGE_AI_API_KEY for Claude Code\n"
-                    "2. VOYAGE_AI_API_KEY environment variable\n"
-                    "3. VOYAGE_AI_API_KEY in .env file"
+                    "1. .mcp.json with env.VOYAGE_API_KEY for Claude Code\n"
+                    "2. VOYAGE_API_KEY environment variable\n"
+                    "3. VOYAGE_API_KEY in .env file"
                 )
             raise RuntimeError(f"Failed to index symbol {name}: {e}")
 

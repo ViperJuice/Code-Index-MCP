@@ -30,7 +30,7 @@ services:
       - SEMANTIC_COLLECTION_NAME=code-index
       - SEMANTIC_VECTOR_SIZE=1024
       - SEMANTIC_SEARCH_LIMIT=10
-      # - VOYAGE_AI_API_KEY=your-voyage-ai-key  # Uncomment and set when enabling
+      # - VOYAGE_API_KEY=your-voyage-ai-key  # Uncomment and set when enabling
       
       # Security configuration
       # JWT_SECRET_KEY=  # Required: generate with: openssl rand -base64 32

@@ -35,7 +35,7 @@ services:
       - INDEXING_BATCH_SIZE=10
       
       # Set API key from environment (user must provide)
-      - VOYAGE_AI_API_KEY=${VOYAGE_AI_API_KEY:-}
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY:-}
     ports:
       - "8000:8000"
       - "8001:8001"  # Additional port for debugging
@@ -79,7 +79,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - QDRANT_URL=http://qdrant:6333
       - SEMANTIC_SEARCH_ENABLED=true
-      - VOYAGE_AI_API_KEY=${VOYAGE_AI_API_KEY:-}
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY:-}
       - MCP_TEST_MODE=1
     command: python -m pytest tests/ -v --tb=short
     depends_on:

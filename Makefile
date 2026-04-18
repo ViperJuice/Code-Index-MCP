@@ -149,8 +149,8 @@ docker-up:
 
 docker-dev:
 	@echo "🐳 Starting Docker development environment..."
-	@if [ -z "$$VOYAGE_AI_API_KEY" ]; then \
-		echo "⚠️  VOYAGE_AI_API_KEY not set - semantic search will be disabled"; \
+	@if [ -z "$$VOYAGE_API_KEY" ]; then \
+		echo "⚠️  VOYAGE_API_KEY not set - semantic search will be disabled"; \
 	fi
 	docker-compose -f docker-compose.yml -f docker/compose/development/docker-compose.dev.yml up -d
 	@echo "✅ Development environment started:"
@@ -199,9 +199,9 @@ test-real-world:
 	python run_parallel_tests.py --phases real_world_validation --setup-real-world
 
 test-semantic:
-	@echo "🔍 Testing semantic search (requires VOYAGE_AI_API_KEY)..."
-	@if [ -z "$$VOYAGE_AI_API_KEY" ]; then \
-		echo "❌ VOYAGE_AI_API_KEY environment variable not set"; \
+	@echo "🔍 Testing semantic search (requires VOYAGE_API_KEY)..."
+	@if [ -z "$$VOYAGE_API_KEY" ]; then \
+		echo "❌ VOYAGE_API_KEY environment variable not set"; \
 		echo "   Get your API key from https://www.voyageai.com/"; \
 		exit 1; \
 	fi
@@ -241,8 +241,8 @@ setup-dev-env: setup-env
 	@echo "🔧 Setting up development environment..."
 	@if [ ! -f .env ]; then cp .env.example .env; fi
 	@echo "🔑 To enable semantic search, add your Voyage AI API key:"
-	@echo "   export VOYAGE_AI_API_KEY='your-key'"
-	@echo "   echo 'VOYAGE_AI_API_KEY=your-key' >> .env"
+	@echo "   export VOYAGE_API_KEY='your-key'"
+	@echo "   echo 'VOYAGE_API_KEY=your-key' >> .env"
 
 setup-prod-env:
 	@echo "🔧 Setting up production environment..."
@@ -251,7 +251,7 @@ setup-prod-env:
 		echo "✅ Created .env.production from template"; \
 		echo "🚨 IMPORTANT: Edit .env.production with production values:"; \
 		echo "   - Set secure JWT_SECRET_KEY"; \
-		echo "   - Set production VOYAGE_AI_API_KEY"; \
+		echo "   - Set production VOYAGE_API_KEY"; \
 		echo "   - Configure production database"; \
 		echo "   - Set proper CORS_ORIGINS"; \
 		echo "   - Change default passwords"; \

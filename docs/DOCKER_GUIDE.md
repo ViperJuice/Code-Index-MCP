@@ -55,7 +55,7 @@ The MCP Index Server Docker images provide a containerized solution for code ind
 - ✅ Contextual embeddings
 - ✅ Advanced reranking
 - ✅ GitHub artifact sync
-- ⚠️ Requires VOYAGE_AI_API_KEY
+- ⚠️ Requires VOYAGE_API_KEY
 
 **Resource Usage**:
 - Memory: 2-4GB
@@ -132,7 +132,7 @@ Create a `.env` file in your project root:
 
 ```env
 # Semantic Search (Standard/Full only)
-VOYAGE_AI_API_KEY=your-api-key-here
+VOYAGE_API_KEY=your-api-key-here
 SEMANTIC_SEARCH_ENABLED=true
 
 # GitHub Artifact Sync
@@ -204,13 +204,13 @@ docker run -it -v $(pwd):/workspace ghcr.io/code-index-mcp/mcp-index:minimal
 # Standard version - with API key
 docker run -it \
   -v $(pwd):/workspace \
-  -e VOYAGE_AI_API_KEY=your-key \
+  -e VOYAGE_API_KEY=your-key \
   ghcr.io/code-index-mcp/mcp-index:standard
 
 # Full version - with external services
 docker run -it \
   -v $(pwd):/workspace \
-  -e VOYAGE_AI_API_KEY=your-key \
+  -e VOYAGE_API_KEY=your-key \
   -e REDIS_URL=redis://redis:6379 \
   -e QDRANT_URL=http://qdrant:6333 \
   ghcr.io/code-index-mcp/mcp-index:full
@@ -230,7 +230,7 @@ services:
       - ./:/workspace
       - ~/.mcp-index:/app/.mcp-index
     environment:
-      - VOYAGE_AI_API_KEY=${VOYAGE_AI_API_KEY}
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY}
       - MCP_ARTIFACT_SYNC=true
     stdin_open: true
     tty: true
@@ -253,13 +253,13 @@ services:
 3. **Configure the Key**:
    ```bash
    # Option 1: Environment variable
-   export VOYAGE_AI_API_KEY=your-key
+   export VOYAGE_API_KEY=your-key
    
    # Option 2: Docker run
-   docker run -e VOYAGE_AI_API_KEY=your-key ...
+   docker run -e VOYAGE_API_KEY=your-key ...
    
    # Option 3: .env file
-   echo "VOYAGE_AI_API_KEY=your-key" >> .env
+   echo "VOYAGE_API_KEY=your-key" >> .env
    ```
 
 ### Cost Estimation
@@ -325,7 +325,7 @@ Create `.mcp.json` in your project root:
         "--rm",
         "-v", "${workspace}:/workspace",
         "-v", "${HOME}/.mcp-index:/app/.mcp-index",
-        "-e", "VOYAGE_AI_API_KEY=${VOYAGE_AI_API_KEY:-}",
+        "-e", "VOYAGE_API_KEY=${VOYAGE_API_KEY:-}",
         "-e", "MCP_ARTIFACT_SYNC=${MCP_ARTIFACT_SYNC:-true}",
         "ghcr.io/code-index-mcp/mcp-index:standard"
       ]
@@ -345,7 +345,7 @@ Claude Code passes environment variables to the Docker container:
       "command": "docker",
       "args": ["run", "-i", "--rm", "..."],
       "env": {
-        "VOYAGE_AI_API_KEY": "your-key",
+        "VOYAGE_API_KEY": "your-key",
         "LOG_LEVEL": "DEBUG"
       }
     }
@@ -557,8 +557,8 @@ Solution: Add user to docker group: sudo usermod -aG docker $USER
 
 #### 3. API key not working
 ```bash
-Warning: Semantic search requires VOYAGE_AI_API_KEY
-Solution: Verify key is set: echo $VOYAGE_AI_API_KEY
+Warning: Semantic search requires VOYAGE_API_KEY
+Solution: Verify key is set: echo $VOYAGE_API_KEY
 ```
 
 #### 4. Out of memory

@@ -51,6 +51,30 @@ from .watcher import FileWatcher
 setup_logging(log_level="INFO")
 logger = logging.getLogger(__name__)
 
+
+def _parse_cors_origins_from_env() -> list[str]:
+    """Parse CORS_ORIGINS env var into a cleaned list of origins.
+
+    No default — an unset or empty value means "no cross-origin requests
+    allowed" and emits a warning. Accepts comma-separated origins. Explicitly
+    refuses "*" which would reintroduce the old footgun.
+    """
+    raw = os.getenv("CORS_ORIGINS", "").strip()
+    if not raw:
+        logger.warning(
+            "CORS_ORIGINS is unset — no cross-origin requests will be allowed. "
+            "Set CORS_ORIGINS to a comma-separated allowlist (never '*' in production)."
+        )
+        return []
+    origins = [o.strip() for o in raw.split(",") if o.strip()]
+    if "*" in origins:
+        logger.warning(
+            "CORS_ORIGINS contains '*' — refusing wildcard origin. "
+            "Replace with an explicit allowlist."
+        )
+        return [o for o in origins if o != "*"]
+    return origins
+
 app = FastAPI(
     title="MCP Server",
     description="Code Index MCP Server with Security, Metrics, and Health Checks",
@@ -213,7 +237,7 @@ async def startup_event():
             lockout_duration_minutes=int(os.getenv("LOCKOUT_DURATION_MINUTES", "15")),
             rate_limit_requests=int(os.getenv("RATE_LIMIT_REQUESTS", "100")),
             rate_limit_window_minutes=int(os.getenv("RATE_LIMIT_WINDOW_MINUTES", "1")),
-            cors_origins=os.getenv("CORS_ORIGINS", "*").split(","),
+            cors_origins=_parse_cors_origins_from_env(),
             cors_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             cors_headers=["*"],
         )
@@ -230,6 +254,15 @@ async def startup_event():
                 raise RuntimeError(
                     "DEFAULT_ADMIN_PASSWORD env var must be set. "
                     "Choose a strong password for the admin account."
+                )
+            _weak_admin_passwords = {
+                "admin", "password", "admin123", "admin123!", "changeme",
+                "password123", "letmein", "12345678",
+            }
+            if admin_password.strip().lower() in _weak_admin_passwords:
+                raise RuntimeError(
+                    "DEFAULT_ADMIN_PASSWORD is on the well-known-weak list. "
+                    "Pick a strong password (see config/validation.py blocklist)."
                 )
             logger.info("Creating default admin user...")
             await auth_manager.create_user(
@@ -1203,7 +1236,7 @@ async def search(
                                 '      "command": "uvicorn",',
                                 '      "args": ["mcp_server.gateway:app"],',
                                 '      "env": {',
-                                '        "VOYAGE_AI_API_KEY": "your-key-here",',
+                                '        "VOYAGE_API_KEY": "your-key-here",',
                                 '        "OPENAI_API_BASE": "http://localhost:8001/v1",',
                                 '        "SEMANTIC_SEARCH_ENABLED": "true"',
                                 "      }",
@@ -1213,16 +1246,16 @@ async def search(
                             ],
                             "method_2_cli": [
                                 "Or use Claude Code CLI:",
-                                "claude mcp add code-index-mcp -e VOYAGE_AI_API_KEY=your_key -e SEMANTIC_SEARCH_ENABLED=true -- uvicorn mcp_server.gateway:app",
+                                "claude mcp add code-index-mcp -e VOYAGE_API_KEY=your_key -e SEMANTIC_SEARCH_ENABLED=true -- uvicorn mcp_server.gateway:app",
                             ],
                             "method_3_env": [
                                 "Or set environment variables:",
-                                "export VOYAGE_AI_API_KEY=your_key",
+                                "export VOYAGE_API_KEY=your_key",
                                 "export SEMANTIC_SEARCH_ENABLED=true",
                             ],
                             "method_4_dotenv": [
                                 "Or add to .env file:",
-                                "VOYAGE_AI_API_KEY=your_key",
+                                "VOYAGE_API_KEY=your_key",
                                 "SEMANTIC_SEARCH_ENABLED=true",
                             ],
                             "get_api_key": "Get your API key from: https://www.voyageai.com/",
@@ -1279,7 +1312,7 @@ async def search(
 @app.get("/search/capabilities")
 async def get_search_capabilities() -> Dict[str, Any]:
     """Get available search capabilities and configuration guidance."""
-    voyage_key = os.environ.get("VOYAGE_API_KEY") or os.environ.get("VOYAGE_AI_API_KEY")
+    voyage_key = os.environ.get("VOYAGE_API_KEY")
     openai_base = os.environ.get("OPENAI_API_BASE")
     semantic_enabled = os.environ.get("SEMANTIC_SEARCH_ENABLED", "false").lower() == "true"
 
@@ -1309,7 +1342,7 @@ async def get_search_capabilities() -> Dict[str, Any]:
                             "command": "uvicorn",
                             "args": ["mcp_server.gateway:app"],
                             "env": {
-                                "VOYAGE_AI_API_KEY": "your-key-here",
+                                "VOYAGE_API_KEY": "your-key-here",
                                 "OPENAI_API_BASE": "http://localhost:8001/v1",
                                 "SEMANTIC_SEARCH_ENABLED": "true",
                             },
@@ -1317,8 +1350,8 @@ async def get_search_capabilities() -> Dict[str, Any]:
                     }
                 },
             },
-            "cli_command": "claude mcp add code-index-mcp -e VOYAGE_AI_API_KEY=key -e SEMANTIC_SEARCH_ENABLED=true -- uvicorn mcp_server.gateway:app",
-            "env_file": "Add to .env: VOYAGE_AI_API_KEY=key and SEMANTIC_SEARCH_ENABLED=true",
+            "cli_command": "claude mcp add code-index-mcp -e VOYAGE_API_KEY=key -e SEMANTIC_SEARCH_ENABLED=true -- uvicorn mcp_server.gateway:app",
+            "env_file": "Add to .env: VOYAGE_API_KEY=key and SEMANTIC_SEARCH_ENABLED=true",
             "get_api_key": "https://www.voyageai.com/",
         },
     }

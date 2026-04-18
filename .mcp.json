@@ -1,8 +1,13 @@
 {
   "mcpServers": {
     "code-index-mcp": {
-      "command": "/home/viperjuice/code/Code-Index-MCP/.venv/bin/python3",
+      "command": "op",
       "args": [
+        "run",
+        "--no-masking",
+        "--env-file=/home/viperjuice/code/Code-Index-MCP/.mcp.env",
+        "--",
+        "/home/viperjuice/code/Code-Index-MCP/.venv/bin/python3",
         "/home/viperjuice/code/Code-Index-MCP/scripts/cli/mcp_server_cli.py"
       ],
       "cwd": "/home/viperjuice/code/Code-Index-MCP",
@@ -15,10 +20,8 @@
         "MCP_ENABLE_MULTI_REPO": "true",
         "MCP_ENABLE_MULTI_PATH": "true",
         "SEMANTIC_SEARCH_ENABLED": "true",
-        "VOYAGE_AI_API_KEY": "pa-kB_U6_PsSUjRsQeWXp7YD4h9a-VdezSX3FzxxBd92Do",
         "OPENAI_API_KEY": "local",
         "OPENAI_API_BASE": "http://ai:8001/v1",
-        "CEREBRAS_API_KEY": "csk-feymxm84xhmfrrp86wcer4vn4rwey8rtvexrckm9ewm93fwf",
         "CEREBRAS_MODEL": "gpt-oss-120b",
         "MCP_LOG_PATH": "/home/viperjuice/.mcp/logs",
         "MCP_TEMP_PATH": "/tmp",

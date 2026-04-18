@@ -138,7 +138,7 @@ async def test_mcp_semantic_search():
     
     if not semantic_working:
         print("\nTroubleshooting:")
-        print("1. Check if VOYAGE_AI_API_KEY is set in .env")
+        print("1. Check if VOYAGE_API_KEY is set in .env")
         print("2. Verify semantic discovery finds correct collection")
         print("3. Check if embeddings exist in Qdrant collections")
 

@@ -23,7 +23,7 @@ def test_semantic_direct():
     print("=" * 60)
     
     # Check environment
-    api_key = os.environ.get("VOYAGE_AI_API_KEY") or os.environ.get("VOYAGE_API_KEY")
+    api_key = os.environ.get("VOYAGE_API_KEY")
     print(f"Voyage AI API Key: {'✅ Found' if api_key else '❌ Not found'}")
     
     # Test discovery
@@ -110,7 +110,7 @@ def test_semantic_direct():
         print("   Need to ensure MCP uses the correct collection.")
     else:
         if not api_key:
-            print("❌ Set VOYAGE_AI_API_KEY in .env file")
+            print("❌ Set VOYAGE_API_KEY in .env file")
         if not best_collection or info.points_count == 0:
             print("❌ Populate semantic embeddings in Qdrant")
 

@@ -191,7 +191,7 @@ def create_mcp_config_with_qdrant():
     config = {
         "env": {
             "SEMANTIC_SEARCH_ENABLED": "true",
-            "VOYAGE_AI_API_KEY": os.getenv("VOYAGE_AI_API_KEY", ""),
+            "VOYAGE_API_KEY": os.getenv("VOYAGE_API_KEY", ""),
             "QDRANT_PATH": "/workspaces/Code-Index-MCP/.indexes/qdrant/main.qdrant",
             "SEMANTIC_COLLECTION_NAME": "code-embeddings",
             "MCP_INDEX_PATH": "/workspaces/Code-Index-MCP/.indexes/844145265d7a/code_index.db"

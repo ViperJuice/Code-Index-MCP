@@ -155,7 +155,7 @@ def index_repository(repo_path: Path, repo_info: Dict[str, str]) -> Dict[str, An
         
         # Initialize semantic indexer with central Qdrant location
         semantic_indexer = None
-        if os.getenv("VOYAGE_AI_API_KEY"):
+        if os.getenv("VOYAGE_API_KEY"):
             try:
                 qdrant_path = ".indexes/qdrant/main.qdrant"
                 collection_name = f"{repo_info['language']}_{repo_info['name']}"
@@ -235,8 +235,8 @@ def main():
     print("=" * 60)
     
     # Check environment
-    if not os.getenv("VOYAGE_AI_API_KEY"):
-        print("⚠️  Warning: VOYAGE_AI_API_KEY not set. Semantic indexing will be disabled.")
+    if not os.getenv("VOYAGE_API_KEY"):
+        print("⚠️  Warning: VOYAGE_API_KEY not set. Semantic indexing will be disabled.")
         print("Set it in .env file to enable semantic search.")
     
     # Enable semantic search
@@ -341,7 +341,7 @@ def main():
     
     print("\n✅ MCP indexing complete!")
     print("\nNote: The MCP server must be restarted to use the updated indexes.")
-    print("Semantic indexing will only work if VOYAGE_AI_API_KEY is set.")
+    print("Semantic indexing will only work if VOYAGE_API_KEY is set.")
 
 
 if __name__ == "__main__":

@@ -38,7 +38,7 @@ Configuration precedence:
 - `QDRANT_COMPOSE_FILE=docker-compose.qdrant.yml`
 - `OPENAI_API_BASE=http://localhost:8001/v1`  # fallback only; prefer profiles.yaml base_url
 - `OPENAI_API_KEY=vllm-local`
-- `VOYAGE_API_KEY` (or `VOYAGE_AI_API_KEY`)
+- `VOYAGE_API_KEY`
 
 ## CLI Examples
 
@@ -72,4 +72,4 @@ curl http://ai:8001/v1/models   # oss_high vLLM (adjust hostname to your setup)
   - check vLLM process/container binding and host/port
   - verify `OPENAI_API_BASE`
 - Voyage provider failing
-  - verify `VOYAGE_API_KEY` or `VOYAGE_AI_API_KEY`
+  - verify `VOYAGE_API_KEY`

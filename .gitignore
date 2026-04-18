@@ -168,3 +168,9 @@ qdrant_storage/
 test_repos/
 temp_cookbook/
 testing-env/
+
+# 1Password op run env-file for MCP server (references only, but machine-local)
+.mcp.env
+index-archive.tar.gz
+coverage.xml
+.metadata/coverage.xml

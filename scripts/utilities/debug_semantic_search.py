@@ -17,7 +17,7 @@ def check_environment():
     print("=== Environment Configuration ===")
     
     # Check Voyage AI configuration
-    voyage_key = os.getenv("VOYAGE_AI_API_KEY") or os.getenv("VOYAGE_API_KEY")
+    voyage_key = os.getenv("VOYAGE_API_KEY")
     print(f"Voyage API Key: {'✓ Present' if voyage_key else '✗ Missing'}")
     if voyage_key:
         print(f"  Key prefix: {voyage_key[:10]}...")

@@ -119,7 +119,7 @@ strategy:
 ### Secrets and Variables
 ```yaml
 env:
-  API_KEY: ${{ secrets.VOYAGE_AI_API_KEY }}
+  API_KEY: ${{ secrets.VOYAGE_API_KEY }}
   
 - name: Use variable
   run: echo "Running on ${{ vars.ENVIRONMENT }}"

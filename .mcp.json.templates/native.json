@@ -6,7 +6,7 @@
       "cwd": "${workspace}",
       "env": {
         "PYTHONPATH": "${workspace}",
-        "VOYAGE_AI_API_KEY": "${VOYAGE_AI_API_KEY:-}",
+        "VOYAGE_API_KEY": "${VOYAGE_API_KEY:-}",
         "SEMANTIC_SEARCH_ENABLED": "${SEMANTIC_SEARCH_ENABLED:-false}",
         "MCP_WORKSPACE_ROOT": "${workspace}",
         "MCP_LOG_LEVEL": "${MCP_LOG_LEVEL:-INFO}",

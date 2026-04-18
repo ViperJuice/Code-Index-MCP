@@ -291,7 +291,7 @@ MCP_VERSION=1.0.0
 DATABASE_URL=sqlite:///./data/code_index.db
 
 # Semantic Search (Voyage AI)
-VOYAGE_AI_API_KEY=
+VOYAGE_API_KEY=
 SEMANTIC_SEARCH_ENABLED=true
 
 # Vector Database (Qdrant)

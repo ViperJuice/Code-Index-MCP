@@ -376,7 +376,7 @@ def main() -> int:
     _explicit = os.getenv("RERANKER_TYPE", "").strip().lower()
     if _explicit:
         reranker_type = _explicit
-    elif os.getenv("VOYAGE_AI_API_KEY") or os.getenv("VOYAGE_API_KEY"):
+    elif os.getenv("VOYAGE_API_KEY"):
         reranker_type = "voyage"
     else:
         reranker_type = "none"

@@ -177,7 +177,7 @@ METRICS_PORT=9090
 ENABLE_DETAILED_METRICS=true
 
 # Semantic Search (Optional)
-VOYAGE_AI_API_KEY=your-voyage-api-key
+VOYAGE_API_KEY=your-voyage-api-key
 QDRANT_URL=http://qdrant:6333
 ENABLE_SEMANTIC_SEARCH=true
 ```

@@ -25,7 +25,7 @@ docker/
 docker run -it -v $(pwd):/workspace ghcr.io/code-index-mcp/mcp-index:minimal
 
 # AI-powered search (requires Voyage AI key)
-docker run -it -v $(pwd):/workspace -e VOYAGE_AI_API_KEY=your-key ghcr.io/code-index-mcp/mcp-index:standard
+docker run -it -v $(pwd):/workspace -e VOYAGE_API_KEY=your-key ghcr.io/code-index-mcp/mcp-index:standard
 
 # Install helper script (recommended)
 curl -sSL https://raw.githubusercontent.com/Code-Index-MCP/main/scripts/install-mcp-docker.sh | bash
@@ -35,7 +35,7 @@ mcp-index  # Now available as a command
 ### Development Setup (All Features)
 ```bash
 # Set your Voyage AI API key for semantic search
-export VOYAGE_AI_API_KEY="your-voyage-ai-key"
+export VOYAGE_API_KEY="your-voyage-ai-key"
 
 # Start development environment with all features
 docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
@@ -82,11 +82,11 @@ Requires Voyage AI API key and Qdrant:
 
 ```bash
 # Set environment variables
-export VOYAGE_AI_API_KEY="your-key"
+export VOYAGE_API_KEY="your-key"
 export SEMANTIC_SEARCH_ENABLED=true
 
 # Or add to .env file
-echo "VOYAGE_AI_API_KEY=your-key" >> .env
+echo "VOYAGE_API_KEY=your-key" >> .env
 echo "SEMANTIC_SEARCH_ENABLED=true" >> .env
 
 # Restart services
@@ -150,7 +150,7 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml run --rm test-run
 ### Dormant Features Tests
 ```bash
 # Set required environment variables
-export VOYAGE_AI_API_KEY="your-key"
+export VOYAGE_API_KEY="your-key"
 export REDIS_URL="redis://redis:6379"
 
 # Run dormant features validation
@@ -194,7 +194,7 @@ cp ./data/code_index.db ./backup/code_index-$(date +%Y%m%d).db
 #### 1. Semantic Search Not Working
 ```bash
 # Check Voyage AI API key
-docker-compose exec mcp-server env | grep VOYAGE_AI_API_KEY
+docker-compose exec mcp-server env | grep VOYAGE_API_KEY
 
 # Check Qdrant connection
 docker-compose exec mcp-server curl -f http://qdrant:6333/health
@@ -268,7 +268,7 @@ cp .env.example .env
 
 # Get Voyage AI API key (for semantic search)
 # Register at https://www.voyageai.com/
-export VOYAGE_AI_API_KEY="your-key"
+export VOYAGE_API_KEY="your-key"
 ```
 
 ### 2. Start Development Environment

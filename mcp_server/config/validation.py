@@ -409,7 +409,7 @@ DATABASE_URL=sqlite:///./dev_code_index.db
 # Security
 JWT_SECRET_KEY={secure_defaults['JWT_SECRET_KEY']}
 DEFAULT_ADMIN_EMAIL=admin@localhost
-DEFAULT_ADMIN_PASSWORD=admin123!
+DEFAULT_ADMIN_PASSWORD={secure_defaults['DEFAULT_ADMIN_PASSWORD']}
 
 # Cache (Optional Redis)
 # REDIS_URL=redis://localhost:6379

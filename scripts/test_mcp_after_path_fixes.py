@@ -212,7 +212,7 @@ class MCPComprehensiveTest:
         # Check if semantic search is available
         check_result = self._run_mcp_command(["search", "search_code", "--semantic", "true", "test query"])
         
-        if "VOYAGE_AI_API_KEY" not in check_result.get("stderr", "") and check_result["success"]:
+        if "VOYAGE_API_KEY" not in check_result.get("stderr", "") and check_result["success"]:
             test_queries = [
                 "implement path resolution for different environments",
                 "handle multi-repository indexing",
@@ -259,7 +259,7 @@ class MCPComprehensiveTest:
             print(f"✓ Hybrid search succeeded, found {result_count} results")
         else:
             print("✗ Hybrid search failed")
-            if "VOYAGE_AI_API_KEY" in result.get("stderr", ""):
+            if "VOYAGE_API_KEY" in result.get("stderr", ""):
                 result["warning"] = "Hybrid search requires semantic search to be configured"
         
         self._add_test_result("hybrid_search", result)

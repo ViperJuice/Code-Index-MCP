@@ -24,7 +24,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       
       # Semantic search (optional)
-      - VOYAGE_AI_API_KEY=${VOYAGE_AI_API_KEY:-}
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY:-}
       - SEMANTIC_SEARCH_ENABLED=${SEMANTIC_SEARCH_ENABLED:-false}
       - SEMANTIC_EMBEDDING_MODEL=${SEMANTIC_EMBEDDING_MODEL:-voyage-code-3}
       

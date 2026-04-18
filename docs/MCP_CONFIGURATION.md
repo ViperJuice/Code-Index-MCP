@@ -69,7 +69,7 @@ The setup script automatically detects your environment:
       "cwd": "${workspace}",
       "env": {
         "PYTHONPATH": "${workspace}",
-        "VOYAGE_AI_API_KEY": "${VOYAGE_AI_API_KEY:-}",
+        "VOYAGE_API_KEY": "${VOYAGE_API_KEY:-}",
         "SEMANTIC_SEARCH_ENABLED": "${SEMANTIC_SEARCH_ENABLED:-false}",
         "MCP_WORKSPACE_ROOT": "${workspace}",
         "MCP_ARTIFACT_SYNC": "${MCP_ARTIFACT_SYNC:-false}",
@@ -132,7 +132,7 @@ The setup script automatically detects your environment:
         "-v", "${workspace}:/workspace",
         "-v", "${HOME}/.mcp-index:/app/.mcp-index",
         "-e", "MCP_WORKSPACE_ROOT=/workspace",
-        "-e", "VOYAGE_AI_API_KEY=${VOYAGE_AI_API_KEY:-}",
+        "-e", "VOYAGE_API_KEY=${VOYAGE_API_KEY:-}",
         "-e", "SEMANTIC_SEARCH_ENABLED=${SEMANTIC_SEARCH_ENABLED:-true}",
         "-e", "MCP_ARTIFACT_SYNC=${MCP_ARTIFACT_SYNC:-true}",
         "-e", "LOG_LEVEL=${LOG_LEVEL:-INFO}",
@@ -166,7 +166,7 @@ The setup script automatically detects your environment:
       ],
       "env": {
         "MCP_WORKSPACE_ROOT": "/workspace",
-        "VOYAGE_AI_API_KEY": "${VOYAGE_AI_API_KEY:-}",
+        "VOYAGE_API_KEY": "${VOYAGE_API_KEY:-}",
         "SEMANTIC_SEARCH_ENABLED": "${SEMANTIC_SEARCH_ENABLED:-false}",
         "LOG_LEVEL": "${LOG_LEVEL:-INFO}"
       }
@@ -241,7 +241,7 @@ Every `.mcp.json` file follows this structure:
 
 | Variable | Description | Required For |
 |----------|-------------|--------------|
-| `VOYAGE_AI_API_KEY` | Voyage AI API key | Semantic search |
+| `VOYAGE_API_KEY` | Voyage AI API key | Semantic search |
 | `GITHUB_TOKEN` | GitHub access token | Private repo artifacts |
 
 ## Advanced Configurations

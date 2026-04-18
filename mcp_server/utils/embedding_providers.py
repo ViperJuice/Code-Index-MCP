@@ -32,7 +32,7 @@ class VoyageEmbeddingProvider(EmbeddingProvider):
                 "Install semantic dependencies first."
             ) from exc
 
-        api_key = os.environ.get("VOYAGE_API_KEY") or os.environ.get("VOYAGE_AI_API_KEY")
+        api_key = os.environ.get("VOYAGE_API_KEY")
         if api_key:
             self.client = voyageai.Client(api_key=api_key)
         else:
@@ -41,7 +41,7 @@ class VoyageEmbeddingProvider(EmbeddingProvider):
             except Exception as exc:
                 raise RuntimeError(
                     "Semantic search requires Voyage AI API key. "
-                    "Set VOYAGE_AI_API_KEY or VOYAGE_API_KEY."
+                    "Set VOYAGE_API_KEY."
                 ) from exc
 
         self.model_name = model_name

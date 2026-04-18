@@ -46,9 +46,9 @@ def populate_semantic_index():
     print(f"Qdrant path: {qdrant_path}")
     
     # Check if Voyage AI API key is available
-    api_key = os.environ.get("VOYAGE_AI_API_KEY")
+    api_key = os.environ.get("VOYAGE_API_KEY")
     if not api_key:
-        print("❌ VOYAGE_AI_API_KEY environment variable not set")
+        print("❌ VOYAGE_API_KEY environment variable not set")
         print("   Semantic search requires Voyage AI for embeddings")
         print("   Set the API key to populate semantic index")
         return False

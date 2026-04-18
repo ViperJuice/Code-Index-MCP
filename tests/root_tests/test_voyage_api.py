@@ -42,19 +42,19 @@ def main():
     print("Testing Voyage AI API keys...")
 
     # Get both keys from environment
-    key1 = os.getenv("VOYAGE_AI_API_KEY")
+    key1 = os.getenv("VOYAGE_API_KEY")
     key2 = os.getenv("VOYAGE_API_KEY")
 
-    print(f"Found VOYAGE_AI_API_KEY: {key1[:10] if key1 else 'Not set'}...")
+    print(f"Found VOYAGE_API_KEY: {key1[:10] if key1 else 'Not set'}...")
     print(f"Found VOYAGE_API_KEY: {key2[:10] if key2 else 'Not set'}...")
 
     # Test both keys
     success = False
 
     if key1:
-        if test_api_key("VOYAGE_AI_API_KEY", key1):
+        if test_api_key("VOYAGE_API_KEY", key1):
             success = True
-            print("\n✅ Use VOYAGE_API_KEY environment variable (not VOYAGE_AI_API_KEY)")
+            print("\n✅ Use VOYAGE_API_KEY environment variable (not VOYAGE_API_KEY)")
 
     if key2 and key2 != key1:
         if test_api_key("VOYAGE_API_KEY", key2):

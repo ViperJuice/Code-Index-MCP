@@ -14,7 +14,7 @@
         "MCP_ENABLE_MULTI_REPO": "${MCP_ENABLE_MULTI_REPO:-true}",
         "MCP_ENABLE_MULTI_PATH": "${MCP_ENABLE_MULTI_PATH:-true}",
         "SEMANTIC_SEARCH_ENABLED": "${SEMANTIC_SEARCH_ENABLED:-true}",
-        "VOYAGE_AI_API_KEY": "${VOYAGE_AI_API_KEY:-}",
+        "VOYAGE_API_KEY": "${VOYAGE_API_KEY:-}",
         "MCP_LOG_PATH": "${MCP_LOG_PATH:-~/.mcp/logs}",
         "MCP_TEMP_PATH": "${MCP_TEMP_PATH:-}",
         "MCP_DATA_PATH": "${MCP_DATA_PATH:-./data}"

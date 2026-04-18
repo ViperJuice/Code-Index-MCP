@@ -98,9 +98,9 @@ def estimate_repo_size(repo_name):
 def main():
     """Main function to index missing repositories."""
     # Check API key
-    api_key = os.environ.get("VOYAGE_AI_API_KEY")
+    api_key = os.environ.get("VOYAGE_API_KEY")
     if not api_key:
-        logger.error("VOYAGE_AI_API_KEY not set!")
+        logger.error("VOYAGE_API_KEY not set!")
         return
     
     # Find missing repositories

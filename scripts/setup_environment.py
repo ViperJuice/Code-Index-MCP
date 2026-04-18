@@ -82,7 +82,7 @@ def setup_mcp_config(force: bool = False):
         "MCP_ENABLE_MULTI_REPO": os.environ.get("MCP_ENABLE_MULTI_REPO", "true"),
         "MCP_ENABLE_MULTI_PATH": os.environ.get("MCP_ENABLE_MULTI_PATH", "true"),
         "SEMANTIC_SEARCH_ENABLED": os.environ.get("SEMANTIC_SEARCH_ENABLED", "true"),
-        "VOYAGE_AI_API_KEY": os.environ.get("VOYAGE_AI_API_KEY", "")
+        "VOYAGE_API_KEY": os.environ.get("VOYAGE_API_KEY", "")
     }
     
     # Also include existing environment variables

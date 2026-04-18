@@ -262,9 +262,9 @@ def find_test_repositories() -> List[Dict[str, str]]:
 def main():
     """Main function to create FULL embeddings for all repositories."""
     # Check API key
-    api_key = os.environ.get("VOYAGE_AI_API_KEY")
+    api_key = os.environ.get("VOYAGE_API_KEY")
     if not api_key:
-        logger.error("VOYAGE_AI_API_KEY not set!")
+        logger.error("VOYAGE_API_KEY not set!")
         return
     
     logger.info("Starting FULL semantic indexing of all test repositories")

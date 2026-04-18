@@ -167,7 +167,7 @@ Then configure Voyage AI:
 
 ```env
 # Add to .env
-VOYAGE_AI_API_KEY=your_api_key_here
+VOYAGE_API_KEY=your_api_key_here
 SEMANTIC_SEARCH_ENABLED=true
 ```
 

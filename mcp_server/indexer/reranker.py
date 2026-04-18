@@ -642,7 +642,7 @@ class VoyageReranker:
     """
 
     def __init__(self, model: str = "rerank-2"):
-        api_key = os.getenv("VOYAGE_API_KEY") or os.getenv("VOYAGE_AI_API_KEY")
+        api_key = os.getenv("VOYAGE_API_KEY")
         import voyageai
 
         self._client = voyageai.Client(api_key=api_key) if api_key else voyageai.Client()

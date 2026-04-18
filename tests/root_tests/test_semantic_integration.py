@@ -36,9 +36,9 @@ def check_services():
         return False
 
     # Check Voyage API key
-    api_key = os.getenv("VOYAGE_AI_API_KEY")
+    api_key = os.getenv("VOYAGE_API_KEY")
     if not api_key:
-        print("✗ VOYAGE_AI_API_KEY not set")
+        print("✗ VOYAGE_API_KEY not set")
         return False
     print("✓ Voyage AI API key is configured")
 

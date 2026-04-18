@@ -399,9 +399,9 @@ def process_from_filesystem(repo_path: Path, repo_name: str, language: str, coll
 def main():
     """Main function to create embeddings for all repositories."""
     # Check API key
-    api_key = os.environ.get("VOYAGE_AI_API_KEY")
+    api_key = os.environ.get("VOYAGE_API_KEY")
     if not api_key:
-        logger.error("VOYAGE_AI_API_KEY environment variable not set")
+        logger.error("VOYAGE_API_KEY environment variable not set")
         return
     
     # Setup paths

@@ -28,7 +28,7 @@ def check_environment():
     """Check environment setup"""
     logger.info("Checking environment configuration...")
     
-    voyage_key = os.getenv("VOYAGE_AI_API_KEY") or os.getenv("VOYAGE_API_KEY")
+    voyage_key = os.getenv("VOYAGE_API_KEY")
     logger.info(f"Voyage AI API Key: {'✓ Found' if voyage_key else '✗ Missing'}")
     
     if voyage_key:
@@ -363,7 +363,7 @@ def main():
         if not semantic_ok:
             print("\n⚠ Semantic search unavailable:")
             print("  - Will test SQL/BM25 vs Native only")
-            print("  - Add VOYAGE_AI_API_KEY to enable semantic")
+            print("  - Add VOYAGE_API_KEY to enable semantic")
     else:
         print("\n✗ Critical issues found - fix before testing")
     

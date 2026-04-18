@@ -129,15 +129,15 @@ choose_variant() {
             print_info "Selected: standard (semantic search)"
             
             # Check for API key
-            if [ -z "$VOYAGE_AI_API_KEY" ]; then
+            if [ -z "$VOYAGE_API_KEY" ]; then
                 print_warn "Semantic search requires a Voyage AI API key"
                 echo "Get your free API key at: https://www.voyageai.com/"
                 echo "Pricing: ~\$0.05 per 1M tokens (free tier: 50M tokens/month)"
                 echo
                 read -p "Enter your Voyage AI API key (or press Enter to skip): " API_KEY
                 if [ ! -z "$API_KEY" ]; then
-                    export VOYAGE_AI_API_KEY="$API_KEY"
-                    echo "export VOYAGE_AI_API_KEY='$API_KEY'" >> ~/.bashrc
+                    export VOYAGE_API_KEY="$API_KEY"
+                    echo "export VOYAGE_API_KEY='$API_KEY'" >> ~/.bashrc
                     print_info "API key saved to ~/.bashrc"
                 fi
             fi
@@ -188,7 +188,7 @@ case "$1" in
         docker run -i --rm \
             -v "$WORKSPACE:/workspace" \
             -v "$HOME/.mcp-index:/app/.mcp-index" \
-            -e VOYAGE_AI_API_KEY="${VOYAGE_AI_API_KEY:-}" \
+            -e VOYAGE_API_KEY="${VOYAGE_API_KEY:-}" \
             -e MCP_ARTIFACT_SYNC="${MCP_ARTIFACT_SYNC:-true}" \
             "${MCP_IMAGE}:${MCP_VARIANT}" "$@"
         ;;
@@ -221,7 +221,7 @@ setup_mcp_json() {
         "--rm",
         "-v", "\${workspace}:/workspace",
         "-v", "\${HOME}/.mcp-index:/app/.mcp-index",
-        "-e", "VOYAGE_AI_API_KEY=\${VOYAGE_AI_API_KEY:-}",
+        "-e", "VOYAGE_API_KEY=\${VOYAGE_API_KEY:-}",
         "-e", "MCP_ARTIFACT_SYNC=\${MCP_ARTIFACT_SYNC:-true}",
         "${MCP_IMAGE}:${MCP_VARIANT}"
       ]
@@ -247,7 +247,7 @@ print_next_steps() {
     
     if [ "$MCP_VARIANT" == "standard" ] || [ "$MCP_VARIANT" == "full" ]; then
         echo "3. Configure semantic search:"
-        echo "   export VOYAGE_AI_API_KEY='your-key-here'"
+        echo "   export VOYAGE_API_KEY='your-key-here'"
         echo "   Get your key at: https://www.voyageai.com/"
         echo
     fi

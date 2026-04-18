@@ -24,7 +24,7 @@ services:
       - DATABASE_URL=sqlite:////app/.mcp-index/code_index.db
       
       # API keys (optional)
-      - VOYAGE_AI_API_KEY=${VOYAGE_AI_API_KEY:-}
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY:-}
       - SEMANTIC_SEARCH_ENABLED=${SEMANTIC_SEARCH_ENABLED:-false}
       
       # GitHub sync settings

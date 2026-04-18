@@ -161,7 +161,7 @@ class SemanticVsSQLComparison:
                 return
                 
             # Initialize Voyage AI client
-            api_key = os.environ.get("VOYAGE_API_KEY") or os.environ.get("VOYAGE_AI_API_KEY")
+            api_key = os.environ.get("VOYAGE_API_KEY")
             if api_key:
                 self.voyage_client = voyageai.Client(api_key=api_key)
             else:

@@ -1,55 +1,15 @@
 {
-  "embedding_provider": "openai_compatible",
-  "embedding_model": "Qwen/Qwen3-Embedding-8B",
-  "model_version": "1",
-  "model_dimension": 4096,
-  "distance_metric": "dot",
-  "normalization_policy": "l2",
-  "chunk_schema_version": "1",
+  "embedding_provider": "voyage",
+  "embedding_model": "voyage-code-3",
+  "model_version": "legacy",
+  "model_dimension": 1024,
+  "distance_metric": "cosine",
+  "normalization_policy": "provider-default",
+  "chunk_schema_version": "legacy",
   "created_at": "2026-03-05T05:10:02.226505",
-  "updated_at": "2026-03-30T03:17:48.326788",
-  "qdrant_path": "vector_index.qdrant",
-  "collection_name": "code_index__oss_high__v1",
-  "compatibility_hash": "0dd4ae03e82143510fee8bfe1912f364",
-  "git_commit": "3b2f0d7429cbc5bc37ccd366143d80814a5eb030",
-  "semantic_profile": "oss_high",
-  "compatibility_fingerprint": "0dd4ae03e82143510fee8bfe1912f364",
-  "semantic_profiles": {
-    "commercial_high": {
-      "profile_id": "commercial_high",
-      "compatibility_fingerprint": "3664eff0e2710def40a70c56ded21178",
-      "compatibility_hash": "3664eff0e2710def40a70c56ded21178",
-      "embedding_provider": "voyage",
-      "embedding_model": "voyage-code-3",
-      "model_version": "1",
-      "model_dimension": 2048,
-      "distance_metric": "dot",
-      "normalization_policy": "provider-default",
-      "chunk_schema_version": "1",
-      "collection_name": "code_index__commercial_high__v1",
-      "qdrant_path": "vector_index.qdrant",
-      "created_at": "2026-03-27T15:39:12.135184",
-      "updated_at": "2026-03-30T03:17:31.311116"
-    },
-    "oss_high": {
-      "profile_id": "oss_high",
-      "compatibility_fingerprint": "0dd4ae03e82143510fee8bfe1912f364",
-      "compatibility_hash": "0dd4ae03e82143510fee8bfe1912f364",
-      "embedding_provider": "openai_compatible",
-      "embedding_model": "Qwen/Qwen3-Embedding-8B",
-      "model_version": "1",
-      "model_dimension": 4096,
-      "distance_metric": "dot",
-      "normalization_policy": "l2",
-      "chunk_schema_version": "1",
-      "collection_name": "code_index__oss_high__v1",
-      "qdrant_path": "vector_index.qdrant",
-      "created_at": "2026-03-27T15:39:12.135184",
-      "updated_at": "2026-03-30T03:17:48.326788"
-    }
-  },
-  "available_semantic_profiles": [
-    "commercial_high",
-    "oss_high"
-  ]
+  "updated_at": "2026-04-14T20:58:02.354265",
+  "qdrant_path": "./vector_index.qdrant",
+  "collection_name": "typescript-127596236859440",
+  "compatibility_hash": "1a8eb12939e6a631",
+  "git_commit": "f8325031147020afca25e2bc650a34d18d6fb163"
 }

@@ -8,7 +8,7 @@
         "--rm",
         "-v", "${workspace}:/workspace",
         "-v", "${HOME}/.mcp-index:/app/.mcp-index",
-        "-e", "VOYAGE_AI_API_KEY=${VOYAGE_AI_API_KEY:-}",
+        "-e", "VOYAGE_API_KEY=${VOYAGE_API_KEY:-}",
         "${MCP_DOCKER_IMAGE:-ghcr.io/code-index-mcp/mcp-index:minimal}"
       ],
       "env": {

@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 
 # Set test environment
-os.environ["VOYAGE_AI_API_KEY"] = "test-key"
+os.environ["VOYAGE_API_KEY"] = "test-key"
 os.environ["ANTHROPIC_API_KEY"] = "test-key"
 os.environ["COHERE_API_KEY"] = "test-key"
 

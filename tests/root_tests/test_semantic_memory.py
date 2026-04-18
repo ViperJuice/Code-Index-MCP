@@ -27,9 +27,9 @@ def test_basic_semantic_indexing():
     print("=== Testing Semantic Indexing with In-Memory Storage ===")
 
     # Check API key
-    api_key = os.getenv("VOYAGE_AI_API_KEY")
+    api_key = os.getenv("VOYAGE_API_KEY")
     if not api_key:
-        print("✗ VOYAGE_AI_API_KEY not set")
+        print("✗ VOYAGE_API_KEY not set")
         print("  Semantic search requires Voyage AI API key")
         return False
     print("✓ Voyage AI API key is configured")

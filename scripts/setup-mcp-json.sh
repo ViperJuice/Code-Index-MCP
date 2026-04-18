@@ -62,10 +62,10 @@ detect_environment() {
 
 # Check for API key
 check_api_key() {
-    if [ -n "$VOYAGE_AI_API_KEY" ]; then
+    if [ -n "$VOYAGE_API_KEY" ]; then
         print_success "Voyage AI API key detected"
         return 0
-    elif [ -f .env ] && grep -q "VOYAGE_AI_API_KEY" .env; then
+    elif [ -f .env ] && grep -q "VOYAGE_API_KEY" .env; then
         print_info "Voyage AI API key found in .env file"
         return 0
     else
@@ -148,7 +148,7 @@ setup_mcp_json() {
         echo
         echo "To enable semantic search:"
         echo "1. Get an API key from https://www.voyageai.com/"
-        echo "2. Set it: export VOYAGE_AI_API_KEY=your-key"
+        echo "2. Set it: export VOYAGE_API_KEY=your-key"
         echo "3. Re-run this script"
     fi
 }

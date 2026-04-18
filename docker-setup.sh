@@ -95,7 +95,7 @@ MCP_WORKSPACE_ROOT=/workspace
 DATABASE_URL=sqlite:///./code_index.db
 
 # Semantic Search (Optional - get key from https://www.voyageai.com/)
-VOYAGE_AI_API_KEY=
+VOYAGE_API_KEY=
 SEMANTIC_SEARCH_ENABLED=false
 SEMANTIC_EMBEDDING_MODEL=voyage-code-3
 SEMANTIC_COLLECTION_NAME=code-embeddings

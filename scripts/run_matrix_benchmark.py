@@ -12,7 +12,7 @@ so BM25-only runs with different rerankers will be identical — they're still
 included for completeness.
 
 Usage:
-    PYTHONPATH=. VOYAGE_AI_API_KEY=... .venv/bin/python3 \\
+    PYTHONPATH=. VOYAGE_API_KEY=... .venv/bin/python3 \\
         scripts/run_matrix_benchmark.py --repo . --limit 5 \\
         --json-out docs/benchmarks/matrix_benchmark.json \\
         --md-out  docs/benchmarks/matrix_benchmark.md
@@ -581,9 +581,9 @@ def main() -> int:
     qdrant_str = str(qdrant_path) if qdrant_path else ""
 
     # Check Voyage key availability
-    has_voyage = bool(os.getenv("VOYAGE_AI_API_KEY") or os.getenv("VOYAGE_API_KEY"))
+    has_voyage = bool(os.getenv("VOYAGE_API_KEY"))
     if not has_voyage:
-        print("WARNING: No VOYAGE_AI_API_KEY found — voyage reranker config will be skipped.")
+        print("WARNING: No VOYAGE_API_KEY found — voyage reranker config will be skipped.")
 
     # Filter configs
     configs_to_run = CONFIGS

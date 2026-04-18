@@ -557,7 +557,7 @@ class Settings(BaseModel):
                 "ARTIFACT_ROUTING_FALLBACK_ORDER", "local_fs,github_actions"
             ),
             artifact_delta_enabled=get_env_var("ARTIFACT_DELTA_ENABLED", "false").lower() == "true",
-            voyage_api_key=get_env_var("VOYAGE_AI_API_KEY"),
+            voyage_api_key=get_env_var("VOYAGE_API_KEY"),
             openai_api_key=get_env_var("OPENAI_API_KEY"),
             openai_api_base=get_env_var("OPENAI_API_BASE", "http://localhost:8001/v1"),
             qdrant_host=get_env_var("QDRANT_HOST", "localhost"),

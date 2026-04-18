@@ -35,7 +35,7 @@ spec:
             secretKeyRef:
               name: code-index-mcp-secrets
               key: database-url
-        - name: VOYAGE_AI_API_KEY
+        - name: VOYAGE_API_KEY
           valueFrom:
             secretKeyRef:
               name: code-index-mcp-secrets

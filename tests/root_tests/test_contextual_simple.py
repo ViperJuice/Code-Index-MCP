@@ -8,7 +8,7 @@ import sys
 
 # Configure for testing
 os.environ["MARKDOWN_MAX_CHUNK_TOKENS"] = "500"
-os.environ["VOYAGE_AI_API_KEY"] = "test-key"
+os.environ["VOYAGE_API_KEY"] = "test-key"
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

@@ -133,7 +133,7 @@ def check_openai_compatible(base_url: str, timeout_s: float = 5.0) -> CheckResul
 
 def check_voyage_key_present() -> CheckResult:
     """Check voyage credential presence."""
-    key = os.getenv("VOYAGE_API_KEY") or os.getenv("VOYAGE_AI_API_KEY")
+    key = os.getenv("VOYAGE_API_KEY")
     if key:
         return CheckResult(
             name="embedding_voyage",
@@ -146,7 +146,7 @@ def check_voyage_key_present() -> CheckResult:
         status=ServiceStatus.MISCONFIGURED,
         message="Voyage API key is missing",
         fixes=[
-            "Set VOYAGE_API_KEY or VOYAGE_AI_API_KEY",
+            "Set VOYAGE_API_KEY",
             "Use `op item get` to load the key from 1Password",
         ],
     )
