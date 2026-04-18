@@ -198,10 +198,10 @@ class TestRecordToolCallWiring:
 
     def test_stdio_runner_imports_record_tool_call(self):
         """stdio_runner must import and use record_tool_call."""
-        import ast, pathlib
-        src = pathlib.Path(
-            "/home/viperjuice/code/Code-Index-MCP/.claude/worktrees/lane-sl-2-20260418T224300-1liz"
-            "/mcp_server/cli/stdio_runner.py"
+        import pathlib
+        src = (
+            pathlib.Path(__file__).resolve().parents[2]
+            / "mcp_server/cli/stdio_runner.py"
         ).read_text()
         assert "record_tool_call" in src, \
             "stdio_runner.py must reference record_tool_call"
@@ -215,9 +215,9 @@ class TestPrometheusExporterWiring:
     def test_prometheus_exporter_imported_in_runner(self):
         """stdio_runner must import PrometheusExporter."""
         import pathlib
-        src = pathlib.Path(
-            "/home/viperjuice/code/Code-Index-MCP/.claude/worktrees/lane-sl-2-20260418T224300-1liz"
-            "/mcp_server/cli/stdio_runner.py"
+        src = (
+            pathlib.Path(__file__).resolve().parents[2]
+            / "mcp_server/cli/stdio_runner.py"
         ).read_text()
         assert "PrometheusExporter" in src, \
             "stdio_runner.py must reference PrometheusExporter"
@@ -259,9 +259,9 @@ class TestPrometheusExporterWiring:
     def test_signal_handlers_installed_in_serve(self):
         """stdio_runner.py source must reference add_signal_handler."""
         import pathlib
-        src = pathlib.Path(
-            "/home/viperjuice/code/Code-Index-MCP/.claude/worktrees/lane-sl-2-20260418T224300-1liz"
-            "/mcp_server/cli/stdio_runner.py"
+        src = (
+            pathlib.Path(__file__).resolve().parents[2]
+            / "mcp_server/cli/stdio_runner.py"
         ).read_text()
         assert "add_signal_handler" in src, \
             "stdio_runner.py must call loop.add_signal_handler for SIGTERM/SIGINT"

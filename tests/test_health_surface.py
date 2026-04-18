@@ -103,7 +103,7 @@ class TestStdioHandleGetStatusRepositories:
         dispatcher = SimpleDispatcher()
         resolver = self._make_resolver_mock(tmp_path)
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.new_event_loop().run_until_complete(
             handle_get_status(
                 arguments={},
                 dispatcher=dispatcher,
@@ -120,7 +120,7 @@ class TestStdioHandleGetStatusRepositories:
         dispatcher = SimpleDispatcher()
         resolver = self._make_resolver_mock(tmp_path)
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.new_event_loop().run_until_complete(
             handle_get_status(
                 arguments={},
                 dispatcher=dispatcher,
@@ -139,7 +139,7 @@ class TestStdioHandleGetStatusRepositories:
 
         dispatcher = SimpleDispatcher()
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.new_event_loop().run_until_complete(
             handle_get_status(
                 arguments={},
                 dispatcher=dispatcher,
