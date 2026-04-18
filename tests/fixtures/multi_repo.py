@@ -151,10 +151,10 @@ class TestServerHandle:
 def _index_repo_into_sqlite(store_registry: Any, repo_id: str, repo_path: Path) -> None:
     """Walk repo_path and insert Python files into the SQLite store directly.
 
-    The EnhancedDispatcher creates plugins without a sqlite_store, so
-    dispatcher.index_directory() never writes to the symbols/fts tables.
-    We bypass the dispatcher and write to SQLite directly so search_code and
-    symbol_lookup find actual content during tests.
+    Direct SQLite seeding is required because the dispatcher's index path does
+    not currently persist to SQLite (plugins are built with sqlite_store=None
+    in EnhancedDispatcher). Production indexing via the full plugin pipeline is
+    out of scope for SL-3; this helper exists solely to seed test content.
     """
     try:
         store = store_registry.get(repo_id)
