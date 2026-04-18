@@ -114,14 +114,14 @@ class TestStoreRegistry:
             try:
                 store = sr.get(repo_id)
                 results.append(store)
-            except sqlite3.OperationalError as e:
+            except Exception as e:
                 errors.append(e)
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
             futures = [executor.submit(worker) for _ in range(8)]
             concurrent.futures.wait(futures, timeout=5)
 
-        assert not errors, f"OperationalError(s) raised: {errors}"
+        assert not errors, f"Errors raised: {errors}"
         assert len(results) == 8
         # Due to the double-check pattern, at most 2 distinct instances may have been
         # constructed (one from the winning thread; any racer closes its copy and
@@ -157,15 +157,20 @@ class TestStoreRegistry:
                 ).lastrowid
 
                 file_id = conn.execute(
-                    "INSERT INTO files (path, repository_id, language, size, hash, metadata) "
-                    "VALUES (?, ?, ?, ?, ?, ?)",
-                    ("test_module.py", repo_row_id, "python", 100, "abc123", "{}"),
+                    "INSERT INTO files "
+                    "(repository_id, path, relative_path, language, size, hash, content_hash, "
+                    " last_modified, indexed_at, metadata, is_deleted) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, FALSE)",
+                    (repo_row_id, str(tmp_path / "test_module.py"), "test_module.py",
+                     "python", 100, "abc123", "abc123content", "{}"),
                 ).lastrowid
 
                 conn.execute(
-                    "INSERT INTO symbols (name, kind, language, file_id, line, signature, metadata) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    ("MyTestClass", "class", "python", file_id, 1, "class MyTestClass:", "{}"),
+                    "INSERT INTO symbols "
+                    "(file_id, name, kind, line_start, line_end, column_start, column_end, "
+                    " signature, documentation, metadata) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (file_id, "MyTestClass", "class", 1, 5, 0, 0, "class MyTestClass:", "", "{}"),
                 )
         finally:
             store.close()
