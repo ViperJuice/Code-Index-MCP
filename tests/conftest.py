@@ -10,12 +10,18 @@ import asyncio
 import os
 from pathlib import Path
 from typing import Dict, List
-from unittest.mock import Mock
+from unittest.mock import Mock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
 from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher as Dispatcher
+from mcp_server.core.repo_context import RepoContext
+from mcp_server.dispatcher import EnhancedDispatcher
+from mcp_server.dispatcher.protocol import DispatcherProtocol
+from mcp_server.storage.multi_repo_manager import RepositoryInfo
+from mcp_server.storage.repository_registry import RepositoryRegistry
+from mcp_server.storage.store_registry import StoreRegistry
 
 # Provide required security env vars for tests so gateway startup doesn't raise RuntimeError
 os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-exactly-32chars!")
@@ -121,7 +127,53 @@ def populated_sqlite_store(sqlite_store: SQLiteStore) -> SQLiteStore:
     return sqlite_store
 
 
+# ---------------------------------------------------------------------------
+# P2B fixtures (SL-4)
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def repo_ctx(sqlite_store, tmp_path):
+    """RepoContext wrapping a live SQLiteStore with a fake repo_id."""
+    registry_entry = MagicMock(spec=RepositoryInfo)
+    registry_entry.tracked_branch = "main"
+    return RepoContext(
+        repo_id="test-repo-p2b-0001",
+        sqlite_store=sqlite_store,
+        workspace_root=tmp_path,
+        tracked_branch="main",
+        registry_entry=registry_entry,
+    )
+
+
+@pytest.fixture
+def store_registry(tmp_path):
+    """In-memory StoreRegistry backed by a temporary RepositoryRegistry."""
+    registry = RepositoryRegistry(registry_path=tmp_path / "test_registry.json")
+    sr = StoreRegistry(registry)
+    yield sr
+    sr.shutdown()
+
+
+@pytest.fixture
+def repo_resolver(repo_ctx):
+    """Minimal RepoResolver that always returns repo_ctx regardless of path."""
+    resolver = MagicMock()
+    resolver.resolve.return_value = repo_ctx
+    return resolver
+
+
+@pytest.fixture
+def dispatcher_factory():
+    """Factory that produces an EnhancedDispatcher conforming to DispatcherProtocol."""
+    def _factory(plugins=None):
+        return EnhancedDispatcher(plugins=plugins or [])
+    return _factory
+
+
+# ---------------------------------------------------------------------------
 # File system fixtures
+# ---------------------------------------------------------------------------
+
 @pytest.fixture
 def temp_code_directory(tmp_path: Path) -> Path:
     """Create a temporary directory with sample code files."""
@@ -248,13 +300,13 @@ def python_plugin(sqlite_store: SQLiteStore) -> PythonPlugin:
 @pytest.fixture
 def dispatcher_with_plugins(python_plugin: PythonPlugin) -> Dispatcher:
     """Create a dispatcher with real plugins."""
-    return Dispatcher([python_plugin])
+    return EnhancedDispatcher(plugins=[python_plugin])
 
 
 @pytest.fixture
 def dispatcher_with_mock(mock_plugin: Mock) -> Dispatcher:
     """Create a dispatcher with mock plugin."""
-    return Dispatcher([mock_plugin])
+    return EnhancedDispatcher(plugins=[mock_plugin])
 
 
 # File watcher fixtures

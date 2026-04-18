@@ -13,10 +13,12 @@ from typing import Any, Dict, Tuple
 
 import httpx
 
+from ..core.repo_context import RepoContext
 from ..dispatcher import Dispatcher
 from ..indexer.bm25_indexer import BM25Indexer
 from ..indexer.hybrid_search import HybridSearch, HybridSearchConfig
 from ..plugin_system import PluginManager
+from ..storage.multi_repo_manager import RepositoryInfo
 from ..storage.sqlite_store import SQLiteStore
 
 
@@ -63,10 +65,25 @@ class MCPClientWrapper:
             plugin_manager = PluginManager()
             plugins = plugin_manager.load_all_plugins()
             self.dispatcher = Dispatcher(plugins)
+            self._ctx = self._make_ctx()
 
         except Exception as e:
             print(f"Warning: Could not initialize MCP components: {e}")
             print("Falling back to HTTP client mode")
+
+    def _make_ctx(self) -> "RepoContext":
+        """Build a minimal RepoContext for dispatcher calls."""
+        from unittest.mock import MagicMock
+
+        registry_entry = MagicMock(spec=RepositoryInfo)
+        registry_entry.tracked_branch = "main"
+        return RepoContext(
+            repo_id="mcp-client-repo",
+            sqlite_store=self.storage,
+            workspace_root=self.index_path.parent,
+            tracked_branch="main",
+            registry_entry=registry_entry,
+        )
 
     def _count_tokens(self, text: str) -> int:
         """Estimate token count (roughly 4 chars = 1 token)."""
@@ -92,7 +109,7 @@ class MCPClientWrapper:
         try:
             # Use dispatcher for symbol lookup
             if self.dispatcher:
-                symbol_def = self.dispatcher.lookup(symbol)
+                symbol_def = self.dispatcher.lookup(self._ctx, symbol)
 
                 if symbol_def:
                     results = [
@@ -177,7 +194,7 @@ class MCPClientWrapper:
                 ]
             else:
                 # Use dispatcher search
-                search_results = list(self.dispatcher.search(pattern, semantic=semantic, limit=20))
+                search_results = list(self.dispatcher.search(self._ctx, pattern, semantic=semantic, limit=20))
                 results = [
                     {
                         "file": r.file,

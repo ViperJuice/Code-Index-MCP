@@ -70,8 +70,9 @@ class TestGatewayStartupShutdown:
             with test_client:
                 pass
 
+    @patch("mcp_server.gateway.EnhancedDispatcher")
     @patch("mcp_server.gateway.FileWatcher")
-    def test_shutdown_stops_watcher(self, mock_watcher_class, test_client_with_dispatcher):
+    def test_shutdown_stops_watcher(self, mock_watcher_class, mock_dispatcher_class, test_client_with_dispatcher):
         """Test that shutdown stops the file watcher."""
         mock_watcher = Mock()
         mock_watcher_class.return_value = mock_watcher
@@ -358,13 +359,14 @@ class TestStatusEndpoint:
         assert "Stats error" in data["message"]
 
     def test_status_plugin_statistics(self, test_client_with_dispatcher):
-        """Test status with plugin-level statistics."""
-        # SimpleDispatcher has no get_statistics, so fallback to _plugins is used
-        # Mock plugin with statistics
+        """Test status with plugin-level statistics aggregated from get_statistics."""
+        dispatcher = test_client_with_dispatcher.app.state.dispatcher
+        # Mock get_statistics to accept any args (ctx may or may not be passed by gateway)
+        dispatcher.get_statistics = Mock(return_value={"total": 5, "by_language": {"python": 5}})
         mock_plugin = Mock()
         mock_plugin.get_indexed_count.return_value = 5
         mock_plugin.language = "python"
-        test_client_with_dispatcher.app.state.dispatcher._plugins = [mock_plugin]
+        dispatcher._plugins = [mock_plugin]
 
         response = test_client_with_dispatcher.get("/status")
 
