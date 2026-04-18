@@ -95,7 +95,10 @@ def _build_tool_list() -> list[types.Tool]:
             description="Reindex files in the codebase. Updates the index for changed files or specific paths. The path must be inside MCP_ALLOWED_ROOTS or the tool returns path_outside_allowed_roots.",
             inputSchema={
                 "type": "object",
-                "properties": {"path": {"type": "string", "description": "Optional path to reindex. If not provided, reindexes all files."}},
+                "properties": {
+                    "path": {"type": "string", "description": "Optional path to reindex. If not provided, reindexes all files."},
+                    "repository": {"type": "string", "description": "Repository ID, path, or git URL. Defaults to current repository."},
+                },
             },
         ),
         types.Tool(
@@ -106,7 +109,10 @@ def _build_tool_list() -> list[types.Tool]:
             ),
             inputSchema={
                 "type": "object",
-                "properties": {"limit": {"type": "integer", "description": "Maximum number of chunks to summarize in this call.", "default": 500}},
+                "properties": {
+                    "limit": {"type": "integer", "description": "Maximum number of chunks to summarize in this call.", "default": 500},
+                    "repository": {"type": "string", "description": "Repository ID, path, or git URL. Defaults to current repository."},
+                },
             },
         ),
         types.Tool(
@@ -122,6 +128,7 @@ def _build_tool_list() -> list[types.Tool]:
                     "paths": {"type": "array", "items": {"type": "string"}, "description": "Specific file paths to summarize (optional)."},
                     "n": {"type": "integer", "description": "Number of random files to sample when paths not given.", "default": 3},
                     "persist": {"type": "boolean", "description": "Save summaries to index (default false for evaluation).", "default": False},
+                    "repository": {"type": "string", "description": "Repository ID, path, or git URL. Defaults to current repository."},
                 },
             },
         ),
