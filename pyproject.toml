@@ -56,9 +56,23 @@ semantic = [
     "cohere>=4.0.0",
     "anthropic>=0.18.0",
     "flashrank>=0.2.0",
+    # Caching backend (optional, for semantic search result caching)
+    "redis>=4.5.0",
+    # Monitoring
+    "prometheus-client>=0.17.0",
+    # Security extras used by semantic/auth endpoints
+    "pyjwt>=2.8.0",
+    "python-multipart>=0.0.6",
+    "cryptography>=41.0.4",
+    # Template rendering (used by benchmark_runner)
+    "jinja2>=3.1.2",
 ]
 rerank = [
     "flashrank>=0.2.0",
+]
+java = [
+    # Java language plugin: static analysis / import resolution
+    "javalang>=0.13.0",
 ]
 dev = [
     "pytest>=7.4.0",
@@ -68,12 +82,28 @@ dev = [
     "pytest-mock>=3.11.1",
     "pytest-benchmark>=4.0.0",
     "pytest-xdist>=3.3.1",
+    # Extended testing utilities
+    "hypothesis>=6.82.0",
+    "factory-boy>=3.3.0",
+    "faker>=19.6.1",
+    "responses>=0.23.3",
+    "freezegun>=1.2.2",
+    "pytest-httpx>=0.22.0",
+    "aiofiles>=23.2.1",
+    # Code quality
     "black>=23.7.0",
     "isort>=5.12.0",
+    "flake8>=6.1.0",
     "mypy>=1.5.1",
+    "coverage[toml]>=7.3.0",
+    # Security scanning
+    "safety>=2.3.5",
+    "bandit>=1.7.5",
+    # Type stubs
+    "types-requests>=2.31.0",
 ]
 all = [
-    "index-it-mcp[semantic,rerank,dev]",
+    "index-it-mcp[semantic,rerank,java,dev]",
 ]
 
 [project.scripts]
