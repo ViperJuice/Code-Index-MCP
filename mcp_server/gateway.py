@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Response
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import PlainTextResponse
 
 from .artifacts.semantic_profiles import SemanticProfileRegistry
@@ -18,6 +18,7 @@ from .cache import (
 from .cli.index_management import _get_profile_collection_name
 from .cli.preflight_commands import format_preflight_report, run_startup_preflight
 from .config.settings import get_settings
+from .core import RepoContext, RepoResolver
 from .core.logging import setup_logging
 from .dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from .indexer.bm25_indexer import BM25Indexer
@@ -80,6 +81,7 @@ app = FastAPI(
     description="Code Index MCP Server with Security, Metrics, and Health Checks",
 )
 dispatcher: EnhancedDispatcher | None = None
+repo_resolver: RepoResolver | None = None
 sqlite_store: SQLiteStore | None = None
 file_watcher: FileWatcher | None = None
 plugin_manager: PluginManager | None = None
@@ -197,6 +199,62 @@ def _normalize_search_result(raw_result: Any) -> SearchResult:
 
 language_detection_status: Dict[str, Any] | None = None
 
+_FALLBACK_REPO_ID = "default"
+
+
+def get_repo_ctx(request: Request) -> RepoContext:
+    """Resolve a RepoContext for the current request.
+
+    Resolution order:
+    1. ``X-Repo-Id`` header value treated as a filesystem path.
+    2. ``?repository=<path>`` query parameter.
+    3. ``repo_resolver.resolve(cwd)`` fallback when a resolver is available.
+    4. Minimal context built from the module-global ``sqlite_store`` as last resort.
+    """
+    candidate_path: Optional[str] = None
+
+    repo_id_header = request.headers.get("X-Repo-Id")
+    if repo_id_header:
+        candidate_path = repo_id_header
+
+    if candidate_path is None:
+        candidate_path = request.query_params.get("repository")
+
+    if candidate_path is not None and repo_resolver is not None:
+        resolved = repo_resolver.resolve(Path(candidate_path))
+        if resolved is not None:
+            return resolved
+
+    if candidate_path is None and repo_resolver is not None:
+        resolved = repo_resolver.resolve(Path.cwd())
+        if resolved is not None:
+            return resolved
+
+    # Final fallback: wrap the gateway-global sqlite_store in a minimal context.
+    from datetime import datetime
+
+    from .storage.multi_repo_manager import RepositoryInfo  # local import to avoid cycles
+
+    cwd = Path.cwd()
+    dummy_entry = RepositoryInfo(
+        repository_id=_FALLBACK_REPO_ID,
+        name="default",
+        path=cwd,
+        index_path=cwd,
+        language_stats={},
+        total_files=0,
+        total_symbols=0,
+        indexed_at=datetime.utcnow(),
+    )
+    return RepoContext(
+        repo_id=_FALLBACK_REPO_ID,
+        sqlite_store=sqlite_store,  # type: ignore[arg-type]
+        workspace_root=cwd,
+        tracked_branch="",
+        registry_entry=dummy_entry,
+    )
+
+
 # Initialize metrics and health checking
 metrics_collector = get_metrics_collector()
 health_checker = get_health_checker()
@@ -209,7 +267,7 @@ setup_metrics_middleware(app, enable_detailed_metrics=True)
 @app.on_event("startup")
 async def startup_event():
     """Initialize the dispatcher and register plugins on startup."""
-    global dispatcher, sqlite_store, file_watcher, plugin_manager, plugin_loader, auth_manager, security_config, cache_manager, query_cache, bm25_indexer, hybrid_search, fuzzy_indexer, semantic_indexer, profile_hydration_status, semantic_setup_status, language_detection_status
+    global dispatcher, repo_resolver, sqlite_store, file_watcher, plugin_manager, plugin_loader, auth_manager, security_config, cache_manager, query_cache, bm25_indexer, hybrid_search, fuzzy_indexer, semantic_indexer, profile_hydration_status, semantic_setup_status, language_detection_status
 
     try:
         preflight_result = run_startup_preflight()
@@ -412,6 +470,19 @@ async def startup_event():
             logger.info("Initializing SQLite store with default path...")
             sqlite_store = SQLiteStore("code_index.db")
 
+        # Initialize RepoResolver for per-request repo context resolution.
+        try:
+            from .storage.repository_registry import RepositoryRegistry
+            from .storage.store_registry import StoreRegistry
+
+            _repo_registry = RepositoryRegistry()
+            _store_registry = StoreRegistry.for_registry(_repo_registry)
+            repo_resolver = RepoResolver(_repo_registry, _store_registry)
+            logger.info("RepoResolver initialized")
+        except Exception as _e:
+            logger.warning("RepoResolver init failed; falling back to global sqlite_store: %s", _e)
+            repo_resolver = None
+
         profile_registry = None
         requested_profiles: Dict[str, Optional[str]] = {}
         try:
@@ -538,7 +609,6 @@ async def startup_event():
         # Create a new EnhancedDispatcher instance with the loaded plugins
         logger.info("Creating dispatcher...")
         dispatcher = EnhancedDispatcher(
-            sqlite_store=sqlite_store,
             semantic_search_enabled=settings.semantic_search_enabled,
             lazy_load=settings.mcp_fast_startup,
         )
@@ -1057,10 +1127,11 @@ def get_metrics_json(
 
 
 @app.get("/symbol", response_model=SymbolDef | None)
-async def symbol(symbol: str, current_user: User = Depends(require_permission(Permission.READ))):
+async def symbol(request: Request, symbol: str, current_user: User = Depends(require_permission(Permission.READ))):
     if dispatcher is None:
         logger.error("Symbol lookup attempted but dispatcher not ready")
         raise HTTPException(503, "Dispatcher not ready")
+    ctx = get_repo_ctx(request)
 
     start_time = time.time()
     try:
@@ -1083,7 +1154,7 @@ async def symbol(symbol: str, current_user: User = Depends(require_permission(Pe
 
         # Record symbol lookup metrics
         with metrics_collector.time_function("symbol_lookup"):
-            result = dispatcher.lookup(symbol)
+            result = dispatcher.lookup(ctx, symbol)
 
         # Cache the result if available
         if query_cache and query_cache.config.enabled and result:
@@ -1114,6 +1185,7 @@ async def symbol(symbol: str, current_user: User = Depends(require_permission(Pe
 
 @app.get("/search", response_model=list[SearchResult])
 async def search(
+    request: Request,
     q: str,
     semantic: bool = False,
     limit: int = 20,
@@ -1137,6 +1209,7 @@ async def search(
         logger.error("Search attempted but dispatcher not ready")
         raise HTTPException(503, "Dispatcher not ready")
 
+    ctx = get_repo_ctx(request)
     start_time = time.time()
     try:
         # Determine effective search mode
@@ -1218,7 +1291,7 @@ async def search(
             # Use classic dispatcher with semantic=True
             if dispatcher:
                 with metrics_collector.time_function("search", labels={"mode": "semantic"}):
-                    results = list(dispatcher.search(q, semantic=True, limit=limit))
+                    results = list(dispatcher.search(ctx, q, semantic=True, limit=limit))
                     results = [_normalize_search_result(r) for r in results]
             else:
                 raise HTTPException(
@@ -1268,7 +1341,7 @@ async def search(
             # Classic search through dispatcher
             if dispatcher:
                 with metrics_collector.time_function("search", labels={"mode": "classic"}):
-                    results = list(dispatcher.search(q, semantic=False, limit=limit))
+                    results = list(dispatcher.search(ctx, q, semantic=False, limit=limit))
                     results = [_normalize_search_result(r) for r in results]
             else:
                 raise HTTPException(503, "Classic search not available")
@@ -1359,6 +1432,7 @@ async def get_search_capabilities() -> Dict[str, Any]:
 
 @app.get("/status")
 async def get_status(
+    request: Request,
     current_user: User = Depends(require_permission(Permission.READ)),
 ) -> Dict[str, Any]:
     """Returns server status including plugin information and statistics."""
@@ -1381,16 +1455,18 @@ async def get_status(
         if cached_status is not None:
             return cached_status
 
-        # Get plugin count
-        plugin_count = len(dispatcher._plugins) if hasattr(dispatcher, "_plugins") else 0
+        ctx = get_repo_ctx(request)
+        # Get plugin count via public Protocol method
+        loaded_plugins = dispatcher.plugins()
+        plugin_count = len(loaded_plugins)
 
         # Get indexed files statistics
         indexed_stats = {"total": 0, "by_language": {}}
         if hasattr(dispatcher, "get_statistics"):
-            indexed_stats = dispatcher.get_statistics()
-        elif hasattr(dispatcher, "_plugins"):
+            indexed_stats = dispatcher.get_statistics(ctx)
+        else:
             # Calculate basic statistics from plugins
-            for plugin in dispatcher._plugins:
+            for plugin in loaded_plugins:
                 if hasattr(plugin, "get_indexed_count"):
                     count = plugin.get_indexed_count()
                     indexed_stats["total"] += count
@@ -1492,6 +1568,7 @@ def plugins(
 
 @app.post("/reindex")
 async def reindex(
+    request: Request,
     path: Optional[str] = None,
     current_user: User = Depends(require_permission(Permission.EXECUTE)),
 ) -> Dict[str, str]:
@@ -1508,6 +1585,7 @@ async def reindex(
         logger.error("Reindex requested but dispatcher not ready")
         raise HTTPException(503, "Dispatcher not ready")
 
+    ctx = get_repo_ctx(request)
     try:
         logger.info(f"Manual reindex requested for path: {path or 'all'}")
         # Since dispatcher has index_file method, we can use it for reindexing
@@ -1520,17 +1598,18 @@ async def reindex(
             indexed_count = 0
             if target_path.is_file():
                 # Single file
-                dispatcher.index_file(target_path)
+                dispatcher.index_file(ctx, target_path)
                 indexed_count = 1
             else:
                 # Directory - find all supported files
+                active_plugins = dispatcher.plugins()
                 for file_path in target_path.rglob("*"):
                     if file_path.is_file():
                         try:
                             # Check if any plugin supports this file
-                            for plugin in dispatcher._plugins:
+                            for plugin in active_plugins:
                                 if plugin.supports(file_path):
-                                    dispatcher.index_file(file_path)
+                                    dispatcher.index_file(ctx, file_path)
                                     indexed_count += 1
                                     break
                         except Exception as e:
@@ -1546,15 +1625,16 @@ async def reindex(
             # Reindex all supported files
             indexed_count = 0
             indexed_by_type = {}
+            active_plugins = dispatcher.plugins()
 
             # Find all files and check if any plugin supports them
             for file_path in Path(".").rglob("*"):
                 if file_path.is_file():
                     try:
                         # Check if any plugin supports this file
-                        for plugin in dispatcher._plugins:
+                        for plugin in active_plugins:
                             if plugin.supports(file_path):
-                                dispatcher.index_file(file_path)
+                                dispatcher.index_file(ctx, file_path)
                                 indexed_count += 1
 
                                 # Track by file type
@@ -2125,6 +2205,7 @@ async def rebuild_search_indexes(
 
 @app.get("/graph/dependencies/{symbol}")
 async def get_symbol_dependencies(
+    request: Request,
     symbol: str,
     max_depth: int = 3,
     current_user: User = Depends(require_permission(Permission.READ)),
@@ -2133,8 +2214,9 @@ async def get_symbol_dependencies(
     if dispatcher is None:
         raise HTTPException(503, "Dispatcher not ready")
 
+    ctx = get_repo_ctx(request)
     try:
-        dependencies = dispatcher.find_symbol_dependencies(symbol, max_depth)
+        dependencies = dispatcher.find_symbol_dependencies(ctx, symbol, max_depth)
 
         return {
             "symbol": symbol,
@@ -2149,6 +2231,7 @@ async def get_symbol_dependencies(
 
 @app.get("/graph/dependents/{symbol}")
 async def get_symbol_dependents(
+    request: Request,
     symbol: str,
     max_depth: int = 3,
     current_user: User = Depends(require_permission(Permission.READ)),
@@ -2157,8 +2240,9 @@ async def get_symbol_dependents(
     if dispatcher is None:
         raise HTTPException(503, "Dispatcher not ready")
 
+    ctx = get_repo_ctx(request)
     try:
-        dependents = dispatcher.find_symbol_dependents(symbol, max_depth)
+        dependents = dispatcher.find_symbol_dependents(ctx, symbol, max_depth)
 
         return {
             "symbol": symbol,
@@ -2173,6 +2257,7 @@ async def get_symbol_dependents(
 
 @app.get("/graph/hotspots")
 async def get_code_hotspots(
+    request: Request,
     top_n: int = 10,
     current_user: User = Depends(require_permission(Permission.READ)),
 ) -> Dict[str, Any]:
@@ -2180,8 +2265,9 @@ async def get_code_hotspots(
     if dispatcher is None:
         raise HTTPException(503, "Dispatcher not ready")
 
+    ctx = get_repo_ctx(request)
     try:
-        hotspots = dispatcher.get_code_hotspots(top_n)
+        hotspots = dispatcher.get_code_hotspots(ctx, top_n)
 
         return {
             "hotspots": hotspots,
@@ -2195,6 +2281,7 @@ async def get_code_hotspots(
 
 @app.post("/graph/context")
 async def get_context_for_symbols(
+    request: Request,
     symbols: List[str],
     radius: int = 2,
     budget: int = 200,
@@ -2205,8 +2292,9 @@ async def get_context_for_symbols(
     if dispatcher is None:
         raise HTTPException(503, "Dispatcher not ready")
 
+    ctx = get_repo_ctx(request)
     try:
-        result = dispatcher.get_context_for_symbols(symbols, radius, budget, weights)
+        result = dispatcher.get_context_for_symbols(ctx, symbols, radius, budget, weights)
 
         if result is None:
             return {
@@ -2255,6 +2343,7 @@ async def get_context_for_symbols(
 
 @app.get("/graph/search")
 async def graph_search(
+    request: Request,
     q: str,
     expansion_radius: int = 1,
     max_context_nodes: int = 50,
@@ -2266,9 +2355,11 @@ async def graph_search(
     if dispatcher is None:
         raise HTTPException(503, "Dispatcher not ready")
 
+    ctx = get_repo_ctx(request)
     try:
         results = list(
             dispatcher.graph_search(
+                ctx,
                 query=q,
                 expansion_radius=expansion_radius,
                 max_context_nodes=max_context_nodes,
@@ -2300,32 +2391,28 @@ async def graph_search(
 
 @app.get("/graph/status")
 async def get_graph_status(
+    request: Request,
     current_user: User = Depends(require_permission(Permission.READ)),
 ) -> Dict[str, Any]:
     """Get graph analysis system status."""
     if dispatcher is None:
         raise HTTPException(503, "Dispatcher not ready")
 
+    ctx = get_repo_ctx(request)
     try:
-        from ..graph import CHUNKER_AVAILABLE
+        from .graph import CHUNKER_AVAILABLE
 
-        status = {
-            "available": CHUNKER_AVAILABLE,
-            "initialized": (
-                dispatcher._graph_analyzer is not None
-                if hasattr(dispatcher, "_graph_analyzer")
-                else False
-            ),
-        }
-
-        if hasattr(dispatcher, "_graph_nodes"):
-            status["nodes"] = len(dispatcher._graph_nodes)
-            status["edges"] = len(dispatcher._graph_edges)
+        status: Dict[str, Any] = {"available": CHUNKER_AVAILABLE}
 
         if not CHUNKER_AVAILABLE:
+            status["initialized"] = False
             status["message"] = (
                 "Install treesitter-chunker for graph features: pip install treesitter-chunker"
             )
+        else:
+            # Probe availability via a zero-cost health check; graph init is lazy.
+            health = dispatcher.health_check(ctx)
+            status["initialized"] = health.get("graph_initialized", False)
 
         return status
     except Exception as e:
@@ -2335,6 +2422,7 @@ async def get_graph_status(
 
 @app.post("/graph/initialize")
 async def initialize_graph(
+    request: Request,
     file_paths: Optional[List[str]] = None,
     current_user: User = Depends(require_role(UserRole.ADMIN)),
 ) -> Dict[str, Any]:
@@ -2342,28 +2430,37 @@ async def initialize_graph(
     if dispatcher is None:
         raise HTTPException(503, "Dispatcher not ready")
 
+    ctx = get_repo_ctx(request)
     try:
         # If no file paths provided, scan all indexed files
         if file_paths is None:
-            if sqlite_store:
-                files = sqlite_store.get_all_files()
+            if ctx.sqlite_store:
+                files = ctx.sqlite_store.get_all_files()
                 file_paths = [f["path"] for f in files]
             else:
                 raise HTTPException(400, "No file paths provided and no store available")
 
-        success = dispatcher._ensure_graph_initialized(file_paths)
-
-        if not success:
+        # Trigger graph initialization via a bulk index_directory call as a proxy.
+        # The dispatcher's graph is built lazily; priming it via index_directory
+        # ensures graph structures are populated for the listed paths.
+        if hasattr(dispatcher, "_ensure_graph_initialized"):
+            success = dispatcher._ensure_graph_initialized(file_paths)
+            if not success:
+                return {
+                    "status": "failed",
+                    "message": "Graph initialization failed. Check that treesitter-chunker is installed.",
+                }
+        else:
             return {
-                "status": "failed",
-                "message": "Graph initialization failed. Check that treesitter-chunker is installed.",
+                "status": "unavailable",
+                "message": "Graph initialization not supported by the current dispatcher.",
             }
 
+        health = dispatcher.health_check(ctx)
         return {
             "status": "success",
             "message": f"Graph initialized from {len(file_paths)} files",
-            "nodes": len(dispatcher._graph_nodes) if hasattr(dispatcher, "_graph_nodes") else 0,
-            "edges": len(dispatcher._graph_edges) if hasattr(dispatcher, "_graph_edges") else 0,
+            "graph_initialized": health.get("graph_initialized", False),
         }
     except Exception as e:
         logger.error(f"Error initializing graph: {e}")
