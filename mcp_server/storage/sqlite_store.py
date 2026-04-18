@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ..core.path_resolver import PathResolver
+from .connection_pool import ConnectionPool
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +75,7 @@ class SQLiteStore:
         self,
         db_path: str = "code_index.db",
         path_resolver: Optional[PathResolver] = None,
+        pool: Optional[ConnectionPool] = None,
     ):
         """
         Initialize the SQLite store.
@@ -81,16 +83,21 @@ class SQLiteStore:
         Args:
             db_path: Path to the SQLite database file
             path_resolver: PathResolver instance for path management
+            pool: Optional ConnectionPool for read operations; factory must use
+                  check_same_thread=False.
         """
         self.db_path = db_path
         self.path_resolver = path_resolver or PathResolver()
+        self._pool = pool
 
         self._init_database()
         self._run_migrations()
         self._ensure_semantic_points_table()
 
     def close(self) -> None:
-        """No-op: SQLiteStore opens/closes per-operation; nothing to release."""
+        """Close the store.  If a connection pool is attached, drain it."""
+        if self._pool is not None:
+            self._pool.close_all()
 
     def _ensure_semantic_points_table(self) -> None:
         """Ensure semantic point mapping table exists for stale vector cleanup."""
@@ -225,18 +232,34 @@ class SQLiteStore:
 
     @contextmanager
     def _get_connection(self):
-        """Get a database connection with proper error handling."""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
-        try:
-            yield conn
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
+        """Get a database connection with proper error handling.
+
+        When a ConnectionPool is attached, borrows a connection from it
+        (skipping open/close) and applies row_factory + foreign_keys each
+        time.  Commit/rollback semantics are identical to the non-pool path.
+        """
+        if self._pool is not None:
+            with self._pool.acquire() as conn:
+                conn.row_factory = sqlite3.Row
+                conn.execute("PRAGMA foreign_keys = ON")
+                try:
+                    yield conn
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+                    raise
+        else:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys = ON")
+            try:
+                yield conn
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
 
     def _check_fts5_support(self, conn: sqlite3.Connection) -> bool:
         """Check if FTS5 is supported in this SQLite build."""

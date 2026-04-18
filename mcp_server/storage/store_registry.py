@@ -3,9 +3,11 @@ Thread-safe registry of SQLiteStore instances keyed by repo_id.
 """
 
 import logging
+import sqlite3
 import threading
 from typing import Dict
 
+from mcp_server.storage.connection_pool import ConnectionPool
 from mcp_server.storage.repository_registry import RepositoryRegistry
 from mcp_server.storage.sqlite_store import SQLiteStore
 
@@ -68,7 +70,11 @@ class StoreRegistry:
                 existing = self._cache.get(repo_id)
                 if existing is not None:
                     return existing
-            store = SQLiteStore(index_path)
+            pool = ConnectionPool(
+                factory=lambda p=index_path: sqlite3.connect(p, check_same_thread=False),
+                size=4,
+            )
+            store = SQLiteStore(index_path, pool=pool)
             with self._lock:
                 self._cache[repo_id] = store
             return store
