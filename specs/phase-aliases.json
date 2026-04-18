@@ -1,0 +1,10 @@
+{
+  "P1": "Phase 1 — Repo Identity & Default-Branch Pinning",
+  "P2A": "Phase 2A — Data Model & Store Registry",
+  "P2B": "Phase 2B — Dispatcher Refactor & Entry-Point Consolidation",
+  "P3": "Phase 3 — Per-Repo Plugins, Stores & Memory",
+  "P4": "Phase 4 — Default-Branch-Only Indexing & Multi-Repo Watcher",
+  "P5": "Phase 5 — STDIO Hardening & Multi-Repo Integration Tests",
+  "P6A": "Phase 6A — Dependency Hygiene",
+  "P6B": "Phase 6B — Documentation Alignment"
+}
