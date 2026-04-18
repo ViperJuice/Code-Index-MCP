@@ -1,0 +1,81 @@
+"""Schema-handler parity test — IF-0-P9-3.
+
+Asserts bidirectional parity: every tool schema that advertises a
+`repository` property has a handler that extracts it, and every handler
+that references `arguments.get("repository")` has a matching schema entry.
+"""
+from __future__ import annotations
+
+import inspect
+
+import pytest
+
+from mcp_server.cli.tool_handlers import (
+    handle_get_status,
+    handle_list_plugins,
+    handle_reindex,
+    handle_search_code,
+    handle_summarize_sample,
+    handle_symbol_lookup,
+    handle_write_summaries,
+)
+from mcp_server.cli.stdio_runner import _build_tool_list
+
+TOOL_NAME_TO_HANDLER = {
+    "symbol_lookup": handle_symbol_lookup,
+    "search_code": handle_search_code,
+    "reindex": handle_reindex,
+    "write_summaries": handle_write_summaries,
+    "summarize_sample": handle_summarize_sample,
+    "get_status": handle_get_status,
+    "list_plugins": handle_list_plugins,
+}
+
+
+def _schema_advertises_repository(tool_schema: dict) -> bool:
+    return "repository" in tool_schema.get("inputSchema", {}).get("properties", {})
+
+
+def _handler_extracts_repository(handler) -> bool:
+    src = inspect.getsource(handler)
+    return (
+        'arguments.get("repository")' in src
+        or "arguments['repository']" in src
+        or '.get("repository")' in src
+    )
+
+
+def test_schema_advertises_repository_implies_handler_accepts_it():
+    """Every tool whose schema has 'repository' must have a handler that extracts it."""
+    tool_list = _build_tool_list()
+    schema_map = {t.name: t.inputSchema for t in tool_list}
+
+    failures = []
+    for tool_name, handler in TOOL_NAME_TO_HANDLER.items():
+        tool_schema = schema_map.get(tool_name, {})
+        if _schema_advertises_repository({"inputSchema": tool_schema}):
+            if not _handler_extracts_repository(handler):
+                failures.append(
+                    f"{tool_name}: schema advertises 'repository' but handler does not "
+                    f"extract arguments.get(\"repository\")"
+                )
+
+    assert not failures, "\n".join(failures)
+
+
+def test_handler_accepts_repository_implies_schema_advertises_it():
+    """Every handler that extracts 'repository' must have a schema that advertises it."""
+    tool_list = _build_tool_list()
+    schema_map = {t.name: t.inputSchema for t in tool_list}
+
+    failures = []
+    for tool_name, handler in TOOL_NAME_TO_HANDLER.items():
+        if _handler_extracts_repository(handler):
+            tool_schema = schema_map.get(tool_name, {})
+            if not _schema_advertises_repository({"inputSchema": tool_schema}):
+                failures.append(
+                    f"{tool_name}: handler extracts 'repository' but schema does not "
+                    f"advertise it in inputSchema.properties"
+                )
+
+    assert not failures, "\n".join(failures)

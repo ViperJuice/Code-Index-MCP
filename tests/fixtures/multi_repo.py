@@ -85,6 +85,7 @@ class TestServerHandle:
     dispatcher: Any
     repo_resolver: Any
     _gate: Any
+    store_registry: Any = field(default=None, repr=False)
     _multi_watcher: Optional[Any] = field(default=None, repr=False)
     _ref_poller: Optional[Any] = field(default=None, repr=False)
 
@@ -117,6 +118,12 @@ class TestServerHandle:
                 coro = tool_handlers.handle_symbol_lookup(**common)
             elif name == "search_code":
                 coro = tool_handlers.handle_search_code(**common)
+            elif name == "reindex":
+                coro = tool_handlers.handle_reindex(**common)
+            elif name == "write_summaries":
+                coro = tool_handlers.handle_write_summaries(**common)
+            elif name == "summarize_sample":
+                coro = tool_handlers.handle_summarize_sample(**common)
             else:
                 return {"error": "Unknown tool", "tool": name}
 
@@ -297,6 +304,7 @@ def boot_test_server(
             dispatcher=dispatcher,
             repo_resolver=repo_resolver,
             _gate=gate,
+            store_registry=store_registry,
             _multi_watcher=multi_watcher,
             _ref_poller=ref_poller,
         )

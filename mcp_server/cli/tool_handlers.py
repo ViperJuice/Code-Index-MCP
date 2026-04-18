@@ -446,8 +446,46 @@ async def handle_reindex(
     sqlite_store: Any = None,
 ) -> Sequence[types.TextContent]:
     path = (arguments or {}).get("path")
+    repository = (arguments or {}).get("repository")
+
+    # Sandbox check for repository when it looks like a path
+    if repository and _looks_like_path(repository):
+        allowed = _allowed_roots()
+        if not _path_within_allowed(Path(repository), allowed):
+            return [types.TextContent(type="text", text=_ensure_response({
+                "error": "Path outside allowed roots",
+                "code": "path_outside_allowed_roots",
+                "path": str(Path(repository).resolve()),
+                "allowed_roots": [str(r) for r in allowed],
+                "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
+            }))]
+
+    # Conflict detection: both path and repository provided but resolve to different repos
+    if path and repository:
+        ctx_from_path = _resolve_ctx(repo_resolver, str(path))
+        ctx_from_repo = _resolve_ctx(repo_resolver, repository)
+        if (ctx_from_path is not None and ctx_from_repo is not None
+                and ctx_from_path.repo_id != ctx_from_repo.repo_id):
+            return [types.TextContent(type="text", text=_ensure_response({
+                "error": "Conflicting scope",
+                "code": "conflicting_path_and_repository",
+                "path": str(path),
+                "repository": repository,
+                "hint": "Provide only one, or ensure both resolve to the same repo.",
+            }))]
+
+    # Resolve ctx — repository takes precedence when both are set and consistent
+    ctx = _resolve_ctx(repo_resolver, repository or (str(path) if path else None))
+    active_store = ctx.sqlite_store if ctx is not None else sqlite_store
+
     allowed = _allowed_roots()
-    target_path = Path(path).expanduser() if path else allowed[0]
+    # Determine target_path: prefer ctx.workspace_root when ctx resolved, else path
+    if path:
+        target_path = Path(path).expanduser()
+    elif ctx is not None:
+        target_path = ctx.workspace_root
+    else:
+        target_path = allowed[0]
 
     if not target_path.exists():
         return [types.TextContent(type="text", text=_ensure_response(
@@ -461,8 +499,6 @@ async def handle_reindex(
             "allowed_roots": [str(r) for r in allowed],
             "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
         }))]
-
-    ctx = _resolve_ctx(repo_resolver, str(target_path))
 
     if path and target_path.is_file():
         try:
@@ -485,7 +521,7 @@ async def handle_reindex(
         except TypeError:
             stats = dispatcher.index_directory(target_path, recursive=True)  # type: ignore[call-arg]
 
-        lexical_rows = sqlite_store.rebuild_fts_code() if sqlite_store else 0
+        lexical_rows = active_store.rebuild_fts_code() if active_store else 0
 
         response_data = {
             "path": str(target_path),
@@ -524,18 +560,34 @@ async def handle_write_summaries(
     from mcp_server.config.settings import Settings
     from mcp_server.indexing.summarization import ComprehensiveChunkWriter
 
+    repository = (arguments or {}).get("repository")
+
+    if repository and _looks_like_path(repository):
+        allowed = _allowed_roots()
+        if not _path_within_allowed(Path(repository), allowed):
+            return [types.TextContent(type="text", text=_ensure_response({
+                "error": "Path outside allowed roots",
+                "code": "path_outside_allowed_roots",
+                "path": str(Path(repository).resolve()),
+                "allowed_roots": [str(r) for r in allowed],
+                "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
+            }))]
+
+    ctx = _resolve_ctx(repo_resolver, repository)
+    active_store = ctx.sqlite_store if ctx is not None else sqlite_store
+
     if lazy_summarizer is None or not lazy_summarizer.can_summarize():
         return [types.TextContent(type="text", text=_ensure_response({
             "error": "Summarization not available",
             "details": "No API key configured. Set CEREBRAS_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY.",
         }))]
 
-    if sqlite_store is None:
+    if active_store is None:
         return [types.TextContent(type="text", text=_ensure_response({
             "error": "sqlite_store not initialized",
         }))]
 
-    db_path = sqlite_store.db_path
+    db_path = active_store.db_path
     limit_arg = int((arguments or {}).get("limit", 500))
     model_used = lazy_summarizer._get_model_name()
 
@@ -573,19 +625,35 @@ async def handle_summarize_sample(
 
     from mcp_server.indexing.summarization import FileBatchSummarizer
 
+    repository = (arguments or {}).get("repository")
+
+    if repository and _looks_like_path(repository):
+        allowed = _allowed_roots()
+        if not _path_within_allowed(Path(repository), allowed):
+            return [types.TextContent(type="text", text=_ensure_response({
+                "error": "Path outside allowed roots",
+                "code": "path_outside_allowed_roots",
+                "path": str(Path(repository).resolve()),
+                "allowed_roots": [str(r) for r in allowed],
+                "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
+            }))]
+
+    ctx = _resolve_ctx(repo_resolver, repository)
+    active_store = ctx.sqlite_store if ctx is not None else sqlite_store
+
     if lazy_summarizer is None or not lazy_summarizer.can_summarize():
         return [types.TextContent(type="text", text=_ensure_response({
             "error": "Summarization not available",
             "details": "No API key configured. Set CEREBRAS_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY.",
         }))]
 
-    if sqlite_store is None:
+    if active_store is None:
         return [types.TextContent(type="text", text=_ensure_response({"error": "sqlite_store not initialized"}))]
 
     paths_arg = (arguments or {}).get("paths")
     n_arg = int((arguments or {}).get("n", 3))
     persist_flag = bool((arguments or {}).get("persist", False))
-    db_path = sqlite_store.db_path
+    db_path = active_store.db_path
     model_used = lazy_summarizer._get_model_name()
 
     if paths_arg:
