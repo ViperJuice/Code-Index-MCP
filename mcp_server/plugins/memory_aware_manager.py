@@ -14,11 +14,14 @@ import weakref
 from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    from mcp_server.core.repo_context import RepoContext
 
 try:
     import psutil
-except ImportError:  # pragma: no cover - optional dependency
+except ImportError:
     psutil = None
 
 # from mcp_server.plugin_system.models import LoadedPlugin
@@ -54,10 +57,10 @@ class MemoryAwarePluginManager:
 
     Features:
     - Configurable memory limits (default 1GB)
-    - LRU eviction of unused plugins
+    - LRU eviction based on real process RSS (via psutil)
     - High-priority plugin protection
     - Transparent plugin reloading
-    - Memory usage monitoring
+    - Per-repo plugin isolation (cache keyed by (repo_id, language))
     """
 
     def __init__(self, max_memory_mb: int = 1024, high_priority_langs: Optional[List[str]] = None):
@@ -67,18 +70,27 @@ class MemoryAwarePluginManager:
         Args:
             max_memory_mb: Maximum memory limit in MB (default 1024)
             high_priority_langs: Languages to keep in memory (e.g., ['python', 'javascript'])
+
+        Raises:
+            RuntimeError: If psutil is not installed.
         """
+        if psutil is None:
+            raise RuntimeError(
+                "MemoryAwarePluginManager requires psutil; install with: uv add psutil"
+            )
+
         self.max_memory_bytes = max_memory_mb * 1024 * 1024
         self.high_priority_langs = set(
             high_priority_langs or ["python", "javascript", "typescript"]
         )
 
-        # Plugin storage with LRU ordering
-        self._plugins: OrderedDict[str, LoadedPlugin] = OrderedDict()
-        self._plugin_info: Dict[str, PluginMemoryInfo] = {}
+        # Plugin storage keyed by (repo_id, language) for per-repo isolation.
+        # repo_id=None is the legacy/global key used when no ctx is provided.
+        self._plugins: OrderedDict[Tuple[Optional[str], str], LoadedPlugin] = OrderedDict()
+        self._plugin_info: Dict[Tuple[Optional[str], str], PluginMemoryInfo] = {}
 
         # Weak references for garbage collection tracking
-        self._weak_refs: Dict[str, weakref.ref] = {}
+        self._weak_refs: Dict[Tuple[Optional[str], str], weakref.ref] = {}
 
         # Thread safety
         self._lock = threading.RLock()
@@ -87,71 +99,68 @@ class MemoryAwarePluginManager:
         self._factory = PluginFactory()
 
         # Memory monitoring
-        if psutil is None:
-            self._process = None
-            self._base_memory = 0
-            logger.warning("psutil is not available; memory tracking is disabled")
-        else:
-            self._process = psutil.Process()
-            self._base_memory = self._get_current_memory()
+        self._process = psutil.Process()
+        self._base_memory = self._get_current_memory()
 
         logger.info(f"Memory-aware plugin manager initialized with {max_memory_mb}MB limit")
 
-    def get_plugin(self, language: str) -> Optional[Any]:
+    def get_plugin(self, language: str, ctx: Optional["RepoContext"] = None) -> Optional[Any]:
         """
         Get a plugin for the specified language, loading if necessary.
 
         Args:
             language: Programming language name
+            ctx: Optional RepoContext; when provided the plugin cache is keyed by
+                 (ctx.repo_id, language) so distinct repos get distinct instances.
+                 ctx=None preserves backward compatibility with the single caller
+                 at repository_plugin_loader.py that does not pass a context.
 
         Returns:
             Plugin instance or None if not available
         """
+        repo_id = ctx.repo_id if ctx is not None else None
+        cache_key = (repo_id, language)
+
         with self._lock:
-            # Check if already loaded
-            if language in self._plugins:
-                # Move to end (most recently used)
-                self._plugins.move_to_end(language)
-                self._update_usage(language)
-                return self._plugins[language].instance
+            if cache_key in self._plugins:
+                self._plugins.move_to_end(cache_key)
+                self._update_usage(cache_key)
+                return self._plugins[cache_key].instance
 
-            # Try to load the plugin
-            return self._load_plugin(language)
+            return self._load_plugin(language, repo_id=repo_id)
 
-    def _load_plugin(self, language: str) -> Optional[Any]:
+    def _load_plugin(self, language: str, repo_id: Optional[str] = None) -> Optional[Any]:
         """Load a plugin with memory management."""
+        cache_key = (repo_id, language)
         start_time = time.time()
 
-        # Check memory before loading
         if not self._ensure_memory_available():
             logger.warning(f"Cannot load {language} plugin - memory limit reached")
             return None
 
         try:
-            # Load through factory
             plugin = self._factory.get_plugin(language)
             if not plugin:
                 return None
 
-            # Measure memory impact
             memory_before = self._get_current_memory()
 
-            # Create loaded plugin wrapper
             loaded = LoadedPlugin(
                 name=language,
                 instance=plugin,
-                metadata={"language": language, "loaded_at": datetime.now().isoformat()},
+                metadata={
+                    "language": language,
+                    "repo_id": repo_id,
+                    "loaded_at": datetime.now().isoformat(),
+                },
             )
 
-            # Store plugin
-            self._plugins[language] = loaded
+            self._plugins[cache_key] = loaded
 
-            # Calculate memory usage
             memory_after = self._get_current_memory()
             memory_used = max(0, memory_after - memory_before)
 
-            # Store memory info
-            self._plugin_info[language] = PluginMemoryInfo(
+            self._plugin_info[cache_key] = PluginMemoryInfo(
                 plugin_name=language,
                 memory_bytes=memory_used,
                 last_used=datetime.now(),
@@ -160,13 +169,13 @@ class MemoryAwarePluginManager:
                 is_high_priority=language in self.high_priority_langs,
             )
 
-            # Create weak reference for GC tracking
-            self._weak_refs[language] = weakref.ref(
-                plugin, lambda ref, lang=language: self._on_plugin_deleted(lang)
+            self._weak_refs[cache_key] = weakref.ref(
+                plugin, lambda ref, k=cache_key: self._on_plugin_deleted(k)
             )
 
             logger.info(
-                f"Loaded {language} plugin in {self._plugin_info[language].load_time:.2f}s, "
+                f"Loaded {language} plugin (repo={repo_id}) in "
+                f"{self._plugin_info[cache_key].load_time:.2f}s, "
                 f"using {memory_used / 1024 / 1024:.1f}MB"
             )
 
@@ -176,95 +185,90 @@ class MemoryAwarePluginManager:
             logger.error(f"Failed to load {language} plugin: {e}")
             return None
 
+    def _should_evict(self) -> bool:
+        """Return True if real process RSS exceeds the configured limit."""
+        return self._get_current_memory() >= self.max_memory_bytes
+
     def _ensure_memory_available(self) -> bool:
         """
         Ensure enough memory is available, evicting plugins if necessary.
 
+        Uses real process RSS (via psutil) as the eviction trigger rather than
+        the sum of tracked PluginMemoryInfo.memory_bytes.  The tracked bytes are
+        kept for per-plugin attribution / telemetry only.
+
         Returns:
             True if memory is available, False otherwise
         """
-        current_memory = self._get_plugin_memory_usage()
-
-        # Check if under limit
-        if current_memory < self.max_memory_bytes:
+        if not self._should_evict():
             return True
 
-        # Need to free memory - get eviction candidates
         candidates = self._get_eviction_candidates()
-
-        # Evict until we have enough space (aim for 10% buffer)
         target_memory = self.max_memory_bytes * 0.9
 
-        for language in candidates:
-            if current_memory < target_memory:
+        for cache_key in candidates:
+            if self._get_current_memory() < target_memory:
                 break
+            self._evict_plugin(cache_key)
 
-            evicted_memory = self._evict_plugin(language)
-            current_memory -= evicted_memory
+        return self._get_current_memory() < self.max_memory_bytes
 
-        return current_memory < self.max_memory_bytes
-
-    def _get_eviction_candidates(self) -> List[str]:
-        """Get list of plugins that can be evicted, ordered by priority."""
+    def _get_eviction_candidates(self) -> List[Tuple[Optional[str], str]]:
+        """Get list of plugin cache keys that can be evicted, ordered by LRU."""
         candidates = []
 
-        # Sort by last used time (LRU), excluding high priority
-        for language, info in self._plugin_info.items():
+        for cache_key, info in self._plugin_info.items():
             if not info.is_high_priority:
-                candidates.append((info.last_used, language))
+                candidates.append((info.last_used, cache_key))
 
-        # Sort by last used (oldest first)
-        candidates.sort()
+        candidates.sort(key=lambda x: x[0])
 
-        return [lang for _, lang in candidates]
+        return [key for _, key in candidates]
 
-    def _evict_plugin(self, language: str) -> int:
+    def _evict_plugin(self, cache_key: Tuple[Optional[str], str]) -> int:
         """
         Evict a plugin from memory.
 
         Returns:
-            Memory freed in bytes
+            Memory freed in bytes (from tracked attribution; may be 0 for new loads)
         """
-        if language not in self._plugins:
+        if cache_key not in self._plugins:
             return 0
 
-        info = self._plugin_info.get(language)
+        info = self._plugin_info.get(cache_key)
         memory_freed = info.memory_bytes if info else 0
 
-        # Remove plugin
-        plugin = self._plugins.pop(language, None)
-        self._plugin_info.pop(language, None)
-        self._weak_refs.pop(language, None)
+        plugin = self._plugins.pop(cache_key, None)
+        self._plugin_info.pop(cache_key, None)
+        self._weak_refs.pop(cache_key, None)
 
-        # Force garbage collection
         del plugin
         gc.collect()
 
+        language = cache_key[1]
         logger.info(f"Evicted {language} plugin, freed {memory_freed / 1024 / 1024:.1f}MB")
 
         return memory_freed
 
-    def _update_usage(self, language: str):
+    def _update_usage(self, cache_key: Tuple[Optional[str], str]):
         """Update usage statistics for a plugin."""
-        if language in self._plugin_info:
-            info = self._plugin_info[language]
+        if cache_key in self._plugin_info:
+            info = self._plugin_info[cache_key]
             info.last_used = datetime.now()
             info.usage_count += 1
 
     def _get_current_memory(self) -> int:
         """Get current process memory usage in bytes."""
-        if not self._process:
-            return 0
         return self._process.memory_info().rss
 
     def _get_plugin_memory_usage(self) -> int:
-        """Get total memory used by plugins."""
+        """Get total memory used by plugins (attribution/telemetry only)."""
         return sum(info.memory_bytes for info in self._plugin_info.values())
 
-    def _on_plugin_deleted(self, language: str):
+    def _on_plugin_deleted(self, cache_key: Tuple[Optional[str], str]):
         """Callback when a plugin is garbage collected."""
-        logger.debug(f"Plugin {language} was garbage collected")
-        self._plugin_info.pop(language, None)
+        logger.debug(f"Plugin {cache_key} was garbage collected")
+        self._plugin_info.pop(cache_key, None)
 
     def get_memory_status(self) -> Dict[str, Any]:
         """Get current memory usage status."""
@@ -293,12 +297,12 @@ class MemoryAwarePluginManager:
                 ],
             }
 
-    def preload_high_priority(self):
+    def preload_high_priority(self, ctx: Optional["RepoContext"] = None):
         """Preload high-priority plugins."""
         logger.info(f"Preloading high-priority plugins: {self.high_priority_langs}")
 
         for language in self.high_priority_langs:
-            self.get_plugin(language)
+            self.get_plugin(language, ctx)
 
     def clear_cache(self, keep_high_priority: bool = True):
         """
@@ -308,26 +312,26 @@ class MemoryAwarePluginManager:
             keep_high_priority: Whether to keep high-priority plugins loaded
         """
         with self._lock:
-            languages = list(self._plugins.keys())
+            keys = list(self._plugins.keys())
 
-            for language in languages:
-                info = self._plugin_info.get(language)
+            for cache_key in keys:
+                info = self._plugin_info.get(cache_key)
                 if not keep_high_priority or not info or not info.is_high_priority:
-                    self._evict_plugin(language)
+                    self._evict_plugin(cache_key)
 
     def set_high_priority_languages(self, languages: List[str]):
         """Update the list of high-priority languages."""
         with self._lock:
             self.high_priority_langs = set(languages)
 
-            # Update existing plugin info
-            for language, info in self._plugin_info.items():
-                info.is_high_priority = language in self.high_priority_langs
+            for cache_key, info in self._plugin_info.items():
+                info.is_high_priority = cache_key[1] in self.high_priority_langs
 
     def get_plugin_info(self, language: str) -> Optional[Dict[str, Any]]:
-        """Get detailed information about a specific plugin."""
+        """Get detailed information about a specific plugin (global/legacy key only)."""
         with self._lock:
-            info = self._plugin_info.get(language)
+            cache_key = (None, language)
+            info = self._plugin_info.get(cache_key)
             if not info:
                 return None
 
@@ -338,7 +342,7 @@ class MemoryAwarePluginManager:
                 "usage_count": info.usage_count,
                 "is_high_priority": info.is_high_priority,
                 "load_time_seconds": info.load_time,
-                "is_loaded": language in self._plugins,
+                "is_loaded": cache_key in self._plugins,
             }
 
 
