@@ -1,10 +1,10 @@
-"""Tests for mcp_server/core/ignore_patterns.py — IgnorePatternManager."""
+"""Tests for mcp_server/core/ignore_patterns.py — IgnorePatternManager and build_walker_filter."""
 
 from pathlib import Path
 
 import pytest
 
-from mcp_server.core.ignore_patterns import IgnorePatternManager
+from mcp_server.core.ignore_patterns import IgnorePatternManager, build_walker_filter, EXCLUDED_DIR_PARTS
 
 
 class TestDefaultPatterns:
@@ -137,3 +137,78 @@ class TestGetPatterns:
         (tmp_path / ".mcp-index-ignore").write_text("*.custom\n")
         manager.reload()
         assert "*.custom" in manager.get_mcp_ignore_patterns()
+
+
+class TestExcludedDirParts:
+    """EXCLUDED_DIR_PARTS must cover all expected directory names."""
+
+    REQUIRED_DIRS = [
+        ".git", "node_modules", "__pycache__", ".venv", "venv",
+        ".mcp-index", ".indexes", "dist", "build", ".ruff_cache",
+        ".mypy_cache", "htmlcov", ".tox", ".pytest_cache", ".idea",
+        ".vscode", ".gradle", ".next", ".nuxt", "target", "coverage",
+    ]
+
+    def test_excluded_dir_parts_completeness(self, tmp_path):
+        f = build_walker_filter(tmp_path)
+        for dir_name in self.REQUIRED_DIRS:
+            path = tmp_path / dir_name / "some_file.py"
+            assert f(path) is True, f"Expected {dir_name} to be excluded but it was not"
+
+    def test_excluded_dir_parts_set_contains_required_dirs(self):
+        for d in self.REQUIRED_DIRS:
+            assert d in EXCLUDED_DIR_PARTS, f"{d} missing from EXCLUDED_DIR_PARTS"
+
+
+class TestBuildWalkerFilter:
+    """Tests for the build_walker_filter() function."""
+
+    def test_gitignore_log_files_ignored(self, tmp_path):
+        (tmp_path / ".gitignore").write_text("*.log\n/secrets/\n")
+        f = build_walker_filter(tmp_path)
+        assert f(tmp_path / "foo.log") is True
+
+    def test_gitignore_secrets_dir_ignored(self, tmp_path):
+        (tmp_path / ".gitignore").write_text("*.log\n/secrets/\n")
+        f = build_walker_filter(tmp_path)
+        assert f(tmp_path / "secrets" / "token.txt") is True
+
+    def test_regular_python_file_not_ignored(self, tmp_path):
+        (tmp_path / ".gitignore").write_text("*.log\n/secrets/\n")
+        f = build_walker_filter(tmp_path)
+        assert f(tmp_path / "src" / "main.py") is False
+
+    def test_non_ignored_code_files(self, tmp_path):
+        """Code files not matched by gitignore or excluded dirs should return False."""
+        f = build_walker_filter(tmp_path)
+        for filename in ["main.py", "index.ts", "main.go", "lib.rs"]:
+            path = tmp_path / "src" / filename
+            assert f(path) is False, f"Expected {filename} to NOT be filtered"
+
+    def test_excluded_dir_returns_true(self, tmp_path):
+        f = build_walker_filter(tmp_path)
+        assert f(tmp_path / "node_modules" / "pkg" / "index.js") is True
+        assert f(tmp_path / "__pycache__" / "module.cpython-311.pyc") is True
+        assert f(tmp_path / ".git" / "HEAD") is True
+
+
+class TestWalkerIntegration:
+    """Integration: EnhancedDispatcher.index_directory respects the walker filter."""
+
+    def test_log_files_not_indexed(self, tmp_path):
+        import os
+        from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
+
+        # Create a minimal git-like structure
+        (tmp_path / "src").mkdir()
+        (tmp_path / "src" / "main.py").write_text("def hello(): pass\n")
+        (tmp_path / "app.log").write_text("log line\n")
+        (tmp_path / ".gitignore").write_text("*.log\n")
+
+        dispatcher = EnhancedDispatcher(tmp_path)
+        stats = dispatcher.index_directory(tmp_path, recursive=True)
+
+        # .log file should be ignored (by gitignore) — indexed_files should not include it
+        # The .py file should be indexed
+        assert stats.get("indexed_files", 0) >= 1
+        assert stats.get("ignored_files", 0) >= 1
