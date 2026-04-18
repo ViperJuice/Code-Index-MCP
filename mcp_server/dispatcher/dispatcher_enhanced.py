@@ -29,10 +29,12 @@ from ..plugin_base import IPlugin, SearchResult, SymbolDef
 from ..plugins.language_registry import get_all_extensions, get_language_by_extension
 from ..plugins.memory_aware_manager import MemoryAwarePluginManager
 from ..plugins.plugin_factory import PluginFactory
+from ..plugins.plugin_set_registry import PluginSetRegistry
 from ..plugins.repository_plugin_loader import RepositoryPluginLoader
 from ..storage.multi_repo_manager import MultiRepositoryManager
 from ..storage.sqlite_store import SQLiteStore
 from ..utils.semantic_indexer import SemanticIndexer
+from ..utils.semantic_indexer_registry import SemanticIndexerRegistry
 from .cross_repo_coordinator import (
     CrossRepositorySearchCoordinator,
     SearchScope,
@@ -163,6 +165,8 @@ class EnhancedDispatcher:
         memory_aware: bool = True,
         multi_repo_enabled: bool = None,
         reranker_type: str = "none",
+        plugin_set_registry: Optional[PluginSetRegistry] = None,
+        semantic_indexer_registry: Optional[SemanticIndexerRegistry] = None,
     ):
         """Initialize the enhanced dispatcher.
 
@@ -203,9 +207,13 @@ class EnhancedDispatcher:
         self._lazy_load = lazy_load
         self._semantic_enabled = semantic_search_enabled
 
-        # Plugin storage
-        self._plugins: List[IPlugin] = []
-        self._by_lang: Dict[str, IPlugin] = {}
+        # Per-repo plugin registry (P3)
+        self._plugin_set_registry: PluginSetRegistry = (
+            plugin_set_registry if plugin_set_registry is not None else PluginSetRegistry()
+        )
+        # Legacy process-global plugin storage for callers that inject a pre-built plugin list.
+        self._legacy_plugins: List[IPlugin] = []
+        self._lang_cache: Dict[str, IPlugin] = {}
         self._loaded_languages: set[str] = set()
 
         # Cache for file hashes to avoid re-indexing unchanged files
@@ -227,9 +235,11 @@ class EnhancedDispatcher:
             "plugins_loaded": 0,
         }
 
-        # Initialize semantic indexer if enabled with auto-discovery (process-global, path-based)
-        self._semantic_indexer = None
-        if self._semantic_enabled:
+        # Per-repo semantic indexer registry (P3)
+        self._semantic_registry: Optional[SemanticIndexerRegistry] = semantic_indexer_registry
+        # Fallback process-global semantic indexer for repos not tracked by the registry.
+        self._semantic_indexer_fallback: Optional[SemanticIndexer] = None
+        if self._semantic_enabled and semantic_indexer_registry is None:
             try:
                 settings = reload_settings()
                 profile_registry = SemanticProfileRegistry.from_raw(
@@ -250,7 +260,7 @@ class EnhancedDispatcher:
                 )
 
                 if Path(qdrant_path).exists():
-                    self._semantic_indexer = SemanticIndexer(
+                    self._semantic_indexer_fallback = SemanticIndexer(
                         qdrant_path=qdrant_path,
                         collection=collection_name,
                         profile_registry=profile_registry,
@@ -299,19 +309,16 @@ class EnhancedDispatcher:
         # VoyageReranker ("voyage") is consistent with Voyage embeddings so it is allowed.
         self._reranker_skips_semantic = reranker_type in ("flashrank", "cross-encoder")
 
-        # Initialize plugins
+        # Initialize legacy plugin list (backward compatibility for callers injecting plugins)
         if plugins:
-            # Use provided plugins (backward compatibility)
-            self._plugins = plugins
-            self._by_lang = {p.lang: p for p in plugins}
+            self._legacy_plugins = plugins
+            self._lang_cache = {p.lang: p for p in plugins}
             for plugin in plugins:
                 self._loaded_languages.add(getattr(plugin, "lang", "unknown"))
             if self._enable_advanced:
                 self._register_plugins_with_router()
         elif use_plugin_factory and not lazy_load:
-            # Load all plugins immediately
             self._load_all_plugins()
-        # If lazy_load is True, plugins will be loaded on demand
 
         # Compile document query patterns for performance
         self._compiled_doc_patterns = [
@@ -328,7 +335,7 @@ class EnhancedDispatcher:
         self._graph_nodes: List[GraphNode] = []
         self._graph_edges = []
 
-        logger.info(f"Enhanced dispatcher initialized with {len(self._plugins)} plugins")
+        logger.info("Enhanced dispatcher initialized")
 
     def _load_all_plugins(self):
         """Load all available plugins using PluginFactory with timeout protection."""
@@ -359,18 +366,13 @@ class EnhancedDispatcher:
             with timeout(30):  # 30 second timeout for startup plugin loading
                 # Use repository-aware loading if available
                 if self._repo_plugin_loader and self._memory_aware:
-                    # Get languages to load based on repository content
                     languages_to_load = self._repo_plugin_loader.get_required_plugins()
                     priority_order = self._repo_plugin_loader.get_priority_languages()
-
-                    # Log loading plan
                     self._repo_plugin_loader.log_loading_plan()
 
-                    # Load plugins in priority order
                     for lang in priority_order:
                         if lang in languages_to_load:
                             try:
-                                # Use memory manager if available
                                 if self._memory_manager:
                                     plugin = self._memory_manager.get_plugin(lang)
                                 else:
@@ -379,23 +381,22 @@ class EnhancedDispatcher:
                                     )
 
                                 if plugin:
-                                    self._plugins.append(plugin)
-                                    self._by_lang[lang] = plugin
+                                    self._legacy_plugins.append(plugin)
+                                    self._lang_cache[lang] = plugin
                                     self._loaded_languages.add(lang)
                                     self._operation_stats["plugins_loaded"] += 1
                                     self._repo_plugin_loader.mark_loaded(lang)
                             except Exception as e:
                                 logger.error(f"Failed to load {lang} plugin: {e}")
                 else:
-                    # Fall back to loading all plugins
                     all_plugins = PluginFactory.create_all_plugins(
                         sqlite_store=None,
                         enable_semantic=self._semantic_enabled,
                     )
 
                     for lang, plugin in all_plugins.items():
-                        self._plugins.append(plugin)
-                        self._by_lang[lang] = plugin
+                        self._legacy_plugins.append(plugin)
+                        self._lang_cache[lang] = plugin
                         self._loaded_languages.add(lang)
                         self._operation_stats["plugins_loaded"] += 1
 
@@ -403,16 +404,16 @@ class EnhancedDispatcher:
                     self._register_plugins_with_router()
 
                 logger.info(
-                    f"Loaded {len(self._plugins)} plugins: {', '.join(sorted(self._loaded_languages))}"
+                    f"Loaded {len(self._legacy_plugins)} plugins: {', '.join(sorted(self._loaded_languages))}"
                 )
 
         except TimeoutError as e:
             logger.warning(f"Plugin loading timeout: {e}")
-            self._plugins = []  # Ensure empty list on timeout
+            self._legacy_plugins = []
             self._loaded_languages = set()
         except Exception as e:
             logger.error(f"Plugin loading failed: {e}")
-            self._plugins = []  # Ensure empty list on failure
+            self._legacy_plugins = []
             self._loaded_languages = set()
 
     def _ensure_plugin_loaded(self, language: str) -> Optional[IPlugin]:
@@ -428,8 +429,8 @@ class EnhancedDispatcher:
         language = language.lower().replace("-", "_")
 
         # Check if already loaded
-        if language in self._by_lang:
-            return self._by_lang[language]
+        if language in self._lang_cache:
+            return self._lang_cache[language]
 
         # If not using factory or already tried to load, return None
         if not self._use_factory or language in self._loaded_languages:
@@ -444,9 +445,9 @@ class EnhancedDispatcher:
                 enable_semantic=self._semantic_enabled,
             )
 
-            # Add to collections
-            self._plugins.append(plugin)
-            self._by_lang[language] = plugin
+            # Add to legacy collections
+            self._legacy_plugins.append(plugin)
+            self._lang_cache[language] = plugin
             self._loaded_languages.add(language)
             self._operation_stats["plugins_loaded"] += 1
 
@@ -483,17 +484,16 @@ class EnhancedDispatcher:
         if language:
             return self._ensure_plugin_loaded(language)
 
-        # Fallback: try all loaded plugins
-        for plugin in self._plugins:
+        # Fallback: try all loaded legacy plugins
+        for plugin in self._legacy_plugins:
             if plugin.supports(path):
                 return plugin
 
         return None
 
     def _register_plugins_with_router(self):
-        """Register plugins with the router and assign capabilities."""
-        for plugin in self._plugins:
-            # Determine capabilities based on plugin type/language
+        """Register legacy plugins with the router and assign capabilities."""
+        for plugin in self._legacy_plugins:
             capabilities = self._detect_plugin_capabilities(plugin)
             self._router.register_plugin(plugin, capabilities)
 
@@ -582,15 +582,15 @@ class EnhancedDispatcher:
         return capabilities
 
     def plugins(self) -> List[IPlugin]:
-        """Return all loaded plugins (process-global during P2B)."""
-        return list(self._plugins)
+        """Return all loaded legacy plugins."""
+        return list(self._legacy_plugins)
 
     def supported_languages(self) -> List[str]:
         """Get list of all supported languages (loaded and available)."""
         if self._use_factory:
             return PluginFactory.get_supported_languages()
         else:
-            return list(self._by_lang.keys())
+            return list(self._lang_cache.keys())
 
     def _get_file_hash(self, content: str) -> str:
         """Compute SHA-256 hash of file content."""
@@ -613,8 +613,8 @@ class EnhancedDispatcher:
 
     def _match_plugin(self, path: Path) -> IPlugin:
         """Match a plugin for the given file path."""
-        # Check explicitly-registered plugins first so mocks and custom plugins take priority
-        for p in self._plugins:
+        # Check explicitly-registered legacy plugins first
+        for p in self._legacy_plugins:
             if p.supports(path):
                 return p
 
@@ -644,7 +644,7 @@ class EnhancedDispatcher:
         else:
             # Basic fallback
             matching_plugins = []
-            for plugin in self._plugins:
+            for plugin in self._legacy_plugins:
                 if plugin.supports(path):
                     matching_plugins.append((plugin, 1.0))
             return matching_plugins
@@ -748,10 +748,11 @@ class EnhancedDispatcher:
                 except Exception as e:
                     logger.error(f"Error in direct symbol lookup: {e}")
 
+            repo_plugins = self._plugin_set_registry.plugins_for(ctx.repo_id)
             if self._enable_advanced and self._aggregator:
                 # Use advanced aggregation
                 definitions_by_plugin = {}
-                for plugin in self._plugins:
+                for plugin in repo_plugins:
                     try:
                         definition = plugin.getDefinition(symbol)
                         definitions_by_plugin[plugin] = definition
@@ -769,7 +770,7 @@ class EnhancedDispatcher:
                 return result
             else:
                 # Fallback to basic lookup
-                for p in self._plugins:
+                for p in repo_plugins:
                     res = p.getDefinition(symbol)
                     if res:
                         self._operation_stats["lookups"] += 1
@@ -1031,6 +1032,15 @@ class EnhancedDispatcher:
             logger.warning(f"_apply_reranker failed, returning original order: {e}")
             return candidates[:limit]
 
+    def _get_semantic_indexer(self, ctx: RepoContext) -> Optional[SemanticIndexer]:
+        """Return the SemanticIndexer for ctx.repo_id, or the fallback if no registry."""
+        if self._semantic_registry is not None:
+            try:
+                return self._semantic_registry.get(ctx.repo_id)
+            except (KeyError, Exception):
+                return None
+        return self._semantic_indexer_fallback
+
     def search(
         self,
         ctx: RepoContext,
@@ -1042,6 +1052,8 @@ class EnhancedDispatcher:
         """Search for code and documentation scoped to ctx.repo_id."""
         start_time = time.time()
         sqlite_store = ctx.sqlite_store
+        _semantic_indexer = self._get_semantic_indexer(ctx)
+        repo_plugins = self._plugin_set_registry.plugins_for(ctx.repo_id)
 
         try:
             # Fuzzy (trigram) path for misspelled queries
@@ -1085,7 +1097,7 @@ class EnhancedDispatcher:
 
             # Prefer direct SQLite lexical search for non-semantic queries so the
             # server remains useful even when plugin in-memory indexes are cold.
-            if sqlite_store and (not semantic or self._semantic_indexer is None):
+            if sqlite_store and (not semantic or _semantic_indexer is None):
                 # Symbol routing: bypass BM25 for explicit symbol-pattern queries.
                 intent, sym_name, kind_hint = classify_query_intent(query)
                 if intent == QueryIntent.SYMBOL:
@@ -1188,10 +1200,10 @@ class EnhancedDispatcher:
 
             # Semantic queries go directly to the vector index — plugins explicitly
             # return [] for semantic=True, so bypassing them is correct.
-            if semantic and self._semantic_indexer:
+            if semantic and _semantic_indexer:
                 logger.info(f"Using semantic indexer for query: {query}")
                 try:
-                    semantic_results = self._semantic_indexer.search(query=query, limit=limit)
+                    semantic_results = _semantic_indexer.search(query=query, limit=limit)
                     candidates = []
                     for result in semantic_results:
                         snippet = result.get("snippet", "")
@@ -1237,16 +1249,17 @@ class EnhancedDispatcher:
 
             # For search, we may need to search across all languages
             # Load all plugins if using lazy loading
-            if self._lazy_load and self._use_factory and len(self._plugins) == 0:
+            if self._lazy_load and self._use_factory and len(repo_plugins) == 0:
                 self._load_all_plugins()
+                repo_plugins = self._plugin_set_registry.plugins_for(ctx.repo_id)
 
             # If still no plugins, try hybrid or BM25 search directly
-            if len(self._plugins) == 0 and sqlite_store:
+            if len(repo_plugins) == 0 and sqlite_store:
                 # Use semantic search if available and requested
-                if semantic and self._semantic_indexer:
+                if semantic and _semantic_indexer:
                     logger.info("No plugins loaded, using semantic search")
                     try:
-                        semantic_results = self._semantic_indexer.search(query=query, limit=limit)
+                        semantic_results = _semantic_indexer.search(query=query, limit=limit)
                         for result in semantic_results:
                             snippet = result.get("snippet", "")
                             if not snippet and "code" in result:
@@ -1344,7 +1357,7 @@ class EnhancedDispatcher:
 
                 # Search with all query variations
                 for search_query in queries:
-                    for plugin in self._plugins:
+                    for plugin in repo_plugins:
                         try:
                             results = list(plugin.search(search_query, opts))
                             if results:
@@ -1451,7 +1464,7 @@ class EnhancedDispatcher:
 
                 # Search with all query variations
                 for search_query in queries:
-                    for p in self._plugins:
+                    for p in repo_plugins:
                         try:
                             for result in p.search(search_query, opts):
                                 all_results.append(result)
@@ -1552,9 +1565,10 @@ class EnhancedDispatcher:
             )
 
             # Semantic indexing for incremental single-file updates
-            if do_semantic and self._semantic_indexer:
+            _sem = self._get_semantic_indexer(ctx)
+            if do_semantic and _sem:
                 try:
-                    self._semantic_indexer.index_file(path)
+                    _sem.index_file(path)
                 except Exception as e:
                     logger.warning(f"Semantic indexing failed for {path}: {e}")
 
@@ -1571,7 +1585,7 @@ class EnhancedDispatcher:
             with self._file_cache_lock:
                 cached_paths = list(self._file_cache.keys())
             for file_path in cached_paths:
-                for lang, plugin in self._by_lang.items():
+                for lang, plugin in self._lang_cache.items():
                     if plugin.supports(Path(file_path)):
                         by_language[lang] = by_language.get(lang, 0) + 1
                         break
@@ -1662,7 +1676,7 @@ class EnhancedDispatcher:
                 # This allows plugins to match by filename patterns (e.g., .env, Dockerfile)
                 else:
                     matched = False
-                    for plugin in self._plugins:
+                    for plugin in self._plugin_set_registry.plugins_for(ctx.repo_id):
                         if plugin.supports(path):
                             self.index_file(ctx, path, do_semantic=False)
                             stats["indexed_files"] += 1
@@ -1686,15 +1700,16 @@ class EnhancedDispatcher:
                 stats["failed_files"] += 1
 
         # Batch semantic embedding — O(n/1000) API calls instead of O(n)
+        _sem = self._get_semantic_indexer(ctx)
         stats["semantic_paths_queued"] = len(semantically_indexed_paths)
-        stats["semantic_indexer_present"] = self._semantic_indexer is not None
-        if self._semantic_indexer and semantically_indexed_paths:
+        stats["semantic_indexer_present"] = _sem is not None
+        if _sem and semantically_indexed_paths:
             logger.info(
                 f"Batch semantic indexing {len(semantically_indexed_paths)} files "
                 f"(embed_batch_size=1000)"
             )
             try:
-                sem_stats = self._semantic_indexer.index_files_batch(
+                sem_stats = _sem.index_files_batch(
                     semantically_indexed_paths, embed_batch_size=1000
                 )
                 stats["semantic_indexed"] = sem_stats.get("files_indexed", 0)
@@ -1797,7 +1812,7 @@ class EnhancedDispatcher:
             "components": {
                 "dispatcher": {
                     "status": "healthy",
-                    "plugins_loaded": len(self._plugins),
+                    "plugins_loaded": len(self._plugin_set_registry.plugins_for(ctx.repo_id)),
                     "languages_supported": len(self.supported_languages()),
                     "factory_enabled": self._use_factory,
                     "lazy_loading": self._lazy_load,
@@ -1808,7 +1823,7 @@ class EnhancedDispatcher:
         }
 
         # Check plugin health
-        for lang, plugin in self._by_lang.items():
+        for lang, plugin in self._lang_cache.items():
             try:
                 plugin_health = {
                     "status": "healthy",
@@ -1859,9 +1874,10 @@ class EnhancedDispatcher:
                 logger.warning(f"Error removing from plugin index: {e}")
 
             # Remove from Qdrant semantic index if available
-            if self._semantic_indexer is not None:
+            _sem = self._get_semantic_indexer(ctx)
+            if _sem is not None:
                 try:
-                    self._semantic_indexer.remove_file(path)
+                    _sem.remove_file(path)
                     logger.info("Removed %s from semantic index", path)
                 except Exception as e:
                     logger.warning("Failed to remove %s from semantic index: %s", path, e)
