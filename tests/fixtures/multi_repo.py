@@ -1,0 +1,315 @@
+"""Multi-repo test fixtures — IF-0-P5-3.
+
+Provides build_temp_repo() and boot_test_server() for integration tests.
+
+IMPORTANT: Do NOT import mock_file_system from tests/conftest.py here.
+That fixture monkey-patches Path.exists() globally and breaks pytest-xdist
+parallelism. All repo state is created under tmp_path via subprocess git calls.
+"""
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import os
+import subprocess
+import threading
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# build_temp_repo
+# ---------------------------------------------------------------------------
+
+def build_temp_repo(
+    tmp_path: Path,
+    name: str,
+    *,
+    seed_files: dict[str, str] | None = None,
+) -> tuple[Path, str]:
+    """Create a git repo at tmp_path/name with optional seed files committed.
+
+    Returns (repo_path, repo_id). repo_id is computed via compute_repo_id.
+    The default branch is always 'main' regardless of the host git config.
+    """
+    from mcp_server.storage.repo_identity import compute_repo_id
+
+    repo_path = tmp_path / name
+    repo_path.mkdir(parents=True, exist_ok=True)
+
+    # Initialize with explicit 'main' branch to avoid host-config variation
+    subprocess.run(
+        ["git", "init", "-b", "main"],
+        cwd=str(repo_path), check=True, capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.email", "test@test.com"],
+        cwd=str(repo_path), check=True, capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test User"],
+        cwd=str(repo_path), check=True, capture_output=True,
+    )
+
+    files = seed_files or {"placeholder.py": "# placeholder\n"}
+    for filename, content in files.items():
+        (repo_path / filename).write_text(content)
+        subprocess.run(
+            ["git", "add", filename],
+            cwd=str(repo_path), check=True, capture_output=True,
+        )
+
+    subprocess.run(
+        ["git", "commit", "-m", "initial commit"],
+        cwd=str(repo_path), check=True, capture_output=True,
+    )
+
+    repo_id = compute_repo_id(repo_path).repo_id
+    return repo_path, repo_id
+
+
+# ---------------------------------------------------------------------------
+# TestServerHandle
+# ---------------------------------------------------------------------------
+
+@dataclass
+class TestServerHandle:
+    """Handle to a running in-process test server."""
+
+    registry: Any
+    dispatcher: Any
+    repo_resolver: Any
+    _gate: Any
+    _multi_watcher: Optional[Any] = field(default=None, repr=False)
+    _ref_poller: Optional[Any] = field(default=None, repr=False)
+
+    def call_tool(self, name: str, arguments: dict) -> dict:
+        """Call a tool synchronously. Returns parsed JSON dict.
+
+        Runs the async handler in a fresh event loop so concurrent threads
+        each get an isolated loop (safe for test_concurrent_no_db_lock).
+        """
+        from mcp_server.cli import tool_handlers
+
+        # HandshakeGate check first
+        gate_err = self._gate.check(name, arguments)
+        if gate_err is not None:
+            return gate_err
+
+        loop = asyncio.new_event_loop()
+        try:
+            common = dict(
+                arguments=arguments,
+                dispatcher=self.dispatcher,
+                repo_resolver=self.repo_resolver,
+            )
+            if name == "handshake":
+                secret = arguments.get("secret", "")
+                if self._gate.verify(secret):
+                    return {"authenticated": True}
+                return {"error": "Invalid secret.", "code": "handshake_required"}
+            elif name == "symbol_lookup":
+                coro = tool_handlers.handle_symbol_lookup(**common)
+            elif name == "search_code":
+                coro = tool_handlers.handle_search_code(**common)
+            else:
+                return {"error": "Unknown tool", "tool": name}
+
+            result = loop.run_until_complete(coro)
+        finally:
+            loop.close()
+
+        if result:
+            return json.loads(result[0].text)
+        return {}
+
+    def stop(self) -> None:
+        """Stop all background threads with a 5s bounded join; log-but-swallow on timeout."""
+        if self._multi_watcher is not None:
+            try:
+                self._multi_watcher.stop_watching_all()
+            except Exception as exc:
+                logger.warning("MultiRepositoryWatcher.stop_watching_all failed: %s", exc)
+
+        if self._ref_poller is not None:
+            try:
+                # RefPoller.stop() already joins with 5s timeout internally
+                self._ref_poller.stop()
+            except Exception as exc:
+                logger.warning("RefPoller.stop failed: %s", exc)
+
+
+# ---------------------------------------------------------------------------
+# Internal: populate SQLite store from seed files
+# ---------------------------------------------------------------------------
+
+def _index_repo_into_sqlite(store_registry: Any, repo_id: str, repo_path: Path) -> None:
+    """Walk repo_path and insert Python files into the SQLite store directly.
+
+    The EnhancedDispatcher creates plugins without a sqlite_store, so
+    dispatcher.index_directory() never writes to the symbols/fts tables.
+    We bypass the dispatcher and write to SQLite directly so search_code and
+    symbol_lookup find actual content during tests.
+    """
+    try:
+        store = store_registry.get(repo_id)
+    except Exception as exc:
+        logger.warning("Could not get sqlite store for %s: %s", repo_id, exc)
+        return
+
+    # Create a repository entry in the sqlite store (integer PK used by files table)
+    internal_repo_id = store.create_repository(str(repo_path), repo_path.name)
+
+    for py_file in repo_path.rglob("*.py"):
+        if ".mcp-index" in py_file.parts:
+            continue
+        try:
+            content = py_file.read_text(encoding="utf-8")
+        except Exception:
+            continue
+
+        file_id = store.store_file(
+            internal_repo_id,
+            path=py_file,
+            language="python",
+            size=len(content.encode()),
+        )
+
+        # Store the file content in fts_code for BM25 search
+        with store._get_connection() as conn:
+            conn.execute(
+                "INSERT INTO fts_code (content, file_id) VALUES (?, ?)",
+                (content, file_id),
+            )
+
+        # Parse and store function/class symbols so symbol_lookup works
+        for lineno, line in enumerate(content.splitlines(), start=1):
+            stripped = line.strip()
+            if stripped.startswith("def ") or stripped.startswith("class "):
+                kind = "function" if stripped.startswith("def ") else "class"
+                name_part = stripped.split("(")[0].split(":")[0]
+                sym_name = name_part.split(" ", 1)[-1].strip()
+                if sym_name:
+                    store.store_symbol(
+                        file_id,
+                        name=sym_name,
+                        kind=kind,
+                        line_start=lineno,
+                        line_end=lineno,
+                        signature=stripped[:120],
+                    )
+
+
+# ---------------------------------------------------------------------------
+# boot_test_server
+# ---------------------------------------------------------------------------
+
+@contextmanager
+def boot_test_server(
+    tmp_path: Path,
+    repos: list[Path],
+    *,
+    enable_watchers: bool = False,
+    poll_interval: float = 2.0,
+    client_secret: str | None = None,
+    extra_roots: list[Path] | None = None,
+):
+    """In-process boot via initialize_stateless_services().
+
+    Registers each repo via RepositoryRegistry.register_repository.
+    If enable_watchers: start MultiRepositoryWatcher + RefPoller(interval_seconds=poll_interval).
+    If client_secret: set MCP_CLIENT_SECRET for this scope and restore on exit.
+    Yields TestServerHandle with .call_tool(name, arguments)->dict, .registry,
+    .dispatcher, .stop().
+    On teardown: .stop_watching_all() + RefPoller.stop() with 5s bounded join;
+    log-but-swallow on timeout.
+    """
+    from mcp_server.cli.bootstrap import initialize_stateless_services
+    from mcp_server.cli.handshake import HandshakeGate
+
+    registry_path = tmp_path / "registry.json"
+
+    # Collect all paths that need to be in MCP_ALLOWED_ROOTS
+    all_roots = list(repos)
+    if extra_roots:
+        all_roots.extend(extra_roots)
+
+    allowed_roots_str = ",".join(str(p.resolve()) for p in all_roots)
+
+    # Save and override env vars
+    saved_env: dict[str, Optional[str]] = {}
+    env_overrides = {
+        "MCP_ALLOWED_ROOTS": allowed_roots_str,
+        "MCP_REPO_REGISTRY": str(registry_path),
+    }
+    if client_secret is not None:
+        env_overrides["MCP_CLIENT_SECRET"] = client_secret
+
+    for key, value in env_overrides.items():
+        saved_env[key] = os.environ.get(key)
+        os.environ[key] = value
+
+    try:
+        store_registry, repo_resolver, dispatcher, repo_registry, git_index_manager = (
+            initialize_stateless_services(registry_path=registry_path)
+        )
+
+        # Register and index each repo
+        for repo_path in repos:
+            repo_id = repo_registry.register_repository(str(repo_path))
+            # SQLiteStore requires the parent directory to exist
+            (repo_path / ".mcp-index").mkdir(exist_ok=True)
+            _index_repo_into_sqlite(store_registry, repo_id, repo_path)
+
+        # Build HandshakeGate (reads MCP_CLIENT_SECRET from env, already set above)
+        gate = HandshakeGate()
+
+        multi_watcher = None
+        ref_poller = None
+
+        if enable_watchers:
+            from mcp_server.watcher_multi_repo import MultiRepositoryWatcher
+            from mcp_server.watcher.ref_poller import RefPoller
+
+            multi_watcher = MultiRepositoryWatcher(
+                registry=repo_registry,
+                dispatcher=dispatcher,
+                index_manager=git_index_manager,
+                repo_resolver=repo_resolver,
+            )
+            ref_poller = RefPoller(
+                registry=repo_registry,
+                git_index_manager=git_index_manager,
+                dispatcher=dispatcher,
+                repo_resolver=repo_resolver,
+                interval_seconds=poll_interval,
+            )
+            multi_watcher.start_watching_all()
+            ref_poller.start()
+
+        handle = TestServerHandle(
+            registry=repo_registry,
+            dispatcher=dispatcher,
+            repo_resolver=repo_resolver,
+            _gate=gate,
+            _multi_watcher=multi_watcher,
+            _ref_poller=ref_poller,
+        )
+
+        try:
+            yield handle
+        finally:
+            handle.stop()
+
+    finally:
+        # Restore env vars
+        for key, original in saved_env.items():
+            if original is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = original
