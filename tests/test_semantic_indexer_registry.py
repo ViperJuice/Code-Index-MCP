@@ -1,0 +1,146 @@
+"""Tests for SemanticIndexerRegistry — SL-4.1."""
+
+from __future__ import annotations
+
+import re
+import tempfile
+from datetime import datetime
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+COLLECTION_PATTERN = re.compile(r"^ci__[0-9a-f]{12}__.+__.+$")
+
+
+def _make_registry_with_repos(tmp_path: Path):
+    """Return a RepositoryRegistry pre-populated with two fake repos."""
+    from mcp_server.storage.multi_repo_manager import RepositoryInfo
+    from mcp_server.storage.repository_registry import RepositoryRegistry
+
+    reg_file = tmp_path / "registry.json"
+    repo_reg = RepositoryRegistry(registry_path=reg_file)
+
+    for repo_id, name, branch, commit in [
+        ("repo-a", "alpha", "main", "aabbccdd1234"),
+        ("repo-b", "beta", "main", "11223344aabb"),
+    ]:
+        fake_path = tmp_path / name
+        fake_path.mkdir()
+        info = RepositoryInfo(
+            repository_id=repo_id,
+            name=name,
+            path=fake_path,
+            index_path=fake_path / ".mcp-index" / "current.db",
+            language_stats={},
+            total_files=0,
+            total_symbols=0,
+            indexed_at=datetime.now(),
+            current_commit=commit,
+            tracked_branch=branch,
+        )
+        repo_reg.register(info)
+
+    return repo_reg
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def mock_qdrant(monkeypatch):
+    """Patch QdrantClient so no server is needed."""
+    mock_client = MagicMock()
+    mock_client.collection_exists.return_value = False
+    mock_client.get_collection.side_effect = Exception("no collection")
+
+    with patch("mcp_server.utils.semantic_indexer.QdrantClient", return_value=mock_client):
+        yield mock_client
+
+
+@pytest.fixture()
+def mock_embedding_provider(monkeypatch):
+    """Patch create_embedding_provider to avoid real HTTP calls."""
+    mock_provider = MagicMock()
+    mock_provider.provider_name = "mock"
+    mock_provider.embed.return_value = [[0.1] * 1024]
+
+    with patch(
+        "mcp_server.utils.semantic_indexer.create_embedding_provider",
+        return_value=mock_provider,
+    ):
+        yield mock_provider
+
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+
+
+class TestSemanticIndexerRegistry:
+    def test_two_repos_distinct_collection_names(
+        self, tmp_path, mock_qdrant, mock_embedding_provider
+    ):
+        """repo-a and repo-b must have different, well-formed collection names."""
+        from mcp_server.utils.semantic_indexer_registry import SemanticIndexerRegistry
+
+        repo_reg = _make_registry_with_repos(tmp_path)
+        registry = SemanticIndexerRegistry(repository_registry=repo_reg)
+
+        indexer_a = registry.get("repo-a")
+        indexer_b = registry.get("repo-b")
+
+        assert indexer_a.collection != indexer_b.collection
+        assert COLLECTION_PATTERN.match(indexer_a.collection), indexer_a.collection
+        assert COLLECTION_PATTERN.match(indexer_b.collection), indexer_b.collection
+
+    def test_same_repo_id_returns_same_instance(
+        self, tmp_path, mock_qdrant, mock_embedding_provider
+    ):
+        """Calling get() twice with the same repo_id returns the cached instance."""
+        from mcp_server.utils.semantic_indexer_registry import SemanticIndexerRegistry
+
+        repo_reg = _make_registry_with_repos(tmp_path)
+        registry = SemanticIndexerRegistry(repository_registry=repo_reg)
+
+        first = registry.get("repo-a")
+        second = registry.get("repo-a")
+        assert first is second
+
+    def test_shutdown_closes_all_indexers(
+        self, tmp_path, mock_qdrant, mock_embedding_provider
+    ):
+        """shutdown() must close all cached indexers."""
+        from mcp_server.utils.semantic_indexer_registry import SemanticIndexerRegistry
+
+        repo_reg = _make_registry_with_repos(tmp_path)
+        registry = SemanticIndexerRegistry(repository_registry=repo_reg)
+
+        # Warm up both
+        registry.get("repo-a")
+        registry.get("repo-b")
+
+        # Spy on qdrant close; SemanticIndexer delegates to self.qdrant.close()
+        mock_qdrant.close = MagicMock()
+
+        registry.shutdown()
+
+        # One close per cached indexer (two repos)
+        assert mock_qdrant.close.call_count == 2
+
+    def test_get_unknown_repo_raises(self, tmp_path, mock_qdrant, mock_embedding_provider):
+        """get() for an unregistered repo_id should raise KeyError."""
+        from mcp_server.utils.semantic_indexer_registry import SemanticIndexerRegistry
+
+        repo_reg = _make_registry_with_repos(tmp_path)
+        registry = SemanticIndexerRegistry(repository_registry=repo_reg)
+
+        with pytest.raises(KeyError):
+            registry.get("no-such-repo")
