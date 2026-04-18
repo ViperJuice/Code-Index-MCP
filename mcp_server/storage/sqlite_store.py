@@ -89,6 +89,9 @@ class SQLiteStore:
         self._run_migrations()
         self._ensure_semantic_points_table()
 
+    def close(self) -> None:
+        """No-op: SQLiteStore opens/closes per-operation; nothing to release."""
+
     def _ensure_semantic_points_table(self) -> None:
         """Ensure semantic point mapping table exists for stale vector cleanup."""
         with self._get_connection() as conn:

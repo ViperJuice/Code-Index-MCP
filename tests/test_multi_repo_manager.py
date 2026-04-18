@@ -123,7 +123,7 @@ class TestMultiRepositoryManager:
         assert manager.central_index_path == temp_registry
         assert manager.max_workers == 2
         assert isinstance(manager.registry, RepositoryRegistry)
-        assert len(manager._connections) == 0
+        assert len(manager._store_registry._cache) == 0
 
     def test_default_registry_path(self, monkeypatch):
         """Test default registry path generation."""
@@ -412,14 +412,14 @@ class TestMultiRepositoryManager:
         """Test connection caching."""
         manager.registry.register(mock_repo_info)
 
-        with patch("mcp_server.storage.multi_repo_manager.SQLiteStore") as mock_store_class:
+        with patch("mcp_server.storage.store_registry.SQLiteStore") as mock_store_class:
             mock_store = Mock()
             mock_store_class.return_value = mock_store
 
             # First call should create connection
             conn1 = manager._get_connection("test_repo_123")
             assert conn1 == mock_store
-            assert "test_repo_123" in manager._connections
+            assert "test_repo_123" in manager._store_registry._cache
 
             # Second call should return cached
             conn2 = manager._get_connection("test_repo_123")
@@ -450,16 +450,16 @@ class TestMultiRepositoryManager:
         """Test manager cleanup."""
         manager.registry.register(mock_repo_info)
 
-        # Add a mock connection
+        # Add a mock connection directly to the store registry cache
         mock_conn = Mock()
-        manager._connections["test_repo_123"] = mock_conn
+        manager._store_registry._cache["test_repo_123"] = mock_conn
 
         # Close manager
         manager.close()
 
-        # Should close all connections
+        # Should close all connections and clear the cache
         mock_conn.close.assert_called_once()
-        assert len(manager._connections) == 0
+        assert len(manager._store_registry._cache) == 0
 
     def test_search_error_handling(self, manager, mock_repo_info):
         """Test error handling during search."""

@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 from mcp_server.storage.repo_identity import compute_repo_id
 from mcp_server.storage.repository_registry import RepositoryRegistry
 from mcp_server.storage.sqlite_store import SQLiteStore
+from mcp_server.storage.store_registry import StoreRegistry
 from mcp_server.utils.index_discovery import IndexDiscovery
 
 logger = logging.getLogger(__name__)
@@ -117,8 +118,8 @@ class MultiRepositoryManager:
         # Repository registry
         self.registry = RepositoryRegistry(self.central_index_path)
 
-        # Cached repository connections
-        self._connections: Dict[str, SQLiteStore] = {}
+        # Cached repository connections (delegated to StoreRegistry)
+        self._store_registry = StoreRegistry.for_registry(self.registry)
 
         # Search statistics
         self._search_stats = {
@@ -305,9 +306,7 @@ class MultiRepositoryManager:
         self.registry.unregister(repository_id)
 
         # Close any cached connection
-        if repository_id in self._connections:
-            self._connections[repository_id].close()
-            del self._connections[repository_id]
+        self._store_registry.close(repository_id)
 
         logger.info(f"Unregistered repository {repository_id}")
 
@@ -374,20 +373,12 @@ class MultiRepositoryManager:
 
     def _get_connection(self, repository_id: str) -> Optional[SQLiteStore]:
         """Get cached connection to repository index."""
-        if repository_id in self._connections:
-            return self._connections[repository_id]
-
-        # Get repository info
         repo_info = self.registry.get(repository_id)
         if not repo_info or not repo_info.active:
             return None
-
-        # Create connection
         try:
-            store = SQLiteStore(str(repo_info.index_path))
-            self._connections[repository_id] = store
-            return store
-        except Exception as e:
+            return self._store_registry.get(repository_id)
+        except (KeyError, Exception) as e:
             logger.error(f"Failed to connect to repository {repository_id}: {e}")
             return None
 
@@ -740,7 +731,7 @@ class MultiRepositoryManager:
             },
             "languages": all_languages,
             "search_stats": self._search_stats.copy(),
-            "cache": {"connections": len(self._connections)},
+            "cache": {"connections": len(self._store_registry._cache)},
         }
 
     def health_check(self) -> Dict[str, Any]:
@@ -812,10 +803,7 @@ class MultiRepositoryManager:
 
     def close(self):
         """Close all connections and save registry."""
-        # Close all cached connections
-        for conn in self._connections.values():
-            conn.close()
-        self._connections.clear()
+        self._store_registry.shutdown()
 
         # Save registry
         self.registry.save()
