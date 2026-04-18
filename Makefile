@@ -58,8 +58,7 @@ help:
 	@echo "  clean-docker    Clean up Docker resources"
 
 install:
-	pip install -r requirements.txt
-	pip install -e .
+	uv sync
 
 test:
 	pytest tests -v -m "not integration and not slow and not benchmark"

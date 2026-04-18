@@ -17,7 +17,7 @@ This guide covers deployment strategies for Code-Index-MCP across different envi
 
 ### System Requirements
 
-- **Python**: 3.10 or higher
+- **Python**: 3.12 or higher
 - **Node.js**: 16.x or higher (for tree-sitter bindings)
 - **Redis**: 7.0 or higher (optional, for caching)
 - **PostgreSQL**: 14 or higher (optional, for persistent storage)
@@ -36,8 +36,8 @@ apt-get update && apt-get install -y \
     libssl-dev \
     libffi-dev
 
-# Python packages (from requirements.txt)
-pip install -r requirements.txt
+# Python packages (managed via uv)
+uv sync --all-extras
 ```
 
 ## Local Development
@@ -49,16 +49,9 @@ pip install -r requirements.txt
 git clone https://github.com/your-org/code-index-mcp.git
 cd code-index-mcp
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
+# Sync dependencies via uv (creates .venv and installs)
+uv sync --extra dev
 npm install  # For tree-sitter grammars
-
-# Install development dependencies
-pip install -e ".[dev]"
 ```
 
 ### 2. Configuration
@@ -129,7 +122,7 @@ python -m mcp_server.gateway --generate-openapi > openapi.json
 Create a `Dockerfile`:
 
 ```dockerfile
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -146,10 +139,10 @@ RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
 WORKDIR /app
 
 # Copy dependency files
-COPY requirements.txt package.json package-lock.json ./
+COPY pyproject.toml uv.lock package.json package-lock.json ./
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install uv and Python dependencies
+RUN pip install --no-cache-dir uv && uv sync --frozen --no-dev
 
 # Install Node dependencies
 RUN npm ci
