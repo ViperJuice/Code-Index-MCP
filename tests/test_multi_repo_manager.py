@@ -563,6 +563,73 @@ class TestRepositoryRegistry:
         assert registry.get("invalid_repo") is None
 
 
+class TestSL2Delegation:
+    """SL-2: MultiRepositoryManager delegates to compute_repo_id."""
+
+    @pytest.fixture
+    def temp_registry(self):
+        temp_dir = tempfile.mkdtemp()
+        registry_path = Path(temp_dir) / "test_registry.json"
+        yield registry_path
+        shutil.rmtree(temp_dir)
+
+    @pytest.fixture
+    def manager(self, temp_registry):
+        return MultiRepositoryManager(central_index_path=temp_registry, max_workers=2)
+
+    def test_generate_repository_id_delegates_to_compute_repo_id(self, manager, tmp_path):
+        """_generate_repository_id delegates to compute_repo_id."""
+        import subprocess as sp
+        sp.run(["git", "init", "-b", "main", str(tmp_path)], check=True, capture_output=True)
+        sp.run(["git", "config", "user.email", "t@t.com"], cwd=tmp_path, check=True, capture_output=True)
+        sp.run(["git", "config", "user.name", "T"], cwd=tmp_path, check=True, capture_output=True)
+        (tmp_path / "f.txt").write_text("x")
+        sp.run(["git", "add", "f.txt"], cwd=tmp_path, check=True, capture_output=True)
+        sp.run(["git", "commit", "-m", "init"], cwd=tmp_path, check=True, capture_output=True)
+
+        with patch("mcp_server.storage.multi_repo_manager.compute_repo_id") as mock_compute:
+            from mcp_server.storage.repo_identity import RepoIdentity
+            mock_compute.return_value = RepoIdentity(
+                repo_id="abcd1234abcd1234",
+                git_common_dir=tmp_path / ".git",
+                source="git_common_dir",
+            )
+            result = manager._generate_repository_id(tmp_path)
+
+        mock_compute.assert_called_once_with(tmp_path)
+        assert result == "abcd1234abcd1234"
+
+    def test_resolve_repo_id_delegates_to_compute_repo_id_for_path(self, tmp_path):
+        """resolve_repo_id calls compute_repo_id for filesystem paths."""
+        import subprocess as sp
+        sp.run(["git", "init", "-b", "main", str(tmp_path)], check=True, capture_output=True)
+        sp.run(["git", "config", "user.email", "t@t.com"], cwd=tmp_path, check=True, capture_output=True)
+        sp.run(["git", "config", "user.name", "T"], cwd=tmp_path, check=True, capture_output=True)
+        (tmp_path / "f.txt").write_text("x")
+        sp.run(["git", "add", "f.txt"], cwd=tmp_path, check=True, capture_output=True)
+        sp.run(["git", "commit", "-m", "init"], cwd=tmp_path, check=True, capture_output=True)
+
+        with patch("mcp_server.storage.multi_repo_manager.compute_repo_id") as mock_compute:
+            from mcp_server.storage.repo_identity import RepoIdentity
+            mock_compute.return_value = RepoIdentity(
+                repo_id="deadbeefdeadbeef",
+                git_common_dir=tmp_path / ".git",
+                source="git_common_dir",
+            )
+            result = MultiRepositoryManager.resolve_repo_id(str(tmp_path))
+
+        assert mock_compute.call_count >= 1
+        assert result == "deadbeefdeadbeef"
+
+    def test_resolve_repo_id_returns_16hex_id_as_is(self):
+        """resolve_repo_id returns a 16-hex id unchanged without calling compute_repo_id."""
+        with patch("mcp_server.storage.multi_repo_manager.compute_repo_id") as mock_compute:
+            result = MultiRepositoryManager.resolve_repo_id("abcdef0123456789")
+
+        mock_compute.assert_not_called()
+        assert result == "abcdef0123456789"
+
+
 class TestSingletonManager:
     """Test singleton manager functionality."""
 
