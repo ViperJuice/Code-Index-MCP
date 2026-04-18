@@ -71,7 +71,7 @@ class TestRepoIsolation:
 class TestBranchSwitchIgnored:
     def test_branch_switch_ignored(self, tmp_path):
         """Non-tracked branch commits must not appear in the index."""
-        repo_a, _ = build_temp_repo(
+        repo_a, repo_id = build_temp_repo(
             tmp_path, "repo_a",
             seed_files={"main_file.py": "def tracked_function(): pass\n"},
         )
@@ -82,12 +82,6 @@ class TestBranchSwitchIgnored:
             enable_watchers=True,
             poll_interval=poll_interval,
         ) as srv:
-            # Confirm the tracked symbol is reachable
-            before = srv.call_tool("symbol_lookup", {
-                "symbol": "tracked_function",
-                "repository": str(repo_a),
-            })
-
             # Switch to a feature branch, add a new symbol, commit
             subprocess.run(
                 ["git", "checkout", "-b", "feature/noise"],
@@ -106,14 +100,22 @@ class TestBranchSwitchIgnored:
             # Wait 2x poll interval + safety margin
             time.sleep(poll_interval * 2 + 1.0)
 
-            # The new symbol on the feature branch must NOT appear
-            after = srv.call_tool("symbol_lookup", {
-                "symbol": "zxq_noise_only",
-                "repository": str(repo_a),
-            })
+            # Assert directly against SQLite — symbol_lookup falls back to
+            # language plugins when a symbol is absent, and the C plugin hangs.
+            store = srv.repo_resolver._store_registry.get(repo_id)
+            conn = sqlite3.connect(store.db_path)
+            try:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT count(*) FROM symbols WHERE name = ?",
+                    ("zxq_noise_only",),
+                )
+                count = cursor.fetchone()[0]
+            finally:
+                conn.close()
 
-        assert after.get("result") == "not_found", \
-            f"Expected zxq_noise_only NOT in index, got: {after}"
+        assert count == 0, \
+            f"Expected zxq_noise_only NOT in symbols table, found {count} row(s)"
 
 
 # ---------------------------------------------------------------------------
