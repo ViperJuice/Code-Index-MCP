@@ -1,3 +1,5 @@
+> **Historical artifact — as-of 2026-04-18, may not reflect current behavior**
+
 # Documentation Update Report
 Generated: Tue Jun 10 19:57:16 EDT 2025
 

@@ -1,3 +1,5 @@
+> **Historical artifact — as-of 2026-04-18, may not reflect current behavior**
+
 # MCP Portable Index Management - Implementation Summary
 
 ## 🎉 Successfully Pushed to GitHub

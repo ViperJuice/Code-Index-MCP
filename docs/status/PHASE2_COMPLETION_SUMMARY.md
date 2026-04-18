@@ -1,3 +1,5 @@
+> **Historical artifact — as-of 2026-04-18, may not reflect current behavior**
+
 # Phase 2 Completion Summary
 
 **Date**: 2025-06-09  

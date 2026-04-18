@@ -1,3 +1,5 @@
+> **Historical artifact — as-of 2026-04-18, may not reflect current behavior**
+
 # Productionization Plan (2026-02)
 
 ## Executive Summary

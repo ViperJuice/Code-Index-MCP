@@ -1,3 +1,5 @@
+> **Historical artifact — as-of 2026-04-18, may not reflect current behavior**
+
 # Edge Case and Error Handling Tests Summary
 
 This document summarizes the four edge case and error handling test files created for the document processing system.

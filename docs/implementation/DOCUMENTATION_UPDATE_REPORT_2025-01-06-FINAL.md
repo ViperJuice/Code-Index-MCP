@@ -1,3 +1,5 @@
+> **Historical artifact — as-of 2026-04-18, may not reflect current behavior**
+
 # Documentation Update Report - Final (With Critical MCP Issues)
 Generated: 2025-01-06
 

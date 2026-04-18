@@ -1,3 +1,5 @@
+> **Historical artifact — as-of 2026-04-18, may not reflect current behavior**
+
 # Implementation Validation Report
 **Date**: 2025-06-09  
 **Status**: Document Processing and Specialized Plugins Validation

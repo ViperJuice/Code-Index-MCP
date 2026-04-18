@@ -1,3 +1,5 @@
+> **Historical artifact — as-of 2026-04-18, may not reflect current behavior**
+
 # Git Hooks Implementation Summary
 
 ## 🎉 Successfully Implemented Automatic Index Synchronization
