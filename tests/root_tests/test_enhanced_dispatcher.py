@@ -5,12 +5,28 @@ import os
 import sys
 import tempfile
 from pathlib import Path
+from unittest.mock import MagicMock
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
+from mcp_server.core.repo_context import RepoContext
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from mcp_server.storage.sqlite_store import SQLiteStore
+from mcp_server.storage.multi_repo_manager import RepositoryInfo
+
+
+def _make_ctx(store):
+    """Build a minimal RepoContext wrapping the given SQLiteStore."""
+    registry_entry = MagicMock(spec=RepositoryInfo)
+    registry_entry.tracked_branch = "main"
+    return RepoContext(
+        repo_id="test-enhanced-repo",
+        sqlite_store=store,
+        workspace_root=Path(tempfile.gettempdir()),
+        tracked_branch="main",
+        registry_entry=registry_entry,
+    )
 
 
 def create_test_files():
@@ -180,17 +196,18 @@ def test_enhanced_dispatcher():
     print("Creating enhanced dispatcher...")
     dispatcher = EnhancedDispatcher(
         plugins=None,  # Start with no plugins
-        sqlite_store=store,
         enable_advanced_features=True,
         use_plugin_factory=True,
         lazy_load=True,
         semantic_search_enabled=True,
     )
+    ctx = _make_ctx(store)
 
     # Check initial status
-    print(f"Supported languages: {len(dispatcher.supported_languages)}")
+    langs = dispatcher.supported_languages()
+    print(f"Supported languages: {len(langs)}")
     print(f"Initially loaded plugins: {len(dispatcher._plugins)}")
-    print(f"Languages available: {', '.join(dispatcher.supported_languages[:15])}...\n")
+    print(f"Languages available: {', '.join(langs[:15])}...\n")
 
     # Test indexing each file (this should trigger lazy loading)
     results = {}
@@ -199,7 +216,7 @@ def test_enhanced_dispatcher():
 
         try:
             # Index the file
-            dispatcher.index_file(file_path)
+            dispatcher.index_file(ctx, file_path)
 
             # Check if plugin was loaded
             language = file_path.suffix[1:]  # Remove dot
@@ -239,7 +256,7 @@ def test_enhanced_dispatcher():
                 search_term = content.split("function ")[1].split("(")[0]
 
             if search_term:
-                search_results = list(dispatcher.search(search_term, limit=5))
+                search_results = list(dispatcher.search(ctx, search_term, limit=5))
                 print(f"  ✓ Search for '{search_term}' found {len(search_results)} results")
 
             results[filename] = True
@@ -253,21 +270,20 @@ def test_enhanced_dispatcher():
 
     # Final statistics
     print("\n=== Final Statistics ===")
-    stats = dispatcher.get_statistics()
-    print(f"Total plugins loaded: {stats['total_plugins']}")
-    print(f"Languages loaded: {', '.join(sorted(stats['loaded_languages']))}")
-    print("Operations performed:")
-    for op, count in stats["operations"].items():
-        if count > 0:
-            print(f"  - {op}: {count}")
+    stats = dispatcher.get_statistics(ctx)
+    print(f"Total indexed files: {stats.get('total', 0)}")
+    by_lang = stats.get("by_language", {})
+    if by_lang:
+        print(f"Languages indexed: {', '.join(sorted(by_lang.keys()))}")
 
     # Health check
     print("\n=== Health Check ===")
-    health = dispatcher.health_check()
+    health = dispatcher.health_check(ctx)
     print(f"Overall status: {health['status']}")
-    print("Dispatcher config:")
-    for key, value in health["components"]["dispatcher"].items():
-        print(f"  - {key}: {value}")
+    components = health.get("components", {})
+    if "dispatcher" in components:
+        for key, value in components["dispatcher"].items():
+            print(f"  - {key}: {value}")
 
     # Summary
     print("\n=== Summary ===")
@@ -311,20 +327,20 @@ def test_search_across_languages():
     store = SQLiteStore(":memory:")
     dispatcher = EnhancedDispatcher(
         plugins=None,
-        sqlite_store=store,
         use_plugin_factory=True,
         lazy_load=False,  # Load all plugins immediately for this test
     )
+    ctx = _make_ctx(store)
 
     print(f"Loaded {len(dispatcher._plugins)} plugins")
 
     # Index all files
     for filename in test_files:
-        dispatcher.index_file(Path(filename))
+        dispatcher.index_file(ctx, Path(filename))
 
     # Search for "calculate"
     print("\nSearching for 'calculate'...")
-    results = list(dispatcher.search("calculate", limit=20))
+    results = list(dispatcher.search(ctx, "calculate", limit=20))
 
     print(f"Found {len(results)} results:")
     for result in results:

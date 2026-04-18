@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from mcp_server.storage.cross_repo_coordinator import (
+from mcp_server.dispatcher.cross_repo_coordinator import (
     AggregatedResult,
     CrossRepositorySearchCoordinator,
     SearchScope,

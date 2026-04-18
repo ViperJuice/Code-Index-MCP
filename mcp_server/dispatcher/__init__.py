@@ -12,6 +12,8 @@ This package provides advanced dispatcher capabilities including:
 # Legacy import for backwards compatibility
 from .dispatcher_enhanced import EnhancedDispatcher
 from .dispatcher_enhanced import EnhancedDispatcher as Dispatcher
+from .simple_dispatcher import SimpleDispatcher
+from .protocol import DispatcherProtocol
 from .plugin_router import (
     FileTypeInfo,
     FileTypeMatcher,
@@ -35,6 +37,8 @@ from .result_aggregator import (
 __all__ = [
     "Dispatcher",  # Legacy alias
     "EnhancedDispatcher",
+    "SimpleDispatcher",
+    "DispatcherProtocol",
     "PluginRouter",
     "FileTypeMatcher",
     "IPluginRouter",

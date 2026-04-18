@@ -16,6 +16,7 @@ from ..core.ignore_patterns import (
     build_walker_filter,
     EXCLUDED_DIR_PARTS as _INDEX_EXCLUDED_DIRS,
 )
+from ..core.repo_context import RepoContext
 from ..graph import (
     CHUNKER_AVAILABLE,
     ContextSelector,
@@ -29,13 +30,13 @@ from ..plugins.language_registry import get_all_extensions, get_language_by_exte
 from ..plugins.memory_aware_manager import MemoryAwarePluginManager
 from ..plugins.plugin_factory import PluginFactory
 from ..plugins.repository_plugin_loader import RepositoryPluginLoader
-from ..storage.cross_repo_coordinator import (
-    CrossRepositorySearchCoordinator,
-    SearchScope,
-)
 from ..storage.multi_repo_manager import MultiRepositoryManager
 from ..storage.sqlite_store import SQLiteStore
 from ..utils.semantic_indexer import SemanticIndexer
+from .cross_repo_coordinator import (
+    CrossRepositorySearchCoordinator,
+    SearchScope,
+)
 from .plugin_router import FileTypeMatcher, PluginCapability, PluginRouter
 from .query_intent import QueryIntent
 from .query_intent import classify as classify_query_intent
@@ -155,7 +156,6 @@ class EnhancedDispatcher:
     def __init__(
         self,
         plugins: Optional[List[IPlugin]] = None,
-        sqlite_store: Optional[SQLiteStore] = None,
         enable_advanced_features: bool = True,
         use_plugin_factory: bool = True,
         lazy_load: bool = True,
@@ -168,7 +168,6 @@ class EnhancedDispatcher:
 
         Args:
             plugins: Optional list of pre-instantiated plugins (for backward compatibility)
-            sqlite_store: SQLite store for plugin persistence
             enable_advanced_features: Whether to enable advanced routing and aggregation
             use_plugin_factory: Whether to use PluginFactory for dynamic loading
             lazy_load: Whether to lazy-load plugins on demand
@@ -177,41 +176,20 @@ class EnhancedDispatcher:
             multi_repo_enabled: Whether to enable multi-repository support (None = auto from env)
             reranker_type: Reranker to use — "voyage", "flashrank", "cross-encoder", or "none"
         """
-        self._sqlite_store = sqlite_store
         self._memory_aware = memory_aware
         self._multi_repo_enabled = multi_repo_enabled
 
-        # Initialize repository-aware components if enabled
-        if self._memory_aware and sqlite_store:
-            self._repo_plugin_loader = RepositoryPluginLoader()
-            self._memory_manager = MemoryAwarePluginManager()
-        else:
-            self._repo_plugin_loader = None
-            self._memory_manager = None
+        # Repository-aware plugin components require a per-call ctx; initialized without store.
+        self._repo_plugin_loader = None
+        self._memory_manager = None
 
         # Initialize multi-repo manager if enabled
         if multi_repo_enabled is None:
             multi_repo_enabled = os.getenv("MCP_ENABLE_MULTI_REPO", "false").lower() == "true"
 
-        if multi_repo_enabled and sqlite_store:
-            # Get current repo ID
-            try:
-                import subprocess
-
-                result = subprocess.run(
-                    ["git", "remote", "get-url", "origin"],
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                )
-                remote_url = result.stdout.strip()
-                _ = hashlib.sha256(remote_url.encode()).hexdigest()[:12]
-            except Exception:
-                _ = hashlib.sha256(str(Path.cwd()).encode()).hexdigest()[:12]
-
+        if multi_repo_enabled:
             default_storage_path = Path.home() / ".mcp" / "indexes"
             storage_path = os.getenv("MCP_INDEX_STORAGE_PATH", str(default_storage_path))
-            # Use the correct registry path
             registry_path = Path(storage_path) / "repository_registry.json"
             self._multi_repo_manager = MultiRepositoryManager(central_index_path=registry_path)
             self._cross_repo_coordinator = CrossRepositorySearchCoordinator(
@@ -249,9 +227,9 @@ class EnhancedDispatcher:
             "plugins_loaded": 0,
         }
 
-        # Initialize semantic indexer if enabled with auto-discovery
+        # Initialize semantic indexer if enabled with auto-discovery (process-global, path-based)
         self._semantic_indexer = None
-        if self._semantic_enabled and self._sqlite_store:
+        if self._semantic_enabled:
             try:
                 settings = reload_settings()
                 profile_registry = SemanticProfileRegistry.from_raw(
@@ -397,7 +375,7 @@ class EnhancedDispatcher:
                                     plugin = self._memory_manager.get_plugin(lang)
                                 else:
                                     plugin = PluginFactory.create_plugin(
-                                        lang, self._sqlite_store, self._semantic_enabled
+                                        lang, None, self._semantic_enabled
                                     )
 
                                 if plugin:
@@ -411,7 +389,7 @@ class EnhancedDispatcher:
                 else:
                     # Fall back to loading all plugins
                     all_plugins = PluginFactory.create_all_plugins(
-                        sqlite_store=self._sqlite_store,
+                        sqlite_store=None,
                         enable_semantic=self._semantic_enabled,
                     )
 
@@ -462,7 +440,7 @@ class EnhancedDispatcher:
             logger.info(f"Lazy loading plugin for {language}")
             plugin = PluginFactory.create_plugin(
                 language,
-                sqlite_store=self._sqlite_store,
+                sqlite_store=None,
                 enable_semantic=self._semantic_enabled,
             )
 
@@ -603,12 +581,10 @@ class EnhancedDispatcher:
 
         return capabilities
 
-    @property
-    def plugins(self):
-        """Get the dictionary of loaded plugins by language."""
-        return self._by_lang
+    def plugins(self) -> List[IPlugin]:
+        """Return all loaded plugins (process-global during P2B)."""
+        return list(self._plugins)
 
-    @property
     def supported_languages(self) -> List[str]:
         """Get list of all supported languages (loaded and available)."""
         if self._use_factory:
@@ -656,7 +632,7 @@ class EnhancedDispatcher:
 
         raise RuntimeError(f"No plugin for {path}")
 
-    def get_plugins_for_file(self, path: Path) -> List[Tuple[IPlugin, float]]:
+    def get_plugins_for_file(self, ctx: RepoContext, path: Path) -> List[Tuple[IPlugin, float]]:
         """Get all plugins that can handle a file with confidence scores."""
         # Ensure plugin is loaded if using lazy loading
         if self._lazy_load and self._use_factory:
@@ -673,19 +649,19 @@ class EnhancedDispatcher:
                     matching_plugins.append((plugin, 1.0))
             return matching_plugins
 
-    def lookup(self, symbol: str, limit: int = 20) -> SymbolDef | None:
-        """Look up symbol definition across all plugins."""
+    def lookup(self, ctx: RepoContext, symbol: str, limit: int = 20) -> Optional[SymbolDef]:
+        """Look up symbol definition within ctx.repo_id."""
         start_time = time.time()
 
         try:
             # For symbol lookup, prefer BM25 direct lookup to avoid plugin loading delays
             # Only load plugins if explicitly needed and BM25 fails
-            if self._sqlite_store:
+            if ctx.sqlite_store:
                 logger.debug("Using BM25 lookup directly for better performance")
                 try:
                     import sqlite3
 
-                    conn = sqlite3.connect(self._sqlite_store.db_path)
+                    conn = sqlite3.connect(ctx.sqlite_store.db_path)
                     cursor = conn.cursor()
 
                     # First try symbols table for exact matches
@@ -977,37 +953,28 @@ class EnhancedDispatcher:
         # Combine with documentation files first
         return doc_results + code_results
 
-    def _get_chunk_content_for_reranking(self, file_path: str) -> str:
-        """Return the best chunk content for a file to use as reranker document text.
-
-        Falls back to an empty string if the file has no chunks or the store
-        is unavailable — callers must handle the empty case.
-        """
-        if not self._sqlite_store or not file_path:
+    def _get_chunk_content_for_reranking(self, sqlite_store: Optional[SQLiteStore], file_path: str) -> str:
+        """Return the best chunk content for a file to use as reranker document text."""
+        if not sqlite_store or not file_path:
             return ""
         try:
-            file_id = self._sqlite_store.get_file_id_by_path(file_path)
+            file_id = sqlite_store.get_file_id_by_path(file_path)
             if file_id is None:
                 return ""
-            chunk = self._sqlite_store.find_best_chunk_for_file(file_id, [])
+            chunk = sqlite_store.find_best_chunk_for_file(file_id, [])
             return chunk.get("content", "") if chunk else ""
         except Exception:
             return ""
 
-    def _symbol_route(self, name: str, kind: Optional[str], limit: int) -> List[Dict]:
-        """Query the symbols table directly and return search-result-shaped dicts.
-
-        Prefers definition files over ``__init__.py`` re-exports by sorting
-        __init__.py results to the end.  Returns an empty list when the store
-        is unavailable or no matching symbol is found (caller falls back to BM25).
-        """
-        if not self._sqlite_store:
+    def _symbol_route(self, sqlite_store: Optional[SQLiteStore], name: str, kind: Optional[str], limit: int) -> List[Dict]:
+        """Query the symbols table directly and return search-result-shaped dicts."""
+        if not sqlite_store:
             return []
         try:
-            rows = self._sqlite_store.get_symbol(name, kind=kind)
+            rows = sqlite_store.get_symbol(name, kind=kind)
             if not rows and kind:
                 # Relax kind constraint and retry
-                rows = self._sqlite_store.get_symbol(name, kind=None)
+                rows = sqlite_store.get_symbol(name, kind=None)
             if not rows:
                 return []
 
@@ -1040,23 +1007,13 @@ class EnhancedDispatcher:
 
     def _apply_reranker(
         self,
+        sqlite_store: Optional[SQLiteStore],
         query: str,
         candidates: List[Dict],
         limit: int,
         semantic_source: bool = False,
     ) -> List[Dict]:
-        """Enrich candidates with chunk text and apply the reranker if configured.
-
-        Returns ``candidates[:limit]`` unchanged when no reranker is set or on error.
-
-        When ``semantic_source=True`` and the configured reranker is text-based
-        (flashrank / cross-encoder), skip reranking — text rerankers degrade the
-        ordering produced by semantic vector search.
-
-        Pre-filters high-penalty paths (``docs/benchmarks/``, ``htmlcov/``) before
-        reranking — those files contain literal query strings and would be
-        incorrectly promoted by a text-based reranker.
-        """
+        """Enrich candidates with chunk text and apply the reranker if configured."""
         if self._reranker is None:
             return candidates[:limit]
         if semantic_source and self._reranker_skips_semantic:
@@ -1064,27 +1021,35 @@ class EnhancedDispatcher:
         # Exclude paths with penalty >= 1.0 (benchmark/coverage noise files).
         filtered = [c for c in candidates if _path_score_penalty(c.get("file", "")) < 1.0]
         if not filtered:
-            filtered = candidates  # nothing passed the filter; fall back to full set
+            filtered = candidates
         for c in filtered:
             if not c.get("_rerank_doc"):
-                c["_rerank_doc"] = self._get_chunk_content_for_reranking(c.get("file", ""))
+                c["_rerank_doc"] = self._get_chunk_content_for_reranking(sqlite_store, c.get("file", ""))
         try:
             return self._reranker.rerank(query, filtered, limit)
         except Exception as e:
             logger.warning(f"_apply_reranker failed, returning original order: {e}")
             return candidates[:limit]
 
-    def search(self, query: str, semantic=False, fuzzy=False, limit=20) -> Iterable[SearchResult]:
-        """Search for code and documentation across all plugins."""
+    def search(
+        self,
+        ctx: RepoContext,
+        query: str,
+        semantic: bool = False,
+        fuzzy: bool = False,
+        limit: int = 20,
+    ) -> Iterable[SearchResult]:
+        """Search for code and documentation scoped to ctx.repo_id."""
         start_time = time.time()
+        sqlite_store = ctx.sqlite_store
 
         try:
             # Fuzzy (trigram) path for misspelled queries
-            if fuzzy and self._sqlite_store:
+            if fuzzy and sqlite_store:
                 logger.info(f"Using fuzzy trigram search for query: {query}")
                 try:
-                    sym_results = self._sqlite_store.search_symbols_fuzzy(query, limit)
-                    file_results = self._sqlite_store.search_files_fuzzy(query, limit)
+                    sym_results = sqlite_store.search_symbols_fuzzy(query, limit)
+                    file_results = sqlite_store.search_files_fuzzy(query, limit)
 
                     # Merge by file_path, keeping best score
                     merged: Dict[str, Dict] = {}
@@ -1120,11 +1085,11 @@ class EnhancedDispatcher:
 
             # Prefer direct SQLite lexical search for non-semantic queries so the
             # server remains useful even when plugin in-memory indexes are cold.
-            if self._sqlite_store and (not semantic or self._semantic_indexer is None):
+            if sqlite_store and (not semantic or self._semantic_indexer is None):
                 # Symbol routing: bypass BM25 for explicit symbol-pattern queries.
                 intent, sym_name, kind_hint = classify_query_intent(query)
                 if intent == QueryIntent.SYMBOL:
-                    sym_results = self._symbol_route(sym_name, kind_hint, limit)
+                    sym_results = self._symbol_route(sqlite_store, sym_name, kind_hint, limit)
                     if sym_results:
                         logger.info(
                             f"Symbol route hit for '{query}' → '{sym_name}' "
@@ -1144,20 +1109,15 @@ class EnhancedDispatcher:
                             # Fetch an oversampled set so path-based penalties can
                             # surface results that BM25 ranked below the cutoff.
                             fetch_limit = max(limit * 8, 50)
-                            results = self._sqlite_store.search_bm25(
+                            results = sqlite_store.search_bm25(
                                 query, table=table, limit=fetch_limit
                             )
                             if len(results) < fetch_limit:
-                                # AND logic found fewer results than the fetch limit —
-                                # supplement with OR results so that files matching
-                                # some-but-not-all query terms (e.g. a file named
-                                # "semantic_preflight.py" lacking the word
-                                # "implementation") can enter the candidate pool.
                                 or_query = " OR ".join(
                                     t for t in query.split() if re.match(r"[a-zA-Z0-9_]", t)
                                 )
                                 if or_query != query:
-                                    or_results = self._sqlite_store.search_bm25(
+                                    or_results = sqlite_store.search_bm25(
                                         or_query, table=table, limit=fetch_limit
                                     )
                                     and_paths = {
@@ -1192,7 +1152,7 @@ class EnhancedDispatcher:
                                     file_id = result.get("file_id")
                                     if file_id is not None:
                                         try:
-                                            chunk = self._sqlite_store.find_best_chunk_for_file(
+                                            chunk = sqlite_store.find_best_chunk_for_file(
                                                 int(file_id), query.split()
                                             )
                                         except Exception:
@@ -1213,7 +1173,7 @@ class EnhancedDispatcher:
                                         }
                                     )
                                 bm25_candidates = self._apply_reranker(
-                                    query, bm25_candidates, limit
+                                    sqlite_store, query, bm25_candidates, limit
                                 )
                                 for item in bm25_candidates:
                                     yield {k: v for k, v in item.items() if k != "_rerank_doc"}
@@ -1265,7 +1225,7 @@ class EnhancedDispatcher:
                     # Re-sort by adjusted score so penalties take effect before reranking.
                     candidates.sort(key=lambda c: c["score"], reverse=True)
                     candidates = self._apply_reranker(
-                        query, candidates, limit, semantic_source=True
+                        sqlite_store, query, candidates, limit, semantic_source=True
                     )
                     for item in candidates:
                         yield {k: v for k, v in item.items() if k != "_rerank_doc"}
@@ -1281,7 +1241,7 @@ class EnhancedDispatcher:
                 self._load_all_plugins()
 
             # If still no plugins, try hybrid or BM25 search directly
-            if len(self._plugins) == 0 and self._sqlite_store:
+            if len(self._plugins) == 0 and sqlite_store:
                 # Use semantic search if available and requested
                 if semantic and self._semantic_indexer:
                     logger.info("No plugins loaded, using semantic search")
@@ -1319,7 +1279,7 @@ class EnhancedDispatcher:
                 try:
                     import sqlite3
 
-                    conn = sqlite3.connect(self._sqlite_store.db_path)
+                    conn = sqlite3.connect(sqlite_store.db_path)
                     cursor = conn.cursor()
 
                     # Check if this is a BM25 index
@@ -1537,7 +1497,7 @@ class EnhancedDispatcher:
         except Exception as e:
             logger.error(f"Error in search for {query}: {e}", exc_info=True)
 
-    def index_file(self, path: Path, do_semantic: bool = True) -> None:
+    def index_file(self, ctx: RepoContext, path: Path, do_semantic: bool = True) -> None:
         """Index a single file if it has changed."""
         try:
             # Ensure path is absolute to avoid relative/absolute path issues
@@ -1604,7 +1564,7 @@ class EnhancedDispatcher:
         except Exception as e:
             logger.error(f"Error indexing {path}: {e}", exc_info=True)
 
-    def get_statistics(self) -> dict:
+    def get_statistics(self, ctx: RepoContext) -> Dict[str, Any]:
         """Get statistics about indexed files and languages."""
         try:
             by_language: Dict[str, int] = {}
@@ -1622,17 +1582,8 @@ class EnhancedDispatcher:
         except Exception:
             return {"total": 0, "by_language": {}}
 
-    def index_directory(self, directory: Path, recursive: bool = True) -> Dict[str, int]:
-        """
-        Index all files in a directory, respecting ignore patterns.
-
-        Args:
-            directory: Directory to index
-            recursive: Whether to index subdirectories
-
-        Returns:
-            Statistics about indexed files
-        """
+    def index_directory(self, ctx: RepoContext, directory: Path, recursive: bool = True) -> Dict[str, int]:
+        """Index all files in a directory, respecting ignore patterns."""
         logger.info(f"Indexing directory: {directory} (recursive={recursive})")
 
         # Note: We don't use ignore patterns during indexing
@@ -1704,7 +1655,7 @@ class EnhancedDispatcher:
                 # First try to match by extension
                 if path.suffix in supported_extensions:
                     # skip_semantic=True — we'll batch semantic embed after the loop
-                    self.index_file(path, do_semantic=False)
+                    self.index_file(ctx, path, do_semantic=False)
                     stats["indexed_files"] += 1
                     semantically_indexed_paths.append(path.resolve())
                 # For files without recognized extensions, try each plugin's supports() method
@@ -1713,7 +1664,7 @@ class EnhancedDispatcher:
                     matched = False
                     for plugin in self._plugins:
                         if plugin.supports(path):
-                            self.index_file(path, do_semantic=False)
+                            self.index_file(ctx, path, do_semantic=False)
                             stats["indexed_files"] += 1
                             semantically_indexed_paths.append(path.resolve())
                             matched = True
@@ -1767,11 +1718,16 @@ class EnhancedDispatcher:
         return stats
 
     def search_documentation(
-        self, topic: str, doc_types: Optional[List[str]] = None, limit: int = 20
+        self,
+        ctx: RepoContext,
+        topic: str,
+        doc_types: Optional[List[str]] = None,
+        limit: int = 20,
     ) -> Iterable[SearchResult]:
-        """Search specifically across documentation files.
+        """Search specifically across documentation files scoped to ctx.repo_id.
 
         Args:
+            ctx: Repository context for storage routing
             topic: Topic to search for (e.g., "installation", "configuration")
             doc_types: Optional list of document types to search (e.g., ["readme", "guide", "api"])
             limit: Maximum number of results
@@ -1815,8 +1771,8 @@ class EnhancedDispatcher:
         all_results = []
         seen = set()
 
-        for query in queries[:10]:  # Limit to 10 queries to avoid too many searches
-            for result in self.search(query, semantic=True, limit=limit):
+        for query in queries[:10]:
+            for result in self.search(ctx, query, semantic=True, limit=limit):
                 # Only include documentation files
                 if self._is_documentation_file(result.get("file", "")):
                     key = f"{result['file']}:{result['line']}"
@@ -1834,7 +1790,7 @@ class EnhancedDispatcher:
             yield result
             count += 1
 
-    def health_check(self) -> Dict[str, Any]:
+    def health_check(self, ctx: RepoContext) -> Dict[str, Any]:
         """Perform a health check on all components."""
         health = {
             "status": "healthy",
@@ -1842,7 +1798,7 @@ class EnhancedDispatcher:
                 "dispatcher": {
                     "status": "healthy",
                     "plugins_loaded": len(self._plugins),
-                    "languages_supported": len(self.supported_languages),
+                    "languages_supported": len(self.supported_languages()),
                     "factory_enabled": self._use_factory,
                     "lazy_loading": self._lazy_load,
                 }
@@ -1873,12 +1829,8 @@ class EnhancedDispatcher:
 
         return health
 
-    def remove_file(self, path: Union[Path, str]) -> None:
-        """Remove a file from all indexes.
-
-        Args:
-            path: File path to remove
-        """
+    def remove_file(self, ctx: RepoContext, path: Union[Path, str]) -> None:
+        """Remove a file from all per-repo indexes."""
         path = Path(path).resolve()
         logger.info(f"Removing file from index: {path}")
 
@@ -1888,15 +1840,13 @@ class EnhancedDispatcher:
 
         try:
             # Remove from SQLite if available
-            if self._sqlite_store:
+            if ctx.sqlite_store:
                 from ..core.path_resolver import PathResolver
 
                 path_resolver = PathResolver()
                 try:
                     relative_path = path_resolver.normalize_path(path)
-                    # Get repository ID - for now assume 1
-                    # TODO: Properly detect repository
-                    self._sqlite_store.remove_file(relative_path, repository_id=1)
+                    ctx.sqlite_store.remove_file(relative_path, repository_id=1)
                 except Exception as e:
                     logger.error(f"Error removing from SQLite: {e}")
 
@@ -1924,33 +1874,26 @@ class EnhancedDispatcher:
 
     def move_file(
         self,
+        ctx: RepoContext,
         old_path: Union[Path, str],
         new_path: Union[Path, str],
         content_hash: Optional[str] = None,
     ) -> None:
-        """Move a file in all indexes.
-
-        Args:
-            old_path: Original file path
-            new_path: New file path
-            content_hash: Optional content hash to verify unchanged content
-        """
+        """Relocate a file in the per-repo index."""
         old_path = Path(old_path).resolve()
         new_path = Path(new_path).resolve()
         logger.info(f"Moving file in index: {old_path} -> {new_path}")
 
         try:
             # Move in SQLite if available
-            if self._sqlite_store:
+            if ctx.sqlite_store:
                 from ..core.path_resolver import PathResolver
 
                 path_resolver = PathResolver()
                 try:
                     old_relative = path_resolver.normalize_path(old_path)
                     new_relative = path_resolver.normalize_path(new_path)
-                    # Get repository ID - for now assume 1
-                    # TODO: Properly detect repository
-                    self._sqlite_store.move_file(
+                    ctx.sqlite_store.move_file(
                         old_relative,
                         new_relative,
                         repository_id=1,
@@ -1976,28 +1919,18 @@ class EnhancedDispatcher:
 
     async def cross_repo_symbol_search(
         self,
+        contexts: List[RepoContext],
         symbol: str,
-        repositories: Optional[List[str]] = None,
         languages: Optional[List[str]] = None,
         max_repositories: int = 10,
     ) -> Dict[str, Any]:
-        """
-        Search for a symbol across multiple repositories.
-
-        Args:
-            symbol: Symbol name to search for
-            repositories: Optional list of specific repository IDs
-            languages: Optional list of languages to filter by
-            max_repositories: Maximum number of repositories to search
-
-        Returns:
-            Dictionary containing aggregated search results
-        """
+        """Fan symbol-lookup across the provided repo contexts."""
         if not self._cross_repo_coordinator:
             raise RuntimeError(
                 "Cross-repository search not enabled. Set MCP_ENABLE_MULTI_REPO=true"
             )
 
+        repositories = [ctx.repo_id for ctx in contexts]
         scope = SearchScope(
             repositories=repositories,
             languages=languages,
@@ -2007,8 +1940,6 @@ class EnhancedDispatcher:
 
         try:
             result = await self._cross_repo_coordinator.search_symbol(symbol, scope)
-
-            # Convert to dictionary format for MCP tools
             return {
                 "query": result.query,
                 "total_results": result.total_results,
@@ -2033,44 +1964,28 @@ class EnhancedDispatcher:
 
     async def cross_repo_code_search(
         self,
+        contexts: List[RepoContext],
         query: str,
-        repositories: Optional[List[str]] = None,
         languages: Optional[List[str]] = None,
-        file_types: Optional[List[str]] = None,
         semantic: bool = False,
-        limit: int = 50,
         max_repositories: int = 10,
     ) -> Dict[str, Any]:
-        """
-        Search for code patterns across multiple repositories.
-
-        Args:
-            query: Search query/pattern
-            repositories: Optional list of specific repository IDs
-            languages: Optional list of languages to filter by
-            file_types: Optional list of file extensions to filter by
-            semantic: Whether to use semantic search
-            limit: Maximum number of results to return
-            max_repositories: Maximum number of repositories to search
-
-        Returns:
-            Dictionary containing aggregated search results
-        """
+        """Fan code-search across the provided repo contexts."""
         if not self._cross_repo_coordinator:
             raise RuntimeError(
                 "Cross-repository search not enabled. Set MCP_ENABLE_MULTI_REPO=true"
             )
 
+        repositories = [ctx.repo_id for ctx in contexts]
         scope = SearchScope(
             repositories=repositories,
             languages=languages,
-            file_types=file_types,
             max_repositories=max_repositories,
             priority_order=True,
         )
 
         try:
-            result = await self._cross_repo_coordinator.search_code(query, scope, semantic, limit)
+            result = await self._cross_repo_coordinator.search_code(query, scope, semantic)
 
             # Convert to dictionary format for MCP tools
             return {
@@ -2095,13 +2010,8 @@ class EnhancedDispatcher:
                 "error": str(e),
             }
 
-    async def get_cross_repo_statistics(self) -> Dict[str, Any]:
-        """
-        Get statistics about cross-repository search capabilities.
-
-        Returns:
-            Dictionary containing repository statistics
-        """
+    async def get_cross_repo_statistics(self, contexts: List[RepoContext]) -> Dict[str, Any]:
+        """Aggregate statistics across the provided repo contexts."""
         if not self._cross_repo_coordinator:
             return {
                 "enabled": False,
@@ -2169,27 +2079,16 @@ class EnhancedDispatcher:
 
     def graph_search(
         self,
+        ctx: RepoContext,
         query: str,
         expansion_radius: int = 1,
         max_context_nodes: int = 50,
         semantic: bool = False,
         limit: int = 20,
     ) -> Iterable[SearchResult]:
-        """
-        Search with graph-based context expansion.
-
-        Args:
-            query: Search query
-            expansion_radius: How far to expand from search results
-            max_context_nodes: Maximum context nodes to add
-            semantic: Use semantic search
-            limit: Maximum search results
-
-        Returns:
-            Search results with expanded context
-        """
+        """Search with graph-based context expansion within ctx.repo_id."""
         # First, perform regular search
-        search_results = list(self.search(query, semantic=semantic, limit=limit))
+        search_results = list(self.search(ctx, query, semantic=semantic, limit=limit))
 
         if not search_results:
             return
@@ -2223,15 +2122,16 @@ class EnhancedDispatcher:
 
     def get_context_for_symbols(
         self,
+        ctx: RepoContext,
         symbols: List[str],
         radius: int = 2,
         budget: int = 200,
         weights: Optional[Dict[str, float]] = None,
     ) -> Optional[GraphCutResult]:
-        """
-        Get optimal context for a list of symbols using graph cut.
+        """Budgeted graph-cut over the symbols' neighborhood within ctx.repo_id.
 
         Args:
+            ctx: Repository context
             symbols: Symbol names to find context for
             radius: Maximum distance from symbols
             budget: Maximum number of nodes in context
@@ -2266,13 +2166,8 @@ class EnhancedDispatcher:
             logger.error(f"Error getting context for symbols: {e}", exc_info=True)
             return None
 
-    def find_symbol_dependencies(self, symbol: str, max_depth: int = 3) -> List[Dict[str, Any]]:
-        """
-        Find dependencies of a symbol.
-
-        Args:
-            symbol: Symbol name
-            max_depth: Maximum depth to traverse
+    def find_symbol_dependencies(self, ctx: RepoContext, symbol: str, max_depth: int = 3) -> List[Dict[str, Any]]:
+        """Outgoing dependency walk from symbol within ctx.repo_id.
 
         Returns:
             List of dependent symbols with metadata
@@ -2312,16 +2207,8 @@ class EnhancedDispatcher:
             logger.error(f"Error finding dependencies for {symbol}: {e}")
             return []
 
-    def find_symbol_dependents(self, symbol: str, max_depth: int = 3) -> List[Dict[str, Any]]:
-        """
-        Find dependents of a symbol (what depends on it).
-
-        Args:
-            symbol: Symbol name
-            max_depth: Maximum depth to traverse
-
-        Returns:
-            List of dependent symbols with metadata
+    def find_symbol_dependents(self, ctx: RepoContext, symbol: str, max_depth: int = 3) -> List[Dict[str, Any]]:
+        """Incoming dependent walk into symbol within ctx.repo_id.
         """
         if not self._graph_analyzer:
             logger.warning("Graph analyzer not initialized")
@@ -2358,12 +2245,8 @@ class EnhancedDispatcher:
             logger.error(f"Error finding dependents for {symbol}: {e}")
             return []
 
-    def get_code_hotspots(self, top_n: int = 10) -> List[Dict[str, Any]]:
-        """
-        Get code hotspots (highly connected nodes).
-
-        Args:
-            top_n: Number of hotspots to return
+    def get_code_hotspots(self, ctx: RepoContext, top_n: int = 10) -> List[Dict[str, Any]]:
+        """Highest-centrality symbols in the per-repo call graph.
 
         Returns:
             List of hotspot information
