@@ -159,22 +159,17 @@ class TestPasswordManager:
         assert result is False
 
     def test_verify_password_accepts_legacy_bcrypt_correct(self):
-        """verify_password returns (True, new_argon2_hash) for a correct legacy bcrypt hash (SL-1.1-c)."""
+        """verify_password returns True for a correct legacy bcrypt hash (SL-1.1-c)."""
         pm = PasswordManager()
-        result = pm.verify_password(_LEGACY_BCRYPT_PASSWORD, _LEGACY_BCRYPT_HASH)
-        assert isinstance(result, tuple), (
-            "Expected tuple[bool, str] for bcrypt match, got plain bool"
-        )
-        ok, new_hash = result
-        assert ok is True
-        assert new_hash.startswith("$argon2id$"), (
-            f"Rehashed value should be argon2id, got: {new_hash!r}"
-        )
+        assert pm.verify_password(_LEGACY_BCRYPT_PASSWORD, _LEGACY_BCRYPT_HASH) is True
+        assert pm.needs_rehash(_LEGACY_BCRYPT_HASH) is True
 
     def test_verify_password_rehash_is_valid_argon2(self):
-        """The rehashed argon2 hash produced from a bcrypt match must itself verify correctly (SL-1.1-c)."""
+        """Pairing verify_password + needs_rehash + hash_password produces a verifiable argon2id hash (SL-1.1-c)."""
         pm = PasswordManager()
-        _, new_hash = pm.verify_password(_LEGACY_BCRYPT_PASSWORD, _LEGACY_BCRYPT_HASH)  # type: ignore[misc]
+        assert pm.verify_password(_LEGACY_BCRYPT_PASSWORD, _LEGACY_BCRYPT_HASH) is True
+        new_hash = pm.hash_password(_LEGACY_BCRYPT_PASSWORD)
+        assert new_hash.startswith("$argon2id$")
         assert pm.verify_password(_LEGACY_BCRYPT_PASSWORD, new_hash) is True
 
     def test_verify_password_rejects_legacy_bcrypt_wrong_password(self):
@@ -187,11 +182,8 @@ class TestPasswordManager:
         """A hash starting with $2a$ should be treated the same as $2b$ (SL-1.1-d)."""
         pm = PasswordManager()
         hash_2a = "$2a$" + _LEGACY_BCRYPT_HASH[4:]
-        result = pm.verify_password(_LEGACY_BCRYPT_PASSWORD, hash_2a)
-        assert isinstance(result, tuple), "Expected tuple[bool, str] for $2a$ bcrypt match"
-        ok, new_hash = result
-        assert ok is True
-        assert new_hash.startswith("$argon2id$")
+        assert pm.verify_password(_LEGACY_BCRYPT_PASSWORD, hash_2a) is True
+        assert pm.needs_rehash(hash_2a) is True
 
     # ------------------------------------------------------------------
     # SL-1-patch Gap 1 & 2: IPasswordManager inheritance + needs_rehash

@@ -108,16 +108,13 @@ class PasswordManager(IPasswordManager):
         """Hash *password* with argon2id.  Returns a ``$argon2id$`` hash string."""
         return self._ph.hash(password)
 
-    def verify_password(
-        self, plain_password: str, hashed_password: str
-    ) -> "bool | tuple[bool, str]":
+    def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """Verify *plain_password* against *hashed_password*.
 
-        Dispatch rules:
-        - ``$argon2*`` prefix  → verify via argon2-cffi; return ``True`` or ``False``.
-        - ``$2b$`` / ``$2a$`` prefix → verify via bcrypt.
-          * Match  → rehash with argon2id and return ``(True, new_argon2_hash)``.
-          * Mismatch → return ``False``.
+        Routes by prefix: ``$argon2*`` → argon2-cffi; ``$2b$`` / ``$2a$`` →
+        bcrypt. Rehash-on-login is the caller's concern — pair this with
+        :meth:`needs_rehash` + :meth:`hash_password` at the authentication
+        call site.
         """
         if hashed_password.startswith("$argon2"):
             try:
@@ -125,17 +122,12 @@ class PasswordManager(IPasswordManager):
                 return True
             except VerifyMismatchError:
                 return False
-        elif hashed_password.startswith(("$2b$", "$2a$")):
-            matched = bcrypt.checkpw(
+        if hashed_password.startswith(("$2b$", "$2a$")):
+            return bcrypt.checkpw(
                 plain_password.encode("utf-8"),
                 hashed_password.encode("utf-8"),
             )
-            if matched:
-                return (True, self.hash_password(plain_password))
-            return False
-        else:
-            # Unknown hash format — fail closed
-            return False
+        return False
 
     def generate_random_password(self, length: int = 12) -> str:
         """Generate a cryptographically random password of *length* characters.
@@ -342,6 +334,9 @@ class AuthManager(IAuthenticator, IAuthorizer):
                 details={"reason": "invalid_password"},
             )
             raise AuthenticationError("Invalid credentials")
+
+        if self.password_manager.needs_rehash(user.hashed_password):
+            user.hashed_password = self.password_manager.hash_password(credentials.password)
 
         # Reset failed attempts on successful login
         self.failed_attempts.pop(username, None)
