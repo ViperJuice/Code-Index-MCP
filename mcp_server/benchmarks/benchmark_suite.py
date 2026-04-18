@@ -22,11 +22,13 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import psutil
 
+from ..core.repo_context import RepoContext
 from ..dispatcher import EnhancedDispatcher as Dispatcher
 from ..interfaces.indexing_interfaces import IIndexPerformanceMonitor
 from ..interfaces.metrics_interfaces import IPerformanceMonitor
 from ..interfaces.shared_interfaces import Error, Result
 from ..plugin_base import IPlugin
+from ..storage.multi_repo_manager import RepositoryInfo
 from ..storage.sqlite_store import SQLiteStore
 
 logger = logging.getLogger(__name__)
@@ -125,6 +127,21 @@ class BenchmarkSuite(IIndexPerformanceMonitor, IPerformanceMonitor):
         self.dispatcher = Dispatcher(plugins)
         self.db_path = db_path or Path(tempfile.mktemp(suffix=".db"))
         self.store = SQLiteStore(self.db_path)
+        self._ctx = self._make_ctx()
+
+    def _make_ctx(self) -> RepoContext:
+        """Build a minimal RepoContext for benchmark calls."""
+        from unittest.mock import MagicMock
+
+        registry_entry = MagicMock(spec=RepositoryInfo)
+        registry_entry.tracked_branch = "main"
+        return RepoContext(
+            repo_id="benchmark-repo",
+            sqlite_store=self.store,
+            workspace_root=self.db_path.parent,
+            tracked_branch="main",
+            registry_entry=registry_entry,
+        )
         self._process = psutil.Process(os.getpid())
 
         # Performance monitoring storage
@@ -228,12 +245,12 @@ void test_method_{idx}(TestStruct{idx}* s) {{
 
         # Warm up
         for _ in range(10):
-            self.dispatcher.lookup(test_symbols[0])
+            self.dispatcher.lookup(self._ctx, test_symbols[0])
 
         # Benchmark
         for i in range(iterations):
             symbol = test_symbols[i % len(test_symbols)]
-            _, duration_ms = self._measure_time(self.dispatcher.lookup, symbol)
+            _, duration_ms = self._measure_time(self.dispatcher.lookup, self._ctx, symbol)
             metric.add_sample(duration_ms)
 
         metric.memory_usage_mb = self._measure_memory()
@@ -257,12 +274,12 @@ void test_method_{idx}(TestStruct{idx}* s) {{
 
             # Warm up
             for _ in range(5):
-                list(self.dispatcher.search(**search_params))
+                list(self.dispatcher.search(self._ctx, **search_params))
 
             # Benchmark
             for _ in range(iterations):
                 _, duration_ms = self._measure_time(
-                    lambda: list(self.dispatcher.search(**search_params))
+                    lambda: list(self.dispatcher.search(self._ctx, **search_params))
                 )
                 metric.add_sample(duration_ms)
 
@@ -371,7 +388,7 @@ void test_method_{idx}(TestStruct{idx}* s) {{
             test_symbol = "function_0"
 
             for _ in range(iterations):
-                _, duration_ms = self._measure_time(self.dispatcher.lookup, test_symbol)
+                _, duration_ms = self._measure_time(self.dispatcher.lookup, self._ctx, test_symbol)
                 cache_hit_metric.add_sample(duration_ms)
 
             # Test cache misses (unique queries)
@@ -379,7 +396,7 @@ void test_method_{idx}(TestStruct{idx}* s) {{
 
             for i in range(iterations):
                 unique_symbol = f"nonexistent_symbol_{i}"
-                _, duration_ms = self._measure_time(self.dispatcher.lookup, unique_symbol)
+                _, duration_ms = self._measure_time(self.dispatcher.lookup, self._ctx, unique_symbol)
                 cache_miss_metric.add_sample(duration_ms)
 
             metrics["cache_hit"] = cache_hit_metric
@@ -757,7 +774,7 @@ def run_pytest_benchmarks(benchmark, plugins: List[IPlugin]):
     def bench_symbol_lookup():
         timer_id = suite.start_timer("symbol_lookup", {"symbol": "test_function"})
         try:
-            result = suite.dispatcher.lookup("test_function")
+            result = suite.dispatcher.lookup(suite._ctx, "test_function")
             return result
         finally:
             suite.stop_timer(timer_id)
@@ -765,7 +782,7 @@ def run_pytest_benchmarks(benchmark, plugins: List[IPlugin]):
     def bench_fuzzy_search():
         timer_id = suite.start_timer("fuzzy_search", {"query": "test"})
         try:
-            results = list(suite.dispatcher.search("test", semantic=False))
+            results = list(suite.dispatcher.search(suite._ctx, "test", semantic=False))
             return results
         finally:
             suite.stop_timer(timer_id)
@@ -773,7 +790,7 @@ def run_pytest_benchmarks(benchmark, plugins: List[IPlugin]):
     def bench_semantic_search():
         timer_id = suite.start_timer("semantic_search", {"query": "calculate sum"})
         try:
-            results = list(suite.dispatcher.search("calculate sum", semantic=True))
+            results = list(suite.dispatcher.search(suite._ctx, "calculate sum", semantic=True))
             return results
         finally:
             suite.stop_timer(timer_id)

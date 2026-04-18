@@ -19,7 +19,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from mcp_server.dispatcher import Dispatcher
+from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
 from mcp_server.indexer import Indexer
 from mcp_server.plugin_system import PluginLoader
 
@@ -52,8 +52,8 @@ class QuickBenchmark:
             workspace_path=str(self.workspace_path),
         )
 
-        # Initialize dispatcher
-        self.dispatcher = Dispatcher(plugin_loader=plugin_loader, indexer=self.indexer)
+        # Initialize dispatcher (no ctor args per Protocol)
+        self.dispatcher = Dispatcher()
 
         setup_time = time.time() - start_time
         self.results["setup"]["mcp_init_time"] = setup_time
