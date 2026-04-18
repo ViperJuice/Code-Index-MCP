@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from tree_sitter import Node, Parser
 from tree_sitter_language_pack import get_language as _get_ts_language
@@ -16,8 +16,11 @@ from ...plugin_base import (
     SearchResult,
     SymbolDef,
 )
-from ...storage.sqlite_store import SQLiteStore
 from ...utils.fuzzy_indexer import FuzzyIndexer
+
+if TYPE_CHECKING:
+    from ...storage.sqlite_store import SQLiteStore
+    from mcp_server.core.repo_context import RepoContext
 
 logger = logging.getLogger(__name__)
 
@@ -27,12 +30,8 @@ class Plugin(IPlugin):
 
     lang = "js"
 
-    def __init__(self, sqlite_store: Optional[SQLiteStore] = None) -> None:
-        """Initialize the JavaScript/TypeScript plugin.
-
-        Args:
-            sqlite_store: Optional SQLite store for persistence
-        """
+    def __init__(self, sqlite_store: Optional["SQLiteStore"] = None) -> None:
+        """Initialize the JavaScript/TypeScript plugin."""
         # Initialize parsers for both JavaScript and TypeScript
         self._js_parser = Parser()
         self._ts_parser = Parser()
@@ -45,8 +44,8 @@ class Plugin(IPlugin):
         self._ts_parser.language = self._ts_language
 
         # Initialize indexer and storage
-        self._indexer = FuzzyIndexer(sqlite_store=sqlite_store)
-        self._sqlite_store = sqlite_store
+        self._indexer = FuzzyIndexer()
+        self._ctx: Optional["RepoContext"] = None
         self._repository_id = None
 
         # State tracking
@@ -60,15 +59,16 @@ class Plugin(IPlugin):
         # Symbol cache for faster lookups
         self._symbol_cache: Dict[str, List[SymbolDef]] = {}
 
-        # Create or get repository if SQLite is enabled
-        if self._sqlite_store:
-            self._repository_id = self._sqlite_store.create_repository(
-                str(Path.cwd()), Path.cwd().name, {"language": "javascript/typescript"}
-            )
-
         # Pre-index existing files
         if os.getenv("MCP_SKIP_PLUGIN_PREINDEX", "false").lower() != "true":
             self._preindex()
+
+    def bind(self, ctx: "RepoContext") -> None:
+        self._ctx = ctx
+        if self._ctx.sqlite_store and not self._repository_id:
+            self._repository_id = self._ctx.sqlite_store.create_repository(
+                str(Path.cwd()), Path.cwd().name, {"language": "javascript/typescript"}
+            )
 
     def _preindex(self) -> None:
         """Pre-index all supported files in the current directory."""
@@ -121,11 +121,11 @@ class Plugin(IPlugin):
 
         # Store file in SQLite if available
         file_id = None
-        if self._sqlite_store and self._repository_id:
+        if (self._ctx.sqlite_store if self._ctx else None) and self._repository_id:
             import hashlib
 
             file_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
-            file_id = self._sqlite_store.store_file(
+            file_id = (self._ctx.sqlite_store if self._ctx else None).store_file(
                 self._repository_id,
                 str(path),
                 str(
@@ -148,7 +148,7 @@ class Plugin(IPlugin):
         self._extract_symbols(root, content, symbols, imports, exports, file_id)
 
         # Store module information if SQLite available
-        if self._sqlite_store and self._repository_id and file_id:
+        if (self._ctx.sqlite_store if self._ctx else None) and self._repository_id and file_id:
             self._store_module_info(path, imports, exports, file_id)
 
         # Cache symbols for quick lookup
@@ -235,8 +235,8 @@ class Plugin(IPlugin):
                 symbols.append(symbol_info)
 
                 # Store in SQLite if available
-                if self._sqlite_store and file_id:
-                    symbol_id = self._sqlite_store.store_symbol(
+                if (self._ctx.sqlite_store if self._ctx else None) and file_id:
+                    symbol_id = (self._ctx.sqlite_store if self._ctx else None).store_symbol(
                         file_id,
                         name,
                         kind,
@@ -318,8 +318,8 @@ class Plugin(IPlugin):
                         symbols.append(symbol_info)
 
                         # Store in SQLite if available
-                        if self._sqlite_store and file_id:
-                            symbol_id = self._sqlite_store.store_symbol(
+                        if (self._ctx.sqlite_store if self._ctx else None) and file_id:
+                            symbol_id = (self._ctx.sqlite_store if self._ctx else None).store_symbol(
                                 file_id,
                                 name,
                                 kind,
@@ -354,8 +354,8 @@ class Plugin(IPlugin):
                 symbols.append(symbol_info)
 
                 # Store in SQLite if available
-                if self._sqlite_store and file_id:
-                    symbol_id = self._sqlite_store.store_symbol(
+                if (self._ctx.sqlite_store if self._ctx else None) and file_id:
+                    symbol_id = (self._ctx.sqlite_store if self._ctx else None).store_symbol(
                         file_id,
                         name,
                         "class",
@@ -799,7 +799,7 @@ class Plugin(IPlugin):
         self, path: Path, imports: List[Dict], exports: List[Dict], file_id: int
     ) -> None:
         """Store module dependency information in SQLite."""
-        if not self._sqlite_store:
+        if not (self._ctx.sqlite_store if self._ctx else None):
             return
 
         # Store imports
