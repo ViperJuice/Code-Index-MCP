@@ -54,6 +54,7 @@ class RepositoryInfo:
     artifact_health: Optional[str] = None
     tracked_branch: Optional[str] = None   # pinned default branch; never auto-mutates
     git_common_dir: Optional[str] = None   # str for JSON-safety; __post_init__ coerces Path→str
+    staleness_reason: Optional[str] = None
 
     def __post_init__(self) -> None:
         """Normalize paths and derived fields."""

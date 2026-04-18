@@ -98,6 +98,7 @@ fuzzy_indexer: FuzzyIndexer | None = None
 semantic_indexer = None
 profile_hydration_status: Dict[str, Any] | None = None
 semantic_setup_status: Dict[str, Any] | None = None
+_repo_registry = None
 
 
 def _normalize_search_result(raw_result: Any) -> SearchResult:
@@ -477,9 +478,11 @@ async def startup_event():
             from .storage.repository_registry import RepositoryRegistry
             from .storage.store_registry import StoreRegistry
 
-            _repo_registry = RepositoryRegistry()
-            _store_registry = StoreRegistry.for_registry(_repo_registry)
-            repo_resolver = RepoResolver(_repo_registry, _store_registry)
+            _local_repo_registry = RepositoryRegistry()
+            _store_registry = StoreRegistry.for_registry(_local_repo_registry)
+            repo_resolver = RepoResolver(_local_repo_registry, _store_registry)
+            import mcp_server.gateway as _gw_self
+            _gw_self._repo_registry = _local_repo_registry
             logger.info("RepoResolver initialized")
         except Exception as _e:
             logger.warning("RepoResolver init failed; falling back to global sqlite_store: %s", _e)
@@ -1518,6 +1521,17 @@ async def get_status(
             except Exception as e:
                 logger.warning(f"Failed to get cache stats: {e}")
 
+        from mcp_server.health.repo_status import build_health_row as _build_health_row
+        _repositories = []
+        if _repo_registry is not None:
+            try:
+                _repositories = [
+                    _build_health_row(info)
+                    for info in _repo_registry.get_all_repositories().values()
+                ]
+            except Exception as _repo_err:
+                logger.warning("Failed to build repository health rows: %s", _repo_err)
+
         status_data = {
             "status": "operational",
             "plugins": plugin_count,
@@ -1529,6 +1543,7 @@ async def get_status(
             "semantic_setup": semantic_setup_status,
             "language_detection": language_detection_status,
             "version": "0.1.0",
+            "repositories": _repositories,
         }
 
         # Add search capabilities
