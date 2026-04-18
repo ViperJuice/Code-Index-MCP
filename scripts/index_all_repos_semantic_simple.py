@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 def find_test_repositories() -> List[Dict[str, Any]]:
     """Find all test repositories and their metadata."""
-    test_repos_dir = Path("PathUtils.get_workspace_root()/test_repos")
+    test_repos_dir = PathUtils.get_workspace_root() / "test_repos"
     repos = []
     
     # Define language patterns for detection

@@ -27,7 +27,7 @@ def demo_centralized_storage():
     print(f"✓ Index storage location: {manager.storage_path}")
     
     # Get repository info
-    repo_path = Path("PathUtils.get_workspace_root()")
+    repo_path = PathUtils.get_workspace_root()
     repo_info = manager.get_repository_info(repo_path)
     print(f"\n✓ Repository Information:")
     print(f"  Name: {repo_info['name']}")
@@ -92,7 +92,7 @@ def demo_storage_strategies():
     
     print("\n=== Storage Strategy Comparison ===\n")
     
-    repo_path = Path("PathUtils.get_workspace_root()")
+    repo_path = PathUtils.get_workspace_root()
     
     # Test each strategy
     strategies = ["centralized", "portable", "inline"]

@@ -906,7 +906,7 @@ class RealStrategicRecommendationGenerator:
 
 def main():
     """Generate comprehensive strategic recommendations"""
-    workspace_path = Path("PathUtils.get_workspace_root()")
+    workspace_path = PathUtils.get_workspace_root()
     generator = RealStrategicRecommendationGenerator(workspace_path)
     
     print("Starting Comprehensive Strategic Recommendation Generation")

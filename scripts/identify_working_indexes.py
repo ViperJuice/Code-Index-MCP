@@ -86,7 +86,7 @@ def find_test_repos():
     test_repos = []
     
     # Check main test_repos directory
-    test_repos_dir = Path("PathUtils.get_workspace_root()/test_repos")
+    test_repos_dir = PathUtils.get_workspace_root() / "test_repos"
     if test_repos_dir.exists():
         for category in test_repos_dir.iterdir():
             if category.is_dir() and not category.name.startswith('.'):
@@ -102,7 +102,7 @@ def find_test_repos():
                                 })
     
     # Also check test_indexes directory references
-    test_indexes_dir = Path("PathUtils.get_workspace_root()/test_indexes")
+    test_indexes_dir = PathUtils.get_workspace_root() / "test_indexes"
     if test_indexes_dir.exists():
         summary_file = test_indexes_dir / "mcp_indexing_summary.json"
         if summary_file.exists():
@@ -231,7 +231,7 @@ def main():
         }
     }
     
-    output_file = Path("PathUtils.get_workspace_root()/working_indexes_analysis.json")
+    output_file = PathUtils.get_workspace_root() / "working_indexes_analysis.json"
     with open(output_file, 'w') as f:
         json.dump(results, f, indent=2, default=str)
     

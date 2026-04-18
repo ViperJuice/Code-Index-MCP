@@ -549,7 +549,7 @@ class RealClaudeSessionTracker:
 
 def main():
     """Run real Claude Code session tracking"""
-    workspace_path = Path("PathUtils.get_workspace_root()")
+    workspace_path = PathUtils.get_workspace_root()
     tracker = RealClaudeSessionTracker(workspace_path)
     
     print("Starting Real Claude Code Session Token Tracking")

@@ -158,8 +158,8 @@ def create_index_for_repo(repo_path: Path, index_path: Path) -> Dict[str, Any]:
 def main():
     """Main function to create indexes for all test repositories."""
     # Base paths
-    test_repos_base = Path("PathUtils.get_workspace_root()/test_repos")
-    test_indexes_base = Path("PathUtils.get_workspace_root()/test_indexes")
+    test_repos_base = PathUtils.get_workspace_root() / "test_repos"
+    test_indexes_base = PathUtils.get_workspace_root() / "test_indexes"
     
     # Select a subset of repos for testing
     test_repos = [

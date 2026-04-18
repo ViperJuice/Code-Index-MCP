@@ -58,7 +58,7 @@ def save_progress(progress: Dict[str, Any]):
 
 def find_all_repositories() -> List[Dict[str, Any]]:
     """Find all test repositories."""
-    test_repos_dir = Path("PathUtils.get_workspace_root()/test_repos")
+    test_repos_dir = PathUtils.get_workspace_root() / "test_repos"
     repos = []
     
     # Language detection patterns

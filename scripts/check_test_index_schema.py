@@ -87,9 +87,9 @@ def main():
     
     # Check a few different test indexes
     test_indexes = [
-        Path("PathUtils.get_workspace_root()/test_indexes/go_gin/code_index.db"),
-        Path("PathUtils.get_workspace_root()/test_indexes/python_django/code_index.db"),
-        Path("PathUtils.get_workspace_root()/test_indexes/c_redis/simple_bm25.db"),
+        PathUtils.get_workspace_root() / "test_indexes/go_gin/code_index.db",
+        PathUtils.get_workspace_root() / "test_indexes/python_django/code_index.db",
+        PathUtils.get_workspace_root() / "test_indexes/c_redis/simple_bm25.db",
         # Check main repo index for comparison
         Path.home() / ".mcp" / "indexes" / "f7b49f5d0ae0" / "current.db"
     ]

@@ -81,7 +81,7 @@ def analyze_path_mismatch():
                     
             # Check current directory structure
             print("\n4. Current Directory Structure:")
-            test_repos = Path("PathUtils.get_workspace_root()/test_repos")
+            test_repos = PathUtils.get_workspace_root() / "test_repos"
             if test_repos.exists():
                 print(f"   ✅ test_repos exists at: {test_repos}")
                 # List subdirectories
@@ -93,7 +93,7 @@ def analyze_path_mismatch():
                 
             # Check for moved repos
             print("\n5. Searching for Actual Repository Locations:")
-            workspace_root = Path("PathUtils.get_workspace_root()")
+            workspace_root = PathUtils.get_workspace_root()
             
             # Common repo patterns from the sample
             repo_names = ["django", "react", "typescript", "aspnetcore"]

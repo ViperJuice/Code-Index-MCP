@@ -64,7 +64,7 @@ def main():
     print("Checking Test Indexes Directory")
     print("=" * 80)
     
-    test_indexes_dir = Path("PathUtils.get_workspace_root()/test_indexes")
+    test_indexes_dir = PathUtils.get_workspace_root() / "test_indexes"
     
     if not test_indexes_dir.exists():
         print("Test indexes directory not found!")

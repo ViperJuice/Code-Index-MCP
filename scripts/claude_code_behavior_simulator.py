@@ -24,7 +24,7 @@ class ClaudeCodeSimulator:
     """Simulate Claude Code's retrieval patterns"""
     
     def __init__(self):
-        self.workspace = Path("PathUtils.get_workspace_root()")
+        self.workspace = PathUtils.get_workspace_root()
         self.metrics = {
             "mcp": {
                 "scenarios": [],

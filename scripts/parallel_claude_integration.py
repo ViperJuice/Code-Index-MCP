@@ -489,7 +489,7 @@ class IntegratedParallelOrchestrator:
 
 async def main():
     """Main entry point for integrated parallel analysis"""
-    workspace = Path("PathUtils.get_workspace_root()")
+    workspace = PathUtils.get_workspace_root()
     
     logger.info("Starting Integrated Parallel MCP Analysis - Phase 3 Optimization")
     logger.info("=" * 80)

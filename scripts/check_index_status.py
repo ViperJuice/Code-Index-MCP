@@ -84,7 +84,7 @@ def check_semantic_indexes():
 
 def find_all_test_repos():
     """Find all test repositories."""
-    test_repos_dir = Path("PathUtils.get_workspace_root()/test_repos")
+    test_repos_dir = PathUtils.get_workspace_root() / "test_repos"
     repos = []
     
     for git_dir in test_repos_dir.rglob(".git"):

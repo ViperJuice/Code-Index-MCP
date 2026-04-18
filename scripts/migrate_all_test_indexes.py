@@ -25,7 +25,7 @@ def get_repo_hash_from_name(repo_name):
 
 def migrate_test_indexes():
     """Migrate all test indexes to central storage."""
-    test_indexes_dir = Path("PathUtils.get_workspace_root()/test_indexes")
+    test_indexes_dir = PathUtils.get_workspace_root() / "test_indexes"
     central_path = Path.home() / ".mcp" / "indexes"
     
     if not test_indexes_dir.exists():
@@ -90,7 +90,7 @@ def migrate_test_indexes():
 
 def cleanup_old_locations():
     """Remove the .mcp-index directory since we're using central storage only."""
-    mcp_index_dir = Path("PathUtils.get_workspace_root()/.mcp-index")
+    mcp_index_dir = PathUtils.get_workspace_root() / ".mcp-index"
     
     if mcp_index_dir.exists():
         print(f"\n🗑️  Removing {mcp_index_dir}")

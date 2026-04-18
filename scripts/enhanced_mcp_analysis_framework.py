@@ -636,7 +636,7 @@ class EnhancedMCPAnalyzer:
 
 def main():
     """Example usage of the enhanced analysis framework"""
-    workspace = Path("PathUtils.get_workspace_root()")
+    workspace = PathUtils.get_workspace_root()
     session_id = f"enhanced_analysis_{int(time.time())}"
     
     analyzer = EnhancedMCPAnalyzer(workspace, session_id)

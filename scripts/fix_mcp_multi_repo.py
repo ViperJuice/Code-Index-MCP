@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 def fix_mcp_config():
     """Update .mcp.json to include repository registry path."""
-    config_path = Path("PathUtils.get_workspace_root()/.mcp.json")
+    config_path = PathUtils.get_workspace_root() / ".mcp.json"
     
     # Read current config
     with open(config_path, 'r') as f:
@@ -43,7 +43,7 @@ def fix_mcp_config():
 
 def test_multi_repo_manager():
     """Test MultiRepositoryManager with correct registry path."""
-    registry_path = Path("PathUtils.get_workspace_root()/PathUtils.get_repo_registry_path()")
+    registry_path = PathUtils.get_workspace_root() / "PathUtils.get_repo_registry_path()"
     
     # Initialize manager
     manager = MultiRepositoryManager(central_index_path=registry_path)
@@ -67,7 +67,7 @@ def test_dispatcher_with_multi_repo():
     os.environ["MCP_INDEX_STORAGE_PATH"] = "PathUtils.get_workspace_root()/.indexes"
     
     # Create a dummy SQLite store for current repo
-    current_index = Path("PathUtils.get_workspace_root()/.mcp-index/code_index.db")
+    current_index = PathUtils.get_workspace_root() / ".mcp-index/code_index.db"
     if current_index.exists():
         sqlite_store = SQLiteStore(str(current_index))
     else:
@@ -97,7 +97,7 @@ def test_dispatcher_with_multi_repo():
 def test_direct_index_search():
     """Test searching directly in a specific index."""
     # Find Django index
-    django_index = Path("PathUtils.get_workspace_root()/.indexes/d8df70cdcd6e/code_index.db")
+    django_index = PathUtils.get_workspace_root() / ".indexes/d8df70cdcd6e/code_index.db"
     
     if not django_index.exists():
         logger.error(f"Django index not found at {django_index}")

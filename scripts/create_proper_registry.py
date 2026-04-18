@@ -96,7 +96,7 @@ def create_proper_registry():
         print(f"Added {name}: {stats['total_files']} files, {stats['total_symbols']} symbols")
     
     # Save registry
-    output_path = Path("PathUtils.get_workspace_root()/.indexes/repository_registry_proper.json")
+    output_path = PathUtils.get_workspace_root() / ".indexes/repository_registry_proper.json"
     with open(output_path, 'w') as f:
         json.dump(registry, f, indent=2)
     

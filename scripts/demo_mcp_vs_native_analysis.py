@@ -194,7 +194,7 @@ def main():
     print(report)
     
     # Save report
-    report_path = Path("PathUtils.get_workspace_root()/MCP_VS_NATIVE_ANALYSIS.md")
+    report_path = PathUtils.get_workspace_root() / "MCP_VS_NATIVE_ANALYSIS.md"
     report_path.write_text(report)
     print(f"\nReport saved to: {report_path}")
     
@@ -220,7 +220,7 @@ def main():
     json_data["summary"]["average_token_reduction"] = sum(token_reductions) / len(token_reductions)
     json_data["summary"]["average_time_reduction"] = sum(time_reductions) / len(time_reductions)
     
-    json_path = Path("PathUtils.get_workspace_root()/mcp_vs_native_analysis.json")
+    json_path = PathUtils.get_workspace_root() / "mcp_vs_native_analysis.json"
     json_path.write_text(json.dumps(json_data, indent=2))
     print(f"JSON data saved to: {json_path}")
 

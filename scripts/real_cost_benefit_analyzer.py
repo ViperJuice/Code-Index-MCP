@@ -648,7 +648,7 @@ class RealCostBenefitAnalyzer:
 
 def main():
     """Run real cost-benefit analysis and ROI calculation"""
-    workspace_path = Path("PathUtils.get_workspace_root()")
+    workspace_path = PathUtils.get_workspace_root()
     analyzer = RealCostBenefitAnalyzer(workspace_path)
     
     print("Starting Real Cost-Benefit Analysis and ROI Calculation")

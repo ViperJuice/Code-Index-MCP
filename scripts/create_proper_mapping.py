@@ -19,7 +19,7 @@ def create_proper_mapping():
     
     # Step 1: Map SQL indexes to their repositories
     print("\n1. MAPPING SQL INDEXES TO REPOSITORIES:")
-    indexes_dir = Path("PathUtils.get_workspace_root()/.indexes")
+    indexes_dir = PathUtils.get_workspace_root() / ".indexes"
     
     index_mapping = {}
     
@@ -261,7 +261,7 @@ def create_proper_mapping():
         }
     }
     
-    output_path = Path("PathUtils.get_workspace_root()/proper_repo_mapping.json")
+    output_path = PathUtils.get_workspace_root() / "proper_repo_mapping.json"
     with open(output_path, 'w') as f:
         json.dump(output, f, indent=2)
     

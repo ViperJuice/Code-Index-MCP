@@ -548,7 +548,7 @@ class ParallelAnalysisPipeline:
 
 async def main():
     """Main entry point for real-time parallel analysis"""
-    workspace = Path("PathUtils.get_workspace_root()")
+    workspace = PathUtils.get_workspace_root()
     transcript_dir = Path("Path.home() / ".claude"/projects")  # Real transcript location
     
     # Optimized configuration for 8x speed improvement

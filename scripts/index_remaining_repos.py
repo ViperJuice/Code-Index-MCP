@@ -42,7 +42,7 @@ def get_progress():
 def get_all_repos():
     """Get list of all repositories."""
     repos = []
-    test_repos_dir = Path("PathUtils.get_workspace_root()/test_repos")
+    test_repos_dir = PathUtils.get_workspace_root() / "test_repos"
     
     for repo_path in test_repos_dir.rglob('.git'):
         if repo_path.is_dir():

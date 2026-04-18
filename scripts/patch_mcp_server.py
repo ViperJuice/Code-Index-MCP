@@ -13,8 +13,8 @@ def create_patched_server():
     """Create a patched version of the MCP server that uses BM25 direct search."""
     
     # Read the original server file
-    original_file = Path("PathUtils.get_workspace_root()/scripts/cli/mcp_server_cli.py")
-    patched_file = Path("PathUtils.get_workspace_root()/scripts/cli/mcp_server_cli_patched.py")
+    original_file = PathUtils.get_workspace_root() / "scripts/cli/mcp_server_cli.py"
+    patched_file = PathUtils.get_workspace_root() / "scripts/cli/mcp_server_cli_patched.py"
     
     content = original_file.read_text()
     
@@ -393,7 +393,7 @@ if __name__ == "__main__":
     asyncio.run(main())
 '''
     
-    standalone_file = Path("PathUtils.get_workspace_root()/scripts/cli/mcp_server_bm25.py")
+    standalone_file = PathUtils.get_workspace_root() / "scripts/cli/mcp_server_bm25.py"
     standalone_file.write_text(standalone_content)
     standalone_file.chmod(0o755)
     

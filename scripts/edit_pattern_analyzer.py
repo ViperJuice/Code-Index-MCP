@@ -620,7 +620,7 @@ class EditPatternAnalyzer:
 
 def main():
     """Example usage of edit pattern analyzer"""
-    workspace = Path("PathUtils.get_workspace_root()")
+    workspace = PathUtils.get_workspace_root()
     session_id = f"edit_analysis_{int(time.time())}"
     
     analyzer = EditPatternAnalyzer(workspace)

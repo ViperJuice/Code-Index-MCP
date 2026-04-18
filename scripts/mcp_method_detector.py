@@ -574,7 +574,7 @@ class MCPMethodValidator:
 
 def main():
     """Example usage of MCP method detection"""
-    workspace = Path("PathUtils.get_workspace_root()")
+    workspace = PathUtils.get_workspace_root()
     session_id = f"method_detection_{int(time.time())}"
     
     # Initialize monitor

@@ -691,7 +691,7 @@ class RealEditBehaviorTracker:
 
 def main():
     """Run real edit behavior tracking analysis"""
-    workspace_path = Path("PathUtils.get_workspace_root()")
+    workspace_path = PathUtils.get_workspace_root()
     tracker = RealEditBehaviorTracker(workspace_path)
     
     print("Starting Real Edit Behavior and Context Utilization Analysis")

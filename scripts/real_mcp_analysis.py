@@ -509,7 +509,7 @@ class RealMCPAnalyzer:
 
 async def main():
     """Main entry point for real MCP analysis"""
-    workspace_path = Path("PathUtils.get_workspace_root()")
+    workspace_path = PathUtils.get_workspace_root()
     
     # Load test queries
     with open(workspace_path / "test_queries.json") as f:
