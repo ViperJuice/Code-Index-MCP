@@ -79,8 +79,8 @@ class SecurityPolicy:
     description: str
     rules: List[Dict[str, Any]]
     priority: int
-    is_active: bool = True
     created_at: datetime
+    is_active: bool = True
 
 
 # ========================================

@@ -1,6 +1,8 @@
 """Authentication and authorization manager."""
 
 import fnmatch
+import secrets
+import string
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -9,6 +11,9 @@ import bcrypt
 import jwt
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
+
+from mcp_server.interfaces.security_interfaces import IPasswordManager
+from mcp_server.interfaces.shared_interfaces import Result
 
 from .models import (
     DEFAULT_ACCESS_RULES,
@@ -81,17 +86,23 @@ class IAuthorizer:
         raise NotImplementedError
 
 
-class PasswordManager:
+class PasswordManager(IPasswordManager):
     """Password hashing and verification utilities.
 
     New hashes use argon2id via argon2-cffi.  Legacy bcrypt hashes (``$2b$`` /
     ``$2a$`` prefix) are verified with the ``bcrypt`` library and, on a
     successful match, are automatically rehashed with argon2id so that the
     caller can persist the upgraded hash.
+
+    Implements :class:`~mcp_server.interfaces.security_interfaces.IPasswordManager`.
     """
 
     def __init__(self) -> None:
         self._ph = PasswordHasher()
+
+    # ------------------------------------------------------------------
+    # IPasswordManager — core hashing / verification
+    # ------------------------------------------------------------------
 
     def hash_password(self, password: str) -> str:
         """Hash *password* with argon2id.  Returns a ``$argon2id$`` hash string."""
@@ -125,6 +136,47 @@ class PasswordManager:
         else:
             # Unknown hash format — fail closed
             return False
+
+    def generate_random_password(self, length: int = 12) -> str:
+        """Generate a cryptographically random password of *length* characters.
+
+        The result always contains at least one uppercase letter, one lowercase
+        letter, one digit, and one special character so that it passes
+        :py:meth:`is_strong_password` out of the box.
+        """
+        alphabet = string.ascii_letters + string.digits + "!@#$%^&*()_+-=[]{}|;:,.<>?"
+        while True:
+            pwd = "".join(secrets.choice(alphabet) for _ in range(length))
+            if self.is_strong_password(pwd):
+                return pwd
+
+    def validate_password_strength(self, password: str) -> Result:
+        """Return a :class:`Result` indicating whether *password* is strong enough."""
+        if self.is_strong_password(password):
+            return Result.success_result(True)
+        return Result(
+            success=False,
+            value=False,
+            error=None,
+            metadata={"reason": "Password does not meet strength requirements"},
+        )
+
+    # ------------------------------------------------------------------
+    # Additional helpers
+    # ------------------------------------------------------------------
+
+    def needs_rehash(self, hashed: str) -> bool:
+        """Return ``True`` if *hashed* should be re-hashed with current argon2 params.
+
+        - argon2 hashes: delegate to :meth:`argon2.PasswordHasher.check_needs_rehash`.
+        - bcrypt hashes (``$2b$`` / ``$2a$``): always ``True`` — must migrate to argon2.
+        - unknown format: ``True`` — safer to rehash.
+        """
+        if hashed.startswith("$argon2"):
+            return self._ph.check_needs_rehash(hashed)
+        if hashed.startswith("$2b$") or hashed.startswith("$2a$"):
+            return True  # all bcrypt hashes need rehash to argon2
+        return True  # unknown format, safer to rehash
 
     def is_strong_password(self, password: str, min_length: int = 8) -> bool:
         """Check if password meets strength requirements."""

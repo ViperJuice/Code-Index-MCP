@@ -8,6 +8,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from mcp_server.interfaces.security_interfaces import IPasswordManager
 from mcp_server.security import (
     AccessLevel,
     AccessRequest,
@@ -26,6 +27,16 @@ from mcp_server.security.security_middleware import (
     RequestValidationMiddleware,
     SecurityHeadersMiddleware,
 )
+
+# ---------------------------------------------------------------------------
+# Constants shared across PasswordManager tests
+# ---------------------------------------------------------------------------
+
+# A pre-generated legacy $2b$ bcrypt hash of 'testpw' (generated with bcrypt 4.x).
+# Hardcoded so the test does NOT depend on bcrypt hash-generation behaviour at
+# test-run time; only the *verification* path is exercised.
+_LEGACY_BCRYPT_HASH = "$2b$12$mWD/c4F17E0iGRFYCaWvx.T.1Rk9k9TVRH0PU3x139u7n2l4X8upS"
+_LEGACY_BCRYPT_PASSWORD = "testpw"
 
 
 @pytest.fixture
@@ -121,6 +132,92 @@ class TestPasswordManager:
         assert not pwd_manager.is_strong_password("alllowercase")
         assert not pwd_manager.is_strong_password("ALLUPPERCASE")
         assert not pwd_manager.is_strong_password("12345678")
+
+    # ------------------------------------------------------------------
+    # SL-1-patch: ported from tests/test_auth_manager.py (now deleted)
+    # ------------------------------------------------------------------
+
+    def test_hash_password_returns_argon2id(self):
+        """hash_password must produce a $argon2id$ hash (SL-1.1-a)."""
+        pm = PasswordManager()
+        h = pm.hash_password("somepassword")
+        assert h.startswith("$argon2id$"), f"Expected argon2id hash prefix, got: {h!r}"
+
+    def test_verify_password_accepts_argon2_hash_correct(self):
+        """verify_password returns True for a correct argon2 hash (SL-1.1-b)."""
+        pm = PasswordManager()
+        plain = "correcthorsebatterystaple"
+        h = pm.hash_password(plain)
+        result = pm.verify_password(plain, h)
+        assert result is True
+
+    def test_verify_password_rejects_argon2_hash_wrong_password(self):
+        """verify_password returns False for a wrong password against an argon2 hash (SL-1.1-b)."""
+        pm = PasswordManager()
+        h = pm.hash_password("rightpassword")
+        result = pm.verify_password("wrongpassword", h)
+        assert result is False
+
+    def test_verify_password_accepts_legacy_bcrypt_correct(self):
+        """verify_password returns (True, new_argon2_hash) for a correct legacy bcrypt hash (SL-1.1-c)."""
+        pm = PasswordManager()
+        result = pm.verify_password(_LEGACY_BCRYPT_PASSWORD, _LEGACY_BCRYPT_HASH)
+        assert isinstance(result, tuple), (
+            "Expected tuple[bool, str] for bcrypt match, got plain bool"
+        )
+        ok, new_hash = result
+        assert ok is True
+        assert new_hash.startswith("$argon2id$"), (
+            f"Rehashed value should be argon2id, got: {new_hash!r}"
+        )
+
+    def test_verify_password_rehash_is_valid_argon2(self):
+        """The rehashed argon2 hash produced from a bcrypt match must itself verify correctly (SL-1.1-c)."""
+        pm = PasswordManager()
+        _, new_hash = pm.verify_password(_LEGACY_BCRYPT_PASSWORD, _LEGACY_BCRYPT_HASH)  # type: ignore[misc]
+        assert pm.verify_password(_LEGACY_BCRYPT_PASSWORD, new_hash) is True
+
+    def test_verify_password_rejects_legacy_bcrypt_wrong_password(self):
+        """verify_password returns False for a wrong password against a legacy bcrypt hash (SL-1.1-c)."""
+        pm = PasswordManager()
+        result = pm.verify_password("wrongpassword", _LEGACY_BCRYPT_HASH)
+        assert result is False
+
+    def test_verify_password_handles_2a_prefix(self):
+        """A hash starting with $2a$ should be treated the same as $2b$ (SL-1.1-d)."""
+        pm = PasswordManager()
+        hash_2a = "$2a$" + _LEGACY_BCRYPT_HASH[4:]
+        result = pm.verify_password(_LEGACY_BCRYPT_PASSWORD, hash_2a)
+        assert isinstance(result, tuple), "Expected tuple[bool, str] for $2a$ bcrypt match"
+        ok, new_hash = result
+        assert ok is True
+        assert new_hash.startswith("$argon2id$")
+
+    # ------------------------------------------------------------------
+    # SL-1-patch Gap 1 & 2: IPasswordManager inheritance + needs_rehash
+    # ------------------------------------------------------------------
+
+    def test_password_manager_implements_ipassword_manager(self):
+        """PasswordManager must be an instance of IPasswordManager (Gap 1)."""
+        pm = PasswordManager()
+        assert isinstance(pm, IPasswordManager), (
+            "PasswordManager does not implement IPasswordManager"
+        )
+
+    def test_needs_rehash_returns_true_for_legacy_bcrypt(self):
+        """needs_rehash returns True for a legacy bcrypt hash (Gap 2)."""
+        pm = PasswordManager()
+        assert pm.needs_rehash(_LEGACY_BCRYPT_HASH) is True, (
+            "Legacy bcrypt hashes should always need rehash to argon2"
+        )
+
+    def test_needs_rehash_returns_false_for_fresh_argon2_hash(self):
+        """needs_rehash returns False for a freshly generated argon2id hash (Gap 2)."""
+        pm = PasswordManager()
+        fresh_hash = pm.hash_password("freshpassword123!")
+        assert pm.needs_rehash(fresh_hash) is False, (
+            "A freshly generated argon2 hash should not need rehash"
+        )
 
 
 class TestRateLimiter:
