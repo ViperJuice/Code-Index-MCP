@@ -7,10 +7,7 @@ the MCP server implementation.
 
 from .fuzzy_indexer import FuzzyIndexer
 from .index_discovery import IndexDiscovery
-from .semantic_indexer_registry import (
-    SemanticIndexerRegistry,
-    SemanticIndexerRegistryProtocol,
-)
+from .semantic_indexer_registry import SemanticIndexerRegistry
 from .token_counter import TokenCounter, compare_model_costs, quick_estimate
 
 # SemanticIndexer requires optional dependencies (voyageai, qdrant-client)
@@ -40,7 +37,6 @@ __all__ = [
     "IndexDiscovery",
     "get_semantic_indexer",
     "SemanticIndexerRegistry",
-    "SemanticIndexerRegistryProtocol",
     "TokenCounter",
     "quick_estimate",
     "compare_model_costs",
