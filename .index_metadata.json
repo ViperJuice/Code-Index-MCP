@@ -1,5 +1,5 @@
 {
-  "embedding_provider": "voyage",
+  "embedding_provider": "mock",
   "embedding_model": "voyage-code-3",
   "model_version": "legacy",
   "model_dimension": 1024,
@@ -7,9 +7,9 @@
   "normalization_policy": "provider-default",
   "chunk_schema_version": "legacy",
   "created_at": "2026-03-05T05:10:02.226505",
-  "updated_at": "2026-04-14T20:58:02.354265",
-  "qdrant_path": "./vector_index.qdrant",
-  "collection_name": "typescript-127596236859440",
+  "updated_at": "2026-04-18T14:17:57.600382",
+  "qdrant_path": ":memory:",
+  "collection_name": "ci__aaa4034450c0__legacy-default__165a4f82df00",
   "compatibility_hash": "1a8eb12939e6a631",
-  "git_commit": "f8325031147020afca25e2bc650a34d18d6fb163"
+  "git_commit": "fb8db808c34cae03ba3cc90c9c1110711da2c09b"
 }
