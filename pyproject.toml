@@ -88,6 +88,7 @@ dev = [
     "faker>=19.6.1",
     "responses>=0.23.3",
     "freezegun>=1.2.2",
+    "tomli>=2.0.1; python_version<\"3.11\"",
     "pytest-httpx>=0.22.0",
     "aiofiles>=23.2.1",
     # Code quality
