@@ -140,6 +140,22 @@ class _Handler(FileSystemEventHandler):
         self._stop_event.set()
         self._worker.join(timeout=2)
 
+    def flush(self) -> None:
+        """Force-drain all pending events immediately. For use in tests only."""
+        with self._lock:
+            pending = dict(self._pending)
+            self._pending.clear()
+        for path, (_, action, extra) in pending.items():
+            try:
+                if action == "reindex":
+                    self._trigger_reindex(path)
+                elif action == "remove":
+                    self._remove_file_from_index(path)
+                elif action == "move" and extra is not None:
+                    self._handle_file_move(path, extra)
+            except Exception:
+                logger.exception("flush drain failed for %s (action=%s)", path, action)
+
     # ------------------------------------------------------------------
     # Dispatcher-side actions (run on the worker thread)
 
@@ -179,12 +195,27 @@ class _Handler(FileSystemEventHandler):
         self.dispatcher.index_file(path)
         self._kick_cache_invalidation(path)
 
+    def trigger_reindex(self, path: Path) -> None:
+        """Public test/integration entrypoint — skips the existence check."""
+        if path.suffix not in self.code_extensions:
+            return
+        logger.info("Re-indexing %s", path)
+        try:
+            self.dispatcher.remove_file(path)
+            self.dispatcher.index_file(path)
+            self._kick_cache_invalidation(path)
+        except Exception:
+            logger.exception("trigger_reindex failed for %s", path)
+
     def _remove_file_from_index(self, path: Path) -> None:
         if path.suffix not in self.code_extensions:
             return
         logger.info("Removing from index: %s", path)
         self.dispatcher.remove_file(path)
         self._kick_cache_invalidation(path)
+
+    def remove_file_from_index(self, path: Path) -> None:
+        self._remove_file_from_index(path)
 
     def _handle_file_move(self, old_path: Path, new_path: Path) -> None:
         if (

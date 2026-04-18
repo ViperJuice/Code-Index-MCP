@@ -1,0 +1,332 @@
+"""Tests for MultiRepositoryWatcher and handler-level branch/gitignore filters."""
+
+import threading
+import time
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
+from watchdog.observers import Observer
+
+from mcp_server.core.repo_context import RepoContext
+from mcp_server.watcher_multi_repo import MultiRepositoryHandler, MultiRepositoryWatcher
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _make_repo_context(workspace_root: Path, tracked_branch: str = "main") -> RepoContext:
+    store = Mock()
+    info = Mock()
+    info.tracked_branch = tracked_branch
+    return RepoContext(
+        repo_id="deadbeef" * 4,
+        sqlite_store=store,
+        workspace_root=workspace_root,
+        tracked_branch=tracked_branch,
+        registry_entry=info,
+    )
+
+
+def _make_registry(repos=None):
+    """Return a mock RepositoryRegistry whose get_all_repositories returns repos."""
+    registry = Mock()
+    repos = repos or {}
+    registry.get_all_repositories.return_value = repos
+    registry.register_repository.side_effect = lambda path: f"repo-{path}"
+    registry.unregister_repository = Mock()
+    registry.get_repository.side_effect = lambda repo_id: repos.get(repo_id)
+    return registry
+
+
+def _make_repo_info(path: str, auto_sync: bool = True):
+    info = Mock()
+    info.path = path
+    info.auto_sync = auto_sync
+    return info
+
+
+def _make_dispatcher():
+    d = Mock()
+    d.index_file = Mock()
+    d.remove_file = Mock()
+    d.move_file = Mock()
+    return d
+
+
+def _make_repo_resolver(ctx_map=None):
+    """Return a mock RepoResolver whose resolve() returns ctx based on path."""
+    resolver = Mock()
+    ctx_map = ctx_map or {}
+    def _resolve(path):
+        for root, ctx in ctx_map.items():
+            if str(path).startswith(str(root)):
+                return ctx
+        return None
+    resolver.resolve.side_effect = _resolve
+    return resolver
+
+
+# ---------------------------------------------------------------------------
+# SL-1.1 tests: handler branch + gitignore filtering
+# ---------------------------------------------------------------------------
+
+class TestHandlerBranchFilter:
+    """Handler drops event when current_branch != ctx.tracked_branch."""
+
+    def test_drops_event_on_non_tracked_branch(self, tmp_path):
+        dispatcher = _make_dispatcher()
+        ctx = _make_repo_context(tmp_path, tracked_branch="main")
+
+        # current branch = "feature", tracked = "main" → event should be dropped
+        with patch(
+            "mcp_server.watcher_multi_repo.subprocess.run",
+            return_value=Mock(stdout="feature\n", returncode=0),
+        ):
+            handler = MultiRepositoryHandler(
+                repo_id="repo-1",
+                repo_path=tmp_path,
+                parent_watcher=Mock(dispatcher=dispatcher, query_cache=None, path_resolver=None),
+                ctx=ctx,
+            )
+            # Directly call _trigger_reindex (bypasses debounce) to test branch guard
+            test_file = tmp_path / "test.py"
+            test_file.write_text("x = 1")
+            handler._trigger_reindex_with_ctx(test_file)
+
+        dispatcher.index_file.assert_not_called()
+        dispatcher.remove_file.assert_not_called()
+
+    def test_allows_event_on_tracked_branch(self, tmp_path):
+        dispatcher = _make_dispatcher()
+        ctx = _make_repo_context(tmp_path, tracked_branch="main")
+
+        with patch(
+            "mcp_server.watcher_multi_repo.subprocess.run",
+            return_value=Mock(stdout="main\n", returncode=0),
+        ):
+            handler = MultiRepositoryHandler(
+                repo_id="repo-1",
+                repo_path=tmp_path,
+                parent_watcher=Mock(dispatcher=dispatcher, query_cache=None, path_resolver=None),
+                ctx=ctx,
+            )
+            test_file = tmp_path / "test.py"
+            test_file.write_text("x = 1")
+            handler._trigger_reindex_with_ctx(test_file)
+
+        dispatcher.remove_file.assert_called_once_with(ctx, test_file)
+        dispatcher.index_file.assert_called_once_with(ctx, test_file)
+
+
+class TestHandlerGitignoreFilter:
+    """Handler drops event when path matches repo .gitignore."""
+
+    def test_drops_event_matching_gitignore(self, tmp_path):
+        dispatcher = _make_dispatcher()
+        ctx = _make_repo_context(tmp_path, tracked_branch="main")
+
+        # Write a .gitignore that ignores *.log files
+        (tmp_path / ".gitignore").write_text("*.log\n")
+
+        with patch(
+            "mcp_server.watcher_multi_repo.subprocess.run",
+            return_value=Mock(stdout="main\n", returncode=0),
+        ):
+            handler = MultiRepositoryHandler(
+                repo_id="repo-1",
+                repo_path=tmp_path,
+                parent_watcher=Mock(dispatcher=dispatcher, query_cache=None, path_resolver=None),
+                ctx=ctx,
+            )
+            ignored_file = tmp_path / "debug.log"
+            ignored_file.write_text("log content")
+            # Treat .log as code extension by patching code_extensions
+            handler._inner_handler.code_extensions = {".log", ".py"}
+            handler._trigger_reindex_with_ctx(ignored_file)
+
+        dispatcher.index_file.assert_not_called()
+
+    def test_allows_event_not_matching_gitignore(self, tmp_path):
+        dispatcher = _make_dispatcher()
+        ctx = _make_repo_context(tmp_path, tracked_branch="main")
+
+        (tmp_path / ".gitignore").write_text("*.log\n")
+
+        with patch(
+            "mcp_server.watcher_multi_repo.subprocess.run",
+            return_value=Mock(stdout="main\n", returncode=0),
+        ):
+            handler = MultiRepositoryHandler(
+                repo_id="repo-1",
+                repo_path=tmp_path,
+                parent_watcher=Mock(dispatcher=dispatcher, query_cache=None, path_resolver=None),
+                ctx=ctx,
+            )
+            allowed_file = tmp_path / "app.py"
+            allowed_file.write_text("x = 1")
+            handler._trigger_reindex_with_ctx(allowed_file)
+
+        dispatcher.remove_file.assert_called_once_with(ctx, allowed_file)
+        dispatcher.index_file.assert_called_once_with(ctx, allowed_file)
+
+
+# ---------------------------------------------------------------------------
+# SL-1.1 tests: MultiRepositoryWatcher lifecycle
+# ---------------------------------------------------------------------------
+
+class TestMultiRepositoryWatcherLifecycle:
+    """MultiRepositoryWatcher observer management."""
+
+    def test_start_watching_all_spawns_one_observer_per_repo(self, tmp_path):
+        repo1 = tmp_path / "repo1"
+        repo2 = tmp_path / "repo2"
+        repo1.mkdir()
+        repo2.mkdir()
+
+        repos = {
+            "repo-1": _make_repo_info(str(repo1)),
+            "repo-2": _make_repo_info(str(repo2)),
+        }
+        registry = _make_registry(repos)
+        dispatcher = _make_dispatcher()
+        index_manager = Mock()
+
+        ctx1 = _make_repo_context(repo1)
+        ctx2 = _make_repo_context(repo2)
+        resolver = _make_repo_resolver({repo1: ctx1, repo2: ctx2})
+
+        watcher = MultiRepositoryWatcher(registry, dispatcher, index_manager, repo_resolver=resolver)
+
+        try:
+            watcher.start_watching_all()
+            time.sleep(0.1)
+            assert len(watcher.observers) == 2
+            for obs in watcher.observers.values():
+                assert isinstance(obs, Observer)
+                assert obs.is_alive()
+        finally:
+            watcher.stop_watching_all()
+
+    def test_add_repository_after_start_begins_watching(self, tmp_path):
+        repo1 = tmp_path / "repo1"
+        repo1.mkdir()
+        new_repo = tmp_path / "new_repo"
+        new_repo.mkdir()
+
+        repos = {"repo-1": _make_repo_info(str(repo1))}
+        registry = _make_registry(repos)
+        registry.register_repository.side_effect = None
+        registry.register_repository.return_value = "repo-new"
+
+        dispatcher = _make_dispatcher()
+        index_manager = Mock()
+
+        ctx1 = _make_repo_context(repo1)
+        ctx_new = _make_repo_context(new_repo)
+        resolver = _make_repo_resolver({repo1: ctx1, new_repo: ctx_new})
+
+        watcher = MultiRepositoryWatcher(registry, dispatcher, index_manager, repo_resolver=resolver)
+
+        try:
+            watcher.start_watching_all()
+            time.sleep(0.1)
+            assert len(watcher.observers) == 1
+
+            watcher.add_repository(str(new_repo))
+            time.sleep(0.1)
+            assert len(watcher.observers) == 2
+            assert "repo-new" in watcher.observers
+            assert watcher.observers["repo-new"].is_alive()
+        finally:
+            watcher.stop_watching_all()
+
+    def test_remove_repository_stops_only_its_observer(self, tmp_path):
+        repo1 = tmp_path / "repo1"
+        repo2 = tmp_path / "repo2"
+        repo1.mkdir()
+        repo2.mkdir()
+
+        repos = {
+            "repo-1": _make_repo_info(str(repo1)),
+            "repo-2": _make_repo_info(str(repo2)),
+        }
+        registry = _make_registry(repos)
+        dispatcher = _make_dispatcher()
+        index_manager = Mock()
+
+        ctx1 = _make_repo_context(repo1)
+        ctx2 = _make_repo_context(repo2)
+        resolver = _make_repo_resolver({repo1: ctx1, repo2: ctx2})
+
+        watcher = MultiRepositoryWatcher(registry, dispatcher, index_manager, repo_resolver=resolver)
+
+        try:
+            watcher.start_watching_all()
+            time.sleep(0.1)
+            assert len(watcher.observers) == 2
+
+            obs2 = watcher.observers["repo-2"]
+            watcher.remove_repository("repo-2")
+            time.sleep(0.2)
+
+            assert "repo-2" not in watcher.observers
+            assert not obs2.is_alive()
+            # repo-1 observer still running
+            assert "repo-1" in watcher.observers
+            assert watcher.observers["repo-1"].is_alive()
+        finally:
+            watcher.stop_watching_all()
+
+    def test_stop_watching_all_joins_all_observers(self, tmp_path):
+        repo1 = tmp_path / "repo1"
+        repo1.mkdir()
+
+        repos = {"repo-1": _make_repo_info(str(repo1))}
+        registry = _make_registry(repos)
+        dispatcher = _make_dispatcher()
+        index_manager = Mock()
+
+        ctx1 = _make_repo_context(repo1)
+        resolver = _make_repo_resolver({repo1: ctx1})
+
+        watcher = MultiRepositoryWatcher(registry, dispatcher, index_manager, repo_resolver=resolver)
+        watcher.start_watching_all()
+        time.sleep(0.1)
+
+        obs = list(watcher.observers.values())
+        assert all(o.is_alive() for o in obs)
+
+        watcher.stop_watching_all()
+        time.sleep(0.3)
+
+        assert all(not o.is_alive() for o in obs), "Observers still alive after stop_watching_all"
+
+    def test_only_auto_sync_repos_are_watched(self, tmp_path):
+        repo1 = tmp_path / "repo1"
+        repo2 = tmp_path / "repo2"
+        repo1.mkdir()
+        repo2.mkdir()
+
+        repos = {
+            "repo-1": _make_repo_info(str(repo1), auto_sync=True),
+            "repo-2": _make_repo_info(str(repo2), auto_sync=False),
+        }
+        registry = _make_registry(repos)
+        dispatcher = _make_dispatcher()
+        index_manager = Mock()
+
+        ctx1 = _make_repo_context(repo1)
+        resolver = _make_repo_resolver({repo1: ctx1})
+
+        watcher = MultiRepositoryWatcher(registry, dispatcher, index_manager, repo_resolver=resolver)
+
+        try:
+            watcher.start_watching_all()
+            time.sleep(0.1)
+            assert len(watcher.observers) == 1
+            assert "repo-1" in watcher.observers
+            assert "repo-2" not in watcher.observers
+        finally:
+            watcher.stop_watching_all()

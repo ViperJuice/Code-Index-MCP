@@ -100,6 +100,7 @@ class TestHandlerEventHandling:
 
         event = FileCreatedEvent(str(test_file))
         handler.on_any_event(event)
+        handler.flush()
 
         dispatcher_with_mock.index_file.assert_called_once()
         call_path = dispatcher_with_mock.index_file.call_args[0][0]
@@ -114,6 +115,7 @@ class TestHandlerEventHandling:
 
         event = FileModifiedEvent(str(test_file))
         handler.on_any_event(event)
+        handler.flush()
 
         dispatcher_with_mock.index_file.assert_called_once()
 
@@ -128,6 +130,7 @@ class TestHandlerEventHandling:
 
         event = FileMovedEvent(str(old_file), str(new_file))
         handler.on_any_event(event)
+        handler.flush()
 
         dispatcher_with_mock.move_file.assert_called_once()
         call_args = dispatcher_with_mock.move_file.call_args[0]
@@ -189,6 +192,9 @@ class TestHandlerEventHandling:
             event = FileCreatedEvent(str(test_file))
             handler.on_any_event(event)
 
+        # Force drain before asserting
+        handler.flush()
+
         # All should trigger indexing
         assert dispatcher_with_mock.index_file.call_count == len(supported_files)
 
@@ -240,8 +246,8 @@ class TestFileWatcher:
             test_file = subdir / "test.py"
             test_file.write_text("print('test')")
 
-            # Give watcher time to process
-            time.sleep(0.5)
+            # Give watcher + debounce time to process (debounce=0.5s + drain tick overhead)
+            time.sleep(1.5)
 
             # Should have indexed the file
             dispatcher_with_mock.index_file.assert_called()
@@ -325,7 +331,8 @@ class TestFileWatcher:
             (dir1 / "file1.py").write_text("# file 1")
             (dir2 / "file2.py").write_text("# file 2")
 
-            time.sleep(0.5)
+            # Allow debounce (0.5s) + drain tick overhead
+            time.sleep(1.5)
 
             # Both files should be indexed
             assert dispatcher_with_mock.index_file.call_count >= 2
@@ -434,7 +441,8 @@ class TestEdgeCases:
             link_file = tmp_path / "link.py"
             link_file.symlink_to(actual_file)
 
-            time.sleep(0.5)
+            # Allow debounce + drain
+            time.sleep(1.5)
 
             # Both actual file and symlink might trigger events
             assert dispatcher_with_mock.index_file.call_count >= 1
