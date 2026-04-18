@@ -8,9 +8,9 @@ from typing import Optional
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
-from .core.path_resolver import PathResolver
-from .dispatcher.dispatcher_enhanced import EnhancedDispatcher
-from .plugins.language_registry import get_all_extensions
+from ..core.path_resolver import PathResolver
+from ..dispatcher.dispatcher_enhanced import EnhancedDispatcher
+from ..plugins.language_registry import get_all_extensions
 
 logger = logging.getLogger(__name__)
 
