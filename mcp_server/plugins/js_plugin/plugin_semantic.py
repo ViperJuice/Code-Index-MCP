@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional
 
 from tree_sitter import Node
 
@@ -17,8 +17,10 @@ from ...plugin_base import (
     SymbolDef,
 )
 from ...plugin_base_enhanced import PluginWithSemanticSearch
-from ...storage.sqlite_store import SQLiteStore
 from ...utils.fuzzy_indexer import FuzzyIndexer
+
+if TYPE_CHECKING:
+    from ...storage.sqlite_store import SQLiteStore
 
 logger = logging.getLogger(__name__)
 
@@ -29,31 +31,32 @@ class JsPluginSemantic(PluginWithSemanticSearch):
     lang = "js"
 
     def __init__(
-        self, sqlite_store: Optional[SQLiteStore] = None, enable_semantic: bool = True
+        self, sqlite_store: Optional["SQLiteStore"] = None, enable_semantic: bool = True
     ) -> None:
         # Initialize enhanced base class
-        super().__init__(sqlite_store=sqlite_store, enable_semantic=enable_semantic)
+        super().__init__(enable_semantic=enable_semantic)
 
         # Initialize JS-specific components
-        self._indexer = FuzzyIndexer(sqlite_store=sqlite_store)
+        self._indexer = FuzzyIndexer()
         self._repository_id = None
 
         # Initialize parser without tree-sitter for now
         self.parser = None
         self.language = None
 
-        # Create or get repository if SQLite is enabled
-        if self._sqlite_store:
+        if os.getenv("MCP_SKIP_PLUGIN_PREINDEX", "false").lower() != "true":
+            self._preindex()
+
+    def bind(self, ctx) -> None:
+        super().bind(ctx)
+        if self._ctx.sqlite_store and not self._repository_id:
             try:
-                self._repository_id = self._sqlite_store.create_repository(
+                self._repository_id = self._ctx.sqlite_store.create_repository(
                     str(Path.cwd()), Path.cwd().name, {"language": "javascript"}
                 )
             except Exception as e:
                 logger.warning(f"Failed to create repository: {e}")
                 self._repository_id = None
-
-        if os.getenv("MCP_SKIP_PLUGIN_PREINDEX", "false").lower() != "true":
-            self._preindex()
 
     def _preindex(self) -> None:
         """Pre-index JavaScript/TypeScript files in the current directory."""
@@ -81,11 +84,11 @@ class JsPluginSemantic(PluginWithSemanticSearch):
 
         # Store file in SQLite if available
         file_id = None
-        if self._sqlite_store and self._repository_id:
+        if (self._ctx.sqlite_store if self._ctx else None) and self._repository_id:
             import hashlib
 
             file_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
-            file_id = self._sqlite_store.store_file(
+            file_id = (self._ctx.sqlite_store if self._ctx else None).store_file(
                 self._repository_id,
                 str(path),
                 str(path.relative_to(Path.cwd()) if path.is_absolute() else path),
@@ -210,8 +213,8 @@ class JsPluginSemantic(PluginWithSemanticSearch):
                 symbols.append(symbol_info)
 
                 # Store in SQLite if available
-                if self._sqlite_store and file_id:
-                    symbol_id = self._sqlite_store.store_symbol(
+                if (self._ctx.sqlite_store if self._ctx else None) and file_id:
+                    symbol_id = (self._ctx.sqlite_store if self._ctx else None).store_symbol(
                         file_id,
                         name,
                         kind,

@@ -1,10 +1,12 @@
 """Enhanced plugin base with semantic search support."""
 
+from __future__ import annotations
+
 import logging
 import os
 from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional
 
 from typing_extensions import TypedDict
 
@@ -13,8 +15,11 @@ from .plugin_base import (
     SearchOpts,
     SearchResult,
 )
-from .storage.sqlite_store import SQLiteStore
 from .utils.semantic_indexer import SemanticIndexer
+
+if TYPE_CHECKING:
+    from .storage.sqlite_store import SQLiteStore
+    from mcp_server.core.repo_context import RepoContext
 
 logger = logging.getLogger(__name__)
 
@@ -34,20 +39,13 @@ class PluginWithSemanticSearch(IPlugin):
 
     def __init__(
         self,
-        sqlite_store: Optional[SQLiteStore] = None,
+        sqlite_store: Optional["SQLiteStore"] = None,
         enable_semantic: bool = True,
         qdrant_host: Optional[str] = None,
         qdrant_port: Optional[int] = None,
     ):
-        """Initialize plugin with optional semantic search support.
-
-        Args:
-            sqlite_store: SQLite storage instance
-            enable_semantic: Whether to enable semantic search features
-            qdrant_host: Qdrant host (defaults to env var or localhost)
-            qdrant_port: Qdrant port (defaults to env var or 6333)
-        """
-        self._sqlite_store = sqlite_store
+        """Initialize plugin with optional semantic search support."""
+        self._ctx: Optional["RepoContext"] = None
         self._semantic_indexer: Optional[SemanticIndexer] = None
         self._enable_semantic = (
             enable_semantic and os.getenv("SEMANTIC_SEARCH_ENABLED", "false").lower() == "true"
@@ -80,6 +78,9 @@ class PluginWithSemanticSearch(IPlugin):
                 logger.debug(f"Failed to initialize semantic search for {self.lang}: {e}")
                 self._enable_semantic = False
                 self._semantic_indexer = None
+
+    def bind(self, ctx: "RepoContext") -> None:
+        self._ctx = ctx
 
     def index_with_embeddings(
         self, path: Path, content: str, symbols: List[Dict[str, Any]]

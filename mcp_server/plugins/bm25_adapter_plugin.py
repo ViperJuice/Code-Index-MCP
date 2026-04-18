@@ -5,10 +5,12 @@ This adapter allows the existing plugin system to work with BM25 indexes
 by implementing the IPlugin interface and querying the BM25 FTS5 tables.
 """
 
+from __future__ import annotations
+
 import logging
 import sqlite3
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import TYPE_CHECKING, Iterable, Optional
 
 from ..plugin_base import (
     IndexShard,
@@ -18,6 +20,9 @@ from ..plugin_base import (
     SearchResult,
     SymbolDef,
 )
+
+if TYPE_CHECKING:
+    from mcp_server.core.repo_context import RepoContext
 
 logger = logging.getLogger(__name__)
 
@@ -29,13 +34,25 @@ class BM25AdapterPlugin(IPlugin):
     lang = "all"
 
     def __init__(self, sqlite_store=None):
-        """Initialize with SQLiteStore that points to BM25 index."""
-        self._sqlite_store = sqlite_store
-        self._db_path = sqlite_store.db_path if sqlite_store else None
+        """Initialize; db_path is set via bind(ctx) post-construction."""
+        self._ctx: Optional["RepoContext"] = None
+
+    def bind(self, ctx: "RepoContext") -> None:
+        self._ctx = ctx
+
+    @property
+    def _db_path(self) -> Optional[str]:
+        if self._ctx is not None:
+            return self._ctx.sqlite_store.db_path
+        return None
 
     def supports(self, path: str | Path) -> bool:
         """Support all file types since BM25 is language agnostic."""
         return True
+
+    def indexFile(self, path: str | Path, content: str) -> IndexShard:
+        """Not implemented - BM25 index is already built."""
+        return {"file": str(path), "symbols": [], "language": "unknown"}
 
     def getSymbols(self, path: Path, content: str) -> IndexShard:
         """Not implemented - BM25 index is already built."""
@@ -112,8 +129,12 @@ class BM25AdapterPlugin(IPlugin):
 
         return None
 
-    def getReferences(self, symbol: str) -> list[Reference]:
+    def findReferences(self, symbol: str) -> list[Reference]:
         """Find references to a symbol - not implemented for BM25."""
+        return []
+
+    def getReferences(self, symbol: str) -> list[Reference]:
+        """Alias kept for compatibility."""
         return []
 
     def search(self, query: str, opts: SearchOpts) -> Iterable[SearchResult]:
