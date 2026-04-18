@@ -5,8 +5,10 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
+import bcrypt
 import jwt
-from passlib.context import CryptContext
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
 
 from .models import (
     DEFAULT_ACCESS_RULES,
@@ -80,18 +82,49 @@ class IAuthorizer:
 
 
 class PasswordManager:
-    """Password hashing and verification utilities."""
+    """Password hashing and verification utilities.
 
-    def __init__(self):
-        self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    New hashes use argon2id via argon2-cffi.  Legacy bcrypt hashes (``$2b$`` /
+    ``$2a$`` prefix) are verified with the ``bcrypt`` library and, on a
+    successful match, are automatically rehashed with argon2id so that the
+    caller can persist the upgraded hash.
+    """
+
+    def __init__(self) -> None:
+        self._ph = PasswordHasher()
 
     def hash_password(self, password: str) -> str:
-        """Hash password using bcrypt."""
-        return self.pwd_context.hash(password)
+        """Hash *password* with argon2id.  Returns a ``$argon2id$`` hash string."""
+        return self._ph.hash(password)
 
-    def verify_password(self, plain_password: str, hashed_password: str) -> bool:
-        """Verify password against hash."""
-        return self.pwd_context.verify(plain_password, hashed_password)
+    def verify_password(
+        self, plain_password: str, hashed_password: str
+    ) -> "bool | tuple[bool, str]":
+        """Verify *plain_password* against *hashed_password*.
+
+        Dispatch rules:
+        - ``$argon2*`` prefix  → verify via argon2-cffi; return ``True`` or ``False``.
+        - ``$2b$`` / ``$2a$`` prefix → verify via bcrypt.
+          * Match  → rehash with argon2id and return ``(True, new_argon2_hash)``.
+          * Mismatch → return ``False``.
+        """
+        if hashed_password.startswith("$argon2"):
+            try:
+                self._ph.verify(hashed_password, plain_password)
+                return True
+            except VerifyMismatchError:
+                return False
+        elif hashed_password.startswith(("$2b$", "$2a$")):
+            matched = bcrypt.checkpw(
+                plain_password.encode("utf-8"),
+                hashed_password.encode("utf-8"),
+            )
+            if matched:
+                return (True, self.hash_password(plain_password))
+            return False
+        else:
+            # Unknown hash format — fail closed
+            return False
 
     def is_strong_password(self, password: str, min_length: int = 8) -> bool:
         """Check if password meets strength requirements."""
