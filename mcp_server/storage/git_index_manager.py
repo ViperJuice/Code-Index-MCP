@@ -11,6 +11,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+
+def should_reindex_for_branch(current: Optional[str], tracked: Optional[str]) -> bool:
+    """True iff both branches are non-None and equal."""
+    if not current or not tracked:
+        return False
+    return current == tracked
+
 from ..artifacts.commit_artifacts import CommitArtifactManager
 from ..dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from .repository_registry import RepositoryRegistry
@@ -103,14 +110,16 @@ class GitAwareIndexManager:
         current_branch = getattr(repo_info, "current_branch", None)
         last_indexed_branch = getattr(repo_info, "last_indexed_branch", None)
 
-        if current_branch and last_indexed_branch and current_branch != last_indexed_branch:
+        if not should_reindex_for_branch(current_branch, repo_info.tracked_branch):
             logger.info(
-                "Branch changed for %s: %s -> %s, forcing full reindex",
-                repo_id,
-                last_indexed_branch,
-                current_branch,
+                "Skipping reindex for %s: current branch %r != tracked branch %r",
+                repo_id, current_branch, repo_info.tracked_branch,
             )
-            force_full = True
+            return IndexSyncResult(
+                action="up_to_date",
+                commit=current_commit,
+                duration_seconds=(datetime.now() - start_time).total_seconds(),
+            )
 
         # Check if already up to date
         if current_commit == last_indexed_commit and not force_full:

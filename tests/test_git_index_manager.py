@@ -154,6 +154,7 @@ def test_same_branch_advance_triggers_incremental(tmp_path):
 
     manager = _make_manager(registry)
     manager._full_index = MagicMock(return_value=0)
+    manager._should_full_reindex = MagicMock(return_value=False)
 
     from mcp_server.storage.git_index_manager import UpdateResult
     incremental_mock = MagicMock(return_value=UpdateResult(indexed=1))
