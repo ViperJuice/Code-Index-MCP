@@ -813,6 +813,71 @@ spec:
       port: 6379
 ```
 
+### MCP Access Controls
+
+The MCP server provides two environment variables that control access at the
+protocol level. Both are read at startup; changing them requires a server
+restart.
+
+#### MCP_CLIENT_SECRET
+
+`MCP_CLIENT_SECRET` enables a shared-secret handshake gate for MCP client
+authentication. When this variable is set to a non-empty value, every
+incoming tool call except `handshake` is blocked with a `handshake_required`
+error until the connecting client authenticates by calling the `handshake`
+tool and supplying the correct secret. The server uses a constant-time
+comparison (`hmac.compare_digest`) to prevent timing attacks.
+
+When `MCP_CLIENT_SECRET` is unset or empty, the gate is disabled — the
+server runs unauthenticated and logs a warning at startup. There is no
+default secret: omitting the variable is an explicit choice to operate
+without client authentication.
+
+**Rotation and storage guidance:**
+
+- Store the secret outside the repository — in a `.env` file with mode `600`
+  or in a secrets manager (e.g., AWS Secrets Manager, HashiCorp Vault).
+- To rotate: update the value in your secret store, then restart the server.
+  In-flight sessions authenticated with the old secret will be invalidated
+  on reconnect.
+- Treat the value like a password — use a randomly generated string of at
+  least 32 characters.
+
+#### MCP_ALLOWED_ROOTS
+
+`MCP_ALLOWED_ROOTS` defines a comma-separated list of absolute filesystem
+paths that form the path-prefix allowlist for multi-repository access. All
+`symbol_lookup`, `search_code`, and `reindex` operations resolve the target
+path against this list; requests that target a path outside every listed
+root return a `path_outside_allowed_roots` error rather than proceeding.
+
+The server resolves paths in the following precedence order:
+
+1. `MCP_ALLOWED_ROOTS` (comma-separated list of absolute paths) — highest
+   priority; overrides both other mechanisms.
+2. `MCP_WORKSPACE_ROOT` — a single root, used when `MCP_ALLOWED_ROOTS` is
+   absent.
+3. Current working directory — fallback when neither variable is set.
+
+Setting `MCP_ALLOWED_ROOTS` to a narrow list of directories prevents a
+compromised or misconfigured client from reading files outside the intended
+workspace boundaries.
+
+#### Example configuration
+
+```bash
+# Set a strong shared secret — the client must call the `handshake` tool
+# with this value before any other tool will respond.
+export MCP_CLIENT_SECRET="$(openssl rand -hex 32)"
+
+# Allow access to two repositories; comma-separate additional paths as needed.
+export MCP_ALLOWED_ROOTS="/home/deploy/repos/project-a,/home/deploy/repos/project-b"
+```
+
+In a systemd unit or Docker environment, pass these through the appropriate
+secrets injection mechanism rather than hardcoding them in the unit file or
+`Dockerfile`.
+
 ## Troubleshooting
 
 ### Common Issues
