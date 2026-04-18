@@ -1,7 +1,0 @@
-# Full requirements - includes all dependencies
-# For minimal install: pip install -r requirements-core.txt
-# For development: pip install -r requirements-dev.txt
-# For semantic search: pip install -r requirements-semantic.txt
-
--r requirements-dev.txt
--r requirements-semantic.txt

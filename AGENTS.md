@@ -330,14 +330,11 @@ mcp_server/, plugin_system/, tree_sitter_wrapper/
 ## DEVELOPMENT_ENVIRONMENT
 
 ```bash
-# Python Version: 3.8+ (from pyproject.toml)
-# Virtual Environment: Required
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Dependencies
-pip install -r requirements.txt
-pip install -e .
+# Python Version: 3.12+ (from pyproject.toml requires-python = ">=3.12")
+# Virtual Environment: Required (managed by uv)
+uv sync            # install all core + dev dependencies
+# Or for a specific extras set:
+uv sync --extra dev --extra semantic
 
 # Pre-commit: Configured for linting and formatting
 make lint     # Verify before committing
