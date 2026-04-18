@@ -761,7 +761,7 @@ class TestRepoCtxResolution:
             ["grep", "-n", r"dispatcher\._", "mcp_server/gateway.py"],
             capture_output=True,
             text=True,
-            cwd="/home/viperjuice/code/Code-Index-MCP/.claude/worktrees/lane-sl-3",
+            cwd=str(Path(__file__).resolve().parent.parent),
         )
         private_pattern = re.compile(
             r"dispatcher\.(_(plugins|graph_|sqlite_store|multi_repo_manager))"
@@ -777,7 +777,7 @@ class TestRepoCtxResolution:
             ["grep", "-n", "EnhancedDispatcher(", "mcp_server/gateway.py"],
             capture_output=True,
             text=True,
-            cwd="/home/viperjuice/code/Code-Index-MCP/.claude/worktrees/lane-sl-3",
+            cwd=str(Path(__file__).resolve().parent.parent),
         )
         for line in result.stdout.splitlines():
             assert "sqlite_store=" not in line, (
