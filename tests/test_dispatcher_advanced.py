@@ -655,7 +655,6 @@ class TestRemoveFileSemanticCleanup:
         from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 
         d = EnhancedDispatcher.__new__(EnhancedDispatcher)
-        d._sqlite_store = None
         d._file_cache = {}
         d._file_cache_lock = threading.Lock()
         d._operation_stats = {}
@@ -663,26 +662,45 @@ class TestRemoveFileSemanticCleanup:
         d._plugins = []
         return d
 
+    def _make_ctx(self):
+        from pathlib import Path
+        from unittest.mock import MagicMock
+
+        from mcp_server.core.repo_context import RepoContext
+        from mcp_server.storage.multi_repo_manager import RepositoryInfo
+
+        registry_entry = MagicMock(spec=RepositoryInfo)
+        registry_entry.tracked_branch = "main"
+        return RepoContext(
+            repo_id="test-repo",
+            sqlite_store=MagicMock(),
+            workspace_root=Path("/tmp/test"),
+            tracked_branch="main",
+            registry_entry=registry_entry,
+        )
+
     def test_remove_file_calls_semantic_indexer(self, tmp_path):
         """remove_file() must call semantic_indexer.remove_file() when one is present."""
         from unittest.mock import MagicMock
 
         mock_semantic = MagicMock()
         dispatcher = self._make_dispatcher(tmp_path, semantic_indexer=mock_semantic)
+        ctx = self._make_ctx()
 
         target = tmp_path / "foo.py"
         target.write_text("x = 1")
-        dispatcher.remove_file(target)
+        dispatcher.remove_file(ctx, target)
 
         mock_semantic.remove_file.assert_called_once()
 
     def test_remove_file_no_semantic_indexer_does_not_raise(self, tmp_path):
         """remove_file() must not raise when _semantic_indexer is None."""
         dispatcher = self._make_dispatcher(tmp_path, semantic_indexer=None)
+        ctx = self._make_ctx()
 
         target = tmp_path / "bar.py"
         target.write_text("y = 2")
-        dispatcher.remove_file(target)  # must not raise
+        dispatcher.remove_file(ctx, target)  # must not raise
 
     def test_remove_file_semantic_indexer_exception_is_swallowed(self, tmp_path):
         """remove_file() must not propagate exceptions from the semantic indexer."""
@@ -691,9 +709,10 @@ class TestRemoveFileSemanticCleanup:
         mock_semantic = MagicMock()
         mock_semantic.remove_file.side_effect = RuntimeError("qdrant unavailable")
         dispatcher = self._make_dispatcher(tmp_path, semantic_indexer=mock_semantic)
+        ctx = self._make_ctx()
 
         target = tmp_path / "baz.py"
         target.write_text("z = 3")
-        dispatcher.remove_file(target)  # must not raise despite indexer error
+        dispatcher.remove_file(ctx, target)  # must not raise despite indexer error
 
         mock_semantic.remove_file.assert_called_once()

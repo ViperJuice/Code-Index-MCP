@@ -8,12 +8,13 @@ providing intelligent result ranking, deduplication, and aggregation.
 import hashlib
 import logging
 import re
+import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-from mcp_server.indexer.reranker import Reranker
+from mcp_server.indexer.reranker import IReranker as Reranker
 from mcp_server.plugins.repository_plugin_loader import get_repository_plugin_loader
 from mcp_server.storage.multi_repo_manager import (
     CrossRepoSearchResult,
@@ -94,7 +95,7 @@ class CrossRepositoryCoordinator:
         self.enable_reranking = enable_reranking
 
         # Initialize reranker if enabled
-        self.reranker = Reranker() if enable_reranking else None
+        self.reranker = None  # initialized on demand; see _rerank_results
 
         # Search strategies
         self._strategies: Dict[str, SearchStrategy] = self._init_strategies()
@@ -576,3 +577,126 @@ def get_cross_repo_coordinator(
         )
 
     return _coordinator_instance
+
+
+# ---------------------------------------------------------------------------
+# Compatibility layer: absorb storage/cross_repo_coordinator shapes
+# (storage variant deleted in SL-1; these names were previously exported there)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class SearchScope:
+    """Defines the scope for cross-repository search (absorbed from storage variant)."""
+
+    repositories: Optional[List[str]] = None
+    languages: Optional[List[str]] = None
+    file_types: Optional[List[str]] = None
+    max_repositories: int = 10
+    priority_order: bool = True
+
+
+@dataclass
+class _CrossRepoAggregatedResult:
+    """Aggregated result shape used by CrossRepositorySearchCoordinator."""
+
+    query: str
+    total_results: int
+    repositories_searched: int
+    search_time: float
+    results: List[Dict[str, Any]]
+    repository_stats: Dict[str, int]
+    deduplication_stats: Dict[str, int]
+
+
+AggregatedResult = _CrossRepoAggregatedResult
+
+
+class CrossRepositorySearchCoordinator:
+    """Thin wrapper around CrossRepositoryCoordinator exposing the legacy storage-variant API.
+
+    Callers using the old ``mcp_server.storage.cross_repo_coordinator`` import path
+    should migrate to ``mcp_server.dispatcher.cross_repo_coordinator``.
+    """
+
+    def __init__(
+        self,
+        multi_repo_manager: Optional[MultiRepositoryManager] = None,
+        max_workers: int = 4,
+        default_result_limit: int = 100,
+    ) -> None:
+        self._inner = CrossRepositoryCoordinator(
+            multi_repo_manager=multi_repo_manager,
+            enable_semantic=True,
+            enable_reranking=True,
+        )
+        self.default_result_limit = default_result_limit
+
+    async def search_symbol(
+        self, symbol: str, scope: Optional[SearchScope] = None
+    ) -> _CrossRepoAggregatedResult:
+        scope = scope or SearchScope()
+        start = time.time()
+        ctx = SearchContext(
+            query=symbol,
+            search_type="symbol",
+            repositories=scope.repositories,
+            languages=scope.languages,
+            max_results=scope.max_repositories * 10,
+        )
+        try:
+            raw = await self._inner.search(ctx)
+        except Exception:
+            raw = []
+        results = [r.content for r in raw]
+        return _CrossRepoAggregatedResult(
+            query=symbol,
+            total_results=len(results),
+            repositories_searched=len({r.get("repository_id", "") for r in results}),
+            search_time=time.time() - start,
+            results=results,
+            repository_stats={},
+            deduplication_stats={},
+        )
+
+    async def search_code(
+        self,
+        query: str,
+        scope: Optional[SearchScope] = None,
+        semantic: bool = False,
+        limit: Optional[int] = None,
+    ) -> _CrossRepoAggregatedResult:
+        scope = scope or SearchScope()
+        limit = limit or self.default_result_limit
+        start = time.time()
+        ctx = SearchContext(
+            query=query,
+            search_type="semantic" if semantic else "code",
+            repositories=scope.repositories,
+            languages=scope.languages,
+            max_results=limit,
+        )
+        try:
+            raw = await self._inner.search(ctx)
+        except Exception:
+            raw = []
+        results = [r.content for r in raw]
+        return _CrossRepoAggregatedResult(
+            query=query,
+            total_results=len(results),
+            repositories_searched=len({r.get("repository_id", "") for r in results}),
+            search_time=time.time() - start,
+            results=results,
+            repository_stats={},
+            deduplication_stats={},
+        )
+
+    async def get_search_statistics(self) -> Dict[str, Any]:
+        return {
+            "enabled": True,
+            "total_repositories": 0,
+            "total_files": 0,
+            "total_symbols": 0,
+            "languages": [],
+            "repository_details": [],
+        }

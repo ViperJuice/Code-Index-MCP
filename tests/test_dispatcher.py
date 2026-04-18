@@ -20,6 +20,13 @@ from mcp_server.dispatcher.query_intent import QueryIntent, classify
 from mcp_server.plugin_base import IPlugin, SearchResult, SymbolDef
 from tests.conftest import measure_time
 
+# ---------------------------------------------------------------------------
+# SL-1.1 imports (new Protocol-conformance tests)
+# ---------------------------------------------------------------------------
+from mcp_server.dispatcher.protocol import DispatcherProtocol
+from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher
+from mcp_server.core.repo_context import RepoContext
+
 
 class TestDispatcherInitialization:
     """Test Dispatcher initialization and configuration."""
@@ -52,12 +59,13 @@ class TestDispatcherInitialization:
         assert len(dispatcher._plugins) == 0
         assert dispatcher._by_lang == {}
 
-    def test_plugins_property(self, mock_plugin):
-        """Test the plugins property getter."""
+    def test_plugins_method(self, mock_plugin):
+        """Test the plugins() method returns list of plugins."""
         dispatcher = Dispatcher([mock_plugin])
 
-        plugins = dispatcher.plugins
-        assert plugins == {"mock": mock_plugin}
+        plugins = dispatcher.plugins()
+        assert isinstance(plugins, list)
+        assert mock_plugin in plugins
 
     @patch("mcp_server.dispatcher.dispatcher_enhanced.MultiRepositoryManager")
     @patch("mcp_server.dispatcher.dispatcher_enhanced.CrossRepositorySearchCoordinator")
@@ -69,7 +77,7 @@ class TestDispatcherInitialization:
         mock_home.return_value = Path("/tmp/test-home")
 
         with patch.dict("os.environ", {"MCP_ENABLE_MULTI_REPO": "true"}, clear=False):
-            Dispatcher([], sqlite_store=Mock())
+            Dispatcher([])
 
         registry_path = mock_multi_repo.call_args.kwargs["central_index_path"]
         assert (
@@ -125,8 +133,9 @@ class TestSymbolLookup:
         expected_symbol = SymbolDef(name="test_func", kind="function", path="/test.py", line=10)
         mock_plugin.getDefinition.return_value = expected_symbol
 
+        ctx = _make_repo_ctx()
         dispatcher = Dispatcher([mock_plugin])
-        result = dispatcher.lookup("test_func")
+        result = dispatcher.lookup(ctx, "test_func")
 
         assert result == expected_symbol
         mock_plugin.getDefinition.assert_called_once_with("test_func")
@@ -135,8 +144,9 @@ class TestSymbolLookup:
         """Test symbol lookup when not found."""
         mock_plugin.getDefinition.return_value = None
 
+        ctx = _make_repo_ctx()
         dispatcher = Dispatcher([mock_plugin])
-        result = dispatcher.lookup("nonexistent")
+        result = dispatcher.lookup(ctx, "nonexistent")
 
         assert result is None
         mock_plugin.getDefinition.assert_called_once_with("nonexistent")
@@ -153,8 +163,9 @@ class TestSymbolLookup:
         plugin3 = Mock(spec=IPlugin, lang="java")
         plugin3.getDefinition.return_value = None
 
+        ctx = _make_repo_ctx()
         dispatcher = Dispatcher([plugin1, plugin2, plugin3])
-        result = dispatcher.lookup("found")
+        result = dispatcher.lookup(ctx, "found")
 
         assert result == expected_symbol
         plugin1.getDefinition.assert_called_once_with("found")
@@ -164,41 +175,62 @@ class TestSymbolLookup:
         """Test lookup when plugin raises error."""
         mock_plugin.getDefinition.side_effect = Exception("Plugin error")
 
+        ctx = _make_repo_ctx()
         dispatcher = Dispatcher([mock_plugin])
 
         # Dispatcher catches plugin errors and returns None
-        result = dispatcher.lookup("test")
+        result = dispatcher.lookup(ctx, "test")
         assert result is None
 
 
 class TestSearch:
     """Test search functionality."""
 
+    def _make_no_sqlite_ctx(self):
+        """Build a RepoContext with no sqlite_store so dispatcher falls back to plugins."""
+        from pathlib import Path
+        from unittest.mock import MagicMock
+
+        from mcp_server.core.repo_context import RepoContext
+        from mcp_server.storage.multi_repo_manager import RepositoryInfo
+
+        registry_entry = MagicMock(spec=RepositoryInfo)
+        registry_entry.tracked_branch = "main"
+        return RepoContext(
+            repo_id="test-repo",
+            sqlite_store=None,
+            workspace_root=Path("/tmp/test"),
+            tracked_branch="main",
+            registry_entry=registry_entry,
+        )
+
     def test_search_basic(self, mock_plugin):
-        """Test basic search across plugins."""
+        """Test basic search across plugins when no sqlite_store (plugin fallback path)."""
         expected_results = [
             SearchResult(name="func1", kind="function", path="/f1.py", score=0.9),
             SearchResult(name="func2", kind="function", path="/f2.py", score=0.8),
         ]
         mock_plugin.search.return_value = expected_results
 
+        ctx = self._make_no_sqlite_ctx()
         dispatcher = Dispatcher([mock_plugin])
-        results = list(dispatcher.search("func"))
+        results = list(dispatcher.search(ctx, "func"))
 
         assert results == expected_results
         mock_plugin.search.assert_called_once_with("func", {"semantic": False, "limit": 20})
 
     def test_search_semantic(self, mock_plugin):
-        """Test semantic search."""
+        """Test semantic search falls back to plugins when no sqlite/semantic indexer."""
         mock_plugin.search.return_value = []
 
+        ctx = self._make_no_sqlite_ctx()
         dispatcher = Dispatcher([mock_plugin])
-        list(dispatcher.search("test", semantic=True, limit=10))
+        list(dispatcher.search(ctx, "test", semantic=True, limit=10))
 
         mock_plugin.search.assert_called_once_with("test", {"semantic": True, "limit": 10})
 
     def test_search_multiple_plugins(self):
-        """Test search results from multiple plugins are combined."""
+        """Test search results from multiple plugins are combined (no sqlite fallback path)."""
         plugin1 = Mock(spec=IPlugin, lang="python")
         plugin1.search.return_value = [
             SearchResult(name="py_func", kind="function", path="/test.py", score=0.9)
@@ -210,8 +242,24 @@ class TestSearch:
             SearchResult(name="js_class", kind="class", path="/test2.js", score=0.7),
         ]
 
+        from pathlib import Path
+        from unittest.mock import MagicMock
+
+        from mcp_server.core.repo_context import RepoContext
+        from mcp_server.storage.multi_repo_manager import RepositoryInfo
+
+        registry_entry = MagicMock(spec=RepositoryInfo)
+        registry_entry.tracked_branch = "main"
+        ctx = RepoContext(
+            repo_id="test-repo",
+            sqlite_store=None,
+            workspace_root=Path("/tmp/test"),
+            tracked_branch="main",
+            registry_entry=registry_entry,
+        )
+
         dispatcher = Dispatcher([plugin1, plugin2])
-        results = list(dispatcher.search("test"))
+        results = list(dispatcher.search(ctx, "test"))
 
         assert len(results) == 3
         assert results[0]["name"] == "py_func"
@@ -222,8 +270,9 @@ class TestSearch:
         """Test search with empty query."""
         mock_plugin.search.return_value = []
 
+        ctx = self._make_no_sqlite_ctx()
         dispatcher = Dispatcher([mock_plugin])
-        results = list(dispatcher.search(""))
+        results = list(dispatcher.search(ctx, ""))
 
         assert results == []
         mock_plugin.search.assert_called_once()
@@ -232,10 +281,11 @@ class TestSearch:
         """Test search when plugin raises error."""
         mock_plugin.search.side_effect = Exception("Search error")
 
+        ctx = self._make_no_sqlite_ctx()
         dispatcher = Dispatcher([mock_plugin])
 
         # Dispatcher catches plugin errors and returns empty results
-        results = list(dispatcher.search("test"))
+        results = list(dispatcher.search(ctx, "test"))
         assert results == []
 
 
@@ -377,7 +427,8 @@ class TestIndexFile:
         mock_plugin.supports.return_value = True
         mock_plugin.indexFile.return_value = {"symbols": [{"name": "hello", "kind": "function"}]}
 
-        dispatcher.index_file(test_file)
+        ctx = _make_repo_ctx()
+        dispatcher.index_file(ctx, test_file)
 
         mock_plugin.indexFile.assert_called_once()
         assert str(test_file) in dispatcher._file_cache
@@ -393,7 +444,8 @@ class TestIndexFile:
         mock_plugin.supports.return_value = True
 
         # Should try latin-1 encoding
-        dispatcher.index_file(test_file)
+        ctx = _make_repo_ctx()
+        dispatcher.index_file(ctx, test_file)
 
         # Plugin should be called with latin-1 decoded content
         mock_plugin.indexFile.assert_called_once()
@@ -406,7 +458,8 @@ class TestIndexFile:
         mock_plugin.supports.return_value = True
 
         # Should not raise, just log error
-        dispatcher.index_file(path)
+        ctx = _make_repo_ctx()
+        dispatcher.index_file(ctx, path)
 
         mock_plugin.indexFile.assert_not_called()
 
@@ -420,7 +473,8 @@ class TestIndexFile:
         mock_plugin.supports.return_value = False
 
         # Should not raise, just log debug
-        dispatcher.index_file(test_file)
+        ctx = _make_repo_ctx()
+        dispatcher.index_file(ctx, test_file)
 
         mock_plugin.indexFile.assert_not_called()
 
@@ -435,7 +489,8 @@ class TestIndexFile:
         mock_plugin.indexFile.side_effect = Exception("Plugin error")
 
         # Should not raise, just log error
-        dispatcher.index_file(test_file)
+        ctx = _make_repo_ctx()
+        dispatcher.index_file(ctx, test_file)
 
         # File should not be cached on error
         assert str(test_file) not in dispatcher._file_cache
@@ -458,7 +513,8 @@ class TestIndexFile:
 
         mock_plugin.supports.return_value = True
 
-        dispatcher.index_file(test_file)
+        ctx = _make_repo_ctx()
+        dispatcher.index_file(ctx, test_file)
 
         # Should not call plugin for cached file
         mock_plugin.indexFile.assert_not_called()
@@ -469,9 +525,10 @@ class TestStatistics:
 
     def test_get_statistics_empty(self, mock_plugin):
         """Test statistics with no indexed files."""
+        ctx = _make_repo_ctx()
         dispatcher = Dispatcher([mock_plugin])
 
-        stats = dispatcher.get_statistics()
+        stats = dispatcher.get_statistics(ctx)
 
         assert stats["total"] == 0
         assert stats["by_language"] == {}
@@ -481,6 +538,7 @@ class TestStatistics:
         py_plugin = Mock(spec=IPlugin, lang="python")
         js_plugin = Mock(spec=IPlugin, lang="javascript")
 
+        ctx = _make_repo_ctx()
         dispatcher = Dispatcher([py_plugin, js_plugin])
 
         # Simulate cached files
@@ -494,7 +552,7 @@ class TestStatistics:
         py_plugin.supports.side_effect = lambda p: p.suffix == ".py"
         js_plugin.supports.side_effect = lambda p: p.suffix == ".js"
 
-        stats = dispatcher.get_statistics()
+        stats = dispatcher.get_statistics(ctx)
 
         assert stats["total"] == 3
         assert stats["by_language"]["python"] == 2
@@ -502,12 +560,13 @@ class TestStatistics:
 
     def test_get_statistics_plugin_error(self, mock_plugin):
         """Test statistics when plugin.supports raises error."""
+        ctx = _make_repo_ctx()
         dispatcher = Dispatcher([mock_plugin])
         dispatcher._file_cache = {"/test/file.py": (1000, 100, "hash")}
 
         mock_plugin.supports.side_effect = Exception("Plugin error")
 
-        stats = dispatcher.get_statistics()
+        stats = dispatcher.get_statistics(ctx)
 
         # Should handle error gracefully
         assert stats["total"] == 0
@@ -532,9 +591,10 @@ class TestConcurrency:
             test_file.write_text(f"def func{i}(): pass")
             files.append(test_file)
 
+        ctx = _make_repo_ctx()
         # Index files concurrently
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [executor.submit(dispatcher.index_file, f) for f in files]
+            futures = [executor.submit(dispatcher.index_file, ctx, f) for f in files]
             concurrent.futures.wait(futures)
 
         # All files should be cached
@@ -542,16 +602,30 @@ class TestConcurrency:
         assert mock_plugin.indexFile.call_count == 10
 
     def test_concurrent_search(self, mock_plugin):
-        """Test concurrent search operations."""
+        """Test concurrent search operations (plugin fallback path, no sqlite)."""
         import concurrent.futures
+        from pathlib import Path
+        from mcp_server.core.repo_context import RepoContext
+        from mcp_server.storage.multi_repo_manager import RepositoryInfo
+        from unittest.mock import MagicMock as _MM
 
         dispatcher = Dispatcher([mock_plugin])
         mock_plugin.search.return_value = [
             SearchResult(name="result", kind="function", path="/test.py", score=1.0)
         ]
 
+        reg = _MM(spec=RepositoryInfo)
+        reg.tracked_branch = "main"
+        ctx = RepoContext(
+            repo_id="test-repo",
+            sqlite_store=None,
+            workspace_root=Path("/tmp/test"),
+            tracked_branch="main",
+            registry_entry=reg,
+        )
+
         def search_task(query):
-            return list(dispatcher.search(query))
+            return list(dispatcher.search(ctx, query))
 
         # Perform concurrent searches
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
@@ -583,10 +657,11 @@ class TestPerformance:
         )
 
         dispatcher = Dispatcher(plugins)
+        ctx = _make_repo_ctx()
 
         with measure_time("dispatcher_lookup", benchmark_results):
             for _ in range(1000):
-                result = dispatcher.lookup("target")
+                result = dispatcher.lookup(ctx, "target")
                 assert result is not None
 
     @pytest.mark.benchmark
@@ -695,9 +770,10 @@ class TestSymbolRouting:
         store.get_symbol.return_value = symbol_rows
         return store
 
-    def _make_dispatcher(self, store):
-        d = Dispatcher([], sqlite_store=store)
-        return d
+    def _make_dispatcher_with_ctx(self, store):
+        d = Dispatcher([])
+        ctx = _make_repo_ctx(store)
+        return d, ctx
 
     def test_symbol_route_returns_definition_file(self):
         store = self._make_store(
@@ -713,8 +789,8 @@ class TestSymbolRouting:
                 }
             ]
         )
-        d = self._make_dispatcher(store)
-        results = d._symbol_route("SemanticIndexer", "class", 5)
+        d, ctx = self._make_dispatcher_with_ctx(store)
+        results = d._symbol_route(store, "SemanticIndexer", "class", 5)
         assert len(results) == 1
         assert results[0]["file"] == "mcp_server/utils/semantic_indexer.py"
         assert results[0]["line"] == 42
@@ -744,8 +820,8 @@ class TestSymbolRouting:
                 },
             ]
         )
-        d = self._make_dispatcher(store)
-        results = d._symbol_route("SemanticIndexer", "class", 5)
+        d, ctx = self._make_dispatcher_with_ctx(store)
+        results = d._symbol_route(store, "SemanticIndexer", "class", 5)
         assert results[0]["file"] == "mcp_server/utils/semantic_indexer.py"
         assert results[1]["file"] == "mcp_server/utils/__init__.py"
 
@@ -753,8 +829,8 @@ class TestSymbolRouting:
         store = self._make_store([])
         # Both strict and relaxed calls return empty
         store.get_symbol.return_value = []
-        d = self._make_dispatcher(store)
-        results = d._symbol_route("NonExistentSymbol", "class", 5)
+        d, ctx = self._make_dispatcher_with_ctx(store)
+        results = d._symbol_route(store, "NonExistentSymbol", "class", 5)
         assert results == []
 
     def test_symbol_route_relaxes_kind_on_miss(self):
@@ -774,8 +850,8 @@ class TestSymbolRouting:
                 }
             ],
         ]
-        d = self._make_dispatcher(store)
-        results = d._symbol_route("rerank", "class", 5)
+        d, ctx = self._make_dispatcher_with_ctx(store)
+        results = d._symbol_route(store, "rerank", "class", 5)
         assert len(results) == 1
         assert "reranker.py" in results[0]["file"]
 
@@ -793,8 +869,8 @@ class TestSymbolRouting:
                 "file_path": "mcp_server/utils/semantic_indexer.py",
             }
         ]
-        d = self._make_dispatcher(store)
-        results = list(d.search("class SemanticIndexer", limit=5))
+        d, ctx = self._make_dispatcher_with_ctx(store)
+        results = list(d.search(ctx, "class SemanticIndexer", limit=5))
         assert len(results) >= 1
         assert results[0]["file"] == "mcp_server/utils/semantic_indexer.py"
         # BM25 (search_bm25) should NOT have been called
@@ -805,8 +881,8 @@ class TestSymbolRouting:
         store = MagicMock()
         store.get_symbol.return_value = []
         store.search_bm25.return_value = []  # BM25 also returns nothing
-        d = self._make_dispatcher(store)
-        results = list(d.search("class SemanticIndexer", limit=5))
+        d, ctx = self._make_dispatcher_with_ctx(store)
+        results = list(d.search(ctx, "class SemanticIndexer", limit=5))
         # BM25 was attempted as fallback
         store.search_bm25.assert_called()
 
@@ -814,6 +890,226 @@ class TestSymbolRouting:
         """Multi-word lexical queries must NOT hit the symbol table."""
         store = MagicMock()
         store.search_bm25.return_value = []
-        d = self._make_dispatcher(store)
-        list(d.search("qdrant docker compose autostart", limit=5))
+        d, ctx = self._make_dispatcher_with_ctx(store)
+        list(d.search(ctx, "qdrant docker compose autostart", limit=5))
         store.get_symbol.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# SL-1.1 — Protocol-conformance tests (initially RED; green after SL-1.2 impl)
+# ---------------------------------------------------------------------------
+
+
+def _make_repo_ctx(sqlite_store=None) -> RepoContext:
+    """Build a minimal RepoContext for tests."""
+    from datetime import datetime
+    from pathlib import Path
+    from unittest.mock import MagicMock
+
+    from mcp_server.storage.multi_repo_manager import RepositoryInfo
+
+    if sqlite_store is None:
+        sqlite_store = MagicMock()
+
+    registry_entry = MagicMock(spec=RepositoryInfo)
+    registry_entry.tracked_branch = "main"
+
+    return RepoContext(
+        repo_id="test-repo-id-0001",
+        sqlite_store=sqlite_store,
+        workspace_root=Path("/tmp/test-repo"),
+        tracked_branch="main",
+        registry_entry=registry_entry,
+    )
+
+
+class TestEnhancedDispatcherProtocolConformance:
+    """EnhancedDispatcher must conform to DispatcherProtocol (SL-1.1)."""
+
+    def test_isinstance_dispatcher_protocol(self):
+        """runtime_checkable isinstance check must pass."""
+        d = Dispatcher([])
+        assert isinstance(d, DispatcherProtocol)
+
+    def test_ctor_rejects_sqlite_store_kwarg(self):
+        """EnhancedDispatcher() must raise TypeError when sqlite_store= is passed."""
+        with pytest.raises(TypeError):
+            Dispatcher(sqlite_store=MagicMock())
+
+    def test_lookup_accepts_ctx_first_arg(self):
+        """lookup(ctx, symbol) must route through ctx.sqlite_store."""
+        store = MagicMock()
+        store.get_symbol.return_value = []
+        ctx = _make_repo_ctx(store)
+        d = Dispatcher([])
+        # Should not raise; returns None when nothing found
+        result = d.lookup(ctx, "nonexistent_symbol_xyz")
+        assert result is None
+
+    def test_search_accepts_ctx_first_arg(self):
+        """search(ctx, query) must not raise and must use ctx.sqlite_store."""
+        store = MagicMock()
+        store.search_bm25.return_value = []
+        ctx = _make_repo_ctx(store)
+        d = Dispatcher([])
+        results = list(d.search(ctx, "test query"))
+        assert isinstance(results, list)
+
+    def test_search_uses_ctx_sqlite_store_not_instance_store(self):
+        """search must consult ctx.sqlite_store, not a captured self._sqlite_store."""
+        store_a = MagicMock()
+        store_a.search_bm25.return_value = [
+            {"filepath": "/repo_a/file.py", "snippet": "hello", "score": 1.0, "language": "python"}
+        ]
+        store_a.find_best_chunk_for_file = MagicMock(return_value=None)
+        ctx_a = _make_repo_ctx(store_a)
+
+        store_b = MagicMock()
+        store_b.search_bm25.return_value = []
+        ctx_b = _make_repo_ctx(store_b)
+
+        d = Dispatcher([])
+        # Search via ctx_a should use store_a
+        list(d.search(ctx_a, "hello"))
+        store_a.search_bm25.assert_called()
+        # store_b was never accessed
+        store_b.search_bm25.assert_not_called()
+
+        # Search via ctx_b should use store_b (not store_a again)
+        list(d.search(ctx_b, "hello"))
+        store_b.search_bm25.assert_called()
+
+    def test_health_check_accepts_ctx(self):
+        """health_check(ctx) must accept ctx and return a dict."""
+        ctx = _make_repo_ctx()
+        d = Dispatcher([])
+        result = d.health_check(ctx)
+        assert isinstance(result, dict)
+        assert "status" in result
+
+    def test_get_statistics_accepts_ctx(self):
+        """get_statistics(ctx) must accept ctx and return a dict."""
+        ctx = _make_repo_ctx()
+        d = Dispatcher([])
+        result = d.get_statistics(ctx)
+        assert isinstance(result, dict)
+
+    def test_index_file_accepts_ctx(self, tmp_path):
+        """index_file(ctx, path) must accept ctx as first positional arg."""
+        ctx = _make_repo_ctx()
+        d = Dispatcher([])
+        f = tmp_path / "test.py"
+        f.write_text("x = 1")
+        # No plugin matches, so RuntimeError is caught internally — should not propagate
+        d.index_file(ctx, f)
+
+    def test_index_directory_accepts_ctx(self, tmp_path):
+        """index_directory(ctx, path) must accept ctx and return a dict."""
+        ctx = _make_repo_ctx()
+        d = Dispatcher([])
+        result = d.index_directory(ctx, tmp_path)
+        assert isinstance(result, dict)
+
+    def test_remove_file_accepts_ctx(self, tmp_path):
+        """remove_file(ctx, path) must accept ctx as first positional arg."""
+        ctx = _make_repo_ctx()
+        d = Dispatcher([])
+        f = tmp_path / "foo.py"
+        f.write_text("x = 1")
+        d.remove_file(ctx, f)  # must not raise
+
+    def test_move_file_accepts_ctx(self, tmp_path):
+        """move_file(ctx, old, new) must accept ctx as first positional arg."""
+        ctx = _make_repo_ctx()
+        d = Dispatcher([])
+        d.move_file(ctx, tmp_path / "old.py", tmp_path / "new.py")  # must not raise
+
+    def test_plugins_takes_no_ctx(self):
+        """plugins() is process-global; must accept no ctx arg."""
+        d = Dispatcher([])
+        result = d.plugins()
+        assert isinstance(result, list)
+
+    def test_supported_languages_takes_no_ctx(self):
+        """supported_languages() is process-global; must accept no ctx arg."""
+        d = Dispatcher([])
+        result = d.supported_languages()
+        assert isinstance(result, list)
+
+    def test_get_plugins_for_file_accepts_ctx(self, tmp_path):
+        """get_plugins_for_file(ctx, path) must accept ctx as first arg."""
+        ctx = _make_repo_ctx()
+        d = Dispatcher([])
+        f = tmp_path / "test.py"
+        result = d.get_plugins_for_file(ctx, f)
+        assert isinstance(result, list)
+
+    def test_search_scoped_to_ctx_repo_id(self):
+        """Results from search(ctx_a, q) must not bleed store_b data."""
+        store_a = MagicMock()
+        store_a.search_bm25.return_value = [
+            {"filepath": "/repo_a/x.py", "snippet": "foo", "score": 1.0, "language": "python"}
+        ]
+        store_a.find_best_chunk_for_file = MagicMock(return_value=None)
+
+        store_b = MagicMock()
+        store_b.search_bm25.return_value = [
+            {"filepath": "/repo_b/y.py", "snippet": "foo", "score": 1.0, "language": "python"}
+        ]
+
+        ctx_a = _make_repo_ctx(store_a)
+        d = Dispatcher([])
+        results = list(d.search(ctx_a, "foo"))
+        # store_b must never be touched
+        store_b.search_bm25.assert_not_called()
+
+
+class TestSimpleDispatcherProtocolConformance:
+    """SimpleDispatcher must conform to the query subset of DispatcherProtocol (SL-1.1)."""
+
+    def test_isinstance_dispatcher_protocol(self):
+        """runtime_checkable isinstance check must pass for SimpleDispatcher."""
+        d = SimpleDispatcher()
+        assert isinstance(d, DispatcherProtocol)
+
+    def test_ctor_rejects_sqlite_store_kwarg(self):
+        """SimpleDispatcher() must raise TypeError when sqlite_store= is passed."""
+        with pytest.raises(TypeError):
+            SimpleDispatcher(sqlite_store=MagicMock())
+
+    def test_search_accepts_ctx(self):
+        """SimpleDispatcher.search(ctx, query) must accept ctx first positional arg."""
+        store = MagicMock()
+        store.search_bm25.return_value = []
+        ctx = _make_repo_ctx(store)
+        d = SimpleDispatcher()
+        results = list(d.search(ctx, "hello"))
+        assert isinstance(results, list)
+
+    def test_health_check_accepts_ctx(self):
+        """SimpleDispatcher.health_check(ctx) must accept ctx."""
+        ctx = _make_repo_ctx()
+        d = SimpleDispatcher()
+        result = d.health_check(ctx)
+        assert isinstance(result, dict)
+
+    def test_get_statistics_accepts_ctx(self):
+        """SimpleDispatcher.get_statistics(ctx) must accept ctx."""
+        ctx = _make_repo_ctx()
+        d = SimpleDispatcher()
+        result = d.get_statistics(ctx)
+        assert isinstance(result, dict)
+
+
+class TestStorageCrossRepoCoordinatorDeleted:
+    """mcp_server.storage.cross_repo_coordinator must be deleted (SL-1.1)."""
+
+    def test_storage_cross_repo_import_raises(self):
+        """Importing from mcp_server.storage.cross_repo_coordinator must raise ModuleNotFoundError."""
+        import importlib
+        import sys
+
+        # Remove from sys.modules cache if already imported (pre-deletion)
+        sys.modules.pop("mcp_server.storage.cross_repo_coordinator", None)
+        with pytest.raises((ModuleNotFoundError, ImportError)):
+            importlib.import_module("mcp_server.storage.cross_repo_coordinator")
