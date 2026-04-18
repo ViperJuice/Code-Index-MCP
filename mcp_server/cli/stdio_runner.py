@@ -9,10 +9,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import signal
 import threading
 import time
 from pathlib import Path
 from typing import Any, Optional, Sequence
+
+from mcp_server.metrics.prometheus_exporter import PrometheusExporter, record_tool_call
 
 import mcp.types as types
 from mcp.server import Server
@@ -144,8 +147,67 @@ def _build_tool_list() -> list[types.Tool]:
     ]
 
 
+_shutdown_called = False
+
+
+async def _graceful_shutdown(
+    multi_watcher: Any,
+    ref_poller: Any,
+    store_registry: Any,
+    exporter: Any,
+    timeout: float = 5.0,
+) -> None:
+    """Stop watcher -> poller -> store -> exporter in order, each bounded by timeout."""
+    global _shutdown_called
+    if _shutdown_called:
+        logger.debug("_graceful_shutdown: already called, skipping")
+        return
+    _shutdown_called = True
+
+    if multi_watcher is not None:
+        try:
+            logger.info("Stopping MultiRepositoryWatcher...")
+            await asyncio.wait_for(asyncio.to_thread(multi_watcher.stop), timeout=timeout)
+            logger.info("MultiRepositoryWatcher stopped")
+        except asyncio.TimeoutError:
+            logger.warning("MultiRepositoryWatcher.stop timed out after %.1fs", timeout)
+        except Exception as exc:
+            logger.warning("MultiRepositoryWatcher.stop error: %s", exc)
+
+    if ref_poller is not None:
+        try:
+            logger.info("Stopping RefPoller...")
+            await asyncio.wait_for(asyncio.to_thread(ref_poller.stop), timeout=timeout)
+            logger.info("RefPoller stopped")
+        except asyncio.TimeoutError:
+            logger.warning("RefPoller.stop timed out after %.1fs", timeout)
+        except Exception as exc:
+            logger.warning("RefPoller.stop error: %s", exc)
+
+    if store_registry is not None:
+        try:
+            logger.info("Shutting down StoreRegistry...")
+            await asyncio.wait_for(asyncio.to_thread(store_registry.shutdown), timeout=timeout)
+            logger.info("StoreRegistry shut down")
+        except asyncio.TimeoutError:
+            logger.warning("StoreRegistry.shutdown timed out after %.1fs", timeout)
+        except Exception as exc:
+            logger.warning("StoreRegistry.shutdown error: %s", exc)
+
+    if exporter is not None:
+        try:
+            logger.info("Stopping PrometheusExporter...")
+            exporter.stop()
+            logger.info("PrometheusExporter stopped")
+        except Exception as exc:
+            logger.warning("PrometheusExporter.stop error: %s", exc)
+
+
 async def _serve(registry_path=None) -> None:
     """Set up and run the MCP stdio server."""
+    global _shutdown_called
+    _shutdown_called = False
+
     from dotenv import load_dotenv
 
     from mcp_server.config.settings import Settings
@@ -174,6 +236,10 @@ async def _serve(registry_path=None) -> None:
         registry_path=registry_path
     )
 
+    # Start Prometheus metrics exporter
+    exporter = PrometheusExporter()
+    exporter.start(int(os.getenv("MCP_METRICS_PORT", "9090")))
+
     # Start multi-repo watcher + ref poller eagerly, after registries are ready
     multi_watcher: Optional[MultiRepositoryWatcher] = None
     ref_poller: Optional[RefPoller] = None
@@ -199,6 +265,24 @@ async def _serve(registry_path=None) -> None:
         logger.warning(f"MultiRepositoryWatcher failed to start: {_watcher_err}")
         multi_watcher = None
         ref_poller = None
+
+    # Install SIGTERM/SIGINT handlers for graceful shutdown
+    _loop = asyncio.get_running_loop()
+    _shutdown_tasks: list[asyncio.Task] = []
+
+    def _handle_signal() -> None:
+        logger.info("Signal received — initiating graceful shutdown")
+        task = asyncio.create_task(
+            _graceful_shutdown(multi_watcher, ref_poller, store_registry, exporter, timeout=5.0)
+        )
+        _shutdown_tasks.append(task)
+
+    try:
+        _loop.add_signal_handler(signal.SIGTERM, _handle_signal)
+        _loop.add_signal_handler(signal.SIGINT, _handle_signal)
+    except NotImplementedError:
+        # Windows does not support add_signal_handler
+        pass
 
     # Optional client handshake gate — closure-scoped so each _serve() invocation
     # gets a fresh instance (required for test isolation).
@@ -407,6 +491,7 @@ async def _serve(registry_path=None) -> None:
             repo_resolver=repo_resolver,
         )
 
+        _tool_status = "success"
         try:
             if name == "handshake":
                 _secret = (arguments or {}).get("secret", "")
@@ -480,12 +565,15 @@ async def _serve(registry_path=None) -> None:
                     ],
                 }))]
         except Exception as e:
+            _tool_status = "error"
             logger.error(f"Error in tool {name}: {e}", exc_info=True)
             response = [types.TextContent(type="text", text=tool_handlers._ensure_response({
                 "error": f"Tool execution failed: {name}",
                 "details": str(e),
                 "tool": name,
             }))]
+
+        record_tool_call(name, _tool_status)
 
         elapsed = time.time() - start_time
         logger.info(f"=== MCP Tool Response: {name} ({elapsed:.2f}s) ===")
@@ -503,18 +591,7 @@ async def _serve(registry_path=None) -> None:
                 read_stream, write_stream, server.create_initialization_options()
             )
     finally:
-        if multi_watcher is not None:
-            try:
-                multi_watcher.stop_watching_all()
-                logger.info("MultiRepositoryWatcher stopped")
-            except Exception as _e:
-                logger.warning(f"MultiRepositoryWatcher stop error: {_e}")
-        if ref_poller is not None:
-            try:
-                ref_poller.stop()
-                logger.info("RefPoller stopped")
-            except Exception as _e:
-                logger.warning(f"RefPoller stop error: {_e}")
+        await _graceful_shutdown(multi_watcher, ref_poller, store_registry, exporter, timeout=5.0)
 
 
 def run() -> None:
