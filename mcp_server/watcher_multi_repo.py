@@ -15,8 +15,11 @@ from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
 from .artifacts.commit_artifacts import CommitArtifactManager
+from .core.ignore_patterns import build_walker_filter
+from .core.repo_context import RepoContext
+from .core.repo_resolver import RepoResolver
 from .dispatcher.dispatcher_enhanced import EnhancedDispatcher
-from .storage.git_index_manager import GitAwareIndexManager
+from .storage.git_index_manager import GitAwareIndexManager, should_reindex_for_branch
 from .storage.repository_registry import RepositoryRegistry
 from .watcher import _Handler
 
@@ -104,25 +107,113 @@ class GitMonitor:
 
 
 class MultiRepositoryHandler(FileSystemEventHandler):
-    """File system event handler for a specific repository."""
+    """File system event handler for a specific repository.
 
-    def __init__(self, repo_id: str, repo_path: Path, parent_watcher):
+    Filters events by branch (drops events on non-tracked branches) and by
+    .gitignore before forwarding to the dispatcher with the resolved RepoContext.
+    """
+
+    def __init__(self, repo_id: str, repo_path: Path, parent_watcher, ctx: RepoContext):
         self.repo_id = repo_id
         self.repo_path = repo_path
         self.parent_watcher = parent_watcher
-        self.handler = _Handler(
+        self.ctx = ctx
+        self._inner_handler = _Handler(
             parent_watcher.dispatcher, parent_watcher.query_cache, parent_watcher.path_resolver
         )
+        self._gitignore_filter = build_walker_filter(repo_path)
+
+    def _get_current_branch(self) -> Optional[str]:
+        """Return the current branch name for this repo, or None on failure."""
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(self.repo_path), "rev-parse", "--abbrev-ref", "HEAD"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                return result.stdout.strip()
+        except Exception:
+            pass
+        return None
+
+    def _trigger_reindex_with_ctx(self, path: Path) -> None:
+        """Branch + gitignore guarded reindex via ctx-aware dispatcher."""
+        current_branch = self._get_current_branch()
+        if not should_reindex_for_branch(current_branch, self.ctx.tracked_branch):
+            logger.debug(
+                "Dropping reindex event for %s: branch %s != tracked %s",
+                path, current_branch, self.ctx.tracked_branch,
+            )
+            return
+
+        if self._gitignore_filter(path):
+            logger.debug("Dropping reindex event for %s: matched gitignore filter", path)
+            return
+
+        if path.suffix not in self._inner_handler.code_extensions:
+            return
+        if not path.exists():
+            return
+
+        logger.info("Re-indexing %s (repo=%s)", path, self.repo_id)
+        self.parent_watcher.dispatcher.remove_file(self.ctx, path)
+        self.parent_watcher.dispatcher.index_file(self.ctx, path)
+
+    def _remove_with_ctx(self, path: Path) -> None:
+        """Branch + gitignore guarded remove via ctx-aware dispatcher."""
+        current_branch = self._get_current_branch()
+        if not should_reindex_for_branch(current_branch, self.ctx.tracked_branch):
+            logger.debug(
+                "Dropping remove event for %s: branch %s != tracked %s",
+                path, current_branch, self.ctx.tracked_branch,
+            )
+            return
+
+        if self._gitignore_filter(path):
+            return
+
+        if path.suffix not in self._inner_handler.code_extensions:
+            return
+
+        logger.info("Removing from index: %s (repo=%s)", path, self.repo_id)
+        self.parent_watcher.dispatcher.remove_file(self.ctx, path)
+
+    def _move_with_ctx(self, old_path: Path, new_path: Path) -> None:
+        """Branch + gitignore guarded move via ctx-aware dispatcher."""
+        current_branch = self._get_current_branch()
+        if not should_reindex_for_branch(current_branch, self.ctx.tracked_branch):
+            return
+
+        if self._gitignore_filter(new_path):
+            return
+
+        exts = self._inner_handler.code_extensions
+        if old_path.suffix not in exts and new_path.suffix not in exts:
+            return
+
+        logger.info("Moving in index: %s -> %s (repo=%s)", old_path, new_path, self.repo_id)
+        self.parent_watcher.dispatcher.move_file(self.ctx, old_path, new_path)
 
     def on_any_event(self, event):
-        """Handle file system events."""
-        # Add repository context
-        logger.debug(f"Event in {self.repo_id}: {event}")
+        """Route watchdog events through branch + gitignore guards."""
+        if event.is_directory:
+            return
 
-        # Let the standard handler process it
-        self.handler.on_any_event(event)
+        logger.debug("Event in %s: %s", self.repo_id, event)
 
-        # Mark repository as having changes
+        src = Path(event.src_path)
+        etype = event.event_type
+
+        if etype in ("created", "modified"):
+            self._trigger_reindex_with_ctx(src)
+        elif etype == "moved":
+            dest = Path(event.dest_path)
+            self._move_with_ctx(src, dest)
+        elif etype == "deleted":
+            self._remove_with_ctx(src)
+
         self.parent_watcher.mark_repository_changed(self.repo_id)
 
 
@@ -135,19 +226,21 @@ class MultiRepositoryWatcher:
         dispatcher: EnhancedDispatcher,
         index_manager: GitAwareIndexManager,
         artifact_manager: Optional[CommitArtifactManager] = None,
+        repo_resolver: Optional[RepoResolver] = None,
     ):
         self.registry = registry
         self.dispatcher = dispatcher
         self.index_manager = index_manager
         self.artifact_manager = artifact_manager or CommitArtifactManager()
+        self.repo_resolver = repo_resolver
 
-        self.watchers = {}  # repo_id -> Observer
+        self.watchers = {}  # repo_id -> MultiRepositoryHandler
         self.observers = {}  # repo_id -> Observer instance
         self.changed_repos = set()  # Repos with uncommitted changes
         self.git_monitor = GitMonitor(registry, self.on_git_commit)
 
-        self.query_cache = None  # TODO: Add query cache support
-        self.path_resolver = None  # TODO: Add path resolver
+        self.query_cache = None
+        self.path_resolver = None
 
         self.executor = ThreadPoolExecutor(max_workers=4)
         self.running = False
@@ -215,26 +308,36 @@ class MultiRepositoryWatcher:
         self.registry.unregister_repository(repo_id)
 
     def _start_repo_watcher(self, repo_id: str, repo_path: str):
-        """Start watching a specific repository.
-
-        Args:
-            repo_id: Repository ID
-            repo_path: Repository path
-        """
+        """Start watching a specific repository."""
         if repo_id in self.observers:
-            # Already watching
             return
 
         try:
             path = Path(repo_path)
             if not path.exists():
-                logger.error(f"Repository path does not exist: {repo_path}")
+                logger.error("Repository path does not exist: %s", repo_path)
                 return
 
-            # Create handler for this repository
-            handler = MultiRepositoryHandler(repo_id, path, self)
+            # Resolve RepoContext for per-repo dispatcher routing.
+            ctx: Optional[RepoContext] = None
+            if self.repo_resolver is not None:
+                ctx = self.repo_resolver.resolve(path)
+            if ctx is None:
+                # Fallback: minimal context so the handler can still filter by branch.
+                repo_info = self.registry.get_repository(repo_id)
+                tracked = (repo_info.tracked_branch if repo_info else None) or ""
+                # Build a bare RepoContext without a live sqlite_store.
+                from .storage.multi_repo_manager import RepositoryInfo as _RI
+                ctx = RepoContext(
+                    repo_id=repo_id,
+                    sqlite_store=None,  # type: ignore[arg-type]
+                    workspace_root=path,
+                    tracked_branch=tracked,
+                    registry_entry=repo_info,
+                )
 
-            # Create and start observer
+            handler = MultiRepositoryHandler(repo_id, path, self, ctx=ctx)
+
             observer = Observer()
             observer.schedule(handler, str(path), recursive=True)
             observer.start()
@@ -242,10 +345,10 @@ class MultiRepositoryWatcher:
             self.observers[repo_id] = observer
             self.watchers[repo_id] = handler
 
-            logger.info(f"Started watching repository: {repo_id} at {repo_path}")
+            logger.info("Started watching repository: %s at %s", repo_id, repo_path)
 
         except Exception as e:
-            logger.error(f"Failed to start watcher for {repo_id}: {e}")
+            logger.error("Failed to start watcher for %s: %s", repo_id, e)
 
     def mark_repository_changed(self, repo_id: str):
         """Mark a repository as having uncommitted changes.
