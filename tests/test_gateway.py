@@ -79,7 +79,7 @@ class TestGatewayStartupShutdown:
     @patch("mcp_server.gateway.run_startup_preflight")
     @patch("mcp_server.gateway.SQLiteStore")
     @patch("mcp_server.gateway.EnhancedDispatcher")
-    @patch("mcp_server.gateway.FileWatcher")
+    @patch("mcp_server.gateway.MultiRepositoryWatcher")
     def test_startup_success(
         self,
         mock_watcher,
@@ -112,9 +112,9 @@ class TestGatewayStartupShutdown:
                 pass
 
     @patch("mcp_server.gateway.EnhancedDispatcher")
-    @patch("mcp_server.gateway.FileWatcher")
+    @patch("mcp_server.gateway.MultiRepositoryWatcher")
     def test_shutdown_stops_watcher(self, mock_watcher_class, mock_dispatcher_class, test_client_with_dispatcher):
-        """Test that shutdown stops the file watcher."""
+        """Test that shutdown stops the multi-repo watcher."""
         mock_watcher = Mock()
         mock_watcher_class.return_value = mock_watcher
 
@@ -122,8 +122,8 @@ class TestGatewayStartupShutdown:
         with test_client_with_dispatcher:
             pass
 
-        # Watcher stop should have been called during shutdown
-        mock_watcher.stop.assert_called_once()
+        # stop_watching_all should have been called during shutdown
+        mock_watcher.stop_watching_all.assert_called_once()
 
 
 class TestSymbolEndpoint:
