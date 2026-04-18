@@ -174,3 +174,7 @@ testing-env/
 index-archive.tar.gz
 coverage.xml
 .metadata/coverage.xml
+
+# execute-phase artifacts
+.worktrees/
+.claude/execute-phase-state.json
