@@ -15,6 +15,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from mcp_server.storage.schema_errors import SchemaMismatchError
+
 logger = logging.getLogger(__name__)
 
 
@@ -285,7 +287,7 @@ class IndexManager:
         candidates: List[Dict[str, Any]],
         requested_schema_version: Optional[str] = None,
         requested_embedding_model: Optional[str] = None,
-        strict_compatibility: bool = False,
+        strict_compatibility: bool = True,
     ) -> Optional[Path]:
         """Select the best index candidate based on requested schema/model preferences."""
         if not candidates:
@@ -328,10 +330,20 @@ class IndexManager:
         if strict_compatibility and (
             requested_schema_version is not None or requested_embedding_model is not None
         ):
-            logger.warning(
-                "No index candidate matched required schema/model compatibility in strict mode"
+            # Pick the first candidate with a manifest to surface its version in the error.
+            mismatch_candidate = next(
+                (c for c in candidates if c.get("manifest")), candidates[0]
             )
-            return None
+            found_version = (
+                mismatch_candidate["manifest"].schema_version
+                if mismatch_candidate.get("manifest")
+                else "unknown"
+            )
+            raise SchemaMismatchError(
+                expected=requested_schema_version or "unknown",
+                found=found_version,
+                index_path=mismatch_candidate["path"],
+            )
 
         if schema_matches:
             if requested_embedding_model:
