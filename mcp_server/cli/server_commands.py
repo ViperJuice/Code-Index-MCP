@@ -27,7 +27,13 @@ def _default_port() -> int:
     show_default="env MCP_SERVER_PORT or 8765",
 )
 @click.option("--reload", is_flag=True, help="Enable auto-reload for development")
-def serve(host: str, port: int, reload: bool) -> None:
+@click.option(
+    "--rebuild-on-schema-mismatch",
+    is_flag=True,
+    default=False,
+    help="On schema mismatch, rebuild the index and retry the load.",
+)
+def serve(host: str, port: int, reload: bool, rebuild_on_schema_mismatch: bool) -> None:
     """Start the MCP HTTP server with configurable host and port."""
     from pathlib import Path
 
@@ -35,14 +41,25 @@ def serve(host: str, port: int, reload: bool) -> None:
 
     os.environ.setdefault("MCP_INDEX_STORAGE_PATH", str(Path.home() / ".mcp" / "indexes"))
     os.environ.setdefault("MCP_SKIP_PLUGIN_PREINDEX", "true")
+    if rebuild_on_schema_mismatch:
+        os.environ["MCP_REBUILD_ON_SCHEMA_MISMATCH"] = "1"
 
     click.echo(f"Starting MCP server on http://{host}:{port}")
     uvicorn.run("mcp_server.gateway:app", host=host, port=port, reload=reload)
 
 
 @click.command("stdio")
-def stdio() -> None:
+@click.option(
+    "--rebuild-on-schema-mismatch",
+    is_flag=True,
+    default=False,
+    help="On schema mismatch, rebuild the index and retry the load.",
+)
+def stdio(rebuild_on_schema_mismatch: bool) -> None:
     """Start the MCP stdio server (JSON-RPC over stdin/stdout)."""
     from mcp_server.cli.stdio_runner import run
+
+    if rebuild_on_schema_mismatch:
+        os.environ["MCP_REBUILD_ON_SCHEMA_MISMATCH"] = "1"
 
     run()

@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from mcp_server.artifacts.profile_hydration import ProfileHydrationCoordinator
 from mcp_server.artifacts.provider_factory import ArtifactProviderFactory
+from mcp_server.storage.schema_errors import SchemaMismatchError
 
 if TYPE_CHECKING:
     from mcp_server.storage.index_manager import IndexManifest
@@ -297,14 +298,34 @@ class IndexDiscovery:
 
                 candidates = compatible_candidates
 
-            return self.index_manager.select_best_index(
-                candidates,
-                requested_schema_version=requested_schema_version,
-                requested_embedding_model=requested_embedding_model,
-                strict_compatibility=strict_compatibility,
-            )
+            try:
+                return self.index_manager.select_best_index(
+                    candidates,
+                    requested_schema_version=requested_schema_version,
+                    requested_embedding_model=requested_embedding_model,
+                    strict_compatibility=strict_compatibility,
+                )
+            except SchemaMismatchError:
+                if os.environ.get("MCP_REBUILD_ON_SCHEMA_MISMATCH") == "1":
+                    self._trigger_rebuild()
+                    return self.index_manager.select_best_index(
+                        candidates,
+                        requested_schema_version=requested_schema_version,
+                        requested_embedding_model=requested_embedding_model,
+                        strict_compatibility=strict_compatibility,
+                    )
+                raise
 
         return None
+
+    def _trigger_rebuild(self) -> None:
+        """Invoke the indexer rebuild path when a schema mismatch is detected."""
+        import asyncio
+
+        from mcp_server.indexer.index_engine import IndexEngine
+
+        engine = IndexEngine()
+        asyncio.get_event_loop().run_until_complete(engine.rebuild_index())
 
     def _validate_sqlite_index(self, db_path: Path) -> bool:
         """Validate that a file is a valid SQLite database with expected schema."""
