@@ -2,11 +2,15 @@
 
 Modular, extensible local-first code indexer designed to enhance Claude Code and other LLMs with deep code understanding capabilities. Built on the Model Context Protocol (MCP) for seamless integration with AI assistants.
 
-## Implementation Status
-**Version**: 1.0.0 (MVP Release)
-**Core Features**: Stable - Local indexing, symbol/text search, 48-language support
-**Optional Features**: Semantic search (requires Voyage AI), Index sync (beta)
-**Performance**: Sub-100ms queries, <10s indexing for cached repositories (benchmarked on this codebase; results vary by repo size and language mix)
+> **Beta status**: Multi-repo support and the MCP STDIO interface are in beta. The MCP tool interface (`search_code`, `symbol_lookup`, and friends) is the primary surface for LLM-driven use; the FastAPI REST gateway is a secondary admin surface for diagnostics and manual operations. Expect API surface changes before stable release.
+
+## Project Status
+**Version**: 1.0.0 (MVP, beta)
+**Primary surface**: MCP tools (`search_code`, `symbol_lookup`) via the STDIO runner — always use these first from an LLM
+**Secondary surface**: FastAPI admin REST gateway for diagnostics and scripting — see "Admin REST Interface (secondary)" below
+**Core features**: local indexing, symbol/text search, 48-language tree-sitter coverage
+**Optional features**: semantic search (requires Voyage AI or a local vLLM endpoint), GitHub Artifacts index sync
+**Performance**: sub-100ms symbol lookup and sub-500ms search on indexed repos (benchmarked on this codebase; results vary by repo size and language mix)
 
 > **New to Code-Index-MCP?** Check out our [Getting Started Guide](docs/GETTING_STARTED.md) for a quick walkthrough.
 
@@ -83,9 +87,9 @@ Key directories:
 
 ## 🛠️ Language Support
 
-### ✅ Fully Supported Languages (46+ Total)
+### Extensive Language Coverage (46+ Tree-sitter Grammars)
 
-**Production-Ready Features:**
+**Core language features:**
 - **Dynamic Plugin Loading**: Languages are loaded on-demand for optimal performance
 - **Tree-sitter Parsing**: Accurate AST-based symbol extraction with language-specific queries
 - **Query Caching**: Improved performance with cached tree-sitter queries
@@ -107,7 +111,7 @@ Key directories:
 | **Data Formats** | JSON, YAML, TOML, XML, GraphQL, SQL | Schema validation, query optimization |
 | **Documentation** | Markdown, LaTeX, reStructuredText | Cross-references, formatting |
 
-**Implementation Status: Production-Ready** - All languages supported via the enhanced dispatcher with:
+**Beta: multi-repo support and the MCP STDIO interface are in active development.** All listed languages are supported via the enhanced dispatcher with:
 - ✅ Dynamic plugin loading (lazy initialization)
 - ✅ Robust error handling and fallback mechanisms
 - ✅ Path resolution for complex project structures
@@ -352,18 +356,42 @@ mcp-index artifact sync
 # Check index status
 mcp-index index status
 
-# Start the API server
+# Start the MCP STDIO runner (primary surface used by LLMs via .mcp.json)
+python -m mcp_server.cli.stdio_runner
+
+# Or start the FastAPI admin REST gateway (secondary, for diagnostics)
 mcp-index serve
-
-# Or choose a custom port explicitly
-mcp-index serve --port 9123
-
-# Test the API
-curl http://localhost:8000/status
-curl -X POST http://localhost:8000/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "def parse"}'
+mcp-index serve --port 9123   # alternate port
 ```
+
+From an LLM (Claude Code, Cursor, …) register the STDIO runner in
+`.mcp.json` and invoke the indexer as MCP tool calls. The two primary tools
+are `search_code` (pattern / keyword / semantic search, <500 ms) and
+`symbol_lookup` (exact class/function lookup, <100 ms):
+
+```json
+{
+  "tool": "search_code",
+  "arguments": {
+    "query": "def parse",
+    "limit": 20,
+    "semantic": false
+  }
+}
+```
+
+```json
+{
+  "tool": "symbol_lookup",
+  "arguments": {
+    "symbol": "parse_file"
+  }
+}
+```
+
+Both tools accept an optional `"repository"` argument (registered repo name or
+an absolute path inside `MCP_ALLOWED_ROOTS`) for multi-repo scoping. See the
+"Using Against Many Repos" section above.
 
 ### 🔧 Configuration
 
@@ -940,12 +968,18 @@ docker run --rm -p 8080:8080 \
 # Open http://localhost:8080 in your browser
 ```
 
-## 📚 API Reference
+## Admin REST Interface (secondary)
 
-### Core Endpoints
+> The canonical surface is MCP tool calls (`search_code`, `symbol_lookup`,
+> etc.) via the STDIO runner — see the "Quick Start" sections above. The
+> FastAPI REST gateway documented here is a secondary admin interface for
+> diagnostics, scripting, and clients that cannot speak MCP. Its endpoints
+> are not the recommended path for LLM-driven workflows.
+
+### Admin REST Endpoints
 
 #### `GET /symbol`
-Get symbol definition
+Get symbol definition (admin/debug surface — prefer the `symbol_lookup` MCP tool):
 ```
 GET /symbol?symbol_name=parseFile&file_path=/path/to/file.py
 ```
@@ -954,7 +988,7 @@ Query parameters:
 - `file_path` (optional): Specific file to search in
 
 #### `GET /search`
-Search for code patterns
+Search for code patterns (admin/debug surface — prefer the `search_code` MCP tool):
 ```
 GET /search?query=async+def.*parse&file_extensions=.py,.js
 ```
@@ -1136,8 +1170,8 @@ Full results: `docs/benchmarks/matrix_benchmark.md` / `.json`
 
 The system follows C4 model architecture patterns:
 
-- **Workspace Definition**: 100% implemented (architecture/workspace.dsl) - Validated with CLI tools
-- **System Context (L1)**: Claude Code integration with MCP sub-agent support fully operational
+- **Workspace Definition**: defined in `architecture/workspace.dsl` and validated with Structurizr CLI
+- **System Context (L1)**: Claude Code integrates via MCP sub-agents against the STDIO primary surface
 - **Container Level (L2)**: 8 main containers including enhanced MCP server and user documentation
 - **Component Level (L3)**: Plugin system with 48 languages, memory management, and cross-repo coordination
 - **Code Level (L4)**: 43 PlantUML diagrams documenting all system components and flows

@@ -97,33 +97,62 @@ local index with `mcp-index repository sync`.
 
 ### 3. Search Your Code
 
-**Via REST API:**
+The primary interface is the Model Context Protocol: your LLM (Claude Code,
+Cursor, etc.) calls `search_code` and `symbol_lookup` as MCP tools. A FastAPI
+admin surface is also available for manual debugging (see below).
 
-```bash
-# Search for code
-curl -X POST http://127.0.0.1:8000/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "parse"}'
+**Via MCP Protocol (primary):**
 
-# Get symbol definition
-curl "http://127.0.0.1:8000/symbol?symbol_name=parse_file"
-```
-
-**Via MCP Protocol (Claude Code):**
-
-Add to your `.mcp.json`:
+First, register the server in your project's `.mcp.json`:
 
 ```json
 {
   "mcpServers": {
     "code-index": {
       "command": "python",
-      "args": ["-m", "mcp_server.cli"],
+      "args": ["-m", "mcp_server.cli.stdio_runner"],
       "cwd": "/path/to/your/project"
     }
   }
 }
 ```
+
+Then the LLM (or any MCP client) invokes the indexer via tool calls. Example
+JSON for a pattern/keyword search:
+
+```json
+{
+  "tool": "search_code",
+  "arguments": {
+    "query": "def parse",
+    "limit": 20,
+    "semantic": false
+  }
+}
+```
+
+Example JSON for an exact-name symbol lookup:
+
+```json
+{
+  "tool": "symbol_lookup",
+  "arguments": {
+    "symbol": "parse_file"
+  }
+}
+```
+
+Both tools accept an optional `repository` argument (a registered repo name or
+an absolute path inside `MCP_ALLOWED_ROOTS`) to scope the query in a multi-repo
+setup. See the multi-repo section above for registration.
+
+**Via REST API (admin/debug):**
+
+The FastAPI gateway exposes the same operations as an HTTP admin surface for
+diagnostics and scripts that cannot speak MCP. It is a secondary surface; use
+the MCP tool calls above for normal LLM-driven workflows. See the
+[API Reference in the README](../README.md#-admin-rest-interface-secondary)
+for endpoint details.
 
 ## Configuration
 
