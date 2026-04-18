@@ -55,16 +55,19 @@ def _build_tool_list() -> list[types.Tool]:
     return [
         types.Tool(
             name="symbol_lookup",
-            description="[USE BEFORE GREP] Look up any class, function, or method definition. 100x faster than grep. Returns file + line number. Fall back to Grep ONLY if this returns not_found.",
+            description="[USE BEFORE GREP] Look up any class, function, or method definition. 100x faster than grep. Returns file + line number. Fall back to Grep ONLY if this returns not_found. Accepts optional repository param (registered repo name or filesystem path); filesystem paths must be inside MCP_ALLOWED_ROOTS or the tool returns path_outside_allowed_roots.",
             inputSchema={
                 "type": "object",
-                "properties": {"symbol": {"type": "string", "description": "The symbol name to look up"}},
+                "properties": {
+                    "symbol": {"type": "string", "description": "The symbol name to look up"},
+                    "repository": {"type": "string", "description": "Repository ID, path, or git URL. Defaults to current repository."},
+                },
                 "required": ["symbol"],
             },
         ),
         types.Tool(
             name="search_code",
-            description="[USE BEFORE GREP] Search code by pattern, keyword, or natural language (semantic=true). Indexed, <500ms, returns ranked results with line numbers and last_indexed timestamp. Fall back to Grep ONLY if this returns 0 results.",
+            description="[USE BEFORE GREP] Search code by pattern, keyword, or natural language (semantic=true). Indexed, <500ms, returns ranked results with line numbers and last_indexed timestamp. Fall back to Grep ONLY if this returns 0 results. Accepts optional repository param (registered repo name or filesystem path); filesystem paths must be inside MCP_ALLOWED_ROOTS or the tool returns path_outside_allowed_roots.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -89,7 +92,7 @@ def _build_tool_list() -> list[types.Tool]:
         ),
         types.Tool(
             name="reindex",
-            description="Reindex files in the codebase. Updates the index for changed files or specific paths.",
+            description="Reindex files in the codebase. Updates the index for changed files or specific paths. The path must be inside MCP_ALLOWED_ROOTS or the tool returns path_outside_allowed_roots.",
             inputSchema={
                 "type": "object",
                 "properties": {"path": {"type": "string", "description": "Optional path to reindex. If not provided, reindexes all files."}},
@@ -110,7 +113,8 @@ def _build_tool_list() -> list[types.Tool]:
             name="summarize_sample",
             description=(
                 "Summarize a sample of indexed files using the LLM and return results "
-                "for quality evaluation. Does not persist results by default."
+                "for quality evaluation. Does not persist results by default. "
+                "Each entry in paths is checked against the sandbox; mismatches return path_outside_allowed_roots."
             ),
             inputSchema={
                 "type": "object",
