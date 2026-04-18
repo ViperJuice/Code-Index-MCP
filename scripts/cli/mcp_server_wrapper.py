@@ -12,7 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # Import the actual server
-from scripts.cli.mcp_server_cli import main
+from mcp_server.cli.stdio_runner import main
 
 # Override the stdio to intercept responses
 original_stdout = sys.stdout
