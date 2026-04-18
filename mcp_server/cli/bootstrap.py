@@ -84,7 +84,7 @@ def _allowed_roots() -> list[Path]:
             if not entry:
                 continue
             try:
-                roots.append(Path(entry).expanduser().resolve())
+                roots.append(Path(entry).expanduser().resolve())  # resolve() exempt: boot-time root canonicalization
             except Exception:
                 continue
         if roots:
@@ -92,25 +92,15 @@ def _allowed_roots() -> list[Path]:
     ws = os.environ.get("MCP_WORKSPACE_ROOT", "").strip()
     if ws:
         try:
-            return [Path(ws).expanduser().resolve()]
+            return [Path(ws).expanduser().resolve()]  # resolve() exempt: boot-time root canonicalization
         except Exception:
             pass
     return [Path.cwd().resolve()]
 
 
 def _path_within_allowed(target: Path, roots: list[Path]) -> bool:
-    """True when target's resolved path lies within one of roots."""
-    try:
-        resolved = target.expanduser().resolve()
-    except Exception:
-        return False
-    for root in roots:
-        try:
-            resolved.relative_to(root)
-            return True
-        except ValueError:
-            continue
-    return False
+    from mcp_server.security.path_allowlist import path_within_allowed
+    return path_within_allowed(target, tuple(roots))
 
 
 def validate_index(store, repo_path: Path) -> dict:
