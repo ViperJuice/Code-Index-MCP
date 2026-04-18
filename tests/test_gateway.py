@@ -13,11 +13,52 @@ import os
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 
 import pytest
 
+from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher
 from mcp_server.plugin_base import SearchResult, SymbolDef
+from mcp_server.storage.sqlite_store import SQLiteStore
+
+
+# ---------------------------------------------------------------------------
+# Local fixture overrides for SL-1 compatibility
+#
+# conftest.py creates SimpleDispatcher([python_plugin]) which fails after SL-1
+# removed the positional-plugin-list constructor arg. These local overrides
+# shadow the conftest fixtures for test_gateway.py only.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def dispatcher_with_plugins(sqlite_store: SQLiteStore) -> SimpleDispatcher:
+    """Local override: create a SimpleDispatcher compatible with the SL-1 API."""
+    return SimpleDispatcher()
+
+
+@pytest.fixture
+def test_client_with_dispatcher(
+    test_client,
+    dispatcher_with_plugins: SimpleDispatcher,
+    sqlite_store: SQLiteStore,
+    monkeypatch,
+):
+    """Local override: test client with initialized dispatcher (SL-1 compatible)."""
+    import mcp_server.gateway as gateway
+
+    if test_client is None:
+        pytest.skip("FastAPI app unavailable")
+
+    monkeypatch.setattr(gateway, "dispatcher", dispatcher_with_plugins)
+    monkeypatch.setattr(gateway, "sqlite_store", sqlite_store)
+    for _attr in ("bm25_indexer", "hybrid_search", "fuzzy_indexer", "semantic_indexer", "query_cache"):
+        if hasattr(gateway, _attr):
+            monkeypatch.setattr(gateway, _attr, None)
+
+    test_client.app.state.dispatcher = dispatcher_with_plugins
+    test_client.app.state.sqlite_store = sqlite_store
+    return test_client
 
 
 @contextmanager
@@ -188,9 +229,9 @@ class TestSearchEndpoint:
         response = test_client_with_dispatcher.get("/search?q=test&semantic=true")
 
         assert response.status_code == 200
-        # Verify semantic parameter was passed
+        # Verify semantic parameter was passed (ctx is first positional arg)
         test_client_with_dispatcher.app.state.dispatcher.search.assert_called_with(
-            "test", semantic=True, limit=20
+            ANY, "test", semantic=True, limit=20
         )
 
     def test_search_auto_prefers_semantic_path_when_requested(
@@ -217,7 +258,7 @@ class TestSearchEndpoint:
         payload = response.json()
         assert payload[0]["file"] == "mcp_server/gateway.py"
         test_client_with_dispatcher.app.state.dispatcher.search.assert_called_with(
-            "test", semantic=True, limit=20
+            ANY, "test", semantic=True, limit=20
         )
 
     def test_search_normalizes_internal_result_shapes(self, test_client_with_dispatcher):
@@ -249,7 +290,7 @@ class TestSearchEndpoint:
 
         assert response.status_code == 200
         test_client_with_dispatcher.app.state.dispatcher.search.assert_called_with(
-            "test", semantic=False, limit=50
+            ANY, "test", semantic=False, limit=50
         )
 
     def test_search_empty_query(self, test_client_with_dispatcher):
@@ -316,9 +357,9 @@ class TestStatusEndpoint:
     def test_status_operational(self, test_client_with_dispatcher, populated_sqlite_store):
         """Test status endpoint when server is operational."""
         dispatcher = test_client_with_dispatcher.app.state.dispatcher
-        # Mock dispatcher statistics and plugin list
+        # Mock dispatcher statistics and plugin list via public Protocol methods
         dispatcher.get_statistics = Mock(return_value={"total": 10, "by_language": {"python": 10}})
-        dispatcher._plugins = [Mock()]  # 1 plugin
+        dispatcher.plugins = Mock(return_value=[Mock()])  # 1 plugin
         test_client_with_dispatcher.app.state.sqlite_store = populated_sqlite_store
 
         response = test_client_with_dispatcher.get("/status")
@@ -358,20 +399,23 @@ class TestStatusEndpoint:
         assert "Stats error" in data["message"]
 
     def test_status_plugin_statistics(self, test_client_with_dispatcher):
-        """Test status with plugin-level statistics."""
-        # SimpleDispatcher has no get_statistics, so fallback to _plugins is used
-        # Mock plugin with statistics
+        """Test status reports plugin count via plugins() Protocol method."""
         mock_plugin = Mock()
         mock_plugin.get_indexed_count.return_value = 5
         mock_plugin.language = "python"
-        test_client_with_dispatcher.app.state.dispatcher._plugins = [mock_plugin]
+        dispatcher = test_client_with_dispatcher.app.state.dispatcher
+        # Return two plugins from the public Protocol method
+        dispatcher.plugins = Mock(return_value=[mock_plugin, mock_plugin])
+        # get_statistics returns basic data; we verify plugins count comes from plugins()
+        dispatcher.get_statistics = Mock(return_value={"total": 0, "by_language": {}})
 
         response = test_client_with_dispatcher.get("/status")
 
         assert response.status_code == 200
         data = response.json()
-        assert data["indexed_files"]["total"] == 5
-        assert data["indexed_files"]["by_language"]["python"] == 5
+        # plugins count comes from plugins() Protocol method
+        assert data["plugins"] == 2
+        assert "indexed_files" in data
 
 
 class TestPluginsEndpoint:
@@ -437,10 +481,10 @@ class TestReindexEndpoint:
     @pytest.mark.asyncio
     async def test_reindex_all(self, test_client_with_dispatcher, temp_code_directory):
         """Test reindexing all files."""
-        # Mock index_file method and _plugins (SimpleDispatcher lacks _plugins by default)
+        # Mock index_file method and plugins() (via public Protocol method)
         mock_plugin = Mock()
         mock_plugin.supports.side_effect = lambda p: Path(p).suffix == ".py"
-        test_client_with_dispatcher.app.state.dispatcher._plugins = [mock_plugin]
+        test_client_with_dispatcher.app.state.dispatcher.plugins = Mock(return_value=[mock_plugin])
         test_client_with_dispatcher.app.state.dispatcher.index_file = Mock()
 
         # Change to temp directory for testing
@@ -476,7 +520,7 @@ class TestReindexEndpoint:
         assert "Reindexed 1 files" in data["message"]
 
         test_client_with_dispatcher.app.state.dispatcher.index_file.assert_called_once_with(
-            file_path
+            ANY, file_path
         )
 
     @pytest.mark.asyncio
@@ -484,10 +528,10 @@ class TestReindexEndpoint:
         """Test reindexing a directory."""
         test_client_with_dispatcher.app.state.dispatcher.index_file = Mock()
 
-        # Mock plugin supports method
+        # Mock plugin supports method via public Protocol method
         mock_plugin = Mock()
         mock_plugin.supports.side_effect = lambda p: p.suffix == ".py"
-        test_client_with_dispatcher.app.state.dispatcher._plugins = [mock_plugin]
+        test_client_with_dispatcher.app.state.dispatcher.plugins = Mock(return_value=[mock_plugin])
 
         response = test_client_with_dispatcher.post(f"/reindex?path={temp_code_directory}")
 
@@ -632,3 +676,109 @@ class TestPerformance:
             for _ in range(100):
                 response = test_client_with_dispatcher.get("/search?q=test")
                 assert response.status_code == 200
+
+
+class TestRepoCtxResolution:
+    """SL-3.1: Tests for get_repo_ctx helper and per-request RepoContext resolution."""
+
+    def test_search_resolves_via_x_repo_id_header(self, test_client_with_dispatcher, monkeypatch, tmp_path):
+        """POST /search with X-Repo-Id header resolves context via RepoResolver."""
+        import mcp_server.gateway as gateway
+        from mcp_server.core import RepoContext
+
+        # Build a fake RepoContext to be returned by resolve()
+        fake_ctx = Mock(spec=RepoContext)
+        fake_resolver = Mock()
+        fake_resolver.resolve.return_value = fake_ctx
+
+        monkeypatch.setattr(gateway, "repo_resolver", fake_resolver)
+        test_client_with_dispatcher.app.state.dispatcher.search = Mock(return_value=[])
+
+        response = test_client_with_dispatcher.get(
+            "/search?q=test", headers={"X-Repo-Id": str(tmp_path)}
+        )
+
+        assert response.status_code == 200
+        fake_resolver.resolve.assert_called_once_with(tmp_path)
+        test_client_with_dispatcher.app.state.dispatcher.search.assert_called_with(
+            fake_ctx, "test", semantic=False, limit=20
+        )
+
+    def test_search_resolves_via_repository_query_param(
+        self, test_client_with_dispatcher, monkeypatch, tmp_path
+    ):
+        """POST /search with ?repository=<path> resolves context via RepoResolver."""
+        import mcp_server.gateway as gateway
+        from mcp_server.core import RepoContext
+
+        fake_ctx = Mock(spec=RepoContext)
+        fake_resolver = Mock()
+        fake_resolver.resolve.return_value = fake_ctx
+
+        monkeypatch.setattr(gateway, "repo_resolver", fake_resolver)
+        test_client_with_dispatcher.app.state.dispatcher.search = Mock(return_value=[])
+
+        response = test_client_with_dispatcher.get(
+            f"/search?q=test&repository={tmp_path}"
+        )
+
+        assert response.status_code == 200
+        fake_resolver.resolve.assert_called_once_with(tmp_path)
+        test_client_with_dispatcher.app.state.dispatcher.search.assert_called_with(
+            fake_ctx, "test", semantic=False, limit=20
+        )
+
+    def test_search_falls_back_to_cwd_resolution(
+        self, test_client_with_dispatcher, monkeypatch
+    ):
+        """POST /search without header/param falls back to resolver.resolve(cwd)."""
+        import mcp_server.gateway as gateway
+        from mcp_server.core import RepoContext
+
+        fake_ctx = Mock(spec=RepoContext)
+        fake_resolver = Mock()
+        fake_resolver.resolve.return_value = fake_ctx
+
+        monkeypatch.setattr(gateway, "repo_resolver", fake_resolver)
+        test_client_with_dispatcher.app.state.dispatcher.search = Mock(return_value=[])
+
+        response = test_client_with_dispatcher.get("/search?q=test")
+
+        assert response.status_code == 200
+        # resolver.resolve should have been called (with cwd)
+        fake_resolver.resolve.assert_called_once()
+        test_client_with_dispatcher.app.state.dispatcher.search.assert_called_with(
+            fake_ctx, "test", semantic=False, limit=20
+        )
+
+    def test_no_private_attr_access_in_gateway(self):
+        """Verify gateway.py contains no dispatcher._plugins / _graph_ / _sqlite_store references."""
+        import re
+        import subprocess
+
+        result = subprocess.run(
+            ["grep", "-n", r"dispatcher\._", "mcp_server/gateway.py"],
+            capture_output=True,
+            text=True,
+            cwd="/home/viperjuice/code/Code-Index-MCP/.claude/worktrees/lane-sl-3",
+        )
+        private_pattern = re.compile(
+            r"dispatcher\.(_(plugins|graph_|sqlite_store|multi_repo_manager))"
+        )
+        matches = [line for line in result.stdout.splitlines() if private_pattern.search(line)]
+        assert matches == [], f"Found forbidden private-attr access: {matches}"
+
+    def test_dispatcher_ctor_no_sqlite_store_kwarg(self):
+        """Verify EnhancedDispatcher ctor calls in gateway.py pass no sqlite_store kwarg."""
+        import subprocess
+
+        result = subprocess.run(
+            ["grep", "-n", "EnhancedDispatcher(", "mcp_server/gateway.py"],
+            capture_output=True,
+            text=True,
+            cwd="/home/viperjuice/code/Code-Index-MCP/.claude/worktrees/lane-sl-3",
+        )
+        for line in result.stdout.splitlines():
+            assert "sqlite_store=" not in line, (
+                f"Found sqlite_store kwarg in EnhancedDispatcher ctor: {line}"
+            )
