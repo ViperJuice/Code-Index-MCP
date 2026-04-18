@@ -275,6 +275,8 @@ class MultiRepositoryWatcher:
 
         logger.info("Stopped all repository watchers")
 
+    stop = stop_watching_all
+
     def add_repository(self, repo_path: str) -> str:
         """Add a new repository to watch.
 
