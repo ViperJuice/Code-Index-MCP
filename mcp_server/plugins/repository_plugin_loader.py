@@ -71,10 +71,11 @@ class RepositoryPluginLoader:
 
         # Repository profiles cache
         self._profiles: Dict[str, RepositoryProfile] = {}
-        # IF-0-P3-5 — SL-2 wraps _profiles reads/writes under this per-key lock map
-        # (currently unused by SL-0; declared up-front so SL-2 and any concurrent
-        # consumer agree on the attribute name).
+        # Class-level lock: guards _profiles fast-path reads and _profile_build_locks dict.
         self._profiles_lock = threading.Lock()
+        # Per-repo_id construction locks: serializes concurrent builds for the SAME key
+        # while allowing different keys to build in parallel (StoreRegistry pattern).
+        self._profile_build_locks: Dict[str, threading.Lock] = {}
         self._loaded_plugins: Dict[str, Any] = {}
 
         # Language to plugin mapping
@@ -87,6 +88,13 @@ class RepositoryPluginLoader:
             f"Repository plugin loader initialized: "
             f"strategy={self.plugin_strategy}, analysis_mode={self.analysis_mode}"
         )
+
+    def _get_profile_build_lock(self, repo_id: str) -> threading.Lock:
+        """Return (creating if needed) a per-repo_id construction lock."""
+        with self._profiles_lock:
+            if repo_id not in self._profile_build_locks:
+                self._profile_build_locks[repo_id] = threading.Lock()
+            return self._profile_build_locks[repo_id]
 
     def _build_language_map(self) -> Dict[str, str]:
         """Build mapping of file extensions to language names."""
@@ -176,44 +184,59 @@ class RepositoryPluginLoader:
         # Get repository ID (hash or name)
         repo_id = self._get_repository_id(repository_path)
 
-        # Check cache
-        if not force_refresh and repo_id in self._profiles:
-            logger.debug(f"Using cached profile for {repo_id}")
-            return self._profiles[repo_id]
+        # Fast path — brief lock, return if already cached.
+        if not force_refresh:
+            with self._profiles_lock:
+                cached = self._profiles.get(repo_id)
+                if cached is not None:
+                    logger.debug(f"Using cached profile for {repo_id}")
+                    return cached
 
-        logger.info(f"Analyzing repository: {repository_path}")
+        # Slow path — acquire per-key lock so concurrent callers for the SAME
+        # repo_id serialize here while different repo_ids build in parallel.
+        build_lock = self._get_profile_build_lock(repo_id)
+        with build_lock:
+            # Double-check: another thread may have built while we waited.
+            if not force_refresh:
+                with self._profiles_lock:
+                    cached = self._profiles.get(repo_id)
+                    if cached is not None:
+                        return cached
 
-        # Find index
-        discovery = IndexDiscovery(repository_path)
-        index_path = discovery.get_local_index_path()
+            logger.info(f"Analyzing repository: {repository_path}")
 
-        if not index_path:
-            logger.warning(f"No index found for {repository_path}")
-            return self._create_empty_profile(repo_id)
+            # Find index
+            discovery = IndexDiscovery(repository_path)
+            index_path = discovery.get_local_index_path()
 
-        # Analyze index
-        language_counts = self._analyze_index(index_path)
+            if not index_path:
+                logger.warning(f"No index found for {repository_path}")
+                return self._create_empty_profile(repo_id)
 
-        # Create profile
-        profile = RepositoryProfile(
-            repository_id=repo_id,
-            languages=language_counts,
-            total_files=sum(language_counts.values()),
-            indexed_at=datetime.now(),
-            primary_languages=self._get_primary_languages(language_counts),
-        )
+            # Analyze index (I/O happens outside global lock)
+            language_counts = self._analyze_index(index_path)
 
-        # Cache profile
-        self._profiles[repo_id] = profile
+            # Create profile
+            profile = RepositoryProfile(
+                repository_id=repo_id,
+                languages=language_counts,
+                total_files=sum(language_counts.values()),
+                indexed_at=datetime.now(),
+                primary_languages=self._get_primary_languages(language_counts),
+            )
 
-        logger.info(
-            f"Repository analysis complete: "
-            f"{len(profile.languages)} languages, "
-            f"{profile.total_files} files, "
-            f"primary: {profile.primary_languages[:3]}"
-        )
+            # Cache profile under global lock
+            with self._profiles_lock:
+                self._profiles[repo_id] = profile
 
-        return profile
+            logger.info(
+                f"Repository analysis complete: "
+                f"{len(profile.languages)} languages, "
+                f"{profile.total_files} files, "
+                f"primary: {profile.primary_languages[:3]}"
+            )
+
+            return profile
 
     def _analyze_index(self, index_path: Path) -> Dict[str, int]:
         """Analyze SQLite index to count files by language."""
@@ -364,7 +387,8 @@ class RepositoryPluginLoader:
 
     def get_repository_profile(self, repository_id: str) -> Optional[RepositoryProfile]:
         """Get cached repository profile."""
-        return self._profiles.get(repository_id)
+        with self._profiles_lock:
+            return self._profiles.get(repository_id)
 
     def get_loading_statistics(self) -> Dict[str, Any]:
         """Get statistics about plugin loading."""
@@ -375,13 +399,16 @@ class RepositoryPluginLoader:
         loaded_plugin_count = memory_status["loaded_plugins"]
         reduction_percent = ((all_plugin_count - loaded_plugin_count) / all_plugin_count) * 100
 
+        with self._profiles_lock:
+            profiles_snapshot = dict(self._profiles)
+
         return {
             "strategy": self.plugin_strategy,
             "analysis_mode": self.analysis_mode,
             "total_available_plugins": all_plugin_count,
             "loaded_plugins": loaded_plugin_count,
             "memory_reduction_percent": reduction_percent,
-            "repository_profiles": len(self._profiles),
+            "repository_profiles": len(profiles_snapshot),
             "memory_status": memory_status,
             "profiles": {
                 repo_id: {
@@ -389,7 +416,7 @@ class RepositoryPluginLoader:
                     "total_files": profile.total_files,
                     "primary_languages": profile.primary_languages[:3],
                 }
-                for repo_id, profile in self._profiles.items()
+                for repo_id, profile in profiles_snapshot.items()
             },
         }
 
@@ -415,7 +442,8 @@ class RepositoryPluginLoader:
 
     def clear_profile_cache(self):
         """Clear cached repository profiles."""
-        self._profiles.clear()
+        with self._profiles_lock:
+            self._profiles.clear()
         logger.info("Repository profile cache cleared")
 
     async def suggest_plugins(self, file_path: Path) -> List[str]:
@@ -448,13 +476,16 @@ class RepositoryPluginLoader:
         Returns:
             List of language plugin names that should be loaded
         """
-        if not self._profiles:
+        with self._profiles_lock:
+            profiles_snapshot = dict(self._profiles)
+
+        if not profiles_snapshot:
             logger.warning("No repository profiles available, returning common languages")
             return ["python", "javascript", "typescript"]
 
         # Get all languages from all profiles
         all_languages = set()
-        for profile in self._profiles.values():
+        for profile in profiles_snapshot.values():
             all_languages.update(profile.primary_languages)
 
         # Convert to sorted list
