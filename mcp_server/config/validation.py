@@ -3,10 +3,11 @@ Configuration validation for production deployments.
 """
 
 import os
+import sys
 import secrets
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Literal, Optional
+from typing import TYPE_CHECKING, Dict, List, Literal
 from urllib.parse import urlparse
 
 from .environment import Environment, get_environment, is_production
@@ -14,6 +15,13 @@ from .settings import Settings
 
 if TYPE_CHECKING:
     from mcp_server.security.models import SecurityConfig
+
+# Consolidated weak-credential blocklist (single source of truth for gateway + validation).
+WEAK_CREDENTIAL_BLOCKLIST: frozenset = frozenset({
+    "secret", "password", "changeme", "jwt-secret", "test", "dev",
+    "123", "admin", "admin123", "admin123!", "password123", "letmein",
+    "12345678", "your-secret-key",
+})
 
 
 @dataclass(frozen=True)
@@ -265,9 +273,65 @@ def validate_production_config(
     *,
     environment: str = "production",
 ) -> List[ValidationError]:
-    """Frozen P16 stub — replaces validate_production_config body; zero external callers;
-    helpers preserved for P18 SL-1."""
-    return []
+    """Validate security config; return ValidationError list (fatal or warn)."""
+    errors: List[ValidationError] = []
+    is_prod = environment == "production"
+
+    # JWT secret checks
+    jwt = config.jwt_secret_key
+    jwt_stripped = jwt.strip().lower()
+    jwt_in_blocklist = jwt_stripped in WEAK_CREDENTIAL_BLOCKLIST or any(
+        jwt_stripped.startswith(word) for word in WEAK_CREDENTIAL_BLOCKLIST
+    )
+    if jwt_in_blocklist:
+        errors.append(ValidationError(
+            code="WEAK_JWT_SECRET",
+            message="JWT secret key matches a well-known weak value",
+            severity="fatal" if is_prod else "warn",
+        ))
+
+    # CORS wildcard
+    cors = getattr(config, "cors_origins", []) or []
+    if "*" in cors:
+        errors.append(ValidationError(
+            code="CORS_WILDCARD",
+            message="CORS wildcard (*) is not allowed in production",
+            severity="fatal" if is_prod else "warn",
+        ))
+
+    # Rate limit
+    rate_limit = getattr(config, "rate_limit_requests", 100)
+    if rate_limit > 1000 and is_prod:
+        errors.append(ValidationError(
+            code="RATE_LIMIT_TOO_HIGH",
+            message=f"rate_limit_requests={rate_limit} exceeds 1000/min — too permissive for production",
+            severity="fatal",
+        ))
+
+    # Admin password (read from env; not on SecurityConfig model)
+    if is_prod:
+        admin_pw = os.environ.get("DEFAULT_ADMIN_PASSWORD", "")
+        if not admin_pw:
+            errors.append(ValidationError(
+                code="MISSING_ADMIN_PASSWORD",
+                message="DEFAULT_ADMIN_PASSWORD env var is not set",
+                severity="fatal",
+            ))
+        elif admin_pw.strip().lower() in WEAK_CREDENTIAL_BLOCKLIST:
+            errors.append(ValidationError(
+                code="WEAK_ADMIN_PASSWORD",
+                message="DEFAULT_ADMIN_PASSWORD matches a well-known weak value",
+                severity="fatal",
+            ))
+
+    return errors
+
+
+def render_validation_errors_to_stderr(errors: List[ValidationError]) -> None:
+    """Write one line per error to stderr, prefixed with [FATAL] or [WARN]."""
+    for error in errors:
+        prefix = "[FATAL]" if error.severity == "fatal" else "[WARN]"
+        sys.stderr.write(f"{prefix} {error.code}: {error.message}\n")
 
 
 def generate_secure_defaults() -> Dict[str, str]:
