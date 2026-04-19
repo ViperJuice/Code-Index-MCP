@@ -111,10 +111,10 @@ def test_require_auth_importable():
     assert callable(require_auth)
 
 
-def test_require_auth_raises_not_implemented():
+def test_require_auth_returns_callable():
     from mcp_server.security.security_middleware import require_auth
-    with pytest.raises(NotImplementedError, match="filled by SL-2"):
-        require_auth("metrics")
+    result = require_auth("metrics")
+    assert callable(result)
 
 
 def test_scope_to_permission_keys():

@@ -37,6 +37,7 @@ from .security_middleware import (
     SecurityMiddlewareStack,
     get_current_active_user,
     get_current_user,
+    require_auth,
     require_permission,
     require_role,
 )
@@ -77,6 +78,7 @@ __all__ = [
     "SecurityMiddlewareStack",
     "get_current_user",
     "get_current_active_user",
+    "require_auth",
     "require_permission",
     "require_role",
 ]

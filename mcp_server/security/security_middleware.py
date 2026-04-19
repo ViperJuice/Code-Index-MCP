@@ -122,7 +122,6 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             "/redoc",
             "/openapi.json",
             "/health",
-            "/metrics",
             "/api/v1/auth/login",
             "/api/v1/auth/register",
             "/api/v1/auth/refresh",
@@ -450,7 +449,9 @@ _SCOPE_TO_PERMISSION: Dict[str, Permission] = {
 
 
 def require_auth(scope: Literal["metrics", "admin", "tools"]) -> Callable[..., User]:
-    raise NotImplementedError("filled by SL-2")
+    """FastAPI dep that delegates to require_permission after scope→permission mapping."""
+    permission = _SCOPE_TO_PERMISSION[scope]
+    return require_permission(permission)
 
 
 class SecurityMiddlewareStack:
