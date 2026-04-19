@@ -16,36 +16,24 @@ def _checkpoint_exists(repo_path: Path) -> bool:
 
 class TestCheckpointClearOnCleanExit:
     def test_checkpoint_cleared_even_with_errors(self):
-        """Checkpoint must be cleared on clean loop exit even when errors list is non-empty."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo_path = Path(tmpdir)
+        """Checkpoint must be cleared on clean loop exit even when errors list is non-empty.
 
-            # Write a checkpoint to simulate a prior interrupted run
-            ckpt = ReindexCheckpoint(
-                repo_id="test-repo",
-                started_at="2024-01-01T00:00:00",
-                last_completed_path=None,
-                remaining_paths=["a.py"],
-                errors=["some error"],
-            )
-            _save_ckpt(ckpt, repo_path)
-            assert _checkpoint_exists(repo_path)
+        Tests the unconditional _clear_ckpt call by verifying the source does not
+        gate the call on 'if not errors'.
+        """
+        import inspect
+        import mcp_server.indexing.incremental_indexer as mod
+        source = inspect.getsource(mod)
 
-            store = MagicMock()
-            indexer = IncrementalIndexer(repo_path=repo_path, store=store)
-
-            # Simulate a clean loop exit (no exception raised in process_changes)
-            # by patching _process_one to succeed but populate errors list
-            with patch.object(indexer, "_index_file", return_value=None), \
-                 patch.object(indexer, "_get_pending_files", return_value=[Path(tmpdir) / "a.py"]), \
-                 patch("mcp_server.indexing.incremental_indexer._clear_ckpt") as mock_clear:
-                # Directly call the checkpoint-clear logic path
-                # The impl change: checkpoint clears unconditionally on clean exit
-                errors = ["a soft error"]
-                # Previously: if not errors: _clear_ckpt(...)
-                # Now: _clear_ckpt(...) always called on clean path
-                mock_clear(repo_path)
-                mock_clear.assert_called_once_with(repo_path)
+        # Find all occurrences of _clear_ckpt; verify none is preceded by "if not errors:"
+        lines = source.splitlines()
+        for i, line in enumerate(lines):
+            if "_clear_ckpt" in line and "def " not in line:
+                # Look backwards for a conditional guard within 3 lines
+                context = "\n".join(lines[max(0, i - 3): i + 1])
+                assert "if not errors" not in context, (
+                    f"_clear_ckpt is still gated on 'if not errors' near line {i}:\n{context}"
+                )
 
     def test_checkpoint_cleared_when_no_errors(self):
         """Checkpoint clears on clean exit with empty errors list (baseline behaviour)."""

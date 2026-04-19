@@ -1,5 +1,6 @@
 """Periodic full-tree sweeper that recovers inotify/FSEvents drop events (IF-0-P14-5)."""
 
+import logging
 import os
 import threading
 import time
@@ -7,7 +8,10 @@ from pathlib import Path
 from typing import Callable, Dict, List
 
 from ..core.ignore_patterns import build_walker_filter
+from ..metrics.prometheus_exporter import mcp_watcher_sweep_errors_total
 from ..storage.sqlite_store import SQLiteStore
+
+logger = logging.getLogger(__name__)
 
 # Supported code-file extensions (mirrors _Handler.code_extensions)
 _CODE_EXTENSIONS = {
@@ -74,8 +78,9 @@ class WatcherSweeper:
                 break
             try:
                 self.sweep_once()
-            except Exception:
-                pass  # never crash the daemon thread
+            except Exception as e:
+                logger.warning("watcher sweep error: %s", e)
+                mcp_watcher_sweep_errors_total.inc()
 
     def sweep_once(self) -> List[str]:
         """Diff filesystem vs SQLite; call on_missed_path for each absent file.

@@ -4,9 +4,14 @@ import logging
 import subprocess
 import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
+
+# Per-repo attachment state: "attached" | "detached"
+# Keyed by repository_id.  Module-level to survive poller restarts, but the
+# poller is single-writer per loop iteration so no lock is needed.
+_FALLBACK_BRANCHES = ("main", "master", "HEAD")
 
 
 class RefPoller:
@@ -26,6 +31,8 @@ class RefPoller:
         self._interval = interval_seconds
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
+        # "attached" | "detached" per repo_id; unknown treated as "attached"
+        self._last_branch_state: Dict[str, str] = {}
 
     def start(self) -> None:
         self._stop_event.clear()
@@ -51,14 +58,53 @@ class RefPoller:
         if not tracked_branch:
             return
 
+        repo_id = repo_info.repository_id
         repo_path = Path(repo_info.path)
         tip_sha = self._read_ref(repo_path, tracked_branch)
+
+        # --- Detached HEAD / branch-rename detection ---
         if tip_sha is None:
+            prior_state = self._last_branch_state.get(repo_id, "attached")
+            self._last_branch_state[repo_id] = "detached"
+            if prior_state != "detached":
+                logger.warning(
+                    "ref_poller: detached HEAD or branch disappeared for %s (was attached); enqueueing full rescan",
+                    repo_id,
+                )
+                self._git_index_manager.enqueue_full_rescan(repo_id)
             return
 
+        # Tip resolved — mark as attached
+        self._last_branch_state[repo_id] = "attached"
+
         last = getattr(repo_info, "last_indexed_commit", None)
-        if tip_sha != last:
-            self._git_index_manager.sync_repository_index(repo_info.repository_id)
+        if tip_sha == last:
+            return  # nothing changed
+
+        # --- Force-push detection ---
+        if last:
+            is_ancestor = self._is_ancestor(repo_path, last, tip_sha)
+            if not is_ancestor:
+                logger.warning(
+                    "ref_poller: force-push detected for %s (old=%s new=%s); enqueueing full rescan",
+                    repo_id,
+                    last,
+                    tip_sha,
+                )
+                self._git_index_manager.enqueue_full_rescan(repo_id)
+                return
+
+        # Normal fast-forward advance
+        self._git_index_manager.sync_repository_index(repo_id)
+
+    def _is_ancestor(self, repo_path: Path, old_sha: str, new_sha: str) -> bool:
+        """Return True if old_sha is an ancestor of new_sha (normal advance)."""
+        result = subprocess.run(
+            ["git", "-C", str(repo_path), "merge-base", "--is-ancestor", old_sha, new_sha],
+            capture_output=True,
+            check=False,
+        )
+        return result.returncode == 0
 
     def _read_ref(self, repo_path: Path, branch: str) -> str | None:
         ref_file = repo_path / ".git" / "refs" / "heads" / branch

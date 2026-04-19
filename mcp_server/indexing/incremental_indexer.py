@@ -229,8 +229,8 @@ class IncrementalIndexer:
                             self.repo_path,
                         )
 
-            if not errors:
-                _clear_ckpt(self.repo_path)
+            # Always clear on clean loop exit; errors list is for reporting, not state resumption.
+            _clear_ckpt(self.repo_path)
 
     def _group_changes_by_type(self, changes: List[FileChange]) -> Dict[str, List[FileChange]]:
         """Group changes by their type.

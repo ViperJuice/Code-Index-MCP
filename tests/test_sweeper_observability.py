@@ -46,13 +46,10 @@ class TestSweeperExceptionObservability:
 
     def test_exception_increments_counter(self):
         """An exception from sweep_once should increment mcp_watcher_sweep_errors_total."""
-        from mcp_server.metrics import prometheus_exporter
-
         sweeper = _make_sweeper(sweep_once_side_effect=RuntimeError("test"))
 
-        with patch.object(
-            prometheus_exporter, "mcp_watcher_sweep_errors_total"
-        ) as mock_counter:
+        # Patch at the location the sweeper module bound the name
+        with patch("mcp_server.watcher.sweeper.mcp_watcher_sweep_errors_total") as mock_counter:
             # Simulate the loop catching the exception and calling counter.inc()
             try:
                 sweeper.sweep_once()
@@ -78,8 +75,8 @@ class TestSweeperExceptionObservability:
         sweeper.interval_minutes = 0
         stop_event_holder["event"] = sweeper._stop_event
 
-        from mcp_server.metrics import prometheus_exporter
-        with patch.object(prometheus_exporter, "mcp_watcher_sweep_errors_total") as mock_ctr, \
+        # Patch where the sweeper module bound the name (not the exporter module)
+        with patch("mcp_server.watcher.sweeper.mcp_watcher_sweep_errors_total") as mock_ctr, \
              patch("mcp_server.watcher.sweeper.logger"):
             sweeper.start()
             sweeper._thread.join(timeout=2.0)

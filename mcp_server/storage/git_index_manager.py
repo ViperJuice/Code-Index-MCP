@@ -430,6 +430,20 @@ class GitAwareIndexManager:
         index_path = Path(repo_info.index_location)
         return self.artifact_manager.create_commit_artifact(repo_id, commit, index_path)
 
+    def enqueue_full_rescan(self, repo_id: str) -> IndexSyncResult:
+        """Mark repo stale and trigger a full rescan (IF-0-P17-2).
+
+        Clears last_indexed_commit so sync_repository_index performs a full
+        re-index regardless of the current tip.  bypass_branch_guard=True
+        prevents the branch-drift short-circuit from blocking the rescan when
+        HEAD is detached or the branch has been renamed.
+
+        Choice: update_indexed_commit(repo_id, None) sets last_indexed_commit to
+        None via the registry mutator — None is the declared Optional[str] type.
+        """
+        self.registry.update_indexed_commit(repo_id, None)
+        return self.sync_repository_index(repo_id, force_full=True, bypass_branch_guard=True)
+
     def sync_all_repositories(self, parallel: bool = True) -> Dict[str, IndexSyncResult]:
         """Sync all repositories that need updates.
 
