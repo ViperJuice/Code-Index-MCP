@@ -416,3 +416,26 @@ All commands must return success. Any non-zero exit, zero counter sample on `mcp
 - `mcp_server/core/errors.py` — SL-5 extends (`IndexingError`, `ArtifactError`, `record_handled_error`).
 - `mcp_server/metrics/prometheus_exporter.py:~L255-293` — SL-5 appends `errors_by_type` Counter alongside P12 SL-4's histograms.
 - `tests/test_reindex_resume.py`, `tests/test_two_phase_commit.py`, `tests/test_dispatcher_toctou.py`, `tests/test_artifact_publish_race.py`, `tests/test_structured_errors.py` — all new, owned by their respective lanes.
+
+---
+
+## Post-Execution Amendments
+
+The following implementation details diverged from specification and are recorded for P14+ reference. No P14 scoping changes are required; these are semantic clarifications.
+
+### SL-5: Exception Hierarchy Deviations
+
+1. **Exception base class**: Spec called for `McpError`; codebase already had `MCPError` (uppercase). Implementation reused `MCPError` to avoid breaking existing imports. P14+ must use `MCPError` when catching or raising from this hierarchy.
+2. **Exception module**: Spec proposed new package `mcp_server/errors/`. Implementation discovered `mcp_server/core/errors.py` existed with `MCPError`, `PluginError`, and others. Reused this module instead of creating a parallel package. New exceptions (`IndexingError`, `ArtifactError`) added to `mcp_server/core/errors.py`.
+3. **IndexingError vs IndexError**: Built-in `IndexError` pre-existed (raised by Python's sequence operations). `IndexingError` is a new exception for semantic indexing and dispatcher faults. Both are used in the codebase; they are distinct exceptions, not a rename.
+4. **Prometheus counter labels**: `mcp_errors_by_type_total` uses labels `["module", "exception"]` where module is the source package name (e.g., `"dispatcher"`, `"publisher"`, `"indexer"`) and exception is the exception class name (e.g., `"IndexingError"`, `"ArtifactError"`). This differs from the pre-existing `errors` counter (which uses `["error_type", "component"]`) to allow separate instrumentation paths.
+
+### SL-4: ArtifactPublisher Injection
+
+The spec anticipated `ArtifactPublisher` as an instantiation inside the watcher's reindex-complete callback. Implementation uses constructor injection: the `ArtifactPublisher` instance is passed to the dispatcher via `set_artifact_publisher(publisher)`, decoupling the watcher from the publisher directly. The watcher calls `publisher.publish_on_reindex(repo_id, commit)` at the reindex completion boundary, which returns an `ArtifactRef` and is idempotent (repeated calls for the same repo_id + commit hash to the same release).
+
+### SL-4: Workflow Input Naming
+
+The workflow input passed by `workflow_dispatch` at runtime is `publish_on_reindex` (boolean flag or structured action). Early exploration called this differently; the final workflow expects the flag/input consistent with GitHub Actions' `inputs` schema in the `.github/workflows/` file. Confirm the exact input names when invoking `workflow_dispatch` from the watcher.
+
+---

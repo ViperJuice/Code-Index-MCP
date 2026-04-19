@@ -62,9 +62,10 @@ No operator actions required. P12 is fully codebase-internal.
 
 #### After P13 merge
 
-- [ ] **Write alerting rules on `mcp_errors_by_type_total`.** Page on sudden spikes; alert-on-any for `PluginError` if plugin errors should be rare in your deployment.
-- [ ] **Retire the cron-based upload workflow.** P13 SL-4 replaces the cron trigger with direct-publish-on-reindex. Either delete the cron workflow or convert it to a no-op stub documenting the deprecation.
-- [ ] **Configure a reindex-resume dashboard** if you monitor reindex progress. The new `.reindex-state` file lets operators observe mid-flight reindex state without waiting for completion; exposing it via a debug endpoint is optional but helpful.
+- [ ] **Write alerting rules on `mcp_errors_by_type_total`.** Page on sudden spikes; alert-on-any for `PluginError` if plugin errors should be rare in your deployment. Counter labels: `module` (e.g., `dispatcher`, `publisher`) and `exception` (e.g., `IndexingError`, `ArtifactError`).
+- [ ] **Retire the cron-based upload workflow.** P13 SL-4 replaces the cron trigger with direct-publish-on-reindex. The watcher now calls `ArtifactPublisher.publish_on_reindex()` directly on successful repository reindex. The workflow still exists for manual publishes via `gh workflow run index-artifact-management.yml -f action=publish_on_reindex -f repo=<repo_id> -f commit=<sha>`. Either delete the cron schedule or convert it to a no-op stub documenting the deprecation.
+- [ ] **Configure a reindex-resume dashboard** if you monitor reindex progress. The new `.reindex-state` file (ReindexCheckpoint dataclass) lets operators observe mid-flight reindex state without waiting for completion; exposing it via a debug endpoint is optional but helpful.
+- [ ] **Verify atomic artifact releases.** P13 SL-4 writes `index-<short-sha>` releases atomically and moves `index-latest` pointer via `gh release edit --target`. Spot-check that the latest pointer always references the most recent successful reindex.
 
 ### 3.3 Phase 14 — Multi-Repo Completeness + Schema Evolution
 

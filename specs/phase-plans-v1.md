@@ -700,6 +700,16 @@ Replace happy-path code with durable flows: checkpointed reindex resume, atomic 
 - IF-0-P13-4
 - IF-0-P13-5
 
+**Post-execution amendments**
+
+The following interface deviations were empirically determined during P13 execution and do not require P14 scoping adjustments:
+
+1. **IF-0-P13-5 exception base class name**: Spec called for `McpError` but implementation uses `MCPError` (uppercase MCP). Downstream code importing the exception follows `MCPError`. P14+ must use the uppercase form.
+2. **IF-0-P13-5 exception module location**: Spec proposed new `mcp_server/errors/` package. Implementation reused existing `mcp_server/core/errors.py` instead. The exception hierarchy (`MCPError`, `IndexingError`, `ArtifactError`, `PluginError`) resides in `mcp_server/core/errors.py` alongside the `record_handled_error(module, exception)` helper. No new package created.
+3. **IF-0-P13-5 IndexingError + IndexError coexistence**: The builtin `IndexError` pre-existed in the codebase. `IndexingError` was added as a separate exception for indexing-specific faults, not a rename of `IndexError`. Both are used in dispatching and storage layers; `IndexError` typically surfaces from Python builtins (sequence indexing), while `IndexingError` is raised for data-model faults.
+4. **IF-0-P13-5 Prometheus counter labels**: Counter `mcp_errors_by_type_total` uses label names `["module", "exception"]` (not `["service", "error_type"]`). Module refers to the source package (e.g., `dispatcher`, `publisher`, `indexer`); exception is the exception class name (e.g., `IndexingError`, `ArtifactError`).
+5. **IF-0-P13-4 ArtifactPublisher watcher injection**: Spec indicated `ArtifactPublisher` would be instantiated in the watcher path. Implementation uses constructor injection + optional setter: the watcher passes the publisher instance to the dispatcher via `set_artifact_publisher(publisher)`, avoiding tight coupling. The publisher's `publish_on_reindex(repo_id, commit)` method is called directly by the watcher on successful reindex completion.
+
 ---
 
 ### Phase 14 — Multi-Repo Completeness + Schema Evolution (P14)
