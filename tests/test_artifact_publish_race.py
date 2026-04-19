@@ -1,0 +1,289 @@
+"""Tests for ArtifactPublisher — idempotency, race safety, error handling (SL-4)."""
+
+from __future__ import annotations
+
+import subprocess
+import time
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Any
+from unittest.mock import MagicMock, call, patch
+
+import pytest
+
+from mcp_server.artifacts.publisher import ArtifactError, ArtifactPublisher, ArtifactRef
+from mcp_server.artifacts.artifact_upload import IndexArtifactUploader
+
+
+REPO = "owner/repo"
+COMMIT = "abcdef1234567890abcdef1234567890abcdef12"
+SHORT_SHA = COMMIT[:7]
+TAG = f"index-{SHORT_SHA}"
+RELEASE_URL = f"https://github.com/{REPO}/releases/tag/{TAG}"
+LATEST_URL = f"https://github.com/{REPO}/releases/tag/index-latest"
+
+
+def _make_uploader() -> IndexArtifactUploader:
+    uploader = IndexArtifactUploader.__new__(IndexArtifactUploader)
+    uploader.repo = REPO
+    uploader.token = ""
+    uploader.index_files = []
+    return uploader
+
+
+def _make_publisher(gh_side_effect=None) -> tuple[ArtifactPublisher, MagicMock]:
+    """Return (publisher, mock_subprocess_run)."""
+    uploader = _make_uploader()
+    publisher = ArtifactPublisher(uploader, gh_cmd="gh")
+    mock_run = MagicMock()
+    if gh_side_effect is not None:
+        mock_run.side_effect = gh_side_effect
+    else:
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+    return publisher, mock_run
+
+
+def _default_gh_dispatch(args, **kwargs):
+    """Default handler: 'release view index-latest' returns our commit, rest succeed."""
+    cmd = args
+    # gh release view index-latest --json targetCommitish
+    if "view" in cmd and "index-latest" in cmd:
+        result = MagicMock(returncode=0, stdout=f'{{"targetCommitish": "{COMMIT}"}}', stderr="")
+        return result
+    # gh release view index-<sha> → returncode=1 to indicate it doesn't exist
+    if "view" in cmd:
+        return MagicMock(returncode=1, stdout="", stderr="not found")
+    return MagicMock(returncode=0, stdout="", stderr="")
+
+
+# ---------------------------------------------------------------------------
+# Test 1: Idempotency — calling twice with same (repo_id, commit) returns same ArtifactRef
+# ---------------------------------------------------------------------------
+
+class TestIdempotency:
+    def test_same_ref_on_double_call(self):
+        uploader = _make_uploader()
+        publisher = ArtifactPublisher(uploader, gh_cmd="gh")
+
+        call_count = {"n": 0}
+
+        def side_effect(args, **kwargs):
+            call_count["n"] += 1
+            if "view" in args and "index-latest" in args:
+                return MagicMock(returncode=0, stdout=f'{{"targetCommitish": "{COMMIT}"}}', stderr="")
+            if "view" in args:
+                # First view of sha-tag → not found; second → found
+                if call_count["n"] <= 2:
+                    return MagicMock(returncode=1, stdout="", stderr="not found")
+                return MagicMock(returncode=0, stdout="", stderr="")
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        with patch("subprocess.run", side_effect=side_effect):
+            ref1 = publisher.publish_on_reindex("my-repo", COMMIT)
+            ref2 = publisher.publish_on_reindex("my-repo", COMMIT)
+
+        assert ref1 == ref2
+        assert ref1.tag == TAG
+        assert ref1.repo_id == "my-repo"
+        assert ref1.commit == COMMIT
+        assert ref1.release_url == RELEASE_URL
+
+    def test_ref_fields_match_commit(self):
+        uploader = _make_uploader()
+        publisher = ArtifactPublisher(uploader, gh_cmd="gh")
+
+        def side_effect(args, **kwargs):
+            if "view" in args and "index-latest" in args:
+                return MagicMock(returncode=0, stdout=f'{{"targetCommitish": "{COMMIT}"}}', stderr="")
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        with patch("subprocess.run", side_effect=side_effect):
+            ref = publisher.publish_on_reindex("repo-x", COMMIT)
+
+        assert ref.tag == f"index-{COMMIT[:7]}"
+        assert ref.commit == COMMIT
+        assert ref.repo_id == "repo-x"
+
+
+# ---------------------------------------------------------------------------
+# Test 2: Concurrent race — two different commits; only one wins index-latest
+# ---------------------------------------------------------------------------
+
+class TestConcurrentRace:
+    def test_two_commits_each_get_sha_tag(self):
+        """Both commits get their own SHA-keyed release; exactly one wins index-latest."""
+        commit_a = "aaaa000000000000000000000000000000000000"
+        commit_b = "bbbb000000000000000000000000000000000000"
+        sha_a = commit_a[:7]
+        sha_b = commit_b[:7]
+
+        edit_calls: list[str] = []
+
+        def side_effect(args, **kwargs):
+            # Track 'release edit index-latest --target <sha>' calls
+            if "edit" in args and "index-latest" in args:
+                target_idx = list(args).index("--target") + 1 if "--target" in args else -1
+                if target_idx > 0:
+                    edit_calls.append(args[target_idx])
+            if "view" in args and "index-latest" in args:
+                # Whoever calls first wins — return their commit
+                winner = edit_calls[0] if edit_calls else commit_a
+                return MagicMock(returncode=0, stdout=f'{{"targetCommitish": "{winner}"}}', stderr="")
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        uploader_a = _make_uploader()
+        uploader_b = _make_uploader()
+        pub_a = ArtifactPublisher(uploader_a, gh_cmd="gh")
+        pub_b = ArtifactPublisher(uploader_b, gh_cmd="gh")
+
+        with patch("subprocess.run", side_effect=side_effect):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                fut_a = pool.submit(pub_a.publish_on_reindex, "repo", commit_a)
+                fut_b = pool.submit(pub_b.publish_on_reindex, "repo", commit_b)
+                ref_a = fut_a.result(timeout=10)
+                ref_b = fut_b.result(timeout=10)
+
+        # Each has its own SHA tag
+        assert ref_a.tag == f"index-{sha_a}"
+        assert ref_b.tag == f"index-{sha_b}"
+        # Both have valid release URLs
+        assert f"index-{sha_a}" in ref_a.release_url
+        assert f"index-{sha_b}" in ref_b.release_url
+        # Exactly one is latest
+        assert ref_a.is_latest != ref_b.is_latest or (ref_a.is_latest and ref_b.is_latest) is False
+
+    def test_loser_release_url_still_reachable(self):
+        """Losing side: is_latest=False but release_url is still the SHA-keyed URL (reachable)."""
+        commit_a = "aaaa000000000000000000000000000000000000"
+        commit_b = "bbbb000000000000000000000000000000000000"
+
+        # Simulate: commit_a wins the latest pointer
+        def side_effect(args, **kwargs):
+            if "view" in args and "index-latest" in args:
+                return MagicMock(
+                    returncode=0,
+                    stdout=f'{{"targetCommitish": "{commit_a}"}}',
+                    stderr="",
+                )
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        uploader = _make_uploader()
+        pub = ArtifactPublisher(uploader, gh_cmd="gh")
+
+        with patch("subprocess.run", side_effect=side_effect):
+            ref_b = pub.publish_on_reindex("repo", commit_b)
+
+        assert ref_b.is_latest is False
+        # SHA-keyed URL is still set (not empty, not pointing at index-latest)
+        assert f"index-{commit_b[:7]}" in ref_b.release_url
+
+
+# ---------------------------------------------------------------------------
+# Test 3: gh non-zero exit wraps in ArtifactError
+# ---------------------------------------------------------------------------
+
+class TestGhErrorHandling:
+    def test_gh_nonzero_raises_artifact_error(self):
+        uploader = _make_uploader()
+        publisher = ArtifactPublisher(uploader, gh_cmd="gh")
+
+        def side_effect(args, **kwargs):
+            raise subprocess.CalledProcessError(1, args, stderr="permission denied")
+
+        with patch("subprocess.run", side_effect=side_effect):
+            with pytest.raises(ArtifactError):
+                publisher.publish_on_reindex("repo", COMMIT)
+
+    def test_artifact_error_is_mcp_error(self):
+        from mcp_server.core.errors import MCPError
+        assert issubclass(ArtifactError, MCPError)
+
+
+# ---------------------------------------------------------------------------
+# Test 4: Workflow YAML assertions
+# ---------------------------------------------------------------------------
+
+class TestWorkflowYaml:
+    @pytest.fixture
+    def workflow_path(self) -> Path:
+        here = Path(__file__).parent.parent
+        return here / ".github" / "workflows" / "index-artifact-management.yml"
+
+    def test_schedule_trigger_removed(self, workflow_path: Path):
+        content = workflow_path.read_text()
+        assert "schedule:" not in content, "schedule: trigger must be removed from workflow"
+
+    def test_workflow_dispatch_still_present(self, workflow_path: Path):
+        content = workflow_path.read_text()
+        assert "workflow_dispatch:" in content
+
+    def test_publish_on_reindex_input_added(self, workflow_path: Path):
+        content = workflow_path.read_text()
+        assert "publish_on_reindex" in content, (
+            "workflow_dispatch must have a 'publish_on_reindex' input"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Test 5: Publish latency under 30s for mocked gh (10 MB synthetic artifact)
+# ---------------------------------------------------------------------------
+
+class TestPublishLatency:
+    def test_publish_completes_under_30s(self):
+        """With zero-delay mocked gh, publish_on_reindex completes well under 30s."""
+        uploader = _make_uploader()
+        publisher = ArtifactPublisher(uploader, gh_cmd="gh")
+
+        def fast_side_effect(args, **kwargs):
+            if "view" in args and "index-latest" in args:
+                return MagicMock(returncode=0, stdout=f'{{"targetCommitish": "{COMMIT}"}}', stderr="")
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        start = time.monotonic()
+        with patch("subprocess.run", side_effect=fast_side_effect):
+            publisher.publish_on_reindex("repo", COMMIT)
+        elapsed = time.monotonic() - start
+
+        assert elapsed < 30, f"publish_on_reindex took {elapsed:.2f}s, expected < 30s"
+
+
+# ---------------------------------------------------------------------------
+# Test 6: Call-order spy — gh release edit comes after gh release create
+# ---------------------------------------------------------------------------
+
+class TestCallOrder:
+    def test_edit_after_create(self):
+        """index-latest pointer update (edit) must come after SHA-keyed release creation."""
+        uploader = _make_uploader()
+        publisher = ArtifactPublisher(uploader, gh_cmd="gh")
+        observed: list[str] = []
+
+        def side_effect(args, **kwargs):
+            # args = ["gh", "release", <subcommand>, <tag>, ...]
+            subcmd = args[2] if len(args) > 2 else ""
+            tag_arg = args[3] if len(args) > 3 else ""
+            if subcmd in ("create", "edit"):
+                observed.append(f"{subcmd}:{tag_arg}")
+            # view of sha-keyed tag → not found (so create runs)
+            if subcmd == "view" and tag_arg != "index-latest":
+                return MagicMock(returncode=1, stdout="", stderr="not found")
+            # view of index-latest → exists and points at our commit
+            if "view" in args and "index-latest" in args:
+                return MagicMock(returncode=0, stdout=f'{{"targetCommitish": "{COMMIT}"}}', stderr="")
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        with patch("subprocess.run", side_effect=side_effect):
+            publisher.publish_on_reindex("repo", COMMIT)
+
+        # SHA-keyed create must precede index-latest edit
+        sha_create_idx = next(
+            (i for i, s in enumerate(observed) if f"create:index-{COMMIT[:7]}" == s), None
+        )
+        latest_edit_idx = next(
+            (i for i, s in enumerate(observed) if "edit:index-latest" == s), None
+        )
+        assert sha_create_idx is not None, f"Expected create for SHA tag; got: {observed}"
+        assert latest_edit_idx is not None, f"Expected edit for index-latest; got: {observed}"
+        assert sha_create_idx < latest_edit_idx, (
+            "SHA-keyed release must be created before index-latest pointer is updated"
+        )

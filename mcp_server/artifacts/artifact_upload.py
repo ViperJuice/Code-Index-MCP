@@ -354,3 +354,18 @@ def main(argv: Optional[list[str]] = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+# ---------------------------------------------------------------------------
+# ArtifactMetadata — lightweight named tuple for publisher helpers (SL-4)
+# ---------------------------------------------------------------------------
+
+from typing import NamedTuple  # noqa: E402 — appended after CLI guard
+
+
+class ArtifactMetadata(NamedTuple):
+    archive_path: Path
+    checksum: str
+    size: int
+    commit: str
+    metadata: Dict[str, Any]

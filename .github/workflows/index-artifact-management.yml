@@ -22,9 +22,12 @@ on:
         required: false
         default: '30'
         type: string
-  schedule:
-    - cron: '15 3 * * *'
-  
+      publish_on_reindex:
+        description: 'Trigger direct publish after a reindex (true/false)'
+        required: false
+        default: 'false'
+        type: string
+
   workflow_call:
     inputs:
       index_path:
@@ -249,7 +252,7 @@ jobs:
   cleanup-artifacts:
     name: Cleanup Old Artifacts
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && inputs.action == 'cleanup' || github.event_name == 'schedule'
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'cleanup'
     steps:
       - name: Setup Python
         uses: actions/setup-python@v5
