@@ -126,33 +126,39 @@ class TestPluginMatching:
 
 
 class TestSymbolLookup:
-    """Test symbol lookup functionality."""
+    """Test symbol lookup functionality (first-hit semantics via run_gated_fallback)."""
 
     def test_lookup_found(self, mock_plugin):
-        """Test successful symbol lookup."""
+        """Test successful symbol lookup — first-truthy-hit semantics (IF-0-P11-1)."""
+        from mcp_server.dispatcher.fallback import run_gated_fallback
+
         expected_symbol = SymbolDef(name="test_func", kind="function", path="/test.py", line=10)
         mock_plugin.getDefinition.return_value = expected_symbol
 
-        ctx = _make_repo_ctx()
-        dispatcher = Dispatcher([mock_plugin])
-        result = dispatcher.lookup(ctx, "test_func")
+        result = run_gated_fallback(
+            [mock_plugin], "test_func", source_ext=".py", timeout_ms=1000
+        )
 
         assert result == expected_symbol
         mock_plugin.getDefinition.assert_called_once_with("test_func")
 
     def test_lookup_not_found(self, mock_plugin):
-        """Test symbol lookup when not found."""
+        """Test symbol lookup when not found — run_gated_fallback returns None."""
+        from mcp_server.dispatcher.fallback import run_gated_fallback
+
         mock_plugin.getDefinition.return_value = None
 
-        ctx = _make_repo_ctx()
-        dispatcher = Dispatcher([mock_plugin])
-        result = dispatcher.lookup(ctx, "nonexistent")
+        result = run_gated_fallback(
+            [mock_plugin], "nonexistent", source_ext=".py", timeout_ms=1000
+        )
 
         assert result is None
         mock_plugin.getDefinition.assert_called_once_with("nonexistent")
 
     def test_lookup_multiple_plugins(self):
-        """Test lookup across multiple plugins."""
+        """Test lookup across multiple plugins — stops at first truthy hit (IF-0-P11-1)."""
+        from mcp_server.dispatcher.fallback import run_gated_fallback
+
         plugin1 = Mock(spec=IPlugin, lang="python")
         plugin1.getDefinition.return_value = None
 
@@ -163,13 +169,15 @@ class TestSymbolLookup:
         plugin3 = Mock(spec=IPlugin, lang="java")
         plugin3.getDefinition.return_value = None
 
-        ctx = _make_repo_ctx()
-        dispatcher = Dispatcher([plugin1, plugin2, plugin3])
-        result = dispatcher.lookup(ctx, "found")
+        result = run_gated_fallback(
+            [plugin1, plugin2, plugin3], "found", source_ext=".py", timeout_ms=1000
+        )
 
         assert result == expected_symbol
         plugin1.getDefinition.assert_called_once_with("found")
         plugin2.getDefinition.assert_called_once_with("found")
+        # plugin3 is NOT called since plugin2 returned a truthy hit
+        plugin3.getDefinition.assert_not_called()
 
     def test_lookup_plugin_error(self, mock_plugin):
         """Test lookup when plugin raises error."""
@@ -183,8 +191,23 @@ class TestSymbolLookup:
         assert result is None
 
 
+def _make_psr_with_plugins(repo_id: str, plugins: list):
+    """Build a PluginSetRegistry pre-seeded with *plugins* for *repo_id*.
+
+    This bypasses MemoryAwarePluginManager so mock plugins are visible to
+    the dispatcher's plugin-fallback search path (first-hit semantics, SL-4).
+    """
+    from mcp_server.plugins.plugin_set_registry import PluginSetRegistry
+
+    psr = PluginSetRegistry()
+    psr._cache[repo_id] = list(plugins)
+    return psr
+
+
 class TestSearch:
     """Test search functionality."""
+
+    _REPO_ID = "test-repo"
 
     def _make_no_sqlite_ctx(self):
         """Build a RepoContext with no sqlite_store so dispatcher falls back to plugins."""
@@ -197,7 +220,7 @@ class TestSearch:
         registry_entry = MagicMock(spec=RepositoryInfo)
         registry_entry.tracked_branch = "main"
         return RepoContext(
-            repo_id="test-repo",
+            repo_id=self._REPO_ID,
             sqlite_store=None,
             workspace_root=Path("/tmp/test"),
             tracked_branch="main",
@@ -213,7 +236,8 @@ class TestSearch:
         mock_plugin.search.return_value = expected_results
 
         ctx = self._make_no_sqlite_ctx()
-        dispatcher = Dispatcher([mock_plugin])
+        psr = _make_psr_with_plugins(self._REPO_ID, [mock_plugin])
+        dispatcher = Dispatcher([mock_plugin], plugin_set_registry=psr)
         results = list(dispatcher.search(ctx, "func"))
 
         assert results == expected_results
@@ -224,13 +248,14 @@ class TestSearch:
         mock_plugin.search.return_value = []
 
         ctx = self._make_no_sqlite_ctx()
-        dispatcher = Dispatcher([mock_plugin])
+        psr = _make_psr_with_plugins(self._REPO_ID, [mock_plugin])
+        dispatcher = Dispatcher([mock_plugin], plugin_set_registry=psr)
         list(dispatcher.search(ctx, "test", semantic=True, limit=10))
 
         mock_plugin.search.assert_called_once_with("test", {"semantic": True, "limit": 10})
 
     def test_search_multiple_plugins(self):
-        """Test search results from multiple plugins are combined (no sqlite fallback path)."""
+        """Test search results from multiple plugins are combined (first-hit plugin path)."""
         plugin1 = Mock(spec=IPlugin, lang="python")
         plugin1.search.return_value = [
             SearchResult(name="py_func", kind="function", path="/test.py", score=0.9)
@@ -251,14 +276,15 @@ class TestSearch:
         registry_entry = MagicMock(spec=RepositoryInfo)
         registry_entry.tracked_branch = "main"
         ctx = RepoContext(
-            repo_id="test-repo",
+            repo_id=self._REPO_ID,
             sqlite_store=None,
             workspace_root=Path("/tmp/test"),
             tracked_branch="main",
             registry_entry=registry_entry,
         )
 
-        dispatcher = Dispatcher([plugin1, plugin2])
+        psr = _make_psr_with_plugins(self._REPO_ID, [plugin1, plugin2])
+        dispatcher = Dispatcher([plugin1, plugin2], plugin_set_registry=psr)
         results = list(dispatcher.search(ctx, "test"))
 
         assert len(results) == 3
@@ -271,7 +297,8 @@ class TestSearch:
         mock_plugin.search.return_value = []
 
         ctx = self._make_no_sqlite_ctx()
-        dispatcher = Dispatcher([mock_plugin])
+        psr = _make_psr_with_plugins(self._REPO_ID, [mock_plugin])
+        dispatcher = Dispatcher([mock_plugin], plugin_set_registry=psr)
         results = list(dispatcher.search(ctx, ""))
 
         assert results == []
@@ -282,7 +309,8 @@ class TestSearch:
         mock_plugin.search.side_effect = Exception("Search error")
 
         ctx = self._make_no_sqlite_ctx()
-        dispatcher = Dispatcher([mock_plugin])
+        psr = _make_psr_with_plugins(self._REPO_ID, [mock_plugin])
+        dispatcher = Dispatcher([mock_plugin], plugin_set_registry=psr)
 
         # Dispatcher catches plugin errors and returns empty results
         results = list(dispatcher.search(ctx, "test"))
@@ -609,7 +637,9 @@ class TestConcurrency:
         from mcp_server.storage.multi_repo_manager import RepositoryInfo
         from unittest.mock import MagicMock as _MM
 
-        dispatcher = Dispatcher([mock_plugin])
+        _REPO_ID = "test-repo"
+        psr = _make_psr_with_plugins(_REPO_ID, [mock_plugin])
+        dispatcher = Dispatcher([mock_plugin], plugin_set_registry=psr)
         mock_plugin.search.return_value = [
             SearchResult(name="result", kind="function", path="/test.py", score=1.0)
         ]
@@ -617,7 +647,7 @@ class TestConcurrency:
         reg = _MM(spec=RepositoryInfo)
         reg.tracked_branch = "main"
         ctx = RepoContext(
-            repo_id="test-repo",
+            repo_id=_REPO_ID,
             sqlite_store=None,
             workspace_root=Path("/tmp/test"),
             tracked_branch="main",
@@ -643,8 +673,10 @@ class TestPerformance:
 
     @pytest.mark.benchmark
     def test_lookup_performance(self, benchmark_results):
-        """Benchmark symbol lookup performance."""
-        # Create dispatcher with multiple plugins
+        """Benchmark first-hit fallback lookup performance (IF-0-P11-1)."""
+        from mcp_server.dispatcher.fallback import run_gated_fallback
+
+        # Create five mock plugins; only the last returns the target symbol
         plugins = []
         for i in range(5):
             plugin = Mock(spec=IPlugin, lang=f"lang{i}")
@@ -656,12 +688,11 @@ class TestPerformance:
             name="target", kind="function", path="/found.py", line=1
         )
 
-        dispatcher = Dispatcher(plugins)
-        ctx = _make_repo_ctx()
-
         with measure_time("dispatcher_lookup", benchmark_results):
             for _ in range(1000):
-                result = dispatcher.lookup(ctx, "target")
+                result = run_gated_fallback(
+                    plugins, "target", source_ext=".py", timeout_ms=1000
+                )
                 assert result is not None
 
     @pytest.mark.benchmark

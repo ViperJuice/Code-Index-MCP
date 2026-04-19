@@ -206,7 +206,7 @@ def test_enhanced_dispatcher():
     # Check initial status
     langs = dispatcher.supported_languages()
     print(f"Supported languages: {len(langs)}")
-    print(f"Initially loaded plugins: {len(dispatcher._plugins)}")
+    print(f"Initially loaded plugins: {len(dispatcher._legacy_plugins)}")
     print(f"Languages available: {', '.join(langs[:15])}...\n")
 
     # Test indexing each file (this should trigger lazy loading)
@@ -242,7 +242,7 @@ def test_enhanced_dispatcher():
             loaded = language in dispatcher._loaded_languages
             print("  ✓ File indexed")
             print(f"  ✓ Plugin for '{language}' loaded: {loaded}")
-            print(f"  ✓ Total plugins loaded: {len(dispatcher._plugins)}")
+            print(f"  ✓ Total plugins loaded: {len(dispatcher._legacy_plugins)}")
 
             # Test search on the file
             content = file_path.read_text()
@@ -332,7 +332,7 @@ def test_search_across_languages():
     )
     ctx = _make_ctx(store)
 
-    print(f"Loaded {len(dispatcher._plugins)} plugins")
+    print(f"Loaded {len(dispatcher._legacy_plugins)} plugins")
 
     # Index all files
     for filename in test_files:
