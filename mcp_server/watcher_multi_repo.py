@@ -24,6 +24,7 @@ from .indexing.lock_registry import lock_registry
 from .storage.git_index_manager import GitAwareIndexManager, should_reindex_for_branch
 from .storage.repository_registry import RepositoryRegistry
 from .watcher import _Handler
+from .watcher.sweeper import WatcherSweeper
 
 logger = logging.getLogger(__name__)
 
@@ -237,12 +238,14 @@ class MultiRepositoryWatcher:
         index_manager: GitAwareIndexManager,
         artifact_manager: Optional[CommitArtifactManager] = None,
         repo_resolver: Optional[RepoResolver] = None,
+        sweeper: Optional[WatcherSweeper] = None,
     ):
         self.registry = registry
         self.dispatcher = dispatcher
         self.index_manager = index_manager
         self.artifact_manager = artifact_manager or CommitArtifactManager()
         self.repo_resolver = repo_resolver
+        self.sweeper: Optional[WatcherSweeper] = sweeper
 
         self.watchers = {}  # repo_id -> MultiRepositoryHandler
         self.observers = {}  # repo_id -> Observer instance
@@ -283,6 +286,10 @@ class MultiRepositoryWatcher:
         # Start git monitor
         self.git_monitor.start()
 
+        # Start sweeper if configured
+        if self.sweeper is not None:
+            self.sweeper.start()
+
         logger.info(f"Started watching {len(self.watchers)} repositories")
 
     def stop_watching_all(self):
@@ -291,6 +298,10 @@ class MultiRepositoryWatcher:
 
         # Stop git monitor
         self.git_monitor.stop()
+
+        # Stop sweeper if configured
+        if self.sweeper is not None:
+            self.sweeper.stop()
 
         # Stop all file watchers
         for repo_id, observer in self.observers.items():
