@@ -97,7 +97,7 @@ class CrossRepositoryCoordinator:
         self.enable_reranking = enable_reranking
 
         # Initialize reranker if enabled
-        self.reranker: Optional[Reranker] = None  # initialized on demand; see _rerank_results
+        self.reranker = None  # initialized on demand; see _rerank_results
 
         # Search strategies
         self._strategies: Dict[str, SearchStrategy] = self._init_strategies()
