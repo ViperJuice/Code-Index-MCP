@@ -152,11 +152,14 @@ def test_attest_importable():
     assert callable(attest)
 
 
-def test_attest_raises_not_implemented():
-    from mcp_server.artifacts.attestation import attest
+def test_attest_skip_mode_returns_attestation():
+    import os
+    from unittest.mock import patch
+    from mcp_server.artifacts.attestation import attest, Attestation
     from pathlib import Path
-    with pytest.raises(NotImplementedError, match="filled by SL-3"):
-        attest(Path("/tmp/fake.tar.gz"), repo="org/repo")
+    with patch.dict(os.environ, {"MCP_ATTESTATION_MODE": "skip"}):
+        result = attest(Path("/tmp/fake.tar.gz"), repo="org/repo")
+    assert isinstance(result, Attestation)
 
 
 def test_verify_attestation_importable():
@@ -164,17 +167,16 @@ def test_verify_attestation_importable():
     assert callable(verify_attestation)
 
 
-def test_verify_attestation_raises_not_implemented():
+def test_verify_attestation_skip_mode_no_ops():
+    import os
+    from unittest.mock import patch
     from mcp_server.artifacts.attestation import verify_attestation, Attestation
     from pathlib import Path
-    from datetime import datetime
-    att = object.__new__(Attestation)
-    with pytest.raises(NotImplementedError, match="filled by SL-3"):
-        verify_attestation(
-            Path("/tmp/fake.tar.gz"),
-            att,
-            expected_repo="org/repo",
-        )
+    from datetime import datetime, timezone
+    att = Attestation(bundle_url="", bundle_path=Path(""), subject_digest="", signed_at=datetime.now(timezone.utc))
+    with patch.dict(os.environ, {"MCP_ATTESTATION_MODE": "skip"}):
+        result = verify_attestation(Path("/tmp/fake.tar.gz"), att, expected_repo="org/repo")
+    assert result is None
 
 
 # ---------------------------------------------------------------------------

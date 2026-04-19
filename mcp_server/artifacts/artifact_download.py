@@ -15,7 +15,7 @@ import tarfile
 import tempfile
 import urllib.error
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 from mcp_server.config.settings import get_settings
 from mcp_server.core.errors import record_handled_error
 
+from .attestation import Attestation, verify_attestation
 from .integrity_gate import (
     ArtifactIntegrityGateResult,
     validate_artifact_integrity,
@@ -149,6 +150,17 @@ class IndexArtifactDownloader:
             compatible, issues = self.check_compatibility(metadata)
             if not compatible:
                 raise ValueError("Artifact compatibility validation failed: " + "; ".join(issues))
+
+            att_url = metadata.get("attestation_url")
+            if att_url:
+                sidecar_path = archive_path.with_suffix(archive_path.suffix + ".attestation.jsonl")
+                att = Attestation(
+                    bundle_url=att_url,
+                    bundle_path=sidecar_path,
+                    subject_digest="",
+                    signed_at=datetime.now(timezone.utc),
+                )
+                verify_attestation(archive_path, att, expected_repo=self.repo, gh_cmd="gh")
 
             print("📦 Extracting index files...")
             with tarfile.open(archive_path, "r:gz") as tar:

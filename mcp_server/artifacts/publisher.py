@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
+from mcp_server.artifacts.attestation import attest
 from mcp_server.artifacts.delta_policy import DeltaPolicy
 from mcp_server.core.errors import MCPError
 
@@ -56,6 +57,7 @@ class ArtifactPublisher:
             archive_path, checksum, size = self._uploader.compress_indexes(
                 Path(f"index-archive-{short_sha}.tar.gz")
             )
+            attestation = attest(archive_path, repo=repo, gh_cmd=self._gh_cmd)
             policy = DeltaPolicy()
             decision = policy.decide(
                 compressed_size_bytes=size,
@@ -66,6 +68,7 @@ class ArtifactPublisher:
                 size,
                 artifact_type=decision.strategy,
                 delta_from=decision.base_artifact_id,
+                attestation=attestation,
             )
             self._ensure_sha_release(sha_tag, commit, repo)
             self._move_latest_pointer(sha_tag, commit, repo)

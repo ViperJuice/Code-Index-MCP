@@ -11,12 +11,29 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
+from mcp_server.artifacts.attestation import Attestation
 from mcp_server.artifacts.publisher import ArtifactError, ArtifactPublisher, ArtifactRef
 from mcp_server.artifacts.artifact_upload import IndexArtifactUploader
 
 
 REPO = "owner/repo"
 COMMIT = "abcdef1234567890abcdef1234567890abcdef12"
+
+_SYNTHETIC_ATTESTATION = Attestation(
+    bundle_url="https://github.com/owner/repo/attestations/1",
+    bundle_path=Path("/tmp/_publish_race_archive.tar.gz.attestation.jsonl"),
+    subject_digest="sha256stub",
+    signed_at=__import__("datetime").datetime.now(__import__("datetime").timezone.utc),
+)
+
+
+@pytest.fixture(autouse=True)
+def _stub_attest(monkeypatch):
+    """Patch mcp_server.artifacts.publisher.attest so publish tests don't shell out."""
+    monkeypatch.setattr(
+        "mcp_server.artifacts.publisher.attest",
+        MagicMock(return_value=_SYNTHETIC_ATTESTATION),
+    )
 SHORT_SHA = COMMIT[:7]
 TAG = f"index-{SHORT_SHA}"
 RELEASE_URL = f"https://github.com/{REPO}/releases/tag/{TAG}"
@@ -33,12 +50,25 @@ def _make_uploader() -> IndexArtifactUploader:
     # on gh-orchestration behavior and stub the uploader's heavy work.
     from pathlib import Path as _Path
     from unittest.mock import MagicMock as _MagicMock
+    from datetime import datetime, timezone as _tz
+    _synthetic_attestation = Attestation(
+        bundle_url="https://github.com/owner/repo/attestations/1",
+        bundle_path=_Path("/tmp/_publish_race_archive.tar.gz.attestation.jsonl"),
+        subject_digest="sha256stub",
+        signed_at=datetime.now(_tz.utc),
+    )
     uploader.compress_indexes = _MagicMock(  # type: ignore[method-assign]
         return_value=(_Path("/tmp/_publish_race_archive.tar.gz"), "sha256stub", 100)
     )
     uploader.create_metadata = _MagicMock(  # type: ignore[method-assign]
-        return_value={"artifact_type": "full", "delta_from": None, "checksum": "sha256stub"}
+        return_value={
+            "artifact_type": "full",
+            "delta_from": None,
+            "checksum": "sha256stub",
+            "attestation_url": "https://github.com/owner/repo/attestations/1",
+        }
     )
+    uploader._synthetic_attestation = _synthetic_attestation  # type: ignore[attr-defined]
     return uploader
 
 
