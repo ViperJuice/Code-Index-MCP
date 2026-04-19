@@ -31,6 +31,8 @@ def initialize_stateless_services(
     The dispatcher holds no per-repo state; every public method takes ``ctx: RepoContext``.
     ``registry_path`` overrides the default registry location (mainly for tests).
     """
+    reset_process_singletons()
+
     import os
 
     from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
@@ -99,6 +101,24 @@ def reset_process_singletons() -> None:
     try:
         import mcp_server.plugins.memory_aware_manager as _m
         setattr(_m, "_manager_instance", None)
+    except ImportError:
+        pass
+
+    try:
+        import mcp_server.storage.multi_repo_manager as _m
+        setattr(_m, "_manager_instance", None)
+    except ImportError:
+        pass
+
+    try:
+        import mcp_server.dispatcher.cross_repo_coordinator as _m
+        setattr(_m, "_coordinator_instance", None)
+    except ImportError:
+        pass
+
+    try:
+        import mcp_server.plugins.repository_plugin_loader as _m
+        setattr(_m, "_loader_instance", None)
     except ImportError:
         pass
 
