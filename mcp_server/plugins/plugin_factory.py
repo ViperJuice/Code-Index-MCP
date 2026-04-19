@@ -14,7 +14,6 @@ tree-sitter based plugins for languages without specific implementations.
 import asyncio
 import logging
 import os
-from concurrent.futures import Future
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple, Type, Union
 
