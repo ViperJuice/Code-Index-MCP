@@ -13,6 +13,7 @@ tree-sitter based plugins for languages without specific implementations.
 
 import asyncio
 import logging
+import os
 from concurrent.futures import Future
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple, Type, Union
@@ -23,12 +24,35 @@ from .language_registry import LANGUAGE_CONFIGS, get_language_by_extension
 
 if TYPE_CHECKING:
     from ..core.repo_context import RepoContext
+    from ..sandbox.capabilities import CapabilitySet
 
 logger = logging.getLogger(__name__)
 
 # Import specific plugins if they exist
 # Can be either a plugin class or a factory function
 SPECIFIC_PLUGINS: Dict[str, Union[Type, Callable]] = {}
+
+# Dotted module paths for sandboxed-mode plugin construction. Each entry maps
+# a language to the dotted module the worker subprocess imports. Kept in sync
+# with SPECIFIC_PLUGINS by construction; see create_plugin's sandbox branch.
+SPECIFIC_PLUGIN_MODULES: Dict[str, str] = {
+    "python": "mcp_server.plugins.python_plugin",
+    "javascript": "mcp_server.plugins.js_plugin",
+    "typescript": "mcp_server.plugins.typescript_plugin",
+    "c": "mcp_server.plugins.c_plugin",
+    "cpp": "mcp_server.plugins.cpp_plugin",
+    "dart": "mcp_server.plugins.dart_plugin",
+    "html": "mcp_server.plugins.html_css_plugin",
+    "css": "mcp_server.plugins.html_css_plugin",
+    "java": "mcp_server.plugins.java_plugin",
+    "go": "mcp_server.plugins.go_plugin",
+    "rust": "mcp_server.plugins.rust_plugin",
+    "c_sharp": "mcp_server.plugins.csharp_plugin",
+    "csharp": "mcp_server.plugins.csharp_plugin",
+    "swift": "mcp_server.plugins.swift_plugin",
+    "kotlin": "mcp_server.plugins.kotlin_plugin",
+    "markdown": "mcp_server.plugins.markdown_plugin",
+}
 
 try:
     from .python_plugin import Plugin as PythonPlugin
@@ -202,6 +226,7 @@ class PluginFactory:
         enable_semantic: bool = True,
         *,
         ctx: Optional["RepoContext"] = None,
+        capabilities: Optional["CapabilitySet"] = None,
     ):
         """Create appropriate plugin for the language.
 
@@ -213,6 +238,12 @@ class PluginFactory:
                 calls ``plugin.bind(ctx)`` post-construction so the plugin can
                 attach per-repo state. SL-1/SL-3/SL-5 preserve this hook through
                 their rewrites.
+            capabilities: P15 IF-0-P15-1 — optional CapabilitySet. When present
+                (or when ``MCP_PLUGIN_SANDBOX_ENABLED=1`` is set in the env),
+                the factory returns a :class:`SandboxedPlugin` that runs the
+                plugin in an isolated subprocess. Default off; existing callers
+                keep their behavior byte-for-byte when the env var is unset and
+                ``capabilities`` is None.
 
         Returns:
             Plugin instance
@@ -222,6 +253,42 @@ class PluginFactory:
         """
         # Normalize language name
         language = language.lower().replace("-", "_")
+
+        # SL-1 sandbox branch (default-off). Activated iff caller passes an
+        # explicit CapabilitySet or sets MCP_PLUGIN_SANDBOX_ENABLED=1. The
+        # direct path below is untouched otherwise.
+        use_sandbox = capabilities is not None or (
+            os.environ.get("MCP_PLUGIN_SANDBOX_ENABLED") == "1"
+        )
+        if use_sandbox:
+            from ..sandbox.capabilities import CapabilitySet as _CapabilitySet
+            from .sandboxed_plugin import SandboxedPlugin
+
+            plugin_module = SPECIFIC_PLUGIN_MODULES.get(language)
+            if plugin_module is None:
+                raise ValueError(
+                    f"Sandbox mode does not yet support language {language!r}. "
+                    f"Supported: {sorted(SPECIFIC_PLUGIN_MODULES)}"
+                )
+
+            if capabilities is None:
+                # Default caps: read-only access to the workspace, no writes,
+                # no network, no sqlite, no env leakage.
+                workspace: Tuple[Path, ...] = ()
+                if ctx is not None and getattr(ctx, "workspace_root", None):
+                    workspace = (Path(ctx.workspace_root),)
+                capabilities = _CapabilitySet(
+                    fs_read=workspace,
+                    fs_write=(),
+                    env_allow=frozenset(),
+                    network=False,
+                    sqlite="none",
+                )
+
+            plugin = SandboxedPlugin(plugin_module, capabilities)
+            if ctx is not None:
+                plugin.bind(ctx)
+            return plugin
 
         plugin = None
 
