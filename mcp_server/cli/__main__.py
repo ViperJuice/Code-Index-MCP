@@ -3,10 +3,9 @@
 Imports server_commands directly to avoid triggering the circular import chain
 that exists when artifact_commands is loaded transitively through __init__.py.
 """
-import sys
-
 import click
 
+from mcp_server.cli.retention_commands import retention
 from mcp_server.cli.server_commands import serve, stdio
 
 
@@ -17,6 +16,7 @@ def _cli():
 
 _cli.add_command(serve)
 _cli.add_command(stdio)
+_cli.add_command(retention)
 
 if __name__ == "__main__":
     _cli()
