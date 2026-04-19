@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (P16 — Shared Vocabulary Preamble)
+- **Frozen error taxonomy** (IF-0-P16-1): New error classes `TransientArtifactError`, `TerminalArtifactError`, and `SchemaMigrationError` in `mcp_server/core/errors.py` for structured error handling in artifact operations. Stubs only — no consumer wiring.
+- **Lazy env-var getters** (IF-0-P16-2): Five new environment variable getters in `mcp_server/config/env_vars.py` — `get_max_file_size_bytes()`, `get_artifact_retention_count()`, `get_artifact_retention_days()`, `get_disk_readonly_threshold_mb()`, and `get_publish_rollback_enabled()` — with sensible defaults. Stubs only — no consumer wiring.
+- **ValidationError dataclass + validate_production_config** (IF-0-P16-3): New `ValidationError` dataclass and keyword-only `validate_production_config(environment: str = "production")` function in `mcp_server/config/validation.py`. Stubs only — no consumer wiring.
+- **reset_process_singletons** (IF-0-P16-4): New utility function in `mcp_server/cli/bootstrap.py` for test isolation and graceful restarts. Stubs only — no consumer wiring.
+
 ### Added (P15 — Security Hardening)
 - **Plugin sandboxing** (IF-0-P15-1): Plugins execute in isolated worker processes with JSON-line IPC, 30s timeout, and capability-based restrictions. New `mcp_server/sandbox/` package with supervisor and adapter; `SandboxedPlugin` wraps instances with `CapabilitySet` (filesystem, network, subprocess, env_read). (`mcp_server/sandbox/supervisor.py`, `mcp_server/plugins/sandboxed_plugin.py`, `tests/security/test_plugin_sandbox.py`)
 - **Metrics endpoint auth** (IF-0-P15-2): `/metrics` requires `Authorization: Bearer <token>` (app-level) or NetworkPolicy restriction (k8s-only). Wired via `require_auth("metrics")` middleware. (`mcp_server/security/security_middleware.py`, `mcp_server/api/gateway.py`)

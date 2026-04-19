@@ -399,3 +399,43 @@ VOYAGEAI_API_KEY=your-api-key-here
 4. **Documentation**: Keep this document updated with new variables
 5. **Typing**: Use appropriate types (string, integer, boolean, path)
 6. **Naming**: Use `MCP_` prefix for all application-specific variables
+
+## P16 reserved (stub-only; not yet enforced)
+
+The following environment variables are defined as part of the P16 Shared Vocabulary Preamble but are not yet wired to consumer logic. They are reserved for use in P17/P18 when the corresponding feature implementations are completed. All values are accessed via lazy getters in `mcp_server.config.env_vars`.
+
+### `MCP_MAX_FILE_SIZE_BYTES`
+- **Description**: Maximum size (in bytes) of a single file for indexing operations
+- **Type**: Integer
+- **Default**: `10485760` (10 MiB)
+- **Getter**: `mcp_server.config.env_vars.get_max_file_size_bytes()`
+- **Note**: Stub definition in P16; consumer wiring deferred to P17/P18
+
+### `MCP_ARTIFACT_RETENTION_COUNT`
+- **Description**: Maximum number of artifact revisions to retain per artifact
+- **Type**: Integer
+- **Default**: `10`
+- **Getter**: `mcp_server.config.env_vars.get_artifact_retention_count()`
+- **Note**: Stub definition in P16; consumer wiring deferred to P17/P18
+
+### `MCP_ARTIFACT_RETENTION_DAYS`
+- **Description**: Maximum age (in days) for retained artifact revisions
+- **Type**: Integer
+- **Default**: `30`
+- **Getter**: `mcp_server.config.env_vars.get_artifact_retention_days()`
+- **Note**: Stub definition in P16; consumer wiring deferred to P17/P18
+
+### `MCP_DISK_READONLY_THRESHOLD_MB`
+- **Description**: Disk free space threshold (in MB) below which the system transitions to read-only mode
+- **Type**: Integer
+- **Default**: `100`
+- **Getter**: `mcp_server.config.env_vars.get_disk_readonly_threshold_mb()`
+- **Note**: Stub definition in P16; consumer wiring deferred to P17/P18
+
+### `MCP_PUBLISH_ROLLBACK_ENABLED`
+- **Description**: Enable automatic rollback on artifact publication failures
+- **Type**: Boolean
+- **Default**: `true` (enabled)
+- **Getter**: `mcp_server.config.env_vars.get_publish_rollback_enabled()`
+- **Truthy Values**: `1`, `true`, `yes`, `on` (case-insensitive); unset = `true`
+- **Note**: Stub definition in P16; consumer wiring deferred to P17/P18
