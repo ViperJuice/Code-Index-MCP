@@ -472,7 +472,7 @@ def test_benchmark_symbol_lookup_performance(benchmark, mock_plugins):
     def lookup():
         timer_id = suite.start_timer("symbol_lookup", {"symbol": "bench_function_42"})
         try:
-            result = suite.dispatcher.lookup("bench_function_42")
+            result = suite.dispatcher.lookup(suite._ctx, "bench_function_42")
             return result
         finally:
             duration = suite.stop_timer(timer_id)
@@ -516,7 +516,7 @@ def test_benchmark_search_performance(benchmark, mock_plugins):
     def search():
         timer_id = suite.start_timer("fuzzy_search", {"query": "search"})
         try:
-            results = list(suite.dispatcher.search("search", semantic=False))
+            results = list(suite.dispatcher.search(suite._ctx, "search", semantic=False))
             return results
         finally:
             duration = suite.stop_timer(timer_id)

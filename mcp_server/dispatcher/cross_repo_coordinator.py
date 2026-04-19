@@ -10,6 +10,7 @@ import logging
 import re
 import time
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
@@ -23,6 +24,7 @@ from mcp_server.storage.multi_repo_manager import (
     MultiRepositoryManager,
     get_multi_repo_manager,
 )
+from mcp_server.storage.sqlite_store import SQLiteStore
 
 logger = logging.getLogger(__name__)
 
@@ -698,10 +700,9 @@ class CrossRepositorySearchCoordinator:
         """Synchronously search one repository for symbols.  Opens a SQLiteStore
         against ``repo.index_path`` and calls ``search_symbols`` on it.
         """
-        mod = __import__(
-            "mcp_server.storage.cross_repo_coordinator", fromlist=["SQLiteStore"]
-        )
-        store_cls = mod.SQLiteStore
+        # Resolve the module attribute dynamically so tests patching
+        # ``mcp_server.dispatcher.cross_repo_coordinator.SQLiteStore`` take effect.
+        store_cls = globals()["SQLiteStore"]
         started = time.time()
         try:
             store = store_cls(str(repo.index_path))
@@ -733,10 +734,7 @@ class CrossRepositorySearchCoordinator:
         """Synchronously search one repository for code.  Honours
         ``scope.file_types`` as a post-filter on ``file_path`` suffix.
         """
-        mod = __import__(
-            "mcp_server.storage.cross_repo_coordinator", fromlist=["SQLiteStore"]
-        )
-        store_cls = mod.SQLiteStore
+        store_cls = globals()["SQLiteStore"]
         started = time.time()
         try:
             store = store_cls(str(repo.index_path))
@@ -844,14 +842,14 @@ class CrossRepositorySearchCoordinator:
         repos: List[Any],
         worker: Callable[[Any], CrossRepoSearchResult],
     ) -> List[CrossRepoSearchResult]:
-        """Execute ``worker`` across ``repos`` via ThreadPoolExecutor (re-exported
-        from storage.cross_repo_coordinator so tests can patch it)."""
-        mod = __import__(
-            "mcp_server.storage.cross_repo_coordinator",
-            fromlist=["ThreadPoolExecutor", "as_completed"],
-        )
-        executor_cls = mod.ThreadPoolExecutor
-        as_completed_fn = mod.as_completed
+        """Execute ``worker`` across ``repos`` via ThreadPoolExecutor.
+
+        Resolves ThreadPoolExecutor/as_completed from this module's globals so
+        tests that patch ``mcp_server.dispatcher.cross_repo_coordinator.X``
+        take effect.
+        """
+        executor_cls = globals()["ThreadPoolExecutor"]
+        as_completed_fn = globals()["as_completed"]
         results: List[CrossRepoSearchResult] = []
         with executor_cls(max_workers=self.max_workers) as executor:
             futures = [executor.submit(worker, repo) for repo in repos]
