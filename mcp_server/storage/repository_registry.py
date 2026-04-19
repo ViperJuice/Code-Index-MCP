@@ -5,6 +5,7 @@ This module handles persistent storage and management of repository
 registration information for cross-repository search.
 """
 
+import fcntl
 import json
 import logging
 import os
@@ -167,45 +168,54 @@ class RepositoryRegistry:
                 f"SQLite migration failed for {db_path} ({old_id} → {new_id}): {exc}"
             )
 
+    def _serialize_registry(self) -> Dict[str, Any]:
+        """Return a JSON-serializable snapshot of self._registry."""
+        data: Dict[str, Any] = {}
+        for repo_id, repo_info in self._registry.items():
+            repo_data = repo_info.copy()
+            repo_data["path"] = str(repo_data["path"])
+            repo_data["index_path"] = str(repo_data["index_path"])
+            if "indexed_at" in repo_data and hasattr(repo_data["indexed_at"], "isoformat"):
+                repo_data["indexed_at"] = repo_data["indexed_at"].isoformat()
+            if "last_indexed" in repo_data and hasattr(repo_data["last_indexed"], "isoformat"):
+                repo_data["last_indexed"] = repo_data["last_indexed"].isoformat()
+            if "index_location" in repo_data:
+                repo_data["index_location"] = str(repo_data["index_location"])
+            data[repo_id] = repo_data
+        return data
+
     def save(self):
-        """Save registry to disk."""
-        with self._lock:
-            try:
-                # Convert to JSON-serializable format
-                data = {}
-                for repo_id, repo_info in self._registry.items():
-                    # Create a copy to avoid modifying original
-                    repo_data = repo_info.copy()
+        """Save registry to disk with cross-process flock + read-merge-write."""
+        lock_path = self.registry_path.with_suffix(".lock")
+        fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o600)
+        os.chmod(lock_path, 0o600)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            with self._lock:
+                try:
+                    # Merge on-disk entries so concurrent writers don't lose each other's data.
+                    on_disk: Dict[str, Any] = {}
+                    if self.registry_path.exists():
+                        try:
+                            with open(self.registry_path, "r") as f:
+                                on_disk = json.load(f)
+                        except Exception:
+                            on_disk = {}
 
-                    # Convert paths to strings
-                    repo_data["path"] = str(repo_data["path"])
-                    repo_data["index_path"] = str(repo_data["index_path"])
+                    merged = {**on_disk, **self._serialize_registry()}
 
-                    # Convert datetime to ISO format
-                    if "indexed_at" in repo_data and hasattr(repo_data["indexed_at"], "isoformat"):
-                        repo_data["indexed_at"] = repo_data["indexed_at"].isoformat()
-                    if "last_indexed" in repo_data and hasattr(
-                        repo_data["last_indexed"], "isoformat"
-                    ):
-                        repo_data["last_indexed"] = repo_data["last_indexed"].isoformat()
+                    temp_path = self.registry_path.with_suffix(".tmp")
+                    with open(temp_path, "w") as f:
+                        json.dump(merged, f, indent=2)
 
-                    if "index_location" in repo_data:
-                        repo_data["index_location"] = str(repo_data["index_location"])
+                    temp_path.replace(self.registry_path)
+                    logger.debug(f"Saved {len(merged)} repositories to registry")
 
-                    data[repo_id] = repo_data
-
-                # Write to temporary file first
-                temp_path = self.registry_path.with_suffix(".tmp")
-                with open(temp_path, "w") as f:
-                    json.dump(data, f, indent=2)
-
-                # Atomic rename
-                temp_path.replace(self.registry_path)
-
-                logger.debug(f"Saved {len(data)} repositories to registry")
-
-            except Exception as e:
-                logger.error(f"Failed to save registry: {e}")
+                except Exception as e:
+                    logger.error(f"Failed to save registry: {e}")
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            os.close(fd)
 
     def register(self, repo_info):
         """
