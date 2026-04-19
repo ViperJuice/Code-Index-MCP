@@ -13,6 +13,7 @@ from mcp_server.artifacts.artifact_download import IndexArtifactDownloader
 from mcp_server.artifacts.artifact_upload import IndexArtifactUploader
 from mcp_server.artifacts.manifest_v2 import WorkspaceArtifactManifest
 from mcp_server.artifacts.semantic_profiles import extract_semantic_profile_metadata
+from mcp_server.core.errors import record_handled_error
 from mcp_server.storage.multi_repo_manager import MultiRepositoryManager, RepositoryInfo
 
 
@@ -59,7 +60,8 @@ class MultiRepoArtifactCoordinator:
             return []
         try:
             payload = json.loads(metadata_path.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as exc:
+            record_handled_error(__name__, exc)
             return []
         return sorted(extract_semantic_profile_metadata(payload).keys())
 

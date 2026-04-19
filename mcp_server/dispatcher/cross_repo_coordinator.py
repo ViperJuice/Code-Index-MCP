@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
+from mcp_server.core.errors import record_handled_error
 from mcp_server.indexer.reranker import IReranker as Reranker
 from mcp_server.plugins.repository_plugin_loader import get_repository_plugin_loader
 from mcp_server.storage.multi_repo_manager import (
@@ -646,7 +647,8 @@ class CrossRepositorySearchCoordinator:
         )
         try:
             raw = await self._inner.search(ctx)
-        except Exception:
+        except Exception as exc:
+            record_handled_error(__name__, exc)
             raw = []
         results = [r.content for r in raw]
         return _CrossRepoAggregatedResult(
@@ -678,7 +680,8 @@ class CrossRepositorySearchCoordinator:
         )
         try:
             raw = await self._inner.search(ctx)
-        except Exception:
+        except Exception as exc:
+            record_handled_error(__name__, exc)
             raw = []
         results = [r.content for r in raw]
         return _CrossRepoAggregatedResult(

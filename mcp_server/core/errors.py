@@ -3,6 +3,26 @@
 from typing import Any, Optional
 
 
+def record_handled_error(module: str, exception: BaseException) -> None:
+    """Increment mcp_errors_by_type_total{module, exception=type(exception).__name__}.
+
+    Must never raise — metric surface failures are swallowed.
+    """
+    try:
+        from mcp_server.metrics.prometheus_exporter import get_prometheus_exporter
+
+        exporter = get_prometheus_exporter()
+        if exporter.errors_by_type is not None:
+            try:
+                exporter.errors_by_type.labels(
+                    module=module, exception=type(exception).__name__
+                ).inc()
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
 class MCPError(Exception):
     """Base exception class for all MCP-related errors."""
 
@@ -87,3 +107,15 @@ class DocumentProcessingError(MCPError):
         """
         self.document_path = document_path
         super().__init__(f"Document processing error for '{document_path}': {message}", details)
+
+
+class IndexingError(MCPError):
+    """Exception raised for general indexing pipeline failures (distinct from IndexError)."""
+
+    pass
+
+
+class ArtifactError(MCPError):
+    """Exception raised for artifact upload/download/validation failures."""
+
+    pass

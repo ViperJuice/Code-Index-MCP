@@ -292,6 +292,17 @@ class PrometheusExporter:
             self.dispatcher_lookup_histogram = None
             self.dispatcher_search_histogram = None
 
+        # Structured error taxonomy counter (IF-0-P13-5)
+        if PROMETHEUS_AVAILABLE:
+            self.errors_by_type = Counter(
+                "mcp_errors_by_type_total",
+                "Handled errors broken down by module and exception type",
+                ["module", "exception"],
+                registry=self.registry,
+            )
+        else:
+            self.errors_by_type = None
+
     def start(self, port: int) -> None:
         """Start the Prometheus HTTP metrics server on the given port (idempotent)."""
         if not PROMETHEUS_AVAILABLE:
