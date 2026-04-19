@@ -19,6 +19,7 @@ from .core.ignore_patterns import build_walker_filter
 from .core.repo_context import RepoContext
 from .core.repo_resolver import RepoResolver
 from .dispatcher.dispatcher_enhanced import EnhancedDispatcher
+from .indexing.lock_registry import lock_registry
 from .storage.git_index_manager import GitAwareIndexManager, should_reindex_for_branch
 from .storage.repository_registry import RepositoryRegistry
 from .watcher import _Handler
@@ -158,8 +159,9 @@ class MultiRepositoryHandler(FileSystemEventHandler):
             return
 
         logger.info("Re-indexing %s (repo=%s)", path, self.repo_id)
-        self.parent_watcher.dispatcher.remove_file(self.ctx, path)
-        self.parent_watcher.dispatcher.index_file(self.ctx, path)
+        with lock_registry.acquire(self.repo_id):
+            self.parent_watcher.dispatcher.remove_file(self.ctx, path)
+            self.parent_watcher.dispatcher.index_file(self.ctx, path)
 
     def _remove_with_ctx(self, path: Path) -> None:
         """Branch + gitignore guarded remove via ctx-aware dispatcher."""
@@ -178,7 +180,8 @@ class MultiRepositoryHandler(FileSystemEventHandler):
             return
 
         logger.info("Removing from index: %s (repo=%s)", path, self.repo_id)
-        self.parent_watcher.dispatcher.remove_file(self.ctx, path)
+        with lock_registry.acquire(self.repo_id):
+            self.parent_watcher.dispatcher.remove_file(self.ctx, path)
 
     def _move_with_ctx(self, old_path: Path, new_path: Path) -> None:
         """Branch + gitignore guarded move via ctx-aware dispatcher."""
@@ -194,7 +197,8 @@ class MultiRepositoryHandler(FileSystemEventHandler):
             return
 
         logger.info("Moving in index: %s -> %s (repo=%s)", old_path, new_path, self.repo_id)
-        self.parent_watcher.dispatcher.move_file(self.ctx, old_path, new_path)
+        with lock_registry.acquire(self.repo_id):
+            self.parent_watcher.dispatcher.move_file(self.ctx, old_path, new_path)
 
     def on_any_event(self, event):
         """Route watchdog events through branch + gitignore guards."""
@@ -445,7 +449,10 @@ class MultiRepositoryWatcher:
 
         for repo_id, repo_info in self.registry.get_all_repositories().items():
             if repo_info.auto_sync:
-                future = self.executor.submit(self.index_manager.sync_repository_index, repo_id)
+                def _locked_sync(rid=repo_id):
+                    with lock_registry.acquire(rid):
+                        return self.index_manager.sync_repository_index(rid)
+                future = self.executor.submit(_locked_sync)
                 futures.append((repo_id, future))
 
         # Wait for all to complete
