@@ -8,7 +8,6 @@ from ..core.errors import record_handled_error
 from ..core.repo_context import RepoContext
 from ..graph import GraphCutResult
 from ..plugin_base import IPlugin, SearchResult, SymbolDef
-from ..storage.sqlite_store import SQLiteStore
 
 logger = logging.getLogger(__name__)
 

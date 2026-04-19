@@ -800,6 +800,11 @@ class RerankerFactory(IRerankerFactory):
             raise ValueError(f"{reranker_class} must implement IReranker interface")
         self.reranker_types[name] = reranker_class
 
+    @classmethod
+    def create_default(cls) -> "TFIDFReranker":
+        """Return a zero-dependency default reranker."""
+        return TFIDFReranker({})
+
 
 # Default factory instance
 default_reranker_factory = RerankerFactory()
