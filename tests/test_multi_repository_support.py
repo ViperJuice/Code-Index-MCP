@@ -105,7 +105,12 @@ def test_multi_repo_manager_registry_persists_local_artifact_fields(tmp_path: Pa
     manager.registry.register(repo)
 
     reloaded = MultiRepositoryManager(central_index_path=tmp_path / "registry.json")
-    stored = reloaded.get_repository_info("repo-1")
+    # The registry _load() re-keys legacy ids to the canonical sha256 derived
+    # from the resolved path, so look up via list_all() rather than the
+    # original id.
+    all_repos = reloaded.registry.list_all()
+    assert len(all_repos) == 1
+    stored = all_repos[0]
 
     assert stored is not None
     assert stored.available_semantic_profiles == ["commercial_high", "oss_high"]

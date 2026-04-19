@@ -409,12 +409,22 @@ class TestMultiRepositoryManager:
         assert stats["languages"]["typescript"] == 40
 
     def test_connection_caching(self, manager, mock_repo_info):
-        """Test connection caching."""
+        """Test connection caching.
+
+        Post-refactor, ``StoreRegistry.get`` eagerly constructs a
+        ``ConnectionPool`` which pre-opens ``sqlite3.connect`` handles at
+        construction time.  The test's mock index path does not exist on disk,
+        so we also stub ``sqlite3.connect`` and ``ConnectionPool`` to prevent
+        that pre-open from raising ``OperationalError: unable to open database``.
+        """
         manager.registry.register(mock_repo_info)
 
-        with patch("mcp_server.storage.store_registry.SQLiteStore") as mock_store_class:
+        with patch("mcp_server.storage.store_registry.SQLiteStore") as mock_store_class, patch(
+            "mcp_server.storage.store_registry.ConnectionPool"
+        ) as mock_pool_class:
             mock_store = Mock()
             mock_store_class.return_value = mock_store
+            mock_pool_class.return_value = Mock()
 
             # First call should create connection
             conn1 = manager._get_connection("test_repo_123")

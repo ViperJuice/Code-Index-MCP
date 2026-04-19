@@ -7,9 +7,9 @@
   "normalization_policy": "provider-default",
   "chunk_schema_version": "legacy",
   "created_at": "2026-03-05T05:10:02.226505",
-  "updated_at": "2026-04-19T08:33:14.436090",
+  "updated_at": "2026-04-19T17:06:33.424650",
   "qdrant_path": ":memory:",
   "collection_name": "ci__aaa4034450c0__legacy-default__165a4f82df00",
   "compatibility_hash": "1a8eb12939e6a631",
-  "git_commit": "310bfd2c52acdaf812165115a69a6b25154b2e8c"
+  "git_commit": "b012ff4eaac228a48fc8ece6d4b60edd969668d6"
 }
