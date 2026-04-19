@@ -4,12 +4,23 @@ Configuration validation for production deployments.
 
 import os
 import secrets
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Literal, Optional
 from urllib.parse import urlparse
 
 from .environment import Environment, get_environment, is_production
 from .settings import Settings
+
+if TYPE_CHECKING:
+    from mcp_server.security.models import SecurityConfig
+
+
+@dataclass(frozen=True)
+class ValidationError:
+    code: str
+    message: str
+    severity: Literal["fatal", "warn"]
 
 
 class ConfigurationError(Exception):
@@ -250,48 +261,13 @@ def validate_environment_variables() -> List[str]:
 
 
 def validate_production_config(
-    settings: Optional[Settings] = None,
-) -> Dict[str, List[str]]:
-    """
-    Comprehensive production configuration validation.
-
-    Args:
-        settings: Settings to validate (defaults to current settings)
-
-    Returns:
-        Dict[str, List[str]]: Validation results by category
-
-    Raises:
-        SecurityConfigurationError: For critical security issues
-    """
-    if settings is None:
-        from .settings import get_settings
-
-        settings = get_settings()
-
-    results = {
-        "security": validate_security_config(settings),
-        "database": validate_database_config(settings),
-        "cache": validate_cache_config(settings),
-        "logging": validate_logging_config(settings),
-        "environment": validate_environment_variables(),
-    }
-
-    # Count total issues
-    total_issues = sum(len(issues) for issues in results.values())
-
-    if total_issues > 0 and is_production():
-        # Log summary for production
-        print("\n🔍 Configuration Validation Summary:")
-        print(f"Total issues found: {total_issues}")
-
-        for category, issues in results.items():
-            if issues:
-                print(f"\n{category.upper()} Issues ({len(issues)}):")
-                for issue in issues:
-                    print(f"  - {issue}")
-
-    return results
+    config: "SecurityConfig",
+    *,
+    environment: str = "production",
+) -> List[ValidationError]:
+    """Frozen P16 stub — replaces validate_production_config body; zero external callers;
+    helpers preserved for P18 SL-1."""
+    return []
 
 
 def generate_secure_defaults() -> Dict[str, str]:

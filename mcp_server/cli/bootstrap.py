@@ -64,6 +64,45 @@ def initialize_stateless_services(
     return store_registry, repo_resolver, dispatcher, repo_registry, git_index_manager
 
 
+def reset_process_singletons() -> None:
+    """Null all module-level process singletons; tolerates pruned installs."""
+    try:
+        import mcp_server.metrics.prometheus_exporter as _m
+        setattr(_m, "_exporter", None)
+    except ImportError:
+        pass
+
+    try:
+        import mcp_server.gateway as _m
+        setattr(_m, "_repo_registry", None)
+    except ImportError:
+        pass
+
+    try:
+        import mcp_server.plugin_system.loader as _m
+        setattr(_m, "_loader", None)
+    except ImportError:
+        pass
+
+    try:
+        import mcp_server.plugin_system.discovery as _m
+        setattr(_m, "_discovery", None)
+    except ImportError:
+        pass
+
+    try:
+        import mcp_server.plugin_system.config as _m
+        setattr(_m, "_config_manager", None)
+    except ImportError:
+        pass
+
+    try:
+        import mcp_server.plugins.memory_aware_manager as _m
+        setattr(_m, "_manager_instance", None)
+    except ImportError:
+        pass
+
+
 def _default_registry_path() -> Path:
     env_path = os.environ.get("MCP_REPO_REGISTRY")
     if env_path:
