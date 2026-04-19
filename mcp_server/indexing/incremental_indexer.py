@@ -15,6 +15,8 @@ from ..core.path_resolver import PathResolver
 from ..dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from ..storage.sqlite_store import SQLiteStore
 from .change_detector import FileChange
+from .checkpoint import ReindexCheckpoint, clear as _clear_ckpt, load as _load_ckpt, save as _save_ckpt
+from .lock_registry import lock_registry
 
 logger = logging.getLogger(__name__)
 
@@ -146,15 +148,9 @@ class IncrementalIndexer:
             else:
                 stats.errors += 1
 
-        # Process additions and modifications
-        for change in changes_by_type.get("added", []) + changes_by_type.get("modified", []):
-            result = self._index_file(change.path)
-            if result == "indexed":
-                stats.files_indexed += 1
-            elif result == "skipped":
-                stats.files_skipped += 1
-            else:
-                stats.errors += 1
+        # Process additions and modifications with checkpoint-resume
+        add_mod_changes = changes_by_type.get("added", []) + changes_by_type.get("modified", [])
+        self._index_files_with_checkpoint(add_mod_changes, stats)
 
         stats.end_time = datetime.now()
 
@@ -169,6 +165,63 @@ class IncrementalIndexer:
         )
 
         return stats
+
+    def _index_files_with_checkpoint(
+        self, changes: List[FileChange], stats: IncrementalStats
+    ) -> None:
+        """Index add/modified files with checkpoint-resume under per-repo lock."""
+        repo_id = self._get_repository_id()
+
+        with lock_registry.acquire(repo_id):
+            # Determine resume point from existing checkpoint
+            ckpt = _load_ckpt(self.repo_path)
+            all_paths = [c.path for c in changes]
+
+            if ckpt is not None and ckpt.repo_id == repo_id and ckpt.remaining_paths:
+                resume_from = ckpt.remaining_paths[0]
+                try:
+                    start_idx = all_paths.index(resume_from)
+                except ValueError:
+                    start_idx = 0
+                pending = all_paths[start_idx:]
+                existing_errors = list(ckpt.errors)
+                last_completed = ckpt.last_completed_path
+            else:
+                pending = list(all_paths)
+                existing_errors = []
+                last_completed = ""
+
+            started_at = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+            errors: list = list(existing_errors)
+            first_error_idx: int = -1
+
+            for idx, path in enumerate(pending):
+                result = self._index_file(path)
+                if result == "indexed":
+                    stats.files_indexed += 1
+                    last_completed = path
+                elif result == "skipped":
+                    stats.files_skipped += 1
+                    last_completed = path
+                else:
+                    stats.errors += 1
+                    errors.append({"path": path, "error": "indexing failed"})
+                    if first_error_idx == -1:
+                        first_error_idx = idx
+                        # Freeze checkpoint at first failure; remaining = from this file onward
+                        _save_ckpt(
+                            ReindexCheckpoint(
+                                repo_id=repo_id,
+                                started_at=started_at,
+                                last_completed_path=last_completed,
+                                remaining_paths=pending[idx:],
+                                errors=errors,
+                            ),
+                            self.repo_path,
+                        )
+
+            if not errors:
+                _clear_ckpt(self.repo_path)
 
     def _group_changes_by_type(self, changes: List[FileChange]) -> Dict[str, List[FileChange]]:
         """Group changes by their type.
