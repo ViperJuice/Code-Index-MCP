@@ -39,22 +39,28 @@ class TestEnospcReadonly:
         baseline = _counter_value()
 
         enospc = sqlite3.OperationalError("database or disk is full")
-        # Patch conn.commit inside _get_connection (non-pool path).
+
+        # sqlite3.Connection.commit is a C-level attribute and cannot be replaced on
+        # instances. Use a thin proxy that delegates all attribute access to the real
+        # connection but overrides commit() to raise once.
+        class _CommitFailProxy:
+            def __init__(self, real):
+                self._real = real
+                self._failed = False
+
+            def commit(self):
+                if not self._failed:
+                    self._failed = True
+                    raise enospc
+                self._real.commit()
+
+            def __getattr__(self, name):
+                return getattr(self._real, name)
+
         original_connect = sqlite3.connect
 
         def patched_connect(*args, **kwargs):
-            conn = original_connect(*args, **kwargs)
-            real_commit = conn.commit
-            called = {"once": False}
-
-            def bad_commit():
-                if not called["once"]:
-                    called["once"] = True
-                    raise enospc
-                real_commit()
-
-            conn.commit = bad_commit
-            return conn
+            return _CommitFailProxy(original_connect(*args, **kwargs))
 
         with patch("mcp_server.storage.sqlite_store.sqlite3.connect", side_effect=patched_connect):
             with pytest.raises((TransientArtifactError, sqlite3.OperationalError)):
