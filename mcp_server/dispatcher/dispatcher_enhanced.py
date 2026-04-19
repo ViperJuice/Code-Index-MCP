@@ -6,6 +6,8 @@ import os
 import re
 import threading
 import time
+from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
@@ -50,6 +52,22 @@ from .result_aggregator import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class IndexResultStatus(str, Enum):
+    INDEXED = "indexed"
+    SKIPPED_UNCHANGED = "skipped_unchanged"
+    SKIPPED_TOCTOU = "skipped_toctou"
+    ERROR = "error"
+
+
+@dataclass
+class IndexResult:
+    status: IndexResultStatus
+    path: Path
+    observed_hash: str | None
+    actual_hash: str | None
+    error: str | None = None
 
 
 _INDEX_EXCLUDED_FILENAMES = {
@@ -615,6 +633,11 @@ class EnhancedDispatcher:
     def _get_file_hash(self, content: str) -> str:
         """Compute SHA-256 hash of file content."""
         return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _hash_file_bytes(path: Path) -> str:
+        """Compute SHA-256 hash of raw file bytes (used for TOCTOU guard)."""
+        return hashlib.sha256(path.read_bytes()).hexdigest()
 
     def _should_reindex(self, path: Path, content: str) -> bool:
         """Return True if the file needs to be (re-)indexed."""
@@ -1678,6 +1701,126 @@ class EnhancedDispatcher:
             logger.debug(f"No plugin for {path}: {e}")
         except Exception as e:
             logger.error(f"Error indexing {path}: {e}", exc_info=True)
+
+    def index_file_guarded(
+        self, ctx: RepoContext, path: Path, expected_hash: str
+    ) -> IndexResult:
+        """TOCTOU-guarded index: re-hashes immediately before plugin write.
+
+        If the file hash at dispatch time differs from expected_hash, the file
+        was modified between watcher observation and dispatch; skip indexing.
+        """
+        path = path.resolve()
+
+        if not path.exists():
+            return IndexResult(
+                status=IndexResultStatus.ERROR,
+                path=path,
+                observed_hash=expected_hash,
+                actual_hash=None,
+                error="file not found",
+            )
+
+        try:
+            actual_hash = self._hash_file_bytes(path)
+        except OSError as e:
+            return IndexResult(
+                status=IndexResultStatus.ERROR,
+                path=path,
+                observed_hash=expected_hash,
+                actual_hash=None,
+                error=str(e),
+            )
+
+        if actual_hash != expected_hash:
+            logger.warning(
+                "dispatcher.index.toctou_skipped: file drifted before dispatch",
+                extra={"path": str(path), "observed": expected_hash, "actual": actual_hash},
+            )
+            return IndexResult(
+                status=IndexResultStatus.SKIPPED_TOCTOU,
+                path=path,
+                observed_hash=expected_hash,
+                actual_hash=actual_hash,
+            )
+
+        try:
+            content = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            try:
+                content = path.read_text(encoding="latin-1")
+            except Exception as e:
+                return IndexResult(
+                    status=IndexResultStatus.ERROR,
+                    path=path,
+                    observed_hash=expected_hash,
+                    actual_hash=actual_hash,
+                    error=str(e),
+                )
+
+        if not self._should_reindex(path, content):
+            return IndexResult(
+                status=IndexResultStatus.SKIPPED_UNCHANGED,
+                path=path,
+                observed_hash=expected_hash,
+                actual_hash=actual_hash,
+            )
+
+        try:
+            plugin = self._match_plugin(path)
+        except RuntimeError as e:
+            return IndexResult(
+                status=IndexResultStatus.ERROR,
+                path=path,
+                observed_hash=expected_hash,
+                actual_hash=actual_hash,
+                error=str(e),
+            )
+
+        try:
+            start_time = time.time()
+            logger.info(f"Indexing {path} with {plugin.lang} plugin (guarded)")
+            plugin.indexFile(path, content)
+
+            try:
+                stat = path.stat()
+                with self._file_cache_lock:
+                    self._file_cache[str(path)] = (
+                        stat.st_mtime,
+                        stat.st_size,
+                        self._get_file_hash(content),
+                    )
+            except OSError:
+                pass
+
+            if self._enable_advanced and self._router:
+                self._router.record_performance(plugin, time.time() - start_time)
+
+            self._operation_stats["indexings"] += 1
+            self._operation_stats["total_time"] += time.time() - start_time
+
+            _sem = self._get_semantic_indexer(ctx)
+            if _sem:
+                try:
+                    _sem.index_file(path)
+                except Exception as e:
+                    logger.warning(f"Semantic indexing failed for {path}: {e}")
+
+            return IndexResult(
+                status=IndexResultStatus.INDEXED,
+                path=path,
+                observed_hash=expected_hash,
+                actual_hash=actual_hash,
+            )
+        except Exception as e:
+            logger.error(f"Error in guarded indexing of {path}: {e}", exc_info=True)
+            return IndexResult(
+                status=IndexResultStatus.ERROR,
+                path=path,
+                observed_hash=expected_hash,
+                actual_hash=actual_hash,
+                error=str(e),
+            )
 
     def get_statistics(self, ctx: RepoContext) -> Dict[str, Any]:
         """Get statistics about indexed files and languages."""
