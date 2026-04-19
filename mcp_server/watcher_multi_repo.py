@@ -249,6 +249,19 @@ class MultiRepositoryWatcher:
         self.executor = ThreadPoolExecutor(max_workers=4)
         self.running = False
 
+        # Wire drift detection callback — avoids circular import (git_index_manager never imports watcher)
+        self.index_manager.on_branch_drift = self._on_branch_drift
+
+    def _on_branch_drift(self, repo_id: str, current_branch: str, tracked_branch: str) -> None:
+        """Called by GitAwareIndexManager when branch drift is detected."""
+        self.enqueue_full_rescan(repo_id)
+
+    def enqueue_full_rescan(self, repo_id: str) -> None:
+        """Submit a force-full reindex to the thread pool; returns immediately."""
+        def _rescan():
+            self.index_manager.sync_repository_index(repo_id, force_full=True)
+        self.executor.submit(_rescan)
+
     def start_watching_all(self):
         """Start watching all registered repositories."""
         self.running = True

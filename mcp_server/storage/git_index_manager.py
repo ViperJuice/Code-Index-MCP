@@ -24,6 +24,9 @@ from .repository_registry import RepositoryRegistry
 
 logger = logging.getLogger(__name__)
 
+# Callback type: (repo_id, current_branch, tracked_branch) -> None
+_DriftCallback = Optional[Any]
+
 
 @dataclass
 class ChangeSet:
@@ -76,6 +79,9 @@ class GitAwareIndexManager:
         self.registry = registry
         self.dispatcher = dispatcher
         self.artifact_manager = CommitArtifactManager()
+        # Wired post-construction by MultiRepositoryWatcher to avoid circular import.
+        # Signature: (repo_id: str, current_branch: str, tracked_branch: str) -> None
+        self.on_branch_drift: _DriftCallback = None
 
     def sync_repository_index(self, repo_id: str, force_full: bool = False) -> IndexSyncResult:
         """Sync index with repository's current git state.
@@ -111,10 +117,23 @@ class GitAwareIndexManager:
         last_indexed_branch = getattr(repo_info, "last_indexed_branch", None)
 
         if not should_reindex_for_branch(current_branch, repo_info.tracked_branch):
-            logger.info(
-                "Skipping reindex for %s: current branch %r != tracked branch %r",
-                repo_id, current_branch, repo_info.tracked_branch,
-            )
+            # Distinguish true drift (both non-None, different) from unconfigured (tracked is None)
+            if current_branch and repo_info.tracked_branch and current_branch != repo_info.tracked_branch:
+                logger.warning(
+                    "branch.drift.detected",
+                    extra={
+                        "repo_id": repo_id,
+                        "current_branch": current_branch,
+                        "tracked_branch": repo_info.tracked_branch,
+                    },
+                )
+                if self.on_branch_drift is not None:
+                    self.on_branch_drift(repo_id, current_branch, repo_info.tracked_branch)
+            else:
+                logger.info(
+                    "Skipping reindex for %s: current branch %r != tracked branch %r",
+                    repo_id, current_branch, repo_info.tracked_branch,
+                )
             return IndexSyncResult(
                 action="up_to_date",
                 commit=current_commit,
