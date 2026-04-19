@@ -15,7 +15,7 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from mcp_server.core.errors import record_handled_error
-from mcp_server.indexer.reranker import IReranker as Reranker
+from mcp_server.indexer.reranker import IReranker as Reranker, RerankerFactory
 from mcp_server.plugins.repository_plugin_loader import get_repository_plugin_loader
 from mcp_server.storage.multi_repo_manager import (
     CrossRepoSearchResult,
@@ -81,6 +81,7 @@ class CrossRepositoryCoordinator:
         multi_repo_manager: Optional[MultiRepositoryManager] = None,
         enable_semantic: bool = True,
         enable_reranking: bool = True,
+        reranker: Optional[Reranker] = None,
     ):
         """
         Initialize the cross-repository coordinator.
@@ -89,14 +90,24 @@ class CrossRepositoryCoordinator:
             multi_repo_manager: Multi-repository manager instance
             enable_semantic: Enable semantic search features
             enable_reranking: Enable result reranking
+            reranker: Optional IReranker to inject; if None and enable_reranking is True,
+                      RerankerFactory.create_default() is attempted.
         """
         self.multi_repo_manager = multi_repo_manager or get_multi_repo_manager()
         self.plugin_loader = get_repository_plugin_loader()
         self.enable_semantic = enable_semantic
         self.enable_reranking = enable_reranking
 
-        # Initialize reranker if enabled
-        self.reranker = None  # initialized on demand; see _rerank_results
+        # Initialize reranker: injected > factory > None
+        if reranker is not None:
+            self.reranker: Optional[Reranker] = reranker
+        elif enable_reranking:
+            try:
+                self.reranker = RerankerFactory.create_default()
+            except Exception:
+                self.reranker = None
+        else:
+            self.reranker = None
 
         # Search strategies
         self._strategies: Dict[str, SearchStrategy] = self._init_strategies()
