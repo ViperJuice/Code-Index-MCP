@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Literal, Optional
 from urllib.parse import unquote
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
@@ -440,6 +440,17 @@ def require_role(role: UserRole):
         return current_user
 
     return role_checker
+
+
+_SCOPE_TO_PERMISSION: Dict[str, Permission] = {
+    "metrics": Permission.ADMIN,
+    "admin": Permission.ADMIN,
+    "tools": Permission.READ,
+}
+
+
+def require_auth(scope: Literal["metrics", "admin", "tools"]) -> Callable[..., User]:
+    raise NotImplementedError("filled by SL-2")
 
 
 class SecurityMiddlewareStack:
