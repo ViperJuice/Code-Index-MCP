@@ -1,0 +1,24 @@
+name: lockfile-check
+
+on:
+  push:
+    paths:
+      - "pyproject.toml"
+      - "uv.lock"
+  pull_request:
+    paths:
+      - "pyproject.toml"
+      - "uv.lock"
+
+jobs:
+  check-lockfile:
+    name: Verify uv.lock is up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Verify lockfile is current
+        run: uv lock --locked
