@@ -272,6 +272,8 @@ async def startup_event():
     """Initialize the dispatcher and register plugins on startup."""
     global dispatcher, repo_resolver, sqlite_store, multi_watcher, ref_poller, plugin_manager, plugin_loader, auth_manager, security_config, cache_manager, query_cache, bm25_indexer, hybrid_search, fuzzy_indexer, semantic_indexer, profile_hydration_status, semantic_setup_status, language_detection_status
 
+    app.state.startup_time = time.monotonic()
+
     try:
         preflight_result = run_startup_preflight()
         for line in format_preflight_report(preflight_result):
@@ -1082,6 +1084,33 @@ async def component_health_check(component: str) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Component health check failed for {component}: {e}", exc_info=True)
         raise HTTPException(500, f"Health check failed: {str(e)}")
+
+
+@app.get("/ready")
+async def readiness_probe() -> Dict[str, Any]:
+    """Readiness probe: 200 when dispatcher, sqlite_store, and _repo_registry are all initialised."""
+    from .health.probes import HealthView
+    from fastapi.responses import JSONResponse as _JSONResponse
+
+    hv = HealthView(
+        dispatcher=dispatcher,
+        sqlite_store=sqlite_store,
+        registry=_repo_registry,
+        startup_time=getattr(app.state, "startup_time", None),
+    )
+    snap = hv.snapshot()
+    code = 200 if (snap["sqlite"] and snap["registry"] and snap["dispatcher"]) else 503
+    return _JSONResponse(content=snap, status_code=code)
+
+
+@app.get("/liveness")
+async def liveness_probe() -> Dict[str, Any]:
+    """Liveness probe: returns 200 if the asyncio event loop is responsive."""
+    import asyncio
+    from fastapi.responses import JSONResponse as _JSONResponse
+
+    await asyncio.sleep(0)
+    return _JSONResponse(content={"status": "ok"}, status_code=200)
 
 
 # Metrics endpoints
