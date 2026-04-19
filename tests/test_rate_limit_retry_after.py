@@ -173,7 +173,8 @@ class TestAttestationPreflight:
 
         try:
             with patch("subprocess.run", side_effect=fake_run):
-                result = attest(_Path("/tmp/fake_archive.tar.gz"), repo="owner/repo", gh_cmd="gh")
+                with patch("mcp_server.artifacts.attestation._sha256_of", return_value="sha256stub"):
+                    result = attest(_Path("/tmp/fake_archive.tar.gz"), repo="owner/repo", gh_cmd="gh")
         finally:
             att_mod.logger.handlers = [
                 h for h in att_mod.logger.handlers if not isinstance(h, Capture)

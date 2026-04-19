@@ -2,16 +2,72 @@
 
 from __future__ import annotations
 
+import email.utils
 import json
 import subprocess
 import time
 from pathlib import Path
 from typing import List, Mapping, Tuple
 
+from mcp_server.core.errors import TerminalArtifactError
 from .base import ArtifactRecord
 
+try:
+    from mcp_server.metrics.prometheus_exporter import (
+        mcp_rate_limit_sleeps_total,
+        mcp_artifact_errors_by_class_total,
+    )
+except ImportError:
+    mcp_rate_limit_sleeps_total = None
+    mcp_artifact_errors_by_class_total = None
 
-def _respect_rate_limit(headers: Mapping[str, str]) -> float:
+
+def _parse_retry_after(value: str) -> float:
+    """Parse a Retry-After header value (integer seconds or HTTP-date) → seconds."""
+    try:
+        return float(int(value))
+    except ValueError:
+        pass
+    try:
+        dt = email.utils.parsedate_to_datetime(value)
+        delay = dt.timestamp() - time.time()
+        return max(0.0, delay)
+    except Exception:
+        return 60.0
+
+
+def _respect_rate_limit(headers: Mapping[str, str], status_code: int = 200) -> float:
+    """Inspect status_code + headers and apply appropriate backoff.
+
+    - 403: raise TerminalArtifactError (forbidden / missing scope)
+    - 429: parse Retry-After, sleep (capped at 300s), increment rate-limit counter
+    - 200 with low X-RateLimit-Remaining: legacy backoff via reset timestamp
+    """
+    if status_code == 403:
+        if mcp_artifact_errors_by_class_total is not None:
+            try:
+                mcp_artifact_errors_by_class_total.labels(
+                    error_class="TerminalArtifactError"
+                ).inc()
+            except Exception:
+                pass
+        raise TerminalArtifactError("forbidden / missing scope (HTTP 403)")
+
+    if status_code == 429:
+        retry_after = headers.get("Retry-After")
+        if retry_after:
+            sleep_s = min(_parse_retry_after(retry_after), 300.0)
+        else:
+            sleep_s = min(60.0, 300.0)
+        time.sleep(sleep_s)
+        if mcp_rate_limit_sleeps_total is not None:
+            try:
+                mcp_rate_limit_sleeps_total.inc()
+            except Exception:
+                pass
+        return sleep_s
+
+    # Legacy path: low X-RateLimit-Remaining on 2xx responses
     remaining = int(headers.get("X-RateLimit-Remaining", "5000"))
     if remaining < 100:
         reset = int(headers.get("X-RateLimit-Reset", str(int(time.time()) + 60)))
@@ -35,11 +91,19 @@ def _gh_api(gh_cmd: str, path: str, *extra: str) -> Tuple[Mapping[str, str], str
         # Fallback: some platforms use \n\n
         header_block, _, body = result.stdout.partition("\n\n")
     headers: dict[str, str] = {}
-    for line in header_block.splitlines()[1:]:
+    status_code = 200
+    lines = header_block.splitlines()
+    if lines:
+        status_line = lines[0]
+        # Parse "HTTP/1.1 NNN Reason"
+        parts = status_line.split(" ", 2)
+        if len(parts) >= 2 and parts[1].isdigit():
+            status_code = int(parts[1])
+    for line in lines[1:]:
         if ": " in line:
             k, v = line.split(": ", 1)
             headers[k] = v
-    _respect_rate_limit(headers)
+    _respect_rate_limit(headers, status_code=status_code)
     return headers, body
 
 
