@@ -133,6 +133,13 @@ Every per-tool-call path — `search_code(query, repo_id)`, `symbol_lookup(symbo
    │
    ▼
   P15  Security Hardening
+   │
+   ▼
+  P16  Shared vocabulary preamble (error taxonomy + env constants + config validator + singleton reset)
+   │
+   ├──► P17  Durability & Multi-Instance Safety     parallel after P16
+   │
+   └──► P18  Enforcement, Artifact Resilience & Ops parallel after P16
 ```
 
 ---
@@ -166,6 +173,12 @@ These gates are the narrowest contracts that let downstream phases start once th
 23. **IF-0-P15-2** — `require_auth(scope: Literal["metrics","admin","tools"]) -> dependency` middleware + the repo-level decision on auth mode (captured in runbook).
 24. **IF-0-P15-3** — `attest(artifact_path: Path) -> Attestation` + `verify_attestation(artifact_path: Path, attestation: Attestation) -> bool`.
 25. **IF-0-P15-4** — `PathTraversalGuard.normalize_and_check(path: str, roots: list[Path]) -> Path` + `TokenValidator.validate_scopes(required: set[str]) -> None` + rate-limit backoff helper.
+26. **IF-0-P16-1** — Artifact error taxonomy in `mcp_server/core/errors.py`: `TransientArtifactError(ArtifactError)` (retry-safe — 5xx, timeout, rate-limit, network), `TerminalArtifactError(ArtifactError)` (not retry-safe — 4xx, auth, validation, missing-artifact), `SchemaMigrationError(ArtifactError)` (migration failed; DB restored from backup). Prometheus counter label extension: `mcp_artifact_errors_by_class_total{class="transient"|"terminal"|"schema_migration"}`.
+27. **IF-0-P16-2** — Env-var constant module `mcp_server/config/env_vars.py` with lazy readers (never module-level `os.environ` reads): `get_max_file_size_bytes() -> int` (default 10_485_760 = 10 MiB), `get_artifact_retention_count() -> int` (10), `get_artifact_retention_days() -> int` (30), `get_disk_readonly_threshold_mb() -> int` (100), `get_publish_rollback_enabled() -> bool` (default True).
+28. **IF-0-P16-3** — `validate_production_config(config: SecurityConfig, *, environment: str) -> list[ValidationError]` in `mcp_server/config/validation.py`; returns a list (empty if valid), caller decides to raise. `ValidationError` is a frozen dataclass `{code: str, message: str, severity: Literal["fatal","warn"]}`. Fatal severity under `environment="production"` must abort boot.
+29. **IF-0-P16-4** — `reset_process_singletons() -> None` in `mcp_server/cli/bootstrap.py`. Idempotent; zeroes each `_instance` at module scope: `multi_repo_manager._manager_instance`, `cross_repo_coordinator._coordinator_instance`, `repository_plugin_loader._loader_instance`, `memory_aware_manager._memory_manager_instance`.
+30. **IF-0-P17-1** — Registry save protocol: `RepositoryRegistry.save()` acquires `fcntl.flock(LOCK_EX)` on a sibling `.lock` file, then performs the existing atomic rename. Pattern documented in `docs/operations/multi-instance.md`.
+31. **IF-0-P18-1** — Route-auth coverage contract: every `@app.(get|post|put|delete|patch)` route in `mcp_server/gateway.py` is one of (a) explicitly public (auth endpoints, `/health*`, `/ready`, `/liveness`), (b) gated by `Depends(require_auth|require_permission|require_role)` on the function signature, or (c) gated by `dependencies=[Depends(...)]` on the decorator. Enforced by `tests/security/test_route_auth_coverage.py` via `app.routes` introspection.
 
 ---
 
@@ -184,6 +197,7 @@ Establish a single, worktree-aware identity scheme for repositories and pin each
 - [ ] Registry auto-regenerates ids on first run under the new scheme; legacy entries either match (no-op) or get re-registered (no stale bookkeeping).
 
 **Scope notes**
+- Decompose into 3 lanes: (a) identity module (new `repo_identity.py`, publishes `compute_repo_id` signature as IF-0-P1-1 day-one so (b)/(c) unblock immediately); (b) registry changes (`RepositoryRegistry.register()` + `git_index_manager.py` branch-change block removal); (c) walker `.gitignore` respect (disjoint edits in CLI walker + dispatcher walker).
 - Create `mcp_server/storage/repo_identity.py` as the single source of truth for id computation. Replace the inline logic in `MultiRepositoryManager._generate_repository_id` (~line 193) and the newly added `MultiRepositoryManager.resolve_repo_id` classmethod added earlier this session (which currently hashes path/URL without worktree awareness).
 - Extend `RepositoryRegistry.register()` (`mcp_server/storage/repository_registry.py:~195`) to compute + persist `tracked_branch` and `git_common_dir`.
 - Rip out the "branch changed → force full reindex" block at `mcp_server/storage/git_index_manager.py:106–113`.
@@ -201,6 +215,9 @@ Establish a single, worktree-aware identity scheme for repositories and pin each
 - `mcp_server/utils/index_discovery.py`
 - `scripts/cli/mcp_server_cli.py` (walker `.gitignore` respect only; no other changes)
 - `mcp_server/dispatcher/dispatcher_enhanced.py` (walker `.gitignore` respect only)
+
+**Depends on**
+- (none)
 
 **Produces**
 - IF-0-P1-1, IF-0-P1-2
@@ -514,7 +531,7 @@ Close the `repository=` parameter gap so every operational tool handler accepts 
 - [ ] `tests/test_tool_schema_handler_parity.py` (new) asserts every MCP tool whose schema advertises `repository` has a handler that accepts the kwarg, and vice versa.
 
 **Scope notes**
-- Two lanes: (a) handler signature + routing completion (three handlers), (b) `tomllib` fallback + `pyproject.toml` conditional dep + parity test.
+- Decompose into 2 lanes: (a) handler signature + routing completion (three handlers), (b) `tomllib` fallback + `pyproject.toml` conditional dep + parity test.
 - `handle_reindex` edge case: if both `path` and `repository` are given and inconsistent, fail-loud with a structured error (do not silent-reinterpret).
 - Depends on P7's schema additions being on `main` first; one-commit ordering, not a structural block.
 
@@ -586,6 +603,7 @@ Investigate why `EnhancedDispatcher.lookup()`'s SIGALRM per-plugin timeout did n
 - [ ] `CPlugin` is not instantiated for non-C/C++ file extensions. Unit test: `dispatch_for('.py', symbol='foo')` does not import or instantiate `CPlugin`.
 
 **Scope notes**
+- Decompose into 2 lanes: (a) investigation + reproducer (owns `docs/investigations/dispatcher-sigalrm-failure.md` + a `test_dispatcher_fallback_timeout.py` reproducer); (b) extension-gating + bounded dispatch path (owns `dispatcher_enhanced.py` + `bootstrap.py` edits + `test_dispatcher_extension_gating.py`). Disjoint files; (b) begins once (a) commits the root-cause note.
 - **Unknown-scope phase** — plan with `--consensus` to surface alternative hypotheses before committing a fix.
 - Extension-gating is a behavior change: cross-language symbol fallback is gone. This is the fix, not a regression — the silent correctness failure mode is what made the hang possible.
 - SimpleDispatcher is out of scope. Enhanced-only.
@@ -818,6 +836,161 @@ Enforce trust boundaries: sandbox plugins, authenticate `/metrics`, sign and ver
 
 ---
 
+### Phase 16 — Shared Vocabulary Preamble (P16)
+
+**Objective**
+Freeze the four shared contracts P17 and P18 both consume: the `TransientArtifactError` / `TerminalArtifactError` / `SchemaMigrationError` taxonomy, a lazy-read env-var constant module, the `validate_production_config` signature + `ValidationError` dataclass, and the `reset_process_singletons` bootstrap hook. Single-lane preamble — each downstream phase fills bodies in files it otherwise owns exclusively.
+
+**Exit criteria**
+- [ ] `TransientArtifactError`, `TerminalArtifactError`, `SchemaMigrationError` importable from `mcp_server.core.errors`; each subclasses `ArtifactError`; pytest shape check passes.
+- [ ] `mcp_server/config/env_vars.py` exports `get_max_file_size_bytes`, `get_artifact_retention_count`, `get_artifact_retention_days`, `get_disk_readonly_threshold_mb`, `get_publish_rollback_enabled`; module-load is side-effect-free (no `os.environ` reads until a getter is called).
+- [ ] `validate_production_config(config, environment="production")` callable; returns a `list[ValidationError]`; body emits an empty list in P16 (downstream lanes fill the fatal entries). Signature contract test passes.
+- [ ] `reset_process_singletons()` callable; unit test registers sentinel values on each known module-level `_instance` attr, invokes the function, asserts all are `None`.
+- [ ] `pytest --collect-only -q` succeeds across the whole repo (proves no downstream breakage from the new imports).
+
+**Scope notes**
+- **Preamble / interface-only phase — single lane justified** per roadmap-builder Rule 5 escape hatch. Four tiny freezes, all new files except `core/errors.py` (additive only) and `cli/bootstrap.py` (additive only).
+- Stubs only. `validate_production_config` returns `[]`; `reset_process_singletons` fills all known `_instance` attrs today but is called by no consumer yet; env-var getters have real bodies but no callers; error subclasses have `pass` bodies.
+- Lane teammate must NOT edit `gateway.py`, `security_middleware.py`, `publisher.py`, `artifact_download.py`, `providers/github_actions.py`, `plugin_factory.py`, `sqlite_store.py`, or any watcher file — those are strictly P17 or P18 territory.
+- Env-var constants use the lazy-getter pattern (never `VALUE = int(os.environ.get(...))` at module scope) per the lesson learned from P15 SL-4's `_PATH_GUARD` that was initially module-level and broke `monkeypatch.setenv` in tests.
+
+**Non-goals**
+- Do not wire `validate_production_config` into startup — P18 owns that.
+- Do not wire `reset_process_singletons` into `initialize_stateless_services` — P17 owns that.
+- No retry logic, no metric instrumentation, no doc beyond module docstrings.
+
+**Key files**
+- `mcp_server/core/errors.py` (extend — add 3 subclasses)
+- `mcp_server/config/env_vars.py` (new)
+- `mcp_server/config/validation.py` (extend — add `validate_production_config` + `ValidationError` dataclass)
+- `mcp_server/cli/bootstrap.py` (extend — add `reset_process_singletons`)
+- `tests/test_p16_vocabulary.py` (new — contract shape tests for all four freezes)
+
+**Depends on**
+- P15 merged.
+
+**Produces**
+- IF-0-P16-1
+- IF-0-P16-2
+- IF-0-P16-3
+- IF-0-P16-4
+
+---
+
+### Phase 17 — Durability & Multi-Instance Safety (P17)
+
+**Objective**
+Make the storage + watcher + indexing layer safe under concurrent multi-instance deployment, disk failures, and long-running process lifecycles. Burn down the 46 pre-existing test failures that hid durability regressions (commit-persistence round-trip bug; stale `CrossRepositorySearchCoordinator` class name after refactor).
+
+**Exit criteria**
+- [ ] Registry survives concurrent writes: two processes calling `RepositoryRegistry.save()` against the same file concurrently → both updates persist, no lost writes (new `tests/test_registry_concurrency.py`).
+- [ ] `reset_process_singletons()` is called at the top of `initialize_stateless_services`; repeat-init in the same Python process yields fresh managers (new `tests/test_singleton_reset.py`).
+- [ ] Ref-poller detects detached HEAD, force-push (commit hash changed without fast-forward), and branch-rename; each triggers a full-repo rescan (new `tests/test_ref_poller_edges.py`, 3 cases).
+- [ ] Sweeper exception emits a `WARNING` log and increments `mcp_watcher_sweep_errors_total` Prometheus counter (new `tests/test_sweeper_observability.py`).
+- [ ] Checkpoint clears on clean exit even when `errors` non-empty (fix `incremental_indexer.py:232-233`); explicit re-run does not resume from stale error state.
+- [ ] `MCP_MAX_FILE_SIZE_BYTES` honored in the dispatcher walker; oversize file logs + skips; indexer does not stall on single-file over-limit.
+- [ ] `ENOSPC` during SQLite commit → store enters read-only mode + emits `mcp_storage_readonly_total` counter; server keeps serving reads without crashing (new `tests/test_disk_full.py`).
+- [ ] `SchemaMigrator.apply` writes a timestamped `.backup` copy of the DB before any migration; rollback-on-failure restores from backup (new `tests/test_schema_migration_backup.py`).
+- [ ] Pre-existing 46 test failures reduced to ≤5; remaining residuals documented in `docs/operations/known-test-debt.md`.
+- [ ] `ruff F401` count across `mcp_server/dispatcher`, `mcp_server/storage`, `mcp_server/watcher` is 0.
+- [ ] `RerankerFactory.create_default()` returns a functional reranker (resolves the P14 carry-over).
+
+**Scope notes**
+- Decompose into 4 impl lanes + terminal SL-docs lane.
+- **SL-1 Registry + singleton hygiene** owns `storage/repository_registry.py`, `storage/multi_repo_manager.py`, `cli/bootstrap.py` (caller wiring — adds the `reset_process_singletons()` call at the top of `initialize_stateless_services`), `tests/test_registry_concurrency.py` (new), `tests/test_singleton_reset.py` (new), and fixes `tests/test_repository_registry_commits.py` (the two failing tests wrongly assumed a caller-supplied `repository_id` string round-trips; the implementation correctly uses `compute_repo_id(path).repo_id`. Tests must read-back via `registry.get_repository(compute_repo_id(path).repo_id)`).
+- **SL-2 Watcher/indexing resilience** owns `watcher/sweeper.py`, `watcher/ref_poller.py`, `indexing/incremental_indexer.py`, `indexing/checkpoint.py`, `dispatcher/dispatcher_enhanced.py` (walker file-size guard only — line-range ownership of the `_walk_directory` method), and 3 new test files. Disjoint from SL-1.
+- **SL-3 Disk & schema safety** owns `storage/sqlite_store.py`, `storage/schema_migrator.py`, fills raise-sites for `SchemaMigrationError` in P16's frozen taxonomy, and 2 new test files. Disjoint from SL-1/SL-2.
+- **SL-4 Carry-over debt** owns `tests/test_cross_repo_coordinator.py` (single root cause for all 18 failures: stale class name `CrossRepositorySearchCoordinator` at `mcp_server.storage.cross_repo_coordinator` from a pre-existing refactor; real class is `CrossRepositoryCoordinator` at `mcp_server.dispatcher.cross_repo_coordinator`. Fix: update imports + method references to the current surface). Also `mcp_server/plugins/reranker_factory.py` (realize `create_default()`), ruff F401 cleanup. Isolated; zero file overlap with SL-1/SL-2/SL-3.
+- **SL-docs (terminal)** owns `docs/operations/multi-instance.md` (new — file-locking protocol, singleton reset semantics, DR/recovery procedure), `docs/operations/known-test-debt.md` (new), `ARCHITECTURE.md` concurrency addendum.
+- **Single-writer within phase**: `mcp_server/core/errors.py` — SL-3 fills `raise SchemaMigrationError(...)` sites in schema_migrator.py only; the class shape is frozen from P16.
+- **Cross-phase single-writer with P18**: **none**. P17 files and P18 files are disjoint; P16's freeze means both phases can fill their own raise-sites without collision.
+
+**Non-goals**
+- No edits to `publisher.py`, `artifact_download.py`, `gateway.py`, `security_middleware.py`, `plugin_factory.py`, `attestation.py`, `providers/github_actions.py` — those are P18.
+- No distributed-backend migration (etcd/Redis). File-based registry + flock only.
+- No long-running retention daemon — P18 owns retention CLI.
+
+**Key files**
+- `mcp_server/storage/repository_registry.py`, `multi_repo_manager.py`, `sqlite_store.py`, `schema_migrator.py`
+- `mcp_server/watcher/sweeper.py`, `ref_poller.py`
+- `mcp_server/indexing/incremental_indexer.py`, `checkpoint.py`
+- `mcp_server/dispatcher/dispatcher_enhanced.py` (walker file-size guard only)
+- `mcp_server/cli/bootstrap.py`
+- `mcp_server/plugins/reranker_factory.py`
+- `mcp_server/core/errors.py` (raise-sites only; shape is frozen)
+- `tests/test_repository_registry_commits.py`, `test_cross_repo_coordinator.py` (fix)
+- `tests/test_registry_concurrency.py`, `test_singleton_reset.py`, `test_ref_poller_edges.py`, `test_sweeper_observability.py`, `test_disk_full.py`, `test_schema_migration_backup.py` (all new)
+- `docs/operations/multi-instance.md`, `docs/operations/known-test-debt.md` (new)
+- `ARCHITECTURE.md` (extend)
+
+**Depends on**
+- P16 merged.
+
+**Produces**
+- IF-0-P17-1
+
+---
+
+### Phase 18 — Enforcement, Artifact Resilience & Ops (P18)
+
+**Objective**
+Turn P15's security primitives from "available" into "enforced by default." Harden the artifact publish/download pipeline against partial-failure, missing delta bases, and hostile rate-limiting. Wire the observability operators actually page on (JSON logs, Prometheus counters, secret redaction). Flip safe defaults (sandbox on) after a documented opt-out path.
+
+**Exit criteria**
+- [ ] `pytest tests/security/test_route_auth_coverage.py` passes: every `@app.(get|post|put|delete|patch)` route in `mcp_server/gateway.py` is auth'd unless explicitly whitelisted (auth endpoints + `/health*` + `/ready` + `/liveness`). `/search/capabilities` is now auth'd.
+- [ ] Boot with `MCP_ENVIRONMENT=production` + weak `JWT_SECRET_KEY` → exits non-zero with a `ValidationError` listing (severity=fatal) rendered to stderr; boot with `MCP_ENVIRONMENT=dev` + same config → logs a WARN and continues.
+- [ ] Killing `gh` mid-`publish_on_reindex` → no orphan release on GitHub (rollback test: stub `_move_latest_pointer` to raise, verify `_ensure_sha_release` output is cleaned up via `gh release delete`).
+- [ ] `artifact_download` falls back to requesting the full artifact when a delta's base is not found on GitHub Releases (new `tests/test_delta_base_fallback.py`).
+- [ ] `_respect_rate_limit` parses `Retry-After` header and applies exponential backoff; distinguishes 429 from 403 (403 raises `TerminalArtifactError`, 429 triggers backoff).
+- [ ] `MCP_PLUGIN_SANDBOX_ENABLED` default flips to on; `MCP_PLUGIN_SANDBOX_DISABLE=1` provides opt-out; existing plugin tests still pass.
+- [ ] Production-mode logs emit JSON; test asserts `json.loads(captured_line)` succeeds.
+- [ ] Secret-redaction response middleware strips `Bearer \S+`, `JWT_SECRET_KEY=\S+`, `GITHUB_TOKEN=\S+` from 4xx/5xx response bodies.
+- [ ] `python -m mcp_server.cli retention prune --repo owner/repo` deletes releases older than `MCP_ARTIFACT_RETENTION_DAYS` or beyond `MCP_ARTIFACT_RETENTION_COUNT`; operator-triggered, no daemon.
+- [ ] Boot with `MCP_ATTESTATION_MODE=enforce` + `gh` missing the `attestation` subcommand (or missing `attestations:write` scope) → single prominent `ATTESTATION_PREREQ` WARN line at startup; boot continues (enforce still the default, but the warn is diagnosable).
+
+**Scope notes**
+- Decompose into 5 impl lanes + terminal SL-docs lane.
+- **SL-1 Config + auth enforcement** owns `gateway.py` (the startup-validation block near `AuthManager` instantiation at ~line 343, plus the single decorator edit at `/search/capabilities` ~line 1472), `config/validation.py` (fill P16's frozen signature body with the security entries: weak JWT, CORS wildcard, permissive RATE_LIMIT, missing admin password), `tests/security/test_route_auth_coverage.py` (new — uses `app.routes` introspection to enumerate every route and assert 401 without token on non-whitelisted paths).
+- **SL-2 Artifact pipeline resilience** owns `artifacts/publisher.py` (publish rollback via try/finally around `_ensure_sha_release` → `_move_latest_pointer`; on failure, `gh release delete` the SHA release), `artifacts/artifact_download.py` (delta-base-missing → request full artifact fallback), `artifacts/providers/github_actions.py` (Retry-After parsing, 403-vs-429 branching, `TransientArtifactError`/`TerminalArtifactError` emission), `artifacts/attestation.py` (attest preflight section only — check `attestations:write` scope before calling `attest()`), 3 new test files.
+- **SL-3 Retention janitor** owns new `artifacts/retention.py`, appends a `delete_releases_older_than` helper at the end of `artifacts/providers/github_actions.py` (append-only past SL-2's line range), extends `cli/commands.py` with the `retention prune` subcommand, new `tests/test_retention_janitor.py`.
+- **SL-4 Observability** owns `core/logging.py` (JSON-format default when `MCP_ENVIRONMENT=production` or `MCP_LOG_FORMAT=json`), `security/security_middleware.py` (secret-redaction response middleware), `metrics/exporters.py` (new Prometheus counters: `mcp_watcher_sweep_errors_total`, `mcp_rate_limit_sleeps_total`, `mcp_artifact_errors_by_class_total`, `mcp_storage_readonly_total`), `gateway.py` (one line: middleware registration near `SecurityMiddlewareStack` init, disjoint from SL-1's block). 2 new test files.
+- **SL-5 Safe defaults flip** owns `plugins/plugin_factory.py` (flip `MCP_PLUGIN_SANDBOX_ENABLED` default to on; honor `MCP_PLUGIN_SANDBOX_DISABLE=1` opt-out), `artifacts/attestation.py` (adds `probe_gh_attestation_support()` + boot-time capability check — disjoint function block from SL-2's preflight work), `docs/security/sandbox.md` (migration guide extension), 1 new test file.
+- **SL-docs (terminal)** owns `docs/configuration/environment-variables.md` (new — full `MCP_*` env reference, defaults, prod-safe values), `docs/operations/gateway-startup-checklist.md` (new — operator deploy checklist), `docs/operations/artifact-retention.md` (new — operator janitor guide), `README.md` / `CHANGELOG.md` extensions, post-execution amendments section of this spec.
+- **Single-writer files within phase**:
+  - `mcp_server/gateway.py`: SL-1 owns the startup-validation block (~line 343) + `/search/capabilities` decorator (~line 1472); SL-4 owns the middleware registration line near `SecurityMiddlewareStack` init (~line 341 area). Disjoint line ranges; top-of-file imports merged alphabetically at lane merge time (P14/P15 pattern).
+  - `mcp_server/artifacts/attestation.py`: SL-2 owns attest-preflight (function block around `attest`); SL-5 owns `probe_gh_attestation_support` (new function, file-end append). Disjoint function blocks.
+  - `mcp_server/artifacts/providers/github_actions.py`: SL-2 owns the rate-limit + retry edits inline; SL-3 appends `delete_releases_older_than` at file end (append-only).
+- **Cross-phase single-writer with P17**: none. See P17 Scope notes — P16's taxonomy freeze means both phases only fill their own raise-sites.
+
+**Non-goals**
+- No mid-run token refresh (operator restart on token rotation remains the documented path).
+- No bounded delta-chain depth enforcement (backlog — surface chain length in metadata only).
+- No release-janitor daemon (CLI-triggered only).
+- No distributed rate-limit coordination (single-instance backoff only).
+- No TLS termination inside the app (unchanged from P15).
+- No plugin signing (sandbox is the substitute, unchanged from P15).
+
+**Key files**
+- `mcp_server/gateway.py` (startup block + one middleware registration line + one route decorator)
+- `mcp_server/config/validation.py`
+- `mcp_server/security/security_middleware.py`
+- `mcp_server/core/logging.py`
+- `mcp_server/artifacts/publisher.py`, `artifact_download.py`, `attestation.py`, `providers/github_actions.py`, `retention.py` (new)
+- `mcp_server/plugins/plugin_factory.py`
+- `mcp_server/metrics/exporters.py`
+- `mcp_server/cli/commands.py`
+- `tests/security/test_route_auth_coverage.py` (new)
+- `tests/test_artifact_publish_rollback.py`, `test_delta_base_fallback.py`, `test_rate_limit_retry_after.py`, `test_json_logs.py`, `test_secret_redaction.py`, `test_sandbox_default_on.py`, `test_retention_janitor.py` (all new)
+- `docs/configuration/environment-variables.md`, `docs/operations/gateway-startup-checklist.md`, `docs/operations/artifact-retention.md`, `docs/security/sandbox.md` (all new or extended)
+
+**Depends on**
+- P16 merged. (Runs in parallel with P17.)
+
+**Produces**
+- IF-0-P18-1
+
+---
+
 ## Execution Notes
 
 - **Save this file as `specs/phase-plans-v1.md`** and create `specs/phase-aliases.json` mapping `P1, P2A, P2B, P3, P4, P5, P6A, P6B` to the full phase headings above so `/plan-phase` can resolve short aliases. If `specs/phase-aliases.json` isn't used, pass `<phase-name-or-id>` as the full heading when invoking `/plan-phase`.
@@ -838,6 +1011,13 @@ Enforce trust boundaries: sandbox plugins, authenticate `/metrics`, sign and ver
 - **P14 SL-4 and P13 SL-4 both edit `artifact_upload.py`** — time-ordered (P13 merges first), no concurrent work.
 - **P15 SL-1 (plugin sandboxing) is the riskiest single lane in this entire remediation arc.** Plan with `--consensus`; budget for a scoping prototype if consensus cannot converge in one lane-day.
 - **User runbook prerequisites** apply before each execute-phase. See `docs/operations/user-action-runbook.md` for the per-phase checklist (GitHub token scopes for P13, SLSA attestations for P15, etc.). Read that file before invoking `/execute-phase p12`.
+- **P16 is a single-lane preamble phase.** After its merge, P17 and P18 have no shared DAG ancestor beyond P16 — plan and execute both concurrently. Use `/plan-phase P17` and `/plan-phase P18` in parallel, then `/execute-phase p17` and `/execute-phase p18` in separate worktrees or terminal panes.
+- **P17 and P18 share `mcp_server/core/errors.py` only for raise-sites.** P16's IF-0-P16-1 freezes the class shape; P17 SL-3 fills `SchemaMigrationError` raise sites in `schema_migrator.py`; P18 SL-2 fills `TransientArtifactError`/`TerminalArtifactError` raise sites in `providers/github_actions.py` and `artifact_download.py`. Disjoint raise-site files; no merge conflict.
+- **P18 SL-1 and SL-4 both edit `gateway.py`.** SL-1 owns the startup-validation block (near AuthManager instantiation at ~line 343) and the `/search/capabilities` decorator (~line 1472). SL-4 owns the secret-redaction middleware registration near the `SecurityMiddlewareStack` init (~line 341). Disjoint line ranges; top-of-file imports alphabetized at merge (P14/P15 pattern).
+- **P18 SL-2 and SL-3 both touch `artifacts/providers/github_actions.py`.** SL-2 owns the rate-limit + retry edits inline in existing functions; SL-3 appends `delete_releases_older_than` at file end (append-only). No overlap.
+- **P18 SL-2 and SL-5 both touch `artifacts/attestation.py`.** SL-2 owns the attest-preflight function block around `attest`; SL-5 owns the new `probe_gh_attestation_support` helper + startup capability probe. Disjoint function blocks; file-end append for SL-5.
+- **P18 SL-5 flips `MCP_PLUGIN_SANDBOX_ENABLED` to on by default.** This is a user-visible behavioral change. Document the opt-out (`MCP_PLUGIN_SANDBOX_DISABLE=1`) prominently in CHANGELOG and release notes. Repo-specific ground truth: no existing plugin in this codebase opens sockets or reads outside the workspace, so the default flip is expected to be non-breaking (verified via `grep -rn 'socket\|urlopen' mcp_server/plugins/` → empty).
+- **P17 SL-4 is isolated cleanup.** The 18 `test_cross_repo_coordinator.py` failures share a single root cause (stale class/module reference from a prior refactor); the 2 `test_repository_registry_commits.py` failures likewise share a single test-assumption bug (hardcoded `repository_id` string ≠ computed `repo_id`). Fix scope is small.
 
 ## Verification (whole-refactor, after P5 merge)
 
@@ -960,3 +1140,45 @@ pytest tests/security/test_path_traversal.py tests/security/test_token_scope.py 
 ```
 
 Any failure in the above — a probe returning 503 when the service is healthy, a fallback to pre-reindex index content when artifact is stale, a concurrent watcher+manual-sync race surfacing in the test, a rename leaving `foo.py` entries behind, a sandboxed plugin escaping to the host filesystem, an unauth'd `/metrics` scrape returning 200, or a tampered artifact passing attestation verification — fails the pre-GA bar and must be remediated before release.
+
+## Verification (post-P18, production-ready)
+
+All P1–P15 verification above must still pass — regression-free. In addition:
+
+```bash
+# P16 — shared vocabulary frozen
+pytest tests/test_p16_vocabulary.py -v --no-cov
+
+# P17 — multi-instance + durability
+pytest tests/test_registry_concurrency.py tests/test_singleton_reset.py \
+       tests/test_ref_poller_edges.py tests/test_sweeper_observability.py \
+       tests/test_disk_full.py tests/test_schema_migration_backup.py -v --no-cov
+
+# P17 — carry-over debt resolved
+pytest tests/test_cross_repo_coordinator.py tests/test_repository_registry_commits.py -v --no-cov
+ruff check mcp_server/dispatcher mcp_server/storage mcp_server/watcher   # expect 0 F401
+
+# P18 — auth coverage + config enforcement
+pytest tests/security/test_route_auth_coverage.py -v --no-cov
+MCP_ENVIRONMENT=production JWT_SECRET_KEY=weak python -m mcp_server.cli.server_commands
+#   expect: exit non-zero with ValidationError listing rendered to stderr
+
+# P18 — artifact resilience
+pytest tests/test_artifact_publish_rollback.py tests/test_delta_base_fallback.py \
+       tests/test_rate_limit_retry_after.py -v --no-cov
+
+# P18 — observability + defaults
+pytest tests/test_json_logs.py tests/test_secret_redaction.py \
+       tests/test_sandbox_default_on.py tests/test_retention_janitor.py -v --no-cov
+
+# P18 — retention CLI round-trip (operator command)
+python -m mcp_server.cli retention prune --repo owner/repo --dry-run
+#   expect: prints releases that would be deleted; exit 0 with no mutation
+
+# Full-suite regression gate — residuals must be ≤5 (down from 46 pre-P17)
+pytest --ignore=tests/test_cross_repo_coordinator.py \
+       --deselect tests/test_plugin_manager_enhanced.py::TestRemoveFileSemanticCleanup \
+       -v --no-cov
+```
+
+Any failure above — concurrent registry writes lost under flock contention, detached-HEAD / force-push missed by ref-poller, disk-full crashing the server instead of dropping to read-only, a gateway route missing auth, a weak JWT accepted under `MCP_ENVIRONMENT=production`, an orphan GitHub release after a mid-publish kill, logs emitting plaintext or leaking secrets in production mode, or the carry-over debt count staying above 5 — fails production-readiness and blocks GA.
