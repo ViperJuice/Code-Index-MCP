@@ -10,6 +10,7 @@ This package provides advanced dispatcher capabilities including:
 """
 
 # Legacy import for backwards compatibility
+from .fallback import run_gated_fallback
 from .dispatcher_enhanced import EnhancedDispatcher
 from .dispatcher_enhanced import EnhancedDispatcher as Dispatcher
 from .simple_dispatcher import SimpleDispatcher
@@ -35,6 +36,7 @@ from .result_aggregator import (
 )
 
 __all__ = [
+    "run_gated_fallback",
     "Dispatcher",  # Legacy alias
     "EnhancedDispatcher",
     "SimpleDispatcher",
