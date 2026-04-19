@@ -450,11 +450,36 @@ class TestBenchmarkRunner:
 
 
 @pytest.mark.benchmark(group="symbol_lookup")
+def _populate_suite_store(suite, symbols_by_file):
+    """Write symbols and BM25 content into suite.store so lookup/search use the fast sqlite path."""
+    import sqlite3 as _sqlite3
+    repo_id = suite.store.create_repository("/benchmark", "benchmark", {})
+    for file_path, syms in symbols_by_file.items():
+        file_id = suite.store.store_file(repo_id, file_path, file_path, language="python", size=0, hash="0")
+        content_lines = []
+        for sym in syms:
+            name = sym["symbol"] if isinstance(sym, dict) else sym.symbol
+            kind = sym["kind"] if isinstance(sym, dict) else sym.kind
+            line_start = sym["start_line"] if isinstance(sym, dict) else sym.start_line
+            line_end = sym["end_line"] if isinstance(sym, dict) else sym.end_line
+            signature = sym["signature"] if isinstance(sym, dict) else sym.signature
+            suite.store.store_symbol(file_id, name, kind, line_start, line_end, signature=signature)
+            content_lines.append(f"def {name}():")
+        # Populate fts_code for BM25 search
+        content = "\n".join(content_lines)
+        with _sqlite3.connect(suite.store.db_path) as _conn:
+            _conn.execute(
+                "INSERT OR IGNORE INTO fts_code(content, file_id) VALUES (?, ?)",
+                (content, file_id),
+            )
+
+
 def test_benchmark_symbol_lookup_performance(benchmark, mock_plugins):
     """Benchmark symbol lookup with pytest-benchmark and SLO validation."""
     suite = BenchmarkSuite(mock_plugins)
 
-    # Pre-populate symbols
+    # Pre-populate symbols in both plugin and store for fast sqlite-path lookup
+    symbols_by_file = {}
     for i in range(100):
         symbol = SymbolDef(
             symbol=f"bench_function_{i}",
@@ -468,6 +493,8 @@ def test_benchmark_symbol_lookup_performance(benchmark, mock_plugins):
             span=(1, 1),
         )
         suite.plugins[0]._symbols[f"bench_function_{i}"] = symbol
+        symbols_by_file.setdefault(f"/test/bench_{i}.py", []).append(symbol)
+    _populate_suite_store(suite, symbols_by_file)
 
     def lookup():
         timer_id = suite.start_timer("symbol_lookup", {"symbol": "bench_function_42"})
@@ -498,7 +525,8 @@ def test_benchmark_search_performance(benchmark, mock_plugins):
     """Benchmark search with pytest-benchmark and SLO validation."""
     suite = BenchmarkSuite(mock_plugins)
 
-    # Pre-populate symbols
+    # Pre-populate symbols in both plugin and store (BM25 path requires store data)
+    symbols_by_file = {}
     for i in range(100):
         symbol = SymbolDef(
             symbol=f"search_function_{i}",
@@ -512,6 +540,8 @@ def test_benchmark_search_performance(benchmark, mock_plugins):
             span=(1, 1),
         )
         suite.plugins[0]._symbols[f"search_function_{i}"] = symbol
+        symbols_by_file.setdefault(f"/test/search_{i}.py", []).append(symbol)
+    _populate_suite_store(suite, symbols_by_file)
 
     def search():
         timer_id = suite.start_timer("fuzzy_search", {"query": "search"})
