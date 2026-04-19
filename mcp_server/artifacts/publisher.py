@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 import subprocess
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, Optional
 
+from mcp_server.artifacts.delta_policy import DeltaPolicy
 from mcp_server.core.errors import MCPError
 
 if TYPE_CHECKING:
@@ -50,6 +52,21 @@ class ArtifactPublisher:
         release_url = f"https://github.com/{repo}/releases/tag/{sha_tag}"
 
         try:
+            previous_artifact_id = self._get_latest_commit(repo)
+            archive_path, checksum, size = self._uploader.compress_indexes(
+                Path(f"index-archive-{short_sha}.tar.gz")
+            )
+            policy = DeltaPolicy()
+            decision = policy.decide(
+                compressed_size_bytes=size,
+                previous_artifact_id=previous_artifact_id,
+            )
+            self._uploader.create_metadata(
+                checksum,
+                size,
+                artifact_type=decision.strategy,
+                delta_from=decision.base_artifact_id,
+            )
             self._ensure_sha_release(sha_tag, commit, repo)
             self._move_latest_pointer(sha_tag, commit, repo)
             is_latest = self._check_is_latest(commit, repo)
@@ -73,6 +90,21 @@ class ArtifactPublisher:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _get_latest_commit(self, repo: str) -> Optional[str]:
+        """Return the target commit of index-latest, or None if it doesn't exist."""
+        result = subprocess.run(
+            [self._gh_cmd, "release", "view", "index-latest", "--repo", repo, "--json", "targetCommitish"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return None
+        try:
+            data = json.loads(result.stdout)
+            return data.get("targetCommitish") or None
+        except (json.JSONDecodeError, AttributeError):
+            return None
 
     def _run(self, args: list[str], *, check: bool = True) -> subprocess.CompletedProcess:
         """Run a gh sub-command, wrapping CalledProcessError in ArtifactError."""

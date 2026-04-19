@@ -61,7 +61,9 @@ class IncrementalIndexer:
         self.path_resolver = PathResolver(self.repo_path)
         self.semantic_indexer = semantic_indexer
 
-    def _get_chunk_ids_for_path(self, path: str) -> List[str]:
+    def _get_chunk_ids_for_path(
+        self, path: str, limit: Optional[int] = None, offset: int = 0
+    ) -> List[str]:
         """Get indexed chunk ids for a relative repository path."""
         relative_path = self.path_resolver.normalize_path(self.repo_path / path)
         repo_id = self._get_repository_id()
@@ -76,10 +78,16 @@ class IncrementalIndexer:
                 return []
 
             file_id = row[0]
-            cursor = conn.execute(
-                "SELECT chunk_id FROM code_chunks WHERE file_id = ?",
-                (file_id,),
-            )
+            if limit is not None:
+                cursor = conn.execute(
+                    "SELECT chunk_id FROM code_chunks WHERE file_id = ? LIMIT ? OFFSET ?",
+                    (file_id, limit, offset),
+                )
+            else:
+                cursor = conn.execute(
+                    "SELECT chunk_id FROM code_chunks WHERE file_id = ?",
+                    (file_id,),
+                )
             chunk_ids = [record[0] for record in cursor.fetchall()]
             if not chunk_ids:
                 return []
