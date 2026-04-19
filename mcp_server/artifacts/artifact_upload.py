@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 from mcp_server.config.settings import get_settings
+from mcp_server.core.errors import record_handled_error
 
 from .secure_export import SecureIndexExporter
 from .semantic_profiles import (
@@ -113,7 +114,8 @@ class IndexArtifactUploader:
                 text=True,
                 check=True,
             ).stdout.strip()
-        except Exception:
+        except Exception as exc:
+            record_handled_error(__name__, exc)
             commit = "unknown"
             branch = "unknown"
 
@@ -144,7 +146,8 @@ class IndexArtifactUploader:
             return {}
         try:
             payload = json.loads(metadata_path.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as exc:
+            record_handled_error(__name__, exc)
             return {}
         return payload if isinstance(payload, dict) else {}
 
@@ -204,7 +207,8 @@ class IndexArtifactUploader:
                 )
             finally:
                 conn.close()
-        except Exception:
+        except Exception as exc:
+            record_handled_error(__name__, exc)
             return os.environ.get("INDEX_SCHEMA_VERSION", "2")
 
     def _get_index_stats(self) -> Dict[str, Any]:
@@ -223,7 +227,8 @@ class IndexArtifactUploader:
                 cursor.execute("SELECT COUNT(*) FROM symbols")
                 stats["sqlite"]["symbols"] = cursor.fetchone()[0]
                 conn.close()
-            except Exception:
+            except Exception as exc:
+                record_handled_error(__name__, exc)
                 pass
         if Path("vector_index.qdrant").exists():
             total_size = sum(

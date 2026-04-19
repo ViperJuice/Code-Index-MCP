@@ -22,6 +22,7 @@ from typing import Any, Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 from mcp_server.config.settings import get_settings
+from mcp_server.core.errors import record_handled_error
 
 from .integrity_gate import (
     ArtifactIntegrityGateResult,
@@ -184,7 +185,8 @@ class IndexArtifactDownloader:
                     required_schema = str(
                         conn.execute("SELECT MAX(version) FROM schema_version").fetchone()[0]
                     )
-                except Exception:
+                except Exception as exc:
+                    record_handled_error(__name__, exc)
                     required_schema = None
                 finally:
                     if conn is not None:
@@ -226,7 +228,8 @@ class IndexArtifactDownloader:
                                 + "; local config expects "
                                 + ", ".join(sorted(requested_profiles))
                             )
-            except Exception:
+            except Exception as exc:
+                record_handled_error(__name__, exc)
                 pass
         elif artifact_model:
             try:
@@ -242,7 +245,8 @@ class IndexArtifactDownloader:
                     issues.append(
                         f"Embedding model mismatch: artifact={artifact_model}, current={current_model}"
                     )
-            except Exception:
+            except Exception as exc:
+                record_handled_error(__name__, exc)
                 pass
 
         return len(issues) == 0, issues
@@ -272,7 +276,8 @@ class IndexArtifactDownloader:
                 profile_id: profile.compatibility_fingerprint
                 for profile_id, profile in registry.list().items()
             }
-        except Exception:
+        except Exception as exc:
+            record_handled_error(__name__, exc)
             return {}
 
     def find_best_artifact(self, artifacts: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -415,7 +420,8 @@ class IndexArtifactDownloader:
                 if commit:
                     label = f"{commit} ({branch})" if branch else commit
                     print(f"🔖 Restored artifact commit: {label}")
-            except Exception:
+            except Exception as exc:
+                record_handled_error(__name__, exc)
                 pass
         return installed_items
 
@@ -439,7 +445,8 @@ class IndexArtifactDownloader:
         if meta_path.exists():
             try:
                 meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            except Exception:
+            except Exception as exc:
+                record_handled_error(__name__, exc)
                 meta = {}
         else:
             meta = {}

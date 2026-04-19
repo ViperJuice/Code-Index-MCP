@@ -50,6 +50,7 @@ from .result_aggregator import (
     RankingCriteria,
     ResultAggregator,
 )
+from ..core.errors import record_handled_error
 
 logger = logging.getLogger(__name__)
 
@@ -370,7 +371,8 @@ class EnhancedDispatcher:
         try:
             from mcp_server.metrics.prometheus_exporter import get_prometheus_exporter
             self._fallback_histogram = get_prometheus_exporter().dispatcher_fallback_histogram
-        except Exception:
+        except Exception as exc:
+            record_handled_error(__name__, exc)
             self._fallback_histogram = None
 
         logger.info("Enhanced dispatcher initialized")
@@ -810,11 +812,13 @@ class EnhancedDispatcher:
                         _hint = _cur.fetchone()
                         if _hint:
                             row_filepath = _hint[0]
-                    except Exception:
+                    except Exception as exc:
+                        record_handled_error(__name__, exc)
                         pass
                     finally:
                         _conn.close()
-                except Exception:
+                except Exception as exc:
+                    record_handled_error(__name__, exc)
                     pass
 
             source_ext = (
@@ -842,7 +846,8 @@ class EnhancedDispatcher:
                 _hist = get_prometheus_exporter().dispatcher_lookup_histogram
                 if _hist is not None:
                     _hist.observe(time.perf_counter() - _hp_t0)
-            except Exception:
+            except Exception as exc:
+                record_handled_error(__name__, exc)
                 pass
 
     def _is_document_query(self, query: str) -> bool:
@@ -1027,7 +1032,8 @@ class EnhancedDispatcher:
                 return ""
             chunk = sqlite_store.find_best_chunk_for_file(file_id, [])
             return chunk.get("content", "") if chunk else ""
-        except Exception:
+        except Exception as exc:
+            record_handled_error(__name__, exc)
             return ""
 
     def _symbol_route(self, sqlite_store: Optional[SQLiteStore], name: str, kind: Optional[str], limit: int) -> List[Dict]:
@@ -1231,7 +1237,8 @@ class EnhancedDispatcher:
                                             chunk = sqlite_store.find_best_chunk_for_file(
                                                 int(file_id), query.split()
                                             )
-                                        except Exception:
+                                        except Exception as exc:
+                                            record_handled_error(__name__, exc)
                                             chunk = None
                                     bm25_candidates.append(
                                         {
@@ -1553,11 +1560,13 @@ class EnhancedDispatcher:
                             _shint = _scur.fetchone()
                             if _shint:
                                 _search_row_filepath = _shint[0]
-                        except Exception:
+                        except Exception as exc:
+                            record_handled_error(__name__, exc)
                             pass
                         finally:
                             _sconn.close()
-                    except Exception:
+                    except Exception as exc:
+                        record_handled_error(__name__, exc)
                         pass
                 _search_source_ext = (
                     os.path.splitext(_search_row_filepath)[1].lower()
@@ -1631,7 +1640,8 @@ class EnhancedDispatcher:
                 _hist = get_prometheus_exporter().dispatcher_search_histogram
                 if _hist is not None:
                     _hist.observe(time.perf_counter() - _hp_t0)
-            except Exception:
+            except Exception as exc:
+                record_handled_error(__name__, exc)
                 pass
 
     def index_file(self, ctx: RepoContext, path: Path, do_semantic: bool = True) -> None:
@@ -1837,7 +1847,8 @@ class EnhancedDispatcher:
                 "total": len(cached_paths),
                 "by_language": by_language,
             }
-        except Exception:
+        except Exception as exc:
+            record_handled_error(__name__, exc)
             return {"total": 0, "by_language": {}}
 
     def index_directory(self, ctx: RepoContext, directory: Path, recursive: bool = True) -> Dict[str, int]:

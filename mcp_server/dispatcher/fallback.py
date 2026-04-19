@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeout
 from typing import Any, Iterable, Optional
 
+from mcp_server.core.errors import record_handled_error
 from mcp_server.plugin_base import IPlugin, SymbolDef
 from mcp_server.plugin_system.plugin_registry import PluginRegistry
 
@@ -54,13 +55,15 @@ def run_gated_fallback(
                 duration = time.monotonic() - t_start
                 _observe(histogram, "timeout", duration)
                 continue
-            except Exception:
+            except Exception as exc:
+                record_handled_error(__name__, exc)
                 duration = time.monotonic() - t_start
                 _observe(histogram, "error", duration)
                 continue
             finally:
                 ex.shutdown(wait=False)
-        except Exception:
+        except Exception as exc:
+            record_handled_error(__name__, exc)
             ex.shutdown(wait=False)
             duration = time.monotonic() - t_start
             _observe(histogram, "error", duration)

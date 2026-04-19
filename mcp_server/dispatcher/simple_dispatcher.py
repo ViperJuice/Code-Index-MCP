@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
+from ..core.errors import record_handled_error
 from ..core.repo_context import RepoContext
 from ..graph import GraphCutResult
 from ..plugin_base import IPlugin, SearchResult, SymbolDef
@@ -179,7 +180,8 @@ class SimpleDispatcher:
             try:
                 _ = list(self.search(ctx, "test", limit=1))
                 health["search_available"] = True
-            except Exception:
+            except Exception as exc:
+                record_handled_error(__name__, exc)
                 health["status"] = "degraded"
         else:
             health["status"] = "unhealthy"
