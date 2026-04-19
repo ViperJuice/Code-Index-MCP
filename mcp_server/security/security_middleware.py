@@ -1,6 +1,7 @@
 """FastAPI security middleware for authentication and authorization."""
 
 import logging
+import re
 from datetime import datetime, timedelta
 from typing import Callable, Dict, List, Literal, Optional
 from urllib.parse import unquote
@@ -454,6 +455,44 @@ def require_auth(scope: Literal["metrics", "admin", "tools"]) -> Callable[..., U
     return require_permission(permission)
 
 
+_REDACTION_PATTERNS = [
+    (re.compile(r"(Bearer\s+)\S+"), r"\1[REDACTED]"),
+    (re.compile(r"(JWT_SECRET_KEY=)\S+"), r"\1[REDACTED]"),
+    (re.compile(r"(GITHUB_TOKEN=)\S+"), r"\1[REDACTED]"),
+]
+
+
+class SecretRedactionResponseMiddleware(BaseHTTPMiddleware):
+    """Redact secrets from 4xx/5xx response bodies. Streaming bodies pass through."""
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        response = await call_next(request)
+
+        if not (400 <= response.status_code < 600):
+            return response
+
+        # Accumulate body; streaming bodies are passed through on failure
+        chunks: list[bytes] = []
+        try:
+            async for chunk in response.body_iterator:  # type: ignore[attr-defined]
+                chunks.append(chunk if isinstance(chunk, bytes) else chunk.encode())
+        except Exception:
+            return response
+
+        body = b"".join(chunks).decode("utf-8", errors="replace")
+        for pattern, replacement in _REDACTION_PATTERNS:
+            body = pattern.sub(replacement, body)
+
+        headers = dict(response.headers)
+        headers.pop("content-length", None)
+        return Response(
+            content=body,
+            status_code=response.status_code,
+            headers=headers,
+            media_type=response.media_type,
+        )
+
+
 class SecurityMiddlewareStack:
     """Complete security middleware stack for FastAPI applications."""
 
@@ -480,6 +519,9 @@ class SecurityMiddlewareStack:
 
         # Add request validation middleware
         self.app.add_middleware(RequestValidationMiddleware)
+
+        # Add secret redaction for error responses
+        self.app.add_middleware(SecretRedactionResponseMiddleware)
 
         # Add rate limiting middleware
         self.app.add_middleware(RateLimitMiddleware, auth_manager=self.auth_manager)
