@@ -17,6 +17,7 @@ from typing import Any, Dict, Optional, Tuple
 from mcp_server.artifacts.delta_policy import DeltaPolicy
 from mcp_server.config.settings import get_settings
 from mcp_server.core.errors import record_handled_error
+from mcp_server.artifacts.attestation import Attestation
 
 from .secure_export import SecureIndexExporter
 from .semantic_profiles import (
@@ -104,6 +105,8 @@ class IndexArtifactUploader:
         secure: bool = True,
         artifact_type: str = "full",
         delta_from: Optional[str] = None,
+        *,
+        attestation: Optional[Attestation] = None,
     ) -> Dict[str, Any]:
         try:
             commit = subprocess.run(
@@ -122,7 +125,7 @@ class IndexArtifactUploader:
 
         schema_version = self._get_schema_version()
         compatibility = self._build_compatibility_metadata(schema_version)
-        return {
+        meta: Dict[str, Any] = {
             "version": "1.0",
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "commit": commit,
@@ -140,6 +143,9 @@ class IndexArtifactUploader:
                 "export_method": "secure" if secure else "unsafe",
             },
         }
+        if attestation is not None:
+            meta["attestation_url"] = attestation.bundle_url
+        return meta
 
     def _read_index_metadata(self) -> Dict[str, Any]:
         metadata_path = Path(".index_metadata.json")
