@@ -19,6 +19,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from mcp_server.storage.schema_migrator import SchemaMigrator, UnknownSchemaVersionError
+
 logger = logging.getLogger(__name__)
 
 from mcp_server.config.settings import get_settings
@@ -194,9 +196,13 @@ class IndexArtifactDownloader:
         if not required_schema:
             required_schema = "2"
         if artifact_schema != required_schema:
-            issues.append(
-                f"Schema mismatch: artifact={artifact_schema}, required={required_schema}"
-            )
+            migrator = SchemaMigrator(store=None)
+            if not migrator.is_known(artifact_schema):
+                raise UnknownSchemaVersionError(
+                    f"Artifact schema version {artifact_schema!r} is unknown; "
+                    f"supported: {migrator.SUPPORTED_VERSIONS}"
+                )
+            # Known older version — migration is possible; skip the hard mismatch issue.
 
         if artifact_profiles:
             try:
