@@ -28,6 +28,17 @@ def _make_uploader() -> IndexArtifactUploader:
     uploader.repo = REPO
     uploader.token = ""
     uploader.index_files = []
+    # P14 SL-4: publisher.publish_on_reindex now invokes compress_indexes +
+    # create_metadata to compute the DeltaPolicy decision. These tests focus
+    # on gh-orchestration behavior and stub the uploader's heavy work.
+    from pathlib import Path as _Path
+    from unittest.mock import MagicMock as _MagicMock
+    uploader.compress_indexes = _MagicMock(  # type: ignore[method-assign]
+        return_value=(_Path("/tmp/_publish_race_archive.tar.gz"), "sha256stub", 100)
+    )
+    uploader.create_metadata = _MagicMock(  # type: ignore[method-assign]
+        return_value={"artifact_type": "full", "delta_from": None, "checksum": "sha256stub"}
+    )
     return uploader
 
 
