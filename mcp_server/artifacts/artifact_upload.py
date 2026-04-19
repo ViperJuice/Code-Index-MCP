@@ -14,6 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+from mcp_server.artifacts.delta_policy import DeltaPolicy
 from mcp_server.config.settings import get_settings
 from mcp_server.core.errors import record_handled_error
 
@@ -327,17 +328,19 @@ def run_cli(args: argparse.Namespace) -> int:
 
     secure = not args.no_secure
     archive_path, checksum, size = uploader.compress_indexes(Path(args.output), secure=secure)
-    if size > 500 * 1024 * 1024:
-        print(f"❌ Archive too large: {size / 1024 / 1024:.1f} MB > 500 MB")
-        print("   Consider cleaning up old data or using incremental updates.")
-        return 1
+
+    policy = DeltaPolicy()
+    decision = policy.decide(
+        compressed_size_bytes=size,
+        previous_artifact_id=args.delta_from,
+    )
 
     metadata = uploader.create_metadata(
         checksum,
         size,
         secure=secure,
-        artifact_type=args.artifact_type,
-        delta_from=args.delta_from,
+        artifact_type=decision.strategy,
+        delta_from=decision.base_artifact_id,
     )
     if args.method == "workflow":
         uploader.trigger_workflow(archive_path, metadata)
