@@ -50,7 +50,8 @@ from .result_aggregator import (
     RankingCriteria,
     ResultAggregator,
 )
-from ..core.errors import record_handled_error
+from ..core.errors import IndexingError, record_handled_error
+from ..storage.two_phase import TwoPhaseCommitError, two_phase_commit
 
 logger = logging.getLogger(__name__)
 
@@ -2150,43 +2151,81 @@ class EnhancedDispatcher:
         new_path: Union[Path, str],
         content_hash: Optional[str] = None,
     ) -> None:
-        """Relocate a file in the per-repo index."""
+        """Relocate a file in the per-repo index.
+
+        SQLite path-update is the primary op; semantic re-embed is the shadow op, both
+        wrapped in two_phase_commit so a semantic-indexer failure rolls SQLite back.
+
+        Lock re-entry: callers inside the watcher loop already hold
+        lock_registry.acquire(repo_id); the reentrant RLock makes any re-acquire here
+        a no-op.  Callers outside the watcher loop must acquire the lock themselves.
+        """
         old_path = Path(old_path).resolve()
         new_path = Path(new_path).resolve()
         logger.info(f"Moving file in index: {old_path} -> {new_path}")
 
+        if not ctx.sqlite_store:
+            # No SQLite — nothing to do
+            self._operation_stats["moves"] = self._operation_stats.get("moves", 0) + 1
+            return
+
+        from ..core.path_resolver import PathResolver
+
+        workspace = ctx.workspace_root if ctx.workspace_root else None
+        path_resolver = PathResolver(repository_root=workspace)
         try:
-            # Move in SQLite if available
-            if ctx.sqlite_store:
-                from ..core.path_resolver import PathResolver
+            old_relative = path_resolver.normalize_path(old_path)
+            new_relative = path_resolver.normalize_path(new_path)
+        except Exception as e:
+            logger.error(f"Error normalizing paths for move {old_path} -> {new_path}: {e}")
+            return
 
-                path_resolver = PathResolver()
-                try:
-                    old_relative = path_resolver.normalize_path(old_path)
-                    new_relative = path_resolver.normalize_path(new_path)
-                    ctx.sqlite_store.move_file(
-                        old_relative,
-                        new_relative,
-                        repository_id=1,
-                        content_hash=content_hash,
-                    )
-                except Exception as e:
-                    logger.error(f"Error moving in SQLite: {e}")
+        store = ctx.sqlite_store
 
-            # Move in semantic index if available
+        def _sqlite_primary() -> Tuple[str, str]:
+            store.move_file(
+                old_relative,
+                new_relative,
+                repository_id=1,
+                content_hash=content_hash,
+            )
+            return old_relative, new_relative
+
+        def _semantic_shadow(_result: Tuple[str, str]) -> None:
             try:
                 plugin = self._match_plugin(new_path)
-                if plugin and hasattr(plugin, "_indexer") and plugin._indexer:
-                    plugin._indexer.move_file(old_path, new_path, content_hash)
-                    logger.info(f"Moved in semantic index: {old_path} -> {new_path}")
-            except Exception as e:
-                logger.warning(f"Error moving in semantic index: {e}")
+            except RuntimeError:
+                return  # No plugin — semantic move not applicable
+            if plugin and hasattr(plugin, "_indexer") and plugin._indexer:
+                plugin._indexer.move_file(old_path, new_path, content_hash)
+                logger.info(f"Moved in semantic index: {old_path} -> {new_path}")
 
-            # Update statistics
+        def _sqlite_rollback(_result: Tuple[str, str]) -> None:
+            try:
+                store.move_file(
+                    new_relative,
+                    old_relative,
+                    repository_id=1,
+                    content_hash=content_hash,
+                )
+                logger.info("Rolled back SQLite rename %s -> %s", new_relative, old_relative)
+            except Exception as rb_exc:
+                logger.error("Rollback failed for %s: %s", old_relative, rb_exc)
+
+        try:
+            two_phase_commit(
+                primary_op=_sqlite_primary,
+                shadow_op=_semantic_shadow,
+                rollback=_sqlite_rollback,
+            )
             self._operation_stats["moves"] = self._operation_stats.get("moves", 0) + 1
-
+        except TwoPhaseCommitError as exc:
+            err = IndexingError(f"Atomic move failed {old_path} -> {new_path}: {exc}")
+            record_handled_error(__name__, err)
+            raise err from exc
         except Exception as e:
             logger.error(f"Error moving file {old_path} -> {new_path}: {e}", exc_info=True)
+            raise
 
     async def cross_repo_symbol_search(
         self,

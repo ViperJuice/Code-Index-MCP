@@ -1,11 +1,8 @@
 """Tests for WatcherSweeper — periodic full-tree sweep for inotify/FSEvents drop recovery."""
 
 import os
-import time
 from pathlib import Path
-from unittest.mock import Mock, MagicMock
-import sqlite3
-import tempfile
+from unittest.mock import Mock
 
 import pytest
 
@@ -29,7 +26,6 @@ def _store_file(store, repo_id_int: int, relative_path: str):
     store.store_file(
         file_path=Path(f"/repo/{relative_path}"),
         language="python",
-        symbols=[],
         repository_id=repo_id_int,
         relative_path=relative_path,
     )
@@ -55,7 +51,7 @@ class TestSweeperRecoversMissedEvent:
         # SQLite store has NO record of missed.py
         store = _make_sqlite_store(tmp_path)
         # Register a repository so store knows about it
-        store.store_repository(path=str(repo_root), name="myrepo")
+        store.create_repository(path=str(repo_root), name="myrepo")
 
         missed_calls = []
 
@@ -114,12 +110,11 @@ class TestSweeperNoopWhenNoDrift:
         py_file.write_text("pass\n")
 
         store = _make_sqlite_store(tmp_path)
-        store.store_repository(path=str(repo_root), name="cleanrepo")
+        store.create_repository(path=str(repo_root), name="cleanrepo")
         # Store the file record so sweeper sees it as known
         store.store_file(
             file_path=py_file,
             language="python",
-            symbols=[],
             repository_id=1,
             relative_path="existing.py",
         )
