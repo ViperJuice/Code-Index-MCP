@@ -55,6 +55,8 @@ except ImportError:  # pragma: no cover - optional dependency
 
 logger = logging.getLogger(__name__)
 
+_DISPATCHER_FALLBACK_BUCKETS = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0)
+
 # Module-level counter registered on the default registry so it is always
 # accessible regardless of which PrometheusExporter instance is active.
 mcp_tool_calls_total = Counter(
@@ -259,6 +261,18 @@ class PrometheusExporter:
 
         # Info metric
         self.build_info = Info("mcp_build", "Build information", registry=self.registry)
+
+        # Dispatcher fallback histogram (IF-0-P11-3)
+        if PROMETHEUS_AVAILABLE:
+            self.dispatcher_fallback_histogram = Histogram(
+                "mcp_dispatcher_fallback_duration_seconds",
+                "Dispatcher fallback attempt duration in seconds",
+                ["outcome"],
+                buckets=_DISPATCHER_FALLBACK_BUCKETS,
+                registry=self.registry,
+            )
+        else:
+            self.dispatcher_fallback_histogram = None
 
     def start(self, port: int) -> None:
         """Start the Prometheus HTTP metrics server on the given port (idempotent)."""
