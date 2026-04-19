@@ -41,6 +41,8 @@ from .security import (
     require_permission,
     require_role,
 )
+from .security.path_guard import PathTraversalError, PathTraversalGuard
+from .security.token_validator import TokenValidator
 from .setup.qdrant_autostart import ensure_qdrant_running
 from .setup.semantic_preflight import run_semantic_preflight
 from .storage.sqlite_store import SQLiteStore
@@ -102,8 +104,21 @@ semantic_setup_status: Dict[str, Any] | None = None
 _repo_registry = None
 
 
-def _normalize_search_result(raw_result: Any) -> SearchResult:
-    """Normalize internal search payloads to the public SearchResult schema."""
+def _get_path_guard() -> Optional[PathTraversalGuard]:
+    # Read env lazily so tests can monkeypatch MCP_ALLOWED_ROOTS before calling.
+    raw = os.environ.get("MCP_ALLOWED_ROOTS", "")
+    roots = [p for p in raw.split(os.pathsep) if p]
+    if not roots:
+        # No roots configured — guard short-circuits (allow-all for dev/test).
+        return None
+    return PathTraversalGuard([Path(p) for p in roots])
+
+
+def _normalize_search_result(raw_result: Any) -> Optional[SearchResult]:
+    """Normalize internal search payloads to the public SearchResult schema.
+
+    Returns None if the result's file path fails the path traversal guard.
+    """
 
     def _prefer_path(candidate: Any, fallback: Any) -> str:
         candidate_str = str(candidate or "")
@@ -120,6 +135,14 @@ def _normalize_search_result(raw_result: Any) -> SearchResult:
             or raw_result.get("defined_in"),
             raw_result.get("relative_path") or raw_result.get("path"),
         )
+
+        guard = _get_path_guard()
+        if guard is not None:
+            try:
+                guard.normalize_and_check(file_value)
+            except PathTraversalError:
+                logger.warning("path traversal attempt blocked: %r", file_value)
+                return None
 
         start_line = raw_result.get("start_line")
         end_line = raw_result.get("end_line")
@@ -172,6 +195,15 @@ def _normalize_search_result(raw_result: Any) -> SearchResult:
         or getattr(raw_result, "filepath", None),
         getattr(raw_result, "relative_path", None) or getattr(raw_result, "path", None),
     )
+
+    guard = _get_path_guard()
+    if guard is not None:
+        try:
+            guard.normalize_and_check(file_value)
+        except PathTraversalError:
+            logger.warning("path traversal attempt blocked: %r", file_value)
+            return None
+
     start_line = (
         getattr(raw_result, "start_line", None)
         or getattr(raw_result, "line_start", None)
@@ -309,6 +341,11 @@ async def startup_event():
         # Initialize authentication manager
         logger.info("Initializing authentication manager...")
         auth_manager = AuthManager(security_config)
+
+        # Validate GitHub token scopes (warns and continues if token absent; raises only if MCP_REQUIRE_TOKEN_SCOPES=1)
+        TokenValidator.validate_scopes(
+            required=["contents:read", "metadata:read", "actions:read", "actions:write", "attestations:write"]
+        )
 
         # Create default admin user if it doesn't exist
         admin_user = await auth_manager.get_user_by_username("admin")
@@ -1300,7 +1337,7 @@ async def search(
             )
 
         if cached_results is not None:
-            cached_results = [_normalize_search_result(r) for r in cached_results]
+            cached_results = [r for r in (_normalize_search_result(x) for x in cached_results) if r is not None]
             logger.debug(f"Found cached search results for: '{q}' ({len(cached_results)} results)")
             duration = time.time() - start_time
             business_metrics.record_search_performed(
@@ -1318,7 +1355,7 @@ async def search(
             # Use hybrid search
             with metrics_collector.time_function("search", labels={"mode": "hybrid"}):
                 hybrid_results = await hybrid_search.search(query=q, filters=filters, limit=limit)
-                results = [_normalize_search_result(r) for r in hybrid_results]
+                results = [r for r in (_normalize_search_result(x) for x in hybrid_results) if r is not None]
 
         elif effective_mode == "bm25" and bm25_indexer:
             # Direct BM25 search
@@ -1326,7 +1363,7 @@ async def search(
                 bm25_results = bm25_indexer.search(q, limit=limit, **filters)
                 if not bm25_results and sqlite_store:
                     bm25_results = sqlite_store.search_bm25(q, table="fts_code", limit=limit)
-                results = [_normalize_search_result(r) for r in bm25_results]
+                results = [r for r in (_normalize_search_result(x) for x in bm25_results) if r is not None]
 
         elif effective_mode == "fuzzy" and fuzzy_indexer:
             # Direct fuzzy search
@@ -1335,14 +1372,14 @@ async def search(
                     fuzzy_results = fuzzy_indexer.search_fuzzy(q, max_results=limit)
                 else:
                     fuzzy_results = fuzzy_indexer.search(q, limit=limit)
-                results = [_normalize_search_result(r) for r in fuzzy_results]
+                results = [r for r in (_normalize_search_result(x) for x in fuzzy_results) if r is not None]
 
         elif effective_mode == "semantic":
             # Use classic dispatcher with semantic=True
             if dispatcher:
                 with metrics_collector.time_function("search", labels={"mode": "semantic"}):
                     results = list(dispatcher.search(ctx, q, semantic=True, limit=limit))
-                    results = [_normalize_search_result(r) for r in results]
+                    results = [r for r in (_normalize_search_result(x) for x in results) if r is not None]
             else:
                 raise HTTPException(
                     503,
@@ -1392,12 +1429,12 @@ async def search(
             if dispatcher:
                 with metrics_collector.time_function("search", labels={"mode": "classic"}):
                     results = list(dispatcher.search(ctx, q, semantic=False, limit=limit))
-                    results = [_normalize_search_result(r) for r in results]
+                    results = [r for r in (_normalize_search_result(x) for x in results) if r is not None]
             else:
                 raise HTTPException(503, "Classic search not available")
 
         # Cache the results if available
-        results = [_normalize_search_result(r) for r in results]
+        results = [r for r in (_normalize_search_result(x) for x in results) if r is not None]
         if query_cache and query_cache.config.enabled and results:
             query_type = (
                 QueryType.SEMANTIC_SEARCH if effective_mode == "semantic" else QueryType.SEARCH

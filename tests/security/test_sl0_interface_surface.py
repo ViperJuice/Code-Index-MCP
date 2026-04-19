@@ -194,11 +194,12 @@ def test_path_traversal_guard_importable():
     assert PathTraversalGuard is not None
 
 
-def test_path_traversal_guard_init_raises():
+def test_path_traversal_guard_init_works():
     from mcp_server.security.path_guard import PathTraversalGuard
     from pathlib import Path
-    with pytest.raises(NotImplementedError, match="filled by SL-4"):
-        PathTraversalGuard([Path("/tmp")])
+    # SL-4 filled the body; construction should succeed.
+    guard = PathTraversalGuard([Path("/tmp")])
+    assert guard is not None
 
 
 def test_path_traversal_guard_normalize_signature():
@@ -227,10 +228,18 @@ def test_token_validator_validate_scopes_signature():
     assert params["token"].default is None
 
 
-def test_token_validator_raises_not_implemented():
+def test_token_validator_no_token_no_require_flag():
+    import os
     from mcp_server.security.token_validator import TokenValidator
-    with pytest.raises(NotImplementedError, match="filled by SL-4"):
-        TokenValidator.validate_scopes(["contents:read"])
+    # SL-4 filled the body; with no token and no require flag it should warn and return.
+    env_backup = os.environ.pop("GITHUB_TOKEN", None)
+    os.environ.pop("MCP_REQUIRE_TOKEN_SCOPES", None)
+    try:
+        result = TokenValidator.validate_scopes(["contents:read"])
+        assert result is None
+    finally:
+        if env_backup is not None:
+            os.environ["GITHUB_TOKEN"] = env_backup
 
 
 # ---------------------------------------------------------------------------
