@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import os
 import shutil
 import sqlite3
@@ -12,10 +13,13 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import urllib.error
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 from mcp_server.config.settings import get_settings
 
@@ -24,6 +28,7 @@ from .integrity_gate import (
     validate_artifact_integrity,
     validate_required_metadata_fields,
 )
+from .freshness import FreshnessVerdict, verify_artifact_freshness
 from .semantic_profiles import extract_semantic_profile_metadata
 
 
@@ -421,7 +426,41 @@ class IndexArtifactDownloader:
         output_dir: Path,
         backup: bool = True,
     ) -> ArtifactDownloadResult:
-        extracted_dir = self.download_artifact(artifact["id"], output_dir)
+        try:
+            extracted_dir = self.download_artifact(artifact["id"], output_dir)
+        except (subprocess.CalledProcessError, urllib.error.URLError, RuntimeError) as exc:
+            logger.warning(
+                "GitHub outage detected, keeping local index (artifact download failed: %s)", exc
+            )
+            return ArtifactDownloadResult(artifact=artifact, installed_items=[])
+
+        # Freshness gate — between metadata-load and install_indexes.
+        meta_path = extracted_dir / "artifact-metadata.json"
+        if meta_path.exists():
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            except Exception:
+                meta = {}
+        else:
+            meta = {}
+
+        max_age_days = int(os.environ.get("MCP_ARTIFACT_MAX_AGE_DAYS", "14"))
+        head_commit = artifact.get("workflow_run", {}).get("head_sha", "HEAD")
+        verdict = verify_artifact_freshness(meta, head_commit, max_age_days)
+        if verdict is FreshnessVerdict.STALE_COMMIT:
+            logger.warning(
+                "Artifact commit %s is not an ancestor of %s (STALE_COMMIT); proceeding with install",
+                meta.get("commit"),
+                head_commit,
+            )
+        elif verdict is FreshnessVerdict.STALE_AGE:
+            logger.warning(
+                "Artifact is older than %d days (STALE_AGE); proceeding with install",
+                max_age_days,
+            )
+        elif verdict is FreshnessVerdict.INVALID:
+            logger.warning("Artifact metadata missing or malformed (INVALID); proceeding with install")
+
         installed_items = self.install_indexes(extracted_dir, backup=backup)
         return ArtifactDownloadResult(artifact=artifact, installed_items=installed_items)
 
