@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from ..artifacts.semantic_profiles import SemanticProfileRegistry
+from ..config.env_vars import get_max_file_size_bytes
 from ..config.settings import reload_settings
 from ..core.ignore_patterns import (
     IgnorePatternManager,
@@ -1917,6 +1918,15 @@ class EnhancedDispatcher:
 
             if is_excluded(path):
                 stats["ignored_files"] += 1
+                continue
+
+            try:
+                size = path.stat().st_size
+            except OSError:
+                continue
+            if size > get_max_file_size_bytes():
+                logger.warning("skipping oversized file: %s (%d bytes)", path, size)
+                stats["ignored_files"] = stats.get("ignored_files", 0) + 1
                 continue
 
             # Try to find a plugin that supports this file

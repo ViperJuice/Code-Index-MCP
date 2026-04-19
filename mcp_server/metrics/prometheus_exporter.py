@@ -66,6 +66,12 @@ mcp_tool_calls_total = Counter(
 )
 
 
+mcp_watcher_sweep_errors_total = Counter(
+    "mcp_watcher_sweep_errors_total",
+    "Count of watcher sweep iterations that raised an exception.",
+)
+
+
 def record_tool_call(tool: str, status: str) -> None:
     """Increment mcp_tool_calls_total for the given tool/status label pair."""
     if not PROMETHEUS_AVAILABLE:
