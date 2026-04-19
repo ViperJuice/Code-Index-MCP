@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (P17 — Durability & Multi-Instance Safety)
+- **Registry flock protocol** (IF-0-P17-1): `RepositoryRegistry.save()` acquires
+  `fcntl.flock(LOCK_EX)` on a sibling `.lock` file, then performs a read-merge-write
+  with an atomic `rename()`.  Two concurrent processes calling `save()` against the same
+  file no longer lose each other's writes. (`mcp_server/storage/repository_registry.py`,
+  `tests/test_registry_concurrency.py`)
+- **Singleton reset wired**: `reset_process_singletons()` (P16 IF-0-P16-4 stub) is now
+  called at the top of `initialize_stateless_services()`.  Repeat-init in the same
+  Python process yields fresh managers. (`mcp_server/cli/bootstrap.py`,
+  `tests/test_singleton_reset.py`)
+- **Ref-poller edge-case handling** (SL-2): `RefPoller` detects detached HEAD,
+  force-push, and branch-rename; each triggers `enqueue_full_rescan(repo_id)` to prevent
+  incremental indexing on a rewritten history. (`mcp_server/watcher/ref_poller.py`,
+  `tests/test_ref_poller_edges.py`)
+- **Sweeper observability** (SL-2): `WatcherSweeper` exceptions emit `WARNING` log and
+  increment `mcp_watcher_sweep_errors_total` Prometheus counter.
+  (`mcp_server/watcher/sweeper.py`, `tests/test_sweeper_observability.py`)
+- **MCP_MAX_FILE_SIZE_BYTES enforced** (SL-2): Dispatcher walker (`index_directory`)
+  now skips files larger than `MCP_MAX_FILE_SIZE_BYTES` (default 10 MiB); oversize
+  files are logged and skipped without stalling the indexer.
+  (`mcp_server/dispatcher/dispatcher_enhanced.py`)
+- **Checkpoint clears on clean exit** (SL-2): `IncrementalIndexer` clears the
+  checkpoint file even when `errors` is non-empty on clean exit; a re-run starts fresh
+  rather than resuming from a stale error state.
+  (`mcp_server/indexing/incremental_indexer.py`)
+- **ENOSPC → read-only store** (SL-3): `SQLiteStore` catches `OSError(ENOSPC)` on
+  `commit()`, transitions to read-only mode, and increments
+  `mcp_storage_readonly_total`.  The server keeps serving reads without crashing.
+  (`mcp_server/storage/sqlite_store.py`, `tests/test_disk_full.py`)
+- **Schema migration backup** (SL-3): `SchemaMigrator.migrate_artifact()` writes a
+  timestamped `.backup` copy of the DB before any migration; rollback-on-failure
+  restores from backup. (`mcp_server/storage/schema_migrator.py`,
+  `tests/test_schema_migration_backup.py`)
+- **UnknownSchemaVersionError in core/errors.py** (SL-3): `UnknownSchemaVersionError`
+  promoted from `schema_migrator.py` to `mcp_server/core/errors.py`, extending the P16
+  IF-0-P16-1 taxonomy by one class.
+- **RerankerFactory.create_default()** (SL-4): `RerankerFactory.create_default()`
+  returns a functional reranker; resolves the P14 carry-over.
+  (`mcp_server/plugins/reranker_factory.py`)
+- **Ruff F401 clean** (SL-4): `ruff F401` count across `mcp_server/dispatcher`,
+  `mcp_server/storage`, `mcp_server/watcher` is 0.
+- **Multi-instance runbook** (SL-docs): `docs/operations/multi-instance.md` — flock
+  protocol, singleton-reset semantics, DR/recovery procedure.
+- **Vocabulary freeze** (IF-0-P17-1): Registry flock + read-merge-write pattern is
+  frozen as a named interface for cross-phase reference.
+- **Test-debt ledger** (SL-docs): `docs/operations/known-test-debt.md` enumerates
+  residual failures after P17 close (56 total; 9 cross-repo coordinator carry-over +
+  47 pre-existing in other modules).
+
 ### Added (P16 — Shared Vocabulary Preamble)
 - **Frozen error taxonomy** (IF-0-P16-1): New error classes `TransientArtifactError`, `TerminalArtifactError`, and `SchemaMigrationError` in `mcp_server/core/errors.py` for structured error handling in artifact operations. Stubs only — no consumer wiring.
 - **Lazy env-var getters** (IF-0-P16-2): Five new environment variable getters in `mcp_server/config/env_vars.py` — `get_max_file_size_bytes()`, `get_artifact_retention_count()`, `get_artifact_retention_days()`, `get_disk_readonly_threshold_mb()`, and `get_publish_rollback_enabled()` — with sensible defaults. Stubs only — no consumer wiring.
