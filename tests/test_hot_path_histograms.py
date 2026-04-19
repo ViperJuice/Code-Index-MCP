@@ -157,7 +157,7 @@ def _make_ctx(db_path: str, tmp_path: Path):
 # _count increment tests
 # ---------------------------------------------------------------------------
 
-def test_lookup_histogram_count_increments(tmp_path, monkeypatch):
+def test_lookup_histogram_count_increments(tmp_path):
     """dispatcher.lookup increments dispatcher_lookup_histogram._count by exactly 1."""
     original_exporter = prometheus_exporter._exporter
     prometheus_exporter._exporter = None
@@ -187,7 +187,7 @@ def test_lookup_histogram_count_increments(tmp_path, monkeypatch):
         prometheus_exporter._exporter = original_exporter
 
 
-def test_search_histogram_count_increments(tmp_path, monkeypatch):
+def test_search_histogram_count_increments(tmp_path):
     """dispatcher.search increments dispatcher_search_histogram._count by exactly 1."""
     original_exporter = prometheus_exporter._exporter
     prometheus_exporter._exporter = None
