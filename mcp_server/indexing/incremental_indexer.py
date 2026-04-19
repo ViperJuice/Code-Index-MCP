@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 from ..core.path_resolver import PathResolver
 from ..dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from ..storage.sqlite_store import SQLiteStore
+from ..storage.two_phase import two_phase_commit
 from .change_detector import FileChange
 from .checkpoint import ReindexCheckpoint, clear as _clear_ckpt, load as _load_ckpt, save as _save_ckpt
 from .lock_registry import lock_registry
@@ -106,19 +107,19 @@ class IncrementalIndexer:
             return chunk_ids + derived_chunk_ids + file_summary_ids
 
     def _cleanup_stale_vectors(self, chunk_ids: List[str]) -> None:
-        """Delete stale semantic vectors for existing chunk ids."""
+        """Delete stale semantic vectors for existing chunk ids.
+
+        Raises on failure so callers using two_phase_commit can detect shadow failure.
+        """
         if not self.semantic_indexer or not chunk_ids:
             return
 
-        try:
-            profile_id = self.semantic_indexer.semantic_profile.profile_id
-            self.semantic_indexer.delete_stale_vectors(
-                profile_id=profile_id,
-                chunk_ids=chunk_ids,
-                sqlite_store=self.store,
-            )
-        except Exception as e:
-            logger.warning(f"Failed stale vector cleanup for chunks {chunk_ids}: {e}")
+        profile_id = self.semantic_indexer.semantic_profile.profile_id
+        self.semantic_indexer.delete_stale_vectors(
+            profile_id=profile_id,
+            chunk_ids=chunk_ids,
+            sqlite_store=self.store,
+        )
 
     def update_from_changes(self, changes: List[FileChange]) -> IncrementalStats:
         """Update index based on file changes.
@@ -242,29 +243,49 @@ class IncrementalIndexer:
     def _remove_file(self, path: str) -> bool:
         """Remove a file from the index.
 
-        Args:
-            path: File path relative to repository
-
-        Returns:
-            True if successful
+        Uses two_phase_commit with SQLite as primary and Qdrant as shadow.
+        SQLite remove_file is irreversible (cascades across many tables), so rollback
+        logs a warning rather than restoring — both ops are destructive but SQLite is
+        chosen as primary because it is the authoritative record of file existence.
         """
         try:
             chunk_ids = self._get_chunk_ids_for_path(path)
-            self._cleanup_stale_vectors(chunk_ids)
 
             if self.dispatcher:
-                # Use dispatcher if available
                 full_path = self.repo_path / path
-                self.dispatcher.remove_file(full_path)
-            else:
-                # Direct database operation
-                relative_path = self.path_resolver.normalize_path(self.repo_path / path)
 
-                # Get repository ID
+                def primary_op():
+                    self.dispatcher.remove_file(full_path)
+                    return chunk_ids
+
+                def shadow_op(captured_chunk_ids):
+                    self._cleanup_stale_vectors(captured_chunk_ids)
+
+                def rollback(captured_chunk_ids):
+                    logger.warning(
+                        f"Cannot roll back SQLite remove for {path}; "
+                        "Qdrant vectors may be inconsistent."
+                    )
+
+                two_phase_commit(primary_op, shadow_op, rollback)
+            else:
+                relative_path = self.path_resolver.normalize_path(self.repo_path / path)
                 repo_id = self._get_repository_id()
 
-                # Remove from SQLite
-                self.store.remove_file(relative_path, repo_id)
+                def primary_op():
+                    self.store.remove_file(relative_path, repo_id)
+                    return chunk_ids
+
+                def shadow_op(captured_chunk_ids):
+                    self._cleanup_stale_vectors(captured_chunk_ids)
+
+                def rollback(captured_chunk_ids):
+                    logger.warning(
+                        f"Cannot roll back SQLite remove for {path}; "
+                        "Qdrant vectors may be inconsistent."
+                    )
+
+                two_phase_commit(primary_op, shadow_op, rollback)
 
             logger.debug(f"Removed file from index: {path}")
             return True
@@ -276,35 +297,60 @@ class IncrementalIndexer:
     def _move_file(self, old_path: str, new_path: str) -> bool:
         """Move a file in the index (handle rename).
 
-        Args:
-            old_path: Old file path
-            new_path: New file path
-
-        Returns:
-            True if successful
+        Uses two_phase_commit: primary = SQLite move_file (durable, rollback via reverse
+        move), shadow = Qdrant delete_stale_vectors for old_path vectors. Chunk IDs are
+        captured before the primary op because SQLite no longer has the old row after move.
         """
         try:
             new_full_path = self.repo_path / new_path
 
-            # Check if new file exists and compute hash
             if not new_full_path.exists():
-                # File was moved and deleted, just remove old entry
                 return self._remove_file(old_path)
 
             content_hash = self._compute_file_hash(new_full_path)
+            # Capture chunk IDs before primary op mutates the SQLite row.
+            chunk_ids = self._get_chunk_ids_for_path(old_path)
 
             if self.dispatcher:
-                # Use dispatcher if available
                 old_full_path = self.repo_path / old_path
-                self.dispatcher.move_file(old_full_path, new_full_path, content_hash)
+
+                def primary_op():
+                    self.dispatcher.move_file(old_full_path, new_full_path, content_hash)
+                    return chunk_ids
+
+                def shadow_op(captured_chunk_ids):
+                    self._cleanup_stale_vectors(captured_chunk_ids)
+
+                def rollback(captured_chunk_ids):
+                    try:
+                        self.dispatcher.move_file(new_full_path, old_full_path, content_hash)
+                    except Exception as rb_exc:
+                        logger.warning(
+                            f"Rollback of dispatcher move {old_path} failed: {rb_exc}"
+                        )
+
+                two_phase_commit(primary_op, shadow_op, rollback)
             else:
-                # Direct database operation
                 old_relative = self.path_resolver.normalize_path(self.repo_path / old_path)
                 new_relative = self.path_resolver.normalize_path(new_full_path)
                 repo_id = self._get_repository_id()
 
-                # Move in SQLite
-                self.store.move_file(old_relative, new_relative, repo_id, content_hash)
+                def primary_op():
+                    self.store.move_file(old_relative, new_relative, repo_id, content_hash)
+                    return chunk_ids
+
+                def shadow_op(captured_chunk_ids):
+                    self._cleanup_stale_vectors(captured_chunk_ids)
+
+                def rollback(captured_chunk_ids):
+                    try:
+                        self.store.move_file(new_relative, old_relative, repo_id, content_hash)
+                    except Exception as rb_exc:
+                        logger.warning(
+                            f"Rollback of SQLite move {old_path} failed: {rb_exc}"
+                        )
+
+                two_phase_commit(primary_op, shadow_op, rollback)
 
             logger.debug(f"Moved file in index: {old_path} -> {new_path}")
             return True
