@@ -660,6 +660,14 @@ class TestRemoveFileSemanticCleanup:
         d._operation_stats = {}
         d._semantic_indexer = semantic_indexer
         d._plugins = []
+        # Attributes added by post-P15 __init__ that remove_file() reads.
+        d._legacy_plugins = []
+        d._semantic_registry = None
+        d._semantic_indexer_fallback = semantic_indexer
+        d._lazy_load = False
+        d._use_factory = False
+        d._enable_advanced = False
+        d._router = None
         return d
 
     def _make_ctx(self):

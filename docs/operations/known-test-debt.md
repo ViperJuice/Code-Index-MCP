@@ -6,67 +6,75 @@ close of each phase.
 
 ---
 
-## P17 residual snapshot (2026-04-19)
+## P17 residual snapshot (2026-04-19, post-SL-4b)
+
+**Total failures from `pytest -q --no-cov --ignore=tests/real_world`**: **19**
+
+> Phase P17 exit criterion was ≤5 total failures. **Gate missed** by 14.
+>
+> SL-4b burned the carry-over queue from 56 → 19 (66% reduction) by resolving all
+> of Group A (9) and 12 of 13 Group-B clusters.  The remaining 19 failures fall
+> into two clusters, both of which require structural work rather than
+> test-alignment fixes and are deferred to a dedicated test-harness lane.
+>
+> Original snapshot preserved below under "P17 pre-SL-4b baseline" for history.
+
+### Remaining clusters
+
+| Cluster | Count | Root cause | Resolution path |
+|---|---|---|---|
+| `test_mcp_server_cli.py` | 17 | The tests load `scripts/cli/mcp_server_cli.py` via `spec_from_file_location` and then `patch.object(cli, "IndexDiscovery", ...)`. After P2B the CLI is a 6-line shim delegating to `mcp_server.cli.stdio_runner`, and `IndexDiscovery`/`EnhancedDispatcher`/`FileWatcher`/`SQLiteStore`/`validate_index`/`PluginManager` are **function-local** imports inside `_serve()`. Similarly `call_tool` is a closure registered via `@server.call_tool()` inside `_serve()`. Module-level patching cannot reach any of these. | Either (a) promote the imports to module level in `stdio_runner.py` and expose `call_tool` as a module attribute, or (b) rewrite the test harness to drive `_serve()` end-to-end with patches targeted at source modules (`mcp_server.utils.index_discovery.IndexDiscovery`, etc.) instead of the CLI module. Both approaches are architectural; out of scope for P17 burn-down. |
+| `test_benchmarks.py` | 2 | `test_benchmark_symbol_lookup_performance` and `test_benchmark_search_performance` — SLO / behaviour miscalibration. Commit `0c26ade` fixed 7/9 benchmark failures by moving misplaced initialisation out of `_make_ctx`'s unreachable post-return block into `BenchmarkSuite.__init__`; these two remain and require SLO recalibration or assertion tuning, not an init-order fix. | Recalibrate expected SLO bounds or pin deterministic inputs for the benchmark harness. Defer to a benchmark-hardening lane. |
+
+### Affected tests (exhaustive)
+
+**`test_mcp_server_cli.py` (17)**:
+- `TestAutoInitGitignore::{test_creates_wal_and_shm_entries, test_creates_db_and_metadata_entries, test_idempotent_when_entries_already_present, test_appends_to_existing_gitignore, test_no_write_when_index_already_exists}`
+- `TestMcpAutoIndexEscapeHatch::{test_false_skips_background_thread, test_true_starts_background_thread, test_thread_not_started_when_index_already_exists}`
+- `TestDeferredFileWatcher::{test_watcher_not_started_during_auto_index, test_watcher_started_immediately_when_index_exists, test_watcher_started_after_initial_index_thread_completes}`
+- `TestIndexingInProgressFlag::{test_empty_results_flag_when_thread_alive, test_empty_results_no_flag_when_thread_done, test_empty_results_informative_message_during_indexing, test_non_empty_results_include_flag_when_thread_alive, test_non_empty_results_no_flag_when_no_thread}`
+- `TestFreshRepoEndToEnd::test_bm25_populated_and_searchable_after_initial_index`
+
+**`test_benchmarks.py` (2)**:
+- `test_benchmark_symbol_lookup_performance`
+- `test_benchmark_search_performance`
+
+### SL-4b resolved
+
+| Cluster (from pre-SL-4b baseline) | Count | Resolved by |
+|---|---|---|
+| `test_cross_repo_coordinator.py` (Group A) | 9 | `f36fad4` — ported cross-repo coordinator methods to wrapper |
+| `test_go_plugin.py` | 3 | `9d79870` — restored `_sqlite_store` on `GoPlugin` |
+| `test_reindex_resume.py` | 2 | `9d79870` — aligned resume tests with SL-2 `_clear_ckpt` semantics |
+| `test_ignore_patterns.py` | 1 | `cdc299d` — exercise `build_walker_filter` directly |
+| `test_interface_contracts.py` | 1 | `cdc299d` — mirror GoPlugin fix on `GenericTreeSitterPlugin` |
+| `test_multi_repo_manager.py` | 1 | `cdc299d` — mock `ConnectionPool` alongside `SQLiteStore` |
+| `test_multi_repo_artifact_coordinator.py` | 1 | `cdc299d` — walk `list_all()` (registry re-keys legacy ids) |
+| `test_multi_repository_support.py` | 1 | `cdc299d` — same registry re-keying fix |
+| `test_multi_repo_bootstrap_order.py` | 1 | `cdc299d` — assert `.stop()` instead of `.stop_watching_all()` |
+| `test_cross_repo_coordinator.py` (dispatcher retarget) | — | `0c26ade` — deleted storage shim; retargeted patches to dispatcher module |
+| `test_dispatcher_advanced.py::TestRemoveFileSemanticCleanup` | 3 | `0c26ade` — stubbed missing dispatcher attrs in test helper |
+| Benchmark init-order (7 of 9) | — | `0c26ade` — moved misplaced init out of unreachable block |
+| `test_repository_plugin_loader_concurrency.py` | 1 | `7395fb4` — `asyncio.new_event_loop()` replaces deprecated `get_event_loop()` |
+
+---
+
+## P17 pre-SL-4b baseline (2026-04-19, pre-burn-down)
+
+The following snapshot is retained for history.  **Current state is the 19-failure
+snapshot above.**
 
 **Total failures from `pytest -q --no-cov`**: **56**
 
-> Phase P17 exit criterion was ≤5 total failures. This criterion was **not met**.
-> The 56 failures fall into two categories: 9 cross-repo coordinator carry-over failures
-> (pre-existing, deferred by design) and 47 additional failures in other test modules that
-> were not resolved during P17.  All are enumerated below.
+Group A — `test_cross_repo_coordinator.py` (9 failures): **resolved** by `f36fad4`.
+Root cause was that the tests patched `mcp_server.storage.cross_repo_coordinator`
+(deleted) and called methods (`_aggregate_*`, `_search_*_in_repository`, etc.) that
+only lived on the deleted implementation.  The wrapper in
+`mcp_server.dispatcher.cross_repo_coordinator` was extended with those methods.
 
----
-
-### Group A — `test_cross_repo_coordinator.py` (9 failures, pre-existing, root cause known)
-
-These 9 failures were partially addressed by SL-4 (reduced from 18 → 9) but the
-remaining 9 require a deeper rewrite that is out of P17 scope.
-
-**Root cause**: The original `CrossRepositoryCoordinator` in
-`mcp_server.storage.cross_repo_coordinator` was deleted during an earlier refactor.  The
-current implementation is `CrossRepositoryCoordinator` at
-`mcp_server.dispatcher.cross_repo_coordinator`, which is a thin wrapper that does not
-expose the internal methods the tests call.
-
-| Test | Root cause detail |
-|---|---|
-| `test_search_symbol_success` | Patches `mcp_server.storage.cross_repo_coordinator.ThreadPoolExecutor` — module deleted |
-| `test_search_code_success` | Same — patches deleted module |
-| `test_aggregate_symbol_results_deduplication` | Calls `_aggregate_symbol_results` — absent on wrapper |
-| `test_aggregate_code_results_with_limit` | Calls `_aggregate_code_results` — absent on wrapper |
-| `test_create_symbol_signature` | Calls `_create_symbol_signature` — absent on wrapper |
-| `test_create_content_hash` | Calls `_create_content_hash` — absent on wrapper |
-| `test_get_search_statistics` | Expects mock repo totals (`total_files=26` etc.); wrapper returns zeros |
-| `test_search_symbol_in_repository` | Patches deleted module; calls `_search_symbol_in_repository` absent on wrapper |
-| `test_search_code_in_repository_with_filters` | Same pattern |
-
-**Resolution path (not for P17)**: either port the missing methods to
-`CrossRepositoryCoordinator` in `mcp_server/dispatcher/cross_repo_coordinator.py`, or
-rewrite these 9 tests to call the wrapper's current public API.
-
----
-
-### Group B — Additional failures at time of P17 close (47 failures)
-
-The following failures were observed in the full suite run.  They are pre-existing or
-introduced in earlier phases and are not attributable to P17 changes.
-
-| Test module | Count | Notes |
-|---|---|---|
-| `test_go_plugin.py` | 3 | `TestGoPlugin.test_package_analysis`, `test_search_functionality`, `test_import_resolution` — `AttributeError`; Go plugin attribute missing |
-| `test_ignore_patterns.py` | 1 | `TestWalkerIntegration.test_log_files_not_indexed` |
-| `test_interface_contracts.py` | 1 | `test_base_document_plugin_process_document_matches_contract` |
-| `test_mcp_server_cli.py` | 16 | Multiple `TestAutoInitGitignore`, `TestMcpAutoIndexEscapeHatch`, `TestDeferredFileWatcher`, `TestIndexingInProgressFlag`, `TestFreshRepoEndToEnd` failures |
-| `test_multi_repo_artifact_coordinator.py` | 1 | `test_repository_registry_persists_artifact_state` |
-| `test_multi_repo_bootstrap_order.py` | 1 | `TestStdioRunnerBootOrder.test_shutdown_calls_stop_watching_all_and_ref_poller_stop` |
-| `test_multi_repo_manager.py` | 1 | `TestMultiRepositoryManager.test_connection_caching` |
-| `test_multi_repository_support.py` | 1 | `test_multi_repo_manager_registry_persists_local_artifact_fields` |
-| `test_reindex_resume.py` | 2 | `test_crash_at_file_500_leaves_correct_checkpoint`, `test_resume_skips_already_indexed_files` |
-| `test_repository_plugin_loader_concurrency.py` | 1 | `test_distinct_repo_ids_do_not_block_each_other` |
-| `test_cross_repo_coordinator.py` | 9 | Covered in Group A above |
-
-**Resolution path**: Group B failures require investigation per test module.  They were
-not prioritized in P17 and are deferred to P18 or a dedicated cleanup sprint.
+Group B — 47 additional failures at P17 close: **12 of 13 clusters resolved**; see
+"SL-4b resolved" table above.  The surviving cluster (`test_mcp_server_cli.py`,
+17 tests) was originally miscounted as 16 in this ledger.
 
 ---
 

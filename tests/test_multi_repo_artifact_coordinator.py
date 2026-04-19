@@ -56,7 +56,12 @@ def test_repository_registry_persists_artifact_state(tmp_path: Path):
     )
 
     reloaded = MultiRepositoryManager(central_index_path=tmp_path / "registry.json")
-    stored = reloaded.get_repository_info("repo-1")
+
+    # The registry _load() re-keys legacy ids to the canonical sha256 derived
+    # from the resolved path, so look the repo up by its new canonical id.
+    all_repos = reloaded.registry.list_all()
+    assert len(all_repos) == 1, "expected exactly one repository in the reloaded registry"
+    stored = all_repos[0]
     assert stored is not None
     assert stored.last_published_commit == "abc123"
     assert stored.last_recovered_commit == "def456"

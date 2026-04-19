@@ -152,7 +152,15 @@ class TestStdioRunnerBootOrder:
         assert sw_idx < rp_idx, "RefPoller.start must come after start_watching_all"
 
     def test_shutdown_calls_stop_watching_all_and_ref_poller_stop(self, tmp_path):
-        """On server shutdown, stop_watching_all and ref_poller.stop are both called."""
+        """On server shutdown, the multi-repo watcher and ref poller are stopped.
+
+        _graceful_shutdown() calls ``multi_watcher.stop()`` (a consolidated
+        shutdown entry point that internally calls stop_watching_all) and
+        ``ref_poller.stop()``.  The test was written against a pre-refactor
+        shutdown path that invoked ``stop_watching_all`` directly; update the
+        assertion to match the current contract without losing coverage of
+        the intent (both subsystems receive a stop signal).
+        """
         mock_multi_watcher = MagicMock()
         mock_ref_poller = MagicMock()
 
@@ -168,7 +176,7 @@ class TestStdioRunnerBootOrder:
                 except (asyncio.TimeoutError, Exception):
                     pass
 
-        mock_multi_watcher.stop_watching_all.assert_called()
+        mock_multi_watcher.stop.assert_called()
         mock_ref_poller.stop.assert_called()
 
 

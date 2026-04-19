@@ -55,6 +55,7 @@ class GenericTreeSitterPlugin(PluginWithSemanticSearch):
 
         # Initialize enhanced base class (after setting lang)
         super().__init__(sqlite_store=sqlite_store, enable_semantic=enable_semantic)
+        self._sqlite_store = sqlite_store
         self.file_extensions = set(language_config["extensions"])
 
         # Initialize components

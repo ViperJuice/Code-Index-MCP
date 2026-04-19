@@ -129,6 +129,14 @@ class BenchmarkSuite(IIndexPerformanceMonitor, IPerformanceMonitor):
         self.store = SQLiteStore(self.db_path)
         self._ctx = self._make_ctx()
 
+        self._process = psutil.Process(os.getpid())
+
+        # Performance monitoring storage
+        self._indexing_times: List[Dict[str, Any]] = []
+        self._search_times: List[Dict[str, Any]] = []
+        self._performance_timers: Dict[str, Dict[str, Any]] = {}
+        self._timer_counter = 0
+
     def _make_ctx(self) -> RepoContext:
         """Build a minimal RepoContext for benchmark calls."""
         from unittest.mock import MagicMock
@@ -142,13 +150,6 @@ class BenchmarkSuite(IIndexPerformanceMonitor, IPerformanceMonitor):
             tracked_branch="main",
             registry_entry=registry_entry,
         )
-        self._process = psutil.Process(os.getpid())
-
-        # Performance monitoring storage
-        self._indexing_times: List[Dict[str, Any]] = []
-        self._search_times: List[Dict[str, Any]] = []
-        self._performance_timers: Dict[str, Dict[str, Any]] = {}
-        self._timer_counter = 0
 
     def _measure_time(self, func, *args, **kwargs) -> Tuple[Any, float]:
         """Measure execution time in milliseconds."""

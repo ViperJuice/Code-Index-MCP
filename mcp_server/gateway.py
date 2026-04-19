@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 import threading
 import time
 from pathlib import Path
@@ -18,6 +19,12 @@ from .cache import (
 from .cli.index_management import _get_profile_collection_name
 from .cli.preflight_commands import format_preflight_report, run_startup_preflight
 from .config.settings import get_settings
+from .config.validation import (
+    WEAK_CREDENTIAL_BLOCKLIST,
+    render_validation_errors_to_stderr,
+    validate_production_config,
+)
+from .config.environment import is_production as _is_production
 from .core import RepoContext, RepoResolver
 from .core.logging import setup_logging
 from .dispatcher.dispatcher_enhanced import EnhancedDispatcher
@@ -338,6 +345,15 @@ async def startup_event():
             cors_headers=["*"],
         )
 
+        # Validate security config before constructing auth manager
+        _validation_errors = validate_production_config(
+            security_config, environment=str(os.getenv("MCP_ENVIRONMENT", "development"))
+        )
+        if _validation_errors:
+            render_validation_errors_to_stderr(_validation_errors)
+            if any(e.severity == "fatal" for e in _validation_errors) and _is_production():
+                sys.exit(1)
+
         # Initialize authentication manager
         logger.info("Initializing authentication manager...")
         auth_manager = AuthManager(security_config)
@@ -356,11 +372,7 @@ async def startup_event():
                     "DEFAULT_ADMIN_PASSWORD env var must be set. "
                     "Choose a strong password for the admin account."
                 )
-            _weak_admin_passwords = {
-                "admin", "password", "admin123", "admin123!", "changeme",
-                "password123", "letmein", "12345678",
-            }
-            if admin_password.strip().lower() in _weak_admin_passwords:
+            if admin_password.strip().lower() in WEAK_CREDENTIAL_BLOCKLIST:
                 raise RuntimeError(
                     "DEFAULT_ADMIN_PASSWORD is on the well-known-weak list. "
                     "Pick a strong password (see config/validation.py blocklist)."
@@ -1470,7 +1482,9 @@ async def search(
 
 
 @app.get("/search/capabilities")
-async def get_search_capabilities() -> Dict[str, Any]:
+async def get_search_capabilities(
+    current_user: User = Depends(require_permission(Permission.READ)),
+) -> Dict[str, Any]:
     """Get available search capabilities and configuration guidance."""
     voyage_key = os.environ.get("VOYAGE_API_KEY")
     openai_base = os.environ.get("OPENAI_API_BASE")

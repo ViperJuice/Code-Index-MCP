@@ -142,7 +142,7 @@ class TestCrossRepositorySearchCoordinator:
         assert result.query == "test_symbol"
 
     @pytest.mark.asyncio
-    @patch("mcp_server.storage.cross_repo_coordinator.ThreadPoolExecutor")
+    @patch("mcp_server.dispatcher.cross_repo_coordinator.ThreadPoolExecutor")
     async def test_search_symbol_success(self, mock_executor, coordinator):
         """Test successful symbol search."""
         # Mock the executor and future results
@@ -183,7 +183,7 @@ class TestCrossRepositorySearchCoordinator:
         mock_executor.return_value = mock_executor_instance
 
         # Mock as_completed to return our futures
-        with patch("mcp_server.storage.cross_repo_coordinator.as_completed") as mock_as_completed:
+        with patch("mcp_server.dispatcher.cross_repo_coordinator.as_completed") as mock_as_completed:
             mock_as_completed.return_value = [mock_future1, mock_future2]
 
             result = await coordinator.search_symbol("test_function")
@@ -196,7 +196,7 @@ class TestCrossRepositorySearchCoordinator:
             assert "repository_name" in result.results[0]
 
     @pytest.mark.asyncio
-    @patch("mcp_server.storage.cross_repo_coordinator.ThreadPoolExecutor")
+    @patch("mcp_server.dispatcher.cross_repo_coordinator.ThreadPoolExecutor")
     async def test_search_code_success(self, mock_executor, coordinator):
         """Test successful code search."""
         # Mock the executor and future results
@@ -222,7 +222,7 @@ class TestCrossRepositorySearchCoordinator:
         mock_executor.return_value = mock_executor_instance
 
         # Mock as_completed
-        with patch("mcp_server.storage.cross_repo_coordinator.as_completed") as mock_as_completed:
+        with patch("mcp_server.dispatcher.cross_repo_coordinator.as_completed") as mock_as_completed:
             mock_as_completed.return_value = [mock_future]
 
             result = await coordinator.search_code("test_code", semantic=True, limit=10)
@@ -348,7 +348,7 @@ class TestCrossRepositorySearchCoordinator:
         assert "javascript" in stats["languages"]
         assert "java" in stats["languages"]
 
-    @patch("mcp_server.storage.cross_repo_coordinator.SQLiteStore")
+    @patch("mcp_server.dispatcher.cross_repo_coordinator.SQLiteStore")
     def test_search_symbol_in_repository(self, mock_store_class, coordinator):
         """Test searching symbol in a single repository."""
         # Mock SQLiteStore
@@ -378,7 +378,7 @@ class TestCrossRepositorySearchCoordinator:
         assert len(result.results) == 1
         assert result.error is None
 
-    @patch("mcp_server.storage.cross_repo_coordinator.SQLiteStore")
+    @patch("mcp_server.dispatcher.cross_repo_coordinator.SQLiteStore")
     def test_search_code_in_repository_with_filters(self, mock_store_class, coordinator):
         """Test searching code in repository with file type filters."""
         # Mock SQLiteStore
