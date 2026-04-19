@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from ..core.errors import TransientArtifactError
 from ..core.path_resolver import PathResolver
 from .connection_pool import ConnectionPool
 
@@ -89,10 +90,15 @@ class SQLiteStore:
         self.db_path = db_path
         self.path_resolver = path_resolver or PathResolver()
         self._pool = pool
+        self._readonly = False
 
         self._init_database()
         self._run_migrations()
         self._ensure_semantic_points_table()
+
+    def _require_writable(self) -> None:
+        if self._readonly:
+            raise TransientArtifactError("store is read-only after ENOSPC")
 
     def close(self) -> None:
         """Close the store.  If a connection pool is attached, drain it."""
@@ -245,6 +251,14 @@ class SQLiteStore:
                 try:
                     yield conn
                     conn.commit()
+                except sqlite3.OperationalError as e:
+                    conn.rollback()
+                    if "disk I/O error" in str(e) or "database or disk is full" in str(e):
+                        self._readonly = True
+                        from mcp_server.metrics.prometheus_exporter import mcp_storage_readonly_total
+                        mcp_storage_readonly_total.inc()
+                        raise TransientArtifactError(str(e)) from e
+                    raise
                 except Exception:
                     conn.rollback()
                     raise
@@ -255,6 +269,14 @@ class SQLiteStore:
             try:
                 yield conn
                 conn.commit()
+            except sqlite3.OperationalError as e:
+                conn.rollback()
+                if "disk I/O error" in str(e) or "database or disk is full" in str(e):
+                    self._readonly = True
+                    from mcp_server.metrics.prometheus_exporter import mcp_storage_readonly_total
+                    mcp_storage_readonly_total.inc()
+                    raise TransientArtifactError(str(e)) from e
+                raise
             except Exception:
                 conn.rollback()
                 raise
@@ -643,6 +665,7 @@ class SQLiteStore:
         **kwargs: Any,
     ) -> int:
         """Store file information using relative paths and content hashes."""
+        self._require_writable()
         file_path_arg = kwargs.pop("file_path", None)
         resolved_path = Path(path or file_path_arg) if path or file_path_arg else None
 

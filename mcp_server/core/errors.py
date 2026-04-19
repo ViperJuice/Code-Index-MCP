@@ -131,3 +131,7 @@ class TerminalArtifactError(ArtifactError):
 
 class SchemaMigrationError(ArtifactError):
     """Raised when a schema migration apply step fails; caller must roll back."""
+
+
+class UnknownSchemaVersionError(ArtifactError):
+    """Raised when an artifact carries a schema version this tool doesn't recognize."""

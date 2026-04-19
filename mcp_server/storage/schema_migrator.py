@@ -1,20 +1,14 @@
 """Schema migration support for artifact extracted directories."""
 
+import shutil
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from mcp_server.core.errors import ArtifactError
+from mcp_server.core.errors import SchemaMigrationError, UnknownSchemaVersionError
 
 if TYPE_CHECKING:
     from mcp_server.storage.sqlite_store import SQLiteStore
-
-
-class UnknownSchemaVersionError(ArtifactError):
-    """Raised when an artifact carries a schema version this tool doesn't recognize."""
-
-
-class SchemaMigrationError(ArtifactError):
-    """Raised when a known migration step fails during execution."""
 
 
 class SchemaMigrator:
@@ -63,25 +57,34 @@ class SchemaMigrator:
                 f"Cannot downgrade schema from {from_version!r} to {to_version!r}"
             )
 
-        current_dir = extracted_dir
-        for i in range(start, end):
-            step_from = chain[i]
-            step_to = chain[i + 1]
-            method_name = f"_migrate_{step_from}_to_{step_to}"
-            method = getattr(self, method_name, None)
-            if method is None:
-                raise SchemaMigrationError(
-                    f"No migration handler for {step_from!r} → {step_to!r}"
-                )
-            try:
-                current_dir = method(current_dir)
-            except SchemaMigrationError:
-                raise
-            except Exception as exc:
-                raise SchemaMigrationError(
-                    f"Migration {step_from!r} → {step_to!r} failed: {exc}"
-                ) from exc
+        backup_dir = extracted_dir.parent / f"{extracted_dir.name}.backup.{int(time.time())}"
+        shutil.copytree(extracted_dir, backup_dir)
 
+        current_dir = extracted_dir
+        try:
+            for i in range(start, end):
+                step_from = chain[i]
+                step_to = chain[i + 1]
+                method_name = f"_migrate_{step_from}_to_{step_to}"
+                method = getattr(self, method_name, None)
+                if method is None:
+                    raise SchemaMigrationError(
+                        f"No migration handler for {step_from!r} → {step_to!r}"
+                    )
+                try:
+                    current_dir = method(current_dir)
+                except SchemaMigrationError:
+                    raise
+                except Exception as exc:
+                    raise SchemaMigrationError(
+                        f"Migration {step_from!r} → {step_to!r} failed: {exc}"
+                    ) from exc
+        except SchemaMigrationError:
+            shutil.rmtree(extracted_dir, ignore_errors=True)
+            shutil.move(backup_dir, extracted_dir)
+            raise
+
+        shutil.rmtree(backup_dir)
         return current_dir
 
     def _migrate_1_to_2(self, extracted_dir: Path) -> Path:

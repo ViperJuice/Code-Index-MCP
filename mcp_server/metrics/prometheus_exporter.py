@@ -72,6 +72,12 @@ mcp_watcher_sweep_errors_total = Counter(
 )
 
 
+mcp_storage_readonly_total = Counter(
+    "mcp_storage_readonly_total",
+    "Count of SQLite stores that transitioned to read-only mode due to ENOSPC.",
+)
+
+
 def record_tool_call(tool: str, status: str) -> None:
     """Increment mcp_tool_calls_total for the given tool/status label pair."""
     if not PROMETHEUS_AVAILABLE:
