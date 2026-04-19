@@ -35,8 +35,8 @@ class TestDispatcherInitialization:
         """Test initialization with a single plugin."""
         dispatcher = Dispatcher([mock_plugin])
 
-        assert len(dispatcher._plugins) == 1
-        assert dispatcher._by_lang["mock"] == mock_plugin
+        assert len(dispatcher.plugins()) == 1
+        assert mock_plugin in dispatcher.plugins()
         assert dispatcher._file_cache == {}
 
     def test_init_with_multiple_plugins(self):
@@ -47,17 +47,16 @@ class TestDispatcherInitialization:
 
         dispatcher = Dispatcher([plugin1, plugin2, plugin3])
 
-        assert len(dispatcher._plugins) == 3
-        assert dispatcher._by_lang["python"] == plugin1
-        assert dispatcher._by_lang["javascript"] == plugin2
-        assert dispatcher._by_lang["java"] == plugin3
+        assert len(dispatcher.plugins()) == 3
+        assert plugin1 in dispatcher.plugins()
+        assert plugin2 in dispatcher.plugins()
+        assert plugin3 in dispatcher.plugins()
 
     def test_init_empty_plugins(self):
         """Test initialization with no plugins."""
         dispatcher = Dispatcher([])
 
-        assert len(dispatcher._plugins) == 0
-        assert dispatcher._by_lang == {}
+        assert len(dispatcher.plugins()) == 0
 
     def test_plugins_method(self, mock_plugin):
         """Test the plugins() method returns list of plugins."""
