@@ -400,16 +400,20 @@ VOYAGEAI_API_KEY=your-api-key-here
 5. **Typing**: Use appropriate types (string, integer, boolean, path)
 6. **Naming**: Use `MCP_` prefix for all application-specific variables
 
-## P16 reserved (stub-only; not yet enforced)
-
-The following environment variables are defined as part of the P16 Shared Vocabulary Preamble but are not yet wired to consumer logic. They are reserved for use in P17/P18 when the corresponding feature implementations are completed. All values are accessed via lazy getters in `mcp_server.config.env_vars`.
+## P17 enforced (wired in P17)
 
 ### `MCP_MAX_FILE_SIZE_BYTES`
 - **Description**: Maximum size (in bytes) of a single file for indexing operations
 - **Type**: Integer
 - **Default**: `10485760` (10 MiB)
 - **Getter**: `mcp_server.config.env_vars.get_max_file_size_bytes()`
-- **Note**: Stub definition in P16; consumer wiring deferred to P17/P18
+- **Enforced**: Dispatcher walker (`index_directory`) skips files larger than this
+  value; oversize files are logged at WARNING level and excluded from the index without
+  stalling the indexer. Wired in P17 SL-2 (`mcp_server/dispatcher/dispatcher_enhanced.py`).
+
+## P16 reserved (stub-only; not yet enforced)
+
+The following environment variables are defined as part of the P16 Shared Vocabulary Preamble but are not yet wired to consumer logic. They are reserved for use in P18 when the corresponding feature implementations are completed. All values are accessed via lazy getters in `mcp_server.config.env_vars`.
 
 ### `MCP_ARTIFACT_RETENTION_COUNT`
 - **Description**: Maximum number of artifact revisions to retain per artifact

@@ -929,6 +929,29 @@ Make the storage + watcher + indexing layer safe under concurrent multi-instance
 **Produces**
 - IF-0-P17-1
 
+### Post-execution amendments
+
+- **2026-04-19** (post-P17 merge):
+  - **UnknownSchemaVersionError promoted to `core/errors.py`** (SL-3): The spec scoped
+    `UnknownSchemaVersionError` to `mcp_server/storage/schema_migrator.py` alongside
+    `SchemaMigrationError`.  During SL-3 implementation it was instead placed in
+    `mcp_server/core/errors.py` alongside the other P16 taxonomy classes.  This extends
+    the P16 IF-0-P16-1 taxonomy by one class and is the authoritative location going
+    forward.  `schema_migrator.py` imports it from `core/errors.py`.
+  - **`SchemaMigrator.apply(db_path)` was never shipped** (SL-3): IF-0-P14-3 promised
+    a `SchemaMigrator.apply(db_path)` surface.  The real surface shipped is
+    `SchemaMigrator.migrate_artifact(extracted_dir, from_version, to_version) -> Path`.
+    SL-3's backup/rollback logic adapted to this directory-level signature.  The
+    `apply(db_path)` name does not exist in the codebase; any P18 code that referenced
+    it must use `migrate_artifact` instead.
+  - **Full suite failures at P17 close: 56 (criterion was ≤5)**: The phase criterion
+    of ≤5 total failures was not met.  9 are the pre-existing cross-repo coordinator
+    carry-over (Group A); 47 are pre-existing failures in other modules not addressed
+    in P17 scope (Group B).  Full enumeration in
+    `docs/operations/known-test-debt.md`.  The ≤5 criterion is carried forward to P18.
+  - **IF-0-P17-1 interface landed as frozen**: Registry flock + read-merge-write
+    pattern shipped as specified; no drift.
+
 ---
 
 ### Phase 18 — Enforcement, Artifact Resilience & Ops (P18)
