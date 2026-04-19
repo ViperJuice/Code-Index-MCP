@@ -157,34 +157,31 @@ What this phase does NOT change:
 ```
 SL-1 — checkpoint-resume
   Depends on: (none)
-  Blocks: SL-2 (single-writer file: incremental_indexer.py non-overlapping ranges, but ordered)
-  Parallel-safe: yes (Wave 1)
+  Blocks: SL-2
+  Parallel-safe: yes
 
 SL-2 — two-phase-commit
-  Depends on: SL-1 (avoid concurrent edits on incremental_indexer.py, even non-overlapping)
+  Depends on: SL-1
   Blocks: (none)
-  Parallel-safe: yes (Wave 2, after SL-1 merges)
+  Parallel-safe: yes
 
 SL-3 — toctou-dispatch
   Depends on: (none)
-  Blocks: SL-5 (SL-5 refactors except-clauses in dispatcher_enhanced.py; SL-3 must land first)
-  Parallel-safe: yes (Wave 1)
+  Blocks: SL-5
+  Parallel-safe: yes
 
 SL-4 — direct-publish
   Depends on: (none)
-  Blocks: SL-5 (SL-5 refactors except-clauses in artifact_upload.py; SL-4 must land first)
-  Parallel-safe: yes (Wave 2)
+  Blocks: SL-5
+  Parallel-safe: yes
 
 SL-5 — structured-errors
-  Depends on: SL-1, SL-2, SL-3, SL-4 (touches files they edit)
-  Blocks: SL-docs
-  Parallel-safe: no (Wave 3, terminal lane for impl)
-
-SL-docs — docs sweep
-  Depends on: SL-1, SL-2, SL-3, SL-4, SL-5
+  Depends on: SL-1, SL-2, SL-3, SL-4
   Blocks: (none)
-  Parallel-safe: no (Wave 4, terminal)
+  Parallel-safe: no
 ```
+
+(Terminal `SL-docs` lane depends on SL-1..SL-5; see `### SL-docs` in Lanes.)
 
 **Wave plan** (`execute-phase` default `MAX_PARALLEL_LANES=2`, four waves):
 
@@ -202,7 +199,7 @@ SL-docs — docs sweep
 - **Scope**: Add `.reindex-state` checkpoint schema + save/load helpers; wrap `update_from_changes` and `_index_file` with checkpoint-aware resume loop. Wrap the resume in `lock_registry.acquire(repo_id)` (P12 carryover).
 - **Owned files**: `mcp_server/indexing/checkpoint.py` (new), `mcp_server/indexing/__init__.py` (extend `__all__` to export `ReindexCheckpoint`, `save`, `load`, `clear`), `mcp_server/indexing/incremental_indexer.py` **lines 121-171 (`update_from_changes`) and 263-309 (`_index_file`) only** (no edits to L106-119, L189-221, L223-261 — owned by SL-2), `tests/test_reindex_resume.py` (new).
 - **Interfaces provided**: IF-0-P13-1.
-- **Interfaces consumed**: `lock_registry.acquire` (P12 IF-0-P12-2).
+- **Interfaces consumed**: `lock_registry.acquire` (pre-existing; P12 IF-0-P12-2).
 - **Tasks**:
 
 | Task ID | Type | Depends on | Files in scope | Tests owned | Test command |
@@ -217,7 +214,7 @@ SL-docs — docs sweep
 - **Scope**: Add `two_phase_commit` primitive; rewrite `_cleanup_stale_vectors`, `_remove_file`, `_move_file` to couple Qdrant vector ops with their corresponding SQLite ops through the primitive. Rename handler becomes atomic (Qdrant delete + SQLite `move_file` are both-or-neither).
 - **Owned files**: `mcp_server/storage/two_phase.py` (new), `mcp_server/indexing/incremental_indexer.py` **lines 106-119 (`_cleanup_stale_vectors`), 189-221 (`_remove_file`), 223-261 (`_move_file`) only** (no edits to L121-171 or L263-309 — owned by SL-1), `tests/test_two_phase_commit.py` (new).
 - **Interfaces provided**: IF-0-P13-2.
-- **Interfaces consumed**: `SQLiteStore.move_file`, `SQLiteStore.remove_file`, `SemanticIndexer.delete_stale_vectors`.
+- **Interfaces consumed**: `SQLiteStore.move_file` (pre-existing), `SQLiteStore.remove_file` (pre-existing), `SemanticIndexer.delete_stale_vectors` (pre-existing).
 - **Tasks**:
 
 | Task ID | Type | Depends on | Files in scope | Tests owned | Test command |
@@ -232,7 +229,7 @@ SL-docs — docs sweep
 - **Scope**: Add `index_file_guarded(ctx, path, expected_hash) -> IndexResult` method on `EnhancedDispatcher` and `IndexResult` + `IndexResultStatus` types. Update watcher call site to pass observed hash. Do NOT modify the existing `index_file` body.
 - **Owned files**: `mcp_server/dispatcher/dispatcher_enhanced.py` **additions only** — (i) new `IndexResult`/`IndexResultStatus` types near L615 (appended to existing dataclass block), (ii) new `index_file_guarded` method appended **after** the existing `index_file` method (i.e., new code after L1680, no edit to L1614-1680 body), `mcp_server/watcher_multi_repo.py` **lines 142-164 only** (compute observed hash immediately before the dispatcher call, switch the call from `index_file` to `index_file_guarded`), `tests/test_dispatcher_toctou.py` (new).
 - **Interfaces provided**: IF-0-P13-3.
-- **Interfaces consumed**: existing `_get_file_hash` L615-617; `lock_registry.acquire` (carried over from P12 SL-2 in the watcher block).
+- **Interfaces consumed**: `_get_file_hash` (pre-existing, L615-617); `lock_registry.acquire` (pre-existing; P12 IF-0-P12-2, carried over in the watcher block).
 - **Tasks**:
 
 | Task ID | Type | Depends on | Files in scope | Tests owned | Test command |
@@ -247,7 +244,7 @@ SL-docs — docs sweep
 - **Scope**: New `ArtifactPublisher` class with `publish_on_reindex(repo_id, commit) -> ArtifactRef`. Commit-SHA-keyed release tags (`index-<short-sha>`); atomic `index-latest` pointer via `gh release edit --target`. Replace `index-artifact-management.yml` cron with on-demand `workflow_dispatch` input for post-reindex publishes. Hook the publisher into the watcher's full-reindex-complete path.
 - **Owned files**: `mcp_server/artifacts/publisher.py` (new), `mcp_server/artifacts/__init__.py` (extend `__all__`), `mcp_server/artifacts/artifact_upload.py` **append-only** — `ArtifactMetadata` namedtuple + `publish_on_reindex` invoked from new class; **no edits to L60-240** (existing `compress_indexes`/`_calculate_checksum`/`create_metadata` bodies, which SL-5 will refactor), `.github/workflows/index-artifact-management.yml` (replace cron trigger — keep the `workflow_dispatch` block; remove or comment the `schedule:` at L26; add a `publish_on_reindex` input to the existing `workflow_dispatch` inputs), `mcp_server/watcher_multi_repo.py` **append-only** — add one post-reindex-done hook on the watcher's completion path that calls `ArtifactPublisher.publish_on_reindex` via injected callback (do NOT re-enter the L142-164 SL-3 zone), `tests/test_artifact_publish_race.py` (new).
 - **Interfaces provided**: IF-0-P13-4.
-- **Interfaces consumed**: `verify_artifact_freshness` / `FreshnessVerdict` (P12 IF-0-P12-5, consumed optionally as a sanity check before moving the `latest` pointer).
+- **Interfaces consumed**: `verify_artifact_freshness` (pre-existing; P12 IF-0-P12-5), `FreshnessVerdict` (pre-existing; P12 IF-0-P12-5). Consumed optionally as a sanity check before moving the `index-latest` pointer.
 - **Tasks**:
 
 | Task ID | Type | Depends on | Files in scope | Tests owned | Test command |
@@ -262,7 +259,7 @@ SL-docs — docs sweep
 - **Scope**: Extend `mcp_server/core/errors.py` with `IndexingError`, `ArtifactError`, `record_handled_error(module, exception)`. Register `errors_by_type` Counter on `PrometheusExporter` mirroring P12 SL-4's pattern. Refactor every bare `except:`, `except Exception:`, and `except BaseException:` in `mcp_server/dispatcher/**` and `mcp_server/artifacts/**` to a typed catch + `record_handled_error(__name__, exc)` call. **Scope strictly limited to `except` keyword replacements** — no structural changes to control flow.
 - **Owned files**: `mcp_server/core/errors.py` (extend), `mcp_server/metrics/prometheus_exporter.py` **additive only** (one new Counter registration, mirroring P12 SL-4's block near L255-293), `mcp_server/dispatcher/dispatcher_enhanced.py` **except-clauses only at L355, L790, L794, L822, L1007, L1211, L1533, L1537, L1611, L1697**, `mcp_server/dispatcher/simple_dispatcher.py` **except-clause only at L182**, `mcp_server/dispatcher/fallback.py` **except-clauses only at L57, L63**, `mcp_server/dispatcher/cross_repo_coordinator.py` **except-clauses only at L649, L681**, `mcp_server/artifacts/artifact_upload.py` **except-clauses only at L116, L147, L207, L226** (none overlap with SL-4's append-only edits), `mcp_server/artifacts/artifact_download.py` **except-clauses only at L187, L229, L245, L275, L418, L442**, `mcp_server/artifacts/multi_repo_artifact_coordinator.py` **except-clause only at L62**, `tests/test_structured_errors.py` (new).
 - **Interfaces provided**: IF-0-P13-5.
-- **Interfaces consumed**: existing `MCPError` base; P12 SL-4 counter-registration pattern.
+- **Interfaces consumed**: `MCPError` (pre-existing, `mcp_server/core/errors.py`); P12 SL-4 counter-registration pattern (pre-existing).
 - **Tasks**:
 
 | Task ID | Type | Depends on | Files in scope | Tests owned | Test command |
