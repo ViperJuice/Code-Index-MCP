@@ -671,6 +671,7 @@ class EnhancedDispatcher:
 
     def lookup(self, ctx: RepoContext, symbol: str, limit: int = 20) -> Optional[SymbolDef]:
         """Look up symbol definition within ctx.repo_id."""
+        _hp_t0 = time.perf_counter()
         start_time = time.time()
 
         try:
@@ -812,6 +813,14 @@ class EnhancedDispatcher:
         except Exception as e:
             logger.error(f"Error in symbol lookup for {symbol}: {e}", exc_info=True)
             return None
+        finally:
+            try:
+                from mcp_server.metrics.prometheus_exporter import get_prometheus_exporter
+                _hist = get_prometheus_exporter().dispatcher_lookup_histogram
+                if _hist is not None:
+                    _hist.observe(time.perf_counter() - _hp_t0)
+            except Exception:
+                pass
 
     def _is_document_query(self, query: str) -> bool:
         """Check if the query is looking for documentation.
@@ -1081,6 +1090,7 @@ class EnhancedDispatcher:
         limit: int = 20,
     ) -> Iterable[SearchResult]:
         """Search for code and documentation scoped to ctx.repo_id."""
+        _hp_t0 = time.perf_counter()
         start_time = time.time()
         sqlite_store = ctx.sqlite_store
         _semantic_indexer = self._get_semantic_indexer(ctx)
@@ -1592,6 +1602,14 @@ class EnhancedDispatcher:
 
         except Exception as e:
             logger.error(f"Error in search for {query}: {e}", exc_info=True)
+        finally:
+            try:
+                from mcp_server.metrics.prometheus_exporter import get_prometheus_exporter
+                _hist = get_prometheus_exporter().dispatcher_search_histogram
+                if _hist is not None:
+                    _hist.observe(time.perf_counter() - _hp_t0)
+            except Exception:
+                pass
 
     def index_file(self, ctx: RepoContext, path: Path, do_semantic: bool = True) -> None:
         """Index a single file if it has changed."""

@@ -274,6 +274,24 @@ class PrometheusExporter:
         else:
             self.dispatcher_fallback_histogram = None
 
+        # Hot-path latency histograms (IF-0-P12-4)
+        if PROMETHEUS_AVAILABLE:
+            self.dispatcher_lookup_histogram = Histogram(
+                "mcp_dispatcher_symbol_lookup_duration_seconds",
+                "EnhancedDispatcher.lookup end-to-end duration in seconds",
+                buckets=_DISPATCHER_FALLBACK_BUCKETS,
+                registry=self.registry,
+            )
+            self.dispatcher_search_histogram = Histogram(
+                "mcp_dispatcher_search_duration_seconds",
+                "EnhancedDispatcher.search end-to-end duration in seconds",
+                buckets=_DISPATCHER_FALLBACK_BUCKETS,
+                registry=self.registry,
+            )
+        else:
+            self.dispatcher_lookup_histogram = None
+            self.dispatcher_search_histogram = None
+
     def start(self, port: int) -> None:
         """Start the Prometheus HTTP metrics server on the given port (idempotent)."""
         if not PROMETHEUS_AVAILABLE:
