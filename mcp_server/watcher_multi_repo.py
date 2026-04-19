@@ -4,6 +4,7 @@ This module extends the basic file watcher to support multiple repositories
 and synchronize with git commits.
 """
 
+import hashlib
 import logging
 import subprocess
 import threading
@@ -159,9 +160,14 @@ class MultiRepositoryHandler(FileSystemEventHandler):
             return
 
         logger.info("Re-indexing %s (repo=%s)", path, self.repo_id)
+        try:
+            observed_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError:
+            logger.warning("Could not read %s for hash; skipping reindex", path)
+            return
         with lock_registry.acquire(self.repo_id):
             self.parent_watcher.dispatcher.remove_file(self.ctx, path)
-            self.parent_watcher.dispatcher.index_file(self.ctx, path)
+            self.parent_watcher.dispatcher.index_file_guarded(self.ctx, path, observed_hash)
 
     def _remove_with_ctx(self, path: Path) -> None:
         """Branch + gitignore guarded remove via ctx-aware dispatcher."""

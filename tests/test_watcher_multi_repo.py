@@ -48,8 +48,15 @@ def _make_repo_info(path: str, auto_sync: bool = True):
 
 
 def _make_dispatcher():
+    from mcp_server.dispatcher.dispatcher_enhanced import IndexResult, IndexResultStatus
     d = Mock()
     d.index_file = Mock()
+    d.index_file_guarded = Mock(return_value=IndexResult(
+        status=IndexResultStatus.INDEXED,
+        path=Path("/mock"),
+        observed_hash="abc",
+        actual_hash="abc",
+    ))
     d.remove_file = Mock()
     d.move_file = Mock()
     return d
@@ -117,7 +124,11 @@ class TestHandlerBranchFilter:
             handler._trigger_reindex_with_ctx(test_file)
 
         dispatcher.remove_file.assert_called_once_with(ctx, test_file)
-        dispatcher.index_file.assert_called_once_with(ctx, test_file)
+        dispatcher.index_file_guarded.assert_called_once()
+        call_args = dispatcher.index_file_guarded.call_args[0]
+        assert call_args[0] is ctx
+        assert call_args[1] == test_file
+        assert isinstance(call_args[2], str) and len(call_args[2]) == 64  # sha256 hex
 
 
 class TestHandlerGitignoreFilter:
@@ -169,7 +180,11 @@ class TestHandlerGitignoreFilter:
             handler._trigger_reindex_with_ctx(allowed_file)
 
         dispatcher.remove_file.assert_called_once_with(ctx, allowed_file)
-        dispatcher.index_file.assert_called_once_with(ctx, allowed_file)
+        dispatcher.index_file_guarded.assert_called_once()
+        call_args = dispatcher.index_file_guarded.call_args[0]
+        assert call_args[0] is ctx
+        assert call_args[1] == allowed_file
+        assert isinstance(call_args[2], str) and len(call_args[2]) == 64
 
 
 # ---------------------------------------------------------------------------
