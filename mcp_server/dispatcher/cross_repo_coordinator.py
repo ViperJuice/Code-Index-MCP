@@ -569,31 +569,23 @@ class CrossRepositoryCoordinator:
         return analysis
 
 
-# Singleton instance
+# Singleton instance (internal — CrossRepositoryCoordinator)
 _coordinator_instance: Optional[CrossRepositoryCoordinator] = None
+
+# Singleton for the public wrapper
+_search_coordinator_instance: Optional["CrossRepositorySearchCoordinator"] = None
 
 
 def get_cross_repo_coordinator(
     enable_semantic: bool = True, enable_reranking: bool = True
-) -> CrossRepositoryCoordinator:
-    """
-    Get the singleton cross-repository coordinator.
+) -> "CrossRepositorySearchCoordinator":
+    """Return the singleton CrossRepositorySearchCoordinator."""
+    global _search_coordinator_instance
 
-    Args:
-        enable_semantic: Enable semantic search
-        enable_reranking: Enable result reranking
+    if _search_coordinator_instance is None:
+        _search_coordinator_instance = CrossRepositorySearchCoordinator()
 
-    Returns:
-        CrossRepositoryCoordinator instance
-    """
-    global _coordinator_instance
-
-    if _coordinator_instance is None:
-        _coordinator_instance = CrossRepositoryCoordinator(
-            enable_semantic=enable_semantic, enable_reranking=enable_reranking
-        )
-
-    return _coordinator_instance
+    return _search_coordinator_instance
 
 
 # ---------------------------------------------------------------------------
@@ -647,7 +639,30 @@ class CrossRepositorySearchCoordinator:
             enable_semantic=True,
             enable_reranking=True,
         )
+        self.max_workers = max_workers
         self.default_result_limit = default_result_limit
+        self.multi_repo_manager = self._inner.multi_repo_manager
+        self.plugin_loader = self._inner.plugin_loader
+        self.memory_manager = self._inner.plugin_loader.memory_manager
+
+    async def _get_target_repositories(self, scope: SearchScope) -> List:
+        """Return RepositoryInfo list filtered and ordered per scope."""
+        all_repos = list(self.multi_repo_manager.list_repositories())
+
+        if scope.repositories is not None:
+            id_set = set(scope.repositories)
+            all_repos = [r for r in all_repos if r.repository_id in id_set]
+
+        if scope.languages is not None:
+            lang_set = set(scope.languages)
+            all_repos = [
+                r for r in all_repos if lang_set & set(r.language_stats.keys())
+            ]
+
+        if scope.priority_order:
+            all_repos.sort(key=lambda r: r.priority, reverse=True)
+
+        return all_repos[: scope.max_repositories]
 
     async def search_symbol(
         self, symbol: str, scope: Optional[SearchScope] = None

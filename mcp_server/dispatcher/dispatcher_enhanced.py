@@ -15,7 +15,6 @@ from ..artifacts.semantic_profiles import SemanticProfileRegistry
 from ..config.env_vars import get_max_file_size_bytes
 from ..config.settings import reload_settings
 from ..core.ignore_patterns import (
-    IgnorePatternManager,
     build_walker_filter,
     EXCLUDED_DIR_PARTS as _INDEX_EXCLUDED_DIRS,
 )
@@ -30,10 +29,8 @@ from ..graph import (
 )
 from ..plugin_base import IPlugin, SearchResult, SymbolDef
 from ..plugins.language_registry import get_all_extensions, get_language_by_extension
-from ..plugins.memory_aware_manager import MemoryAwarePluginManager
 from ..plugins.plugin_factory import PluginFactory
 from ..plugins.plugin_set_registry import PluginSetRegistry
-from ..plugins.repository_plugin_loader import RepositoryPluginLoader
 from ..storage.multi_repo_manager import MultiRepositoryManager
 from ..storage.sqlite_store import SQLiteStore
 from ..utils.semantic_indexer import SemanticIndexer
