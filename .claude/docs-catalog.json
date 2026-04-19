@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "generated_at": "2026-04-19",
+  "docs": [
+    {
+      "path": "README.md",
+      "description": "Project overview, quick-start, and feature summary",
+      "touched_by_phases": []
+    },
+    {
+      "path": "CHANGELOG.md",
+      "description": "Per-phase release notes",
+      "touched_by_phases": ["P14"]
+    },
+    {
+      "path": "AGENTS.md",
+      "description": "Agent configuration, search strategy, multi-repo operation notes",
+      "touched_by_phases": ["P14"]
+    },
+    {
+      "path": "docs/configuration/ENVIRONMENT-VARIABLES.md",
+      "description": "All supported environment variables with types, defaults, and examples",
+      "touched_by_phases": ["P14"]
+    },
+    {
+      "path": "docs/architecture/P2B-known-limits.md",
+      "description": "Deferred per-repo global state items and resolution plan",
+      "touched_by_phases": []
+    },
+    {
+      "path": "specs/phase-plans-v1.md",
+      "description": "Phase-by-phase implementation roadmap with exit criteria and IF contracts",
+      "touched_by_phases": ["P14"]
+    }
+  ]
+}
