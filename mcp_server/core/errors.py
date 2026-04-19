@@ -119,3 +119,15 @@ class ArtifactError(MCPError):
     """Exception raised for artifact upload/download/validation failures."""
 
     pass
+
+
+class TransientArtifactError(ArtifactError):
+    """Retryable artifact failure (rate-limit, network blip, 5xx)."""
+
+
+class TerminalArtifactError(ArtifactError):
+    """Non-retryable artifact failure (403, missing scopes, corrupt bundle)."""
+
+
+class SchemaMigrationError(ArtifactError):
+    """Raised when a schema migration apply step fails; caller must roll back."""

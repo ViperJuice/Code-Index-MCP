@@ -24,6 +24,7 @@ from .settings import (
 from .validation import (
     ConfigurationError,
     SecurityConfigurationError,
+    ValidationError,
     validate_production_config,
     validate_security_config,
 )
@@ -48,6 +49,7 @@ __all__ = [
     "validate_security_config",
     "ConfigurationError",
     "SecurityConfigurationError",
+    "ValidationError",
 ]
 
 __version__ = "1.0.0"
