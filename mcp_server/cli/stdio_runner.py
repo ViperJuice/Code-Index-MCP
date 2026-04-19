@@ -21,7 +21,7 @@ import mcp.types as types
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 
-from mcp_server.cli.bootstrap import initialize_stateless_services, timeout
+from mcp_server.cli.bootstrap import initialize_stateless_services
 from mcp_server.cli import tool_handlers
 from mcp_server.cli.handshake import HandshakeGate
 from mcp_server.watcher_multi_repo import MultiRepositoryWatcher
@@ -230,6 +230,7 @@ async def _serve(registry_path=None) -> None:
     logger.info(f"Dispatcher Mode: {'Simple (BM25-only)' if USE_SIMPLE_DISPATCHER else 'Enhanced (with plugins)'}")
     logger.info(f"Plugin Timeout: {PLUGIN_LOAD_TIMEOUT} seconds")
     logger.info("=" * 60)
+    from mcp_server.artifacts.attestation import warn_if_gh_attestation_missing; warn_if_gh_attestation_missing()
 
     # Process-wide service pool — stateless, no cwd capture
     store_registry, repo_resolver, dispatcher, repo_registry, git_index_manager = initialize_stateless_services(

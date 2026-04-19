@@ -14,7 +14,6 @@ tree-sitter based plugins for languages without specific implementations.
 import asyncio
 import logging
 import os
-from concurrent.futures import Future
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple, Type, Union
 
@@ -254,11 +253,10 @@ class PluginFactory:
         # Normalize language name
         language = language.lower().replace("-", "_")
 
-        # SL-1 sandbox branch (default-off). Activated iff caller passes an
-        # explicit CapabilitySet or sets MCP_PLUGIN_SANDBOX_ENABLED=1. The
-        # direct path below is untouched otherwise.
+        # SL-5 sandbox branch (default-on). Deactivated only when no capabilities
+        # are passed AND MCP_PLUGIN_SANDBOX_DISABLE=1 is set explicitly.
         use_sandbox = capabilities is not None or (
-            os.environ.get("MCP_PLUGIN_SANDBOX_ENABLED") == "1"
+            os.environ.get("MCP_PLUGIN_SANDBOX_DISABLE") != "1"
         )
         if use_sandbox:
             from ..sandbox.capabilities import CapabilitySet as _CapabilitySet
