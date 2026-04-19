@@ -74,6 +74,7 @@ class SandboxedPlugin(IPlugin):
         return self._cached_language
 
     def bind(self, ctx) -> None:  # type: ignore[override]
+        self._ctx = ctx
         # Forward only JSON-safe scalar fields. SQLiteStore / RepositoryInfo
         # cannot cross process boundaries; sandboxed plugins operate without
         # per-repo SQLite state in this release.
