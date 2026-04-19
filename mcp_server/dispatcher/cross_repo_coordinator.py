@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from mcp_server.core.errors import record_handled_error
+from mcp_server.dependency_graph.aggregator import DependencyGraphAnalyzer
 from mcp_server.indexer.reranker import IReranker as Reranker
 from mcp_server.plugins.repository_plugin_loader import get_repository_plugin_loader
 from mcp_server.storage.multi_repo_manager import (
@@ -96,7 +97,7 @@ class CrossRepositoryCoordinator:
         self.enable_reranking = enable_reranking
 
         # Initialize reranker if enabled
-        self.reranker = None  # initialized on demand; see _rerank_results
+        self.reranker: Optional[Reranker] = None  # initialized on demand; see _rerank_results
 
         # Search strategies
         self._strategies: Dict[str, SearchStrategy] = self._init_strategies()
@@ -490,15 +491,19 @@ class CrossRepositoryCoordinator:
         return results
 
     async def _get_repository_dependencies(self, repository_id: str) -> Set[str]:
-        """Get dependency repositories."""
+        """Get dependency repositories by analyzing manifests via DependencyGraphAnalyzer."""
         if repository_id in self._repo_dependencies:
             return self._repo_dependencies[repository_id]
 
-        # Would analyze package.json, pom.xml, etc.
-        # For now, return empty set
-        deps = set()
-        self._repo_dependencies[repository_id] = deps
+        if self._multi_repo_manager is None:
+            self._repo_dependencies[repository_id] = set()
+            return set()
 
+        if not hasattr(self, "_dep_analyzer"):
+            self._dep_analyzer = DependencyGraphAnalyzer(self._multi_repo_manager)
+
+        deps = await self._dep_analyzer.analyze(repository_id)
+        self._repo_dependencies[repository_id] = deps
         return deps
 
     def get_search_strategies(self) -> List[str]:
