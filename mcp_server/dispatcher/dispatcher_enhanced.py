@@ -39,6 +39,7 @@ from .cross_repo_coordinator import (
     CrossRepositorySearchCoordinator,
     SearchScope,
 )
+from .fallback import run_gated_fallback
 from .plugin_router import FileTypeMatcher, PluginCapability, PluginRouter
 from .query_intent import QueryIntent
 from .query_intent import classify as classify_query_intent
@@ -334,6 +335,25 @@ class EnhancedDispatcher:
         self._context_selector: Optional[ContextSelector] = None
         self._graph_nodes: List[GraphNode] = []
         self._graph_edges = []
+
+        # Bounded fallback timeout (IF-0-P11-2)
+        try:
+            _ms = int(os.environ.get("MCP_DISPATCHER_FALLBACK_MS", "2000"))
+            if _ms <= 0:
+                raise ValueError("non-positive")
+            self._fallback_timeout_ms = _ms
+        except (ValueError, TypeError):
+            logger.warning(
+                "Invalid MCP_DISPATCHER_FALLBACK_MS value; using default 2000ms"
+            )
+            self._fallback_timeout_ms = 2000
+
+        # Fallback histogram handle (IF-0-P11-3)
+        try:
+            from mcp_server.metrics.prometheus_exporter import get_prometheus_exporter
+            self._fallback_histogram = get_prometheus_exporter().dispatcher_fallback_histogram
+        except Exception:
+            self._fallback_histogram = None
 
         logger.info("Enhanced dispatcher initialized")
 
@@ -749,34 +769,45 @@ class EnhancedDispatcher:
                     logger.error(f"Error in direct symbol lookup: {e}")
 
             repo_plugins = self._plugin_set_registry.plugins_for(ctx.repo_id)
-            if self._enable_advanced and self._aggregator:
-                # Use advanced aggregation
-                definitions_by_plugin = {}
-                for plugin in repo_plugins:
+
+            # Derive source_ext from a BM25 filepath hint so run_gated_fallback
+            # can gate plugins by extension.
+            row_filepath: Optional[str] = None
+            if ctx.sqlite_store:
+                try:
+                    import sqlite3 as _sqlite3
+                    _conn = _sqlite3.connect(ctx.sqlite_store.db_path)
                     try:
-                        definition = plugin.getDefinition(symbol)
-                        definitions_by_plugin[plugin] = definition
-                    except Exception as e:
-                        logger.warning(
-                            f"Plugin {plugin.lang} failed to get definition for {symbol}: {e}"
+                        _cur = _conn.cursor()
+                        _cur.execute(
+                            "SELECT filepath FROM bm25_content WHERE bm25_content MATCH ? LIMIT 1",
+                            (symbol,),
                         )
-                        definitions_by_plugin[plugin] = None
+                        _hint = _cur.fetchone()
+                        if _hint:
+                            row_filepath = _hint[0]
+                    except Exception:
+                        pass
+                    finally:
+                        _conn.close()
+                except Exception:
+                    pass
 
-                result = self._aggregator.aggregate_symbol_definitions(definitions_by_plugin)
+            source_ext = (
+                os.path.splitext(row_filepath)[1].lower() if row_filepath else None
+            )
 
-                self._operation_stats["lookups"] += 1
-                self._operation_stats["total_time"] += time.time() - start_time
+            result = run_gated_fallback(
+                plugins=repo_plugins,
+                symbol=symbol,
+                source_ext=source_ext,
+                timeout_ms=self._fallback_timeout_ms,
+                histogram=self._fallback_histogram,
+            )
 
-                return result
-            else:
-                # Fallback to basic lookup
-                for p in repo_plugins:
-                    res = p.getDefinition(symbol)
-                    if res:
-                        self._operation_stats["lookups"] += 1
-                        self._operation_stats["total_time"] += time.time() - start_time
-                        return res
-                return None
+            self._operation_stats["lookups"] += 1
+            self._operation_stats["total_time"] += time.time() - start_time
+            return result
 
         except Exception as e:
             logger.error(f"Error in symbol lookup for {symbol}: {e}", exc_info=True)
@@ -1472,6 +1503,58 @@ class EnhancedDispatcher:
                             logger.warning(
                                 f"Plugin {p.lang} failed to search for {search_query}: {e}"
                             )
+
+                # Attempt gated symbol-definition fallback for the query as a symbol name.
+                # source_ext is derived from the first BM25 filepath hit, or None.
+                _search_row_filepath: Optional[str] = None
+                if sqlite_store:
+                    try:
+                        import sqlite3 as _sqlite3_s
+                        _sconn = _sqlite3_s.connect(sqlite_store.db_path)
+                        try:
+                            _scur = _sconn.cursor()
+                            _scur.execute(
+                                "SELECT filepath FROM bm25_content WHERE bm25_content MATCH ? LIMIT 1",
+                                (query,),
+                            )
+                            _shint = _scur.fetchone()
+                            if _shint:
+                                _search_row_filepath = _shint[0]
+                        except Exception:
+                            pass
+                        finally:
+                            _sconn.close()
+                    except Exception:
+                        pass
+                _search_source_ext = (
+                    os.path.splitext(_search_row_filepath)[1].lower()
+                    if _search_row_filepath
+                    else None
+                )
+                _sym_def = run_gated_fallback(
+                    plugins=repo_plugins,
+                    symbol=query,
+                    source_ext=_search_source_ext,
+                    timeout_ms=self._fallback_timeout_ms,
+                    histogram=self._fallback_histogram,
+                )
+                if _sym_def is not None:
+                    _sym_filepath = (
+                        _sym_def.get("defined_in", "") if isinstance(_sym_def, dict) else ""
+                    )
+                    all_results.append({
+                        "file": _sym_filepath,
+                        "line": (
+                            _sym_def.get("line", 1) if isinstance(_sym_def, dict) else 1
+                        ),
+                        "snippet": (
+                            _sym_def.get("signature", "") if isinstance(_sym_def, dict) else ""
+                        ),
+                        "score": 1.0,
+                        "language": (
+                            _sym_def.get("language", "unknown") if isinstance(_sym_def, dict) else "unknown"
+                        ),
+                    })
 
                 # Deduplicate results
                 seen = set()
