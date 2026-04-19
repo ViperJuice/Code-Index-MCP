@@ -119,6 +119,20 @@ Every per-tool-call path — `search_code(query, repo_id)`, `symbol_lookup(symbo
 
   P6A  Dep hygiene          parallel after P1
   P6B  Docs alignment       after P4 merge
+
+  P11  Dispatcher Dependability (after P10 merge)
+   │
+   ▼
+  P12  Ops Readiness + Reindex Safety
+   │
+   ▼
+  P13  Reindex Durability + Artifact Automation
+   │
+   ▼
+  P14  Multi-Repo Completeness + Schema Evolution
+   │
+   ▼
+  P15  Security Hardening
 ```
 
 ---
@@ -133,6 +147,25 @@ These gates are the narrowest contracts that let downstream phases start once th
 4. **IF-0-P2A-2** — `StoreRegistry.get(repo_id: str) -> SQLiteStore` — idempotent, thread-safe, owns connection lifetime.
 5. **IF-0-P2B-1** — Dispatcher public tool-call signature: every public method takes `ctx: RepoContext` as first positional arg after `self`. Frozen before P3/P4 starts.
 6. **IF-0-P3-1** — `plugins_for(repo_id: str) -> list[Plugin]` and `SemanticIndexerRegistry.get(repo_id) -> SemanticIndexer`. These are what unblock P4.
+7. **IF-0-P12-1** — `HealthView.snapshot() -> dict[str, Any]` with stable keys `{sqlite, registry, dispatcher, last_index_ms, uptime_s}`. `/ready` and `/liveness` both derive from it.
+8. **IF-0-P12-2** — `IndexingLockRegistry.acquire(repo_id: str) -> ContextManager[None]`. Per-repo reentrant lock; both watcher and manual-sync paths must acquire before dispatcher write.
+9. **IF-0-P12-3** — Log event name `branch.drift.detected` with `{repo_id, current_branch, tracked_branch}` fields + `MultiRepoWatcher.enqueue_full_rescan(repo_id)` call point.
+10. **IF-0-P12-4** — Histogram attribute names on `PrometheusExporter`: `dispatcher_lookup_histogram`, `dispatcher_search_histogram`. Same `(0.005, … 5.0)` bucket tuple as P11.
+11. **IF-0-P12-5** — `verify_artifact_freshness(meta: ArtifactMetadata, head_commit: str, max_age_days: int) -> FreshnessVerdict` enum (`FRESH | STALE_COMMIT | STALE_AGE | INVALID`).
+12. **IF-0-P13-1** — `.reindex-state` JSON schema: `{repo_id, started_at, last_completed_path, remaining_paths, errors}`. Stable shape; additive fields OK.
+13. **IF-0-P13-2** — `two_phase_commit(primary_op: Callable, shadow_op: Callable, rollback: Callable) -> None` helper. Both-or-neither semantics.
+14. **IF-0-P13-3** — `dispatcher.index_file_guarded(path: Path, expected_hash: str) -> IndexResult` — returns `SKIPPED_TOCTOU` if hash mismatch at write time.
+15. **IF-0-P13-4** — `ArtifactPublisher.publish_on_reindex(repo_id: str, commit: str) -> ArtifactRef`. Idempotent; atomic `latest` pointer update via GitHub release tag move.
+16. **IF-0-P13-5** — Exception base class `McpError` + subclasses (`IndexingError`, `ArtifactError`, `PluginError`). Prometheus counter `mcp_errors_by_type_total{module, exception}`.
+17. **IF-0-P14-1** — `RerankerProvider` abstract base with `rerank(query: str, results: list[SearchResult]) -> list[SearchResult]`; registration via `register_reranker(name, provider)` module-level helper.
+18. **IF-0-P14-2** — `_get_repository_dependencies(repo_id: str) -> Set[str]` real implementation; returns repo_ids of detected upstream dependencies.
+19. **IF-0-P14-3** — `ArtifactManifest.schema_version: int` + `SchemaMigrator.apply(from_version: int, to_version: int, db_path: Path) -> None`.
+20. **IF-0-P14-4** — `DeltaPolicy.should_publish_delta(full_size_bytes: int, last_artifact: ArtifactRef | None) -> bool` + delta-manifest shape extension.
+21. **IF-0-P14-5** — `FileSystemSweeper.periodic_sweep(repo_id: str)` method + env vars `MCP_WATCHER_SWEEP_MINUTES` and `MCP_WATCHER_POLL_SECONDS`.
+22. **IF-0-P15-1** — Plugin-sandbox IPC protocol (message envelope schema) + `SandboxedPlugin(real_plugin_spec, capabilities: CapabilitySet)` adapter.
+23. **IF-0-P15-2** — `require_auth(scope: Literal["metrics","admin","tools"]) -> dependency` middleware + the repo-level decision on auth mode (captured in runbook).
+24. **IF-0-P15-3** — `attest(artifact_path: Path) -> Attestation` + `verify_attestation(artifact_path: Path, attestation: Attestation) -> bool`.
+25. **IF-0-P15-4** — `PathTraversalGuard.normalize_and_check(path: str, roots: list[Path]) -> Path` + `TokenValidator.validate_scopes(required: set[str]) -> None` + rate-limit backoff helper.
 
 ---
 
@@ -571,6 +604,196 @@ Investigate why `EnhancedDispatcher.lookup()`'s SIGALRM per-plugin timeout did n
 
 ---
 
+### Phase 12 — Ops Readiness + Reindex Safety (P12)
+
+**Objective**
+Stop silent drift immediately and make the service k8s-deployable. Small, high-leverage safety nets: HTTP probes, per-repo indexing lock, branch-drift loud-path, hot-path latency histograms, artifact freshness gate with offline fallback.
+
+**Exit criteria**
+- [ ] `GET /ready` returns 200 with a stable JSON envelope (checks SQLite reachable, registry loaded, dispatcher initialized); 503 otherwise.
+- [ ] `GET /liveness` returns 200 while the event loop is responsive, 503 after a block exceeding 10 seconds.
+- [ ] Concurrent watcher + manual `sync_all_repositories` on the same repo cannot race; enforced by per-repo `threading.Lock` with a passing test that spawns both paths and asserts serialized dispatcher calls.
+- [ ] Branch drift no longer drops events silently: if `current != tracked`, a `branch.drift.detected` WARN log fires AND a full rescan is enqueued for the next poll.
+- [ ] Prometheus surface includes `mcp_symbol_lookup_duration_seconds` and `mcp_search_duration_seconds` histograms with the same bucket tuple as P11's fallback histogram.
+- [ ] Artifact downloader verifies `artifact.metadata.commit` is an ancestor of HEAD AND age < `MCP_ARTIFACT_MAX_AGE_DAYS` (default 14); else skips with warn + falls back to local index. GitHub outage returns local-index + warn, never raises.
+- [ ] `uv.lock` committed to repo root; CI verifies it is up-to-date.
+
+**Scope notes**
+- Decompose into 5 lanes, each owning disjoint files.
+- Lane SL-1 owns `mcp_server/api/gateway.py` route additions + new `mcp_server/health/probes.py`.
+- Lane SL-2 owns new `mcp_server/indexing/lock_registry.py` and adds `with lock_registry.acquire(repo_id):` call sites in `mcp_server/watcher_multi_repo.py`.
+- Lane SL-3 owns `mcp_server/watcher_multi_repo.py::should_reindex_for_branch` and `mcp_server/storage/git_index_manager.py`.
+- **Single-writer overlap between SL-2 and SL-3 on `watcher_multi_repo.py`**: partition by function. SL-2 wraps dispatcher call sites; SL-3 owns the branch-check function and rescan-enqueue. Non-overlapping line ranges.
+- Lane SL-4 owns `mcp_server/metrics/prometheus_exporter.py` histogram additions + `mcp_server/dispatcher/dispatcher_enhanced.py` instrumentation (behavior untouched).
+- Lane SL-5 owns `mcp_server/artifacts/artifact_download.py`, new `mcp_server/artifacts/freshness.py`, `uv.lock`, and new `.github/workflows/lockfile-check.yml`.
+
+**Non-goals**
+- No upload-path changes (deferred to P13).
+- No new metric endpoints beyond probes.
+- No artifact signing (deferred to P15).
+
+**Key files**
+- `mcp_server/api/gateway.py`, `mcp_server/health/probes.py` (new)
+- `mcp_server/indexing/lock_registry.py` (new), `mcp_server/watcher_multi_repo.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/metrics/prometheus_exporter.py`, `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/artifacts/artifact_download.py`, `mcp_server/artifacts/freshness.py` (new)
+- `uv.lock` (new), `.github/workflows/lockfile-check.yml` (new)
+- `tests/test_health_probes.py`, `tests/test_indexing_lock.py`, `tests/test_branch_drift_rescan.py`, `tests/test_hot_path_histograms.py`, `tests/test_artifact_freshness.py` (all new)
+
+**Depends on**
+- P11 merged.
+
+**Produces**
+- IF-0-P12-1
+- IF-0-P12-2
+- IF-0-P12-3
+- IF-0-P12-4
+- IF-0-P12-5
+
+---
+
+### Phase 13 — Reindex Durability + Artifact Automation (P13)
+
+**Objective**
+Replace happy-path code with durable flows: checkpointed reindex resume, atomic Qdrant+SQLite coupling, TOCTOU-safe dispatch, direct post-reindex artifact upload (removing the human-cron dependency), structured exception hierarchy with error-type Prometheus counters.
+
+**Exit criteria**
+- [ ] Reindex of 1000 files where file #500 fails leaves a `.reindex-state` checkpoint; the next reindex starts at file #500, not file #1. Recovery test asserts no re-work of files #1-499.
+- [ ] Qdrant vector delete and SQLite path update for a renamed file are atomic: if SQLite step fails, Qdrant rolls back; conversely if Qdrant fails the SQLite write aborts. Fault-injection test proves this.
+- [ ] Dispatcher recomputes file hash immediately before write; if hash has changed since the watcher's observation, it skips and logs a TOCTOU skip. Test with concurrent writer proves no stale content is indexed.
+- [ ] Watcher triggers artifact upload directly on successful full-reindex completion; no cron dependency. Measured publish latency (reindex-done → artifact-available) < 2 min.
+- [ ] Two parallel CI uploads of the same repo at commits A and B cannot both win the `latest` pointer; one is atomically elected, the loser's artifact remains addressable by its commit SHA.
+- [ ] All bare `except:` clauses in `mcp_server/dispatcher/**` and `mcp_server/artifacts/**` replaced with typed catches. Prometheus counter `mcp_errors_by_type_total{module,exception}` increments on each handled error.
+
+**Scope notes**
+- Decompose into 5 lanes.
+- Lane SL-1 (checkpoint resume) owns `mcp_server/indexing/incremental_indexer.py` resume logic and new `mcp_server/indexing/checkpoint.py`.
+- Lane SL-2 (two-phase commit) owns new `mcp_server/storage/two_phase.py` and `mcp_server/indexing/incremental_indexer.py::_cleanup_stale_vectors` + rename handler.
+- **Single-writer overlap between SL-1 and SL-2 on `incremental_indexer.py`**: SL-1 owns the resume entry points, SL-2 owns the cleanup and rename handler. Non-overlapping line ranges agreed at plan-phase.
+- Lane SL-3 (TOCTOU dispatch) owns `mcp_server/dispatcher/dispatcher_enhanced.py::index_file` guarded variant.
+- Lane SL-4 (direct publish) owns `mcp_server/artifacts/artifact_upload.py`, new `mcp_server/artifacts/publisher.py`, and `.github/workflows/index-artifact-management.yml` (cron trigger replaced with workflow_dispatch from runtime).
+- Lane SL-5 (exception hierarchy) owns new `mcp_server/errors/__init__.py`, counter registration in `mcp_server/metrics/prometheus_exporter.py`, and cross-module `except` refactoring.
+- **SL-5 is a cross-module lane by design**: scoped to `except` keyword replacements only. Other lanes must not touch `except` clauses in their edited files during P13.
+
+**Non-goals**
+- No plugin-level error taxonomy (plugins too heterogeneous; deferred).
+- No retention-policy change (lives in the user runbook).
+- No artifact signing (deferred to P15).
+
+**Key files**
+- `mcp_server/indexing/incremental_indexer.py`, `mcp_server/indexing/checkpoint.py` (new)
+- `mcp_server/storage/two_phase.py` (new)
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/artifacts/artifact_upload.py`, `mcp_server/artifacts/publisher.py` (new)
+- `.github/workflows/index-artifact-management.yml`
+- `mcp_server/errors/__init__.py` (new), `mcp_server/metrics/prometheus_exporter.py`
+- `tests/test_reindex_resume.py`, `tests/test_two_phase_commit.py`, `tests/test_dispatcher_toctou.py`, `tests/test_artifact_publish_race.py`, `tests/test_structured_errors.py` (all new)
+
+**Depends on**
+- P12 merged (consumes P12-2 lock, P12-5 freshness helper, P12-4 counter registration pattern).
+
+**Produces**
+- IF-0-P13-1
+- IF-0-P13-2
+- IF-0-P13-3
+- IF-0-P13-4
+- IF-0-P13-5
+
+---
+
+### Phase 14 — Multi-Repo Completeness + Schema Evolution (P14)
+
+**Objective**
+Close the functional gaps that currently limit product reach: wire the stubbed semantic reranker, implement dependency-aware search, establish schema version gating, add auto-delta on large artifacts, and make the watcher robust against inotify event drops plus enforce rename atomicity.
+
+**Exit criteria**
+- [ ] `cross_repo_coordinator.py::_rerank_results` no longer returns unranked results when a reranker is configured; calls the reranker via `RerankerProvider.rerank(query, results) -> results`. Unit test with a fake reranker proves ordering changes.
+- [ ] `_get_repository_dependencies(repo_id) -> Set[str]` returns non-empty sets for repos containing `requirements.txt`, `package.json`, `go.mod`, or `Cargo.toml`. Integration test builds a tiny dep graph across 3 test repos.
+- [ ] Every new artifact carries a `schema_version` field in its manifest; downloader refuses to open an artifact whose version is unknown, runs `SchemaMigrator` for a known older version, succeeds for equal version. Test covers all three paths.
+- [ ] When a full artifact exceeds `MCP_ARTIFACT_FULL_SIZE_LIMIT` (default 500 MB), the publisher automatically switches to delta mode using the previous artifact as base. Test forces the threshold low and verifies delta output shape.
+- [ ] Watcher runs a periodic full-tree scan every `MCP_WATCHER_SWEEP_MINUTES` (default 60) to catch inotify/FSEvents drops. Test injects a missed event and confirms the next sweep recovers it.
+- [ ] Rename `foo.py → bar.py` produces exactly one `foo.py` removal plus one `bar.py` add in the index; no stale `foo.py` entry lingers. Verified by post-rename grep of SQLite rows.
+
+**Scope notes**
+- Decompose into 5 lanes.
+- Lane SL-1 owns `mcp_server/dispatcher/cross_repo_coordinator.py::_rerank_results` and new `mcp_server/retrieval/reranker.py`.
+- Lane SL-2 owns `mcp_server/dispatcher/cross_repo_coordinator.py::_get_repository_dependencies` and new `mcp_server/dependency_graph/` package.
+- Lane SL-3 owns `mcp_server/artifacts/manifest_v2.py` (schema_version promotion), new `mcp_server/storage/schema_migrator.py`, and `mcp_server/storage/sqlite_store.py::_run_migrations` version stamps.
+- Lane SL-4 owns `mcp_server/artifacts/artifact_upload.py` delta-fallback branch, `mcp_server/indexing/incremental_indexer.py::_get_chunk_ids_for_path` pagination, and new `mcp_server/artifacts/delta_policy.py`.
+- **Cross-phase single-writer note**: Lane SL-4 edits `artifact_upload.py`, which P13 SL-4 also edited. Resolved by time ordering — P13 merges before P14 starts, so no concurrent work.
+- Lane SL-5 owns `mcp_server/watcher/file_watcher.py`, `mcp_server/watcher_multi_repo.py`, and new `mcp_server/watcher/sweeper.py`.
+
+**Non-goals**
+- No auto-repo discovery (scope creep; deferred).
+- No cross-ecosystem dep resolution (e.g., Python→Node via FFI); each ecosystem stays self-contained.
+
+**Key files**
+- `mcp_server/dispatcher/cross_repo_coordinator.py`, `mcp_server/retrieval/reranker.py` (new)
+- `mcp_server/dependency_graph/` (new package)
+- `mcp_server/artifacts/manifest_v2.py`, `mcp_server/storage/schema_migrator.py` (new), `mcp_server/storage/sqlite_store.py`
+- `mcp_server/artifacts/artifact_upload.py`, `mcp_server/artifacts/delta_policy.py` (new)
+- `mcp_server/indexing/incremental_indexer.py`
+- `mcp_server/watcher/file_watcher.py`, `mcp_server/watcher_multi_repo.py`, `mcp_server/watcher/sweeper.py` (new)
+- `tests/test_reranker_integration.py`, `tests/test_dependency_aware_search.py`, `tests/test_schema_migration.py`, `tests/test_artifact_auto_delta.py`, `tests/test_chunk_query_pagination.py`, `tests/test_watcher_sweep.py`, `tests/test_rename_atomicity.py` (all new)
+
+**Depends on**
+- P13 merged.
+
+**Produces**
+- IF-0-P14-1
+- IF-0-P14-2
+- IF-0-P14-3
+- IF-0-P14-4
+- IF-0-P14-5
+
+---
+
+### Phase 15 — Security Hardening (P15)
+
+**Objective**
+Enforce trust boundaries: sandbox plugins, authenticate `/metrics`, sign and verify artifacts, guard path-traversal in search output, validate `GITHUB_TOKEN` scopes at startup, rate-limit cross-repo artifact fetches.
+
+**Exit criteria**
+- [ ] Plugin calls (`getDefinition`, `index_file`) execute in a subprocess (or WASI; decided during plan-phase) with no access to the host SQLite DB, network, or arbitrary filesystem. A deliberately-malicious test plugin (attempts shell-command execution via stdlib helpers, opens `/etc/passwd`) is caught and rejected.
+- [ ] `/metrics` requires auth (bearer token OR k8s-style NetworkPolicy per user choice documented in runbook). Unauth'd request returns 401.
+- [ ] All artifacts uploaded by P13 SL-4's publisher carry a GitHub attestation (`gh attestation`). Downloader verifies attestation and rejects tampered artifacts. Negative test swaps archive bytes post-attest and confirms rejection.
+- [ ] Search results cannot return paths outside `MCP_ALLOWED_ROOTS`: response values run through `PathTraversalGuard.normalize_and_check`. Negative test asserts `../../../etc/passwd` variant is 403'd.
+- [ ] At startup, `TokenValidator.validate_scopes()` checks `GITHUB_TOKEN` has required scopes (`contents:read`, `actions:read+write`, `attestations:write`). Missing scopes fails-loud with actionable error; no silent mid-operation failures.
+- [ ] Cross-repo artifact pulls respect `X-RateLimit-Remaining`; if <100, back off exponentially. Test simulates rate-limit header and verifies backoff.
+
+**Scope notes**
+- Decompose into 4 lanes.
+- **Lane SL-1 (plugin sandboxing) is the riskiest single lane in this entire remediation arc.** Plan it with `--consensus` (subprocess vs WASI vs subinterpreter); budget for a scoping prototype if consensus can't converge in one lane-day.
+- Lane SL-1 owns new `mcp_server/sandbox/` package + adapter `mcp_server/plugins/sandboxed_plugin.py`.
+- Lane SL-2 owns `mcp_server/security/security_middleware.py` extension and `mcp_server/api/gateway.py` wiring.
+- Lane SL-3 owns `mcp_server/artifacts/publisher.py` (extends P13 SL-4 with attestation call), new `mcp_server/artifacts/attestation.py`, and `mcp_server/artifacts/artifact_download.py` verify-on-download.
+- Lane SL-4 owns new `mcp_server/security/path_guard.py`, new `mcp_server/security/token_validator.py`, and `mcp_server/artifacts/providers/github_actions.py` rate-limit tracking.
+
+**Non-goals**
+- No plugin signing (decision: sandbox instead).
+- No TLS termination inside the app (expected to be ingress/sidecar).
+- No secrets management beyond `GITHUB_TOKEN` validation (vault integration out of scope).
+
+**Key files**
+- `mcp_server/sandbox/` (new package), `mcp_server/plugins/sandboxed_plugin.py` (new)
+- `mcp_server/security/security_middleware.py`, `mcp_server/api/gateway.py`
+- `mcp_server/artifacts/publisher.py`, `mcp_server/artifacts/attestation.py` (new), `mcp_server/artifacts/artifact_download.py`
+- `mcp_server/security/path_guard.py` (new), `mcp_server/security/token_validator.py` (new)
+- `mcp_server/artifacts/providers/github_actions.py`
+- `tests/test_plugin_sandbox.py`, `tests/security/test_malicious_plugin.py`, `tests/security/test_metrics_auth.py`, `tests/test_artifact_attestation.py`, `tests/security/test_path_traversal.py`, `tests/security/test_token_scope.py`, `tests/test_cross_repo_rate_limit.py` (all new)
+
+**Depends on**
+- P14 merged.
+
+**Produces**
+- IF-0-P15-1
+- IF-0-P15-2
+- IF-0-P15-3
+- IF-0-P15-4
+
+---
+
 ## Execution Notes
 
 - **Save this file as `specs/phase-plans-v1.md`** and create `specs/phase-aliases.json` mapping `P1, P2A, P2B, P3, P4, P5, P6A, P6B` to the full phase headings above so `/plan-phase` can resolve short aliases. If `specs/phase-aliases.json` isn't used, pass `<phase-name-or-id>` as the full heading when invoking `/plan-phase`.
@@ -584,6 +807,13 @@ Investigate why `EnhancedDispatcher.lookup()`'s SIGALRM per-plugin timeout did n
 - **P10 is the highest-parallelism phase since P3** — six disjoint lanes. Keep `MAX_PARALLEL_LANES=2`; expect three waves.
 - **P11 is unknown-scope.** Plan with `--consensus`. If root cause eludes a one-lane-day timebox, ship extension-gating + bounded timeout and document the investigation gap in `docs/investigations/`.
 - **P8 historical sweep requires human review** of the triage log. Consider flagging that lane for no-auto-merge in `/execute-phase`.
+- **P12 → P13 → P14 → P15 is strictly serial.** No cross-phase parallelism. Each phase's planning can start the day after its predecessor merges.
+- **P12 SL-2 and SL-3 both edit `watcher_multi_repo.py`** — partition by function: SL-2 wraps dispatcher call sites with `with lock_registry.acquire(repo_id):`; SL-3 owns `should_reindex_for_branch` plus the rescan enqueue. Coordinate via IF-freeze at plan-phase.
+- **P13 SL-1 and SL-2 both edit `incremental_indexer.py`** — SL-1 owns the resume entry points, SL-2 owns `_cleanup_stale_vectors` and the rename handler. Non-overlapping line ranges.
+- **P13 SL-5 touches many files by design** (exception refactoring). Scope strictly to `except` keyword replacements; other lanes must not touch `except` clauses in their edited files during P13.
+- **P14 SL-4 and P13 SL-4 both edit `artifact_upload.py`** — time-ordered (P13 merges first), no concurrent work.
+- **P15 SL-1 (plugin sandboxing) is the riskiest single lane in this entire remediation arc.** Plan with `--consensus`; budget for a scoping prototype if consensus cannot converge in one lane-day.
+- **User runbook prerequisites** apply before each execute-phase. See `docs/operations/user-action-runbook.md` for the per-phase checklist (GitHub token scopes for P13, SLSA attestations for P15, etc.). Read that file before invoking `/execute-phase p12`.
 
 ## Verification (whole-refactor, after P5 merge)
 
@@ -640,3 +870,69 @@ pytest tests/test_dispatcher_extension_gating.py tests/test_dispatcher_fallback_
 ```
 
 Any failure in the above — stale `mcp_tool_calls_total` of zero after a stdio call, shutdown exceeding 5s, a `/etc/passwd` symlink read succeeding from an allowed-root alias, a `database is locked` surfaced under concurrent readers, or an untrapped fallback hang — fails the post-hardening bar and blocks beta ship.
+
+## Verification (post-P15, pre-GA)
+
+All P1–P11 verification above must still pass — regression-free. In addition:
+
+```bash
+# Probes (P12 SL-1)
+curl -f localhost:8000/ready       # expect 200
+curl -f localhost:8000/liveness    # expect 200
+
+# Hot-path histograms present (P12 SL-4)
+curl -s localhost:9090/metrics | grep -E 'mcp_(symbol_lookup|search)_duration_seconds_bucket' | head -5
+
+# Per-repo indexing lock (P12 SL-2)
+pytest tests/test_indexing_lock.py -v
+
+# Branch-drift loud-path (P12 SL-3)
+pytest tests/test_branch_drift_rescan.py -v
+
+# Artifact freshness gate + offline fallback (P12 SL-5)
+pytest tests/test_artifact_freshness.py -v
+
+# Reindex resume (P13 SL-1)
+pytest tests/test_reindex_resume.py -v
+
+# Two-phase Qdrant+SQLite commit (P13 SL-2)
+pytest tests/test_two_phase_commit.py -v
+
+# TOCTOU-guarded dispatch (P13 SL-3)
+pytest tests/test_dispatcher_toctou.py -v
+
+# Direct publish + atomic latest (P13 SL-4)
+pytest tests/test_artifact_publish_race.py -v
+
+# Structured error counters surface on /metrics (P13 SL-5)
+curl -s localhost:9090/metrics | grep -E 'mcp_errors_by_type_total' | head -3
+pytest tests/test_structured_errors.py -v
+
+# Semantic reranker + dependency-aware search (P14 SL-1, SL-2)
+pytest tests/test_reranker_integration.py tests/test_dependency_aware_search.py -v
+
+# Schema version gate + migrator (P14 SL-3)
+pytest tests/test_schema_migration.py -v
+
+# Auto-delta + paginated chunk queries (P14 SL-4)
+pytest tests/test_artifact_auto_delta.py tests/test_chunk_query_pagination.py -v
+
+# Watcher fallback sweep + rename atomicity (P14 SL-5)
+pytest tests/test_watcher_sweep.py tests/test_rename_atomicity.py -v
+
+# Plugin sandboxing — malicious plugin rejected (P15 SL-1)
+pytest tests/security/test_malicious_plugin.py tests/test_plugin_sandbox.py -v
+
+# Metrics auth (P15 SL-2) — unauth'd request denied
+curl -s -o /dev/null -w '%{http_code}' localhost:9090/metrics   # expect 401
+pytest tests/security/test_metrics_auth.py -v
+
+# Artifact attestation verify (P15 SL-3)
+pytest tests/test_artifact_attestation.py -v
+
+# Path traversal + token scope + rate limit (P15 SL-4)
+pytest tests/security/test_path_traversal.py tests/security/test_token_scope.py \
+       tests/test_cross_repo_rate_limit.py -v
+```
+
+Any failure in the above — a probe returning 503 when the service is healthy, a fallback to pre-reindex index content when artifact is stale, a concurrent watcher+manual-sync race surfacing in the test, a rename leaving `foo.py` entries behind, a sandboxed plugin escaping to the host filesystem, an unauth'd `/metrics` scrape returning 200, or a tampered artifact passing attestation verification — fails the pre-GA bar and must be remediated before release.
