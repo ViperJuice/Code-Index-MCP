@@ -234,7 +234,7 @@ def test_enqueue_full_rescan_passes_repo_id():
     fn, args, kwargs = submitted_callables[0]
     # Call the submitted closure — it should invoke index_manager.sync_repository_index with force_full=True
     fn()
-    index_manager.sync_repository_index.assert_called_once_with("my-repo", force_full=True)
+    index_manager.sync_repository_index.assert_called_once_with("my-repo", force_full=True, bypass_branch_guard=True)
 
 
 # ---------------------------------------------------------------------------
@@ -263,3 +263,27 @@ def test_watcher_drift_callback_calls_enqueue_full_rescan():
         cb = index_manager.on_branch_drift
         cb("my-repo", "feature/x", "main")
         mock_enqueue.assert_called_once_with("my-repo")
+
+
+# ---------------------------------------------------------------------------
+# SL-3.1f: bypass_branch_guard prevents infinite drift→rescan loop
+# ---------------------------------------------------------------------------
+
+
+def test_bypass_branch_guard_prevents_infinite_loop(caplog):
+    """sync_repository_index with bypass_branch_guard=True must not emit drift log or fire callback
+    even when current != tracked (i.e., the rescan path won't re-trigger drift)."""
+    repo_id = "test-repo"
+    registry, _ = _make_registry_with_drift(repo_id=repo_id, current_branch="feature/noise", tracked_branch="main")
+    # Mock out _full_index so it returns without actually indexing
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    manager.on_branch_drift = MagicMock()
+    manager._full_index = MagicMock(return_value=5)
+    registry.update_indexed_commit = MagicMock(return_value=True)
+
+    with caplog.at_level(logging.WARNING, logger="mcp_server.storage.git_index_manager"):
+        manager.sync_repository_index(repo_id, force_full=True, bypass_branch_guard=True)
+
+    drift_records = [r for r in caplog.records if r.getMessage() == "branch.drift.detected"]
+    assert len(drift_records) == 0, "bypass_branch_guard must suppress drift log on rescan path"
+    manager.on_branch_drift.assert_not_called()

@@ -259,7 +259,8 @@ class MultiRepositoryWatcher:
     def enqueue_full_rescan(self, repo_id: str) -> None:
         """Submit a force-full reindex to the thread pool; returns immediately."""
         def _rescan():
-            self.index_manager.sync_repository_index(repo_id, force_full=True)
+            # bypass_branch_guard=True prevents infinite drift→rescan→drift→rescan loops
+            self.index_manager.sync_repository_index(repo_id, force_full=True, bypass_branch_guard=True)
         self.executor.submit(_rescan)
 
     def start_watching_all(self):

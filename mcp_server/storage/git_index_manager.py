@@ -83,12 +83,16 @@ class GitAwareIndexManager:
         # Signature: (repo_id: str, current_branch: str, tracked_branch: str) -> None
         self.on_branch_drift: _DriftCallback = None
 
-    def sync_repository_index(self, repo_id: str, force_full: bool = False) -> IndexSyncResult:
+    def sync_repository_index(
+        self, repo_id: str, force_full: bool = False, bypass_branch_guard: bool = False
+    ) -> IndexSyncResult:
         """Sync index with repository's current git state.
 
         Args:
             repo_id: Repository ID
             force_full: Force full reindex instead of incremental
+            bypass_branch_guard: Skip branch-drift check (used by enqueue_full_rescan to
+                prevent infinite drift→rescan→drift→rescan loops)
 
         Returns:
             IndexSyncResult
@@ -116,7 +120,7 @@ class GitAwareIndexManager:
         current_branch = getattr(repo_info, "current_branch", None)
         last_indexed_branch = getattr(repo_info, "last_indexed_branch", None)
 
-        if not should_reindex_for_branch(current_branch, repo_info.tracked_branch):
+        if not bypass_branch_guard and not should_reindex_for_branch(current_branch, repo_info.tracked_branch):
             # Distinguish true drift (both non-None, different) from unconfigured (tracked is None)
             if current_branch and repo_info.tracked_branch and current_branch != repo_info.tracked_branch:
                 logger.warning(
