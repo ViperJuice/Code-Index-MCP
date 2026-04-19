@@ -10,7 +10,7 @@ import logging
 import re
 import time
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed  # noqa: F401  (patched by tests; looked up via globals())
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
@@ -24,7 +24,7 @@ from mcp_server.storage.multi_repo_manager import (
     MultiRepositoryManager,
     get_multi_repo_manager,
 )
-from mcp_server.storage.sqlite_store import SQLiteStore
+from mcp_server.storage.sqlite_store import SQLiteStore  # noqa: F401  (patched by tests; looked up via globals())
 
 logger = logging.getLogger(__name__)
 

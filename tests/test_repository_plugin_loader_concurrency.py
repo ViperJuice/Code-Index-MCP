@@ -199,7 +199,7 @@ def test_distinct_repo_ids_do_not_block_each_other():
         ):
             await loader_serial.analyze_repository(Path("/fake/repo_b"))
 
-    asyncio.get_event_loop().run_until_complete(run_serial())
+    asyncio.new_event_loop().run_until_complete(run_serial())
     serial_time = time.monotonic() - t0
 
     # Parallel: two threads each analyze a distinct repo_id
