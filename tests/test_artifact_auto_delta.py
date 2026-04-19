@@ -52,6 +52,14 @@ class TestPublisherDeltaIntegration:
         publisher._patcher = patcher  # type: ignore[attr-defined]
         publisher._run = MagicMock(return_value=MagicMock(returncode=0, stdout="", stderr=""))
 
+        from mcp_server.artifacts.attestation import Attestation
+        attest_patcher = patch(
+            "mcp_server.artifacts.publisher.attest",
+            return_value=Attestation(bundle_url="", bundle_path=Path(""), subject_digest="", signed_at=__import__("datetime").datetime.now(__import__("datetime").timezone.utc)),
+        )
+        attest_patcher.start()
+        publisher._attest_patcher = attest_patcher  # type: ignore[attr-defined]
+
     def test_publisher_switches_to_delta_when_env_low(self, monkeypatch):
         """When MCP_ARTIFACT_FULL_SIZE_LIMIT=1 and prev artifact exists, metadata must be delta."""
         monkeypatch.setenv("MCP_ARTIFACT_FULL_SIZE_LIMIT", "1")
@@ -73,6 +81,8 @@ class TestPublisherDeltaIntegration:
 
         if hasattr(publisher, "_patcher"):
             publisher._patcher.stop()
+        if hasattr(publisher, "_attest_patcher"):
+            publisher._attest_patcher.stop()
 
     def test_publisher_full_when_no_previous(self, monkeypatch):
         """When no previous artifact, strategy must be full regardless of size."""
@@ -90,3 +100,5 @@ class TestPublisherDeltaIntegration:
 
         if hasattr(publisher, "_patcher"):
             publisher._patcher.stop()
+        if hasattr(publisher, "_attest_patcher"):
+            publisher._attest_patcher.stop()
