@@ -6,8 +6,12 @@ import email.utils
 import json
 import subprocess
 import time
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import List, Mapping, Tuple
+from typing import List, Mapping, Optional, Tuple
+
+from mcp_server.core.errors import TerminalArtifactError, TransientArtifactError
 
 from mcp_server.core.errors import TerminalArtifactError
 from .base import ArtifactRecord
@@ -176,3 +180,129 @@ class GitHubActionsArtifactProvider:
             return True
         except subprocess.CalledProcessError:
             return False
+
+
+# ---------------------------------------------------------------------------
+# SL-3: Retention janitor — EOF append region
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ReleaseRef:
+    tag_name: str
+    created_at: str  # ISO-8601
+    is_latest: bool
+    is_draft: bool
+
+
+_PROTECTED_TAGS = frozenset({"index-latest"})
+
+
+def delete_releases_older_than(
+    repo: str,
+    *,
+    older_than_days: Optional[int] = None,
+    keep_latest_n: Optional[int] = None,
+    dry_run: bool = False,
+) -> list[ReleaseRef]:
+    """Delete (or list, if dry_run) releases matching retention criteria.
+
+    Protection order:
+      1. isLatest=True releases and tags in _PROTECTED_TAGS are never deleted.
+      2. Age filter: drop releases created more than older_than_days ago.
+      3. Keep-latest-N: from remaining candidates, preserve the newest N.
+    Returns the set of deleted (or candidate-if-dry_run) releases.
+    Raises TerminalArtifactError on 403, TransientArtifactError on 429.
+    """
+    if older_than_days is None and keep_latest_n is None:
+        return []
+
+    result = subprocess.run(
+        [
+            "gh",
+            "release",
+            "list",
+            "--repo",
+            repo,
+            "--json",
+            "tagName,createdAt,isLatest,isDraft",
+            "--limit",
+            "1000",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        stderr = result.stderr or ""
+        if "403" in stderr:
+            raise TerminalArtifactError(f"gh release list failed (403): {stderr}")
+        if "429" in stderr:
+            raise TransientArtifactError(f"gh release list rate-limited (429): {stderr}")
+        raise RuntimeError(f"gh release list failed: {stderr}")
+
+    releases_raw: list[dict] = json.loads(result.stdout)
+
+    all_refs = [
+        ReleaseRef(
+            tag_name=r["tagName"],
+            created_at=r["createdAt"],
+            is_latest=r["isLatest"],
+            is_draft=r["isDraft"],
+        )
+        for r in releases_raw
+    ]
+
+    # Step 1: Remove protected releases (pointers + isLatest)
+    candidates = [
+        ref
+        for ref in all_refs
+        if not ref.is_latest and ref.tag_name not in _PROTECTED_TAGS
+    ]
+
+    # Step 2: Age filter
+    if older_than_days is not None:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=older_than_days)
+        candidates = [
+            ref
+            for ref in candidates
+            if datetime.fromisoformat(ref.created_at.replace("Z", "+00:00")) < cutoff
+        ]
+
+    # Step 3: Keep-latest-N (sorted newest-first; protect the newest N)
+    if keep_latest_n is not None and keep_latest_n > 0:
+        # Sort all non-protected refs by date descending to determine "newest N"
+        non_protected = sorted(
+            [ref for ref in all_refs if not ref.is_latest and ref.tag_name not in _PROTECTED_TAGS],
+            key=lambda r: r.created_at,
+            reverse=True,
+        )
+        protected_by_count = {ref.tag_name for ref in non_protected[:keep_latest_n]}
+        candidates = [ref for ref in candidates if ref.tag_name not in protected_by_count]
+
+    if dry_run:
+        return candidates
+
+    deleted: list[ReleaseRef] = []
+    for ref in candidates:
+        del_result = subprocess.run(
+            ["gh", "release", "delete", ref.tag_name, "--repo", repo, "--yes"],
+            capture_output=True,
+            text=True,
+        )
+        if del_result.returncode != 0:
+            stderr = del_result.stderr or ""
+            if "403" in stderr:
+                raise TerminalArtifactError(
+                    f"gh release delete {ref.tag_name} failed (403): {stderr}"
+                )
+            if "429" in stderr:
+                _respect_rate_limit(
+                    {"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": str(int(time.time()) + 60)}
+                )
+                raise TransientArtifactError(
+                    f"gh release delete {ref.tag_name} rate-limited (429): {stderr}"
+                )
+            raise RuntimeError(f"gh release delete {ref.tag_name} failed: {stderr}")
+        deleted.append(ref)
+
+    return deleted
