@@ -93,13 +93,9 @@ def test_sandboxed_plugin_init_signature():
     assert params["gh_cmd"].default == "python"
 
 
-def test_sandboxed_plugin_raises_not_implemented():
-    from mcp_server.plugins.sandboxed_plugin import SandboxedPlugin
-    from mcp_server.sandbox.capabilities import CapabilitySet
-    with pytest.raises(NotImplementedError, match="filled by SL-1"):
-        SandboxedPlugin("mcp_server.plugins.python_plugin", CapabilitySet(
-            fs_read=(), fs_write=(), env_allow=frozenset()
-        ))
+# SL-1 filled the SandboxedPlugin body; the stub-stage NotImplementedError
+# assertion has been removed. Behavior is covered by
+# tests/security/test_plugin_sandbox.py and tests/security/test_malicious_plugin.py.
 
 
 # ---------------------------------------------------------------------------
