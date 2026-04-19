@@ -255,6 +255,9 @@ class MultiRepositoryWatcher:
         self.executor = ThreadPoolExecutor(max_workers=4)
         self.running = False
 
+        # Injected by caller; never instantiated here (circular-import guard).
+        self._artifact_publisher = None
+
         # Wire drift detection callback — avoids circular import (git_index_manager never imports watcher)
         self.index_manager.on_branch_drift = self._on_branch_drift
 
@@ -420,6 +423,12 @@ class MultiRepositoryWatcher:
                 repo_info = self.registry.get_repository(repo_id)
                 if repo_info and repo_info.artifact_enabled:
                     self._create_and_upload_artifact(repo_id, commit)
+
+                if self._artifact_publisher is not None:
+                    try:
+                        self._artifact_publisher.publish_on_reindex(repo_id, commit)
+                    except Exception as pub_exc:
+                        logger.error("ArtifactPublisher.publish_on_reindex failed for %s: %s", repo_id, pub_exc)
 
         except Exception as e:
             logger.error(f"Failed to sync repository {repo_id}: {e}")

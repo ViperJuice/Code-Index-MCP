@@ -1,0 +1,157 @@
+"""ArtifactPublisher — commit-SHA-keyed release creation with atomic latest pointer (IF-0-P13-4)."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+from mcp_server.core.errors import MCPError
+
+if TYPE_CHECKING:
+    from .artifact_upload import IndexArtifactUploader
+
+
+class ArtifactError(MCPError):
+    """Raised when a gh CLI operation fails during artifact publishing."""
+
+
+@dataclass(frozen=True)
+class ArtifactRef:
+    repo_id: str
+    commit: str
+    tag: str
+    release_url: str
+    is_latest: bool
+
+
+class ArtifactPublisher:
+    """Publish commit-SHA-keyed GitHub releases and atomically update index-latest."""
+
+    def __init__(self, uploader: "IndexArtifactUploader", *, gh_cmd: str = "gh") -> None:
+        self._uploader = uploader
+        self._gh_cmd = gh_cmd
+
+    # ------------------------------------------------------------------
+    # Public API (frozen by IF-0-P13-4)
+    # ------------------------------------------------------------------
+
+    def publish_on_reindex(self, repo_id: str, commit: str) -> ArtifactRef:
+        """Idempotent publish: creates a SHA-keyed release and atomically moves index-latest.
+
+        Calling twice with the same (repo_id, commit) returns the same ArtifactRef.
+        The losing side of a concurrent race still has its SHA-keyed release reachable;
+        only is_latest differs.
+        """
+        short_sha = commit[:7]
+        sha_tag = f"index-{short_sha}"
+        repo = self._uploader.repo
+        release_url = f"https://github.com/{repo}/releases/tag/{sha_tag}"
+
+        try:
+            self._ensure_sha_release(sha_tag, commit, repo)
+            self._move_latest_pointer(sha_tag, commit, repo)
+            is_latest = self._check_is_latest(commit, repo)
+        except ArtifactError:
+            raise
+        except subprocess.CalledProcessError as exc:
+            raise ArtifactError(
+                f"gh CLI returned non-zero exit {exc.returncode}: {exc.stderr}"
+            ) from exc
+        except Exception as exc:
+            raise ArtifactError(f"publish_on_reindex failed: {exc}") from exc
+
+        return ArtifactRef(
+            repo_id=repo_id,
+            commit=commit,
+            tag=sha_tag,
+            release_url=release_url,
+            is_latest=is_latest,
+        )
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _run(self, args: list[str], *, check: bool = True) -> subprocess.CompletedProcess:
+        """Run a gh sub-command, wrapping CalledProcessError in ArtifactError."""
+        try:
+            return subprocess.run(
+                [self._gh_cmd] + args,
+                capture_output=True,
+                text=True,
+                check=check,
+            )
+        except subprocess.CalledProcessError as exc:
+            raise ArtifactError(
+                f"gh CLI returned non-zero exit {exc.returncode}: {exc.stderr}"
+            ) from exc
+
+    def _ensure_sha_release(self, sha_tag: str, commit: str, repo: str) -> None:
+        """Create the SHA-keyed release if it doesn't already exist (idempotent)."""
+        result = subprocess.run(
+            [self._gh_cmd, "release", "view", sha_tag, "--repo", repo],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            return  # Already exists — idempotent short-circuit
+
+        # Create new SHA-keyed release
+        self._run(
+            [
+                "release", "create", sha_tag,
+                "--repo", repo,
+                "--target", commit,
+                "--title", f"Index: {sha_tag}",
+                "--notes", f"Auto-published index artifact for commit {commit}",
+            ]
+        )
+
+    def _move_latest_pointer(self, sha_tag: str, commit: str, repo: str) -> None:
+        """Atomically move index-latest to point at commit via gh release edit (or create)."""
+        result = subprocess.run(
+            [self._gh_cmd, "release", "view", "index-latest", "--repo", repo],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            # First-ever publish: create index-latest
+            self._run(
+                [
+                    "release", "create", "index-latest",
+                    "--repo", repo,
+                    "--target", commit,
+                    "--title", "Index: latest",
+                    "--notes", f"Auto-updated index artifact. Commit: {commit}",
+                ]
+            )
+        else:
+            self._run(
+                [
+                    "release", "edit", "index-latest",
+                    "--repo", repo,
+                    "--target", commit,
+                    "--title", f"Index: latest ({commit[:8]})",
+                ]
+            )
+
+    def _check_is_latest(self, commit: str, repo: str) -> bool:
+        """Return True iff index-latest currently points at our commit."""
+        result = subprocess.run(
+            [
+                self._gh_cmd, "release", "view", "index-latest",
+                "--repo", repo,
+                "--json", "targetCommitish",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return False
+        try:
+            data = json.loads(result.stdout)
+            return data.get("targetCommitish", "") == commit
+        except (json.JSONDecodeError, AttributeError):
+            return False
