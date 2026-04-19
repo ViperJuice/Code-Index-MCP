@@ -167,7 +167,13 @@ def _make_changes(repo_path: Path, n: int = 1000) -> List[FileChange]:
 
 
 def test_crash_at_file_500_leaves_correct_checkpoint(repo_env, tmp_path: Path) -> None:
-    """When file #500 (0-indexed: file_0499) raises, checkpoint has correct state."""
+    """When a process crashes at file #500, the first-error checkpoint survives.
+
+    Post-P17 semantics (SL-2): the checkpoint is cleared unconditionally at
+    clean loop exit — so to observe the saved checkpoint we must simulate a
+    real process crash by patching ``_clear_ckpt`` to raise.  Any exception
+    that escapes ``update_from_changes`` leaves the on-disk checkpoint intact.
+    """
     repo_path, store = repo_env
     fail_name = "file_0499.py"
     dispatcher = _CountingDispatcher(fail_on=fail_name)
@@ -179,11 +185,22 @@ def test_crash_at_file_500_leaves_correct_checkpoint(repo_env, tmp_path: Path) -
     )
 
     changes = _make_changes(repo_path)
-    # Run — expect it to proceed past the error (errors are counted, not re-raised)
-    stats = indexer.update_from_changes(changes)
+
+    class _Crash(Exception):
+        pass
+
+    def _simulate_crash(_repo_path):
+        raise _Crash("simulated process crash before cleanup")
+
+    with patch(
+        "mcp_server.indexing.incremental_indexer._clear_ckpt",
+        side_effect=_simulate_crash,
+    ):
+        with pytest.raises(_Crash):
+            indexer.update_from_changes(changes)
 
     ckpt = load(repo_path)
-    assert ckpt is not None, "checkpoint must exist after a run with errors"
+    assert ckpt is not None, "checkpoint must exist after a crash before cleanup"
     # last_completed_path is paths[498] (last successfully indexed before the failure)
     assert ckpt.last_completed_path == "file_0498.py", (
         f"expected file_0498.py, got {ckpt.last_completed_path!r}"
@@ -198,15 +215,31 @@ def test_crash_at_file_500_leaves_correct_checkpoint(repo_env, tmp_path: Path) -
 
 
 def test_resume_skips_already_indexed_files(repo_env, tmp_path: Path) -> None:
-    """Re-invoking update_from_changes resumes from checkpoint, skipping completed files."""
+    """Re-invoking update_from_changes resumes from checkpoint, skipping completed files.
+
+    Post-P17 semantics: the checkpoint is cleared at clean loop exit, so to
+    exercise the resume path we simulate a process crash on the first run so
+    the checkpoint survives into the second run.
+    """
     repo_path, store = repo_env
     fail_name = "file_0499.py"
 
-    # First run: crash at file 499
+    class _Crash(Exception):
+        pass
+
+    def _simulate_crash(_repo_path):
+        raise _Crash("simulated process crash before cleanup")
+
+    # First run: crash after file 499 is recorded in checkpoint, before cleanup
     dispatcher1 = _CountingDispatcher(fail_on=fail_name)
     indexer1 = IncrementalIndexer(store=store, dispatcher=dispatcher1, repo_path=repo_path)
     changes = _make_changes(repo_path)
-    indexer1.update_from_changes(changes)
+    with patch(
+        "mcp_server.indexing.incremental_indexer._clear_ckpt",
+        side_effect=_simulate_crash,
+    ):
+        with pytest.raises(_Crash):
+            indexer1.update_from_changes(changes)
 
     # First run: indexer continues past failure, so 999 files succeed (0-998 except 499)
     first_run_count = len(dispatcher1.indexed)
