@@ -279,6 +279,26 @@ This document provides a comprehensive reference of all environment variables su
   export MCP_TEST_MODE=true
   ```
 
+## Artifact & Watcher Configuration
+
+### `MCP_ARTIFACT_FULL_SIZE_LIMIT`
+- **Description**: Byte threshold above which the artifact publisher switches to delta mode (requires a previously recorded artifact ID). Introduced in P14 SL-4 (`mcp_server/artifacts/delta_policy.py`).
+- **Type**: Integer (bytes)
+- **Default**: `524288000` (500 MB)
+- **Example**:
+  ```bash
+  export MCP_ARTIFACT_FULL_SIZE_LIMIT=104857600  # Force delta above 100 MB
+  ```
+
+### `MCP_WATCHER_SWEEP_MINUTES`
+- **Description**: Interval in minutes between full-tree periodic sweeps performed by `WatcherSweeper` to recover events dropped by inotify/FSEvents. Introduced in P14 SL-5 (`mcp_server/watcher/sweeper.py`).
+- **Type**: Integer (minutes)
+- **Default**: `60`
+- **Example**:
+  ```bash
+  export MCP_WATCHER_SWEEP_MINUTES=30  # Sweep every 30 minutes
+  ```
+
 ## Cloud Sync Configuration (Optional)
 
 ### `MCP_CLOUD_SYNC_ENABLED`

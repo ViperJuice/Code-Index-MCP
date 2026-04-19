@@ -757,6 +757,14 @@ Close the functional gaps that currently limit product reach: wire the stubbed s
 - IF-0-P14-4
 - IF-0-P14-5
 
+**Post-execution amendments**
+
+The following interface deviations were empirically determined during P14 execution:
+
+1. **IF-0-P14-1 reranker module path**: Spec L742 listed `mcp_server/retrieval/reranker.py` as the landing point for the reranker abstraction. Actual file created: `mcp_server/indexer/reranker.py`. `CrossRepoCoordinator` imports `IReranker` and `RerankerFactory` from that path. Any downstream code referencing the spec path must use `mcp_server/indexer/reranker.py` instead.
+2. **IF-0-P14-1 RerankerFactory.create_default() not yet a real classmethod**: IF-0-P14-1 assumed `RerankerFactory.create_default()` would be a fully implemented classmethod by the time SL-1 landed. The method exists but its body may raise (e.g., missing config or import). SL-1 wraps the call in `try/except Exception` so a missing or failing factory degrades gracefully to `reranker = None` rather than crashing at coordinator startup. Callers that need a live reranker must inject one explicitly via the `reranker=` parameter.
+3. **IF-0-P14-5 move_file error-handling behaviour change**: Prior to P14, `dispatcher_enhanced.py::move_file` logged semantic-indexer failures silently and continued. After SL-5, the function wraps the operation in `two_phase_commit` and raises `IndexingError` on semantic failure. The watchdog handler in `mcp_server/watcher_multi_repo.py` catches `IndexingError` at the call site. Code that previously relied on move_file completing without exception even on partial failure must be updated to handle `IndexingError`.
+
 ---
 
 ### Phase 15 — Security Hardening (P15)

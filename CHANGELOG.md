@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (P14 — Multi-Repo Completeness + Schema Evolution)
+- **Reranker wiring** (IF-0-P14-1): `CrossRepoCoordinator.__init__` now accepts an injected `IReranker` (`mcp_server/indexer/reranker.py`); falls back to `RerankerFactory.create_default()` with graceful degradation to `None`. (`mcp_server/dispatcher/cross_repo_coordinator.py`, `tests/test_cross_repo_reranker.py`)
+- **Dependency graph** (IF-0-P14-2): New `mcp_server/dependency_graph/` package with `parsers.py`, `aggregator.py`, and ecosystem parsers (Python/npm/Go/Cargo). `_get_repository_dependencies` returns resolved repo IDs. (`mcp_server/dispatcher/cross_repo_coordinator.py`)
+- **Schema migrator** (IF-0-P14-3): New `mcp_server/storage/schema_migrator.py` with `SchemaMigrator`, `UnknownSchemaVersionError`, and `SchemaMigrationError`. Artifact manifests carry `schema_version`; `check_compatibility` gates downloads by version. (`mcp_server/artifacts/artifact_download.py`)
+- **Auto-delta artifacts** (IF-0-P14-4): New `mcp_server/artifacts/delta_policy.py` with `DeltaPolicy`/`DeltaDecision`. Publisher switches to delta mode when artifact exceeds `MCP_ARTIFACT_FULL_SIZE_LIMIT` (default 500 MB). `_get_chunk_ids_for_path` accepts `limit`/`offset` pagination. (`mcp_server/artifacts/publisher.py`, `mcp_server/artifacts/artifact_upload.py`)
+- **Watcher sweep + rename atomicity** (IF-0-P14-5): New `mcp_server/watcher/sweeper.py::WatcherSweeper` runs full-tree scans every `MCP_WATCHER_SWEEP_MINUTES` (default 60) to recover dropped inotify/FSEvents events. `move_file` wrapped in `two_phase_commit`; raises `IndexingError` on semantic failure. (`mcp_server/dispatcher/dispatcher_enhanced.py`, `mcp_server/watcher_multi_repo.py`)
+
 ## [1.1.0] - 2026-04-14
 
 ### Security

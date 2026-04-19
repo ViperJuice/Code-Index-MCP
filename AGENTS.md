@@ -162,6 +162,16 @@ Set `MCP_CLIENT_SECRET=<shared-secret>` to require a `handshake` tool call befor
 | `MultiRepositoryWatcher` | `mcp_server/watcher_multi_repo.py` | Orchestrates `RefPoller` per registered repo |
 | `initialize_stateless_services()` | `mcp_server/cli/bootstrap.py:25-64` | In-process boot helper; returns `(StoreRegistry, RepoResolver, dispatcher, RepositoryRegistry, GitAwareIndexManager)` |
 
+### Cross-Repo Search Architecture (P14)
+
+`CrossRepoCoordinator` (`mcp_server/dispatcher/cross_repo_coordinator.py`) drives all multi-repo search. Key P14 additions:
+
+- **Reranker wiring** (IF-0-P14-1): `__init__` accepts an injected `IReranker` (defined in `mcp_server/indexer/reranker.py`). When none is injected and `enable_reranking=True`, it falls back to `RerankerFactory.create_default()` wrapped in a try/except so a missing factory degrades gracefully to `reranker=None`.
+- **Dependency graph** (IF-0-P14-2): `_get_repository_dependencies(repo_id)` now returns resolved repo IDs via the `mcp_server/dependency_graph/` package (`parsers.py`, `aggregator.py`, ecosystem parsers for Python/npm/Go/Cargo).
+- **Schema migration** (IF-0-P14-3): Every artifact manifest carries a `schema_version` field. `mcp_server/storage/schema_migrator.py::SchemaMigrator.apply(from_version, to_version, db_path)` runs upgrade migrations; `mcp_server/artifacts/artifact_download.py::check_compatibility` raises `UnknownSchemaVersionError` for unrecognised versions.
+- **Auto-delta artifacts** (IF-0-P14-4): `mcp_server/artifacts/delta_policy.py::DeltaPolicy.should_publish_delta(full_size_bytes, last_artifact)` gates delta mode in `ArtifactPublisher.publish_on_reindex`. Threshold controlled by `MCP_ARTIFACT_FULL_SIZE_LIMIT` (default `524288000` bytes / 500 MB).
+- **Watcher sweep** (IF-0-P14-5): `mcp_server/watcher/sweeper.py::WatcherSweeper` runs a full-tree scan every `MCP_WATCHER_SWEEP_MINUTES` (default 60) to recover inotify/FSEvents drops. `mcp_server/watcher_multi_repo.py` starts/stops the sweeper. `move_file` in `dispatcher_enhanced.py` is wrapped in `two_phase_commit` and now raises `IndexingError` on semantic failure (previously a silent log).
+
 ### Setup Steps
 
 1. Set `MCP_ALLOWED_ROOTS` to include all repo parent directories.
