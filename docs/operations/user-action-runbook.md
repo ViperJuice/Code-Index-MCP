@@ -97,6 +97,43 @@ No operator actions required. P12 is fully codebase-internal.
   2. **NetworkPolicy (k8s).** Metrics port is only reachable from the Prometheus pod selector. No app-level auth.
   Pick one and document. Default recommendation: NetworkPolicy if deploying to k8s; bearer token otherwise.
 
+#### Operationalization subsections
+
+**SL-1 plugin-trust posture operationalization**:
+- Plugin sandboxing is controlled by `MCP_PLUGIN_SANDBOX_ENABLED=1` (default off in P15).
+- When enabled, all plugins run in isolated worker processes communicating via JSON-line IPC over stdin/stdout.
+- Per-plugin capability restrictions can be set via `PluginFactory.create_plugin(..., capabilities=CapabilitySet(...))`.
+- Three recommended postures:
+  1. **No sandbox (default)**: Plugins run in-process; fastest but least safe.
+  2. **Sandbox with default caps**: All plugins run in workers; default `CapabilitySet` allows SQLite only.
+  3. **Locked-down per-plugin**: Each plugin gets custom capability set (e.g., Go plugin granted `subprocess`, others locked down).
+- For production deployments, set `MCP_PLUGIN_SANDBOX_ENABLED=1`.
+
+**SL-2 bearer-vs-NetworkPolicy decision matrix**:
+- `/metrics` endpoint now requires authentication (`Depends(require_auth("metrics"))` → `Permission.ADMIN`).
+- Two deployment postures:
+  1. **App-level bearer token (A)** (recommended): Clients send `Authorization: Bearer <token>` to `/metrics`. Uses existing `GITHUB_TOKEN` or a derived metrics-only token. Works anywhere Prometheus runs.
+  2. **Network-policy restriction (B)**: Metrics port is only reachable from the Prometheus pod selector (k8s only). Requires Prometheus to be in the same namespace or behind a service mesh. Requires disabling the `/metrics` scope requirement (revert the scope check).
+- Default for new deployments: **Bearer token (A)**. For k8s + existing NetworkPolicy: **NetworkPolicy (B)**.
+
+**SL-3 `MCP_ATTESTATION_MODE` trinary**:
+- Artifact attestation mode controlled by environment variable:
+  - **`enforce`** (default, production): Raises error on sign or verify failure; deployment will not start. Safest.
+  - **`warn`**: Logs warning on failure; continues. Graceful degradation.
+  - **`skip`**: No attestation checking. Use for air-gapped environments without GitHub connectivity.
+- Required: `GITHUB_TOKEN` must include `attestations:write` scope.
+- Required: `gh` CLI must be installed and support `attestation` subcommand (GitHub CLI ≥ recent version).
+- Verify with: `gh attestation --help`.
+
+**SL-4 `MCP_ALLOWED_ROOTS` + `MCP_REQUIRE_TOKEN_SCOPES` guidance**:
+- **Path traversal guard**: `MCP_ALLOWED_ROOTS` is an `os.pathsep`-separated list of absolute paths (`:` on Unix, `;` on Windows). Unset → guard is a no-op. Recommended for production: set to the list of all indexed repo roots.
+- **Token scope validation**:
+  - Five required scopes: `contents:read, metadata:read, actions:read, actions:write, attestations:write`.
+  - `TokenValidator.validate_scopes(required)` fires at startup.
+  - Default behavior: soft-skip (WARN log if token unset or scopes missing).
+  - Hard-fail mode: set `MCP_REQUIRE_TOKEN_SCOPES=1` to raise error at startup.
+  - Verify token scopes: `curl -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/user | grep X-OAuth-Scopes` or `gh auth status`.
+
 #### After P15 merge
 
 - [ ] **Rotate `GITHUB_TOKEN`** and verify scopes via the new `TokenValidator` at startup. If `TokenValidator` emits missing-scope errors, the deployment will refuse to start — this is intentional fail-loud behavior.

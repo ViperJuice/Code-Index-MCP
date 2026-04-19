@@ -69,6 +69,18 @@ The Code-Index-MCP follows a modular, plugin-based architecture designed for ext
    - **Index Manager**: SQLite with FTS5 for fast searches
    - **Watcher Service**: Real-time file monitoring
 
+## 🔐 Security
+
+Code-Index-MCP implements defense-in-depth security hardening (Phase 15):
+
+- **Plugin Sandboxing**: Plugins execute in isolated worker processes with capability-based restrictions. See [docs/security/sandbox.md](docs/security/sandbox.md).
+- **Artifact Attestation**: Published indexes are signed with GitHub SLSA attestations and verified at download. See [docs/security/attestation.md](docs/security/attestation.md).
+- **Path Traversal Guard**: Search results are validated to prevent escaping configured repository roots. See [docs/security/path-guard.md](docs/security/path-guard.md).
+- **Token Validation**: GitHub tokens are validated for required scopes at startup (`contents:read`, `metadata:read`, `actions:read`, `actions:write`, `attestations:write`). See [docs/security/token-scopes.md](docs/security/token-scopes.md).
+- **Metrics Authentication**: The `/metrics` endpoint requires bearer token authentication.
+
+For a comprehensive operator runbook, see [docs/operations/user-action-runbook.md](docs/operations/user-action-runbook.md).
+
 ## 📁 Project Structure
 
 The project follows a clean, organized structure. See [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) for detailed layout.

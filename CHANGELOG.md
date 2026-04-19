@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (P15 — Security Hardening)
+- **Plugin sandboxing** (IF-0-P15-1): Plugins execute in isolated worker processes with JSON-line IPC, 30s timeout, and capability-based restrictions. New `mcp_server/sandbox/` package with supervisor and adapter; `SandboxedPlugin` wraps instances with `CapabilitySet` (filesystem, network, subprocess, env_read). (`mcp_server/sandbox/supervisor.py`, `mcp_server/plugins/sandboxed_plugin.py`, `tests/security/test_plugin_sandbox.py`)
+- **Metrics endpoint auth** (IF-0-P15-2): `/metrics` requires `Authorization: Bearer <token>` (app-level) or NetworkPolicy restriction (k8s-only). Wired via `require_auth("metrics")` middleware. (`mcp_server/security/security_middleware.py`, `mcp_server/api/gateway.py`)
+- **Artifact attestation** (IF-0-P15-3): Published artifacts are signed with `gh attestation sign` and verified with `gh attestation verify` (requires `GITHUB_TOKEN` with `attestations:write` scope). Mode controlled by `MCP_ATTESTATION_MODE` (enforce/warn/skip). (`mcp_server/artifacts/attestation.py`, `mcp_server/artifacts/publisher.py`, `mcp_server/artifacts/artifact_download.py`)
+- **Path traversal guard + token validator** (IF-0-P15-4): Search results filtered through `PathTraversalGuard.normalize_and_check(path, allowed_roots)` (controlled by `MCP_ALLOWED_ROOTS` env). Startup validates `GITHUB_TOKEN` for all five required scopes via `TokenValidator.validate_scopes()` (soft-fail default; hard-fail with `MCP_REQUIRE_TOKEN_SCOPES=1`). Rate-limit backoff on cross-repo artifact fetches. (`mcp_server/security/path_guard.py`, `mcp_server/security/token_validator.py`)
+
 ### Added (P14 — Multi-Repo Completeness + Schema Evolution)
 - **Reranker wiring** (IF-0-P14-1): `CrossRepoCoordinator.__init__` now accepts an injected `IReranker` (`mcp_server/indexer/reranker.py`); falls back to `RerankerFactory.create_default()` with graceful degradation to `None`. (`mcp_server/dispatcher/cross_repo_coordinator.py`, `tests/test_cross_repo_reranker.py`)
 - **Dependency graph** (IF-0-P14-2): New `mcp_server/dependency_graph/` package with `parsers.py`, `aggregator.py`, and ecosystem parsers (Python/npm/Go/Cargo). `_get_repository_dependencies` returns resolved repo IDs. (`mcp_server/dispatcher/cross_repo_coordinator.py`)

@@ -810,6 +810,12 @@ Enforce trust boundaries: sandbox plugins, authenticate `/metrics`, sign and ver
 - IF-0-P15-3
 - IF-0-P15-4
 
+### Post-execution amendments
+
+- **2026-04-19** (post-P15 merge):
+  - IF-0-P15-4 token scope list: the runbook specified `metadata:read` in addition to the original spec's four scopes (`contents:read`, `actions:read`, `actions:write`, `attestations:write`). SL-4's `TokenValidator.validate_scopes()` enforces all five cumulatively. Spec updated by retroactive commit `be026e5`; this amendment records the decision.
+  - Interface signatures otherwise landed as frozen — no drift.
+
 ---
 
 ## Execution Notes

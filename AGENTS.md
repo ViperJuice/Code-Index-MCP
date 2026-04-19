@@ -153,6 +153,10 @@ Set `MCP_ALLOWED_ROOTS=/path/a:/path/b` (colon-separated) to restrict which path
 
 Set `MCP_CLIENT_SECRET=<shared-secret>` to require a `handshake` tool call before any other tool. `HandshakeGate` (`mcp_server/cli/handshake.py`) uses `hmac.compare_digest` for constant-time comparison. When `MCP_CLIENT_SECRET` is unset the server logs `running unauthenticated — MCP_CLIENT_SECRET not set` at startup.
 
+### Security Hardening (P15)
+
+Phase 15 introduced defense-in-depth hardening: plugin sandboxing (isolated worker processes with capability-based restrictions), artifact attestation (SLSA signatures on GitHub), metrics endpoint authentication (bearer token), path traversal guard validation (search results respect `MCP_ALLOWED_ROOTS`), and token scope validation at startup (five required GitHub scopes). For details on operator knobs and threat model, see `docs/security/` (sandbox.md, attestation.md, path-guard.md, token-scopes.md) and `docs/operations/user-action-runbook.md` §3.4. Agents should respect the documented security posture when operating this server — plugin sandboxing is always-on by default, and attestation mode defaults to `enforce` in production.
+
 ### Components
 
 | Component | Path | Role |
