@@ -37,6 +37,7 @@ from .security import (
     User,
     UserRole,
     get_current_active_user,
+    require_auth,
     require_permission,
     require_role,
 )
@@ -1114,17 +1115,7 @@ async def liveness_probe() -> Dict[str, Any]:
 
 
 # Metrics endpoints
-@app.get("/metrics", response_class=PlainTextResponse)
-def get_metrics() -> str:
-    """Prometheus metrics endpoint."""
-    try:
-        return metrics_collector.get_metrics()
-    except Exception as e:
-        logger.error(f"Failed to get metrics: {e}", exc_info=True)
-        raise HTTPException(500, f"Failed to get metrics: {str(e)}")
-
-
-@app.get("/metrics")
+@app.get("/metrics", dependencies=[Depends(require_auth("metrics"))])
 def get_prometheus_metrics() -> Response:
     """Prometheus metrics endpoint."""
     try:
