@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from mcp_server.storage.multi_repo_manager import RepositoryInfo
+from mcp_server.storage.repo_identity import compute_repo_id
 from mcp_server.storage.repository_registry import RepositoryRegistry
 
 
@@ -47,8 +48,9 @@ def _create_registry_with_repo(
     registry_path = tmp_path / "registry.json"
     registry = RepositoryRegistry(registry_path)
 
+    repo_id = compute_repo_id(repo_path).repo_id
     repo_info = RepositoryInfo(
-        repository_id=f"{repo_name}_id",
+        repository_id=repo_id,
         name=repo_name,
         path=repo_path,
         index_path=repo_path / ".mcp-index" / "index.db",
@@ -61,10 +63,10 @@ def _create_registry_with_repo(
     registry.register(repo_info)
 
     # Seed current commit metadata
-    registry.update_indexed_commit(repo_info.repository_id, initial_commit)
-    registry.update_current_commit(repo_info.repository_id)
+    registry.update_indexed_commit(repo_id, initial_commit)
+    registry.update_current_commit(repo_id)
 
-    return registry, repo_info.repository_id
+    return registry, repo_id
 
 
 def test_indexed_commit_persisted_across_sessions(tmp_path: Path):
