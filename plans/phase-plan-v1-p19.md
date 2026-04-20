@@ -119,7 +119,7 @@ Wave plan (MAX_PARALLEL_LANES=2):
 
 1. `git fetch origin main`; assert `git rev-parse origin/main == 8151341` (else halt: someone else is pushing).
 2. `git tag pre-p19-main <current main SHA>` (backup; safe no-op if push fails).
-3. `git switch main`; `git reset --hard 2e574df` (adopts worktree branch history into main).
+3. `git switch main`; `git reset --hard 0ce5f9f` (worktree branch tip after the `chore(plan): P19 lane plan` commit; this adopts the full worktree history *including* this plan doc at `plans/phase-plan-v1-p19.md`). If the worktree tip has advanced past `0ce5f9f` before SL-1 starts, use `git rev-parse worktree-lane-sl-4b-20260419T170149-ms2d` to get the current tip and reset there instead; log whatever SHA you used.
 4. `git cherry-pick 977c82f`. Resolve the single expected conflict on `.claude/docs-catalog.json` by dropping the duplicate lowercase `docs/configuration/environment-variables.md` entry (3 JSON lines). Complete with `git cherry-pick --continue`.
 5. Verify: `grep -c 'environment-variables.md' .claude/docs-catalog.json` returns `1` (only the uppercase path); `jq '.docs | length' .claude/docs-catalog.json` returns the expected count.
 6. Execute SL-1.1 → SL-1.2 → SL-1.3 → SL-1.4 in-order.
