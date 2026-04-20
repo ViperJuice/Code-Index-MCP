@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+[Unreleased]: # placeholder for post-rc2 work
+
+## [1.2.0-rc2] — 2026-04-20
+
+### Fixed (P20 — sandbox/OpenBLAS hotfix, observability bugs)
+- **(P20 SL-0)** Raised `CapabilitySet.mem_mb` default from 512 to 2048
+  so sandbox-default-on plugins that transitively import numpy/OpenBLAS
+  no longer abort on `RLIMIT_AS`. Closes IF-0-P20-3.
+- **(P20 SL-2b)** Prometheus `/metrics` endpoint now exposes
+  `mcp_tool_calls_total`, `mcp_rate_limit_sleeps_total`, and
+  `mcp_artifact_errors_by_class_total`. Previously a registry split
+  meant the counters lived on the default REGISTRY while the exporter
+  served a private one.
+- **(P20 SL-2b)** `SecretRedactionResponseMiddleware` is now applied
+  on subprocess uvicorn boot. Previously it was registered in a startup
+  hook that ran after FastAPI sealed its middleware stack, so subprocess
+  gateways never redacted `Bearer ...` tokens in HTTP responses.
+
+### Added (P20 — validation harness, runbook, observability smoke)
+- **(P20 SL-1)** New `tests/integration/multi_repo/` harness — pytest
+  fixture spawns ≥2 live uvicorn gateway subprocesses sharing one
+  registry; tests cover concurrency (200 entries), cross-repo delta
+  resolution, and dispatcher repo_id isolation. Closes IF-0-P20-1.
+- **(P20 SL-2)** New `tests/integration/obs/` smoke — docker-compose
+  Prom+Loki stack proves JSON log parse rate, counter scrape, and
+  secret redaction over HTTP. Skips cleanly without docker.
+- **(P20 SL-3)** New `docs/operations/deployment-runbook.md` with
+  measurable bake-pass criteria, bake windows, and rollback procedures
+  per stage (dev/staging/canary/full-prod). Closes IF-0-P20-2.
+
 ## [1.2.0-rc1] — 2026-04-20
 
 ### Added (P18 — Enforcement, Artifact Resilience & Ops)
