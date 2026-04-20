@@ -157,15 +157,24 @@ def test_validation_error_dataclass():
     assert ve2.severity == "fatal"
 
 
-def test_validate_production_config_signature():
+def test_validate_production_config_signature(monkeypatch):
+    import types
     from mcp_server.config import validate_production_config
+    from mcp_server.config.validation import ValidationError
 
-    result = validate_production_config(object(), environment="production")
-    assert result == []
+    # Use a minimal real-shaped config with a strong JWT secret and no CORS wildcard.
+    strong_secret = "a" * 40  # 40 hex chars — not in weak-credential blocklist
+    cfg = types.SimpleNamespace(jwt_secret_key=strong_secret, cors_origins=[], rate_limit_requests=100)
+
+    # Ensure DEFAULT_ADMIN_PASSWORD is strong (required in production env check)
+    monkeypatch.setenv("DEFAULT_ADMIN_PASSWORD", "Strong-Admin-Password-xyz!")
+
+    result = validate_production_config(cfg, environment="production")
     assert isinstance(result, list)
+    assert all(isinstance(e, ValidationError) for e in result)
 
-    result2 = validate_production_config(object(), environment="dev")
-    assert result2 == []
+    result2 = validate_production_config(cfg, environment="dev")
+    assert isinstance(result2, list)
 
     sig = inspect.signature(validate_production_config)
     params = list(sig.parameters.values())
