@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (P18 — Enforcement, Artifact Resilience & Ops)
+- **Route auth enforcement** (IF-0-P18-4): `validate_production_config()` body fills weak-JWT, CORS-wildcard, permissive rate-limit, and weak-admin-password checks. `render_validation_errors_to_stderr()` emits `[FATAL]`/`[WARN]`-prefixed listings. Gateway startup exits non-zero on any fatal validation error in production; WARN-continues in dev/test. Auth added to `/search/capabilities`, `/graph/context`, `/graph/search`. (`mcp_server/gateway.py`, `mcp_server/config/validation.py`, `tests/security/test_route_auth_coverage.py`, `tests/security/test_startup_config_validation.py`)
+- **Artifact pipeline resilience**: publisher try/finally rollback via `gh release delete` on downstream failure; `artifact_download` delta-base-missing fallback to full artifact; `_respect_rate_limit` parses `Retry-After` (int-seconds or HTTP-date, capped 300s) and distinguishes 403 (`TerminalArtifactError`) from 429 (backoff + retry); attestation preflight checks `attestations:write` scope. (`mcp_server/artifacts/publisher.py`, `artifact_download.py`, `providers/github_actions.py`, `attestation.py`)
+- **Retention janitor CLI** (IF-0-P18-2): `python -m mcp_server.cli retention prune --repo OWNER/REPO [--dry-run] [--older-than-days N] [--keep-latest-n N]`. Protects `index-latest` and `isLatest=true` releases. New `mcp_server/artifacts/retention.py` policy module; new `mcp_server/cli/retention_commands.py` click group.
+- **JSON logging**: hand-rolled `JSONFormatter` in `mcp_server/core/logging.py`; emits `{"timestamp","level","name","message", ...extras}`. Gated on `MCP_ENVIRONMENT=production` or `MCP_LOG_FORMAT=json`.
+- **Secret redaction middleware** (IF-0-P18-1): `SecretRedactionResponseMiddleware` rewrites `Bearer \S+`, `JWT_SECRET_KEY=\S+`, `GITHUB_TOKEN=\S+` to `[REDACTED]` in 4xx/5xx response bodies. Streaming bodies pass through unmodified (documented limitation). (`mcp_server/security/security_middleware.py`)
+- **Prometheus counters**: `mcp_rate_limit_sleeps_total` (no labels) and `mcp_artifact_errors_by_class_total{error_class}`. Scrapeable on `/metrics`. (`mcp_server/metrics/prometheus_exporter.py`)
+- **Attestation boot probe**: `probe_gh_attestation_support()` (lru_cache'd) runs `gh attestation --help`. Boot banner emits `ATTESTATION_PREREQ` WARN if the subcommand is unavailable and `MCP_ATTESTATION_MODE=enforce`. (`mcp_server/artifacts/attestation.py`, `mcp_server/cli/stdio_runner.py`)
+- **stdio_runner module surface** (IF-0-P18-3): `initialize_services()` and `call_tool(name, arguments)` hoisted from `_serve()` closures to top-level async functions. Seven runtime state variables (`dispatcher`, `plugin_manager`, `sqlite_store`, `initialization_error`, `_file_watcher`, `_indexing_thread`, `_fts_rebuild_thread`) promoted to module globals. Restores the pre-P2B test surface on the post-P2B file layout. (`mcp_server/cli/stdio_runner.py`)
+
+### Changed (P18)
+- **Plugin sandbox default** (behavioural change): `MCP_PLUGIN_SANDBOX_ENABLED=1` is no longer required — sandboxing is now ON by default. Set `MCP_PLUGIN_SANDBOX_DISABLE=1` to opt out. See `docs/security/sandbox.md` for migration notes. (`mcp_server/plugins/plugin_factory.py`)
+
+### Fixed (P18 — P17 straggler burn-down)
+- Full-suite failure count closed from 19 (P17 SL-4b close) to 4. The 17 `tests/test_mcp_server_cli.py` failures and 2 `tests/test_benchmarks.py` SLO failures now pass; residual 4 are pre-existing integration tests gated on `gh` CLI `attestations:write` scope and an unrelated P16 vocabulary signature mismatch. (`mcp_server/cli/stdio_runner.py`, `mcp_server/benchmarks/benchmark_suite.py`, `mcp_server/plugins/sandboxed_plugin.py`)
+
 ### Added (P17 — Durability & Multi-Instance Safety)
 - **Registry flock protocol** (IF-0-P17-1): `RepositoryRegistry.save()` acquires
   `fcntl.flock(LOCK_EX)` on a sibling `.lock` file, then performs a read-merge-write

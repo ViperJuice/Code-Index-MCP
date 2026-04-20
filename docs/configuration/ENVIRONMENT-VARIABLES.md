@@ -411,9 +411,91 @@ VOYAGEAI_API_KEY=your-api-key-here
   value; oversize files are logged at WARNING level and excluded from the index without
   stalling the indexer. Wired in P17 SL-2 (`mcp_server/dispatcher/dispatcher_enhanced.py`).
 
+## P18 enforced (Enforcement + Artifact Resilience + Ops)
+
+### `MCP_PLUGIN_SANDBOX_DISABLE`
+- **Description**: Opt out of plugin sandboxing (disabled=1 means run unsandboxed)
+- **Type**: Boolean (`0`/`1`)
+- **Default**: `0` (sandbox ON)
+- **Example**:
+  ```bash
+  export MCP_PLUGIN_SANDBOX_DISABLE=1  # Disable sandbox (not recommended)
+  ```
+- **Security**: Default-on sandbox prevents plugins from accessing the filesystem, network, and subprocess APIs outside approved capabilities. Only disable if you fully trust all loaded plugins.
+
+### `MCP_ARTIFACT_RETENTION_COUNT`
+- **Description**: Maximum number of artifact revisions to retain per artifact (used by retention janitor)
+- **Type**: Integer
+- **Default**: `10`
+- **Getter**: `mcp_server.config.env_vars.get_artifact_retention_count()`
+- **Example**:
+  ```bash
+  export MCP_ARTIFACT_RETENTION_COUNT=5  # Keep only the 5 most recent revisions
+  ```
+
+### `MCP_ARTIFACT_RETENTION_DAYS`
+- **Description**: Maximum age (in days) for retained artifact revisions (used by retention janitor)
+- **Type**: Integer
+- **Default**: `30`
+- **Getter**: `mcp_server.config.env_vars.get_artifact_retention_days()`
+- **Example**:
+  ```bash
+  export MCP_ARTIFACT_RETENTION_DAYS=14  # Retain artifacts for 14 days
+  ```
+
+### `MCP_LOG_FORMAT`
+- **Description**: Force JSON log formatter regardless of environment
+- **Type**: String
+- **Default**: Unset (format determined by `MCP_ENVIRONMENT`)
+- **Valid Values**: `json`
+- **Example**:
+  ```bash
+  export MCP_LOG_FORMAT=json  # Force JSON logs in all environments
+  ```
+- **Note**: When `MCP_ENVIRONMENT=production` or `MCP_LOG_FORMAT=json`, logs emit as JSON with fields: `timestamp`, `level`, `name`, `message`, and additional context fields.
+
+## P17 enforced (Durability & Multi-Instance Safety)
+
+### `MCP_ENVIRONMENT`
+- **Description**: Deployment environment (gates validation fatals and JSON log default)
+- **Type**: String
+- **Default**: `test`
+- **Valid Values**: `production`, `dev`, `test`
+- **Example**:
+  ```bash
+  export MCP_ENVIRONMENT=production
+  ```
+- **Security**: In production, weak credentials (JWT, password, CORS wildcard, permissive rate-limit) are fatal and cause startup failure. In dev/test, the same errors log as WARN and startup continues.
+
+### `JWT_SECRET_KEY`
+- **Description**: Secret key for JWT token signing
+- **Type**: String
+- **Default**: None (required in production)
+- **Example**:
+  ```bash
+  export JWT_SECRET_KEY=$(openssl rand -hex 32)
+  ```
+- **Security**: Generate with `openssl rand -hex 32`. Weak values (length < 32 hex chars / 16 bytes) are fatal in production, warn in dev.
+
+### `DEFAULT_ADMIN_PASSWORD`
+- **Description**: Default admin account password
+- **Type**: String
+- **Default**: None (required in production)
+- **Security**: Weak values are fatal in production, warn in dev.
+
+### `MCP_ATTESTATION_MODE`
+- **Description**: Artifact attestation enforcement level
+- **Type**: String
+- **Default**: `enforce`
+- **Valid Values**: `enforce`, `warn`, `off`
+- **Example**:
+  ```bash
+  export MCP_ATTESTATION_MODE=warn  # Log warnings instead of failing
+  ```
+
 ## P16 reserved (stub-only; not yet enforced)
 
-The following environment variables are defined as part of the P16 Shared Vocabulary Preamble but are not yet wired to consumer logic. They are reserved for use in P18 when the corresponding feature implementations are completed. All values are accessed via lazy getters in `mcp_server.config.env_vars`.
+The following environment variables are defined as part of the P16 Shared Vocabulary Preamble but are not yet wired to consumer logic beyond P17/P18. All values are accessed via lazy getters in `mcp_server.config.env_vars`.
 
 ### `MCP_ARTIFACT_RETENTION_COUNT`
 - **Description**: Maximum number of artifact revisions to retain per artifact

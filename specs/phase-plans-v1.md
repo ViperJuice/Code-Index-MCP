@@ -1012,6 +1012,18 @@ Turn P15's security primitives from "available" into "enforced by default." Hard
 **Produces**
 - IF-0-P18-1
 
+### Post-execution amendments
+
+These drift notes record where the shipped P18 implementation differed from the spec wording above. Recorded by SL-docs at phase close.
+
+- **CLI file path**: spec says `mcp_server/cli/commands.py`; actual layout uses `mcp_server/cli/__main__.py` as the click entry with per-concern files (`artifact_commands.py`, `retention_commands.py`, etc.). SL-3 added `mcp_server/cli/retention_commands.py` (NEW) and a single `_cli.add_command(retention)` line in `__main__.py` — not a `cli/commands.py` edit.
+- **Metrics exporter path**: spec says `mcp_server/metrics/exporters.py`; actual file is `mcp_server/metrics/prometheus_exporter.py`. SL-4 appended the two new counter definitions there.
+- **Route auth surface**: spec whitelist listed `/health*`, `/ready`, `/liveness`, and auth endpoints. `/graph/context` and `/graph/search` were unprotected at plan time and outside the whitelist — SL-1 added `Depends(require_permission(Permission.READ))` to both, consistent with `/search`.
+- **SL-5 probe call**: plan doc specified the attestation probe call at line 232 of `stdio_runner.py` (startup banner); landed at line 233 (after the second banner `logger.info("=" * 60)` line). Functionally equivalent.
+- **SL-6 bonus fix**: added `self._ctx = ctx` in `SandboxedPlugin.bind()` to satisfy the IPlugin contract — surfaced while fixing benchmark fixtures. Out of strict SL-6 scope; kept in-lane because it unblocks the sandbox regression suite.
+- **P18 interface freezes (all four)** shipped as designed: IF-0-P18-1 (secret redaction middleware), IF-0-P18-2 (`delete_releases_older_than`), IF-0-P18-3 (stdio_runner module surface), IF-0-P18-4 (startup validation error rendering).
+- **Full-suite residuals after P18 close**: 4 failures (down from 19 at P17 SL-4b close). All residuals pre-existing or gated on GitHub CLI `attestations:write` scope; none in P18 scope.
+
 ---
 
 ## Execution Notes
