@@ -33,7 +33,7 @@ class CapabilitySet:
     network: bool = False
     sqlite: Literal["none", "readonly"] = "none"
     cpu_seconds: int = 30
-    mem_mb: int = 512
+    mem_mb: int = 2048
 
     def to_json(self) -> str:
         """Serialize to a JSON string suitable for a shell argv slot."""
@@ -59,7 +59,7 @@ class CapabilitySet:
             network=bool(d.get("network", False)),
             sqlite=d.get("sqlite", "none"),
             cpu_seconds=int(d.get("cpu_seconds", 30)),
-            mem_mb=int(d.get("mem_mb", 512)),
+            mem_mb=int(d.get("mem_mb", 2048)),
         )
 
 
