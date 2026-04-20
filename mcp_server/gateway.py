@@ -49,6 +49,7 @@ from .security import (
     require_role,
 )
 from .security.path_guard import PathTraversalError, PathTraversalGuard
+from .security.security_middleware import SecretRedactionResponseMiddleware
 from .security.token_validator import TokenValidator
 from .setup.qdrant_autostart import ensure_qdrant_running
 from .setup.semantic_preflight import run_semantic_preflight
@@ -305,6 +306,11 @@ business_metrics = get_business_metrics()
 
 # Setup metrics middleware
 setup_metrics_middleware(app, enable_detailed_metrics=True)
+
+# Register SecretRedactionResponseMiddleware at import time so it applies
+# regardless of how the app is booted. The rest of the security stack needs
+# runtime-configured auth_manager and stays in startup_event.
+app.add_middleware(SecretRedactionResponseMiddleware)
 
 
 @app.on_event("startup")
