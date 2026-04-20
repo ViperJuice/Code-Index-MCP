@@ -47,6 +47,7 @@ def _fail_run(*args, **kwargs):
 # ---------------------------------------------------------------------------
 
 class TestAttest:
+    @pytest.mark.requires_gh_auth
     def test_attest_returns_attestation_with_bundle_url(self, tmp_path, monkeypatch):
         monkeypatch.delenv("MCP_ATTESTATION_MODE", raising=False)
         archive = _make_archive(tmp_path)
@@ -59,6 +60,7 @@ class TestAttest:
         assert result.bundle_url != ""
         assert result.subject_digest == expected_digest
 
+    @pytest.mark.requires_gh_auth
     def test_attest_sidecar_path_is_set(self, tmp_path, monkeypatch):
         monkeypatch.delenv("MCP_ATTESTATION_MODE", raising=False)
         archive = _make_archive(tmp_path)
@@ -68,6 +70,7 @@ class TestAttest:
 
         assert result.bundle_path == archive.with_suffix(archive.suffix + ".attestation.jsonl")
 
+    @pytest.mark.requires_gh_auth
     def test_attest_signed_at_is_datetime(self, tmp_path, monkeypatch):
         monkeypatch.delenv("MCP_ATTESTATION_MODE", raising=False)
         archive = _make_archive(tmp_path)
