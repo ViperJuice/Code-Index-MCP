@@ -69,3 +69,21 @@ The host constructs a `SandboxedPlugin` adapter wrapping each real plugin instan
 - Plugins are not intentionally adversarial (sandboxing is defense-in-depth, not a hard security boundary)
 - The host process is trusted
 - The Go plugin (which needs subprocess access for `go test` execution) is first-party or heavily audited
+
+## Default-on migration (P18)
+
+As of P18, plugin sandboxing is **enabled by default**. Previously `MCP_PLUGIN_SANDBOX_ENABLED=1` was required to activate it; now sandboxing runs unless explicitly opted out.
+
+### Opting out
+
+Set `MCP_PLUGIN_SANDBOX_DISABLE=1` to run plugins unsandboxed. Only do this if every loaded plugin is fully trusted.
+
+```bash
+export MCP_PLUGIN_SANDBOX_DISABLE=1  # NOT recommended; removes defense-in-depth
+```
+
+### Migration checklist
+
+- **If you previously ran with `MCP_PLUGIN_SANDBOX_ENABLED=1`**: no action required — sandbox remains on.
+- **If you previously ran without that env var**: you were running unsandboxed. Expect subprocess and network calls from plugins to fail unless capabilities are declared. Audit plugin capability needs and either grant them or set `MCP_PLUGIN_SANDBOX_DISABLE=1` while you migrate.
+- **Go plugin users**: ensure `subprocess` capability is granted (it was already required for `go test`).
