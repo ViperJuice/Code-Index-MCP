@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0-rc1] — 2026-04-20
+
 ### Added (P18 — Enforcement, Artifact Resilience & Ops)
 - **Route auth enforcement** (IF-0-P18-4): `validate_production_config()` body fills weak-JWT, CORS-wildcard, permissive rate-limit, and weak-admin-password checks. `render_validation_errors_to_stderr()` emits `[FATAL]`/`[WARN]`-prefixed listings. Gateway startup exits non-zero on any fatal validation error in production; WARN-continues in dev/test. Auth added to `/search/capabilities`, `/graph/context`, `/graph/search`. (`mcp_server/gateway.py`, `mcp_server/config/validation.py`, `tests/security/test_route_auth_coverage.py`, `tests/security/test_startup_config_validation.py`)
 - **Artifact pipeline resilience**: publisher try/finally rollback via `gh release delete` on downstream failure; `artifact_download` delta-base-missing fallback to full artifact; `_respect_rate_limit` parses `Retry-After` (int-seconds or HTTP-date, capped 300s) and distinguishes 403 (`TerminalArtifactError`) from 429 (backoff + retry); attestation preflight checks `attestations:write` scope. (`mcp_server/artifacts/publisher.py`, `artifact_download.py`, `providers/github_actions.py`, `attestation.py`)

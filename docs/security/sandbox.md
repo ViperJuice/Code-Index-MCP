@@ -72,6 +72,8 @@ The host constructs a `SandboxedPlugin` adapter wrapping each real plugin instan
 
 ## Default-on migration (P18)
 
+> See [docs/operations/p18-upgrade.md](../operations/p18-upgrade.md) for the full operator migration procedure.
+
 As of P18, plugin sandboxing is **enabled by default**. Previously `MCP_PLUGIN_SANDBOX_ENABLED=1` was required to activate it; now sandboxing runs unless explicitly opted out.
 
 ### Opting out
