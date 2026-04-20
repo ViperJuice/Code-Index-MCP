@@ -11,5 +11,14 @@
   "P8":  "Phase 8 — Doc Truth: Customer Audience & Historical Artifact Sweep",
   "P9":  "Phase 9 — Operational Scoping Completion",
   "P10": "Phase 10 — Production Hardening",
-  "P11": "Phase 11 — Dispatcher Dependability"
+  "P11": "Phase 11 — Dispatcher Dependability",
+  "P12": "Phase 12 — Ops Readiness + Reindex Safety",
+  "P13": "Phase 13 — Reindex Durability + Artifact Automation",
+  "P14": "Phase 14 — Multi-Repo Completeness + Schema Evolution",
+  "P15": "Phase 15 — Security Hardening",
+  "P16": "Phase 16 — Shared Vocabulary Preamble",
+  "P17": "Phase 17 — Durability & Multi-Instance Safety",
+  "P18": "Phase 18 — Enforcement, Artifact Resilience & Ops",
+  "P19": "Phase 19 — Release Readiness",
+  "P20": "Phase 20 — Multi-Repo Validation & Staged Rollout"
 }

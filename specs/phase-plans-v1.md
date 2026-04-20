@@ -140,6 +140,12 @@ Every per-tool-call path — `search_code(query, repo_id)`, `symbol_lookup(symbo
    ├──► P17  Durability & Multi-Instance Safety     parallel after P16
    │
    └──► P18  Enforcement, Artifact Resilience & Ops parallel after P16
+                    │
+                    ▼
+                   P19  Release Readiness (reconcile, publish, residual debt, upgrade comms)
+                    │
+                    ▼
+                   P20  Multi-Repo Validation & Staged Rollout (GA)
 ```
 
 ---
@@ -179,6 +185,11 @@ These gates are the narrowest contracts that let downstream phases start once th
 29. **IF-0-P16-4** — `reset_process_singletons() -> None` in `mcp_server/cli/bootstrap.py`. Idempotent; zeroes each `_instance` at module scope: `multi_repo_manager._manager_instance`, `cross_repo_coordinator._coordinator_instance`, `repository_plugin_loader._loader_instance`, `memory_aware_manager._memory_manager_instance`.
 30. **IF-0-P17-1** — Registry save protocol: `RepositoryRegistry.save()` acquires `fcntl.flock(LOCK_EX)` on a sibling `.lock` file, then performs the existing atomic rename. Pattern documented in `docs/operations/multi-instance.md`.
 31. **IF-0-P18-1** — Route-auth coverage contract: every `@app.(get|post|put|delete|patch)` route in `mcp_server/gateway.py` is one of (a) explicitly public (auth endpoints, `/health*`, `/ready`, `/liveness`), (b) gated by `Depends(require_auth|require_permission|require_role)` on the function signature, or (c) gated by `dependencies=[Depends(...)]` on the decorator. Enforced by `tests/security/test_route_auth_coverage.py` via `app.routes` introspection.
+32. **IF-0-P19-1** — `scripts/preflight_upgrade.sh <env_file_path>` exits `0` if the configured env will not fatal against the current gateway validation rules, `1` with a categorized `[FATAL]`/`[WARN]` listing on stdout otherwise. Same rendering contract as SL-1's `render_validation_errors_to_stderr` so operators see identical diagnostics pre- and post-deploy. Consumed by the deployment runbook in P20.
+33. **IF-0-P19-2** — Opt-in network/auth test marker: `pytest.mark.requires_gh_auth` is defined in `tests/conftest.py`; `addopts` skips it by default and runs it when `RUN_GH_AUTHENTICATED_TESTS=1`. All tests that call live `gh` CLI subcommands or require real `attestations:write` scope carry this marker. Default `pytest` run is zero-failure; CI runs both modes in separate jobs.
+34. **IF-0-P19-3** — Docs-catalog integrity gate: `tests/test_docs_catalog_integrity.py` asserts (a) every `path` in `.claude/docs-catalog.json` exists on disk, (b) no duplicate `path` entries, (c) schema shape matches `{version:int, generated_at:str, docs:[{path,description,touched_by_phases}]}`. Enforced in CI; any SL-docs lane that rescans the catalog must keep this green.
+35. **IF-0-P20-1** — Multi-repo integration fixture: `tests/integration/multi_repo/conftest.py::multi_repo_fixture(n_repos: int = 2)` yields `list[MultiRepoContext]` where `MultiRepoContext = {repo_id: str, workspace: Path, gateway_url: str, registry_path: Path}`. All contexts share `registry_path`; each has distinct `repo_id` and `workspace`. Teardown is synchronous and idempotent. Consumed by every P20 multi-repo integration test.
+36. **IF-0-P20-2** — Deployment bake-gate contract: `docs/operations/deployment-runbook.md` defines, for each rollout stage, (a) measurable bake-pass criteria (error rate, 99p latency, log JSON parse rate, counter non-zero), (b) bake window duration, (c) rollback trigger, (d) rollback procedure. Contract shape is stable across phases; future deploys can append new stages without editing existing ones.
 
 ---
 
@@ -1023,6 +1034,102 @@ These drift notes record where the shipped P18 implementation differed from the 
 - **SL-6 bonus fix**: added `self._ctx = ctx` in `SandboxedPlugin.bind()` to satisfy the IPlugin contract — surfaced while fixing benchmark fixtures. Out of strict SL-6 scope; kept in-lane because it unblocks the sandbox regression suite.
 - **P18 interface freezes (all four)** shipped as designed: IF-0-P18-1 (secret redaction middleware), IF-0-P18-2 (`delete_releases_older_than`), IF-0-P18-3 (stdio_runner module surface), IF-0-P18-4 (startup validation error rendering).
 - **Full-suite residuals after P18 close**: 4 failures (down from 19 at P17 SL-4b close). All residuals pre-existing or gated on GitHub CLI `attestations:write` scope; none in P18 scope.
+
+### Phase 19 — Release Readiness (P19)
+
+**Objective**
+Move P18's feature-complete state into a publishable, CI-verified, deploy-ready RC. Reconcile the local integration branch onto `main` without silently absorbing leaked commits, close the last 4 residual test failures, fix the `.claude/docs-catalog.json` integrity bug, and publish a breaking-change migration path so operators can upgrade without a gateway that fatals on their existing config.
+
+**Exit criteria**
+- [ ] Local `main` is a descendant of `worktree-lane-sl-4b-20260419T170149-ms2d`'s tip or has subsumed it cleanly; the leaked SL-docs commit `977c82f` is either absorbed (catalog delta only) or deliberately dropped.
+- [ ] `origin/main` is pushed to the post-P18 tip and CI is green on it.
+- [ ] `pytest --no-cov --ignore=tests/real_world` reports `0 failed` with the default marker set; the 3 `gh`-gated tests pass under `RUN_GH_AUTHENTICATED_TESTS=1` in a separate CI job.
+- [ ] `tests/test_p16_vocabulary.py::test_validate_production_config_signature` passes (P16 signature reconciled with P18's filled body, or explicitly amended in the test).
+- [ ] `tests/test_docs_catalog_integrity.py` exists and passes; `.claude/docs-catalog.json` has no duplicate or missing-file entries.
+- [ ] `docs/operations/p18-upgrade.md` exists, describes every breaking change from P18 (sandbox default flip, validation fatals, new required envs), and walks operators through a no-downtime upgrade.
+- [ ] `scripts/preflight_upgrade.sh` runs non-interactively against an env file and exits `0`/`1` per IF-0-P19-1.
+- [ ] Release tag `v0.X.0-rc1` (exact version chosen during the phase) cut on the pushed tip; CHANGELOG `Unreleased` moved into the tagged release section.
+
+**Scope notes**
+- **5 impl lanes + 1 terminal SL-docs lane**. All impl lanes DAG-roots with disjoint file ownership. Plan with `MAX_PARALLEL_LANES=2` → 3 waves.
+- **SL-1 Reconcile + publish**. Owns the main-branch reconciliation (pick reconcile option (c) from `~/.claude/skills/execute-phase/handoff.md` — cherry-pick the `.claude/docs-catalog.json` hunk out of `977c82f`, strip its duplicate lowercase `environment-variables.md` entry, apply on top of the phase tip, reset local `main` to that commit). Pushes to `origin/main`. Adds / verifies `.github/workflows/ci.yml` coverage of the full-suite + ruff + the new docs-catalog integrity test. Release tag cut here. No other lane touches CI config.
+- **SL-2 Residual test debt**. Owns `tests/test_p16_vocabulary.py` (fix or amend the signature-mismatch test; must pass against the current `validate_production_config` body without hollowing the original contract intent), `tests/security/test_artifact_attestation.py::TestAttest` (the 3 remaining failures — gate with `pytest.mark.requires_gh_auth`), `tests/conftest.py` (add the marker definition + `addopts` skip-by-default logic per IF-0-P19-2). Does not touch production code.
+- **SL-3 Docs-catalog integrity**. Owns `.claude/docs-catalog.json` (remove duplicate `docs/configuration/environment-variables.md` entry added by the leaked commit; rescan to cover P18 and retroactively P17 additions), `.claude/skills/_shared/scaffold_docs_catalog.py` (if absent, port from the team skills repo; this was flagged absent in the P18 handoff), new `tests/test_docs_catalog_integrity.py` per IF-0-P19-3. Single-writer on the catalog file within this phase.
+- **SL-4 Upgrade comms & preflight**. Owns new `docs/operations/p18-upgrade.md` (breaking-change migration guide: sandbox flip, validation fatals, env var surface), new `scripts/preflight_upgrade.sh` per IF-0-P19-1 (shells into Python to re-use `validate_production_config` against a supplied env file), new `tests/test_preflight_upgrade.py` (argument parsing, happy path, fatal-detected path). The `docs/operations/p18-upgrade.md` file does NOT overlap SL-docs' catalog maintenance — SL-4 owns the content; SL-docs registers it.
+- **SL-5 Release-notes migration**. Owns `CHANGELOG.md` surgical edit (move the `Unreleased` → `P18` block into a new `## [0.X.0-rc1] — <date>` section; re-open `Unreleased` empty), `README.md` extension if the `## Recent phases` section exists (else no-op), `docs/security/sandbox.md` cross-link to the new `p18-upgrade.md`. Does not touch code; does not touch the spec.
+- **SL-docs (terminal)** owns the docs-catalog append of the new P19 doc files, `specs/phase-plans-v1.md` post-execution amendments if any IF-0-P19-* drifted.
+- **Single-writer files within phase**: `.claude/docs-catalog.json` (SL-3), `CHANGELOG.md` (SL-5), `tests/conftest.py` (SL-2), `docs/security/sandbox.md` (SL-5 extends only — disjoint from any P18 block). `docs/operations/p18-upgrade.md` is SL-4's owned NEW file; SL-docs references it only.
+- **Merge order discipline**: SL-3 should merge before SL-docs (SL-docs' rescan assumes SL-3's shape). SL-5 should merge after SL-4 (CHANGELOG links to `p18-upgrade.md`). Otherwise lanes are independent.
+
+**Non-goals**
+- No staging deployment (P20).
+- No actual production rollout (P20).
+- No retroactive fixes to phases P1–P17 — if a test fix for a pre-existing P16 bug touches P16 production code, scope-creep gate: stop and surface.
+- No new features. P19 is a hygiene phase only.
+- No force-push to any remote or shared branch. `origin/main` must fast-forward; if it cannot, stop and ask.
+
+**Key files**
+- Reconciliation: local `main` branch, `origin/main`, `worktree-lane-sl-4b-20260419T170149-ms2d`
+- `.github/workflows/` (CI config additions)
+- `tests/conftest.py`, `tests/test_p16_vocabulary.py`, `tests/security/test_artifact_attestation.py` (marker + fix)
+- `tests/test_docs_catalog_integrity.py` (NEW), `tests/test_preflight_upgrade.py` (NEW)
+- `.claude/docs-catalog.json`, `.claude/skills/_shared/scaffold_docs_catalog.py` (port if absent)
+- `scripts/preflight_upgrade.sh` (NEW)
+- `docs/operations/p18-upgrade.md` (NEW)
+- `CHANGELOG.md`, `README.md`, `docs/security/sandbox.md` (extend)
+
+**Depends on**
+- P18 merged (lives on branch `worktree-lane-sl-4b-20260419T170149-ms2d` @ `4580c6c` as of roadmap append).
+
+**Produces**
+- IF-0-P19-1, IF-0-P19-2, IF-0-P19-3
+
+### Phase 20 — Multi-Repo Validation & Staged Rollout (P20)
+
+**Objective**
+Prove that the multi-repo primitives shipped across P3/P4/P14/P17 actually survive real concurrent load, then execute a staged production rollout with documented bake gates and a rehearsed rollback. This phase is the GA milestone.
+
+**Exit criteria**
+- [ ] `tests/integration/multi_repo/` harness exists and passes locally and on CI; runs ≥2 gateways against a shared registry with distinct repo workspaces.
+- [ ] Harness includes a lost-writes load test: 2 processes each `register_repository()` 100× to a shared registry; post-run registry has all 200 entries (flock holding).
+- [ ] Harness includes a cross-repo delta-artifact resolution test: repo-A publishes a delta whose base points at repo-B's latest artifact; downloader resolves it correctly.
+- [ ] Observability smoke on a staging target: production-mode logs parse as `json.loads(...)` line-by-line; `/metrics` exposes `mcp_rate_limit_sleeps_total`, `mcp_artifact_errors_by_class_total`, `mcp_tool_calls_total` (all scrapeable); synthetic 4xx with `Bearer xyz` in body renders `Bearer [REDACTED]`.
+- [ ] `docs/operations/deployment-runbook.md` exists per IF-0-P20-2, with stage-by-stage bake gates, rollback triggers, and rollback procedure for at least: staging, canary, full-prod.
+- [ ] A rollback was exercised at least once on the staging target and the procedure survived without engineer improvisation.
+- [ ] Production rollout complete: canary → full-prod, with all bake gates green.
+- [ ] 72h post-rollout bake clean (no alerts on the new counters, no unexpected JSON log parse failures, no secret-redaction misses).
+
+**Scope notes**
+- **4 impl lanes + 1 terminal SL-docs lane**. SL-1 and SL-2 run parallel (test-side); SL-3 runs parallel with them (docs-side); SL-4 is sequential after all three (operator-driven rollout). Plan with `MAX_PARALLEL_LANES=2`.
+- **SL-1 Multi-repo integration harness**. Owns new `tests/integration/multi_repo/` directory end-to-end: `conftest.py` with the fixture per IF-0-P20-1, `test_registry_concurrency_live.py` (real flock under 2+ processes), `test_cross_repo_delta.py` (cross-repo artifact resolution), `test_multi_repo_dispatcher.py` (dispatcher routes by `RepoContext.repo_id`). If gaps in P5's integration test layer are discovered (e.g., fixtures that don't match current API), the lane surfaces them in its final report; it does not retrofit production code.
+- **SL-2 Observability staging smoke**. Owns new `tests/integration/obs/test_obs_smoke.py` which spins up a gateway against a local Prometheus + Loki (docker-compose under `tests/integration/obs/infra/`), verifies JSON log parse rate, counter scrape, secret redaction. Also owns `docs/operations/observability-verification.md` (operator procedure to reproduce the smoke on staging). Disjoint from SL-1's harness directory.
+- **SL-3 Deployment runbook**. Owns new `docs/operations/deployment-runbook.md` per IF-0-P20-2. Stages: dev → staging → canary → full-prod. Each stage: pass criteria, bake window, rollback trigger, rollback procedure. Cross-links `scripts/preflight_upgrade.sh` from P19.
+- **SL-4 Staged rollout execution**. Owns the execution of the rollout itself: cut RC tag (re-use SL-1 of P19 if still within tag window, else `v0.X.0-rc2`), deploy to staging, run SL-2's smoke, bake, promote to canary, bake, promote to full-prod. This lane is operator-driven with orchestrator tracking; commits are `deploy:` messages capturing tag moves and promotion approvals, not code. Rollback rehearsal happens at the staging bake window.
+- **SL-docs (terminal)** registers new docs in `.claude/docs-catalog.json`, appends any post-execution amendments.
+- **Single-writer files within phase**: `tests/integration/multi_repo/` (SL-1 exclusive), `tests/integration/obs/` (SL-2 exclusive), `docs/operations/deployment-runbook.md` (SL-3 exclusive). No overlap.
+- **Parallelism**: SL-1, SL-2, SL-3 can all land concurrently. SL-4 must wait for all three. SL-docs is terminal.
+- **Gate escalation**: if SL-1 or SL-2 surfaces a real bug (not a test harness gap), SL-4 must not advance past staging until a hotfix lane is added. Plan explicitly.
+
+**Non-goals**
+- No new production features. P20 is validation + rollout only.
+- No backfilling of missing integration tests for phases P6–P17 beyond what IF-0-P20-1's fixture naturally exercises.
+- No cross-region rollout (single-region only; multi-region is future work).
+- No automated canary-analysis system (manual bake with documented criteria).
+- No per-customer rollout gating (all-tenants-at-once within each stage).
+
+**Key files**
+- `tests/integration/multi_repo/` (NEW directory: conftest.py, 3+ test files)
+- `tests/integration/obs/` (NEW directory: `infra/docker-compose.yml`, test file)
+- `docs/operations/deployment-runbook.md` (NEW)
+- `docs/operations/observability-verification.md` (NEW)
+- Release tags: `v0.X.0-rc1`..`v0.X.0` (cut and promoted by SL-4)
+- Staging + canary + production infrastructure configs (owned by SL-4; per-operator)
+
+**Depends on**
+- P19 merged (needs pushed origin/main, green CI, preflight script, docs-catalog green).
+
+**Produces**
+- IF-0-P20-1, IF-0-P20-2
 
 ---
 
