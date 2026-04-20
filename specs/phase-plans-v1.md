@@ -1084,6 +1084,21 @@ Move P18's feature-complete state into a publishable, CI-verified, deploy-ready 
 **Produces**
 - IF-0-P19-1, IF-0-P19-2, IF-0-P19-3
 
+### Post-execution amendments
+
+Drift notes recorded by SL-docs at P19 close.
+
+- **Version resolution**: spec placeholder `v0.X.0-rc1` resolved to `v1.2.0-rc1` (given the P12–P18 feature delta on top of the last published `v1.1.0`). Tag pushed to `origin` at merge-commit `baf47a5`.
+- **Reconciliation sequence** (SL-1): executed option (c) from the handoff — `git reset --hard` local `main` onto the worktree-branch tip (`6669f3a`), then cherry-picked `977c82f` minus the 3-line duplicate lowercase `docs/configuration/environment-variables.md` catalog entry. Backup tag `pre-p19-main` preserves the pre-reset main tip. Fast-forward push of 125 commits to `origin/main` succeeded on first attempt; `origin/main` went from `8151341` to `baf47a5`.
+- **`mcp_server/cli/preflight_commands.py` status**: spec + plan doc said NEW. File already existed from a prior phase (`4108e8e Add startup preflight for local MCP usage`). SL-4 extended it additively (+73 lines, `preflight_env` click subcommand); registration added via a single-line insert in `mcp_server/cli/__main__.py`. Functionally equivalent to the NEW-file contract.
+- **`tests/test_release_notes.py`** (SL-5): the plan's Owned-files list for SL-5 did not explicitly include this file; the lane created it per the SL-5.1 test task spec. Included in merge; 3 tests pass.
+- **IF-0-P19-1 rendering contract**: shell wrapper and Python subcommand emit `[FATAL]` / `[WARN]` lines to stderr, byte-compatible with `render_validation_errors_to_stderr`. Shell wrapper uses `cd $REPO_ROOT` before `python -m mcp_server.cli preflight_env` so local source takes precedence over any editable install. Exit codes: 0 on no-fatal, 1 on any fatal.
+- **IF-0-P19-2 marker gate**: `pytest.mark.requires_gh_auth` registered in `pytest.ini`; `pytest_collection_modifyitems` hook in `tests/conftest.py` composes with the existing `-m "not integration and not slow"` addopts (via marker-attachment, not addopts mutation). 3 `TestAttest` tests marked; `RUN_GH_AUTHENTICATED_TESTS=1 pytest -m requires_gh_auth` collects 3 items.
+- **IF-0-P19-3 scaffold tool scope**: `.claude/skills/_shared/scaffold_docs_catalog.py` landed at 130 LOC (<150 cap). `--rescan` preserves `touched_by_phases` history; only bumps `generated_at` and normalises JSON (indent=2); does NOT auto-discover new files. `--check` surfaces missing-file hard errors and case-variant warnings (never hard-errors on case variants).
+- **`test-authenticated` CI job**: added in `.github/workflows/ci-cd-pipeline.yml`, gated on `secrets.ATTESTATION_GH_TOKEN` with `continue-on-error: true` and a `::warning::` if the secret is absent. Runs on push-to-main, scheduled nightly, and workflow_dispatch. Secret is NOT yet wired in the repo settings — operators should add it post-push to enable the authenticated suite.
+- **Full-suite residuals at P19 close**: 1621 passed, 96 skipped on `pytest --no-cov --ignore=tests/real_world`. Four pre-existing OpenBLAS OOM failures in `tests/test_dispatcher.py` + `tests/test_plugin_factory_async.py` surfaced under parallel xdist memory pressure; unrelated to P19 scope. P20 should investigate as a harness-flake pass.
+- **`_check_gh_auth_for_attestations` mockability**: marker-gating the 3 `TestAttest` tests is tactical P19 debt. P20 (or a follow-up lane) should refactor the prereq check in `mcp_server/artifacts/attestation.py` so it can be mocked from test scope.
+
 ### Phase 20 — Multi-Repo Validation & Staged Rollout (P20)
 
 **Objective**

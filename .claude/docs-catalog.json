@@ -12,7 +12,8 @@
       "description": "Per-phase release notes",
       "touched_by_phases": [
         "P14",
-        "P18"
+        "P18",
+        "P19"
       ]
     },
     {
@@ -45,6 +46,13 @@
       ]
     },
     {
+      "path": "docs/operations/p18-upgrade.md",
+      "description": "Operator migration guide for upgrading through P12-P18 to v1.2.0-rc1 (breaking changes, preflight, rollback)",
+      "touched_by_phases": [
+        "P19"
+      ]
+    },
+    {
       "path": "docs/architecture/P2B-known-limits.md",
       "description": "Deferred per-repo global state items and resolution plan",
       "touched_by_phases": []
@@ -54,7 +62,8 @@
       "description": "Plugin sandbox architecture, threat model, and P18 default-on migration",
       "touched_by_phases": [
         "P15",
-        "P18"
+        "P18",
+        "P19"
       ]
     },
     {
@@ -62,7 +71,8 @@
       "description": "Phase-by-phase implementation roadmap with exit criteria and IF contracts",
       "touched_by_phases": [
         "P14",
-        "P18"
+        "P18",
+        "P19"
       ]
     }
   ]
