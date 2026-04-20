@@ -46,10 +46,25 @@
       ]
     },
     {
+      "path": "docs/operations/deployment-runbook.md",
+      "description": "GA deployment runbook for v1.2.0 — step-by-step operator procedures, rollback, and observability checks",
+      "touched_by_phases": [
+        "p20"
+      ]
+    },
+    {
+      "path": "docs/operations/observability-verification.md",
+      "description": "Post-deployment observability verification checklist — metrics, traces, and alert validation",
+      "touched_by_phases": [
+        "p20"
+      ]
+    },
+    {
       "path": "docs/operations/p18-upgrade.md",
       "description": "Operator migration guide for upgrading through P12-P18 to v1.2.0-rc1 (breaking changes, preflight, rollback)",
       "touched_by_phases": [
-        "P19"
+        "P19",
+        "p20"
       ]
     },
     {
@@ -63,7 +78,8 @@
       "touched_by_phases": [
         "P15",
         "P18",
-        "P19"
+        "P19",
+        "p20"
       ]
     },
     {
@@ -72,7 +88,8 @@
       "touched_by_phases": [
         "P14",
         "P18",
-        "P19"
+        "P19",
+        "p20"
       ]
     }
   ]

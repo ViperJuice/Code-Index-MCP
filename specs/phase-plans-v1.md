@@ -1146,6 +1146,27 @@ Prove that the multi-repo primitives shipped across P3/P4/P14/P17 actually survi
 **Produces**
 - IF-0-P20-1, IF-0-P20-2
 
+### Post-execution amendments (SL-docs.3 — appended 2026-04-20)
+
+**Owned-files / task-table inconsistency in `plans/phase-plan-v1-p20.md`**
+
+The plan doc's "Owned files" 1-liner for SL-3 omits `tests/test_deployment_runbook_shape.py`,
+and the "Owned files" 1-liner for SL-4 omits `tests/test_release_readiness_p20.py`.
+Both files appear in each lane's own task table, which is the authoritative list of what
+the lane actually wrote.
+
+**Recommendation for future phases**: when `plan-phase` generates a lane section, the
+"Owned files" line must be the union of every file listed in the lane's task table.
+A post-plan validation step should diff "Owned files" against the task table and fail
+loudly on any mismatch; the plan doc should not be accepted until they agree.
+
+**SL-0 escapee fix (caught by SL-2b's regression sweep)**
+
+`tests/security/test_sl0_interface_surface.py` line 43 asserted
+`dc_fields["mem_mb"].default == 512` after SL-0 raised the default to 2048. This
+regression test was not updated when SL-0 landed. The mismatch was flagged during
+SL-2b's regression sweep; the fix was applied by the SL-docs terminal lane (this phase).
+
 ---
 
 ## Execution Notes

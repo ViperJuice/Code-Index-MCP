@@ -144,3 +144,10 @@ v1.2.0-rc1.
 | `MCP_PLUGIN_SANDBOX_DISABLE` | unset = sandbox off | unset = sandbox **on**; set `=1` to opt out | Breaking change — see above |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `30` | `30` | No change |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | `7` | `7` | No change |
+
+---
+
+## See also
+
+- [Deployment Runbook (v1.2.0 GA)](deployment-runbook.md) — step-by-step operator deployment procedure for the GA release, including rollback and staged-rollout gates.
+- [Observability Verification](observability-verification.md) — post-deployment checklist for confirming metrics, traces, and alerts are healthy.

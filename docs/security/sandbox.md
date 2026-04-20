@@ -70,6 +70,15 @@ The host constructs a `SandboxedPlugin` adapter wrapping each real plugin instan
 - The host process is trusted
 - The Go plugin (which needs subprocess access for `go test` execution) is first-party or heavily audited
 
+## Memory limit default (P20)
+
+As of P20, the `CapabilitySet.mem_mb` default was raised from **512 MiB to 2048 MiB**
+(`mcp_server/sandbox/capabilities.py`). The previous 512 MiB limit caused spurious
+worker OOM kills when plugins loaded large embedding models (in particular, OpenBLAS
+triggered by `numpy` import during the semantic-indexing pipeline). The new default
+allows the Voyage AI embedding worker to initialise without requiring operators to set
+a per-plugin memory override.
+
 ## Default-on migration (P18)
 
 > See [docs/operations/p18-upgrade.md](../operations/p18-upgrade.md) for the full operator migration procedure.

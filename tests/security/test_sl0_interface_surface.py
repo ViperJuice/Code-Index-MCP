@@ -40,7 +40,7 @@ def test_capability_set_defaults():
     assert dc_fields["network"].default is False
     assert dc_fields["sqlite"].default == "none"
     assert dc_fields["cpu_seconds"].default == 30
-    assert dc_fields["mem_mb"].default == 512
+    assert dc_fields["mem_mb"].default == 2048
 
 
 def test_sandbox_supervisor_importable():
