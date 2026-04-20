@@ -58,21 +58,21 @@ def test_no_auth():
     pass
 """
 
-_INI = """\
+_PYTEST_INI = """\
 [pytest]
 markers =
     requires_gh_auth: tests requiring live gh CLI auth; set RUN_GH_AUTHENTICATED_TESTS=1 to run
 """
 
 
-def test_hook_skips_when_env_unset(pytester):
+def test_hook_skips_when_env_unset(pytester, monkeypatch):
     """When env var is absent the marked test must be skipped, not failed."""
+    monkeypatch.delenv("RUN_GH_AUTHENTICATED_TESTS", raising=False)
     pytester.makeconftest(_CONFTEST)
-    pytester.makefile(".ini", pytest=_INI.strip().split("[pytest]\n", 1)[1])
+    pytester.path.joinpath("pytest.ini").write_text(_PYTEST_INI)
     pytester.makepyfile(_TESTS)
 
-    # Ensure env var is absent for this inner run
-    result = pytester.runpytest("--override-ini=markers=requires_gh_auth: gh auth marker")
+    result = pytester.runpytest("-p", "no:warnings")
     result.assert_outcomes(passed=1, skipped=1)
 
 
@@ -80,8 +80,8 @@ def test_hook_runs_when_env_set(pytester, monkeypatch):
     """When RUN_GH_AUTHENTICATED_TESTS=1 the marked test must not be skipped."""
     monkeypatch.setenv("RUN_GH_AUTHENTICATED_TESTS", "1")
     pytester.makeconftest(_CONFTEST)
-    pytester.makefile(".ini", pytest=_INI.strip().split("[pytest]\n", 1)[1])
+    pytester.path.joinpath("pytest.ini").write_text(_PYTEST_INI)
     pytester.makepyfile(_TESTS)
 
-    result = pytester.runpytest("--override-ini=markers=requires_gh_auth: gh auth marker")
+    result = pytester.runpytest("-p", "no:warnings")
     result.assert_outcomes(passed=2, skipped=0)
