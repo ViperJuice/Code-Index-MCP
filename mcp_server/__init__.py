@@ -1,7 +1,7 @@
 """MCP Server - Local-first code indexer for LLMs."""
 
 # Version information
-__version__ = "1.2.0rc1"
+__version__ = "1.2.0-rc2"
 
 # Public API exports
 __all__ = [
