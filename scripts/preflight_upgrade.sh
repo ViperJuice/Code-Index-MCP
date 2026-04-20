@@ -14,4 +14,5 @@ else
     PYTHON="python3"
 fi
 
+cd "$REPO_ROOT"
 exec "$PYTHON" -m mcp_server.cli preflight_env "$1"
