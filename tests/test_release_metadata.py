@@ -1,12 +1,12 @@
-"""Release metadata assertions for P19 v1.2.0-rc1 cut."""
+"""Release metadata assertions for P20 v1.2.0-rc2 cut."""
 
 from __future__ import annotations
 
 import subprocess
 
 
-EXPECTED_VERSION = "1.2.0rc1"
-EXPECTED_TAG = "v1.2.0-rc1"
+EXPECTED_VERSION = "1.2.0-rc2"
+EXPECTED_TAG = "v1.2.0-rc2"
 
 
 def test_package_version_matches_rc_tag():
