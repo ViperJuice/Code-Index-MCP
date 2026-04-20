@@ -10,27 +10,39 @@
     {
       "path": "CHANGELOG.md",
       "description": "Per-phase release notes",
-      "touched_by_phases": ["P14", "P18"]
+      "touched_by_phases": [
+        "P14",
+        "P18"
+      ]
     },
     {
       "path": "AGENTS.md",
       "description": "Agent configuration, search strategy, multi-repo operation notes",
-      "touched_by_phases": ["P14"]
+      "touched_by_phases": [
+        "P14"
+      ]
     },
     {
       "path": "docs/configuration/ENVIRONMENT-VARIABLES.md",
       "description": "All supported environment variables with types, defaults, and examples",
-      "touched_by_phases": ["P14", "P18"]
+      "touched_by_phases": [
+        "P14",
+        "P18"
+      ]
     },
     {
       "path": "docs/operations/gateway-startup-checklist.md",
       "description": "Operator deployment validation checklist and startup procedures",
-      "touched_by_phases": ["P18"]
+      "touched_by_phases": [
+        "P18"
+      ]
     },
     {
       "path": "docs/operations/artifact-retention.md",
       "description": "Artifact retention janitor CLI guide with examples and troubleshooting",
-      "touched_by_phases": ["P18"]
+      "touched_by_phases": [
+        "P18"
+      ]
     },
     {
       "path": "docs/architecture/P2B-known-limits.md",
@@ -40,12 +52,18 @@
     {
       "path": "docs/security/sandbox.md",
       "description": "Plugin sandbox architecture, threat model, and P18 default-on migration",
-      "touched_by_phases": ["P15", "P18"]
+      "touched_by_phases": [
+        "P15",
+        "P18"
+      ]
     },
     {
       "path": "specs/phase-plans-v1.md",
       "description": "Phase-by-phase implementation roadmap with exit criteria and IF contracts",
-      "touched_by_phases": ["P14", "P18"]
+      "touched_by_phases": [
+        "P14",
+        "P18"
+      ]
     }
   ]
 }
