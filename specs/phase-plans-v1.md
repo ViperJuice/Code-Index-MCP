@@ -1186,6 +1186,20 @@ cd /tmp/repo-a && git checkout -b feature/noise && echo "x" > newfile.py && slee
 
 All commands above should return success. Any `database is locked`, cross-contaminated results, or reindex-on-branch-switch observation fails the refactor.
 
+### Post-Execution Amendments (P18)
+
+The following minor deviations from the spec occurred during implementation and are documented for future reference. All deviations are functionally equivalent and do not affect the exit criteria.
+
+- **SL-3 module naming**: `artifacts/retention.py` (spec) implements the janitor; `cli/commands.py` wires the `retention prune` subcommand. Spec referenced `cli/commands.py` as the single owner; implementation split concerns for clarity. Functionally equivalent — both locations are single-writer and disjoint.
+
+- **IF-0-P18-1 produced no interface freeze**: P18's primary interface is the operational CLI `retention prune` (spec completes) and configuration (environment variables). No inter-phase API boundary was introduced beyond the existing artifact/plugin contract extensions. No new frozen interface was needed.
+
+- **All validation errors render to stderr as documented**: `render_validation_errors_to_stderr()` outputs `[FATAL] <code>: <message>` one per line. Tested in production and dev modes per spec.
+
+- **Rate-limit Retry-After parsing**: Correctly distinguishes 429 (Retry-After backoff) from 403 (terminal error, raises `TerminalArtifactError`). No deviations from spec.
+
+- **Sandbox default-on**: `MCP_PLUGIN_SANDBOX_DISABLE=1` provides opt-out. Default is ON. All built-in plugins have been updated with capability declarations. No pre-P18 plugins in the codebase required fallback opt-out.
+
 ## Verification (post-hardening, after P11 merge)
 
 All P1–P6B verification above must still pass — regression-free. In addition:
