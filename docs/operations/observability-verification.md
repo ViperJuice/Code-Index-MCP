@@ -141,59 +141,41 @@ curl -sf -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8080/metrics \
 
 Expected output (example): `mcp_requests_total{endpoint="/health",method="GET",status="200"} 5.0`
 
-#### Known limitation — three plan-specified counters
-
-The counters `mcp_tool_calls_total`, `mcp_rate_limit_sleeps_total`, and
-`mcp_artifact_errors_by_class_total` are registered on `prometheus_client`'s default
-`REGISTRY` (see `mcp_server/metrics/prometheus_exporter.py:62–91`), whereas the
-`/metrics` HTTP endpoint emits from a private `CollectorRegistry` created in
-`PrometheusExporter.__init__` (line 115).  These three counters therefore do **not**
-appear in the `/metrics` HTTP response — this is a latent bug.  Verify their
-existence directly:
+Additionally confirm the three plan-specified counters appear in `/metrics`:
 
 ```bash
-python3 - <<'EOF'
-from prometheus_client import REGISTRY, generate_latest
-from mcp_server.metrics.prometheus_exporter import (
-    mcp_tool_calls_total, mcp_rate_limit_sleeps_total, mcp_artifact_errors_by_class_total,
-)
-mcp_tool_calls_total.labels(tool="verify", status="ok").inc()
-mcp_rate_limit_sleeps_total.inc()
-mcp_artifact_errors_by_class_total.labels(error_class="Verify").inc()
-output = generate_latest(REGISTRY).decode()
-for name in ("mcp_tool_calls_total", "mcp_rate_limit_sleeps_total", "mcp_artifact_errors_by_class_total"):
-    found = any(line.startswith(name) and not line.startswith("# ") for line in output.splitlines())
-    print(f"{'OK' if found else 'MISS'}: {name}")
-EOF
+curl -sf -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8080/metrics \
+  | grep -E '^# (HELP|TYPE) (mcp_tool_calls_total|mcp_rate_limit_sleeps_total|mcp_artifact_errors_by_class_total)\b'
 ```
 
-Expected: `OK: mcp_tool_calls_total`, `OK: mcp_rate_limit_sleeps_total`, `OK: mcp_artifact_errors_by_class_total`
+Expected: six lines — HELP and TYPE for each of the three counters.  These counters
+share a module-level `CollectorRegistry` with the gateway's `PrometheusExporter`, so
+any increment (stdio tool calls, artifact provider rate-limit back-offs, artifact
+error taxonomy) is directly observable over HTTP scrape.
 
 ### 2.5 Verify secret redaction
 
 `SecretRedactionResponseMiddleware` (`mcp_server/security/security_middleware.py:465`)
-applies regex substitution to 4xx/5xx response bodies.  The patterns are:
+is registered at module import time in `mcp_server/gateway.py` so it applies to
+every 4xx/5xx response regardless of how the app is launched.  The patterns are:
 
 - `Bearer\s+\S+` → `Bearer [REDACTED]`
 - `JWT_SECRET_KEY=\S+` → `JWT_SECRET_KEY=[REDACTED]`
 - `GITHUB_TOKEN=\S+` → `GITHUB_TOKEN=[REDACTED]`
 
-Verify the pattern directly:
+Verify over HTTP by POSTing a malformed body containing a synthetic token.  The
+422 validation error echoes the input dict and the middleware must rewrite the
+token before the response leaves the process:
 
 ```bash
-python3 - <<'EOF'
-from mcp_server.security.security_middleware import _REDACTION_PATTERNS
-raw = "Authorization: Bearer SYNTH_ABC123"
-redacted = raw
-for pattern, replacement in _REDACTION_PATTERNS:
-    redacted = pattern.sub(replacement, redacted)
-assert "Bearer [REDACTED]" in redacted, f"FAIL: {redacted!r}"
-assert "SYNTH_ABC123" not in redacted, f"FAIL raw token still present: {redacted!r}"
-print(f"OK: '{raw}' → '{redacted}'")
-EOF
+curl -s -X POST \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"Bearer SYNTH_ABC123"}' \
+  http://127.0.0.1:8080/api/v1/auth/login
 ```
 
-Expected: `OK: 'Authorization: Bearer SYNTH_ABC123' → 'Authorization: Bearer [REDACTED]'`
+Expected: HTTP 422 body contains `Bearer [REDACTED]` and does NOT contain the
+raw `SYNTH_ABC123` string.
 
 ### 2.6 Tear down
 
@@ -226,9 +208,7 @@ Expected result (Docker present):
 ```
 tests/integration/obs/test_obs_smoke.py::test_json_log_parse_rate PASSED
 tests/integration/obs/test_obs_smoke.py::test_metrics_endpoint_reachable PASSED
-tests/integration/obs/test_obs_smoke.py::test_three_counters_exist_in_default_registry PASSED
-tests/integration/obs/test_obs_smoke.py::test_secret_redaction_middleware_patterns PASSED
-tests/integration/obs/test_obs_smoke.py::test_secret_redaction_via_http PASSED or SKIPPED
+tests/integration/obs/test_obs_smoke.py::test_secret_redaction_via_http PASSED
 ```
 
 ---

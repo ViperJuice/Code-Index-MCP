@@ -520,8 +520,10 @@ class SecurityMiddlewareStack:
         # Add request validation middleware
         self.app.add_middleware(RequestValidationMiddleware)
 
-        # Add secret redaction for error responses
-        self.app.add_middleware(SecretRedactionResponseMiddleware)
+        # Note: SecretRedactionResponseMiddleware is registered at module-level
+        # in gateway.py so it applies in subprocess/uvicorn boot paths where
+        # late middleware registration from the startup event is rejected by
+        # FastAPI (see gateway.py "Skipping late middleware registration" log).
 
         # Add rate limiting middleware
         self.app.add_middleware(RateLimitMiddleware, auth_manager=self.auth_manager)

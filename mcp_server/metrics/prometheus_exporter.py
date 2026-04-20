@@ -57,30 +57,39 @@ logger = logging.getLogger(__name__)
 
 _DISPATCHER_FALLBACK_BUCKETS = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0)
 
-# Module-level counter registered on the default registry so it is always
-# accessible regardless of which PrometheusExporter instance is active.
+# Shared module-level registry used by the module-level counters AND the
+# global PrometheusExporter instance, so /metrics serializes the same
+# registry that emission sites increment.
+_EXPORTER_REGISTRY = CollectorRegistry()
+
+# Module-level counters registered on the shared exporter registry so they
+# appear in PrometheusExporter.generate_metrics() output.
 mcp_tool_calls_total = Counter(
     "mcp_tool_calls_total",
     "MCP tool call counter",
     ["tool", "status"],
+    registry=_EXPORTER_REGISTRY,
 )
 
 
 mcp_watcher_sweep_errors_total = Counter(
     "mcp_watcher_sweep_errors_total",
     "Count of watcher sweep iterations that raised an exception.",
+    registry=_EXPORTER_REGISTRY,
 )
 
 
 mcp_storage_readonly_total = Counter(
     "mcp_storage_readonly_total",
     "Count of SQLite stores that transitioned to read-only mode due to ENOSPC.",
+    registry=_EXPORTER_REGISTRY,
 )
 
 
 mcp_rate_limit_sleeps_total = Counter(
     "mcp_rate_limit_sleeps_total",
     "Count of rate-limit back-off sleeps injected by the dispatcher.",
+    registry=_EXPORTER_REGISTRY,
 )
 
 
@@ -88,6 +97,7 @@ mcp_artifact_errors_by_class_total = Counter(
     "mcp_artifact_errors_by_class_total",
     "Count of artifact processing errors, labelled by error class.",
     ["error_class"],
+    registry=_EXPORTER_REGISTRY,
 )
 
 
@@ -514,5 +524,5 @@ def get_prometheus_exporter() -> PrometheusExporter:
     """Get the global Prometheus exporter instance."""
     global _exporter
     if _exporter is None:
-        _exporter = PrometheusExporter()
+        _exporter = PrometheusExporter(registry=_EXPORTER_REGISTRY)
     return _exporter
