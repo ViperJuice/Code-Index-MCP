@@ -246,15 +246,17 @@ class TestPrometheusExporterWiring:
         assert "mcp_requests_total" in body, \
             f"Expected mcp_requests_total in metrics body; got: {body[:300]}"
 
-    def test_mcp_tool_calls_total_in_default_registry_output(self):
-        """mcp_tool_calls_total appears in default-registry generate_latest output after record_tool_call."""
-        from mcp_server.metrics.prometheus_exporter import PROMETHEUS_AVAILABLE, record_tool_call, generate_latest
+    def test_mcp_tool_calls_total_in_exporter_registry_output(self):
+        """mcp_tool_calls_total appears in _EXPORTER_REGISTRY generate_latest output after record_tool_call."""
+        from mcp_server.metrics.prometheus_exporter import (
+            PROMETHEUS_AVAILABLE, record_tool_call, generate_latest, _EXPORTER_REGISTRY,
+        )
         if not PROMETHEUS_AVAILABLE:
             pytest.skip("prometheus_client not installed")
         record_tool_call("_gen_test_", "success")
-        body = generate_latest().decode()
+        body = generate_latest(_EXPORTER_REGISTRY).decode()
         assert "mcp_tool_calls_total" in body, \
-            f"Expected mcp_tool_calls_total in generate_latest() output"
+            f"Expected mcp_tool_calls_total in generate_latest(_EXPORTER_REGISTRY) output"
 
     def test_signal_handlers_installed_in_serve(self):
         """stdio_runner.py source must reference add_signal_handler."""

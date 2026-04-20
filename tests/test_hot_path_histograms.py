@@ -154,104 +154,102 @@ def _make_ctx(db_path: str, tmp_path: Path):
 
 
 # ---------------------------------------------------------------------------
+# Fixture: isolated exporter with a fresh registry (avoids _EXPORTER_REGISTRY
+# pollution left by test_dispatcher_fallback_metrics.py resetting _exporter)
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def isolated_exporter(monkeypatch):
+    fresh = PrometheusExporter()  # private CollectorRegistry, not _EXPORTER_REGISTRY
+    monkeypatch.setattr(prometheus_exporter, "get_prometheus_exporter", lambda: fresh)
+    monkeypatch.setattr(prometheus_exporter, "_exporter", fresh)
+    return fresh
+
+
+# ---------------------------------------------------------------------------
 # _count increment tests
 # ---------------------------------------------------------------------------
 
-def test_lookup_histogram_count_increments(tmp_path):
+def test_lookup_histogram_count_increments(tmp_path, isolated_exporter):
     """dispatcher.lookup increments dispatcher_lookup_histogram._count by exactly 1."""
-    original_exporter = prometheus_exporter._exporter
-    prometheus_exporter._exporter = None
-    try:
-        db_path = _make_db_with_symbol(tmp_path, "my_func")
-        dispatcher = _make_dispatcher()
-        ctx = _make_ctx(db_path, tmp_path)
+    db_path = _make_db_with_symbol(tmp_path, "my_func")
+    dispatcher = _make_dispatcher()
+    ctx = _make_ctx(db_path, tmp_path)
 
-        exporter = prometheus_exporter.get_prometheus_exporter()
-        hist = exporter.dispatcher_lookup_histogram
-        assert hist is not None
+    exporter = isolated_exporter
+    hist = exporter.dispatcher_lookup_histogram
+    assert hist is not None
 
-        def _count():
-            return sum(
-                s.value
-                for m in exporter.registry.collect()
-                if m.name == LOOKUP_METRIC_NAME
-                for s in m.samples
-                if s.name.endswith("_count")
-            )
+    def _count():
+        return sum(
+            s.value
+            for m in exporter.registry.collect()
+            if m.name == LOOKUP_METRIC_NAME
+            for s in m.samples
+            if s.name.endswith("_count")
+        )
 
-        before = _count()
-        dispatcher.lookup(ctx, "my_func", limit=5)
-        after = _count()
-        assert after - before == 1.0
-    finally:
-        prometheus_exporter._exporter = original_exporter
+    before = _count()
+    dispatcher.lookup(ctx, "my_func", limit=5)
+    after = _count()
+    assert after - before == 1.0
 
 
-def test_search_histogram_count_increments(tmp_path):
+def test_search_histogram_count_increments(tmp_path, isolated_exporter):
     """dispatcher.search increments dispatcher_search_histogram._count by exactly 1."""
-    original_exporter = prometheus_exporter._exporter
-    prometheus_exporter._exporter = None
-    try:
-        db_path = _make_bm25_db(tmp_path, "searchword")
-        dispatcher = _make_dispatcher()
-        ctx = _make_ctx(db_path, tmp_path)
+    db_path = _make_bm25_db(tmp_path, "searchword")
+    dispatcher = _make_dispatcher()
+    ctx = _make_ctx(db_path, tmp_path)
 
-        exporter = prometheus_exporter.get_prometheus_exporter()
-        hist = exporter.dispatcher_search_histogram
-        assert hist is not None
+    exporter = isolated_exporter
+    hist = exporter.dispatcher_search_histogram
+    assert hist is not None
 
-        def _count():
-            return sum(
-                s.value
-                for m in exporter.registry.collect()
-                if m.name == SEARCH_METRIC_NAME
-                for s in m.samples
-                if s.name.endswith("_count")
-            )
+    def _count():
+        return sum(
+            s.value
+            for m in exporter.registry.collect()
+            if m.name == SEARCH_METRIC_NAME
+            for s in m.samples
+            if s.name.endswith("_count")
+        )
 
-        before = _count()
-        list(dispatcher.search(ctx, "searchword", limit=5))
-        after = _count()
-        assert after - before == 1.0
-    finally:
-        prometheus_exporter._exporter = original_exporter
+    before = _count()
+    list(dispatcher.search(ctx, "searchword", limit=5))
+    after = _count()
+    assert after - before == 1.0
 
 
 # ---------------------------------------------------------------------------
 # No-double-count test: fallback histogram must NOT fire on a pure BM25 hit
 # ---------------------------------------------------------------------------
 
-def test_no_double_count_fallback_histogram(tmp_path):
+def test_no_double_count_fallback_histogram(tmp_path, isolated_exporter):
     """A symbols-table hit must not increment dispatcher_fallback_histogram."""
-    original_exporter = prometheus_exporter._exporter
-    prometheus_exporter._exporter = None
-    try:
-        db_path = _make_db_with_symbol(tmp_path, "pure_bm25_sym")
-        dispatcher = _make_dispatcher()
-        ctx = _make_ctx(db_path, tmp_path)
+    db_path = _make_db_with_symbol(tmp_path, "pure_bm25_sym")
+    dispatcher = _make_dispatcher()
+    ctx = _make_ctx(db_path, tmp_path)
 
-        exporter = prometheus_exporter.get_prometheus_exporter()
-        fallback_hist = exporter.dispatcher_fallback_histogram
-        assert fallback_hist is not None
+    exporter = isolated_exporter
+    fallback_hist = exporter.dispatcher_fallback_histogram
+    assert fallback_hist is not None
 
-        def _fallback_count():
-            return sum(
-                s.value
-                for m in exporter.registry.collect()
-                if m.name == "mcp_dispatcher_fallback_duration_seconds"
-                for s in m.samples
-                if s.name.endswith("_count")
-            )
-
-        before = _fallback_count()
-        dispatcher.lookup(ctx, "pure_bm25_sym", limit=5)
-        after = _fallback_count()
-        assert after == before, (
-            f"dispatcher_fallback_histogram must not fire on a BM25 hit; "
-            f"before={before}, after={after}"
+    def _fallback_count():
+        return sum(
+            s.value
+            for m in exporter.registry.collect()
+            if m.name == "mcp_dispatcher_fallback_duration_seconds"
+            for s in m.samples
+            if s.name.endswith("_count")
         )
-    finally:
-        prometheus_exporter._exporter = original_exporter
+
+    before = _fallback_count()
+    dispatcher.lookup(ctx, "pure_bm25_sym", limit=5)
+    after = _fallback_count()
+    assert after == before, (
+        f"dispatcher_fallback_histogram must not fire on a BM25 hit; "
+        f"before={before}, after={after}"
+    )
 
 
 # ---------------------------------------------------------------------------
