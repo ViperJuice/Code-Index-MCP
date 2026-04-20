@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,8 +13,17 @@ from mcp_server.artifacts.attestation import attest
 from mcp_server.artifacts.delta_policy import DeltaPolicy
 from mcp_server.core.errors import MCPError
 
+try:
+    from mcp_server.metrics.prometheus_exporter import (
+        mcp_artifact_errors_by_class_total,
+    )
+except ImportError:
+    mcp_artifact_errors_by_class_total = None
+
 if TYPE_CHECKING:
     from .artifact_upload import IndexArtifactUploader
+
+logger = logging.getLogger(__name__)
 
 
 class ArtifactError(MCPError):
@@ -71,7 +81,15 @@ class ArtifactPublisher:
                 attestation=attestation,
             )
             self._ensure_sha_release(sha_tag, commit, repo)
-            self._move_latest_pointer(sha_tag, commit, repo)
+            sha_release_created = True
+            try:
+                self._move_latest_pointer(sha_tag, commit, repo)
+            except Exception:
+                subprocess.run(
+                    [self._gh_cmd, "release", "delete", sha_tag, "--yes", "--repo", repo],
+                    capture_output=True,
+                )
+                raise
             is_latest = self._check_is_latest(commit, repo)
         except ArtifactError:
             raise

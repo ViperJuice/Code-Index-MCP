@@ -242,19 +242,20 @@ def test_sandboxed_plugin_language_cached():
 # ---------------------------------------------------------------------------
 
 
-def test_plugin_factory_sandbox_off_by_default():
-    """Default behavior must be byte-for-byte unchanged when caps not passed."""
+def test_plugin_factory_sandbox_on_by_default():
+    """Default behavior is sandbox-on after SL-5 flip. DISABLE=1 is required to turn it off."""
     from mcp_server.plugins.plugin_factory import PluginFactory
 
     # Clear any stray env that a parallel test might have set.
-    prev = os.environ.pop("MCP_PLUGIN_SANDBOX_ENABLED", None)
+    os.environ.pop("MCP_PLUGIN_SANDBOX_ENABLED", None)
+    os.environ.pop("MCP_PLUGIN_SANDBOX_DISABLE", None)
     try:
         p = PluginFactory.create_plugin("python")
-        # Direct path returns PythonPlugin, not SandboxedPlugin.
-        assert type(p).__name__ != "SandboxedPlugin"
+        # SL-5: default-on means no-cap path still returns SandboxedPlugin.
+        assert type(p).__name__ == "SandboxedPlugin"
     finally:
-        if prev is not None:
-            os.environ["MCP_PLUGIN_SANDBOX_ENABLED"] = prev
+        if hasattr(p, "close"):
+            p.close()
 
 
 def test_plugin_factory_sandbox_opt_in_via_capabilities():

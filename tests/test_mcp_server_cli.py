@@ -18,7 +18,7 @@ import pytest
 # Module loading helpers
 # ---------------------------------------------------------------------------
 
-CLI_PATH = Path(__file__).parent.parent / "scripts" / "cli" / "mcp_server_cli.py"
+CLI_PATH = Path(__file__).parent.parent / "mcp_server" / "cli" / "stdio_runner.py"
 
 
 def _load_cli_module():
@@ -457,6 +457,7 @@ class TestFreshRepoEndToEnd:
         monkeypatch.chdir(tmp_path)
         monkeypatch.setenv("MCP_AUTO_INDEX", "true")
         monkeypatch.setenv("MCP_USE_SIMPLE_DISPATCHER", "false")
+        monkeypatch.setenv("MCP_PLUGIN_SANDBOX_DISABLE", "1")
 
         cli = _load_cli_module()
         _reset_globals(cli)

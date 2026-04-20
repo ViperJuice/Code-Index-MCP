@@ -2,16 +2,76 @@
 
 from __future__ import annotations
 
+import email.utils
 import json
 import subprocess
 import time
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import List, Mapping, Tuple
+from typing import List, Mapping, Optional, Tuple
 
+from mcp_server.core.errors import TerminalArtifactError, TransientArtifactError
+
+from mcp_server.core.errors import TerminalArtifactError
 from .base import ArtifactRecord
 
+try:
+    from mcp_server.metrics.prometheus_exporter import (
+        mcp_rate_limit_sleeps_total,
+        mcp_artifact_errors_by_class_total,
+    )
+except ImportError:
+    mcp_rate_limit_sleeps_total = None
+    mcp_artifact_errors_by_class_total = None
 
-def _respect_rate_limit(headers: Mapping[str, str]) -> float:
+
+def _parse_retry_after(value: str) -> float:
+    """Parse a Retry-After header value (integer seconds or HTTP-date) → seconds."""
+    try:
+        return float(int(value))
+    except ValueError:
+        pass
+    try:
+        dt = email.utils.parsedate_to_datetime(value)
+        delay = dt.timestamp() - time.time()
+        return max(0.0, delay)
+    except Exception:
+        return 60.0
+
+
+def _respect_rate_limit(headers: Mapping[str, str], status_code: int = 200) -> float:
+    """Inspect status_code + headers and apply appropriate backoff.
+
+    - 403: raise TerminalArtifactError (forbidden / missing scope)
+    - 429: parse Retry-After, sleep (capped at 300s), increment rate-limit counter
+    - 200 with low X-RateLimit-Remaining: legacy backoff via reset timestamp
+    """
+    if status_code == 403:
+        if mcp_artifact_errors_by_class_total is not None:
+            try:
+                mcp_artifact_errors_by_class_total.labels(
+                    error_class="TerminalArtifactError"
+                ).inc()
+            except Exception:
+                pass
+        raise TerminalArtifactError("forbidden / missing scope (HTTP 403)")
+
+    if status_code == 429:
+        retry_after = headers.get("Retry-After")
+        if retry_after:
+            sleep_s = min(_parse_retry_after(retry_after), 300.0)
+        else:
+            sleep_s = min(60.0, 300.0)
+        time.sleep(sleep_s)
+        if mcp_rate_limit_sleeps_total is not None:
+            try:
+                mcp_rate_limit_sleeps_total.inc()
+            except Exception:
+                pass
+        return sleep_s
+
+    # Legacy path: low X-RateLimit-Remaining on 2xx responses
     remaining = int(headers.get("X-RateLimit-Remaining", "5000"))
     if remaining < 100:
         reset = int(headers.get("X-RateLimit-Reset", str(int(time.time()) + 60)))
@@ -35,11 +95,19 @@ def _gh_api(gh_cmd: str, path: str, *extra: str) -> Tuple[Mapping[str, str], str
         # Fallback: some platforms use \n\n
         header_block, _, body = result.stdout.partition("\n\n")
     headers: dict[str, str] = {}
-    for line in header_block.splitlines()[1:]:
+    status_code = 200
+    lines = header_block.splitlines()
+    if lines:
+        status_line = lines[0]
+        # Parse "HTTP/1.1 NNN Reason"
+        parts = status_line.split(" ", 2)
+        if len(parts) >= 2 and parts[1].isdigit():
+            status_code = int(parts[1])
+    for line in lines[1:]:
         if ": " in line:
             k, v = line.split(": ", 1)
             headers[k] = v
-    _respect_rate_limit(headers)
+    _respect_rate_limit(headers, status_code=status_code)
     return headers, body
 
 
@@ -112,3 +180,129 @@ class GitHubActionsArtifactProvider:
             return True
         except subprocess.CalledProcessError:
             return False
+
+
+# ---------------------------------------------------------------------------
+# SL-3: Retention janitor — EOF append region
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ReleaseRef:
+    tag_name: str
+    created_at: str  # ISO-8601
+    is_latest: bool
+    is_draft: bool
+
+
+_PROTECTED_TAGS = frozenset({"index-latest"})
+
+
+def delete_releases_older_than(
+    repo: str,
+    *,
+    older_than_days: Optional[int] = None,
+    keep_latest_n: Optional[int] = None,
+    dry_run: bool = False,
+) -> list[ReleaseRef]:
+    """Delete (or list, if dry_run) releases matching retention criteria.
+
+    Protection order:
+      1. isLatest=True releases and tags in _PROTECTED_TAGS are never deleted.
+      2. Age filter: drop releases created more than older_than_days ago.
+      3. Keep-latest-N: from remaining candidates, preserve the newest N.
+    Returns the set of deleted (or candidate-if-dry_run) releases.
+    Raises TerminalArtifactError on 403, TransientArtifactError on 429.
+    """
+    if older_than_days is None and keep_latest_n is None:
+        return []
+
+    result = subprocess.run(
+        [
+            "gh",
+            "release",
+            "list",
+            "--repo",
+            repo,
+            "--json",
+            "tagName,createdAt,isLatest,isDraft",
+            "--limit",
+            "1000",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        stderr = result.stderr or ""
+        if "403" in stderr:
+            raise TerminalArtifactError(f"gh release list failed (403): {stderr}")
+        if "429" in stderr:
+            raise TransientArtifactError(f"gh release list rate-limited (429): {stderr}")
+        raise RuntimeError(f"gh release list failed: {stderr}")
+
+    releases_raw: list[dict] = json.loads(result.stdout)
+
+    all_refs = [
+        ReleaseRef(
+            tag_name=r["tagName"],
+            created_at=r["createdAt"],
+            is_latest=r["isLatest"],
+            is_draft=r["isDraft"],
+        )
+        for r in releases_raw
+    ]
+
+    # Step 1: Remove protected releases (pointers + isLatest)
+    candidates = [
+        ref
+        for ref in all_refs
+        if not ref.is_latest and ref.tag_name not in _PROTECTED_TAGS
+    ]
+
+    # Step 2: Age filter
+    if older_than_days is not None:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=older_than_days)
+        candidates = [
+            ref
+            for ref in candidates
+            if datetime.fromisoformat(ref.created_at.replace("Z", "+00:00")) < cutoff
+        ]
+
+    # Step 3: Keep-latest-N (sorted newest-first; protect the newest N)
+    if keep_latest_n is not None and keep_latest_n > 0:
+        # Sort all non-protected refs by date descending to determine "newest N"
+        non_protected = sorted(
+            [ref for ref in all_refs if not ref.is_latest and ref.tag_name not in _PROTECTED_TAGS],
+            key=lambda r: r.created_at,
+            reverse=True,
+        )
+        protected_by_count = {ref.tag_name for ref in non_protected[:keep_latest_n]}
+        candidates = [ref for ref in candidates if ref.tag_name not in protected_by_count]
+
+    if dry_run:
+        return candidates
+
+    deleted: list[ReleaseRef] = []
+    for ref in candidates:
+        del_result = subprocess.run(
+            ["gh", "release", "delete", ref.tag_name, "--repo", repo, "--yes"],
+            capture_output=True,
+            text=True,
+        )
+        if del_result.returncode != 0:
+            stderr = del_result.stderr or ""
+            if "403" in stderr:
+                raise TerminalArtifactError(
+                    f"gh release delete {ref.tag_name} failed (403): {stderr}"
+                )
+            if "429" in stderr:
+                _respect_rate_limit(
+                    {"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": str(int(time.time()) + 60)}
+                )
+                raise TransientArtifactError(
+                    f"gh release delete {ref.tag_name} rate-limited (429): {stderr}"
+                )
+            raise RuntimeError(f"gh release delete {ref.tag_name} failed: {stderr}")
+        deleted.append(ref)
+
+    return deleted

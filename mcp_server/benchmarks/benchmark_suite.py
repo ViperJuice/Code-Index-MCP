@@ -128,6 +128,10 @@ class BenchmarkSuite(IIndexPerformanceMonitor, IPerformanceMonitor):
         self.db_path = db_path or Path(tempfile.mktemp(suffix=".db"))
         self.store = SQLiteStore(self.db_path)
         self._ctx = self._make_ctx()
+        # Pre-seed the plugin registry with mock plugins so lookup/search bypass real plugin loading
+        self._dispatcher_plugin_registry = getattr(self.dispatcher, "_plugin_set_registry", None)
+        if self._dispatcher_plugin_registry is not None:
+            self._dispatcher_plugin_registry._cache["benchmark-repo"] = list(plugins)
 
         self._process = psutil.Process(os.getpid())
 

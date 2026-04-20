@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import logging
 import os
@@ -28,6 +29,19 @@ class Attestation:
     signed_at: datetime
 
 
+def _check_attestation_scope(gh_cmd: str = "gh") -> bool:
+    """Return True iff gh auth reports attestations:write scope."""
+    result = subprocess.run(
+        [gh_cmd, "auth", "status", "--show-token"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return False
+    combined = result.stdout + result.stderr
+    return "attestations:write" in combined
+
+
 def _sha256_of(path: Path) -> str:
     sha256 = hashlib.sha256()
     with path.open("rb") as fh:
@@ -48,6 +62,17 @@ def attest(artifact_path: Path, *, repo: str, gh_cmd: str = "gh") -> Attestation
             bundle_url="",
             bundle_path=Path(""),
             subject_digest="",
+            signed_at=datetime.now(timezone.utc),
+        )
+    if not _check_attestation_scope(gh_cmd):
+        msg = "ATTESTATION_PREREQ: gh token missing attestations:write scope"
+        logger.warning(msg)
+        if mode == "enforce":
+            raise AttestationError(msg)
+        return Attestation(
+            bundle_url="",
+            bundle_path=Path(""),
+            subject_digest=_sha256_of(artifact_path),
             signed_at=datetime.now(timezone.utc),
         )
     sidecar = artifact_path.with_suffix(artifact_path.suffix + ".attestation.jsonl")
@@ -100,3 +125,26 @@ def verify_attestation(
         if mode == "enforce":
             raise AttestationError(msg)
         logger.warning(msg)
+
+
+@functools.lru_cache(maxsize=None)
+def probe_gh_attestation_support() -> bool:
+    """Return True iff `gh attestation --help` exits 0. Cached per process."""
+    try:
+        result = subprocess.run(
+            ["gh", "attestation", "--help"],
+            capture_output=True,
+            timeout=5,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def warn_if_gh_attestation_missing() -> None:
+    """Log a WARNING if gh attestation is unavailable and mode is enforce."""
+    if not probe_gh_attestation_support() and os.environ.get("MCP_ATTESTATION_MODE") == "enforce":
+        logger.warning(
+            "ATTESTATION_PREREQ: gh attestation subcommand unavailable;"
+            " attestation will degrade per MCP_ATTESTATION_MODE"
+        )

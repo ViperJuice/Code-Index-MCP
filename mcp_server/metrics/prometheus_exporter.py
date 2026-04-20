@@ -4,7 +4,7 @@ Provides detailed metrics for monitoring and alerting.
 """
 
 import logging
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional
 
 try:
     from prometheus_client import (  # type: ignore
@@ -75,6 +75,19 @@ mcp_watcher_sweep_errors_total = Counter(
 mcp_storage_readonly_total = Counter(
     "mcp_storage_readonly_total",
     "Count of SQLite stores that transitioned to read-only mode due to ENOSPC.",
+)
+
+
+mcp_rate_limit_sleeps_total = Counter(
+    "mcp_rate_limit_sleeps_total",
+    "Count of rate-limit back-off sleeps injected by the dispatcher.",
+)
+
+
+mcp_artifact_errors_by_class_total = Counter(
+    "mcp_artifact_errors_by_class_total",
+    "Count of artifact processing errors, labelled by error class.",
+    ["error_class"],
 )
 
 
