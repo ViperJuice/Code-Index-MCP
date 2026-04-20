@@ -568,3 +568,13 @@ def measure_time(test_name: str, benchmark_results: dict):
     if test_name not in benchmark_results:
         benchmark_results[test_name] = []
     benchmark_results[test_name].append(elapsed)
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip requires_gh_auth tests unless RUN_GH_AUTHENTICATED_TESTS=1."""
+    if os.getenv("RUN_GH_AUTHENTICATED_TESTS") == "1":
+        return
+    skip_mark = pytest.mark.skip(reason="set RUN_GH_AUTHENTICATED_TESTS=1 to run")
+    for item in items:
+        if list(item.iter_markers(name="requires_gh_auth")):
+            item.add_marker(skip_mark)
