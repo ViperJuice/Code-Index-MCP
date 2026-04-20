@@ -6,21 +6,22 @@ close of each phase.
 
 ---
 
-## P18 residual snapshot (2026-04-19, post-SL-6)
+## P18 residual snapshot (2026-04-20, post-SL-6)
 
-**Total failures from `pytest -q --no-cov --ignore=tests/real_world`**: **5**
+**Total failures from `pytest -q --no-cov --ignore=tests/real_world`**: **4**
 
-> P18 SL-6 burned the P17 carry-over from 19 → 5 (74% reduction).
-> P17 clusters (`test_mcp_server_cli.py` 17 + `test_benchmarks.py` 2) are fully resolved.
-> The 5 remaining failures are pre-existing and unrelated to SL-6 scope.
+> P18 SL-6 burned the P17 carry-over from 19 → 4 (79% reduction).
+> P17 clusters (`test_mcp_server_cli.py` 17 + `test_benchmarks.py` 2) and
+> `SandboxedPlugin._ctx` contract are fully resolved.
+> The 4 remaining failures require a `gh` CLI token with `attestations:write` scope
+> (environment-dependent) and a P16-era vocabulary update; both are out of SL-6 scope.
 
 ### Remaining clusters
 
 | Cluster | Count | Root cause | Resolution path |
 |---|---|---|---|
-| `tests/security/test_artifact_attestation.py` | 3 | `SandboxedPlugin` lacks `_ctx` attribute; attestation tests require `bind(ctx)` post-construction. Pre-existing. | Fix `SandboxedPlugin` to set `_ctx` in `__init__` or `bind()`. |
-| `test_p16_vocabulary.py::test_validate_production_config_signature` | 1 | Production config signature mismatch; P16-era failure. | Update config signature or test expectation. |
-| `test_plugin_factory_async.py::test_create_plugin_async_returns_bound_plugin` | 1 | `SandboxedPlugin._ctx` missing; same root cause as attestation cluster. | Fix `SandboxedPlugin` to expose `_ctx`. |
+| `tests/security/test_artifact_attestation.py::TestAttest` | 3 | Requires `gh` CLI token with `attestations:write` scope. `attest()` raises `AttestationError: ATTESTATION_PREREQ` when token lacks this scope. Environment-dependent; not a code defect. | Either add `@pytest.mark.skipif` for missing scope, or provision a test token with the scope. |
+| `test_p16_vocabulary.py::test_validate_production_config_signature` | 1 | Production config signature mismatch; P16-era vocabulary test failure. | Update config signature or test expectation. |
 
 ### SL-6 resolved (P17 carry-overs)
 
