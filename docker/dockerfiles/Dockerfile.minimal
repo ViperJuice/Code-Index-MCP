@@ -15,17 +15,15 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /build
 
-# Copy core requirements file for minimal configuration
-COPY requirements-core.txt ./
-COPY mcp_server/__init__.py ./mcp_server/
+# Copy dependency metadata for minimal configuration
+COPY pyproject.toml uv.lock README.md ./
 
-# Install core dependencies only (no semantic search, no heavy ORMs)
-# Uses requirements-core.txt for maintainable dependency management
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements-core.txt
+# Install locked project dependencies
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel uv && \
+    uv sync --locked --no-install-project
 
 # Pre-compile tree-sitter grammars for all supported languages
-RUN python -c "import tree_sitter_languages; tree_sitter_languages.get_parser('python')"
+RUN .venv/bin/python -c "import tree_sitter_languages; tree_sitter_languages.get_parser('python')"
 
 # Final stage - minimal runtime
 FROM python:3.12-slim
@@ -43,11 +41,11 @@ RUN useradd -m -s /bin/bash -u 1000 mcp
 WORKDIR /app
 
 # Copy from builder
-COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+COPY --from=builder /build/.venv /app/.venv
 
 # Copy application code
 COPY --chown=mcp:mcp mcp_server/ ./mcp_server/
+COPY --chown=mcp:mcp pyproject.toml uv.lock README.md ./
 COPY --chown=mcp:mcp scripts/cli/mcp_server_cli.py ./
 COPY --chown=mcp:mcp scripts/cli/mcp_cli.py ./scripts/cli/
 COPY --chown=mcp:mcp mcp-index-kit/ ./mcp-index-kit/
@@ -57,7 +55,8 @@ RUN mkdir -p /app/data /app/logs /app/.mcp-index /workspace && \
     chown -R mcp:mcp /app /workspace
 
 # Set environment variables for minimal configuration
-ENV PYTHONPATH=/app \
+ENV PATH=/app/.venv/bin:$PATH \
+    PYTHONPATH=/app \
     MCP_WORKSPACE_ROOT=/workspace \
     DATABASE_URL=sqlite:////app/data/code_index.db \
     # Disable features that require external services

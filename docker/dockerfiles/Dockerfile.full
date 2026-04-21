@@ -13,21 +13,8 @@ RUN apt-get update && apt-get install -y \
     netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
-# Install production dependencies
-RUN pip install --no-cache-dir \
-    # Redis caching
-    redis>=4.5.0 \
-    hiredis>=2.2.0 \
-    # Production servers
-    gunicorn>=21.2.0 \
-    # Monitoring
-    prometheus-client>=0.19.0 \
-    # Database connection pooling
-    psycopg2-binary>=2.9.0 \
-    # Advanced logging
-    python-json-logger>=2.0.0 \
-    # Health checks
-    httpx>=0.25.0
+# Install locked production dependencies
+RUN uv sync --locked --extra production --extra semantic --no-install-project
 
 # Final stage
 FROM base

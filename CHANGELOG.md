@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-[Unreleased]: # placeholder for post-rc2 work
+[Unreleased]: # placeholder for post-rc3 work
+
+## [1.2.0-rc3] — 2026-04-21
+
+### Changed (P21 — release contract and dependency unification)
+- Unified the P21 release contract across runtime metadata, package metadata,
+  README status, changelog, and release automation around `1.2.0-rc3`.
+- Removed active workflow and Docker dependency references to retired
+  `requirements*.txt` inputs in favor of the locked `pyproject.toml`/`uv.lock`
+  dependency source.
+- Expanded release metadata and requirements-consolidation tests to guard the
+  P21 contract surfaces consumed by P22.
 
 ## [1.2.0-rc2] — 2026-04-20
 

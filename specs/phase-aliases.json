@@ -20,5 +20,11 @@
   "P17": "Phase 17 — Durability & Multi-Instance Safety",
   "P18": "Phase 18 — Enforcement, Artifact Resilience & Ops",
   "P19": "Phase 19 — Release Readiness",
-  "P20": "Phase 20 — Multi-Repo Validation & Staged Rollout"
+  "P20": "Phase 20 — Multi-Repo Validation & Staged Rollout",
+  "P21": "Phase 21 — Release Contract & Dependency Unification",
+  "P22": "Phase 22 — Packaging & Container Release Smoke",
+  "P23": "Phase 23 — Customer Docs Truth & Support Matrix",
+  "P24": "Phase 24 — Sandbox & Plugin Runtime Hardening",
+  "P25": "Phase 25 — Blocking Release Gates & Automation",
+  "P26": "Phase 26 — Private Alpha Evidence & Public Alpha Decision"
 }

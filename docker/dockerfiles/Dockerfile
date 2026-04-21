@@ -11,12 +11,13 @@ RUN apt-get update && apt-get install -y \
     libcurl4-openssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
-COPY requirements.txt .
-COPY pyproject.toml .
+# Copy dependency metadata first for better caching
+COPY pyproject.toml uv.lock README.md ./
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir uv && \
+    uv sync --locked --no-install-project
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Copy application code
 COPY mcp_server/ ./mcp_server/
@@ -25,7 +26,7 @@ COPY pytest.ini .
 COPY .coveragerc .
 
 # Install the package in development mode
-RUN pip install -e .
+RUN uv sync --locked
 
 # Create volume for code indexing
 VOLUME ["/code"]

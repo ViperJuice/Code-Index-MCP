@@ -79,10 +79,9 @@ jobs:
       - name: Install dependencies
         if: steps.check_index.outputs.found == 'false' && steps.download.outputs.downloaded == 'false'
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-semantic.txt
-          pip install -e .
+          python -m pip install --upgrade pip uv
+          uv sync --locked --extra semantic
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Build Index
         if: steps.check_index.outputs.found == 'false' && steps.download.outputs.downloaded == 'false'
@@ -292,9 +291,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-semantic.txt
-          pip install flashrank
+          python -m pip install --upgrade pip uv
+          uv sync --locked --extra semantic --extra rerank
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Download latest index
         id: download_index

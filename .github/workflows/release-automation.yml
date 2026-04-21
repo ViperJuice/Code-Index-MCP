@@ -4,8 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., v1.0.0)'
+        description: 'Version to release (e.g., v1.2.0-rc3)'
         required: true
+        default: 'v1.2.0-rc3'
         type: string
       release_type:
         description: 'Release type'
@@ -206,12 +207,13 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
-          pip install pytest pytest-cov
+          python -m pip install --upgrade pip uv
+          uv sync --locked --extra dev
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Run release smoke tests
         run: |
-          pytest \
+          uv run pytest \
             tests/test_artifact_commands.py \
             tests/test_artifact_integrity_gate.py \
             tests/test_artifact_recovery_selection.py \
@@ -223,7 +225,7 @@ jobs:
 
       - name: Run integration tests
         run: |
-          pytest tests/integration/ -v || echo "Integration tests not found"
+          uv run pytest tests/integration/ -v || echo "Integration tests not found"
 
       - name: Validate version consistency
         run: |
@@ -232,6 +234,9 @@ jobs:
           
           # Check pyproject.toml
           grep -q "version = \"$VERSION_NO_V\"" pyproject.toml || exit 1
+
+          # Check runtime package metadata
+          grep -q "__version__ = \"$VERSION_NO_V\"" mcp_server/__init__.py || exit 1
           
           echo "Version consistency check passed"
 
@@ -361,6 +366,8 @@ jobs:
           title: "Release ${{ needs.prepare-release.outputs.version }}"
           body: |
             ## Release ${{ needs.prepare-release.outputs.version }}
+
+            P21 release contract target: v1.2.0-rc3
             
             This PR contains all changes for release ${{ needs.prepare-release.outputs.version }}.
             

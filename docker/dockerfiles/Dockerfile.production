@@ -12,11 +12,12 @@ RUN apt-get update && apt-get install -y \
 # Create build directory
 WORKDIR /build
 
-# Copy requirements first for better caching
-COPY requirements-production.txt .
+# Copy dependency metadata first for better caching
+COPY pyproject.toml uv.lock README.md ./
 
 # Install Python dependencies
-RUN pip install --no-cache-dir --user -r requirements-production.txt
+RUN pip install --no-cache-dir uv && \
+    uv sync --locked --extra production --no-install-project
 
 # Production stage
 FROM python:3.12-slim as production
@@ -35,10 +36,10 @@ RUN groupadd -r mcp && useradd -r -g mcp -d /app -s /bin/bash mcp
 WORKDIR /app
 
 # Copy Python dependencies from builder
-COPY --from=builder /root/.local /home/mcp/.local
+COPY --from=builder /build/.venv /home/mcp/.venv
 
-# Make sure scripts in .local are usable
-ENV PATH=/home/mcp/.local/bin:$PATH
+# Make sure virtualenv scripts are usable
+ENV PATH=/home/mcp/.venv/bin:$PATH
 
 # Copy application code
 COPY mcp_server/ ./mcp_server/

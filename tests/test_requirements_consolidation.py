@@ -14,6 +14,17 @@ except ImportError:  # Python <3.11
 from pathlib import Path
 
 REPO = Path(__file__).parent.parent
+ACTIVE_WORKFLOW_GLOBS = (".github/workflows/*.yml", ".github/workflows/*.yaml")
+ACTIVE_DOCKERFILE_GLOBS = ("docker/dockerfiles/Dockerfile*",)
+STALE_DEPENDENCY_PATTERNS = (
+    "requirements.txt",
+    "requirements-production.txt",
+    "requirements-semantic.txt",
+    "requirements-core.txt",
+    "requirements*.txt",
+    "pip install -r",
+    "hashFiles('**/requirements*.txt')",
+)
 
 
 def test_no_requirements_txt_files():
@@ -43,6 +54,30 @@ def test_agents_md_no_stale_python_claim():
 
 def test_uv_lock_exists():
     assert (REPO / "uv.lock").exists(), "uv.lock does not exist"
+
+
+def test_active_workflows_do_not_reference_requirements_files():
+    stale = {}
+    for pattern in ACTIVE_WORKFLOW_GLOBS:
+        for path in REPO.glob(pattern):
+            text = path.read_text()
+            hits = [needle for needle in STALE_DEPENDENCY_PATTERNS if needle in text]
+            if hits:
+                stale[str(path.relative_to(REPO))] = hits
+
+    assert stale == {}, f"Active workflows reference removed requirements files: {stale}"
+
+
+def test_dockerfiles_do_not_reference_requirements_files():
+    stale = {}
+    for pattern in ACTIVE_DOCKERFILE_GLOBS:
+        for path in REPO.glob(pattern):
+            text = path.read_text()
+            hits = [needle for needle in STALE_DEPENDENCY_PATTERNS if needle in text]
+            if hits:
+                stale[str(path.relative_to(REPO))] = hits
+
+    assert stale == {}, f"Dockerfiles reference removed requirements files: {stale}"
 
 
 def test_tomllib_import_guard_present():

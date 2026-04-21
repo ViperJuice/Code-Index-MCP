@@ -5,7 +5,7 @@ Modular, extensible local-first code indexer designed to enhance Claude Code and
 > **Beta status**: Multi-repo support and the MCP STDIO interface are in beta. The MCP tool interface (`search_code`, `symbol_lookup`, and friends) is the primary surface for LLM-driven use; the FastAPI REST gateway is a secondary admin surface for diagnostics and manual operations. Expect API surface changes before stable release.
 
 ## Project Status
-**Version**: 1.0.0 (MVP, beta)
+**Version**: 1.2.0-rc3 (beta)
 **Primary surface**: MCP tools (`search_code`, `symbol_lookup`) via the STDIO runner — always use these first from an LLM
 **Secondary surface**: FastAPI admin REST gateway for diagnostics and scripting — see "Admin REST Interface (secondary)" below
 **Core features**: local indexing, symbol/text search, 48-language tree-sitter coverage

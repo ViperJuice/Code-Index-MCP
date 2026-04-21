@@ -5,18 +5,9 @@ FROM mcp-index:minimal as base
 # Switch to root for installation
 USER root
 
-# Install additional Python dependencies for semantic search
-RUN pip install --no-cache-dir \
-    # Semantic search dependencies
-    voyageai>=0.2.0 \
-    qdrant-client>=1.7.0 \
-    # Reranking dependencies
-    sentence-transformers>=2.0.0 \
-    # Enhanced processing
-    numpy>=1.24.0 \
-    # Artifact management
-    requests>=2.31.0 \
-    PyGithub>=2.1.0
+# Install additional locked Python dependencies for semantic search
+RUN pip install --no-cache-dir uv && \
+    uv sync --locked --extra semantic --extra rerank --no-install-project
 
 # Final stage
 FROM base

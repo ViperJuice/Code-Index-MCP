@@ -1,6 +1,6 @@
 [project]
 name = "index-it-mcp"
-version = "1.1.0"
+version = "1.2.0-rc3"
 description = "Local-first code indexer for AI assistants via Model Context Protocol (MCP)"
 readme = "README.md"
 license = {text = "MIT"}
@@ -125,10 +125,15 @@ dev = [
 ]
 production = [
     "redis>=5.0",
+    "hiredis>=2.2.0",
+    "gunicorn>=21.2.0",
+    "prometheus-client>=0.19.0",
     "asyncpg>=0.29",
+    "psycopg2-binary>=2.9.0",
     "sqlalchemy>=2.0",
     "alembic>=1.13",
     "PyJWT>=2.8",
+    "python-json-logger>=2.0.0",
 ]
 all = [
     "index-it-mcp[semantic,rerank,java,dev,production]",
