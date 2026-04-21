@@ -22,14 +22,21 @@ docker/
 
 ```bash
 # Basic search (no API keys required) - 2 minute setup
-docker run -it -v $(pwd):/workspace ghcr.io/code-index-mcp/mcp-index:minimal
+docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:latest
 
-# AI-powered search (requires Voyage AI key)
-docker run -it -v $(pwd):/workspace -e VOYAGE_API_KEY=your-key ghcr.io/code-index-mcp/mcp-index:standard
+# AI-powered search (requires Voyage AI key; lexical search is the image default)
+docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY=your-key ghcr.io/viperjuice/code-index-mcp:latest
 
 # Install helper script (recommended)
 curl -sSL https://raw.githubusercontent.com/Code-Index-MCP/main/scripts/install-mcp-docker.sh | bash
 mcp-index  # Now available as a command
+```
+
+### Release Smoke
+
+```bash
+make release-smoke
+make release-smoke-container
 ```
 
 ### Development Setup (All Features)

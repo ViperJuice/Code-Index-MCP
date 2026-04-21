@@ -2,13 +2,13 @@
 # PowerShell script to install and configure MCP Index with Docker
 
 param(
-    [string]$Variant = "minimal",
+    [string]$Variant = "latest",
     [string]$Version = "latest"
 )
 
 # Configuration
 $MCPRegistry = "ghcr.io"
-$MCPImage = "$MCPRegistry/code-index-mcp/mcp-index"
+$MCPImage = "$MCPRegistry/viperjuice/code-index-mcp"
 $ErrorActionPreference = "Stop"
 
 # Colors
@@ -80,40 +80,25 @@ function Install-Docker {
 function Select-Variant {
     Write-Host ""
     Write-Host "Choose MCP Index variant:"
-    Write-Host "1) minimal  - Zero configuration, BM25 search only (recommended for start)"
-    Write-Host "2) standard - AI-powered semantic search (requires Voyage AI key)"
-    Write-Host "3) full     - Production stack with monitoring"
+    Write-Host "1) latest      - Current production image (recommended)"
+    Write-Host "2) v1.2.0-rc3  - Release candidate image"
+    Write-Host "3) local-smoke - Local smoke image built by make release-smoke-container"
     Write-Host ""
     
     $choice = Read-Host "Select variant [1-3] (default: 1)"
     
     switch ($choice) {
         "2" {
-            $script:Variant = "standard"
-            Write-Host "[INFO] Selected: standard (semantic search)" -ForegroundColor Green
-            
-            # Check for API key
-            if (-not $env:VOYAGE_AI_API_KEY) {
-                Write-Host "[WARN] Semantic search requires a Voyage AI API key" -ForegroundColor Yellow
-                Write-Host "Get your free API key at: https://www.voyageai.com/"
-                Write-Host "Pricing: ~`$0.05 per 1M tokens (free tier: 50M tokens/month)"
-                Write-Host ""
-                
-                $apiKey = Read-Host "Enter your Voyage AI API key (or press Enter to skip)"
-                if ($apiKey) {
-                    [Environment]::SetEnvironmentVariable("VOYAGE_AI_API_KEY", $apiKey, "User")
-                    $env:VOYAGE_AI_API_KEY = $apiKey
-                    Write-Host "[INFO] API key saved to user environment" -ForegroundColor Green
-                }
-            }
+            $script:Variant = "v1.2.0-rc3"
+            Write-Host "[INFO] Selected: v1.2.0-rc3" -ForegroundColor Green
         }
         "3" {
-            $script:Variant = "full"
-            Write-Host "[INFO] Selected: full (production stack)" -ForegroundColor Green
+            $script:Variant = "local-smoke"
+            Write-Host "[INFO] Selected: local-smoke" -ForegroundColor Green
         }
         default {
-            $script:Variant = "minimal"
-            Write-Host "[INFO] Selected: minimal (zero configuration)" -ForegroundColor Green
+            $script:Variant = "latest"
+            Write-Host "[INFO] Selected: latest" -ForegroundColor Green
         }
     }
 }
@@ -130,9 +115,9 @@ function Create-Launcher {
 REM MCP Index Docker Launcher for Windows
 
 SET MCP_VARIANT=%MCP_VARIANT%
-IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=minimal
+IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=latest
 
-SET MCP_IMAGE=ghcr.io/code-index-mcp/mcp-index
+SET MCP_IMAGE=ghcr.io/viperjuice/code-index-mcp
 SET WORKSPACE=%CD%
 
 IF "%1"=="setup" (

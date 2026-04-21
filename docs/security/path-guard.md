@@ -1,5 +1,8 @@
 # Path Traversal Guard
 
+> **Beta status**: This page targets `1.2.0-rc3`. `MCP_ALLOWED_ROOTS` is the
+> current path boundary knob for MCP tools in beta multi-repo deployments.
+
 ## Overview
 
 The path traversal guard (SL-4) prevents search results from leaking paths outside of explicitly allowed repository roots. This document describes the guard's operation, configuration, and fallback behavior.

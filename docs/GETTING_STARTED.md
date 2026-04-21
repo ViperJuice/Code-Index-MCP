@@ -2,6 +2,10 @@
 
 This guide walks you through installing and using Code-Index-MCP to index and search your codebase.
 
+> **Beta status**: This guide targets `1.2.0-rc3`. MCP STDIO is the primary
+> LLM surface; FastAPI is a secondary admin surface. Language behavior is
+> documented in [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md).
+
 ## Prerequisites
 
 - Python 3.12 or higher
@@ -28,12 +32,11 @@ mcp-index --version
 git clone https://github.com/ViperJuice/Code-Index-MCP.git
 cd Code-Index-MCP
 
-# Create and activate virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Install locked project dependencies
+uv sync --locked
 
-# Install in editable mode
-pip install -e .
+# Verify the console script
+uv run mcp-index --version
 ```
 
 ## Quick Start
@@ -189,7 +192,7 @@ build/
 For AI-powered semantic search, install with semantic support:
 
 ```bash
-pip install index-it-mcp[semantic]
+uv sync --locked --extra semantic
 ```
 
 Then configure Voyage AI:

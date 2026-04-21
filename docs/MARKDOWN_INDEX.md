@@ -5,6 +5,13 @@ Generated: 2025-01-30
 
 This index provides a complete catalog of all markdown documentation in the Code-Index-MCP project, organized by purpose, context (AI Agent vs Human), and content type.
 
+> **P23 navigation note**: Current customer-facing truth starts with
+> `README.md`, `docs/GETTING_STARTED.md`, `docs/DOCKER_GUIDE.md`,
+> `docs/MCP_CONFIGURATION.md`, and `docs/SUPPORT_MATRIX.md`. Historical
+> implementation, status, and validation reports are tracked in
+> `docs/HISTORICAL-ARTIFACTS-TRIAGE.md` and should not be cited as current
+> release truth.
+
 ### Summary Statistics
 - **Total Markdown Files**: 70 (including new index files)
 - **AI Agent Context Files**: 20 (CLAUDE.md, AGENTS.md, and index files)

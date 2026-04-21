@@ -7,7 +7,7 @@ This file defines the capabilities and constraints for AI agents working with th
 ### What's Actually Working (FULLY OPERATIONAL)
 - ✅ **FastAPI Gateway**: Complete endpoints `/symbol`, `/search`, `/status`, `/plugins`, `/reindex`
 - ✅ **Enhanced Dispatcher**: Caching, routing, error handling, auto-initialization
-- ✅ **Plugin Framework**: 48 languages via GenericTreeSitterPlugin + specialized plugins
+- ✅ **Plugin Framework**: Specialized plugins plus generic registry coverage; see `../docs/SUPPORT_MATRIX.md`
 - ✅ **Specialized Plugins**: Python, C, C++, JavaScript, Dart, HTML/CSS with semantic support
 - ✅ **Storage Layer**: SQLite + FTS5 search, optional Qdrant vector database
 - ✅ **File Watcher**: Real-time monitoring with automatic re-indexing (Watchdog integrated)
@@ -34,7 +34,9 @@ This file defines the capabilities and constraints for AI agents working with th
 - ~~Handle file watching~~ (NOT CONNECTED to indexing)
 
 ### Language Plugins Overview
-This directory contains language-specific plugins for the code indexing system. Currently, only the Python plugin has a working implementation. All other plugins are placeholders that need to be implemented.
+This directory contains language-specific plugins for the code indexing system.
+The current support contract is documented in `../docs/SUPPORT_MATRIX.md`;
+do not treat every registry language as equivalent under default sandbox mode.
 
 #### Plugin Implementation Status
 - ✅ **Python Plugin**: FULLY IMPLEMENTED
@@ -186,8 +188,8 @@ mcp_server/plugins/{language}_plugin/
 # Python Setup
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-pip install -e .
+uv sync --locked
+uv run mcp-index --version
 
 # FastAPI Development
 # Auto-reload enabled by default in uvicorn command

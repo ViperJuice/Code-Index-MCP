@@ -14,7 +14,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: viperjuice/code-index-mcp
+  IMAGE_REF: ghcr.io/viperjuice/code-index-mcp
 
 jobs:
   build-and-push:
@@ -59,7 +60,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.IMAGE_REF }}
           tags: |
             # Branch events
             type=ref,event=branch
@@ -88,6 +89,18 @@ jobs:
           PLATFORM: ${{ matrix.platform }}
         run: echo "PLATFORM_SAFE=${PLATFORM//\//-}" >> $GITHUB_ENV
 
+      - name: Set up Python for smoke harness
+        if: matrix.platform == 'linux/amd64'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install smoke harness dependencies
+        if: matrix.platform == 'linux/amd64'
+        run: |
+          python -m pip install --upgrade pip uv
+          uv sync --locked --extra dev
+
       - name: Build container image
         uses: docker/build-push-action@v5
         with:
@@ -104,6 +117,10 @@ jobs:
             BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
             VCS_REF=${{ github.sha }}
             VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+
+      - name: Run production container smoke
+        if: matrix.platform == 'linux/amd64'
+        run: make release-smoke-container
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -205,7 +222,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.IMAGE_REF }}
           tags: |
             type=ref,event=branch
             type=ref,event=tag
@@ -216,23 +233,21 @@ jobs:
 
       - name: Load, retag, and push platform images
         run: |
-          IMAGE_LOWER="${IMAGE_NAME,,}"
           for arch in amd64 arm64; do
             platform_safe="linux-${arch}"
             LOADED=$(docker load --input /tmp/artifacts/image-${platform_safe}/image-${platform_safe}.tar 2>&1 \
               | grep "Loaded image" | head -1 | sed 's/Loaded image: //' | tr -d '[:space:]')
-            docker tag "$LOADED" "${REGISTRY}/${IMAGE_LOWER}:${arch}"
-            docker push "${REGISTRY}/${IMAGE_LOWER}:${arch}"
+            docker tag "$LOADED" "${REGISTRY}/${IMAGE_NAME}:${arch}"
+            docker push "${REGISTRY}/${IMAGE_NAME}:${arch}"
           done
 
       - name: Create and push manifest with imagetools
         run: |
-          IMAGE_LOWER="${IMAGE_NAME,,}"
           echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
             if [ -n "$tag" ]; then
               docker buildx imagetools create -t "$tag" \
-                "${REGISTRY}/${IMAGE_LOWER}:amd64" \
-                "${REGISTRY}/${IMAGE_LOWER}:arm64"
+                "${REGISTRY}/${IMAGE_NAME}:amd64" \
+                "${REGISTRY}/${IMAGE_NAME}:arm64"
             fi
           done
 

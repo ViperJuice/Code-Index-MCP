@@ -212,16 +212,7 @@ jobs:
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Run release smoke tests
-        run: |
-          uv run pytest \
-            tests/test_artifact_commands.py \
-            tests/test_artifact_integrity_gate.py \
-            tests/test_artifact_recovery_selection.py \
-            tests/test_chunker_adapter.py \
-            tests/test_semantic_profile_settings.py \
-            tests/test_incremental_indexer.py \
-            tests/test_watcher.py \
-            -v --no-cov
+        run: make release-smoke
 
       - name: Run integration tests
         run: |
@@ -257,8 +248,9 @@ jobs:
 
       - name: Build Python package
         run: |
-          pip install build wheel
-          python -m build
+          python -m pip install --upgrade pip uv
+          uv sync --locked --extra dev
+          uv build
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

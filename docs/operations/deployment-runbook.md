@@ -1,8 +1,13 @@
-# Deployment Runbook (v1.2.0)
+# Deployment Runbook (1.2.0-rc3 beta)
 
 ## Overview
 
-This runbook is the operator's playbook for the Code-Index-MCP v1.2.0 staged rollout.
+This runbook is the operator's playbook for the Code-Index-MCP `1.2.0-rc3`
+beta release candidate. It is a staged rollout guide, not a GA production
+claim. The documented container package is `ghcr.io/viperjuice/code-index-mcp`.
+Language and sandbox limitations are tracked in
+[`../SUPPORT_MATRIX.md`](../SUPPORT_MATRIX.md).
+
 It covers four stages — **dev → staging → canary → full-prod** — each with measurable
 pass criteria, a bake window, rollback triggers, and a rollback procedure.
 
@@ -93,7 +98,7 @@ Any single pass criterion breached for **> 2 consecutive 1-minute windows**.
 
 ```bash
 # Delete the RC tag and roll back the Kubernetes deployment
-git tag --delete v1.2.0-rc2
+git tag --delete v1.2.0-rc3
 kubectl rollout undo deploy/mcp-gateway -n staging
 
 # Confirm rollback is live

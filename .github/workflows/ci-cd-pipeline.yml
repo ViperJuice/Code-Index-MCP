@@ -25,7 +25,8 @@ env:
   PYTHON_VERSION: '3.12'
   NODE_VERSION: '18'
   DOCKER_REGISTRY: ghcr.io
-  DOCKER_IMAGE_NAME: ${{ github.repository }}
+  DOCKER_IMAGE_NAME: viperjuice/code-index-mcp
+  DOCKER_IMAGE_REF: ghcr.io/viperjuice/code-index-mcp
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
@@ -128,6 +129,9 @@ jobs:
             -n auto \
             --timeout=60 \
             --benchmark-skip
+
+      - name: Run release smoke
+        run: make release-smoke
 
   # Cross-platform smoke tests (informational, non-blocking)
   test-cross-platform:
@@ -394,7 +398,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}
+          images: ${{ env.DOCKER_IMAGE_REF }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr

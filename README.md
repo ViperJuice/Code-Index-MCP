@@ -8,7 +8,7 @@ Modular, extensible local-first code indexer designed to enhance Claude Code and
 **Version**: 1.2.0-rc3 (beta)
 **Primary surface**: MCP tools (`search_code`, `symbol_lookup`) via the STDIO runner — always use these first from an LLM
 **Secondary surface**: FastAPI admin REST gateway for diagnostics and scripting — see "Admin REST Interface (secondary)" below
-**Core features**: local indexing, symbol/text search, 48-language tree-sitter coverage
+**Core features**: local indexing, symbol/text search, registry-based language coverage; see [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md)
 **Optional features**: semantic search (requires Voyage AI or a local vLLM endpoint), GitHub Artifacts index sync
 **Performance**: sub-100ms symbol lookup and sub-500ms search on indexed repos (benchmarked on this codebase; results vary by repo size and language mix)
 
@@ -19,7 +19,7 @@ Modular, extensible local-first code indexer designed to enhance Claude Code and
 - **🚀 Local-First Architecture**: All indexing happens locally for speed and privacy
 - **📂 Local Index Storage**: All indexes stored at `.indexes/` (relative to MCP server)
 - **🔌 Plugin-Based Design**: Easily extensible with language-specific plugins
-- **🔍 48-Language Support**: Complete tree-sitter integration with semantic search
+- **🔍 Language support**: Specialized plugins plus generic registry coverage documented in [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md)
 - **⚡ Real-Time Updates**: File system monitoring for instant index updates
 - **🧠 Semantic Search**: AI-powered code search with Voyage AI embeddings
 - **📊 Rich Code Intelligence**: Symbol resolution, type inference, dependency tracking
@@ -99,35 +99,11 @@ Key directories:
 
 ## 🛠️ Language Support
 
-### Extensive Language Coverage (46+ Tree-sitter Grammars)
-
-**Core language features:**
-- **Dynamic Plugin Loading**: Languages are loaded on-demand for optimal performance
-- **Tree-sitter Parsing**: Accurate AST-based symbol extraction with language-specific queries
-- **Query Caching**: Improved performance with cached tree-sitter queries
-- **Semantic Search**: Optional AI-powered code search (when Qdrant is available)
-- **Cross-Language Search**: Find symbols and patterns across all supported languages
-
-**Language Categories:**
-
-| Category | Languages | Features |
-|----------|-----------|----------|
-| **Dedicated Plugins** | Python, JavaScript, TypeScript, C, C++, Dart, HTML/CSS | Enhanced analysis, framework support |
-| **Systems Languages** | Go, Rust, C, C++, Zig, Nim, D, V | Memory safety, performance analysis |
-| **JVM Languages** | Java, Kotlin, Scala, Clojure | Package analysis, build tool integration |
-| **Web Technologies** | JavaScript, TypeScript, HTML, CSS, SCSS, PHP | Framework detection, bundler support |
-| **Scripting Languages** | Python, Ruby, Perl, Lua, R, Julia | Dynamic typing, REPL integration |
-| **Functional Languages** | Haskell, Elixir, Erlang, F#, OCaml | Pattern matching, type inference |
-| **Mobile Development** | Swift, Kotlin, Dart, Objective-C | Platform-specific APIs |
-| **Infrastructure** | Dockerfile, Bash, PowerShell, Makefile, CMake | Build automation, CI/CD |
-| **Data Formats** | JSON, YAML, TOML, XML, GraphQL, SQL | Schema validation, query optimization |
-| **Documentation** | Markdown, LaTeX, reStructuredText | Cross-references, formatting |
-
-**Beta: multi-repo support and the MCP STDIO interface are in active development.** All listed languages are supported via the enhanced dispatcher with:
-- ✅ Dynamic plugin loading (lazy initialization)
-- ✅ Robust error handling and fallback mechanisms
-- ✅ Path resolution for complex project structures
-- ✅ Graceful degradation when external services unavailable
+The current beta support contract is centralized in [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md).
+It distinguishes specialized plugins, generic Tree-sitter registry coverage,
+default sandbox support, optional extras, semantic/rerank setup, and known
+alpha limitations. Do not assume every registry language has the same symbol
+quality or default sandbox behavior.
 
 ## 🚀 Quick Start
 
@@ -150,7 +126,7 @@ This automatically detects your environment and creates the appropriate `.mcp.js
 curl -sSL https://raw.githubusercontent.com/ViperJuice/Code-Index-MCP/main/scripts/install-mcp-docker.sh | bash
 
 # Index your current directory
-docker run -it -v $(pwd):/workspace ghcr.io/code-index-mcp/mcp-index:minimal
+docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:latest
 ```
 
 #### Option 2: AI-Powered Search
@@ -158,8 +134,8 @@ docker run -it -v $(pwd):/workspace ghcr.io/code-index-mcp/mcp-index:minimal
 # Set your API key (get one at https://www.voyageai.com — free tier available)
 export VOYAGE_API_KEY=your-key
 
-# Run with semantic search
-docker run -it -v $(pwd):/workspace -e VOYAGE_API_KEY ghcr.io/code-index-mcp/mcp-index:standard
+# Run with semantic search enabled explicitly
+docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY ghcr.io/viperjuice/code-index-mcp:latest
 ```
 
 ### 💻 Environment-Specific Setup
@@ -170,7 +146,7 @@ docker run -it -v $(pwd):/workspace -e VOYAGE_API_KEY ghcr.io/code-index-mcp/mcp
 .\scripts\setup-mcp-json.ps1
 
 # Or manually with Docker Desktop
-docker run -it -v ${PWD}:/workspace ghcr.io/code-index-mcp/mcp-index:minimal
+docker run -it -v ${PWD}:/workspace ghcr.io/viperjuice/code-index-mcp:latest
 ```
 
 #### 🍎 macOS
@@ -198,7 +174,7 @@ curl -fsSL https://get.docker.com | sh
 
 # Without Docker Desktop
 cp .mcp.json.templates/native.json .mcp.json
-pip install -e .
+uv sync --locked
 ```
 
 #### 📦 Nested Containers (Dev Containers)
@@ -222,7 +198,7 @@ The setup script creates the appropriate `.mcp.json` for your environment. Manua
   "mcpServers": {
     "code-index-native": {
       "command": "python",
-      "args": ["scripts/cli/mcp_server_cli.py"],
+      "args": ["-m", "mcp_server.cli.stdio_runner"],
       "cwd": "${workspace}"
     }
   }
@@ -238,11 +214,18 @@ The setup script creates the appropriate `.mcp.json` for your environment. Manua
       "args": [
         "run", "-i", "--rm",
         "-v", "${workspace}:/workspace",
-        "ghcr.io/code-index-mcp/mcp-index:minimal"
+        "ghcr.io/viperjuice/code-index-mcp:latest"
       ]
     }
   }
 }
+```
+
+### Release Smoke
+
+```bash
+make release-smoke
+make release-smoke-container
 ```
 
 ## Using Against Many Repos
@@ -305,14 +288,13 @@ docker run -p 8000:8000 vllm/vllm-openai --model Qwen/Qwen3-Embedding-8B
 
 Both profiles and their collection names are defined in `code-index-mcp.profiles.yaml` and can be customized.
 
-### 💰 Costs & Features
-| Feature | Minimal | Standard | Full | Cost |
-|---------|---------|----------|------|------|
-| Code Search | ✅ | ✅ | ✅ | Free |
-| 48 Languages | ✅ | ✅ | ✅ | Free |
-| Semantic Search | ❌ | ✅ | ✅ | ~$0.05/1M tokens |
-| GitHub Sync | ❌ | ✅ | ✅ | Free |
-| Monitoring | ❌ | ❌ | ✅ | Free |
+### Costs & Optional Features
+
+The documented container package is `ghcr.io/viperjuice/code-index-mcp`.
+BM25 code search works without provider credentials. Semantic search, reranking,
+artifact sync, and monitoring depend on extras, environment variables, and
+service configuration. See [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md)
+for language/runtime support details.
 
 ## 🚀 Quickstart (Python)
 
@@ -337,12 +319,8 @@ pip install index-it-mcp[dev]
 git clone https://github.com/ViperJuice/Code-Index-MCP.git
 cd Code-Index-MCP
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install in editable mode
-pip install -e .
+# Install locked project dependencies
+uv sync --locked
 ```
 
 ### Quick Start After Installation
@@ -1121,10 +1099,10 @@ Maintainers can create new releases with pre-built indexes:
 
 ```bash
 # Create a new release (as draft)
-python scripts/create-release.py --version 1.0.0
+python scripts/create-release.py --version 1.2.0-rc3
 
 # Create and publish immediately
-python scripts/create-release.py --version 1.0.0 --publish
+python scripts/create-release.py --version 1.2.0-rc3 --publish
 ```
 
 ### Automatic Index Synchronization
@@ -1185,7 +1163,7 @@ The system follows C4 model architecture patterns:
 - **Workspace Definition**: defined in `architecture/workspace.dsl` and validated with Structurizr CLI
 - **System Context (L1)**: Claude Code integrates via MCP sub-agents against the STDIO primary surface
 - **Container Level (L2)**: 8 main containers including enhanced MCP server and user documentation
-- **Component Level (L3)**: Plugin system with 48 languages, memory management, and cross-repo coordination
+- **Component Level (L3)**: Plugin system, memory management, and cross-repo coordination
 - **Code Level (L4)**: 43 PlantUML diagrams documenting all system components and flows
 
 For detailed architectural documentation, see the [architecture/](architecture/) directory.
@@ -1194,9 +1172,9 @@ For detailed architectural documentation, see the [architecture/](architecture/)
 
 See [ROADMAP.md](ROADMAP.md) for detailed development plans and current progress.
 
-**Current Status**: v1.0.0 MVP Release
+**Current Status**: 1.2.0-rc3 beta release candidate
 - ✅ **Core Indexing**: SQLite + FTS5 for fast local search
-- ✅ **Multi-Language**: 48 languages via tree-sitter integration
+- ✅ **Multi-Language**: Specialized and registry-backed language coverage; see `docs/SUPPORT_MATRIX.md`
 - ✅ **MCP Protocol**: Full compatibility with Claude Code and other MCP clients
 - ✅ **Performance**: Sub-100ms queries with BM25 optimization
 - 🔄 **Index Sync**: Beta support via GitHub Artifacts

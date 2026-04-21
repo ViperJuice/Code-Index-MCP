@@ -1,4 +1,4 @@
-.PHONY: help install test test-unit test-integration test-all test-parallel test-interfaces test-plugins test-performance test-resilience lint format clean coverage benchmark security docker
+.PHONY: help install test test-unit test-integration test-all test-parallel test-interfaces test-plugins test-performance test-resilience lint format clean coverage benchmark security docker release-smoke release-smoke-container
 .PHONY: docker-up docker-down docker-dev docker-prod docker-test docker-logs docker-health
 .PHONY: test-dormant test-real-world test-semantic test-redis test-advanced test-cross-lang
 .PHONY: setup-env setup-dev-env setup-prod-env backup restore clean-docker check-diagrams
@@ -23,6 +23,8 @@ help:
 	@echo "  coverage        Generate coverage report"
 	@echo "  benchmark       Run performance benchmarks"
 	@echo "  security        Run security checks"
+	@echo "  release-smoke   Run wheel and lexical MCP release smoke"
+	@echo "  release-smoke-container Run production container release smoke"
 	@echo ""
 	@echo "🐳 Docker Operations:"
 	@echo "  docker          Build Docker image"
@@ -139,6 +141,12 @@ security:
 
 docker:
 	docker build -t mcp-server:latest .
+
+release-smoke:
+	uv run --extra dev python scripts/release_smoke.py --wheel --stdio
+
+release-smoke-container:
+	uv run --extra dev python scripts/release_smoke.py --container
 
 # Docker operations
 docker-up:

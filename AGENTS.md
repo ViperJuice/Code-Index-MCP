@@ -7,6 +7,8 @@ This file defines the capabilities and constraints for AI agents working with th
 **System Complexity**: 5/5 (High — SQLite FTS5 + Qdrant vector index, 48 language plugins, rerankers, query-intent routing)
 **MCP Status**: Use MCP tools first for all code search; STDIO is the primary surface
 **Last Updated**: 2026-04-18
+**Support matrix**: Customer-facing language/runtime support claims live in `docs/SUPPORT_MATRIX.md`.
+**Dependency truth**: Use `uv sync --locked`; `pyproject.toml` and `uv.lock` are canonical.
 
 > **Beta status**: Multi-repo support and the STDIO interface are in beta. STDIO is the primary surface for LLM tool calls; FastAPI is a secondary admin surface for diagnostics and manual operations. Expect API surface changes before stable release.
 
@@ -188,8 +190,8 @@ Phase 15 introduced defense-in-depth hardening: plugin sandboxing (isolated work
 
 ```bash
 # Build & Install
-make install                    # Install dependencies
-pip install -e .               # Install in development mode
+uv sync --locked                # Install locked dependencies
+make install                    # Project install helper
 
 # Testing
 make test                       # Run unit tests
@@ -366,7 +368,7 @@ mcp_server/, plugin_system/, tree_sitter_wrapper/
 # Virtual Environment: Required (managed by uv)
 uv sync            # install all core + dev dependencies
 # Or for a specific extras set:
-uv sync --extra dev --extra semantic
+uv sync --locked --extra dev --extra semantic
 
 # Pre-commit: Configured for linting and formatting
 make lint     # Verify before committing

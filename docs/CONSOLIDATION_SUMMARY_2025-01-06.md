@@ -11,7 +11,7 @@ Successfully consolidated and organized the Code-Index-MCP root directory, reduc
 - **Files in root**: Reduced from 44+ to ~20 essential files
 - **Organization**: Created logical directory structure for scripts, tests, and configs
 - **MCP Compliance**: Preserved all MCP-specific files in root
-- **Functionality**: All features remain fully operational
+- **Functionality**: All features remain available in this historical snapshot
 
 ### 🗂️ Files Moved
 
@@ -60,7 +60,7 @@ Successfully consolidated and organized the Code-Index-MCP root directory, reduc
 - `ROADMAP.md`, `SECURITY.md`, `TROUBLESHOOTING.md`
 
 #### Python Configuration
-- `requirements.txt`, `requirements-production.txt`
+- `pyproject.toml`, `pyproject.toml production extra`
 - `pyproject.toml`, `pytest.ini`, `tox.ini`
 
 #### Build & Deploy

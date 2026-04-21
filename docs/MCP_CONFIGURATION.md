@@ -2,6 +2,10 @@
 
 This guide provides comprehensive information on configuring the Code-Index-MCP for different environments and use cases.
 
+> **Beta status**: This guide targets `1.2.0-rc3`. MCP STDIO is the primary
+> LLM surface. Docker examples use `ghcr.io/viperjuice/code-index-mcp`.
+> Language behavior is defined in [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md).
+
 ## Table of Contents
 
 1. [Understanding MCP Communication](#understanding-mcp-communication)
@@ -64,8 +68,8 @@ The setup script automatically detects your environment:
 {
   "mcpServers": {
     "code-index-native": {
-      "command": "python",
-      "args": ["scripts/cli/mcp_server_cli.py"],
+      "command": "mcp-index",
+      "args": ["serve"],
       "cwd": "${workspace}",
       "env": {
         "PYTHONPATH": "${workspace}",
@@ -103,7 +107,7 @@ The setup script automatically detects your environment:
         "-e", "MCP_WORKSPACE_ROOT=/workspace",
         "-e", "LOG_LEVEL=${LOG_LEVEL:-INFO}",
         "-e", "MCP_ARTIFACT_SYNC=false",
-        "${MCP_DOCKER_IMAGE:-ghcr.io/code-index-mcp/mcp-index:minimal}"
+        "${MCP_DOCKER_IMAGE:-ghcr.io/viperjuice/code-index-mcp:latest}"
       ]
     }
   }
@@ -113,7 +117,7 @@ The setup script automatically detects your environment:
 **Features:**
 - Privacy-first (no external API calls)
 - No artifact sync
-- Basic code search functionality
+- Basic code search functionality; see [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md)
 - Smallest image size
 
 ### Docker Standard Configuration
@@ -136,7 +140,7 @@ The setup script automatically detects your environment:
         "-e", "SEMANTIC_SEARCH_ENABLED=${SEMANTIC_SEARCH_ENABLED:-true}",
         "-e", "MCP_ARTIFACT_SYNC=${MCP_ARTIFACT_SYNC:-true}",
         "-e", "LOG_LEVEL=${LOG_LEVEL:-INFO}",
-        "${MCP_DOCKER_IMAGE:-ghcr.io/code-index-mcp/mcp-index:standard}"
+        "${MCP_DOCKER_IMAGE:-ghcr.io/viperjuice/code-index-mcp:latest}"
       ]
     }
   }
@@ -258,7 +262,7 @@ Configure multiple repositories in one `.mcp.json`:
       "args": [
         "run", "-i", "--rm",
         "-v", "${HOME}/projects/frontend:/workspace",
-        "mcp-index:minimal"
+        "ghcr.io/viperjuice/code-index-mcp:latest"
       ]
     },
     "project-backend": {
@@ -266,7 +270,7 @@ Configure multiple repositories in one `.mcp.json`:
       "args": [
         "run", "-i", "--rm",
         "-v", "${HOME}/projects/backend:/workspace",
-        "mcp-index:minimal"
+        "ghcr.io/viperjuice/code-index-mcp:latest"
       ]
     }
   }
@@ -306,7 +310,7 @@ Add Docker resource constraints:
         "--memory", "2g",
         "--cpus", "2",
         "-v", "${workspace}:/workspace",
-        "mcp-index:minimal"
+        "ghcr.io/viperjuice/code-index-mcp:latest"
       ]
     }
   }
@@ -326,7 +330,7 @@ For maximum security:
         "run", "-i", "--rm",
         "--network", "none",
         "-v", "${workspace}:/workspace:ro",
-        "mcp-index:minimal"
+        "ghcr.io/viperjuice/code-index-mcp:latest"
       ],
       "env": {
         "MCP_ARTIFACT_SYNC": "false"
@@ -403,7 +407,7 @@ Enable debug logging:
         "-v", "${workspace}:/workspace",
         "-e", "LOG_LEVEL=DEBUG",
         "-e", "MCP_DEBUG=true",
-        "mcp-index:minimal"
+        "ghcr.io/viperjuice/code-index-mcp:latest"
       ]
     }
   }
@@ -416,7 +420,7 @@ Test your configuration:
 
 ```bash
 # Test MCP connection
-echo '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{}}' | docker run -i --rm mcp-index:minimal
+echo '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{}}' | docker run -i --rm ghcr.io/viperjuice/code-index-mcp:latest
 
 # Expected response:
 # {"jsonrpc":"2.0","id":1,"result":{"capabilities":...}}
@@ -492,7 +496,7 @@ Enable security audit logs:
         "-v", "${HOME}/mcp-audit:/app/logs",
         "-e", "MCP_AUDIT_LOG=/app/logs/audit.log",
         "-e", "MCP_SECURITY_MODE=strict",
-        "mcp-index:minimal"
+        "ghcr.io/viperjuice/code-index-mcp:latest"
       ]
     }
   }

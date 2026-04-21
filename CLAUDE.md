@@ -5,6 +5,9 @@ This repository uses `AGENTS.md` for all agent guidance and configuration.
 Please refer to the adjacent `AGENTS.md` file in this directory for full
 instructions and notes.
 
+Current dependency setup uses `uv sync --locked`. Language and sandbox support
+claims are centralized in `docs/SUPPORT_MATRIX.md`.
+
 ## Search Tool Priority (MCP-FIRST)
 
 This repo has a pre-built code index (BM25 + semantic). **Always search with MCP tools

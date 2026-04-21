@@ -1,5 +1,8 @@
 # GitHub Token Scopes & Validation
 
+> **Beta status**: This page targets `1.2.0-rc3`. Token validation supports
+> artifact and attestation operations for the current beta release path.
+
 ## Overview
 
 The token validator (SL-4) ensures that `GITHUB_TOKEN` includes the five required scopes for artifact operations, attestation signing, and metadata access. This document lists the scopes and describes the validation flow.

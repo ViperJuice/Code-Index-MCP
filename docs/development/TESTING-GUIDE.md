@@ -64,13 +64,13 @@ tests/
 
 ```bash
 # Install test dependencies
-pip install -r requirements-test.txt
+uv sync --locked dev extra
 
 # Or install with development extras
 pip install -e ".[test]"
 ```
 
-### 2. Create requirements-test.txt
+### 2. Create pyproject.toml dev extra
 
 ```txt
 # Testing frameworks
@@ -1001,8 +1001,8 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -r requirements-test.txt
+        uv sync --locked
+        uv sync --locked dev extra
     
     - name: Run linting
       run: |
@@ -1055,8 +1055,8 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -r requirements-test.txt
+        uv sync --locked
+        uv sync --locked dev extra
     
     - name: Run performance tests
       run: |

@@ -1,6 +1,6 @@
 > **Historical artifact — as-of 2026-04-18, may not reflect current behavior**
 
-# Docker Setup Review for MCP Server with 48-Language Support
+# Docker Setup Review for MCP Server with Language support
 
 ## Executive Summary
 

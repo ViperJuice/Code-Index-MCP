@@ -13,9 +13,9 @@ NC='\033[0m' # No Color
 
 # Configuration
 MCP_VERSION="${MCP_VERSION:-latest}"
-MCP_VARIANT="${MCP_VARIANT:-minimal}"
+MCP_VARIANT="${MCP_VARIANT:-latest}"
 DOCKER_REGISTRY="${DOCKER_REGISTRY:-ghcr.io}"
-MCP_IMAGE="${DOCKER_REGISTRY}/code-index-mcp/mcp-index"
+MCP_IMAGE="${DOCKER_REGISTRY}/viperjuice/code-index-mcp"
 
 # Functions
 print_banner() {
@@ -115,9 +115,9 @@ install_docker() {
 choose_variant() {
     echo
     echo "Choose MCP Index variant:"
-    echo "1) minimal  - Zero configuration, BM25 search only (recommended for start)"
-    echo "2) standard - AI-powered semantic search (requires Voyage AI key)"
-    echo "3) full     - Production stack with monitoring"
+    echo "1) latest      - Current production image (recommended)"
+    echo "2) v1.2.0-rc3  - Release candidate image"
+    echo "3) local-smoke - Local smoke image built by make release-smoke-container"
     echo
     
     read -p "Select variant [1-3] (default: 1): " -n 1 -r
@@ -125,30 +125,16 @@ choose_variant() {
     
     case $REPLY in
         2)
-            MCP_VARIANT="standard"
-            print_info "Selected: standard (semantic search)"
-            
-            # Check for API key
-            if [ -z "$VOYAGE_API_KEY" ]; then
-                print_warn "Semantic search requires a Voyage AI API key"
-                echo "Get your free API key at: https://www.voyageai.com/"
-                echo "Pricing: ~\$0.05 per 1M tokens (free tier: 50M tokens/month)"
-                echo
-                read -p "Enter your Voyage AI API key (or press Enter to skip): " API_KEY
-                if [ ! -z "$API_KEY" ]; then
-                    export VOYAGE_API_KEY="$API_KEY"
-                    echo "export VOYAGE_API_KEY='$API_KEY'" >> ~/.bashrc
-                    print_info "API key saved to ~/.bashrc"
-                fi
-            fi
+            MCP_VARIANT="v1.2.0-rc3"
+            print_info "Selected: v1.2.0-rc3"
             ;;
         3)
-            MCP_VARIANT="full"
-            print_info "Selected: full (production stack)"
+            MCP_VARIANT="local-smoke"
+            print_info "Selected: local-smoke"
             ;;
         *)
-            MCP_VARIANT="minimal"
-            print_info "Selected: minimal (zero configuration)"
+            MCP_VARIANT="latest"
+            print_info "Selected: latest"
             ;;
     esac
 }
@@ -169,8 +155,8 @@ create_launcher() {
 # MCP Index Docker Launcher
 
 # Default settings
-MCP_VARIANT="${MCP_VARIANT:-minimal}"
-MCP_IMAGE="${MCP_IMAGE:-ghcr.io/code-index-mcp/mcp-index}"
+MCP_VARIANT="${MCP_VARIANT:-latest}"
+MCP_IMAGE="${MCP_IMAGE:-ghcr.io/viperjuice/code-index-mcp}"
 WORKSPACE="${WORKSPACE:-$(pwd)}"
 
 # Handle commands

@@ -1,5 +1,5 @@
 # Multi-stage production Dockerfile for MCP Server
-FROM python:3.12-slim as builder
+FROM python:3.12-slim AS builder
 
 # Install system dependencies for building
 RUN apt-get update && apt-get install -y \
@@ -11,16 +11,19 @@ RUN apt-get update && apt-get install -y \
 
 # Create build directory
 WORKDIR /build
+ENV UV_PROJECT_ENVIRONMENT=/home/mcp/.venv
 
 # Copy dependency metadata first for better caching
 COPY pyproject.toml uv.lock README.md ./
+COPY mcp_server/ ./mcp_server/
 
-# Install Python dependencies
-RUN pip install --no-cache-dir uv && \
-    uv sync --locked --extra production --no-install-project
+# Install Python dependencies and the project entry points
+RUN mkdir -p /home/mcp && \
+    pip install --no-cache-dir uv && \
+    uv sync --locked --extra production
 
 # Production stage
-FROM python:3.12-slim as production
+FROM python:3.12-slim AS production
 
 # Install runtime dependencies including tree-sitter requirements
 RUN apt-get update && apt-get install -y \
@@ -36,15 +39,14 @@ RUN groupadd -r mcp && useradd -r -g mcp -d /app -s /bin/bash mcp
 WORKDIR /app
 
 # Copy Python dependencies from builder
-COPY --from=builder /build/.venv /home/mcp/.venv
+COPY --from=builder /home/mcp/.venv /home/mcp/.venv
 
 # Make sure virtualenv scripts are usable
 ENV PATH=/home/mcp/.venv/bin:$PATH
 
 # Copy application code
 COPY mcp_server/ ./mcp_server/
-COPY pyproject.toml .
-COPY README.md .
+COPY pyproject.toml README.md ./
 
 # Create necessary directories
 RUN mkdir -p /var/log/mcp-server /app/uploads /app/data \
@@ -57,6 +59,8 @@ USER mcp
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 ENV MCP_ENVIRONMENT=production
+ENV SEMANTIC_SEARCH_ENABLED=false
+ENV SEMANTIC_DEFAULT_PROFILE=legacy-default
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
@@ -69,12 +73,12 @@ EXPOSE 8000 8001
 CMD ["gunicorn", "mcp_server.gateway:app", \
      "--worker-class", "uvicorn.workers.UvicornWorker", \
      "--bind", "0.0.0.0:8000", \
-     "--workers", "4", \
+     "--workers", "1", \
      "--worker-connections", "1000", \
      "--max-requests", "1000", \
      "--max-requests-jitter", "100", \
      "--timeout", "30", \
-     "--keepalive", "2", \
+     "--keep-alive", "2", \
      "--access-logfile", "-", \
      "--error-logfile", "-", \
      "--log-level", "info"]

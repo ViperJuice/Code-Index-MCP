@@ -64,7 +64,7 @@ Successfully consolidated root directory files from ~250 files to 59 items (file
 
 ### Files Kept in Root (Essential Only)
 - **Core Documentation**: README.md, LICENSE, CHANGELOG.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md, TROUBLESHOOTING.md, ROADMAP.md
-- **Essential Configuration**: .gitignore, pyproject.toml, requirements.txt, requirements-production.txt, Makefile, pytest.ini, tox.ini
+- **Essential Configuration**: .gitignore, pyproject.toml, pyproject.toml, pyproject.toml production extra, Makefile, pytest.ini, tox.ini
 - **Docker Compose Files**: All docker-compose*.yml files
 - **Main Scripts**: dev.sh, docker-setup.sh, codex-setup.sh, scaffold_mcp.sh, setup-documentation.sh
 - **Agent Instructions**: AGENTS.md, CLAUDE.md

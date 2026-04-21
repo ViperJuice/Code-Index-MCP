@@ -1,5 +1,8 @@
 # Plugin Sandbox Architecture
 
+> **Beta status**: This page targets `1.2.0-rc3`. Default sandbox behavior is
+> documented alongside language support in [../SUPPORT_MATRIX.md](../SUPPORT_MATRIX.md).
+
 ## Overview
 
 The plugin sandbox (SL-1) isolates plugin execution from the host process via a dedicated worker process communicating over JSON-line IPC. This document describes the sandbox boundary, capability model, and threat profile.

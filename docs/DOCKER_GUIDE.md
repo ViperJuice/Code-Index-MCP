@@ -1,11 +1,13 @@
 # Docker Guide for MCP Index Server
 
-This guide provides comprehensive documentation for running MCP Index Server using Docker, including installation, configuration, and troubleshooting.
+This guide documents the beta Docker path for Code-Index-MCP `1.2.0-rc3`.
+The P22-proven image package is `ghcr.io/viperjuice/code-index-mcp`. MCP STDIO
+is the primary LLM surface; FastAPI remains a secondary admin surface.
 
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Docker Variants](#docker-variants)
+2. [Image Contract](#image-contract)
 3. [Installation](#installation)
 4. [Configuration](#configuration)
 5. [Usage](#usage)
@@ -17,67 +19,30 @@ This guide provides comprehensive documentation for running MCP Index Server usi
 
 ## Overview
 
-The MCP Index Server Docker images provide a containerized solution for code indexing without requiring local Python installation. All dependencies, including tree-sitter grammars for 48+ languages, are pre-installed and optimized.
+The MCP Index Server image provides a containerized solution for code indexing
+without requiring local Python installation. Language support varies by plugin,
+sandbox path, and optional dependencies; see [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md)
+for the canonical support contract.
 
 ### Why Docker?
 
-- **Zero Setup**: No Python, no dependencies, just Docker
+- **Containerized setup**: Docker supplies the Python runtime and package install
 - **Consistency**: Same environment for all users
 - **Isolation**: No conflicts with system packages
 - **Portability**: Works identically on Linux, macOS, and Windows
 
-## Docker Variants
+## Image Contract
 
-### 1. `mcp-index:minimal` (Default)
+P23 documents one image package:
 
-**Best for**: Getting started, basic code search, privacy-conscious users
+```bash
+ghcr.io/viperjuice/code-index-mcp:latest
+```
 
-**Features**:
-- ✅ Full 48-language indexing
-- ✅ BM25 full-text search
-- ✅ Symbol navigation
-- ✅ Real-time file watching
-- ❌ Semantic search (no API key required)
-- ❌ GitHub sync (disabled by default)
-
-**Resource Usage**:
-- Memory: 512MB-1GB
-- CPU: 1 core
-- Storage: ~100MB + index size
-
-### 2. `mcp-index:standard`
-
-**Best for**: Teams wanting AI-powered search
-
-**Features**:
-- All minimal features PLUS:
-- ✅ Semantic search with Voyage AI
-- ✅ Contextual embeddings
-- ✅ Advanced reranking
-- ✅ GitHub artifact sync
-- ⚠️ Requires VOYAGE_API_KEY
-
-**Resource Usage**:
-- Memory: 2-4GB
-- CPU: 2 cores
-- Storage: ~500MB + index size
-
-### 3. `mcp-index:full`
-
-**Best for**: Production deployments
-
-**Features**:
-- All standard features PLUS:
-- ✅ Redis caching
-- ✅ Qdrant vector database
-- ✅ Prometheus metrics
-- ✅ Grafana dashboards
-- ✅ Health monitoring
-
-**Resource Usage**:
-- Memory: 4-8GB
-- CPU: 4 cores
-- Storage: 1GB+ depending on codebase
+Enable optional behavior with environment variables and installed extras rather
+than relying on documented variant tags. Semantic search requires provider
+configuration such as `VOYAGE_API_KEY`; artifact sync requires GitHub CLI
+authentication and suitable repository permissions.
 
 ## Installation
 
@@ -102,13 +67,13 @@ iwr -useb https://raw.githubusercontent.com/Code-Index-MCP/main/scripts/install-
 
 2. **Pull the image**:
    ```bash
-   docker pull ghcr.io/code-index-mcp/mcp-index:minimal
+   docker pull ghcr.io/viperjuice/code-index-mcp:latest
    ```
 
 3. **Create launcher script**:
    ```bash
    # Linux/macOS
-   echo 'docker run -i --rm -v $(pwd):/workspace ghcr.io/code-index-mcp/mcp-index:minimal "$@"' > /usr/local/bin/mcp-index
+   echo 'docker run -i --rm -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:latest "$@"' > /usr/local/bin/mcp-index
    chmod +x /usr/local/bin/mcp-index
    ```
 
@@ -123,7 +88,7 @@ Configure the Docker container using environment variables:
 docker run -it \
   -e LOG_LEVEL=DEBUG \
   -e MCP_WORKSPACE_ROOT=/workspace \
-  ghcr.io/code-index-mcp/mcp-index:minimal
+  ghcr.io/viperjuice/code-index-mcp:latest
 ```
 
 ### Configuration File (.env)
@@ -131,7 +96,7 @@ docker run -it \
 Create a `.env` file in your project root:
 
 ```env
-# Semantic Search (Standard/Full only)
+# Semantic Search (optional)
 VOYAGE_API_KEY=your-api-key-here
 SEMANTIC_SEARCH_ENABLED=true
 
@@ -199,13 +164,13 @@ mcp-index upgrade
 
 ```bash
 # Minimal version - basic search
-docker run -it -v $(pwd):/workspace ghcr.io/code-index-mcp/mcp-index:minimal
+docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:latest
 
 # Standard version - with API key
 docker run -it \
   -v $(pwd):/workspace \
   -e VOYAGE_API_KEY=your-key \
-  ghcr.io/code-index-mcp/mcp-index:standard
+  ghcr.io/viperjuice/code-index-mcp:latest
 
 # Full version - with external services
 docker run -it \
@@ -213,7 +178,7 @@ docker run -it \
   -e VOYAGE_API_KEY=your-key \
   -e REDIS_URL=redis://redis:6379 \
   -e QDRANT_URL=http://qdrant:6333 \
-  ghcr.io/code-index-mcp/mcp-index:full
+  ghcr.io/viperjuice/code-index-mcp:latest
 ```
 
 ### Docker Compose
@@ -225,7 +190,7 @@ version: '3.8'
 
 services:
   mcp-index:
-    image: ghcr.io/code-index-mcp/mcp-index:standard
+    image: ghcr.io/viperjuice/code-index-mcp:latest
     volumes:
       - ./:/workspace
       - ~/.mcp-index:/app/.mcp-index
@@ -292,13 +257,13 @@ Control index sharing per repository:
 
 ```bash
 # Check sync status
-docker run -it -v $(pwd):/workspace ghcr.io/code-index-mcp/mcp-index:standard artifact status
+docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:latest artifact status
 
 # Download latest index
-docker run -it -v $(pwd):/workspace ghcr.io/code-index-mcp/mcp-index:standard artifact pull
+docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:latest artifact pull
 
 # Upload your index
-docker run -it -v $(pwd):/workspace ghcr.io/code-index-mcp/mcp-index:standard artifact push
+docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:latest artifact push
 ```
 
 ### Security Features
@@ -327,7 +292,7 @@ Create `.mcp.json` in your project root:
         "-v", "${HOME}/.mcp-index:/app/.mcp-index",
         "-e", "VOYAGE_API_KEY=${VOYAGE_API_KEY:-}",
         "-e", "MCP_ARTIFACT_SYNC=${MCP_ARTIFACT_SYNC:-true}",
-        "ghcr.io/code-index-mcp/mcp-index:standard"
+        "ghcr.io/viperjuice/code-index-mcp:latest"
       ]
     }
   }
@@ -443,7 +408,7 @@ Connect to Docker running on the host:
 ```bash
 # Inside dev container
 export DOCKER_HOST=tcp://host.docker.internal:2375
-docker run -it -v /mnt/c/path/to/code:/workspace mcp-index:minimal
+docker run -it -v /mnt/c/path/to/code:/workspace ghcr.io/viperjuice/code-index-mcp:latest
 ```
 
 **Note:** Requires Docker Desktop with exposed daemon.
@@ -456,7 +421,7 @@ For WSL2 with Docker Desktop:
 2. **Use WSL paths** for volume mounts:
    ```bash
    # Convert Windows path to WSL path
-   docker run -it -v /mnt/c/Users/name/project:/workspace mcp-index:minimal
+   docker run -it -v /mnt/c/Users/name/project:/workspace ghcr.io/viperjuice/code-index-mcp:latest
    ```
 
 3. **Configure .mcp.json for WSL:**
@@ -469,7 +434,7 @@ For WSL2 with Docker Desktop:
            "run", "-i", "--rm",
            "-v", "${workspace}:/workspace",
            "-v", "/mnt/c/Users/${USER}/.mcp-index:/app/.mcp-index",
-           "mcp-index:minimal"
+           "ghcr.io/viperjuice/code-index-mcp:latest"
          ]
        }
      }
@@ -530,7 +495,7 @@ docker version
 
 # Test MCP connection
 echo '{"jsonrpc":"2.0","method":"initialize","id":1}' | \
-  docker run -i --rm mcp-index:minimal
+  docker run -i --rm ghcr.io/viperjuice/code-index-mcp:latest
 
 # Verify volume mounts
 docker run --rm -v $(pwd):/workspace alpine ls -la /workspace
@@ -576,7 +541,7 @@ docker run -it \
   -e LOG_LEVEL=DEBUG \
   -e MCP_LOG_FILE=/workspace/mcp-debug.log \
   -v $(pwd):/workspace \
-  ghcr.io/code-index-mcp/mcp-index:minimal
+  ghcr.io/viperjuice/code-index-mcp:latest
 ```
 
 ### Health Checks
@@ -585,13 +550,13 @@ Check container health:
 
 ```bash
 # Check if MCP server is responsive
-docker run --rm ghcr.io/code-index-mcp/mcp-index:minimal --health
+docker run --rm ghcr.io/viperjuice/code-index-mcp:latest --health
 
 # Test database connection
-docker run --rm -v $(pwd):/workspace ghcr.io/code-index-mcp/mcp-index:minimal test db
+docker run --rm -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:latest test db
 
 # Verify index status
-docker run --rm -v $(pwd):/workspace ghcr.io/code-index-mcp/mcp-index:minimal index status
+docker run --rm -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:latest index status
 ```
 
 ## Advanced Topics
@@ -601,7 +566,7 @@ docker run --rm -v $(pwd):/workspace ghcr.io/code-index-mcp/mcp-index:minimal in
 Extend the base images for your needs:
 
 ```dockerfile
-FROM ghcr.io/code-index-mcp/mcp-index:standard
+FROM ghcr.io/viperjuice/code-index-mcp:latest
 
 # Add custom dependencies
 RUN pip install --no-cache-dir custom-package
@@ -637,12 +602,12 @@ docker run -it \
   -v $(pwd):/workspace \
   -v mcp-index-data:/app/data \
   -v mcp-index-cache:/app/.cache \
-  ghcr.io/code-index-mcp/mcp-index:standard
+  ghcr.io/viperjuice/code-index-mcp:latest
 
 # Read-only workspace
 docker run -it \
   -v $(pwd):/workspace:ro \
-  ghcr.io/code-index-mcp/mcp-index:minimal
+  ghcr.io/viperjuice/code-index-mcp:latest
 ```
 
 ### Network Configuration
@@ -660,7 +625,7 @@ docker run -d --name redis --network mcp-network redis:alpine
 docker run -it \
   --network mcp-network \
   -e REDIS_URL=redis://redis:6379 \
-  ghcr.io/code-index-mcp/mcp-index:full
+  ghcr.io/viperjuice/code-index-mcp:latest
 ```
 
 ### Performance Tuning
@@ -674,7 +639,7 @@ docker run -it \
   -e CACHE_MAX_MEMORY_MB=1000 \
   --cpus="4" \
   --memory="8g" \
-  ghcr.io/code-index-mcp/mcp-index:standard
+  ghcr.io/viperjuice/code-index-mcp:latest
 ```
 
 ## Support

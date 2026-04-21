@@ -36,8 +36,8 @@ The root directory has been streamlined to contain only essential files:
 - `TROUBLESHOOTING.md` - Common issues
 
 ### Python Configuration
-- `requirements.txt` - Python dependencies
-- `requirements-production.txt` - Production dependencies
+- `pyproject.toml` - Python dependencies
+- `pyproject.toml production extra` - Production dependencies
 - `pyproject.toml` - Python project config
 - `pytest.ini` - Pytest configuration
 - `tox.ini` - Testing configuration

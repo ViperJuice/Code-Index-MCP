@@ -71,7 +71,7 @@ No operator actions required. P12 is fully codebase-internal.
 
 #### Before P14
 
-- [ ] **Audit dependency-file coverage across your multi-repo fleet.** SL-2 detects dependencies only in `requirements.txt`, `package.json`, `go.mod`, and `Cargo.toml`. Repos using unsupported ecosystems (Python `pyproject.toml`, Ruby Gemfile, PHP composer.json, etc.) will show empty dep sets. Either add ecosystem-parser lanes to P14 SL-2 or accept the gap.
+- [ ] **Audit dependency-file coverage across your multi-repo fleet.** SL-2 detects dependencies only in `pyproject.toml`, `package.json`, `go.mod`, and `Cargo.toml`. Repos using unsupported ecosystems (Python `pyproject.toml`, Ruby Gemfile, PHP composer.json, etc.) will show empty dep sets. Either add ecosystem-parser lanes to P14 SL-2 or accept the gap.
 - [ ] **Decide schema-version deprecation policy.** SL-3's `SchemaMigrator` supports forward migration across versions; set a cap on how many versions back you'll support (e.g., N-2). Document the policy here for future reference.
 - [ ] **Decide reranker provider.** SL-1 wires `RerankerProvider`. Options: no-op (default, same as today), Voyage AI reranker, Cohere reranker, or self-hosted. Pick one and provision the credential + endpoint before planning SL-1.
 

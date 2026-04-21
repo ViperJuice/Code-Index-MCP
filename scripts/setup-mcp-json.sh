@@ -134,7 +134,7 @@ setup_mcp_json() {
         docker|wsl-docker)
             echo "1. Ensure Docker Desktop is running"
             echo "2. Build the Docker image (if using local images):"
-            echo "   docker build -f docker/dockerfiles/Dockerfile.minimal -t mcp-index:minimal ."
+            echo "   make release-smoke-container"
             echo "3. Open your project in Claude Code"
             ;;
         devcontainer|native|wsl)

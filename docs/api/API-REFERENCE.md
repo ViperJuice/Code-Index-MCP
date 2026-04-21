@@ -342,7 +342,7 @@ List all available language plugins.
     {
       "name": "python",
       "language": "Python",
-      "version": "1.0.0",
+      "version": "1.2.0-rc3",
       "status": "active",
       "supported_extensions": [".py", ".pyw"],
       "features": ["syntax_analysis", "symbol_extraction", "documentation_parsing"],
@@ -352,7 +352,7 @@ List all available language plugins.
     {
       "name": "javascript",
       "language": "JavaScript/TypeScript",
-      "version": "1.0.0",
+      "version": "1.2.0-rc3",
       "status": "active",
       "supported_extensions": [".js", ".jsx", ".ts", ".tsx"],
       "features": ["syntax_analysis", "symbol_extraction"],
@@ -379,7 +379,7 @@ Get detailed information about a specific plugin.
 {
   "name": "python",
   "language": "Python",
-  "version": "1.0.0",
+  "version": "1.2.0-rc3",
   "status": "active",
   "supported_extensions": [".py", ".pyw"],
   "features": ["syntax_analysis", "symbol_extraction", "documentation_parsing"],
@@ -503,7 +503,7 @@ Get system health status (no authentication required).
 {
   "status": "healthy",
   "timestamp": "2025-01-01T12:30:00Z",
-  "version": "1.0.0",
+  "version": "1.2.0-rc3",
   "environment": "production",
   "components": {
     "database": {
@@ -596,7 +596,7 @@ Get comprehensive system status and statistics.
 ```json
 {
   "system": {
-    "version": "1.0.0",
+    "version": "1.2.0-rc3",
     "environment": "production",
     "uptime_seconds": 86400,
     "started_at": "2025-01-01T00:00:00Z"

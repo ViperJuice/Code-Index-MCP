@@ -11,7 +11,7 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 # Configuration
-REGISTRY=${REGISTRY:-"mcp-index"}
+REGISTRY=${REGISTRY:-"ghcr.io/viperjuice/code-index-mcp"}
 TAG=${TAG:-"latest"}
 PLATFORMS=${PLATFORMS:-"linux/amd64"}
 PUSH=${PUSH:-false}
@@ -21,7 +21,7 @@ usage() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
     echo "Options:"
-    echo "  -r, --registry REGISTRY    Docker registry (default: mcp-index)"
+    echo "  -r, --registry REGISTRY    Docker registry (default: ghcr.io/viperjuice/code-index-mcp)"
     echo "  -t, --tag TAG              Image tag (default: latest)"
     echo "  -p, --platform PLATFORM    Build platform (default: linux/amd64)"
     echo "  -P, --push                 Push images to registry"
@@ -33,7 +33,7 @@ usage() {
     echo "  $0"
     echo ""
     echo "  # Build and push to GitHub Container Registry"
-    echo "  $0 --registry ghcr.io/code-index-mcp/mcp-index --push"
+    echo "  $0 --registry ghcr.io/viperjuice/code-index-mcp --push"
     echo ""
     echo "  # Build specific variant with custom tag"
     echo "  $0 --variant minimal --tag dev"

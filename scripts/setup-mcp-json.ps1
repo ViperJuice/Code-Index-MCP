@@ -144,7 +144,7 @@ function Set-McpJson {
         { $_ -in "docker", "wsl-docker" } {
             Write-Host "1. Ensure Docker Desktop is running"
             Write-Host "2. Build the Docker image (if using local images):"
-            Write-Host "   docker build -f docker/dockerfiles/Dockerfile.minimal -t mcp-index:minimal ."
+            Write-Host "   make release-smoke-container"
             Write-Host "3. Open your project in Claude Code"
         }
         { $_ -in "devcontainer", "native", "wsl" } {
