@@ -24,6 +24,7 @@ import dataclasses
 import importlib
 import inspect
 import json
+import os
 import sys
 import traceback
 from typing import Any, Iterable, List, Optional
@@ -35,6 +36,34 @@ from mcp_server.sandbox.protocol import Envelope, ProtocolError, decode, encode
 
 
 _MATERIALIZE_CAP = 1000  # max generator results to materialize per call
+
+_MISSING_EXTRA_REMEDIATION = {
+    "javalang": "Install the Java plugin extra with `uv sync --locked --extra java`.",
+    "p24_missing_extra": "Install the optional dependency required by this plugin.",
+}
+
+
+def _normalize_startup_error(exc: BaseException, plugin_module_name: str) -> dict:
+    payload = {
+        "type": exc.__class__.__name__,
+        "message": str(exc),
+        "state": "load_error",
+        "language": plugin_module_name.rsplit(".", 1)[-1].replace("_plugin", ""),
+        "remediation": None,
+    }
+    if isinstance(exc, ModuleNotFoundError):
+        missing = getattr(exc, "name", "") or str(exc)
+        payload["state"] = "missing_extra" if missing in _MISSING_EXTRA_REMEDIATION else "unsupported"
+        payload["missing_extra"] = missing
+        payload["required_extras"] = [missing]
+        payload["remediation"] = _MISSING_EXTRA_REMEDIATION.get(
+            missing,
+            "The plugin module or one of its optional dependencies is not importable.",
+        )
+    elif "No IPlugin subclass" in str(exc) or "Multiple IPlugin subclasses" in str(exc):
+        payload["state"] = "unsupported"
+        payload["remediation"] = "Plugin module does not expose a single IPlugin-compatible Plugin class."
+    return payload
 
 
 def _reference_to_dict(r: Reference) -> dict:
@@ -93,6 +122,7 @@ def _find_plugin_class(module) -> type:
                 continue
             if issubclass(obj, IPlugin):
                 candidates.append(obj)
+    candidates = list(dict.fromkeys(candidates))
     if not candidates:
         raise RuntimeError(
             f"No IPlugin subclass found in module {module.__name__!r}"
@@ -146,6 +176,10 @@ def _error_env(call_id: str, method: str, exc: BaseException) -> Envelope:
     )
 
 
+def _startup_error_env(payload: dict) -> Envelope:
+    return Envelope(v=1, id="", kind="error", method="startup", payload=payload)
+
+
 def _dispatch(plugin: IPlugin, method: str, payload: dict) -> Any:
     """Invoke a plugin method by name with the given JSON payload."""
     if method == "bind":
@@ -194,9 +228,20 @@ def main(argv: Optional[List[str]] = None) -> int:
     caps_apply.apply(caps)
 
     # Phase 2: import plugin module.
-    module = importlib.import_module(plugin_module_name)
-    plugin_cls = _find_plugin_class(module)
-    plugin = _instantiate(plugin_cls)
+    try:
+        module = importlib.import_module(plugin_module_name)
+        plugin_cls = _find_plugin_class(module)
+        os.environ.setdefault("MCP_SKIP_PLUGIN_PREINDEX", "true")
+        plugin = _instantiate(plugin_cls)
+    except BaseException as exc:
+        payload = _normalize_startup_error(exc, plugin_module_name)
+        if payload.get("state") == "load_error":
+            traceback.print_exc(file=sys.stderr)
+        try:
+            _write_envelope(_startup_error_env(payload))
+        except Exception:
+            pass
+        return 1
 
     # Phase 3: NOW install the FS guard — plugin code is loaded.
     caps_apply.install_fs_guard(caps)

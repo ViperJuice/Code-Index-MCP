@@ -2,4 +2,6 @@
 
 from .plugin import RustPlugin
 
-__all__ = ["RustPlugin"]
+Plugin = RustPlugin
+
+__all__ = ["RustPlugin", "Plugin"]

@@ -25,7 +25,7 @@ except ImportError:
     psutil = None
 
 # from mcp_server.plugin_system.models import LoadedPlugin
-from mcp_server.plugins.plugin_factory import PluginFactory
+from mcp_server.plugins.plugin_factory import PluginFactory, PluginUnavailableError
 
 logger = logging.getLogger(__name__)
 
@@ -181,6 +181,13 @@ class MemoryAwarePluginManager:
 
             return plugin
 
+        except PluginUnavailableError as e:
+            logger.info(
+                "Skipping unavailable %s plugin: %s",
+                language,
+                e.state,
+            )
+            return None
         except Exception as e:
             logger.error(f"Failed to load {language} plugin: {e}")
             return None

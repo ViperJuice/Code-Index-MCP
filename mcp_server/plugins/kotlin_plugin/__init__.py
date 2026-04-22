@@ -2,4 +2,6 @@
 
 from .plugin import KotlinPlugin
 
-__all__ = ["KotlinPlugin"]
+Plugin = KotlinPlugin
+
+__all__ = ["KotlinPlugin", "Plugin"]

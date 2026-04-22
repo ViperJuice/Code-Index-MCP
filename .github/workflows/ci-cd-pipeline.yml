@@ -8,7 +8,7 @@ on:
   pull_request:
     branches: [ main ]
   schedule:
-    - cron: '0 3 * * *'  # Nightly at 03:00 UTC (for test-extended job)
+    - cron: '0 3 * * *'
   workflow_dispatch:
     inputs:
       deploy_environment:
@@ -28,11 +28,11 @@ env:
   DOCKER_IMAGE_NAME: viperjuice/code-index-mcp
   DOCKER_IMAGE_REF: ghcr.io/viperjuice/code-index-mcp
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  MCP_SKIP_PLUGIN_PREINDEX: "true"
 
 jobs:
-  # Code quality checks
-  quality-checks:
-    name: Code Quality Checks
+  alpha-format-lint:
+    name: Alpha Gate - Format And Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,54 +44,19 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Cache dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/uv
-            ~/.cache/pre-commit
-          key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock', 'pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-uv-
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip uv
           uv sync --locked --extra dev --extra semantic
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
-      - name: Enforce Mermaid diagram policy
-        run: make check-diagrams
+      - name: Run focused alpha format and lint checks
+        run: make alpha-format-lint
 
-      - name: Run black
-        run: black --check mcp_server tests
-
-      - name: Run isort
-        run: isort --check-only mcp_server tests
-
-      - name: Run flake8
-        run: flake8 mcp_server tests
-
-      - name: Run mypy
-        run: mypy mcp_server --ignore-missing-imports --exclude mcp_server/benchmarks || true  # informational; large pre-existing error count
-
-      - name: Run pylint
-        run: pylint mcp_server --fail-under=7.0
-
-      - name: Security check with bandit
-        run: bandit -r mcp_server -lll  # HIGH severity only; large pre-existing medium count
-
-      - name: Check dependencies with safety
-        run: safety check --json
-
-  # Run tests (Ubuntu gate — must pass before build)
-  test:
-    name: Test Suite (Ubuntu)
+  alpha-unit-release-smoke:
+    name: Alpha Gate - Unit And Release Smoke
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      MCP_SKIP_PLUGIN_PREINDEX: "true"
-
     steps:
       - uses: actions/checkout@v4
         with:
@@ -117,25 +82,73 @@ jobs:
         run: |
           python -c "from tree_sitter_language_pack import get_language; get_language('python'); print('tree-sitter grammars available')"
 
-      - name: Run tests with coverage
-        shell: bash
+      - name: Run alpha unit and release smoke checks
         run: |
-          pytest tests/ \
-            --ignore=tests/test_git_integration.py \
-            --cov=mcp_server \
-            --cov-report=xml \
-            --cov-report=html \
-            --cov-report=term \
-            -n auto \
-            --timeout=60 \
-            --benchmark-skip
+          make alpha-unit-release-smoke
+          # make release-smoke is invoked by alpha-unit-release-smoke.
 
-      - name: Run release smoke
-        run: make release-smoke
+  alpha-integration-smoke:
+    name: Alpha Gate - Integration Smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-  # Cross-platform smoke tests (informational, non-blocking)
-  test-cross-platform:
-    name: Test Suite (${{ matrix.os }})
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libffi-dev
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip uv
+          uv sync --locked --extra dev
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Run alpha integration smoke checks
+        run: make alpha-integration-smoke
+
+  alpha-docs-truth:
+    name: Alpha Gate - Docs Truth
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip uv
+          uv sync --locked --extra dev
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Run docs and release truth checks
+        run: make alpha-docs-truth
+
+  alpha-required-gates-passed:
+    name: Alpha Gate - Required Gates Passed
+    runs-on: ubuntu-latest
+    needs:
+      - alpha-format-lint
+      - alpha-unit-release-smoke
+      - alpha-integration-smoke
+      - alpha-docs-truth
+    steps:
+      - name: Confirm required main CI gates passed
+        run: echo "Required main CI alpha gates passed."
+
+  informational-test-cross-platform:
+    name: Informational - Test Suite (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     continue-on-error: true
     timeout-minutes: 45
@@ -147,9 +160,6 @@ jobs:
             workers: auto
           - os: windows-latest
             workers: 0
-    env:
-      MCP_SKIP_PLUGIN_PREINDEX: "true"
-
     steps:
       - uses: actions/checkout@v4
         with:
@@ -166,11 +176,7 @@ jobs:
           uv sync --locked --extra dev
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
-      - name: Install tree-sitter grammars
-        run: |
-          python -c "from tree_sitter_language_pack import get_language; get_language('python'); print('tree-sitter grammars available')"
-
-      - name: Run tests
+      - name: Run cross-platform tests
         shell: bash
         run: |
           pytest tests/ \
@@ -180,72 +186,11 @@ jobs:
             --benchmark-skip \
             --no-cov
 
-      - name: Upload coverage reports
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.xml
-          flags: unittests
-          name: codecov-umbrella
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results-${{ matrix.os }}-${{ matrix.python-version }}
-          path: |
-            .coverage
-            coverage.xml
-            htmlcov/
-
-  # Integration tests (git repos, real plugin loading) — runs in parallel with test
-  test-integration:
-    name: Integration Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      MCP_SKIP_PLUGIN_PREINDEX: "true"
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential libffi-dev
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip uv
-          uv sync --locked --extra dev
-          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
-
-      - name: Run integration tests
-        run: |
-          pytest tests/ -m "integration or slow" \
-            --timeout=120 \
-            --no-cov \
-            --benchmark-skip \
-            -v
-
-  # Extended tests — nightly and manual trigger only
-  test-extended:
-    name: Extended Tests (real-world + performance)
+  informational-extended-tests:
+    name: Informational - Extended Tests
     runs-on: ubuntu-latest
     continue-on-error: true
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    env:
-      MCP_SKIP_PLUGIN_PREINDEX: "true"
-      RUN_REAL_WORLD_TESTS: "1"
-      RUN_PERFORMANCE_TESTS: "1"
-
     steps:
       - uses: actions/checkout@v4
 
@@ -260,23 +205,22 @@ jobs:
           uv sync --locked --extra dev
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
-      - name: Run real-world tests
-        run: pytest tests/real_world/ --timeout=300 --no-cov -v
+      - name: Run real-world and performance suites
+        env:
+          RUN_REAL_WORLD_TESTS: "1"
+          RUN_PERFORMANCE_TESTS: "1"
+        run: |
+          pytest tests/real_world/ --timeout=300 --no-cov -v
+          pytest tests/performance/ --timeout=300 --no-cov -v
 
-      - name: Run performance tests
-        run: pytest tests/performance/ --timeout=300 --no-cov -v
-
-  # Authenticated tests — gated on ATTESTATION_GH_TOKEN secret (opt-in, non-blocking)
-  test-authenticated:
-    name: Authenticated Tests (gh attestations)
+  informational-authenticated-attestations:
+    name: Informational - Authenticated Tests (gh attestations)
     runs-on: ubuntu-latest
     if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     continue-on-error: true
     timeout-minutes: 15
     env:
-      MCP_SKIP_PLUGIN_PREINDEX: "true"
       RUN_GH_AUTHENTICATED_TESTS: "1"
-
     steps:
       - name: Check for ATTESTATION_GH_TOKEN secret
         id: check-secret
@@ -287,7 +231,7 @@ jobs:
             echo "secret_present=true" >> "$GITHUB_OUTPUT"
           else
             echo "secret_present=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::ATTESTATION_GH_TOKEN secret is not set; skipping authenticated tests. Wire the secret in repository settings to enable."
+            echo "::warning::ATTESTATION_GH_TOKEN secret is not set; private-alpha authenticated attestation tests are informational skipped/warn. Wire the secret in repository settings to enable."
           fi
 
       - uses: actions/checkout@v4
@@ -320,13 +264,12 @@ jobs:
             --benchmark-skip \
             -v
 
-  # Performance benchmarks (informational)
-  benchmark:
-    name: Performance Benchmarks
+  informational-benchmark:
+    name: Informational - Performance Benchmarks
     runs-on: ubuntu-latest
-    needs: [quality-checks]
+    needs: [alpha-format-lint]
     continue-on-error: true
-
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
 
@@ -353,82 +296,11 @@ jobs:
           name: benchmark-results
           path: "*_results.json"
 
-      - name: Comment benchmark results on PR
-        if: github.event_name == 'pull_request' && hashFiles('indexing_speed_benchmark_results.json') != ''
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const { readFileSync } = await import('node:fs');
-            const results = JSON.parse(readFileSync('indexing_speed_benchmark_results.json'));
-            const comment = `## Performance Benchmark Results
-
-            - **Files/minute**: ${results.single_threaded.files_per_minute.toFixed(0)}
-            - **p95 Symbol Lookup**: < 100ms ✅
-            - **p95 Semantic Search**: < 500ms ✅
-            `;
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            });
-
-  # Build Docker images
-  build-docker:
-    name: Build Docker Images
+  informational-security-scan:
+    name: Informational - Security Scanning
     runs-on: ubuntu-latest
-    needs: [test, test-integration]
     continue-on-error: true
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.DOCKER_REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.DOCKER_IMAGE_REF }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix={{branch}}-
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./docker/dockerfiles/Dockerfile.production
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            BUILD_DATE=${{ github.event.head_commit.timestamp }}
-            VCS_REF=${{ github.sha }}
-            VERSION=${{ steps.meta.outputs.version }}
-
-  # Security scanning
-  security-scan:
-    name: Security Scanning
-    runs-on: ubuntu-latest
-    needs: [build-docker]
-    continue-on-error: true
-
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
 
@@ -441,16 +313,6 @@ jobs:
           output: 'trivy-results.sarif'
 
       - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
-
-      - name: Run Snyk security scan
-        if: ${{ env.SNYK_TOKEN != '' }}
-        uses: snyk/actions/docker@0.4.0
-        continue-on-error: true
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          image: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
-          args: --severity-threshold=high

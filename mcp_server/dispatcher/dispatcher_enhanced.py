@@ -29,7 +29,7 @@ from ..graph import (
 )
 from ..plugin_base import IPlugin, SearchResult, SymbolDef
 from ..plugins.language_registry import get_all_extensions, get_language_by_extension
-from ..plugins.plugin_factory import PluginFactory
+from ..plugins.plugin_factory import PluginFactory, PluginUnavailableError
 from ..plugins.plugin_set_registry import PluginSetRegistry
 from ..storage.multi_repo_manager import MultiRepositoryManager
 from ..storage.sqlite_store import SQLiteStore
@@ -234,6 +234,7 @@ class EnhancedDispatcher:
         self._legacy_plugins: List[IPlugin] = []
         self._lang_cache: Dict[str, IPlugin] = {}
         self._loaded_languages: set[str] = set()
+        self._unavailable_languages: set[str] = set()
 
         # Cache for file hashes to avoid re-indexing unchanged files
         self._file_cache = {}  # path -> (mtime, size, content_hash)
@@ -425,6 +426,13 @@ class EnhancedDispatcher:
                                     self._loaded_languages.add(lang)
                                     self._operation_stats["plugins_loaded"] += 1
                                     self._repo_plugin_loader.mark_loaded(lang)
+                            except PluginUnavailableError as e:
+                                logger.info(
+                                    "Skipping unavailable plugin for %s: %s",
+                                    lang,
+                                    e.state,
+                                )
+                                self._unavailable_languages.add(lang)
                             except Exception as e:
                                 logger.error(f"Failed to load {lang} plugin: {e}")
                 else:
@@ -472,7 +480,11 @@ class EnhancedDispatcher:
             return self._lang_cache[language]
 
         # If not using factory or already tried to load, return None
-        if not self._use_factory or language in self._loaded_languages:
+        if (
+            not self._use_factory
+            or language in self._loaded_languages
+            or language in self._unavailable_languages
+        ):
             return None
 
         # Try to load the plugin
@@ -498,12 +510,16 @@ class EnhancedDispatcher:
             logger.info(f"Successfully loaded {language} plugin")
             return plugin
 
-        except ValueError as e:
-            logger.warning(f"No plugin available for {language}: {e}")
-            self._loaded_languages.add(language)  # Mark as attempted
+        except PluginUnavailableError as e:
+            logger.info(
+                "No plugin available for %s: %s",
+                language,
+                e.state,
+            )
+            self._unavailable_languages.add(language)
             return None
         except Exception as e:
-            logger.error(f"Error loading plugin for {language}: {e}")
+            logger.error(f"Unexpected plugin load failure for {language}: {e}")
             self._loaded_languages.add(language)  # Mark as attempted
             return None
 

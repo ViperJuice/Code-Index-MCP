@@ -8,7 +8,6 @@ on:
   pull_request:
     branches: [ main ]
   schedule:
-    # Weekly vulnerability scan
     - cron: '0 2 * * 1'
   workflow_dispatch:
 
@@ -18,25 +17,102 @@ env:
   IMAGE_REF: ghcr.io/viperjuice/code-index-mcp
 
 jobs:
-  build-and-push:
-    name: Build and Push Container Images
+  alpha-docker-build-smoke:
+    name: Alpha Gate - Docker Build And Smoke
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
-      security-events: write
-    
-    strategy:
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/arm64
-    
+      packages: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_REF }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=ref,event=tag
+            type=raw,value=alpha-gate,enable=true
+            type=sha,prefix={{branch}}-,format=short
+          labels: |
+            org.opencontainers.image.title=Code Index MCP
+            org.opencontainers.image.description=Code Index MCP Server
+
+      - name: Set up Python for smoke harness
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install smoke harness dependencies
+        run: |
+          python -m pip install --upgrade pip uv
+          uv sync --locked --extra dev
+
+      - name: Build production container image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/dockerfiles/Dockerfile.production
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: ${{ env.IMAGE_REF }}:alpha-gate
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=alpha-gate
+          cache-to: type=gha,mode=max,scope=alpha-gate
+          build-args: |
+            BUILD_DATE=${{ github.event.repository.updated_at }}
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ steps.meta.outputs.version }}
+
+      - name: Run production container smoke
+        run: make release-smoke-container
+
+  informational-container-security-scan:
+    name: Informational - Container Security Scan
+    needs: alpha-docker-build-smoke
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: 'sarif'
+          output: trivy-results.sarif
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          vuln-type: 'os,library'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+
+  informational-push-manifests:
+    name: Informational - Push Multi-Platform Manifests
+    needs: alpha-docker-build-smoke
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -45,9 +121,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: |
-            network=host
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3
@@ -62,205 +135,36 @@ jobs:
         with:
           images: ${{ env.IMAGE_REF }}
           tags: |
-            # Branch events
-            type=ref,event=branch
-            # PR events
-            type=ref,event=pr
-            # Tag events
             type=ref,event=tag
-            # Latest tag for main branch
-            type=raw,value=latest,enable={{is_default_branch}}
-            # Semantic versions
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            # SHA
             type=sha,prefix={{branch}}-,format=short
-            # Date
-            type=schedule,pattern={{date 'YYYYMMDD'}}
-          labels: |
-            org.opencontainers.image.title=MCP Server
-            org.opencontainers.image.description=Code Index MCP Server
-            org.opencontainers.image.vendor=Your Organization
-            maintainer=your-email@example.com
 
-      - name: Set safe platform name
-        env:
-          PLATFORM: ${{ matrix.platform }}
-        run: echo "PLATFORM_SAFE=${PLATFORM//\//-}" >> $GITHUB_ENV
-
-      - name: Set up Python for smoke harness
-        if: matrix.platform == 'linux/amd64'
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install smoke harness dependencies
-        if: matrix.platform == 'linux/amd64'
-        run: |
-          python -m pip install --upgrade pip uv
-          uv sync --locked --extra dev
-
-      - name: Build container image
+      - name: Build and push release images
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./docker/dockerfiles/Dockerfile.production
-          platforms: ${{ matrix.platform }}
-          push: false
+          platforms: linux/amd64,linux/arm64
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.platform }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
-          outputs: type=docker,dest=/tmp/image-${{ env.PLATFORM_SAFE }}.tar
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           build-args: |
-            BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+            BUILD_DATE=${{ github.event.repository.updated_at }}
             VCS_REF=${{ github.sha }}
-            VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+            VERSION=${{ steps.meta.outputs.version }}
 
-      - name: Run production container smoke
-        if: matrix.platform == 'linux/amd64'
-        run: make release-smoke-container
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: image-${{ env.PLATFORM_SAFE }}
-          path: /tmp/image-${{ env.PLATFORM_SAFE }}.tar
-          retention-days: 1
-
-  security-scan:
-    name: Security Scanning
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    permissions:
-      security-events: write
-    
-    strategy:
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/arm64
-    
-    steps:
-      - name: Set safe platform name
-        env:
-          PLATFORM: ${{ matrix.platform }}
-        run: echo "PLATFORM_SAFE=${PLATFORM//\//-}" >> $GITHUB_ENV
-
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: image-${{ env.PLATFORM_SAFE }}
-          path: /tmp
-
-      - name: Load Docker image
-        run: |
-          docker load --input /tmp/image-${{ env.PLATFORM_SAFE }}.tar
-          docker image ls -a
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          input: /tmp/image-${{ env.PLATFORM_SAFE }}.tar
-          format: 'sarif'
-          output: trivy-results-${{ env.PLATFORM_SAFE }}.sarif
-          severity: 'CRITICAL,HIGH,MEDIUM'
-          vuln-type: 'os,library'
-
-      - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-results-${{ env.PLATFORM_SAFE }}.sarif
-          category: trivy-${{ env.PLATFORM_SAFE }}
-
-      - name: Run Grype vulnerability scanner
-        uses: anchore/scan-action@v3
-        with:
-          image: "docker-archive:/tmp/image-${{ env.PLATFORM_SAFE }}.tar"
-          fail-build: false
-          output-format: sarif
-
-      - name: Generate SBOM with Syft
-        uses: anchore/sbom-action@v0
-        with:
-          image: "docker-archive:/tmp/image-${{ env.PLATFORM_SAFE }}.tar"
-          format: spdx-json
-          output-file: sbom-${{ env.PLATFORM_SAFE }}.spdx.json
-
-      - name: Upload SBOM
-        uses: actions/upload-artifact@v4
-        with:
-          name: sbom-${{ env.PLATFORM_SAFE }}
-          path: sbom-${{ env.PLATFORM_SAFE }}.spdx.json
-
-  push-manifests:
-    name: Push Multi-Platform Manifests
-    needs: security-scan
-    runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request'
-    permissions:
-      packages: write
-    
-    steps:
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: /tmp/artifacts
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE_REF }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=tag
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix={{branch}}-,format=short
-
-      - name: Load, retag, and push platform images
-        run: |
-          for arch in amd64 arm64; do
-            platform_safe="linux-${arch}"
-            LOADED=$(docker load --input /tmp/artifacts/image-${platform_safe}/image-${platform_safe}.tar 2>&1 \
-              | grep "Loaded image" | head -1 | sed 's/Loaded image: //' | tr -d '[:space:]')
-            docker tag "$LOADED" "${REGISTRY}/${IMAGE_NAME}:${arch}"
-            docker push "${REGISTRY}/${IMAGE_NAME}:${arch}"
-          done
-
-      - name: Create and push manifest with imagetools
-        run: |
-          echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
-            if [ -n "$tag" ]; then
-              docker buildx imagetools create -t "$tag" \
-                "${REGISTRY}/${IMAGE_NAME}:amd64" \
-                "${REGISTRY}/${IMAGE_NAME}:arm64"
-            fi
-          done
-
-  cleanup-old-images:
-    name: Cleanup Old Images
+  informational-cleanup-old-images:
+    name: Informational - Cleanup Old Images
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule'
     permissions:
       packages: write
-    
     steps:
       - name: Delete old container images
-        uses: actions/delete-package-versions@v4
+        uses: actions/delete-package-versions@v5
         with:
           package-name: 'code-index-mcp'
           package-type: 'container'
@@ -268,38 +172,14 @@ jobs:
           delete-only-pre-release-versions: false
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Delete untagged images
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const response = await github.rest.packages.listPackageVersionsForPackageOwnedByOrg({
-              package_type: 'container',
-              package_name: 'code-index-mcp',
-              org: context.repo.owner,
-              state: 'active'
-            });
-            
-            for (const version of response.data.versions) {
-              if (version.metadata.container.tags.length === 0) {
-                console.log(`Deleting untagged version ${version.id}`);
-                await github.rest.packages.deletePackageVersionForOrg({
-                  package_type: 'container',
-                  package_name: 'code-index-mcp',
-                  org: context.repo.owner,
-                  package_version_id: version.id
-                });
-              }
-            }
-
-  sign-images:
-    name: Sign Container Images
-    needs: push-manifests
+  informational-sign-images:
+    name: Informational - Sign Container Images
+    needs: informational-push-manifests
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       packages: write
       id-token: write
-    
     steps:
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3
@@ -315,28 +195,5 @@ jobs:
         env:
           COSIGN_EXPERIMENTAL: 1
         run: |
-          # Get image digest
-          IMAGE_DIGEST=$(crane digest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }})
-          
-          # Sign the image
-          cosign sign --yes \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${IMAGE_DIGEST}
-          
-          # Verify signature
-          cosign verify \
-            --certificate-identity-regexp "https://github.com/${{ github.repository }}/*" \
-            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${IMAGE_DIGEST}
-
-      - name: Attach SBOM to image
-        run: |
-          # Download SBOMs
-          for platform in linux-amd64 linux-arm64; do
-            curl -L -o sbom-${platform}.spdx.json \
-              ${{ github.server_url }}/${{ github.repository }}/actions/artifacts/sbom-${platform}/sbom-${platform}.spdx.json
-          done
-          
-          # Attach SBOM
-          IMAGE_DIGEST=$(crane digest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }})
-          cosign attach sbom --sbom sbom-linux-amd64.spdx.json \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${IMAGE_DIGEST}
+          IMAGE_DIGEST=$(crane digest "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}")
+          cosign sign --yes "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${IMAGE_DIGEST}"

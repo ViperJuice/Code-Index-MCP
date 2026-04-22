@@ -12,10 +12,12 @@ tree-sitter based plugins for languages without specific implementations.
 """
 
 import asyncio
+import importlib.util
 import logging
 import os
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Callable, Dict, Literal, Optional, Tuple, Type, Union
 
 from ..storage.sqlite_store import SQLiteStore
 from .generic_treesitter_plugin import GenericTreeSitterPlugin
@@ -52,6 +54,64 @@ SPECIFIC_PLUGIN_MODULES: Dict[str, str] = {
     "kotlin": "mcp_server.plugins.kotlin_plugin",
     "markdown": "mcp_server.plugins.markdown_plugin",
 }
+
+AvailabilityState = Literal["enabled", "unsupported", "missing_extra", "disabled", "load_error"]
+
+REQUIRED_PLUGIN_EXTRAS: Dict[str, Tuple[str, ...]] = {
+    "java": ("javalang",),
+}
+
+EXTRA_REMEDIATION: Dict[str, str] = {
+    "java": "Install the Java plugin extra with `uv sync --locked --extra java`.",
+}
+
+
+@dataclass(frozen=True)
+class PluginAvailability:
+    language: str
+    state: AvailabilityState
+    sandbox_supported: bool
+    specific_plugin: bool
+    plugin_module: Optional[str]
+    required_extras: Tuple[str, ...] = ()
+    remediation: Optional[str] = None
+    error_type: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return {
+            "language": self.language,
+            "state": self.state,
+            "sandbox_supported": self.sandbox_supported,
+            "specific_plugin": self.specific_plugin,
+            "plugin_module": self.plugin_module,
+            "required_extras": list(self.required_extras),
+            "remediation": self.remediation,
+            "error_type": self.error_type,
+        }
+
+
+class PluginUnavailableError(ValueError):
+    """Expected plugin capability-unavailable state."""
+
+    def __init__(self, availability: PluginAvailability):
+        self.language = availability.language
+        self.state = availability.state
+        self.required_extras = availability.required_extras
+        self.remediation = availability.remediation
+        self.error_type = availability.error_type
+        super().__init__(
+            f"Plugin {availability.language!r} unavailable: {availability.state}"
+            + (f" ({availability.remediation})" if availability.remediation else "")
+        )
+
+    def to_dict(self) -> dict:
+        return {
+            "language": self.language,
+            "state": self.state,
+            "required_extras": list(self.required_extras),
+            "remediation": self.remediation,
+            "error_type": self.error_type,
+        }
 
 try:
     from .python_plugin import Plugin as PythonPlugin
@@ -174,6 +234,73 @@ class PluginFactory:
     # Prevents duplicate cold-starts for concurrent requests to the same plugin.
     _async_cache: Dict[Tuple[str, str], "asyncio.Future"] = {}
 
+    @staticmethod
+    def _sandbox_enabled(sandbox_enabled: bool | None = None) -> bool:
+        if sandbox_enabled is not None:
+            return sandbox_enabled
+        return os.environ.get("MCP_PLUGIN_SANDBOX_DISABLE") != "1"
+
+    @classmethod
+    def _missing_required_extras(cls, language: str) -> Tuple[str, ...]:
+        return tuple(
+            extra
+            for extra in REQUIRED_PLUGIN_EXTRAS.get(language, ())
+            if importlib.util.find_spec(extra) is None
+        )
+
+    @classmethod
+    def get_plugin_availability(
+        cls,
+        language: str | None = None,
+        *,
+        sandbox_enabled: bool | None = None,
+    ) -> list[dict] | dict:
+        """Return stable plugin capability state rows for factory languages."""
+        sandbox = cls._sandbox_enabled(sandbox_enabled)
+        languages = [language] if language is not None else cls.get_supported_languages()
+        rows: list[dict] = []
+
+        for raw in languages:
+            lang = raw.lower().replace("-", "_")
+            known = lang in cls.get_supported_languages()
+            plugin_module = SPECIFIC_PLUGIN_MODULES.get(lang)
+            sandbox_supported = plugin_module is not None
+            specific_plugin = lang in SPECIFIC_PLUGINS
+            required_extras = REQUIRED_PLUGIN_EXTRAS.get(lang, ())
+            missing = cls._missing_required_extras(lang)
+
+            if not known:
+                state: AvailabilityState = "unsupported"
+                remediation = "Use one of PluginFactory.get_supported_languages()."
+                error_type = "UnsupportedLanguage"
+            elif sandbox and not sandbox_supported:
+                state = "unsupported"
+                remediation = "Sandbox mode has no hardened plugin module for this language."
+                error_type = "SandboxUnsupported"
+            elif missing:
+                state = "missing_extra"
+                remediation = EXTRA_REMEDIATION.get(lang)
+                error_type = "MissingOptionalDependency"
+            else:
+                state = "enabled"
+                remediation = None
+                error_type = None
+
+            rows.append(
+                PluginAvailability(
+                    language=lang,
+                    state=state,
+                    sandbox_supported=sandbox_supported,
+                    specific_plugin=specific_plugin,
+                    plugin_module=plugin_module,
+                    required_extras=tuple(required_extras),
+                    remediation=remediation,
+                    error_type=error_type,
+                ).to_dict()
+            )
+
+        return rows[0] if language is not None else rows
+
     @classmethod
     async def create_plugin_async(
         cls,
@@ -238,11 +365,9 @@ class PluginFactory:
                 attach per-repo state. SL-1/SL-3/SL-5 preserve this hook through
                 their rewrites.
             capabilities: P15 IF-0-P15-1 — optional CapabilitySet. When present
-                (or when ``MCP_PLUGIN_SANDBOX_ENABLED=1`` is set in the env),
                 the factory returns a :class:`SandboxedPlugin` that runs the
-                plugin in an isolated subprocess. Default off; existing callers
-                keep their behavior byte-for-byte when the env var is unset and
-                ``capabilities`` is None.
+                plugin in an isolated subprocess. Sandboxing is default-on
+                unless ``MCP_PLUGIN_SANDBOX_DISABLE=1`` is set.
 
         Returns:
             Plugin instance
@@ -262,12 +387,22 @@ class PluginFactory:
             from ..sandbox.capabilities import CapabilitySet as _CapabilitySet
             from .sandboxed_plugin import SandboxedPlugin
 
-            plugin_module = SPECIFIC_PLUGIN_MODULES.get(language)
-            if plugin_module is None:
-                raise ValueError(
-                    f"Sandbox mode does not yet support language {language!r}. "
-                    f"Supported: {sorted(SPECIFIC_PLUGIN_MODULES)}"
+            availability = cls.get_plugin_availability(language, sandbox_enabled=True)
+            if availability["state"] != "enabled":
+                raise PluginUnavailableError(
+                    PluginAvailability(
+                        language=availability["language"],
+                        state=availability["state"],
+                        sandbox_supported=availability["sandbox_supported"],
+                        specific_plugin=availability["specific_plugin"],
+                        plugin_module=availability["plugin_module"],
+                        required_extras=tuple(availability["required_extras"]),
+                        remediation=availability["remediation"],
+                        error_type=availability["error_type"],
+                    )
                 )
+
+            plugin_module = SPECIFIC_PLUGIN_MODULES.get(language)
 
             if capabilities is None:
                 # Default caps: read-only access to the workspace, no writes,
@@ -305,6 +440,20 @@ class PluginFactory:
                 plugin = plugin_class_or_factory(sqlite_store=sqlite_store)
         # Check if language is supported by generic plugin
         elif language in LANGUAGE_CONFIGS:
+            availability = cls.get_plugin_availability(language, sandbox_enabled=False)
+            if availability["state"] == "missing_extra":
+                raise PluginUnavailableError(
+                    PluginAvailability(
+                        language=availability["language"],
+                        state=availability["state"],
+                        sandbox_supported=availability["sandbox_supported"],
+                        specific_plugin=availability["specific_plugin"],
+                        plugin_module=availability["plugin_module"],
+                        required_extras=tuple(availability["required_extras"]),
+                        remediation=availability["remediation"],
+                        error_type=availability["error_type"],
+                    )
+                )
             logger.info(f"Using generic plugin for {language}")
             config = LANGUAGE_CONFIGS[language]
             plugin = GenericTreeSitterPlugin(config, sqlite_store, enable_semantic)
@@ -407,7 +556,13 @@ class PluginFactory:
                 plugin = cls.create_plugin(language, sqlite_store, enable_semantic)
                 plugins[language] = plugin
                 logger.info(f"Created plugin for {language}")
+            except PluginUnavailableError as e:
+                logger.info(
+                    "Skipping unavailable plugin for %s: %s",
+                    language,
+                    e.state,
+                )
             except Exception as e:
-                logger.error(f"Failed to create plugin for {language}: {e}")
+                logger.error(f"Unexpected plugin construction failure for {language}: {e}")
 
         return plugins

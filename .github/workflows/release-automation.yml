@@ -38,13 +38,46 @@ env:
   SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
 
 jobs:
+  preflight-release-gates:
+    name: Preflight Release Gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip uv
+          uv sync --locked --extra dev --extra semantic
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Validate requested release version
+        run: |
+          VERSION="${{ inputs.version }}"
+          VERSION_NO_V=${VERSION#v}
+          grep -q "default: 'v1.2.0-rc3'" .github/workflows/release-automation.yml
+          grep -q "version = \"$VERSION_NO_V\"" pyproject.toml
+          grep -q "__version__ = \"$VERSION_NO_V\"" mcp_server/__init__.py
+
+      - name: Run alpha release gates
+        run: |
+          make alpha-release-gates
+          # make release-smoke is invoked by alpha-release-gates.
+
   prepare-release:
     name: Prepare Release
+    needs: preflight-release-gates
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.determine_version.outputs.version }}
       changelog: ${{ steps.generate_changelog.outputs.changelog }}
-    
     steps:
       - uses: actions/checkout@v4
         with:
@@ -62,16 +95,11 @@ jobs:
           if [ "${{ inputs.release_type }}" == "custom" ]; then
             VERSION="${{ inputs.version }}"
           else
-            # Get latest semver tag (ignore non-semver tags like index-latest)
             LATEST_TAG=$(git tag --list 'v[0-9]*' --sort=-version:refname | head -1 || true)
             [ -z "$LATEST_TAG" ] && LATEST_TAG="v0.0.0"
-            
-            # Extract version numbers
-            VERSION_MAJOR=$(echo $LATEST_TAG | sed 's/v//' | cut -d. -f1)
-            VERSION_MINOR=$(echo $LATEST_TAG | sed 's/v//' | cut -d. -f2)
-            VERSION_PATCH=$(echo $LATEST_TAG | sed 's/v//' | cut -d. -f3)
-            
-            # Increment based on release type
+            VERSION_MAJOR=$(echo "$LATEST_TAG" | sed 's/v//' | cut -d. -f1)
+            VERSION_MINOR=$(echo "$LATEST_TAG" | sed 's/v//' | cut -d. -f2)
+            VERSION_PATCH=$(echo "$LATEST_TAG" | sed 's/v//' | cut -d. -f3)
             case "${{ inputs.release_type }}" in
               major)
                 VERSION_MAJOR=$((VERSION_MAJOR + 1))
@@ -86,95 +114,54 @@ jobs:
                 VERSION_PATCH=$((VERSION_PATCH + 1))
                 ;;
             esac
-            
             VERSION="v${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
           fi
-          
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Version will be: $VERSION"
 
       - name: Update Version Files
         run: |
           VERSION="${{ steps.determine_version.outputs.version }}"
           VERSION_NO_V=${VERSION#v}
-          
-          # Update pyproject.toml
           sed -i "s/^version = .*/version = \"$VERSION_NO_V\"/" pyproject.toml
-          
-          # Update __init__.py files
           find . -name "__init__.py" -path "*/mcp_server/*" -exec sed -i "s/__version__ = .*/__version__ = \"$VERSION_NO_V\"/" {} \; 2>/dev/null || true
-          
-          # Update package.json if exists
-          if [ -f package.json ]; then
-            jq ".version = \"$VERSION_NO_V\"" package.json > package.json.tmp && mv package.json.tmp package.json
-          fi
 
       - name: Generate Changelog
         id: generate_changelog
         run: |
           VERSION="${{ steps.determine_version.outputs.version }}"
           PREVIOUS_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          
-          # Generate changelog
-          echo "# Changelog for $VERSION" > RELEASE_NOTES.md
-          echo "" >> RELEASE_NOTES.md
-          echo "## What's Changed" >> RELEASE_NOTES.md
-          echo "" >> RELEASE_NOTES.md
-          
-          if [ -n "$PREVIOUS_TAG" ]; then
-            # Get commit messages
-            git log $PREVIOUS_TAG..HEAD --pretty=format:"- %s (%an)" >> RELEASE_NOTES.md
-            
-            # Extract PR numbers and categorize
-            echo -e "\n\n## Pull Requests" >> RELEASE_NOTES.md
-            git log $PREVIOUS_TAG..HEAD --grep="Merge pull request" --pretty=format:"- %s" >> RELEASE_NOTES.md
-            
-            # Statistics
-            echo -e "\n\n## Statistics" >> RELEASE_NOTES.md
-            echo "- Commits: $(git rev-list --count $PREVIOUS_TAG..HEAD)" >> RELEASE_NOTES.md
-            echo "- Contributors: $(git log $PREVIOUS_TAG..HEAD --format='%an' | sort -u | wc -l)" >> RELEASE_NOTES.md
-            echo "- Files changed: $(git diff --name-only $PREVIOUS_TAG..HEAD | wc -l)" >> RELEASE_NOTES.md
-          else
-            echo "Initial release" >> RELEASE_NOTES.md
-          fi
-          
-          # Add feature highlights
-          echo -e "\n\n## Feature Highlights" >> RELEASE_NOTES.md
-          echo "- 🚀 Dynamic plugin loading system" >> RELEASE_NOTES.md
-          echo "- 📊 Comprehensive monitoring with Prometheus & Grafana" >> RELEASE_NOTES.md
-          echo "- 🔍 48+ language support via tree-sitter" >> RELEASE_NOTES.md
-          echo "- 📝 Document processing (Markdown & PlainText)" >> RELEASE_NOTES.md
-          echo "- 🔐 Security with JWT authentication" >> RELEASE_NOTES.md
-          echo "- ⚡ High-performance caching system" >> RELEASE_NOTES.md
-          
-          # Add breaking changes if major version
-          if [[ "${{ inputs.release_type }}" == "major" ]]; then
-            echo -e "\n\n## ⚠️ Breaking Changes" >> RELEASE_NOTES.md
-            echo "Please review the migration guide before upgrading." >> RELEASE_NOTES.md
-          fi
-          
-          # Output changelog
-          echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          cat RELEASE_NOTES.md >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "# Changelog for $VERSION"
+            echo ""
+            echo "## What's Changed"
+            echo ""
+            if [ -n "$PREVIOUS_TAG" ]; then
+              git log "${PREVIOUS_TAG}..HEAD" --pretty=format:"- %s (%an)"
+            else
+              echo "Initial release"
+            fi
+          } > RELEASE_NOTES.md
+          {
+            echo "changelog<<EOF"
+            cat RELEASE_NOTES.md
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Update CHANGELOG.md
         run: |
           VERSION="${{ steps.determine_version.outputs.version }}"
           DATE=$(date +%Y-%m-%d)
-          
-          # Create temporary file with new entry
-          echo "# Changelog" > CHANGELOG.tmp
-          echo "" >> CHANGELOG.tmp
-          echo "## [$VERSION] - $DATE" >> CHANGELOG.tmp
-          cat RELEASE_NOTES.md | tail -n +2 >> CHANGELOG.tmp
-          echo "" >> CHANGELOG.tmp
-          
-          # Append existing changelog
-          if [ -f CHANGELOG.md ]; then
-            tail -n +2 CHANGELOG.md >> CHANGELOG.tmp
-          fi
-          
+          {
+            echo "# Changelog"
+            echo ""
+            echo "## [$VERSION] - $DATE"
+            tail -n +2 RELEASE_NOTES.md
+            echo ""
+            if [ -f CHANGELOG.md ]; then
+              tail -n +2 CHANGELOG.md
+            fi
+          } > CHANGELOG.tmp
           mv CHANGELOG.tmp CHANGELOG.md
 
       - name: Commit Version Changes
@@ -187,14 +174,13 @@ jobs:
         run: |
           VERSION="${{ steps.determine_version.outputs.version }}"
           BRANCH="release/$VERSION"
-          git checkout -b $BRANCH
-          git push origin $BRANCH
+          git checkout -b "$BRANCH"
+          git push origin "$BRANCH"
 
   run-tests:
     name: Run Release Tests
-    needs: prepare-release
+    needs: [preflight-release-gates, prepare-release]
     runs-on: ubuntu-latest
-    
     steps:
       - uses: actions/checkout@v4
         with:
@@ -214,28 +200,18 @@ jobs:
       - name: Run release smoke tests
         run: make release-smoke
 
-      - name: Run integration tests
-        run: |
-          uv run pytest tests/integration/ -v || echo "Integration tests not found"
-
       - name: Validate version consistency
         run: |
           VERSION="${{ needs.prepare-release.outputs.version }}"
           VERSION_NO_V=${VERSION#v}
-          
-          # Check pyproject.toml
           grep -q "version = \"$VERSION_NO_V\"" pyproject.toml || exit 1
-
-          # Check runtime package metadata
           grep -q "__version__ = \"$VERSION_NO_V\"" mcp_server/__init__.py || exit 1
-          
           echo "Version consistency check passed"
 
   build-artifacts:
     name: Build Release Artifacts
-    needs: [prepare-release, run-tests]
+    needs: [preflight-release-gates, prepare-release, run-tests]
     runs-on: ubuntu-latest
-    
     steps:
       - uses: actions/checkout@v4
         with:
@@ -295,9 +271,8 @@ jobs:
 
   create-release:
     name: Create GitHub Release
-    needs: [prepare-release, build-artifacts]
+    needs: [preflight-release-gates, prepare-release, build-artifacts]
     runs-on: ubuntu-latest
-    
     steps:
       - uses: actions/checkout@v4
         with:
@@ -314,11 +289,11 @@ jobs:
           VERSION="${{ needs.prepare-release.outputs.version }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a $VERSION -m "Release $VERSION"
-          git push origin $VERSION
+          git tag -a "$VERSION" -m "Release $VERSION"
+          git push origin "$VERSION"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare-release.outputs.version }}
           name: Release ${{ needs.prepare-release.outputs.version }}
@@ -340,9 +315,8 @@ jobs:
 
   merge-release:
     name: Merge Release Branch
-    needs: [prepare-release, create-release]
+    needs: [preflight-release-gates, prepare-release, create-release]
     runs-on: ubuntu-latest
-    
     steps:
       - uses: actions/checkout@v4
         with:
@@ -350,7 +324,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: release/${{ needs.prepare-release.outputs.version }}
@@ -360,16 +334,17 @@ jobs:
             ## Release ${{ needs.prepare-release.outputs.version }}
 
             P21 release contract target: v1.2.0-rc3
-            
+
             This PR contains all changes for release ${{ needs.prepare-release.outputs.version }}.
-            
+
             ### Checklist
+            - [x] Alpha release gates passed
             - [x] Version bumped
             - [x] Changelog updated
-            - [x] Tests passed
+            - [x] Release smoke passed
             - [x] Docker images built
             - [x] Release created
-            
+
             ### Release Notes
             ${{ needs.prepare-release.outputs.changelog }}
           labels: |
@@ -380,26 +355,21 @@ jobs:
         if: ${{ github.event.inputs.auto_merge == 'true' }}
         run: |
           PR_NUMBER=$(gh pr list --base main --head release/${{ needs.prepare-release.outputs.version }} --json number -q '.[0].number')
-          gh pr merge $PR_NUMBER --auto --merge
+          gh pr merge "$PR_NUMBER" --auto --merge
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   post-release:
     name: Post-Release Tasks
-    needs: [prepare-release, create-release]
+    needs: [preflight-release-gates, prepare-release, create-release]
     runs-on: ubuntu-latest
-    
     steps:
       - uses: actions/checkout@v4
 
       - name: Update documentation
         run: |
           VERSION="${{ needs.prepare-release.outputs.version }}"
-          
-          # Update README
           sed -i "s/Latest Version: .*/Latest Version: $VERSION/" README.md || true
-          
-          # Update installation docs
           find docs -name "*.md" -exec sed -i "s/code-index-mcp:.*/code-index-mcp:$VERSION/g" {} \;
 
       - name: Notify Slack
@@ -408,34 +378,18 @@ jobs:
           VERSION="${{ needs.prepare-release.outputs.version }}"
           curl -X POST "$SLACK_WEBHOOK" \
             -H 'Content-Type: application/json' \
-            -d "{
-              \"text\": \"🎉 MCP Server $VERSION has been released!\",
-              \"attachments\": [{
-                \"color\": \"good\",
-                \"fields\": [
-                  {\"title\": \"Version\", \"value\": \"$VERSION\", \"short\": true},
-                  {\"title\": \"Type\", \"value\": \"${{ inputs.release_type }}\", \"short\": true},
-                  {\"title\": \"Release URL\", \"value\": \"https://github.com/${{ github.repository }}/releases/tag/$VERSION\"}
-                ]
-              }]
-            }"
+            -d "{\"text\":\"MCP Server $VERSION has been released.\"}"
 
       - name: Trigger deployment workflows
         run: |
           VERSION="${{ needs.prepare-release.outputs.version }}"
-
-          # Trigger staging deployment when the workflow exists
           if gh workflow view deploy-staging.yml >/dev/null 2>&1; then
             gh workflow run deploy-staging.yml -f version=$VERSION
           else
             echo "deploy-staging.yml not present; skipping staging trigger"
           fi
-
-          # Ensure deployment labels exist before creating the approval issue
           gh label create deployment --color 1d76db --description "Deployment tracking" 2>/dev/null || true
           gh label create production --color b60205 --description "Production release work" 2>/dev/null || true
-          
-          # Create issue for production deployment approval
           gh issue create \
             --title "Production Deployment: $VERSION" \
             --body "Please review and approve production deployment for version $VERSION" \

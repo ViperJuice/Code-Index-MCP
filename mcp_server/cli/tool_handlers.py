@@ -324,6 +324,7 @@ async def handle_get_status(
     client_name: Optional[str] = None,
 ) -> Sequence[types.TextContent]:
     from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
+    from mcp_server.plugins.plugin_factory import PluginFactory
 
     ctx = _resolve_ctx(repo_resolver, None)
 
@@ -403,6 +404,12 @@ async def handle_get_status(
         },
         "repositories": _build_repositories(repo_resolver),
     }
+    availability_rows = PluginFactory.get_plugin_availability()
+    counts: dict[str, int] = {}
+    for row in availability_rows:
+        state = row.get("state", "load_error")
+        counts[state] = counts.get(state, 0) + 1
+    status_data["plugins"]["availability_counts"] = counts
     return [types.TextContent(type="text", text=_ensure_response(status_data))]
 
 
@@ -413,10 +420,20 @@ async def handle_list_plugins(
     repo_resolver: RepoResolver,
     plugin_manager: Any = None,
 ) -> Sequence[types.TextContent]:
+    from mcp_server.plugins.plugin_factory import PluginFactory
+
+    availability_rows = PluginFactory.get_plugin_availability()
+    counts: dict[str, int] = {}
+    for row in availability_rows:
+        state = row.get("state", "load_error")
+        counts[state] = counts.get(state, 0) + 1
+
     response_data: dict = {
         "plugin_manager_plugins": [],
         "supported_languages": [],
         "loaded_plugins": [],
+        "plugin_availability": availability_rows,
+        "availability_counts": counts,
     }
 
     if plugin_manager is not None:

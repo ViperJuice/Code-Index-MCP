@@ -1,4 +1,4 @@
-# User Action Runbook — P12 through P15
+# User Action Runbook — P12 through P25
 
 > This runbook lists actions that **cannot** be performed by automated phase execution (`/execute-phase`) and must be done by the operator. Each phase has a "before execute-phase" checklist and an "after-merge" checklist. Read the relevant section before invoking `/plan-phase` for that phase.
 
@@ -100,14 +100,23 @@ No operator actions required. P12 is fully codebase-internal.
 #### Operationalization subsections
 
 **SL-1 plugin-trust posture operationalization**:
-- Plugin sandboxing is controlled by `MCP_PLUGIN_SANDBOX_ENABLED=1` (default off in P15).
-- When enabled, all plugins run in isolated worker processes communicating via JSON-line IPC over stdin/stdout.
+- Plugin sandboxing is default-on as of P18/P24. Set
+  `MCP_PLUGIN_SANDBOX_DISABLE=1` only for trusted environments that need
+  unsandboxed generic parsing.
+- When enabled, sandbox-supported plugins run in isolated worker processes
+  communicating via JSON-line IPC over stdin/stdout.
 - Per-plugin capability restrictions can be set via `PluginFactory.create_plugin(..., capabilities=CapabilitySet(...))`.
+- Use the MCP `list_plugins` tool to audit `plugin_availability` before rollout.
+  Expected states are `enabled`, `unsupported`, `missing_extra`, `disabled`, and
+  `load_error`. Registry-only languages without hardened sandbox modules are
+  `unsupported` and skipped quietly; optional extras such as Java's `javalang`
+  are `missing_extra` with remediation.
 - Three recommended postures:
-  1. **No sandbox (default)**: Plugins run in-process; fastest but least safe.
-  2. **Sandbox with default caps**: All plugins run in workers; default `CapabilitySet` allows SQLite only.
-  3. **Locked-down per-plugin**: Each plugin gets custom capability set (e.g., Go plugin granted `subprocess`, others locked down).
-- For production deployments, set `MCP_PLUGIN_SANDBOX_ENABLED=1`.
+  1. **Sandbox with default caps (default)**: Hardened plugins run in workers; unsupported registry-only languages are visible in `list_plugins`.
+  2. **Locked-down per-plugin**: Each plugin gets custom capability set (e.g., Go plugin granted `subprocess`, others locked down).
+  3. **Trusted unsandboxed opt-out**: Plugins run in-process; fastest but least safe.
+- For production deployments, keep the default sandbox posture and alert on
+  `load_error` availability rows.
 
 **SL-2 bearer-vs-NetworkPolicy decision matrix**:
 - `/metrics` endpoint now requires authentication (`Depends(require_auth("metrics"))` → `Permission.ADMIN`).
@@ -139,6 +148,39 @@ No operator actions required. P12 is fully codebase-internal.
 - [ ] **Rotate `GITHUB_TOKEN`** and verify scopes via the new `TokenValidator` at startup. If `TokenValidator` emits missing-scope errors, the deployment will refuse to start — this is intentional fail-loud behavior.
 - [ ] **Add alerting on path-traversal-guard rejections + attestation-verify failures.** Either event should be rare and indicates either a bug or an attack. Page-worthy.
 - [ ] **Verify attestation-enabled download path in staging.** Sign a test artifact, download it, confirm the verify step passes. Then deliberately corrupt an artifact and confirm verify rejects it.
+
+### 3.5 Phase 25 - Blocking Release Gates & Automation
+
+#### Before P25
+
+- [ ] **Confirm GitHub artifact attestations are enabled.** Navigate to
+  `Settings -> Actions -> General -> Artifact attestations` and keep the
+  repository setting enabled before relying on authenticated attestation tests.
+- [ ] **Provision `ATTESTATION_GH_TOKEN` only where appropriate.** The token must
+  be stored as a GitHub Actions secret and have the repository access required
+  by `tests/security/test_artifact_attestation.py`. Do not expose it to
+  contributor pull requests.
+- [ ] **Decide private-alpha fallback posture.** If `ATTESTATION_GH_TOKEN` or the
+  repository attestation setting is unavailable, the authenticated attestation
+  job must remain private-alpha informational skipped/warn. It must not silently
+  pass and must not block contributor PRs.
+
+#### After P25 merge
+
+- [ ] **Require the public alpha gate set before release evidence is accepted.**
+  The required jobs are `Alpha Gate - Dependency Sync`,
+  `Alpha Gate - Format And Lint`, `Alpha Gate - Unit And Release Smoke`,
+  `Alpha Gate - Integration Smoke`, `Alpha Gate - Docker Build And Smoke`,
+  `Alpha Gate - Docs Truth`, and `Alpha Gate - Required Gates Passed`.
+- [ ] **Verify release automation refuses early.** Before approving a release
+  workflow run, confirm `preflight-release-gates` completed before
+  `prepare-release`; version mutation, branch creation, artifact build, tag
+  creation, GitHub release creation, PyPI publish, and container publish must
+  remain downstream of that gate.
+- [ ] **Record informational leftovers explicitly.** Cross-platform tests,
+  authenticated attestation tests without `ATTESTATION_GH_TOKEN`, benchmarks,
+  vulnerability scans, cleanup, signing, and publish-only container manifest work
+  are informational for private alpha unless promoted by a later phase.
 
 ---
 

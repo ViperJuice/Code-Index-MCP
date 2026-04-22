@@ -37,6 +37,7 @@ class Plugin(PluginWithSemanticSearch):
 
         # Initialize enhanced base class
         super().__init__(sqlite_store=sqlite_store, enable_semantic=enable_semantic)
+        self._sqlite_store = sqlite_store
 
         # Initialize components
         self._indexer = FuzzyIndexer(sqlite_store=sqlite_store)

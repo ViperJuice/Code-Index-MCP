@@ -120,7 +120,7 @@ def _build_tool_list() -> list[types.Tool]:
         ),
         types.Tool(
             name="list_plugins",
-            description="List all loaded plugins. Shows 48 supported languages with specialized and generic plugin information.",
+            description="List all loaded plugins and plugin availability states, including enabled, unsupported, disabled, missing-extra, and load-error capabilities.",
             inputSchema={"type": "object", "properties": {}},
         ),
         types.Tool(

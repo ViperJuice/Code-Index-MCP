@@ -47,6 +47,34 @@ The `CapabilitySet` dataclass defines which operations are allowed:
 
 The host constructs a `SandboxedPlugin` adapter wrapping each real plugin instance with per-plugin capability declarations.
 
+## Availability States (P24)
+
+Sandboxing remains default-on. `PluginFactory.get_plugin_availability()` and the
+MCP `list_plugins` tool expose the detailed capability state for every factory
+language:
+
+- `enabled`: the language has a hardened sandbox module and required extras are present.
+- `unsupported`: the language is registry-only or otherwise lacks a hardened sandbox module.
+- `missing_extra`: the plugin depends on an optional extra that is not installed.
+- `disabled`: reserved for administratively disabled capabilities.
+- `load_error`: an unexpected construction failure that should be investigated.
+
+Registry-only languages such as Ruby or JSON are skipped quietly in default
+sandbox mode and are visible as `unsupported`, not as startup/runtime failures.
+They can be loaded through generic parsing only when an operator explicitly opts
+out with `MCP_PLUGIN_SANDBOX_DISABLE=1`.
+
+Known optional dependency misses are normalized. For example, Java static
+analysis requires `javalang`; install it with:
+
+```bash
+uv sync --locked --extra java
+```
+
+Sandbox worker import and construction failures return structured details with
+`state`, `language`, `required_extras`, and `remediation` where known. C# is
+available through both `c_sharp` and `csharp` aliases.
+
 ## Worker Lifecycle
 
 1. **Startup**: Host spawns worker as a subprocess, passing `--plugin-name <name>` and `--capabilities <json>`.

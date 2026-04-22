@@ -20,6 +20,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expanded release metadata and requirements-consolidation tests to guard the
   P21 contract surfaces consumed by P22.
 
+### Added (P25 — blocking release gates and automation)
+- Added explicit public alpha gate jobs for dependency sync, focused format/lint,
+  unit plus release smoke, integration smoke, Docker build/smoke, docs truth, and
+  required-gate aggregation.
+- Added release automation preflight refusal before version mutation, release
+  branch creation, artifact build, tag creation, GitHub release creation, PyPI
+  publish, or container publish.
+- Documented the operator gate checklist and private-alpha authenticated
+  attestation fallback for missing `ATTESTATION_GH_TOKEN` or repository
+  attestation settings.
+
 ## [1.2.0-rc2] — 2026-04-20
 
 ### Fixed (P20 — sandbox/OpenBLAS hotfix, observability bugs)

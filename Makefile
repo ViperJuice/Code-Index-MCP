@@ -1,4 +1,5 @@
 .PHONY: help install test test-unit test-integration test-all test-parallel test-interfaces test-plugins test-performance test-resilience lint format clean coverage benchmark security docker release-smoke release-smoke-container
+.PHONY: alpha-dependency-sync alpha-format-lint alpha-unit-release-smoke alpha-integration-smoke alpha-docs-truth alpha-release-gates
 .PHONY: docker-up docker-down docker-dev docker-prod docker-test docker-logs docker-health
 .PHONY: test-dormant test-real-world test-semantic test-redis test-advanced test-cross-lang
 .PHONY: setup-env setup-dev-env setup-prod-env backup restore clean-docker check-diagrams
@@ -147,6 +148,43 @@ release-smoke:
 
 release-smoke-container:
 	uv run --extra dev python scripts/release_smoke.py --container
+
+alpha-dependency-sync:
+	uv lock --locked
+	uv sync --locked
+
+alpha-format-lint:
+	uv run black --check mcp_server tests
+	uv run isort --check-only mcp_server tests
+	uv run flake8 mcp_server tests
+	uv run pylint mcp_server --fail-under=7.0
+
+alpha-unit-release-smoke:
+	uv run pytest tests/ \
+		--ignore=tests/test_git_integration.py \
+		-n auto \
+		--timeout=60 \
+		--benchmark-skip \
+		--no-cov
+	$(MAKE) release-smoke
+
+alpha-integration-smoke:
+	uv run pytest tests/ -m "integration or slow" \
+		--timeout=120 \
+		--no-cov \
+		--benchmark-skip \
+		-v
+
+alpha-docs-truth:
+	uv run pytest \
+		tests/test_release_metadata.py \
+		tests/test_requirements_consolidation.py \
+		tests/smoke/test_release_smoke_contract.py \
+		tests/docs/test_p23_doc_truth.py \
+		tests/docs/test_p25_release_checklist.py \
+		-v --no-cov
+
+alpha-release-gates: alpha-dependency-sync alpha-format-lint alpha-unit-release-smoke alpha-integration-smoke alpha-docs-truth
 
 # Docker operations
 docker-up:

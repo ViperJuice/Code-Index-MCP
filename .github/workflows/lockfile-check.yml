@@ -2,17 +2,14 @@ name: lockfile-check
 
 on:
   push:
-    paths:
-      - "pyproject.toml"
-      - "uv.lock"
+    branches: [ main, develop ]
   pull_request:
-    paths:
-      - "pyproject.toml"
-      - "uv.lock"
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
-  check-lockfile:
-    name: Verify uv.lock is up to date
+  alpha-dependency-sync:
+    name: Alpha Gate - Dependency Sync
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,5 +17,5 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v4
 
-      - name: Verify lockfile is current
-        run: uv lock --locked
+      - name: Verify dependency lock and sync
+        run: make alpha-dependency-sync

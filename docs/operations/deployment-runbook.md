@@ -22,6 +22,23 @@ are met and the bake window has elapsed without a rollback trigger firing.
 
 ---
 
+## Public Alpha Release Gate Checklist
+
+The public alpha release cannot advance until each required job below is green.
+Slow, credentialed, cross-platform, benchmark, scan, signing, cleanup, and
+publication jobs are informational unless this table explicitly names them as a
+blocker.
+
+| Required job | Operator decision | Command/workflow source | Block/fallback behavior |
+|---|---|---|---|
+| Alpha Gate - Dependency Sync | Dependency metadata and `uv.lock` are in sync before release qualification. | `.github/workflows/lockfile-check.yml` -> `make alpha-dependency-sync` | Blocks release on failure; no fallback for public alpha. |
+| Alpha Gate - Format And Lint | Focused formatting and lint checks are clean enough to trust the release branch. | `.github/workflows/ci-cd-pipeline.yml` -> `make alpha-format-lint` | Blocks release on failure; fix code or lint configuration before continuing. |
+| Alpha Gate - Unit And Release Smoke | Unit coverage and P22 wheel/stdio release smoke pass on the release candidate. | `.github/workflows/ci-cd-pipeline.yml` -> `make alpha-unit-release-smoke` and `make release-smoke` | Blocks release on failure; no promotion until smoke is green. |
+| Alpha Gate - Integration Smoke | Integration and slow smoke coverage still works against the current repository state. | `.github/workflows/ci-cd-pipeline.yml` -> `make alpha-integration-smoke` | Blocks release on failure; quarantine only with a tracked release-blocker decision. |
+| Alpha Gate - Docker Build And Smoke | The production container image builds locally in CI and passes the P22 container smoke. | `.github/workflows/container-registry.yml` -> `make release-smoke-container` | Blocks release on failure; scan/sign/publish jobs remain informational until publication. |
+| Alpha Gate - Docs Truth | Release metadata, dependency source-of-truth, smoke contract, and customer docs truth checks are current. | `.github/workflows/ci-cd-pipeline.yml` -> `make alpha-docs-truth` | Blocks release on failure; docs must be corrected before release evidence is accepted. |
+| Alpha Gate - Required Gates Passed | The required main CI gates completed successfully and are ready to combine with dependency/container gates. | `.github/workflows/ci-cd-pipeline.yml` aggregator job | Blocks release on failure; rerun only after the failed upstream gate is understood. |
+
 ## Stages
 
 ### Stage: dev

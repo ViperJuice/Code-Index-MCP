@@ -11,12 +11,15 @@ Consumed by the dispatcher (SL-6) and by P4's watcher (which calls
 from __future__ import annotations
 
 import threading
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional, Protocol, Tuple, runtime_checkable
 
 if TYPE_CHECKING:
     from mcp_server.core.repo_context import RepoContext
     from mcp_server.plugin_base import IPlugin
+
+logger = logging.getLogger(__name__)
 
 
 @runtime_checkable
@@ -75,7 +78,7 @@ class PluginSetRegistry:
 
     def _build_plugin_list(self, repo_id: str) -> List["IPlugin"]:
         """Construct the plugin list for a repo_id via the memory manager."""
-        from mcp_server.plugins.plugin_factory import PluginFactory
+        from mcp_server.plugins.plugin_factory import PluginFactory, PluginUnavailableError
 
         languages = PluginFactory.get_supported_languages()
         result: List["IPlugin"] = []
@@ -93,8 +96,14 @@ class PluginSetRegistry:
                 plugin = manager.get_plugin(lang, ctx)
                 if plugin is not None:
                     result.append(plugin)
+            except PluginUnavailableError as exc:
+                logger.info(
+                    "Skipping unavailable plugin for %s: %s",
+                    lang,
+                    exc.state,
+                )
             except Exception:
-                pass
+                logger.exception("Unexpected error loading plugin for %s", lang)
 
         return result
 
