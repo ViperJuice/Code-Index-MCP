@@ -240,7 +240,7 @@ jobs:
             echo "secret_present=true" >> "$GITHUB_OUTPUT"
           else
             echo "secret_present=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::ATTESTATION_GH_TOKEN secret is not set; private-alpha authenticated attestation tests are informational skipped/warn. Wire the secret in repository settings to enable."
+            echo "ATTESTATION_GH_TOKEN secret is not set; authenticated attestation tests skipped."
           fi
 
       - uses: actions/checkout@v4
