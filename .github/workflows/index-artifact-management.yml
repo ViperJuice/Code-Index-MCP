@@ -65,7 +65,7 @@ jobs:
       checksum: ${{ steps.compress.outputs.checksum }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       
       - name: Prepare artifact metadata
         id: metadata
@@ -161,7 +161,7 @@ jobs:
       
       - name: Upload artifact
         id: upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.metadata.outputs.artifact_name }}
           path: |
@@ -185,10 +185,10 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.action == 'validate'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       
       - name: Download artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ inputs.artifact_name }}
           path: ./artifact-download
@@ -229,13 +229,13 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.action == 'promote'
     steps:
       - name: Download artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ inputs.artifact_name }}
           path: ./artifact-download
       
       - name: Re-upload with extended retention
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ inputs.artifact_name }}-promoted
           path: ./artifact-download/*
@@ -255,7 +255,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.action == 'cleanup'
     steps:
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -351,7 +351,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.action == 'list'
     steps:
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 

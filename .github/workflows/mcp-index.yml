@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       
@@ -70,7 +70,7 @@ jobs:
 
       - name: Set up Python
         if: steps.check_index.outputs.found == 'false' && steps.download.outputs.downloaded == 'false'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -254,7 +254,7 @@ jobs:
           PY
 
       - name: Upload index artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mcp-index-${{ github.sha }}
           path: |
@@ -265,7 +265,7 @@ jobs:
       
       - name: Upload index for PRs
         if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mcp-index-pr-${{ github.event.pull_request.number }}
           path: |
@@ -280,10 +280,10 @@ jobs:
     needs: check-enabled
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -326,7 +326,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     steps:
       - name: Cleanup old artifacts
-        uses: actions/github-script@v6
+        uses: actions/github-script@v9
         with:
           script: |
             const artifacts = await github.rest.actions.listArtifactsForRepo({
