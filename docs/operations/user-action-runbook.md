@@ -1,4 +1,4 @@
-# User Action Runbook — P12 through P25
+# User Action Runbook — P12 through P26
 
 > This runbook lists actions that **cannot** be performed by automated phase execution (`/execute-phase`) and must be done by the operator. Each phase has a "before execute-phase" checklist and an "after-merge" checklist. Read the relevant section before invoking `/plan-phase` for that phase.
 
@@ -181,6 +181,49 @@ No operator actions required. P12 is fully codebase-internal.
   authenticated attestation tests without `ATTESTATION_GH_TOKEN`, benchmarks,
   vulnerability scans, cleanup, signing, and publish-only container manifest work
   are informational for private alpha unless promoted by a later phase.
+
+### 3.6 Phase 26 - Private Alpha Evidence & Public Alpha Decision
+
+#### Before P26
+
+- [ ] **Select the private-alpha fixture set.** The local config must cover
+  exactly `python_repo`, `typescript_js_repo`, `mixed_docs_code_repo`,
+  `multi_repo_workspace`, and `large_ignored_vendor_repo`.
+- [ ] **Keep fixture details local.** Store private paths, repository names,
+  source expectations, and operator notes in a local config file that is not
+  committed. Raw harness output belongs only under ignored
+  `private-alpha-evidence/`.
+- [ ] **Confirm P21-P25 required gates are green.** Any required gate failure
+  blocks public alpha before P26 evidence is considered.
+
+#### During P26
+
+- [ ] **Run the evidence harness.**
+  ```bash
+  uv run python scripts/private_alpha_evidence.py \
+    --config <private-config.json> \
+    --output-dir private-alpha-evidence/<run-id> \
+    --redacted-md docs/validation/private-alpha-decision.md \
+    --redacted-json docs/validation/private-alpha-decision.json
+  ```
+- [ ] **Review redaction before committing.** The committed decision files must
+  contain fixture categories, aggregate timings, pass/fail classifications, and
+  issue IDs only. Do not commit private names, absolute paths, source excerpts,
+  or raw logs.
+- [ ] **Classify every known issue.** Use exactly `public_alpha_blocker`,
+  `documented_limitation`, or `post_alpha_backlog`.
+
+#### After P26
+
+- [ ] **Record the final go/no-go decision.** The redacted decision artifact is
+  `docs/validation/private-alpha-decision.md`, and the decision must be exactly
+  `go`, `no_go`, or `conditional_go`.
+- [ ] **Escalate blockers narrowly.** Any P26 `public_alpha_blocker` or required
+  P21-P25 gate failure blocks public alpha and should become a targeted follow-up
+  roadmap item.
+- [ ] **Close non-blockers explicitly.** A `go` decision requires all remaining
+  non-blocking issues to be captured as `documented_limitation` or
+  `post_alpha_backlog`.
 
 ---
 

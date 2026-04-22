@@ -39,6 +39,36 @@ blocker.
 | Alpha Gate - Docs Truth | Release metadata, dependency source-of-truth, smoke contract, and customer docs truth checks are current. | `.github/workflows/ci-cd-pipeline.yml` -> `make alpha-docs-truth` | Blocks release on failure; docs must be corrected before release evidence is accepted. |
 | Alpha Gate - Required Gates Passed | The required main CI gates completed successfully and are ready to combine with dependency/container gates. | `.github/workflows/ci-cd-pipeline.yml` aggregator job | Blocks release on failure; rerun only after the failed upstream gate is understood. |
 
+## Private Alpha Evidence
+
+P26 adds the private-alpha go/no-go evidence step before any public alpha
+promotion. Run the harness only with local operator-owned fixture paths:
+
+```bash
+uv run python scripts/private_alpha_evidence.py \
+  --config <private-config.json> \
+  --output-dir private-alpha-evidence/<run-id> \
+  --redacted-md docs/validation/private-alpha-decision.md \
+  --redacted-json docs/validation/private-alpha-decision.json
+```
+
+Raw output, absolute paths, repository names, source excerpts, and logs must stay
+under ignored `private-alpha-evidence/`. Only the redacted decision artifact
+`docs/validation/private-alpha-decision.md`, its JSON companion, and aggregate
+summary data may be committed.
+
+The fixture config must include exactly these categories:
+`python_repo`, `typescript_js_repo`, `mixed_docs_code_repo`,
+`multi_repo_workspace`, and `large_ignored_vendor_repo`. Each fixture must record
+install time, first index time, p50/p95 query latency, result quality, log noise,
+branch/default-branch behavior, rollback/rebuild behavior, and blocker
+classification.
+
+Public alpha is blocked by any required P21-P25 gate failure or any P26
+`public_alpha_blocker`. Non-blocking issues must be classified as
+`documented_limitation` or `post_alpha_backlog` before the final go/no-go
+decision is recorded as `go`, `no_go`, or `conditional_go`.
+
 ## Stages
 
 ### Stage: dev

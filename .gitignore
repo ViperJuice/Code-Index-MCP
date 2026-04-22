@@ -168,6 +168,7 @@ qdrant_storage/
 test_repos/
 temp_cookbook/
 testing-env/
+private-alpha-evidence/
 
 # 1Password op run env-file for MCP server (references only, but machine-local)
 .mcp.env

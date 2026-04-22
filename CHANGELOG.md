@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (P26 — private alpha evidence and public alpha decision)
+- Added the P26 private-alpha evidence contract:
+  `docs/validation/private-alpha-decision.md`,
+  `docs/validation/private-alpha-evidence.schema.json`, and the ignored
+  `private-alpha-evidence/` raw-output boundary.
+- Added `scripts/private_alpha_evidence.py` for local private fixture runs across
+  `python_repo`, `typescript_js_repo`, `mixed_docs_code_repo`,
+  `multi_repo_workspace`, and `large_ignored_vendor_repo` before public alpha.
+- Documented public-alpha release truth: supported install paths are
+  `uv sync --locked`/STDIO and `ghcr.io/viperjuice/code-index-mcp`; language
+  support is scoped by `docs/SUPPORT_MATRIX.md`; beta warnings and rollback
+  instructions remain in `docs/operations/deployment-runbook.md`.
+
 [Unreleased]: # placeholder for post-rc3 work
 
 ## [1.2.0-rc3] — 2026-04-21

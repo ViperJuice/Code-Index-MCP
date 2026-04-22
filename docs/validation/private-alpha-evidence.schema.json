@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Code-Index-MCP P26 Redacted Private Alpha Evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_at",
+    "run_id",
+    "fixtures",
+    "known_issues",
+    "final_decision"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "generated_at": {
+      "type": "string"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fixture_id",
+          "category",
+          "display_alias",
+          "measurements"
+        ],
+        "properties": {
+          "fixture_id": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "python_repo",
+              "typescript_js_repo",
+              "mixed_docs_code_repo",
+              "multi_repo_workspace",
+              "large_ignored_vendor_repo"
+            ]
+          },
+          "display_alias": {
+            "type": "string"
+          },
+          "measurements": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "install_time_seconds",
+              "first_index_time_seconds",
+              "query_latency_p50_ms",
+              "query_latency_p95_ms",
+              "result_quality_notes",
+              "log_noise_classification",
+              "branch_default_branch_behavior",
+              "rollback_rebuild_behavior",
+              "blocker_classification"
+            ],
+            "properties": {
+              "install_time_seconds": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "first_index_time_seconds": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "query_latency_p50_ms": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "query_latency_p95_ms": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "result_quality_notes": {
+                "type": "string"
+              },
+              "log_noise_classification": {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "not_run"
+                ]
+              },
+              "branch_default_branch_behavior": {
+                "type": "string"
+              },
+              "rollback_rebuild_behavior": {
+                "type": "string"
+              },
+              "blocker_classification": {
+                "type": "string",
+                "enum": [
+                  "public_alpha_blocker",
+                  "documented_limitation",
+                  "post_alpha_backlog"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "known_issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "classification",
+          "summary",
+          "disposition"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "public_alpha_blocker",
+              "documented_limitation",
+              "post_alpha_backlog"
+            ]
+          },
+          "summary": {
+            "type": "string"
+          },
+          "disposition": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "final_decision": {
+      "type": "string",
+      "enum": [
+        "go",
+        "no_go",
+        "conditional_go"
+      ]
+    }
+  }
+}

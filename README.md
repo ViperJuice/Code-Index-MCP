@@ -11,6 +11,7 @@ Modular, extensible local-first code indexer designed to enhance Claude Code and
 **Core features**: local indexing, symbol/text search, registry-based language coverage; see [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md)
 **Optional features**: semantic search (requires Voyage AI or a local vLLM endpoint), GitHub Artifacts index sync
 **Performance**: sub-100ms symbol lookup and sub-500ms search on indexed repos (benchmarked on this codebase; results vary by repo size and language mix)
+**Public alpha decision**: see [docs/validation/private-alpha-decision.md](docs/validation/private-alpha-decision.md) before promotion; public alpha remains beta-status until P21-P26 gates and private evidence are green.
 
 > **New to Code-Index-MCP?** Check out our [Getting Started Guide](docs/GETTING_STARTED.md) for a quick walkthrough.
 
@@ -106,6 +107,14 @@ alpha limitations. Do not assume every registry language has the same symbol
 quality or default sandbox behavior.
 
 ## 🚀 Quick Start
+
+Supported public-alpha install paths are native Python/STDIO with
+`uv sync --locked` and the `ghcr.io/viperjuice/code-index-mcp` container image.
+Language coverage is bounded by [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md),
+and rollback procedures live in
+[docs/operations/deployment-runbook.md](docs/operations/deployment-runbook.md).
+Do not treat this beta release candidate as GA or as a universal language
+support claim.
 
 ### 🎯 Automatic Setup for Claude Code/Desktop (Recommended)
 ```bash
