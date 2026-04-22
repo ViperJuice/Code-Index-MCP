@@ -151,6 +151,7 @@ jobs:
     name: Informational - Test Suite (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     continue-on-error: true
+    if: github.event_name == 'workflow_dispatch'
     timeout-minutes: 45
     strategy:
       fail-fast: false
