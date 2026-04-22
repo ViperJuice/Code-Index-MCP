@@ -68,6 +68,7 @@ def _run_async(coro):
 # Helpers to patch away filesystem calls inside analyze_repository
 # ---------------------------------------------------------------------------
 
+
 def _patch_loader_fs(loader: RepositoryPluginLoader, repo_path: Path, repo_id: str):
     """
     Patch _get_repository_id and IndexDiscovery so analyze_repository
@@ -93,6 +94,7 @@ def _patch_loader_fs(loader: RepositoryPluginLoader, repo_path: Path, repo_id: s
 # ---------------------------------------------------------------------------
 # Test 1: same repo_id → same RepositoryProfile instance across all threads
 # ---------------------------------------------------------------------------
+
 
 def test_same_repo_id_returns_identical_instance():
     """8 threads × 100 iterations must all see the same profile object."""
@@ -123,9 +125,7 @@ def test_same_repo_id_returns_identical_instance():
                     FakeDiscovery,
                 ):
                     loader._get_repository_id = lambda path: repo_id
-                    profile = loop.run_until_complete(
-                        loader.analyze_repository(repo_path)
-                    )
+                    profile = loop.run_until_complete(loader.analyze_repository(repo_path))
                     with lock:
                         results.append(profile)
         except Exception as exc:
@@ -145,22 +145,23 @@ def test_same_repo_id_returns_identical_instance():
 
     first_id = id(results[0])
     for i, profile in enumerate(results):
-        assert id(profile) == first_id, (
-            f"Profile at index {i} is a different object (id={id(profile)} vs {first_id})"
-        )
+        assert (
+            id(profile) == first_id
+        ), f"Profile at index {i} is a different object (id={id(profile)} vs {first_id})"
 
 
 # ---------------------------------------------------------------------------
 # Test 2: distinct repo_ids must not serialize — parallel < 1.8× serial
 # ---------------------------------------------------------------------------
 
+
 def test_distinct_repo_ids_do_not_block_each_other():
     """Two different repo_ids analyzed in parallel must not wait for each other."""
     DELAY = 0.10  # seconds per analysis
 
     def make_loader(delay):
-        l = _make_loader_with_slow_analysis(delay=delay)
-        return l
+        loader = _make_loader_with_slow_analysis(delay=delay)
+        return loader
 
     loader = make_loader(DELAY)
 
@@ -216,19 +217,14 @@ def test_distinct_repo_ids_do_not_block_each_other():
                 "mcp_server.plugins.repository_plugin_loader.IndexDiscovery",
                 FakeDiscovery,
             ):
-                loop.run_until_complete(
-                    loader_parallel.analyze_repository(Path(f"/fake/{rid}"))
-                )
+                loop.run_until_complete(loader_parallel.analyze_repository(Path(f"/fake/{rid}")))
         except Exception as exc:
             errors.append(exc)
         finally:
             loop.close()
 
     t0 = time.monotonic()
-    threads = [
-        threading.Thread(target=thread_worker, args=(rid,))
-        for rid in ("repo_x", "repo_y")
-    ]
+    threads = [threading.Thread(target=thread_worker, args=(rid,)) for rid in ("repo_x", "repo_y")]
     for t in threads:
         t.start()
     for t in threads:

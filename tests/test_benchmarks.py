@@ -453,9 +453,12 @@ class TestBenchmarkRunner:
 def _populate_suite_store(suite, symbols_by_file):
     """Write symbols and BM25 content into suite.store so lookup/search use the fast sqlite path."""
     import sqlite3 as _sqlite3
+
     repo_id = suite.store.create_repository("/benchmark", "benchmark", {})
     for file_path, syms in symbols_by_file.items():
-        file_id = suite.store.store_file(repo_id, file_path, file_path, language="python", size=0, hash="0")
+        file_id = suite.store.store_file(
+            repo_id, file_path, file_path, language="python", size=0, hash="0"
+        )
         content_lines = []
         for sym in syms:
             name = sym["symbol"] if isinstance(sym, dict) else sym.symbol

@@ -10,10 +10,10 @@ import pytest
 from mcp_server.core.errors import SchemaMigrationError
 from mcp_server.storage.schema_migrator import SchemaMigrator
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_migrator():
     store_stub = object.__new__(object)  # minimal stand-in, migrator only uses it for type hint
@@ -33,6 +33,7 @@ def _make_artifact_dir(tmp_path: Path) -> Path:
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 class TestMigrationBackup:
     def test_backup_created_before_migration(self, tmp_path):
@@ -68,9 +69,7 @@ class TestMigrationBackup:
         migrator = _make_migrator()
         extracted_dir = _make_artifact_dir(tmp_path)
 
-        original_contents = {
-            p.name: p.read_bytes() for p in extracted_dir.iterdir()
-        }
+        original_contents = {p.name: p.read_bytes() for p in extracted_dir.iterdir()}
 
         def bad_migrate(self_inner, d: Path) -> Path:
             # Mutate the directory then fail.
@@ -84,14 +83,12 @@ class TestMigrationBackup:
 
         # extracted_dir should be back to original state.
         assert extracted_dir.exists()
-        restored_contents = {
-            p.name: p.read_bytes() for p in extracted_dir.iterdir()
-        }
+        restored_contents = {p.name: p.read_bytes() for p in extracted_dir.iterdir()}
         assert restored_contents == original_contents
 
     def test_canonical_error_class(self):
         """SchemaMigrationError imported from schema_migrator IS the canonical class."""
-        from mcp_server.storage.schema_migrator import SchemaMigrationError as A
         from mcp_server.core.errors import SchemaMigrationError as B
+        from mcp_server.storage.schema_migrator import SchemaMigrationError as A
 
         assert A is B

@@ -124,7 +124,7 @@ class BenchmarkSuite(IIndexPerformanceMonitor, IPerformanceMonitor):
 
     def __init__(self, plugins: List[IPlugin], db_path: Optional[Path] = None):
         self.plugins = plugins
-        self.dispatcher = Dispatcher(plugins)
+        self.dispatcher = Dispatcher(plugins, semantic_search_enabled=False)
         self.db_path = db_path or Path(tempfile.mktemp(suffix=".db"))
         self.store = SQLiteStore(self.db_path)
         self._ctx = self._make_ctx()
@@ -401,7 +401,9 @@ void test_method_{idx}(TestStruct{idx}* s) {{
 
             for i in range(iterations):
                 unique_symbol = f"nonexistent_symbol_{i}"
-                _, duration_ms = self._measure_time(self.dispatcher.lookup, self._ctx, unique_symbol)
+                _, duration_ms = self._measure_time(
+                    self.dispatcher.lookup, self._ctx, unique_symbol
+                )
                 cache_miss_metric.add_sample(duration_ms)
 
             metrics["cache_hit"] = cache_hit_metric

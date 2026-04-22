@@ -19,8 +19,9 @@ from ...plugin_base import (
 from ...utils.fuzzy_indexer import FuzzyIndexer
 
 if TYPE_CHECKING:
-    from ...storage.sqlite_store import SQLiteStore
     from mcp_server.core.repo_context import RepoContext
+
+    from ...storage.sqlite_store import SQLiteStore
 
 logger = logging.getLogger(__name__)
 
@@ -319,7 +320,9 @@ class Plugin(IPlugin):
 
                         # Store in SQLite if available
                         if (self._ctx.sqlite_store if self._ctx else None) and file_id:
-                            symbol_id = (self._ctx.sqlite_store if self._ctx else None).store_symbol(
+                            symbol_id = (
+                                self._ctx.sqlite_store if self._ctx else None
+                            ).store_symbol(
                                 file_id,
                                 name,
                                 kind,

@@ -25,15 +25,12 @@ def test_rate_limit_remaining_low_sleeps():
     """When X-RateLimit-Remaining is 50, time.sleep should be called."""
     future_reset = str(int(time.time()) + 30)
     header_block = (
-        "HTTP/1.1 200 OK\r\n"
-        f"X-RateLimit-Remaining: 50\r\n"
-        f"X-RateLimit-Reset: {future_reset}"
+        "HTTP/1.1 200 OK\r\n" f"X-RateLimit-Remaining: 50\r\n" f"X-RateLimit-Reset: {future_reset}"
     )
     body = '{"artifacts": []}'
     fake_result = _make_run_result(header_block, body)
 
-    with patch("subprocess.run", return_value=fake_result), \
-         patch("time.sleep") as mock_sleep:
+    with patch("subprocess.run", return_value=fake_result), patch("time.sleep") as mock_sleep:
         provider = GitHubActionsArtifactProvider("org/repo")
         provider.list_artifacts(prefixes=("code-index-",))
 
@@ -44,15 +41,11 @@ def test_rate_limit_remaining_low_sleeps():
 
 def test_rate_limit_remaining_high_no_sleep():
     """When X-RateLimit-Remaining is 5000, time.sleep should NOT be called."""
-    header_block = (
-        "HTTP/1.1 200 OK\r\n"
-        "X-RateLimit-Remaining: 5000"
-    )
+    header_block = "HTTP/1.1 200 OK\r\n" "X-RateLimit-Remaining: 5000"
     body = '{"artifacts": []}'
     fake_result = _make_run_result(header_block, body)
 
-    with patch("subprocess.run", return_value=fake_result), \
-         patch("time.sleep") as mock_sleep:
+    with patch("subprocess.run", return_value=fake_result), patch("time.sleep") as mock_sleep:
         provider = GitHubActionsArtifactProvider("org/repo")
         provider.list_artifacts(prefixes=("code-index-",))
 
@@ -94,8 +87,7 @@ def test_delete_artifact_rate_limit_applied():
     )
     fake_result = _make_run_result(header_block, "")
 
-    with patch("subprocess.run", return_value=fake_result), \
-         patch("time.sleep") as mock_sleep:
+    with patch("subprocess.run", return_value=fake_result), patch("time.sleep") as mock_sleep:
         provider = GitHubActionsArtifactProvider("org/repo")
         result = provider.delete_artifact("12345")
 

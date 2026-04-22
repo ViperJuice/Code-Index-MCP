@@ -10,6 +10,7 @@ Covers:
 - NO double-count: dispatcher_fallback_histogram._count does NOT increment on a
   hot-path call that returns before hitting run_gated_fallback
 """
+
 import sqlite3
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -18,14 +19,12 @@ import pytest
 
 import mcp_server.metrics.prometheus_exporter as prometheus_exporter
 from mcp_server.metrics.prometheus_exporter import (
+    _DISPATCHER_FALLBACK_BUCKETS,
     PROMETHEUS_AVAILABLE,
     PrometheusExporter,
-    _DISPATCHER_FALLBACK_BUCKETS,
 )
 
-pytestmark = pytest.mark.skipif(
-    not PROMETHEUS_AVAILABLE, reason="prometheus_client not installed"
-)
+pytestmark = pytest.mark.skipif(not PROMETHEUS_AVAILABLE, reason="prometheus_client not installed")
 
 LOOKUP_METRIC_NAME = "mcp_dispatcher_symbol_lookup_duration_seconds"
 SEARCH_METRIC_NAME = "mcp_dispatcher_search_duration_seconds"
@@ -34,6 +33,7 @@ SEARCH_METRIC_NAME = "mcp_dispatcher_search_duration_seconds"
 # ---------------------------------------------------------------------------
 # Exporter attribute / registration tests
 # ---------------------------------------------------------------------------
+
 
 def test_exporter_exposes_lookup_histogram():
     exporter = PrometheusExporter()
@@ -81,6 +81,7 @@ def test_search_histogram_metric_name_on_scrape():
 # Helpers to build a minimal SQLite DB with a symbols row for fast BM25 hit
 # ---------------------------------------------------------------------------
 
+
 def _make_db_with_symbol(tmp_path: Path, symbol: str) -> str:
     from mcp_server.storage.sqlite_store import SQLiteStore
 
@@ -89,9 +90,7 @@ def _make_db_with_symbol(tmp_path: Path, symbol: str) -> str:
     store = SQLiteStore(db_path)
     conn = sqlite3.connect(db_path)
     # Insert a repository row (required FK for files)
-    conn.execute(
-        "INSERT OR IGNORE INTO repositories(id, path, name) VALUES (1, '/repo', 'test')"
-    )
+    conn.execute("INSERT OR IGNORE INTO repositories(id, path, name) VALUES (1, '/repo', 'test')")
     # Insert a file row
     conn.execute(
         "INSERT INTO files(id, repository_id, path, relative_path, language) "
@@ -112,8 +111,7 @@ def _make_bm25_db(tmp_path: Path, query_word: str) -> str:
     db_path = str(tmp_path / "test_bm25.db")
     conn = sqlite3.connect(db_path)
     conn.execute(
-        "CREATE VIRTUAL TABLE bm25_content USING fts5"
-        "(filepath, filename, content, language)"
+        "CREATE VIRTUAL TABLE bm25_content USING fts5" "(filepath, filename, content, language)"
     )
     conn.execute(
         "INSERT INTO bm25_content VALUES (?, ?, ?, ?)",
@@ -158,6 +156,7 @@ def _make_ctx(db_path: str, tmp_path: Path):
 # pollution left by test_dispatcher_fallback_metrics.py resetting _exporter)
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def isolated_exporter(monkeypatch):
     fresh = PrometheusExporter()  # private CollectorRegistry, not _EXPORTER_REGISTRY
@@ -169,6 +168,7 @@ def isolated_exporter(monkeypatch):
 # ---------------------------------------------------------------------------
 # _count increment tests
 # ---------------------------------------------------------------------------
+
 
 def test_lookup_histogram_count_increments(tmp_path, isolated_exporter):
     """dispatcher.lookup increments dispatcher_lookup_histogram._count by exactly 1."""
@@ -224,6 +224,7 @@ def test_search_histogram_count_increments(tmp_path, isolated_exporter):
 # No-double-count test: fallback histogram must NOT fire on a pure BM25 hit
 # ---------------------------------------------------------------------------
 
+
 def test_no_double_count_fallback_histogram(tmp_path, isolated_exporter):
     """A symbols-table hit must not increment dispatcher_fallback_histogram."""
     db_path = _make_db_with_symbol(tmp_path, "pure_bm25_sym")
@@ -255,6 +256,7 @@ def test_no_double_count_fallback_histogram(tmp_path, isolated_exporter):
 # ---------------------------------------------------------------------------
 # generate_metrics output contains both new metric name strings
 # ---------------------------------------------------------------------------
+
 
 def test_metric_names_appear_in_generate_metrics():
     exporter = PrometheusExporter()

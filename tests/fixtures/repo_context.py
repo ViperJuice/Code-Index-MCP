@@ -7,6 +7,7 @@ The fixture bodies are implemented in SL-4's ``tests/conftest.py``. Importing
 this module yields the canonical names as a tuple so tests and lint rules
 can reference them symbolically.
 """
+
 from __future__ import annotations
 
 from typing import Tuple

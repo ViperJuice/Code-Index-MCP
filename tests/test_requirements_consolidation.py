@@ -11,6 +11,7 @@ try:
     import tomllib
 except ImportError:  # Python <3.11
     import tomli as tomllib
+
 from pathlib import Path
 
 REPO = Path(__file__).parent.parent
@@ -47,9 +48,9 @@ def test_pyproject_requires_python():
 def test_agents_md_no_stale_python_claim():
     text = (REPO / "AGENTS.md").read_text()
     # The stale claim is the exact string "# Python Version: 3.8+"
-    assert "# Python Version: 3.8+" not in text, (
-        "AGENTS.md still contains stale '# Python Version: 3.8+' claim"
-    )
+    assert (
+        "# Python Version: 3.8+" not in text
+    ), "AGENTS.md still contains stale '# Python Version: 3.8+' claim"
 
 
 def test_uv_lock_exists():
@@ -81,7 +82,9 @@ def test_dockerfiles_do_not_reference_requirements_files():
 
 
 def test_tomllib_import_guard_present():
-    import inspect, sys
+    import inspect
+    import sys
+
     src = inspect.getsource(sys.modules[__name__])
     assert "try:\n    import tomllib\nexcept ImportError:" in src
     assert "import tomli as tomllib" in src
@@ -89,10 +92,11 @@ def test_tomllib_import_guard_present():
 
 def test_pyproject_declares_tomli_for_py310():
     import re
+
     with open(REPO / "pyproject.toml", "rb") as f:
         data = tomllib.load(f)
     dev_deps = data.get("project", {}).get("optional-dependencies", {}).get("dev", [])
-    normalized = [re.sub(r'\s+', ' ', entry).strip() for entry in dev_deps]
-    assert 'tomli>=2.0.1; python_version<"3.11"' in normalized, (
-        f"tomli conditional dep not found in dev deps: {normalized}"
-    )
+    normalized = [re.sub(r"\s+", " ", entry).strip() for entry in dev_deps]
+    assert (
+        'tomli>=2.0.1; python_version<"3.11"' in normalized
+    ), f"tomli conditional dep not found in dev deps: {normalized}"

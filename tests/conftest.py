@@ -10,15 +10,15 @@ import asyncio
 import os
 from pathlib import Path
 from typing import Dict, List
-from unittest.mock import Mock, MagicMock
+from unittest.mock import MagicMock, Mock
 
 import pytest
 from fastapi.testclient import TestClient
 
-from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher as Dispatcher
 from mcp_server.core.repo_context import RepoContext
 from mcp_server.dispatcher import EnhancedDispatcher
 from mcp_server.dispatcher.protocol import DispatcherProtocol
+from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher as Dispatcher
 from mcp_server.storage.multi_repo_manager import RepositoryInfo
 from mcp_server.storage.repository_registry import RepositoryRegistry
 from mcp_server.storage.store_registry import StoreRegistry
@@ -131,6 +131,7 @@ def populated_sqlite_store(sqlite_store: SQLiteStore) -> SQLiteStore:
 # P2B fixtures (SL-4)
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def repo_ctx(sqlite_store, tmp_path):
     """RepoContext wrapping a live SQLiteStore with a fake repo_id."""
@@ -165,14 +166,17 @@ def repo_resolver(repo_ctx):
 @pytest.fixture
 def dispatcher_factory():
     """Factory that produces an EnhancedDispatcher conforming to DispatcherProtocol."""
+
     def _factory(plugins=None):
         return EnhancedDispatcher(plugins=plugins or [])
+
     return _factory
 
 
 # ---------------------------------------------------------------------------
 # File system fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def temp_code_directory(tmp_path: Path) -> Path:

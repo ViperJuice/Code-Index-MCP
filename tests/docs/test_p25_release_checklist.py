@@ -23,7 +23,10 @@ def test_deployment_runbook_maps_each_required_alpha_gate():
     assert "## Public Alpha Release Gate Checklist" in text
     for gate in REQUIRED_GATES:
         assert gate in text
-    assert "| Required job | Operator decision | Command/workflow source | Block/fallback behavior |" in text
+    assert (
+        "| Required job | Operator decision | Command/workflow source | Block/fallback behavior |"
+        in text
+    )
 
 
 def test_attestation_prerequisite_and_private_alpha_fallback_documented():

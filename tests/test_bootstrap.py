@@ -1,4 +1,5 @@
 """Tests for SL-2 entry-point consolidation: bootstrap, stdio_runner, tool_handlers."""
+
 from __future__ import annotations
 
 import json
@@ -9,7 +10,6 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # SL-2.1 — red tests (will fail before SL-2.2 impl)
@@ -68,7 +68,10 @@ class TestInitializeStatelessServices:
         _, _, dispatcher, _, _ = initialize_stateless_services(registry_path=registry_path)
 
         # Dispatcher should not have an _sqlite_store bound at init time
-        assert not hasattr(dispatcher, "_sqlite_store") or getattr(dispatcher, "_sqlite_store", None) is None
+        assert (
+            not hasattr(dispatcher, "_sqlite_store")
+            or getattr(dispatcher, "_sqlite_store", None) is None
+        )
 
 
 class TestStdioCommandHelp:
@@ -81,9 +84,9 @@ class TestStdioCommandHelp:
             text=True,
             timeout=30,
         )
-        assert result.returncode == 0, (
-            f"Expected exit 0, got {result.returncode}.\nstdout: {result.stdout}\nstderr: {result.stderr}"
-        )
+        assert (
+            result.returncode == 0
+        ), f"Expected exit 0, got {result.returncode}.\nstdout: {result.stdout}\nstderr: {result.stderr}"
         assert "stdio" in result.stdout.lower() or "stdio" in result.stderr.lower()
 
 
@@ -99,18 +102,16 @@ class TestShimImportable:
         # The shim at scripts/cli/mcp_server_cli.py must expose `main`
         from scripts.cli import mcp_server_cli  # noqa: F401
 
-        assert hasattr(mcp_server_cli, "main"), (
-            "scripts/cli/mcp_server_cli.py shim must expose 'main'"
-        )
+        assert hasattr(
+            mcp_server_cli, "main"
+        ), "scripts/cli/mcp_server_cli.py shim must expose 'main'"
 
     def test_shim_is_short(self):
         """Shim must be < 10 lines."""
         shim_path = Path(__file__).parent.parent / "scripts" / "cli" / "mcp_server_cli.py"
         lines = shim_path.read_text().splitlines()
-        non_empty = [l for l in lines if l.strip() and not l.strip().startswith("#")]
-        assert len(non_empty) < 10, (
-            f"Shim has {len(non_empty)} non-comment lines; expected < 10"
-        )
+        non_empty = [line for line in lines if line.strip() and not line.strip().startswith("#")]
+        assert len(non_empty) < 10, f"Shim has {len(non_empty)} non-comment lines; expected < 10"
 
 
 class TestMcpJsonTemplates:

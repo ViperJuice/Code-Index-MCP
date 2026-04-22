@@ -10,21 +10,27 @@ import logging
 import re
 import time
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor, as_completed  # noqa: F401  (patched by tests; looked up via globals())
+from concurrent.futures import (  # noqa: F401  (patched by tests; looked up via globals())
+    ThreadPoolExecutor,
+    as_completed,
+)
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from mcp_server.core.errors import record_handled_error
 from mcp_server.dependency_graph.aggregator import DependencyGraphAnalyzer
-from mcp_server.indexer.reranker import IReranker as Reranker, RerankerFactory
+from mcp_server.indexer.reranker import IReranker as Reranker
+from mcp_server.indexer.reranker import RerankerFactory
 from mcp_server.plugins.repository_plugin_loader import get_repository_plugin_loader
 from mcp_server.storage.multi_repo_manager import (
     CrossRepoSearchResult,
     MultiRepositoryManager,
     get_multi_repo_manager,
 )
-from mcp_server.storage.sqlite_store import SQLiteStore  # noqa: F401  (patched by tests; looked up via globals())
+from mcp_server.storage.sqlite_store import (  # noqa: F401  (patched by tests; looked up via globals())
+    SQLiteStore,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -657,9 +663,7 @@ class CrossRepositorySearchCoordinator:
 
         if scope.languages is not None:
             lang_set = set(scope.languages)
-            all_repos = [
-                r for r in all_repos if lang_set & set(r.language_stats.keys())
-            ]
+            all_repos = [r for r in all_repos if lang_set & set(r.language_stats.keys())]
 
         if scope.priority_order:
             all_repos.sort(key=lambda r: r.priority, reverse=True)
@@ -686,8 +690,7 @@ class CrossRepositorySearchCoordinator:
     def _create_content_hash(self, result: Dict[str, Any]) -> str:
         """Content hash for code-result dedup across repos."""
         key = (
-            f"{result.get('content', '')}:"
-            f"{self._relative_suffix(result.get('file_path', ''))}"
+            f"{result.get('content', '')}:" f"{self._relative_suffix(result.get('file_path', ''))}"
         )
         return hashlib.md5(key.encode(), usedforsecurity=False).hexdigest()
 
@@ -738,7 +741,11 @@ class CrossRepositorySearchCoordinator:
         started = time.time()
         try:
             store = store_cls(str(repo.index_path))
-            raw = store.search_content(query, limit=limit) if limit is not None else store.search_content(query)
+            raw = (
+                store.search_content(query, limit=limit)
+                if limit is not None
+                else store.search_content(query)
+            )
             items = list(raw or [])
             if scope.file_types:
                 exts = tuple(scope.file_types)

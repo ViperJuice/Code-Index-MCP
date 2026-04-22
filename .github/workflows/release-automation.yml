@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., v1.2.0-rc3)'
+        description: 'Version to release (e.g., v1.2.0-rc4)'
         required: true
-        default: 'v1.2.0-rc3'
+        default: 'v1.2.0-rc4'
         type: string
       release_type:
         description: 'Release type'
@@ -54,6 +54,8 @@ jobs:
 
       - name: Install dependencies
         run: |
+          sudo apt-get update
+          sudo apt-get install -y ripgrep
           python -m pip install --upgrade pip uv
           uv sync --locked --extra dev --extra semantic
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
@@ -62,7 +64,7 @@ jobs:
         run: |
           VERSION="${{ inputs.version }}"
           VERSION_NO_V=${VERSION#v}
-          grep -q "default: 'v1.2.0-rc3'" .github/workflows/release-automation.yml
+          grep -q "default: 'v1.2.0-rc4'" .github/workflows/release-automation.yml
           grep -q "version = \"$VERSION_NO_V\"" pyproject.toml
           grep -q "__version__ = \"$VERSION_NO_V\"" mcp_server/__init__.py
 
@@ -333,7 +335,7 @@ jobs:
           body: |
             ## Release ${{ needs.prepare-release.outputs.version }}
 
-            P21 release contract target: v1.2.0-rc3
+            P21 release contract target: v1.2.0-rc4
 
             This PR contains all changes for release ${{ needs.prepare-release.outputs.version }}.
 

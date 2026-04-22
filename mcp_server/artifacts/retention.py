@@ -26,11 +26,11 @@ def prune_releases(
     dry_run: bool = False,
 ) -> list[ReleaseRef]:
     """Apply retention policy, falling back to env-var defaults."""
-    effective_days = older_than_days if older_than_days is not None else _env_int(
-        "MCP_ARTIFACT_RETENTION_DAYS"
+    effective_days = (
+        older_than_days if older_than_days is not None else _env_int("MCP_ARTIFACT_RETENTION_DAYS")
     )
-    effective_count = keep_latest_n if keep_latest_n is not None else _env_int(
-        "MCP_ARTIFACT_RETENTION_COUNT"
+    effective_count = (
+        keep_latest_n if keep_latest_n is not None else _env_int("MCP_ARTIFACT_RETENTION_COUNT")
     )
     return delete_releases_older_than(
         repo,

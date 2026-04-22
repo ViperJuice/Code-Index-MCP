@@ -20,9 +20,15 @@ VALID_DISPOSITIONS = {"deleted", "bannered", "rewritten"}
 def _get_deleted_set() -> set[str]:
     result = subprocess.run(
         [
-            "git", "diff", "--diff-filter=D", "--name-only",
-            "main..HEAD", "--",
-            "docs/implementation/", "docs/status/", "docs/validation/",
+            "git",
+            "diff",
+            "--diff-filter=D",
+            "--name-only",
+            "main..HEAD",
+            "--",
+            "docs/implementation/",
+            "docs/status/",
+            "docs/validation/",
         ],
         capture_output=True,
         text=True,
@@ -51,9 +57,7 @@ def test_banner_on_all_non_deleted_files():
             failures.append(f"{rel_path}: file is empty")
             continue
         if not BANNER_REGEX.match(lines[0]):
-            failures.append(
-                f"{rel_path}: line 1 does not match banner regex. Got: {lines[0]!r}"
-            )
+            failures.append(f"{rel_path}: line 1 does not match banner regex. Got: {lines[0]!r}")
     assert not failures, "Banner check failures:\n" + "\n".join(failures)
 
 
@@ -63,17 +67,17 @@ def test_triage_log_exists():
 
 def test_triage_log_header_row():
     content = TRIAGE_LOG.read_text(encoding="utf-8")
-    assert "| Path | Disposition | Rationale | As-of |" in content, (
-        "Triage log missing required header row: '| Path | Disposition | Rationale | As-of |'"
-    )
+    assert (
+        "| Path | Disposition | Rationale | As-of |" in content
+    ), "Triage log missing required header row: '| Path | Disposition | Rationale | As-of |'"
 
 
 def test_triage_log_has_three_h3_subsections():
     content = TRIAGE_LOG.read_text(encoding="utf-8")
     h3_sections = re.findall(r"^### ", content, re.MULTILINE)
-    assert len(h3_sections) == 3, (
-        f"Expected 3 H3 subsections in triage log, found {len(h3_sections)}"
-    )
+    assert (
+        len(h3_sections) == 3
+    ), f"Expected 3 H3 subsections in triage log, found {len(h3_sections)}"
 
 
 def test_triage_log_row_count_matches_union():
@@ -85,8 +89,11 @@ def test_triage_log_row_count_matches_union():
     content = TRIAGE_LOG.read_text(encoding="utf-8")
     # Count data rows: lines starting with | that contain a path (not header or separator)
     data_rows = [
-        line for line in content.splitlines()
-        if line.startswith("| ") and not line.startswith("| Path") and "---" not in line
+        line
+        for line in content.splitlines()
+        if line.startswith("| ")
+        and not line.startswith("| Path")
+        and "---" not in line
         and line.strip() != "|"
     ]
     actual_count = len(data_rows)
@@ -133,9 +140,7 @@ def test_triage_log_valid_dispositions():
             if len(parts) >= 3:
                 disposition = parts[2].strip()
                 if disposition and disposition not in VALID_DISPOSITIONS:
-                    failures.append(
-                        f"Invalid disposition {disposition!r} in row: {line!r}"
-                    )
+                    failures.append(f"Invalid disposition {disposition!r} in row: {line!r}")
     assert not failures, "Invalid dispositions:\n" + "\n".join(failures)
 
 

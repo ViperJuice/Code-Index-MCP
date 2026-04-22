@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import PlainTextResponse
 
 from .artifacts.semantic_profiles import SemanticProfileRegistry
 from .cache import (
@@ -18,13 +17,13 @@ from .cache import (
 )
 from .cli.index_management import _get_profile_collection_name
 from .cli.preflight_commands import format_preflight_report, run_startup_preflight
+from .config.environment import is_production as _is_production
 from .config.settings import get_settings
 from .config.validation import (
     WEAK_CREDENTIAL_BLOCKLIST,
     render_validation_errors_to_stderr,
     validate_production_config,
 )
-from .config.environment import is_production as _is_production
 from .core import RepoContext, RepoResolver
 from .core.logging import setup_logging
 from .dispatcher.dispatcher_enhanced import EnhancedDispatcher
@@ -57,8 +56,8 @@ from .storage.sqlite_store import SQLiteStore
 from .utils.fuzzy_indexer import FuzzyIndexer
 from .utils.index_discovery import IndexDiscovery
 from .utils.language_detector import detect_repository_languages
-from .watcher_multi_repo import MultiRepositoryWatcher
 from .watcher.ref_poller import RefPoller
+from .watcher_multi_repo import MultiRepositoryWatcher
 
 # Set up logging
 setup_logging(log_level="INFO")
@@ -87,6 +86,7 @@ def _parse_cors_origins_from_env() -> list[str]:
         )
         return [o for o in origins if o != "*"]
     return origins
+
 
 app = FastAPI(
     title="MCP Server",
@@ -333,8 +333,7 @@ async def startup_event():
         jwt_secret_key = os.getenv("JWT_SECRET_KEY")
         if not jwt_secret_key:
             raise RuntimeError(
-                "JWT_SECRET_KEY env var must be set. "
-                "Generate one with: openssl rand -base64 32"
+                "JWT_SECRET_KEY env var must be set. " "Generate one with: openssl rand -base64 32"
             )
         security_config = SecurityConfig(
             jwt_secret_key=jwt_secret_key,
@@ -366,7 +365,13 @@ async def startup_event():
 
         # Validate GitHub token scopes (warns and continues if token absent; raises only if MCP_REQUIRE_TOKEN_SCOPES=1)
         TokenValidator.validate_scopes(
-            required=["contents:read", "metadata:read", "actions:read", "actions:write", "attestations:write"]
+            required=[
+                "contents:read",
+                "metadata:read",
+                "actions:read",
+                "actions:write",
+                "attestations:write",
+            ]
         )
 
         # Create default admin user if it doesn't exist
@@ -540,6 +545,7 @@ async def startup_event():
             _store_registry = StoreRegistry.for_registry(_local_repo_registry)
             repo_resolver = RepoResolver(_local_repo_registry, _store_registry)
             import mcp_server.gateway as _gw_self
+
             _gw_self._repo_registry = _local_repo_registry
             logger.info("RepoResolver initialized")
         except Exception as _e:
@@ -795,7 +801,10 @@ async def startup_event():
             logger.info("Starting MultiRepositoryWatcher and RefPoller...")
             try:
                 from .storage.git_index_manager import GitAwareIndexManager
-                _git_index_manager = GitAwareIndexManager(registry=_repo_registry, dispatcher=dispatcher)
+
+                _git_index_manager = GitAwareIndexManager(
+                    registry=_repo_registry, dispatcher=dispatcher
+                )
                 multi_watcher = MultiRepositoryWatcher(
                     registry=_repo_registry,
                     dispatcher=dispatcher,
@@ -1145,8 +1154,9 @@ async def component_health_check(component: str) -> Dict[str, Any]:
 @app.get("/ready")
 async def readiness_probe() -> Dict[str, Any]:
     """Readiness probe: 200 when dispatcher, sqlite_store, and _repo_registry are all initialised."""
-    from .health.probes import HealthView
     from fastapi.responses import JSONResponse as _JSONResponse
+
+    from .health.probes import HealthView
 
     hv = HealthView(
         dispatcher=dispatcher,
@@ -1163,6 +1173,7 @@ async def readiness_probe() -> Dict[str, Any]:
 async def liveness_probe() -> Dict[str, Any]:
     """Liveness probe: returns 200 if the asyncio event loop is responsive."""
     import asyncio
+
     from fastapi.responses import JSONResponse as _JSONResponse
 
     await asyncio.sleep(0)
@@ -1232,7 +1243,9 @@ def get_metrics_json(
 
 
 @app.get("/symbol", response_model=SymbolDef | None)
-async def symbol(request: Request, symbol: str, current_user: User = Depends(require_permission(Permission.READ))):
+async def symbol(
+    request: Request, symbol: str, current_user: User = Depends(require_permission(Permission.READ))
+):
     if dispatcher is None:
         logger.error("Symbol lookup attempted but dispatcher not ready")
         raise HTTPException(503, "Dispatcher not ready")
@@ -1355,7 +1368,9 @@ async def search(
             )
 
         if cached_results is not None:
-            cached_results = [r for r in (_normalize_search_result(x) for x in cached_results) if r is not None]
+            cached_results = [
+                r for r in (_normalize_search_result(x) for x in cached_results) if r is not None
+            ]
             logger.debug(f"Found cached search results for: '{q}' ({len(cached_results)} results)")
             duration = time.time() - start_time
             business_metrics.record_search_performed(
@@ -1373,7 +1388,11 @@ async def search(
             # Use hybrid search
             with metrics_collector.time_function("search", labels={"mode": "hybrid"}):
                 hybrid_results = await hybrid_search.search(query=q, filters=filters, limit=limit)
-                results = [r for r in (_normalize_search_result(x) for x in hybrid_results) if r is not None]
+                results = [
+                    r
+                    for r in (_normalize_search_result(x) for x in hybrid_results)
+                    if r is not None
+                ]
 
         elif effective_mode == "bm25" and bm25_indexer:
             # Direct BM25 search
@@ -1381,7 +1400,9 @@ async def search(
                 bm25_results = bm25_indexer.search(q, limit=limit, **filters)
                 if not bm25_results and sqlite_store:
                     bm25_results = sqlite_store.search_bm25(q, table="fts_code", limit=limit)
-                results = [r for r in (_normalize_search_result(x) for x in bm25_results) if r is not None]
+                results = [
+                    r for r in (_normalize_search_result(x) for x in bm25_results) if r is not None
+                ]
 
         elif effective_mode == "fuzzy" and fuzzy_indexer:
             # Direct fuzzy search
@@ -1390,14 +1411,18 @@ async def search(
                     fuzzy_results = fuzzy_indexer.search_fuzzy(q, max_results=limit)
                 else:
                     fuzzy_results = fuzzy_indexer.search(q, limit=limit)
-                results = [r for r in (_normalize_search_result(x) for x in fuzzy_results) if r is not None]
+                results = [
+                    r for r in (_normalize_search_result(x) for x in fuzzy_results) if r is not None
+                ]
 
         elif effective_mode == "semantic":
             # Use classic dispatcher with semantic=True
             if dispatcher:
                 with metrics_collector.time_function("search", labels={"mode": "semantic"}):
                     results = list(dispatcher.search(ctx, q, semantic=True, limit=limit))
-                    results = [r for r in (_normalize_search_result(x) for x in results) if r is not None]
+                    results = [
+                        r for r in (_normalize_search_result(x) for x in results) if r is not None
+                    ]
             else:
                 raise HTTPException(
                     503,
@@ -1447,7 +1472,9 @@ async def search(
             if dispatcher:
                 with metrics_collector.time_function("search", labels={"mode": "classic"}):
                     results = list(dispatcher.search(ctx, q, semantic=False, limit=limit))
-                    results = [r for r in (_normalize_search_result(x) for x in results) if r is not None]
+                    results = [
+                        r for r in (_normalize_search_result(x) for x in results) if r is not None
+                    ]
             else:
                 raise HTTPException(503, "Classic search not available")
 
@@ -1599,6 +1626,7 @@ async def get_status(
                 logger.warning(f"Failed to get cache stats: {e}")
 
         from mcp_server.health.repo_status import build_health_row as _build_health_row
+
         _repositories = []
         if _repo_registry is not None:
             try:

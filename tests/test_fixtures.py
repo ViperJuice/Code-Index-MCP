@@ -3,6 +3,7 @@
 Verifies that the P2B shared fixtures behave correctly before the
 rest of the test suite depends on them.
 """
+
 from __future__ import annotations
 
 import pytest

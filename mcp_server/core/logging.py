@@ -23,10 +23,28 @@ class JSONFormatter(logging.Formatter):
         }
         # Forward any extra fields set on the record
         skip = {
-            "name", "msg", "args", "created", "levelname", "levelno", "pathname",
-            "filename", "module", "exc_info", "exc_text", "stack_info", "lineno",
-            "funcName", "msecs", "relativeCreated", "thread", "threadName",
-            "processName", "process", "message", "taskName",
+            "name",
+            "msg",
+            "args",
+            "created",
+            "levelname",
+            "levelno",
+            "pathname",
+            "filename",
+            "module",
+            "exc_info",
+            "exc_text",
+            "stack_info",
+            "lineno",
+            "funcName",
+            "msecs",
+            "relativeCreated",
+            "thread",
+            "threadName",
+            "processName",
+            "process",
+            "message",
+            "taskName",
         }
         for key, value in record.__dict__.items():
             if key not in skip:
@@ -35,10 +53,7 @@ class JSONFormatter(logging.Formatter):
 
 
 def _use_json_logging() -> bool:
-    return (
-        get_environment() == Environment.PRODUCTION
-        or os.getenv("MCP_LOG_FORMAT") == "json"
-    )
+    return get_environment() == Environment.PRODUCTION or os.getenv("MCP_LOG_FORMAT") == "json"
 
 
 def setup_logging(log_level: str = "INFO", log_file: Optional[str] = None) -> None:

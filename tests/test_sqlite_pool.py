@@ -18,10 +18,10 @@ import pytest
 from mcp_server.storage.connection_pool import ConnectionPool
 from mcp_server.storage.sqlite_store import SQLiteStore
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_pool(db_path: str, size: int = 4) -> ConnectionPool:
     return ConnectionPool(
@@ -44,6 +44,7 @@ def _make_pool_store(tmp_path, size: int = 4):
 # ---------------------------------------------------------------------------
 # Concurrency test
 # ---------------------------------------------------------------------------
+
 
 class TestConcurrentReaders:
     def test_16_readers_no_locked_error(self, tmp_path):
@@ -82,6 +83,7 @@ class TestConcurrentReaders:
 # close_all() behaviour
 # ---------------------------------------------------------------------------
 
+
 class TestCloseAll:
     def test_close_all_idempotent(self, tmp_path):
         """close_all() called twice must not raise."""
@@ -101,6 +103,7 @@ class TestCloseAll:
 # ---------------------------------------------------------------------------
 # Write path round trip
 # ---------------------------------------------------------------------------
+
 
 class TestWritePathWithPool:
     def test_store_file_get_file_round_trip(self, tmp_path):

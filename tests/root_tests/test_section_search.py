@@ -766,7 +766,7 @@ pipeline {
 
 Enterprise customers can self-host:
 
-1. Contact sales for enterprise license
+1. Request enterprise access
 2. Receive installation packages
 3. Deploy to your infrastructure
 4. Maintain with our support

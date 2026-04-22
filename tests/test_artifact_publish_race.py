@@ -11,10 +11,9 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
+from mcp_server.artifacts.artifact_upload import IndexArtifactUploader
 from mcp_server.artifacts.attestation import Attestation
 from mcp_server.artifacts.publisher import ArtifactError, ArtifactPublisher, ArtifactRef
-from mcp_server.artifacts.artifact_upload import IndexArtifactUploader
-
 
 REPO = "owner/repo"
 COMMIT = "abcdef1234567890abcdef1234567890abcdef12"
@@ -34,6 +33,8 @@ def _stub_attest(monkeypatch):
         "mcp_server.artifacts.publisher.attest",
         MagicMock(return_value=_SYNTHETIC_ATTESTATION),
     )
+
+
 SHORT_SHA = COMMIT[:7]
 TAG = f"index-{SHORT_SHA}"
 RELEASE_URL = f"https://github.com/{REPO}/releases/tag/{TAG}"
@@ -48,9 +49,11 @@ def _make_uploader() -> IndexArtifactUploader:
     # P14 SL-4: publisher.publish_on_reindex now invokes compress_indexes +
     # create_metadata to compute the DeltaPolicy decision. These tests focus
     # on gh-orchestration behavior and stub the uploader's heavy work.
+    from datetime import datetime
+    from datetime import timezone as _tz
     from pathlib import Path as _Path
     from unittest.mock import MagicMock as _MagicMock
-    from datetime import datetime, timezone as _tz
+
     _synthetic_attestation = Attestation(
         bundle_url="https://github.com/owner/repo/attestations/1",
         bundle_path=_Path("/tmp/_publish_race_archive.tar.gz.attestation.jsonl"),
@@ -101,6 +104,7 @@ def _default_gh_dispatch(args, **kwargs):
 # Test 1: Idempotency — calling twice with same (repo_id, commit) returns same ArtifactRef
 # ---------------------------------------------------------------------------
 
+
 class TestIdempotency:
     def test_same_ref_on_double_call(self):
         uploader = _make_uploader()
@@ -111,7 +115,9 @@ class TestIdempotency:
         def side_effect(args, **kwargs):
             call_count["n"] += 1
             if "view" in args and "index-latest" in args:
-                return MagicMock(returncode=0, stdout=f'{{"targetCommitish": "{COMMIT}"}}', stderr="")
+                return MagicMock(
+                    returncode=0, stdout=f'{{"targetCommitish": "{COMMIT}"}}', stderr=""
+                )
             if "view" in args:
                 # First view of sha-tag → not found; second → found
                 if call_count["n"] <= 2:
@@ -135,7 +141,9 @@ class TestIdempotency:
 
         def side_effect(args, **kwargs):
             if "view" in args and "index-latest" in args:
-                return MagicMock(returncode=0, stdout=f'{{"targetCommitish": "{COMMIT}"}}', stderr="")
+                return MagicMock(
+                    returncode=0, stdout=f'{{"targetCommitish": "{COMMIT}"}}', stderr=""
+                )
             return MagicMock(returncode=0, stdout="", stderr="")
 
         with patch("subprocess.run", side_effect=side_effect):
@@ -149,6 +157,7 @@ class TestIdempotency:
 # ---------------------------------------------------------------------------
 # Test 2: Concurrent race — two different commits; only one wins index-latest
 # ---------------------------------------------------------------------------
+
 
 class TestConcurrentRace:
     def test_two_commits_each_get_sha_tag(self):
@@ -169,7 +178,9 @@ class TestConcurrentRace:
             if "view" in args and "index-latest" in args:
                 # Whoever calls first wins — return their commit
                 winner = edit_calls[0] if edit_calls else commit_a
-                return MagicMock(returncode=0, stdout=f'{{"targetCommitish": "{winner}"}}', stderr="")
+                return MagicMock(
+                    returncode=0, stdout=f'{{"targetCommitish": "{winner}"}}', stderr=""
+                )
             return MagicMock(returncode=0, stdout="", stderr="")
 
         uploader_a = _make_uploader()
@@ -223,6 +234,7 @@ class TestConcurrentRace:
 # Test 3: gh non-zero exit wraps in ArtifactError
 # ---------------------------------------------------------------------------
 
+
 class TestGhErrorHandling:
     def test_gh_nonzero_raises_artifact_error(self):
         uploader = _make_uploader()
@@ -237,12 +249,14 @@ class TestGhErrorHandling:
 
     def test_artifact_error_is_mcp_error(self):
         from mcp_server.core.errors import MCPError
+
         assert issubclass(ArtifactError, MCPError)
 
 
 # ---------------------------------------------------------------------------
 # Test 4: Workflow YAML assertions
 # ---------------------------------------------------------------------------
+
 
 class TestWorkflowYaml:
     @pytest.fixture
@@ -260,14 +274,15 @@ class TestWorkflowYaml:
 
     def test_publish_on_reindex_input_added(self, workflow_path: Path):
         content = workflow_path.read_text()
-        assert "publish_on_reindex" in content, (
-            "workflow_dispatch must have a 'publish_on_reindex' input"
-        )
+        assert (
+            "publish_on_reindex" in content
+        ), "workflow_dispatch must have a 'publish_on_reindex' input"
 
 
 # ---------------------------------------------------------------------------
 # Test 5: Publish latency under 30s for mocked gh (10 MB synthetic artifact)
 # ---------------------------------------------------------------------------
+
 
 class TestPublishLatency:
     def test_publish_completes_under_30s(self):
@@ -277,7 +292,9 @@ class TestPublishLatency:
 
         def fast_side_effect(args, **kwargs):
             if "view" in args and "index-latest" in args:
-                return MagicMock(returncode=0, stdout=f'{{"targetCommitish": "{COMMIT}"}}', stderr="")
+                return MagicMock(
+                    returncode=0, stdout=f'{{"targetCommitish": "{COMMIT}"}}', stderr=""
+                )
             return MagicMock(returncode=0, stdout="", stderr="")
 
         start = time.monotonic()
@@ -291,6 +308,7 @@ class TestPublishLatency:
 # ---------------------------------------------------------------------------
 # Test 6: Call-order spy — gh release edit comes after gh release create
 # ---------------------------------------------------------------------------
+
 
 class TestCallOrder:
     def test_edit_after_create(self):
@@ -310,7 +328,9 @@ class TestCallOrder:
                 return MagicMock(returncode=1, stdout="", stderr="not found")
             # view of index-latest → exists and points at our commit
             if "view" in args and "index-latest" in args:
-                return MagicMock(returncode=0, stdout=f'{{"targetCommitish": "{COMMIT}"}}', stderr="")
+                return MagicMock(
+                    returncode=0, stdout=f'{{"targetCommitish": "{COMMIT}"}}', stderr=""
+                )
             return MagicMock(returncode=0, stdout="", stderr="")
 
         with patch("subprocess.run", side_effect=side_effect):
@@ -325,6 +345,6 @@ class TestCallOrder:
         )
         assert sha_create_idx is not None, f"Expected create for SHA tag; got: {observed}"
         assert latest_edit_idx is not None, f"Expected edit for index-latest; got: {observed}"
-        assert sha_create_idx < latest_edit_idx, (
-            "SHA-keyed release must be created before index-latest pointer is updated"
-        )
+        assert (
+            sha_create_idx < latest_edit_idx
+        ), "SHA-keyed release must be created before index-latest pointer is updated"

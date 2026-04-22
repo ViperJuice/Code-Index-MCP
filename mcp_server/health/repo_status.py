@@ -1,4 +1,5 @@
 """Build per-repository health rows for the get_status surface (IF-0-P10-7)."""
+
 from pathlib import Path
 
 from mcp_server.storage.multi_repo_manager import RepositoryInfo

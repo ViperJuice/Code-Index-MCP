@@ -14,9 +14,10 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 from ..artifacts.semantic_profiles import SemanticProfileRegistry
 from ..config.env_vars import get_max_file_size_bytes
 from ..config.settings import reload_settings
+from ..core.errors import IndexingError, record_handled_error
+from ..core.ignore_patterns import EXCLUDED_DIR_PARTS as _INDEX_EXCLUDED_DIRS
 from ..core.ignore_patterns import (
     build_walker_filter,
-    EXCLUDED_DIR_PARTS as _INDEX_EXCLUDED_DIRS,
 )
 from ..core.repo_context import RepoContext
 from ..graph import (
@@ -33,6 +34,7 @@ from ..plugins.plugin_factory import PluginFactory, PluginUnavailableError
 from ..plugins.plugin_set_registry import PluginSetRegistry
 from ..storage.multi_repo_manager import MultiRepositoryManager
 from ..storage.sqlite_store import SQLiteStore
+from ..storage.two_phase import TwoPhaseCommitError, two_phase_commit
 from ..utils.semantic_indexer import SemanticIndexer
 from ..utils.semantic_indexer_registry import SemanticIndexerRegistry
 from .cross_repo_coordinator import (
@@ -48,8 +50,6 @@ from .result_aggregator import (
     RankingCriteria,
     ResultAggregator,
 )
-from ..core.errors import IndexingError, record_handled_error
-from ..storage.two_phase import TwoPhaseCommitError, two_phase_commit
 
 logger = logging.getLogger(__name__)
 
@@ -362,14 +362,13 @@ class EnhancedDispatcher:
                 raise ValueError("non-positive")
             self._fallback_timeout_ms = _ms
         except (ValueError, TypeError):
-            logger.warning(
-                "Invalid MCP_DISPATCHER_FALLBACK_MS value; using default 2000ms"
-            )
+            logger.warning("Invalid MCP_DISPATCHER_FALLBACK_MS value; using default 2000ms")
             self._fallback_timeout_ms = 2000
 
         # Fallback histogram handle (IF-0-P11-3)
         try:
             from mcp_server.metrics.prometheus_exporter import get_prometheus_exporter
+
             self._fallback_histogram = get_prometheus_exporter().dispatcher_fallback_histogram
         except Exception as exc:
             record_handled_error(__name__, exc)
@@ -817,6 +816,7 @@ class EnhancedDispatcher:
             if ctx.sqlite_store:
                 try:
                     import sqlite3 as _sqlite3
+
                     _conn = _sqlite3.connect(ctx.sqlite_store.db_path)
                     try:
                         _cur = _conn.cursor()
@@ -836,9 +836,7 @@ class EnhancedDispatcher:
                     record_handled_error(__name__, exc)
                     pass
 
-            source_ext = (
-                os.path.splitext(row_filepath)[1].lower() if row_filepath else None
-            )
+            source_ext = os.path.splitext(row_filepath)[1].lower() if row_filepath else None
 
             result = run_gated_fallback(
                 plugins=repo_plugins,
@@ -858,6 +856,7 @@ class EnhancedDispatcher:
         finally:
             try:
                 from mcp_server.metrics.prometheus_exporter import get_prometheus_exporter
+
                 _hist = get_prometheus_exporter().dispatcher_lookup_histogram
                 if _hist is not None:
                     _hist.observe(time.perf_counter() - _hp_t0)
@@ -1037,7 +1036,9 @@ class EnhancedDispatcher:
         # Combine with documentation files first
         return doc_results + code_results
 
-    def _get_chunk_content_for_reranking(self, sqlite_store: Optional[SQLiteStore], file_path: str) -> str:
+    def _get_chunk_content_for_reranking(
+        self, sqlite_store: Optional[SQLiteStore], file_path: str
+    ) -> str:
         """Return the best chunk content for a file to use as reranker document text."""
         if not sqlite_store or not file_path:
             return ""
@@ -1051,7 +1052,9 @@ class EnhancedDispatcher:
             record_handled_error(__name__, exc)
             return ""
 
-    def _symbol_route(self, sqlite_store: Optional[SQLiteStore], name: str, kind: Optional[str], limit: int) -> List[Dict]:
+    def _symbol_route(
+        self, sqlite_store: Optional[SQLiteStore], name: str, kind: Optional[str], limit: int
+    ) -> List[Dict]:
         """Query the symbols table directly and return search-result-shaped dicts."""
         if not sqlite_store:
             return []
@@ -1109,7 +1112,9 @@ class EnhancedDispatcher:
             filtered = candidates
         for c in filtered:
             if not c.get("_rerank_doc"):
-                c["_rerank_doc"] = self._get_chunk_content_for_reranking(sqlite_store, c.get("file", ""))
+                c["_rerank_doc"] = self._get_chunk_content_for_reranking(
+                    sqlite_store, c.get("file", "")
+                )
         try:
             return self._reranker.rerank(query, filtered, limit)
         except Exception as e:
@@ -1565,6 +1570,7 @@ class EnhancedDispatcher:
                 if sqlite_store:
                     try:
                         import sqlite3 as _sqlite3_s
+
                         _sconn = _sqlite3_s.connect(sqlite_store.db_path)
                         try:
                             _scur = _sconn.cursor()
@@ -1599,19 +1605,21 @@ class EnhancedDispatcher:
                     _sym_filepath = (
                         _sym_def.get("defined_in", "") if isinstance(_sym_def, dict) else ""
                     )
-                    all_results.append({
-                        "file": _sym_filepath,
-                        "line": (
-                            _sym_def.get("line", 1) if isinstance(_sym_def, dict) else 1
-                        ),
-                        "snippet": (
-                            _sym_def.get("signature", "") if isinstance(_sym_def, dict) else ""
-                        ),
-                        "score": 1.0,
-                        "language": (
-                            _sym_def.get("language", "unknown") if isinstance(_sym_def, dict) else "unknown"
-                        ),
-                    })
+                    all_results.append(
+                        {
+                            "file": _sym_filepath,
+                            "line": (_sym_def.get("line", 1) if isinstance(_sym_def, dict) else 1),
+                            "snippet": (
+                                _sym_def.get("signature", "") if isinstance(_sym_def, dict) else ""
+                            ),
+                            "score": 1.0,
+                            "language": (
+                                _sym_def.get("language", "unknown")
+                                if isinstance(_sym_def, dict)
+                                else "unknown"
+                            ),
+                        }
+                    )
 
                 # Deduplicate results
                 seen = set()
@@ -1652,6 +1660,7 @@ class EnhancedDispatcher:
         finally:
             try:
                 from mcp_server.metrics.prometheus_exporter import get_prometheus_exporter
+
                 _hist = get_prometheus_exporter().dispatcher_search_histogram
                 if _hist is not None:
                     _hist.observe(time.perf_counter() - _hp_t0)
@@ -1727,9 +1736,7 @@ class EnhancedDispatcher:
         except Exception as e:
             logger.error(f"Error indexing {path}: {e}", exc_info=True)
 
-    def index_file_guarded(
-        self, ctx: RepoContext, path: Path, expected_hash: str
-    ) -> IndexResult:
+    def index_file_guarded(self, ctx: RepoContext, path: Path, expected_hash: str) -> IndexResult:
         """TOCTOU-guarded index: re-hashes immediately before plugin write.
 
         If the file hash at dispatch time differs from expected_hash, the file
@@ -1866,7 +1873,9 @@ class EnhancedDispatcher:
             record_handled_error(__name__, exc)
             return {"total": 0, "by_language": {}}
 
-    def index_directory(self, ctx: RepoContext, directory: Path, recursive: bool = True) -> Dict[str, int]:
+    def index_directory(
+        self, ctx: RepoContext, directory: Path, recursive: bool = True
+    ) -> Dict[str, int]:
         """Index all files in a directory, respecting ignore patterns."""
         logger.info(f"Indexing directory: {directory} (recursive={recursive})")
 
@@ -2499,7 +2508,9 @@ class EnhancedDispatcher:
             logger.error(f"Error getting context for symbols: {e}", exc_info=True)
             return None
 
-    def find_symbol_dependencies(self, ctx: RepoContext, symbol: str, max_depth: int = 3) -> List[Dict[str, Any]]:
+    def find_symbol_dependencies(
+        self, ctx: RepoContext, symbol: str, max_depth: int = 3
+    ) -> List[Dict[str, Any]]:
         """Outgoing dependency walk from symbol within ctx.repo_id.
 
         Returns:
@@ -2540,9 +2551,10 @@ class EnhancedDispatcher:
             logger.error(f"Error finding dependencies for {symbol}: {e}")
             return []
 
-    def find_symbol_dependents(self, ctx: RepoContext, symbol: str, max_depth: int = 3) -> List[Dict[str, Any]]:
-        """Incoming dependent walk into symbol within ctx.repo_id.
-        """
+    def find_symbol_dependents(
+        self, ctx: RepoContext, symbol: str, max_depth: int = 3
+    ) -> List[Dict[str, Any]]:
+        """Incoming dependent walk into symbol within ctx.repo_id."""
         if not self._graph_analyzer:
             logger.warning("Graph analyzer not initialized")
             return []

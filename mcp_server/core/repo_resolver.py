@@ -1,4 +1,5 @@
 """Resolves filesystem paths to RepoContext via the RepositoryRegistry."""
+
 from __future__ import annotations
 
 import logging

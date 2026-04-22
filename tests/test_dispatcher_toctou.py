@@ -13,10 +13,10 @@ from mcp_server.core.repo_context import RepoContext
 from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
 from mcp_server.dispatcher.dispatcher_enhanced import IndexResult, IndexResultStatus
 
-
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
+
 
 def _bytes_hash(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
@@ -40,6 +40,7 @@ def _make_ctx() -> RepoContext:
 # ---------------------------------------------------------------------------
 # SL-3.1 tests
 # ---------------------------------------------------------------------------
+
 
 class TestIndexFileGuarded:
     def test_matching_hash_returns_indexed(self, tmp_path):
@@ -92,9 +93,7 @@ class TestIndexFileGuarded:
             result = dispatcher.index_file_guarded(ctx, test_file, stale_hash)
 
         assert result.status == IndexResultStatus.SKIPPED_TOCTOU
-        toctou_records = [
-            r for r in caplog.records if "toctou_skipped" in r.getMessage()
-        ]
+        toctou_records = [r for r in caplog.records if "toctou_skipped" in r.getMessage()]
         assert len(toctou_records) >= 1
         record = toctou_records[0]
         assert hasattr(record, "path") or str(test_file) in record.getMessage()
@@ -213,12 +212,16 @@ class TestWatcherUsesGuardedDispatch:
         with patch("mcp_server.watcher_multi_repo.lock_registry") as mock_lr:
             mock_lr.acquire.return_value.__enter__ = MagicMock(return_value=None)
             mock_lr.acquire.return_value.__exit__ = MagicMock(return_value=False)
-            with patch("mcp_server.watcher_multi_repo.should_reindex_for_branch", return_value=True):
+            with patch(
+                "mcp_server.watcher_multi_repo.should_reindex_for_branch", return_value=True
+            ):
                 handler._trigger_reindex_with_ctx(test_file)
 
         mock_dispatcher.index_file_guarded.assert_called_once()
         call_args = mock_dispatcher.index_file_guarded.call_args
         # Third argument should be the observed hash of the file bytes
-        observed_hash_passed = call_args[0][2] if len(call_args[0]) >= 3 else call_args[1].get("expected_hash")
+        observed_hash_passed = (
+            call_args[0][2] if len(call_args[0]) >= 3 else call_args[1].get("expected_hash")
+        )
         expected = _bytes_hash(content)
         assert observed_hash_passed == expected

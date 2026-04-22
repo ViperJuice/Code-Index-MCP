@@ -1,4 +1,5 @@
 """Tests for PluginFactory.create_plugin_async (SL-3)."""
+
 import asyncio
 import time
 from pathlib import Path
@@ -6,12 +7,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from mcp_server.plugins.plugin_factory import PluginFactory, SPECIFIC_PLUGINS
 from mcp_server.plugin_base import IPlugin
+from mcp_server.plugins.plugin_factory import SPECIFIC_PLUGINS, PluginFactory
 
 
 class _MockPlugin(IPlugin):
     """Minimal IPlugin for testing."""
+
     lang = "python"
 
     def __init__(self, sqlite_store=None, enable_semantic=True):
@@ -103,10 +105,8 @@ async def test_create_plugin_async_does_not_block_event_loop():
     assert slow_create_done_at is not None
     # The sleep (0.05 s) must complete well before the slow ctor (0.2 s) finishes.
     # Allow 0.1 s slack for scheduling jitter.
-    assert sleep_done_at < slow_create_done_at, (
-        "asyncio.sleep(0.05) should finish before the 0.2 s slow ctor"
-    )
+    assert (
+        sleep_done_at < slow_create_done_at
+    ), "asyncio.sleep(0.05) should finish before the 0.2 s slow ctor"
     elapsed = sleep_done_at - start
-    assert elapsed < 0.15, (
-        f"sleep took {elapsed:.3f}s — event loop was probably blocked"
-    )
+    assert elapsed < 0.15, f"sleep took {elapsed:.3f}s — event loop was probably blocked"

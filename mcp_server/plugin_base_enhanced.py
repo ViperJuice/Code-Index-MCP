@@ -18,8 +18,9 @@ from .plugin_base import (
 from .utils.semantic_indexer import SemanticIndexer
 
 if TYPE_CHECKING:
-    from .storage.sqlite_store import SQLiteStore
     from mcp_server.core.repo_context import RepoContext
+
+    from .storage.sqlite_store import SQLiteStore
 
 logger = logging.getLogger(__name__)
 

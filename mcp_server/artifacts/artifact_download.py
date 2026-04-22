@@ -19,21 +19,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from mcp_server.storage.schema_migrator import SchemaMigrator, UnknownSchemaVersionError
-
-logger = logging.getLogger(__name__)
-
 from mcp_server.config.settings import get_settings
 from mcp_server.core.errors import record_handled_error
+from mcp_server.storage.schema_migrator import SchemaMigrator, UnknownSchemaVersionError
 
 from .attestation import Attestation, verify_attestation
+from .freshness import FreshnessVerdict, verify_artifact_freshness
 from .integrity_gate import (
     ArtifactIntegrityGateResult,
     validate_artifact_integrity,
     validate_required_metadata_fields,
 )
-from .freshness import FreshnessVerdict, verify_artifact_freshness
 from .semantic_profiles import extract_semantic_profile_metadata
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -499,7 +498,9 @@ class IndexArtifactDownloader:
                 max_age_days,
             )
         elif verdict is FreshnessVerdict.INVALID:
-            logger.warning("Artifact metadata missing or malformed (INVALID); proceeding with install")
+            logger.warning(
+                "Artifact metadata missing or malformed (INVALID); proceeding with install"
+            )
 
         installed_items = self.install_indexes(extracted_dir, backup=backup)
         return ArtifactDownloadResult(artifact=artifact, installed_items=installed_items)

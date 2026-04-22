@@ -192,24 +192,24 @@ class TestPasswordManager:
     def test_password_manager_implements_ipassword_manager(self):
         """PasswordManager must be an instance of IPasswordManager (Gap 1)."""
         pm = PasswordManager()
-        assert isinstance(pm, IPasswordManager), (
-            "PasswordManager does not implement IPasswordManager"
-        )
+        assert isinstance(
+            pm, IPasswordManager
+        ), "PasswordManager does not implement IPasswordManager"
 
     def test_needs_rehash_returns_true_for_legacy_bcrypt(self):
         """needs_rehash returns True for a legacy bcrypt hash (Gap 2)."""
         pm = PasswordManager()
-        assert pm.needs_rehash(_LEGACY_BCRYPT_HASH) is True, (
-            "Legacy bcrypt hashes should always need rehash to argon2"
-        )
+        assert (
+            pm.needs_rehash(_LEGACY_BCRYPT_HASH) is True
+        ), "Legacy bcrypt hashes should always need rehash to argon2"
 
     def test_needs_rehash_returns_false_for_fresh_argon2_hash(self):
         """needs_rehash returns False for a freshly generated argon2id hash (Gap 2)."""
         pm = PasswordManager()
         fresh_hash = pm.hash_password("freshpassword123!")
-        assert pm.needs_rehash(fresh_hash) is False, (
-            "A freshly generated argon2 hash should not need rehash"
-        )
+        assert (
+            pm.needs_rehash(fresh_hash) is False
+        ), "A freshly generated argon2 hash should not need rehash"
 
 
 class TestRateLimiter:

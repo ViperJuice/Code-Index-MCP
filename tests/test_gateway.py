@@ -21,7 +21,6 @@ from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher
 from mcp_server.plugin_base import SearchResult, SymbolDef
 from mcp_server.storage.sqlite_store import SQLiteStore
 
-
 # ---------------------------------------------------------------------------
 # Local fixture overrides for SL-1 compatibility
 #
@@ -52,7 +51,13 @@ def test_client_with_dispatcher(
 
     monkeypatch.setattr(gateway, "dispatcher", dispatcher_with_plugins)
     monkeypatch.setattr(gateway, "sqlite_store", sqlite_store)
-    for _attr in ("bm25_indexer", "hybrid_search", "fuzzy_indexer", "semantic_indexer", "query_cache"):
+    for _attr in (
+        "bm25_indexer",
+        "hybrid_search",
+        "fuzzy_indexer",
+        "semantic_indexer",
+        "query_cache",
+    ):
         if hasattr(gateway, _attr):
             monkeypatch.setattr(gateway, _attr, None)
 
@@ -113,7 +118,9 @@ class TestGatewayStartupShutdown:
 
     @patch("mcp_server.gateway.EnhancedDispatcher")
     @patch("mcp_server.gateway.MultiRepositoryWatcher")
-    def test_shutdown_stops_watcher(self, mock_watcher_class, mock_dispatcher_class, test_client_with_dispatcher):
+    def test_shutdown_stops_watcher(
+        self, mock_watcher_class, mock_dispatcher_class, test_client_with_dispatcher
+    ):
         """Test that shutdown stops the multi-repo watcher."""
         mock_watcher = Mock()
         mock_watcher_class.return_value = mock_watcher
@@ -682,7 +689,9 @@ class TestPerformance:
 class TestRepoCtxResolution:
     """SL-3.1: Tests for get_repo_ctx helper and per-request RepoContext resolution."""
 
-    def test_search_resolves_via_x_repo_id_header(self, test_client_with_dispatcher, monkeypatch, tmp_path):
+    def test_search_resolves_via_x_repo_id_header(
+        self, test_client_with_dispatcher, monkeypatch, tmp_path
+    ):
         """POST /search with X-Repo-Id header resolves context via RepoResolver."""
         import mcp_server.gateway as gateway
         from mcp_server.core import RepoContext
@@ -719,9 +728,7 @@ class TestRepoCtxResolution:
         monkeypatch.setattr(gateway, "repo_resolver", fake_resolver)
         test_client_with_dispatcher.app.state.dispatcher.search = Mock(return_value=[])
 
-        response = test_client_with_dispatcher.get(
-            f"/search?q=test&repository={tmp_path}"
-        )
+        response = test_client_with_dispatcher.get(f"/search?q=test&repository={tmp_path}")
 
         assert response.status_code == 200
         fake_resolver.resolve.assert_called_once_with(tmp_path)
@@ -729,9 +736,7 @@ class TestRepoCtxResolution:
             fake_ctx, "test", semantic=False, limit=20
         )
 
-    def test_search_falls_back_to_cwd_resolution(
-        self, test_client_with_dispatcher, monkeypatch
-    ):
+    def test_search_falls_back_to_cwd_resolution(self, test_client_with_dispatcher, monkeypatch):
         """POST /search without header/param falls back to resolver.resolve(cwd)."""
         import mcp_server.gateway as gateway
         from mcp_server.core import RepoContext
@@ -780,6 +785,6 @@ class TestRepoCtxResolution:
             cwd=str(Path(__file__).resolve().parent.parent),
         )
         for line in result.stdout.splitlines():
-            assert "sqlite_store=" not in line, (
-                f"Found sqlite_store kwarg in EnhancedDispatcher ctor: {line}"
-            )
+            assert (
+                "sqlite_store=" not in line
+            ), f"Found sqlite_store kwarg in EnhancedDispatcher ctor: {line}"

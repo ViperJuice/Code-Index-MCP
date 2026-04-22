@@ -8,10 +8,11 @@ Composes over :class:`MemoryAwarePluginManager` for per-repo cache keying.
 Consumed by the dispatcher (SL-6) and by P4's watcher (which calls
 :meth:`evict` on repo-removal events).
 """
+
 from __future__ import annotations
 
-import threading
 import logging
+import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional, Protocol, Tuple, runtime_checkable
 
@@ -30,9 +31,7 @@ class PluginSetRegistryProtocol(Protocol):
         """Return the plugin set bound to ``repo_id``. Stable across calls."""
         ...
 
-    def plugins_for_file(
-        self, ctx: "RepoContext", path: Path
-    ) -> List[Tuple["IPlugin", float]]:
+    def plugins_for_file(self, ctx: "RepoContext", path: Path) -> List[Tuple["IPlugin", float]]:
         """Return plugins capable of handling ``path`` in ``ctx.repo_id``, with scores."""
         ...
 
@@ -58,6 +57,7 @@ class PluginSetRegistry:
     def _get_manager(self):
         if self._manager is None:
             from mcp_server.plugins.memory_aware_manager import get_memory_aware_manager
+
             self._manager = get_memory_aware_manager()
         return self._manager
 
@@ -107,9 +107,7 @@ class PluginSetRegistry:
 
         return result
 
-    def plugins_for_file(
-        self, ctx: "RepoContext", path: Path
-    ) -> List[Tuple["IPlugin", float]]:
+    def plugins_for_file(self, ctx: "RepoContext", path: Path) -> List[Tuple["IPlugin", float]]:
         """Return (plugin, score) pairs for plugins that can handle ``path``.
 
         Score is 1.0 for a positive ``supports()`` match. Only matching plugins

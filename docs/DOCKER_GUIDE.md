@@ -1,6 +1,6 @@
 # Docker Guide for MCP Index Server
 
-This guide documents the beta Docker path for Code-Index-MCP `1.2.0-rc3`.
+This guide documents the beta Docker path for Code-Index-MCP `1.2.0-rc4`.
 The P22-proven image package is `ghcr.io/viperjuice/code-index-mcp`. MCP STDIO
 is the primary LLM surface; FastAPI remains a secondary admin surface.
 

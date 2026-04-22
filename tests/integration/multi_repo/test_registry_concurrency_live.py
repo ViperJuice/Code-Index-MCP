@@ -42,6 +42,4 @@ def test_concurrent_writers_200_distinct_repo_ids():
         final_reg = RepositoryRegistry(registry_path=registry_path)
         # Must have received all 200 registrations with distinct repo_ids
         repo_ids = set(final_reg._registry.keys())
-        assert len(repo_ids) >= 200, (
-            f"Expected ≥200 distinct repo_ids, got {len(repo_ids)}"
-        )
+        assert len(repo_ids) >= 200, f"Expected ≥200 distinct repo_ids, got {len(repo_ids)}"

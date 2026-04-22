@@ -18,11 +18,10 @@ from unittest.mock import MagicMock, call
 import pytest
 
 from mcp_server.core.errors import MCPError
-from mcp_server.storage.two_phase import TwoPhaseCommitError, two_phase_commit
-from mcp_server.indexing.incremental_indexer import IncrementalIndexer
 from mcp_server.core.path_resolver import PathResolver
+from mcp_server.indexing.incremental_indexer import IncrementalIndexer
 from mcp_server.storage.sqlite_store import SQLiteStore
-
+from mcp_server.storage.two_phase import TwoPhaseCommitError, two_phase_commit
 
 # ---------------------------------------------------------------------------
 # Primitive tests
@@ -193,9 +192,7 @@ def test_rename_qdrant_fail_sqlite_not_updated(rename_setup):
     path_in_db = _get_relative_path(store, repo_id, file_id)
     # SQLite path must be unchanged (still old_name)
     assert path_in_db is not None
-    assert "old_name" in path_in_db, (
-        f"SQLite path was updated despite Qdrant failure: {path_in_db}"
-    )
+    assert "old_name" in path_in_db, f"SQLite path was updated despite Qdrant failure: {path_in_db}"
 
 
 def test_rename_sqlite_fail_qdrant_not_called(rename_setup):
@@ -217,6 +214,6 @@ def test_rename_sqlite_fail_qdrant_not_called(rename_setup):
     store.move_file = original_move  # restore
 
     assert result is False
-    assert semantic.delete_calls == [], (
-        f"Qdrant delete was called despite SQLite failure: {semantic.delete_calls}"
-    )
+    assert (
+        semantic.delete_calls == []
+    ), f"Qdrant delete was called despite SQLite failure: {semantic.delete_calls}"

@@ -54,9 +54,9 @@ def test_readme_no_stale_claims():
 def test_readme_beta_admonition_near_top():
     text = _readme_text()
     head = "\n".join(text.splitlines()[:80])
-    assert "> **Beta status**:" in head, (
-        "README missing '> **Beta status**:' blockquote within first 80 lines"
-    )
+    assert (
+        "> **Beta status**:" in head
+    ), "README missing '> **Beta status**:' blockquote within first 80 lines"
     # Body must name MCP as primary and FastAPI/REST as secondary admin surface.
     # Search the full admonition block (contiguous blockquote lines).
     admonition_blocks = re.findall(r"(?:^>.*\n)+", text, re.MULTILINE)
@@ -64,12 +64,12 @@ def test_readme_beta_admonition_near_top():
     assert len(beta_blocks) >= 1, "No 'Beta status' admonition block found"
     beta_body = "\n".join(beta_blocks)
     assert "MCP" in beta_body, "Beta admonition does not name MCP as primary surface"
-    assert ("FastAPI" in beta_body) or ("REST" in beta_body), (
-        "Beta admonition does not name FastAPI/REST as secondary admin surface"
-    )
-    assert ("secondary" in beta_body.lower()) or ("admin" in beta_body.lower()), (
-        "Beta admonition does not mark FastAPI/REST as secondary/admin"
-    )
+    assert ("FastAPI" in beta_body) or (
+        "REST" in beta_body
+    ), "Beta admonition does not name FastAPI/REST as secondary admin surface"
+    assert ("secondary" in beta_body.lower()) or (
+        "admin" in beta_body.lower()
+    ), "Beta admonition does not mark FastAPI/REST as secondary/admin"
 
 
 # ---------------------------------------------------------------------------
@@ -90,12 +90,10 @@ def test_readme_tool_call_json_arguments_objects():
     for tool in ("search_code", "symbol_lookup"):
         # Look for {"tool": "<tool>"...} paired with an "arguments" object.
         # Match across lines; be permissive about whitespace ordering.
-        pattern = (
-            r'"tool"\s*:\s*"' + re.escape(tool) + r'"[^{}]*?"arguments"\s*:\s*\{'
-        )
-        assert re.search(pattern, text, re.DOTALL), (
-            f"README missing tool-call JSON for '{tool}' with 'arguments' object"
-        )
+        pattern = r'"tool"\s*:\s*"' + re.escape(tool) + r'"[^{}]*?"arguments"\s*:\s*\{'
+        assert re.search(
+            pattern, text, re.DOTALL
+        ), f"README missing tool-call JSON for '{tool}' with 'arguments' object"
 
 
 # ---------------------------------------------------------------------------
@@ -119,9 +117,7 @@ def test_readme_rest_demoted_to_secondary():
 def test_getting_started_no_curl_rest_examples():
     text = _getting_started_text()
     matches = re.findall(r"curl .*(search|symbol)", text)
-    assert matches == [], (
-        f"docs/GETTING_STARTED.md still contains curl REST examples: {matches}"
-    )
+    assert matches == [], f"docs/GETTING_STARTED.md still contains curl REST examples: {matches}"
 
 
 # ---------------------------------------------------------------------------
@@ -137,12 +133,10 @@ def test_getting_started_has_mcp_json_registration():
 def test_getting_started_has_tool_call_json_for_both_tools():
     text = _getting_started_text()
     for tool in ("search_code", "symbol_lookup"):
-        pattern = (
-            r'"tool"\s*:\s*"' + re.escape(tool) + r'"[^{}]*?"arguments"\s*:\s*\{'
-        )
-        assert re.search(pattern, text, re.DOTALL), (
-            f"docs/GETTING_STARTED.md missing tool-call JSON for '{tool}'"
-        )
+        pattern = r'"tool"\s*:\s*"' + re.escape(tool) + r'"[^{}]*?"arguments"\s*:\s*\{'
+        assert re.search(
+            pattern, text, re.DOTALL
+        ), f"docs/GETTING_STARTED.md missing tool-call JSON for '{tool}'"
 
 
 def test_getting_started_via_mcp_subsection_leads():
@@ -153,14 +147,12 @@ def test_getting_started_via_mcp_subsection_leads():
     assert via_mcp != -1, "Missing 'Via MCP Protocol' subsection"
     via_rest = text.find("Via REST API")
     if via_rest != -1:
-        assert via_mcp < via_rest, (
-            "'Via MCP Protocol' must appear before 'Via REST API' subsection"
-        )
+        assert via_mcp < via_rest, "'Via MCP Protocol' must appear before 'Via REST API' subsection"
         # REST subsection must not label itself primary.
         # Slice out just the REST subsection (up to the next H2/H3 heading).
         rest_tail = text[via_rest:]
         next_heading = re.search(r"\n##?#?\s", rest_tail[1:])
         rest_section = rest_tail[: next_heading.start() + 1] if next_heading else rest_tail
-        assert "primary" not in rest_section.lower(), (
-            "'Via REST API' subsection must not describe itself as primary"
-        )
+        assert (
+            "primary" not in rest_section.lower()
+        ), "'Via REST API' subsection must not describe itself as primary"

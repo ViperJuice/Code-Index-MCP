@@ -32,6 +32,7 @@ class TestPublisherDeltaIntegration:
 
     def _mock_gh(self, publisher: ArtifactPublisher, *, prev_commit: str | None = None) -> None:
         """Patch publisher._run and subprocess.run to avoid real gh calls."""
+
         def fake_run(args, **kwargs):
             result = MagicMock()
             result.returncode = 0
@@ -47,15 +48,22 @@ class TestPublisherDeltaIntegration:
             return result
 
         import subprocess as _sp
+
         patcher = patch.object(_sp, "run", side_effect=fake_run)
         patcher.start()
         publisher._patcher = patcher  # type: ignore[attr-defined]
         publisher._run = MagicMock(return_value=MagicMock(returncode=0, stdout="", stderr=""))
 
         from mcp_server.artifacts.attestation import Attestation
+
         attest_patcher = patch(
             "mcp_server.artifacts.publisher.attest",
-            return_value=Attestation(bundle_url="", bundle_path=Path(""), subject_digest="", signed_at=__import__("datetime").datetime.now(__import__("datetime").timezone.utc)),
+            return_value=Attestation(
+                bundle_url="",
+                bundle_path=Path(""),
+                subject_digest="",
+                signed_at=__import__("datetime").datetime.now(__import__("datetime").timezone.utc),
+            ),
         )
         attest_patcher.start()
         publisher._attest_patcher = attest_patcher  # type: ignore[attr-defined]

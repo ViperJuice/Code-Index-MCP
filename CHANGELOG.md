@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+[Unreleased]: # placeholder for post-rc4 work
+
+## [1.2.0-rc4] — 2026-04-22
+
 ### Added (P26 — private alpha evidence and public alpha decision)
 - Added the P26 private-alpha evidence contract:
   `docs/validation/private-alpha-decision.md`,
@@ -19,8 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `uv sync --locked`/STDIO and `ghcr.io/viperjuice/code-index-mcp`; language
   support is scoped by `docs/SUPPORT_MATRIX.md`; beta warnings and rollback
   instructions remain in `docs/operations/deployment-runbook.md`.
-
-[Unreleased]: # placeholder for post-rc3 work
 
 ## [1.2.0-rc3] — 2026-04-21
 

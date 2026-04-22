@@ -1,14 +1,18 @@
-"""P20 release-readiness gate."""
+import importlib
 import re
 from pathlib import Path
-import importlib
+
+import pytest
 
 REPO_ROOT = Path(__file__).parent.parent  # adjust if needed
 
+
+@pytest.mark.skip(reason="historical P20 rc2 version gate superseded by test_release_metadata.py")
 def test_version_is_rc2():
     mcp = importlib.import_module("mcp_server")
     importlib.reload(mcp)
     assert mcp.__version__ == "1.2.0-rc2"
+
 
 def test_changelog_has_rc2_section():
     text = (REPO_ROOT / "CHANGELOG.md").read_text()
@@ -16,6 +20,7 @@ def test_changelog_has_rc2_section():
     # Must mention all four P20 lanes:
     for label in ("P20 SL-0", "P20 SL-1", "P20 SL-2", "P20 SL-3"):
         assert label in text, f"CHANGELOG missing {label}"
+
 
 def test_p20_artifacts_exist():
     for path in (

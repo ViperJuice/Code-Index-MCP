@@ -10,6 +10,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 def _get_cli():
     from mcp_server.cli.__main__ import _cli
+
     return _cli
 
 

@@ -1,13 +1,15 @@
 """Per-tool-call repository context (frozen outer, mutable inner reference)."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
 
+from mcp_server.storage.multi_repo_manager import RepositoryInfo
+
 # Real imports so get_type_hints() resolves forward references at runtime.
 # Neither class imports repo_context, so there is no circular dependency.
 from mcp_server.storage.sqlite_store import SQLiteStore
-from mcp_server.storage.multi_repo_manager import RepositoryInfo
 
 
 @dataclass(frozen=True)

@@ -47,7 +47,9 @@ class TestValidateProductionConfigProd:
     """validate_production_config with environment='production'."""
 
     def test_weak_jwt_is_fatal_in_production(self) -> None:
-        cfg = _make_config(jwt_secret=_JWT_WEAK + "x" * 30)  # long enough to pass model, but in blocklist
+        cfg = _make_config(
+            jwt_secret=_JWT_WEAK + "x" * 30
+        )  # long enough to pass model, but in blocklist
         # Use a plainly blocked keyword
         cfg2 = SecurityConfig(
             jwt_secret_key="password" + "x" * 25,  # in blocklist
@@ -72,23 +74,24 @@ class TestValidateProductionConfigProd:
         cfg = _make_config(cors_origins=["*"])
         errors = validate_production_config(cfg, environment="production")
         fatals = [e for e in errors if e.severity == "fatal"]
-        assert any("cors" in e.code.lower() or "cors" in e.message.lower() for e in fatals), (
-            f"Expected CORS-wildcard fatal, got: {errors}"
-        )
+        assert any(
+            "cors" in e.code.lower() or "cors" in e.message.lower() for e in fatals
+        ), f"Expected CORS-wildcard fatal, got: {errors}"
 
     def test_high_rate_limit_is_fatal_in_production(self) -> None:
         cfg = _make_config(rate_limit_requests=1001)
         errors = validate_production_config(cfg, environment="production")
         fatals = [e for e in errors if e.severity == "fatal"]
-        assert any("rate" in e.code.lower() or "rate" in e.message.lower() for e in fatals), (
-            f"Expected rate-limit fatal, got: {errors}"
-        )
+        assert any(
+            "rate" in e.code.lower() or "rate" in e.message.lower() for e in fatals
+        ), f"Expected rate-limit fatal, got: {errors}"
 
     def test_missing_admin_password_is_fatal_in_production(self) -> None:
         cfg = _make_config()
         with patch.dict("os.environ", {"DEFAULT_ADMIN_PASSWORD": ""}, clear=False):
             # Unset the var by removing it
             import os
+
             env_backup = os.environ.pop("DEFAULT_ADMIN_PASSWORD", None)
             try:
                 errors = validate_production_config(cfg, environment="production")
@@ -97,7 +100,9 @@ class TestValidateProductionConfigProd:
                     os.environ["DEFAULT_ADMIN_PASSWORD"] = env_backup
         fatals = [e for e in errors if e.severity == "fatal"]
         assert any(
-            "admin" in e.code.lower() or "admin" in e.message.lower() or "password" in e.message.lower()
+            "admin" in e.code.lower()
+            or "admin" in e.message.lower()
+            or "password" in e.message.lower()
             for e in fatals
         ), f"Expected missing-admin-password fatal, got: {errors}"
 
@@ -107,13 +112,14 @@ class TestValidateProductionConfigProd:
             errors = validate_production_config(cfg, environment="production")
         fatals = [e for e in errors if e.severity == "fatal"]
         assert any(
-            "admin" in e.code.lower() or "password" in e.message.lower()
-            for e in fatals
+            "admin" in e.code.lower() or "password" in e.message.lower() for e in fatals
         ), f"Expected weak-admin-password fatal, got: {errors}"
 
     def test_clean_production_config_returns_no_errors(self) -> None:
         cfg = _make_config()
-        with patch.dict("os.environ", {"DEFAULT_ADMIN_PASSWORD": "Str0ng!Admin#Pass9876"}, clear=False):
+        with patch.dict(
+            "os.environ", {"DEFAULT_ADMIN_PASSWORD": "Str0ng!Admin#Pass9876"}, clear=False
+        ):
             errors = validate_production_config(cfg, environment="production")
         assert errors == [], f"Expected no errors for clean config, got: {errors}"
 

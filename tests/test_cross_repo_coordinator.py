@@ -183,7 +183,9 @@ class TestCrossRepositorySearchCoordinator:
         mock_executor.return_value = mock_executor_instance
 
         # Mock as_completed to return our futures
-        with patch("mcp_server.dispatcher.cross_repo_coordinator.as_completed") as mock_as_completed:
+        with patch(
+            "mcp_server.dispatcher.cross_repo_coordinator.as_completed"
+        ) as mock_as_completed:
             mock_as_completed.return_value = [mock_future1, mock_future2]
 
             result = await coordinator.search_symbol("test_function")
@@ -222,7 +224,9 @@ class TestCrossRepositorySearchCoordinator:
         mock_executor.return_value = mock_executor_instance
 
         # Mock as_completed
-        with patch("mcp_server.dispatcher.cross_repo_coordinator.as_completed") as mock_as_completed:
+        with patch(
+            "mcp_server.dispatcher.cross_repo_coordinator.as_completed"
+        ) as mock_as_completed:
             mock_as_completed.return_value = [mock_future]
 
             result = await coordinator.search_code("test_code", semantic=True, limit=10)

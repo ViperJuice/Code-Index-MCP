@@ -1,4 +1,5 @@
 """Tests for P13 SL-1: checkpoint-resume for reindexing."""
+
 from __future__ import annotations
 
 import json
@@ -8,6 +9,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from mcp_server.core.path_resolver import PathResolver
+from mcp_server.indexing.change_detector import FileChange
 from mcp_server.indexing.checkpoint import (
     REINDEX_STATE_VERSION,
     ReindexCheckpoint,
@@ -15,12 +18,9 @@ from mcp_server.indexing.checkpoint import (
     load,
     save,
 )
-from mcp_server.indexing.change_detector import FileChange
 from mcp_server.indexing.incremental_indexer import IncrementalIndexer
 from mcp_server.indexing.lock_registry import IndexingLockRegistry, lock_registry
-from mcp_server.core.path_resolver import PathResolver
 from mcp_server.storage.sqlite_store import SQLiteStore
-
 
 # ---------------------------------------------------------------------------
 # SL-1.1: checkpoint schema + helpers
@@ -202,13 +202,13 @@ def test_crash_at_file_500_leaves_correct_checkpoint(repo_env, tmp_path: Path) -
     ckpt = load(repo_path)
     assert ckpt is not None, "checkpoint must exist after a crash before cleanup"
     # last_completed_path is paths[498] (last successfully indexed before the failure)
-    assert ckpt.last_completed_path == "file_0498.py", (
-        f"expected file_0498.py, got {ckpt.last_completed_path!r}"
-    )
+    assert (
+        ckpt.last_completed_path == "file_0498.py"
+    ), f"expected file_0498.py, got {ckpt.last_completed_path!r}"
     # remaining_paths starts at the failed file
-    assert ckpt.remaining_paths[0] == "file_0499.py", (
-        f"expected file_0499.py at remaining[0], got {ckpt.remaining_paths[0]!r}"
-    )
+    assert (
+        ckpt.remaining_paths[0] == "file_0499.py"
+    ), f"expected file_0499.py at remaining[0], got {ckpt.remaining_paths[0]!r}"
     # 1 error recorded
     assert len(ckpt.errors) >= 1
     assert any(e["path"] == fail_name for e in ckpt.errors)
@@ -252,9 +252,9 @@ def test_resume_skips_already_indexed_files(repo_env, tmp_path: Path) -> None:
 
     # Should only have indexed from file_0499 onward (501 files: 499..999)
     second_run_count = len(dispatcher2.indexed)
-    assert second_run_count == 501, (
-        f"expected 501 files on resume (499..999), got {second_run_count}"
-    )
+    assert (
+        second_run_count == 501
+    ), f"expected 501 files on resume (499..999), got {second_run_count}"
 
 
 def test_resume_wraps_lock_registry(repo_env) -> None:
@@ -276,9 +276,9 @@ def test_resume_wraps_lock_registry(repo_env) -> None:
 
     assert len(acquired_ids) >= 1, "lock_registry.acquire must be called at least once"
     repo_id = indexer._get_repository_id()
-    assert repo_id in acquired_ids, (
-        f"acquire must be called with the repo's id ({repo_id!r}), got {acquired_ids}"
-    )
+    assert (
+        repo_id in acquired_ids
+    ), f"acquire must be called with the repo's id ({repo_id!r}), got {acquired_ids}"
 
 
 def test_checkpoint_cleared_on_clean_completion(repo_env) -> None:

@@ -1,4 +1,5 @@
 """P6B SL-1: Doc alignment tests — verify AGENTS.md and README.md match post-refactor reality."""
+
 import re
 from pathlib import Path
 
@@ -35,14 +36,13 @@ def test_agents_multi_repo_section():
     for token in required_tokens:
         assert token in text, f"Required token missing from AGENTS.md: {token!r}"
 
-    headings = [
-        line for line in text.splitlines()
-        if line.startswith("#")
-    ]
+    headings = [line for line in text.splitlines() if line.startswith("#")]
     has_multi_repo_heading = any(
         re.search(r"multi.?repo", line, re.IGNORECASE) for line in headings
     )
-    assert has_multi_repo_heading, "AGENTS.md missing a heading containing 'multi-repo' or 'multi repo'"
+    assert (
+        has_multi_repo_heading
+    ), "AGENTS.md missing a heading containing 'multi-repo' or 'multi repo'"
 
 
 def test_readme_many_repos_section():
@@ -64,22 +64,22 @@ def test_readme_many_repos_section():
                 target_level = level
                 break
 
-    assert target_line_idx is not None, (
-        "README.md missing a heading matching 'many repos', 'multi-repo', or 'multi repo'"
-    )
+    assert (
+        target_line_idx is not None
+    ), "README.md missing a heading matching 'many repos', 'multi-repo', or 'multi repo'"
 
     # Collect lines between this heading and the next heading of equal or higher level
     section_lines = []
-    for line in lines[target_line_idx + 1:]:
+    for line in lines[target_line_idx + 1 :]:
         m = heading_pattern.match(line)
         if m and len(m.group(1)) <= target_level:
             break
         section_lines.append(line)
 
     section_text = "\n".join(section_lines)
-    assert "MCP_ALLOWED_ROOTS" in section_text, (
-        "README.md 'many repos' section missing 'MCP_ALLOWED_ROOTS'"
-    )
-    assert "repository register" in section_text, (
-        "README.md 'many repos' section missing 'repository register'"
-    )
+    assert (
+        "MCP_ALLOWED_ROOTS" in section_text
+    ), "README.md 'many repos' section missing 'MCP_ALLOWED_ROOTS'"
+    assert (
+        "repository register" in section_text
+    ), "README.md 'many repos' section missing 'repository register'"

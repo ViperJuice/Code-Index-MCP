@@ -12,10 +12,10 @@ import pytest
 from mcp_server.plugins.bm25_adapter_plugin import BM25AdapterPlugin
 from mcp_server.plugins.js_plugin.plugin import Plugin as JsPlugin
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_ctx(db_path: str):
     """Build a minimal fake RepoContext with a sqlite_store pointing to db_path."""
@@ -45,6 +45,7 @@ def _init_fts5_db(db_path: str) -> None:
 # SL-5 Test 1: BM25 FTS5 query routes through ctx.sqlite_store.db_path
 # ---------------------------------------------------------------------------
 
+
 class TestBM25AdapterBindCtx:
     def test_search_calls_sqlite_connect_with_ctx_db_path(self):
         """After bind(ctx), search() opens ctx.sqlite_store.db_path."""
@@ -61,9 +62,9 @@ class TestBM25AdapterBindCtx:
 
         # Must have connected to the path provided by ctx, not ctor arg
         called_paths = [call.args[0] for call in mock_connect.call_args_list]
-        assert db_path in called_paths, (
-            f"Expected sqlite3.connect({db_path!r}), got {called_paths!r}"
-        )
+        assert (
+            db_path in called_paths
+        ), f"Expected sqlite3.connect({db_path!r}), got {called_paths!r}"
 
     def test_getdefinition_calls_sqlite_connect_with_ctx_db_path(self):
         """After bind(ctx), getDefinition() opens ctx.sqlite_store.db_path."""
@@ -92,6 +93,7 @@ class TestBM25AdapterBindCtx:
 # SL-5 Test 2: js_plugin has no _sqlite_store attribute after bind
 # ---------------------------------------------------------------------------
 
+
 class TestJsPluginBindCtx:
     def test_js_plugin_has_no_sqlite_store_attr(self, monkeypatch):
         """After bind(ctx), js_plugin should not carry _sqlite_store."""
@@ -99,9 +101,9 @@ class TestJsPluginBindCtx:
         plugin = JsPlugin()
         ctx = _make_ctx(":memory:")
         plugin.bind(ctx)
-        assert not hasattr(plugin, "_sqlite_store"), (
-            "js_plugin must not expose _sqlite_store after SL-5 refactor"
-        )
+        assert not hasattr(
+            plugin, "_sqlite_store"
+        ), "js_plugin must not expose _sqlite_store after SL-5 refactor"
 
     def test_js_plugin_ctx_set_after_bind(self, monkeypatch):
         """bind(ctx) sets _ctx on the plugin."""
@@ -115,6 +117,7 @@ class TestJsPluginBindCtx:
 # ---------------------------------------------------------------------------
 # SL-5 Test 3: rg returns zero _sqlite_store hits in owned files
 # ---------------------------------------------------------------------------
+
 
 class TestNoResidualSqliteStoreAttr:
     def test_rg_finds_no_sqlite_store_assignments(self):
@@ -130,6 +133,6 @@ class TestNoResidualSqliteStoreAttr:
             capture_output=True,
             text=True,
         )
-        assert result.returncode != 0 or result.stdout.strip() == "", (
-            f"Found residual _sqlite_store references:\n{result.stdout}"
-        )
+        assert (
+            result.returncode != 0 or result.stdout.strip() == ""
+        ), f"Found residual _sqlite_store references:\n{result.stdout}"

@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from mcp_server.plugins.sandboxed_plugin import SandboxedPlugin
 from mcp_server.sandbox.capabilities import CapabilitySet
 from mcp_server.sandbox.protocol import (
     MAX_LINE_BYTES,
@@ -24,8 +25,6 @@ from mcp_server.sandbox.supervisor import (
     SandboxSupervisor,
     SandboxTimeout,
 )
-from mcp_server.plugins.sandboxed_plugin import SandboxedPlugin
-
 
 # Repo root (ancestor containing mcp_server/ and tests/). Passed to child
 # subprocesses as PYTHONPATH so they resolve the worker module plus fixtures.
@@ -73,8 +72,7 @@ def _echo_worker_cmd(tmp_path: Path) -> list:
     The inline script acts as a minimal IPC responder: it reads one envelope
     per line from stdin and writes the same envelope back with kind=result.
     """
-    script = textwrap.dedent(
-        """
+    script = textwrap.dedent("""
         import sys, json
         stdin = sys.stdin.buffer
         stdout = sys.stdout.buffer
@@ -90,8 +88,7 @@ def _echo_worker_cmd(tmp_path: Path) -> list:
             env['payload'] = {'echoed': env.get('payload', {})}
             stdout.write((json.dumps(env) + "\\n").encode('utf-8'))
             stdout.flush()
-        """
-    )
+        """)
     path = tmp_path / "echo_worker.py"
     path.write_text(script)
     return [sys.executable, str(path)]
@@ -109,14 +106,12 @@ def test_supervisor_spawn_and_close(tmp_path: Path):
 
 def test_supervisor_timeout(tmp_path: Path):
     """A worker that never responds triggers SandboxTimeout."""
-    script = textwrap.dedent(
-        """
+    script = textwrap.dedent("""
         import sys, time
         # Read one line then sleep forever, never reply.
         sys.stdin.buffer.readline()
         time.sleep(60)
-        """
-    )
+        """)
     path = tmp_path / "sleepy.py"
     path.write_text(script)
     caps = CapabilitySet(fs_read=(), fs_write=(), env_allow=frozenset())
@@ -130,12 +125,10 @@ def test_supervisor_timeout(tmp_path: Path):
 
 def test_supervisor_worker_exited(tmp_path: Path):
     """Worker that exits before responding surfaces SandboxCallError."""
-    script = textwrap.dedent(
-        """
+    script = textwrap.dedent("""
         import sys
         sys.exit(3)
-        """
-    )
+        """)
     path = tmp_path / "die.py"
     path.write_text(script)
     caps = CapabilitySet(fs_read=(), fs_write=(), env_allow=frozenset())

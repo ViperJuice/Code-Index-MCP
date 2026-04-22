@@ -1,4 +1,5 @@
 """Tests for symlink-escape hardening in path_allowlist."""
+
 import os
 from pathlib import Path
 

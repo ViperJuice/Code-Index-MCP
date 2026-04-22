@@ -11,6 +11,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from ..artifacts.commit_artifacts import CommitArtifactManager
+from ..dispatcher.dispatcher_enhanced import EnhancedDispatcher
+from .repository_registry import RepositoryRegistry
+
 
 def should_reindex_for_branch(current: Optional[str], tracked: Optional[str]) -> bool:
     """True iff both branches are non-None and equal."""
@@ -18,9 +22,6 @@ def should_reindex_for_branch(current: Optional[str], tracked: Optional[str]) ->
         return False
     return current == tracked
 
-from ..artifacts.commit_artifacts import CommitArtifactManager
-from ..dispatcher.dispatcher_enhanced import EnhancedDispatcher
-from .repository_registry import RepositoryRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -118,11 +119,16 @@ class GitAwareIndexManager:
             repo_info.current_branch = git_state["branch"]
         last_indexed_commit = repo_info.last_indexed_commit
         current_branch = getattr(repo_info, "current_branch", None)
-        last_indexed_branch = getattr(repo_info, "last_indexed_branch", None)
 
-        if not bypass_branch_guard and not should_reindex_for_branch(current_branch, repo_info.tracked_branch):
+        if not bypass_branch_guard and not should_reindex_for_branch(
+            current_branch, repo_info.tracked_branch
+        ):
             # Distinguish true drift (both non-None, different) from unconfigured (tracked is None)
-            if current_branch and repo_info.tracked_branch and current_branch != repo_info.tracked_branch:
+            if (
+                current_branch
+                and repo_info.tracked_branch
+                and current_branch != repo_info.tracked_branch
+            ):
                 logger.warning(
                     "branch.drift.detected",
                     extra={
@@ -136,7 +142,9 @@ class GitAwareIndexManager:
             else:
                 logger.info(
                     "Skipping reindex for %s: current branch %r != tracked branch %r",
-                    repo_id, current_branch, repo_info.tracked_branch,
+                    repo_id,
+                    current_branch,
+                    repo_info.tracked_branch,
                 )
             return IndexSyncResult(
                 action="up_to_date",

@@ -84,9 +84,7 @@ class TestDeleteReleasesOlderThan:
             _make_release("v3.0.0", days_ago=10),
         ]
         with self._patch_run(_gh_list_output(releases)):
-            deleted = delete_releases_older_than(
-                "owner/repo", older_than_days=30, keep_latest_n=2
-            )
+            deleted = delete_releases_older_than("owner/repo", older_than_days=30, keep_latest_n=2)
         # v3.0.0 is within 30 days, protected
         # v2.0.0 and v3.0.0 are newest 2, so v2.0.0 is kept by keep_latest_n
         # Only v1.0.0 is old AND not in the newest 2
@@ -127,9 +125,7 @@ class TestDeleteReleasesOlderThan:
             return result
 
         with patch("subprocess.run", side_effect=side_effect):
-            candidates = delete_releases_older_than(
-                "owner/repo", older_than_days=30, dry_run=True
-            )
+            candidates = delete_releases_older_than("owner/repo", older_than_days=30, dry_run=True)
 
         assert len(candidates) == 1
         assert candidates[0].tag_name == "v1.0.0"

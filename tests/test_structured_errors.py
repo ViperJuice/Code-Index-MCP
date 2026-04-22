@@ -14,7 +14,6 @@ from mcp_server.core.errors import (
     record_handled_error,
 )
 
-
 # ---------------------------------------------------------------------------
 # Class hierarchy
 # ---------------------------------------------------------------------------
@@ -76,8 +75,12 @@ def test_errors_by_type_none_when_prometheus_unavailable(monkeypatch):
 
 def test_record_handled_error_increments_counter_by_one():
     """Each call must increment the counter for the given module/exception pair by exactly 1."""
-    from mcp_server.metrics.prometheus_exporter import PROMETHEUS_AVAILABLE, PrometheusExporter, _exporter
     import mcp_server.metrics.prometheus_exporter as prom_mod
+    from mcp_server.metrics.prometheus_exporter import (
+        PROMETHEUS_AVAILABLE,
+        PrometheusExporter,
+        _exporter,
+    )
 
     if not PROMETHEUS_AVAILABLE:
         pytest.skip("prometheus_client not installed")
@@ -93,8 +96,8 @@ def test_record_handled_error_increments_counter_by_one():
 
 
 def test_record_handled_error_increments_once_per_call():
-    from mcp_server.metrics.prometheus_exporter import PROMETHEUS_AVAILABLE, PrometheusExporter
     import mcp_server.metrics.prometheus_exporter as prom_mod
+    from mcp_server.metrics.prometheus_exporter import PROMETHEUS_AVAILABLE, PrometheusExporter
 
     if not PROMETHEUS_AVAILABLE:
         pytest.skip("prometheus_client not installed")
@@ -113,8 +116,8 @@ def test_record_handled_error_increments_once_per_call():
 
 def test_record_handled_error_no_raise_when_prometheus_unavailable(monkeypatch):
     """When prometheus_client unavailable, record_handled_error must not raise."""
-    import mcp_server.metrics.prometheus_exporter as prom_mod
     import mcp_server.core.errors as errors_mod
+    import mcp_server.metrics.prometheus_exporter as prom_mod
 
     monkeypatch.setattr(prom_mod, "PROMETHEUS_AVAILABLE", False)
     monkeypatch.setattr(prom_mod, "_exporter", None)
@@ -124,8 +127,8 @@ def test_record_handled_error_no_raise_when_prometheus_unavailable(monkeypatch):
 
 def test_record_handled_error_never_raises():
     """Helper must swallow all exceptions from metric surface."""
-    from mcp_server.metrics.prometheus_exporter import PrometheusExporter
     import mcp_server.metrics.prometheus_exporter as prom_mod
+    from mcp_server.metrics.prometheus_exporter import PrometheusExporter
 
     bad_exporter = MagicMock()
     bad_exporter.errors_by_type = MagicMock()
@@ -170,8 +173,8 @@ def test_record_handled_error_call_present_in_file(rel_path):
 
 def test_dispatcher_enhanced_site_instruments_exception():
     """Smoke: the dispatcher_enhanced init-time metrics site catches and instruments correctly."""
-    from mcp_server.metrics.prometheus_exporter import PROMETHEUS_AVAILABLE, PrometheusExporter
     import mcp_server.metrics.prometheus_exporter as prom_mod
+    from mcp_server.metrics.prometheus_exporter import PROMETHEUS_AVAILABLE, PrometheusExporter
 
     if not PROMETHEUS_AVAILABLE:
         pytest.skip("prometheus_client not installed")
@@ -181,15 +184,17 @@ def test_dispatcher_enhanced_site_instruments_exception():
 
     # Importing EnhancedDispatcher triggers the init-time except block if something fails.
     # We directly call record_handled_error to verify the counter path works for the module.
-    before = _get_counter_value(exporter, "mcp_server.dispatcher.dispatcher_enhanced", "ImportError")
+    before = _get_counter_value(
+        exporter, "mcp_server.dispatcher.dispatcher_enhanced", "ImportError"
+    )
     record_handled_error("mcp_server.dispatcher.dispatcher_enhanced", ImportError("missing dep"))
     after = _get_counter_value(exporter, "mcp_server.dispatcher.dispatcher_enhanced", "ImportError")
     assert after - before == 1
 
 
 def test_artifact_upload_site_instruments_exception():
-    from mcp_server.metrics.prometheus_exporter import PROMETHEUS_AVAILABLE, PrometheusExporter
     import mcp_server.metrics.prometheus_exporter as prom_mod
+    from mcp_server.metrics.prometheus_exporter import PROMETHEUS_AVAILABLE, PrometheusExporter
 
     if not PROMETHEUS_AVAILABLE:
         pytest.skip("prometheus_client not installed")
@@ -204,8 +209,8 @@ def test_artifact_upload_site_instruments_exception():
 
 
 def test_artifact_download_site_instruments_exception():
-    from mcp_server.metrics.prometheus_exporter import PROMETHEUS_AVAILABLE, PrometheusExporter
     import mcp_server.metrics.prometheus_exporter as prom_mod
+    from mcp_server.metrics.prometheus_exporter import PROMETHEUS_AVAILABLE, PrometheusExporter
 
     if not PROMETHEUS_AVAILABLE:
         pytest.skip("prometheus_client not installed")

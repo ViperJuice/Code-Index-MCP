@@ -15,6 +15,8 @@ from typing import Dict, List, Optional
 class TestQuery:
     """Represents a test query with expected results."""
 
+    __test__ = False
+
     query: str
     query_type: str  # 'symbol', 'semantic', 'pattern'
     expected_files: List[str]
@@ -35,6 +37,8 @@ class CodebaseSpec:
 
 class TestDataGenerator:
     """Generates synthetic codebases and test queries."""
+
+    __test__ = False
 
     # Code templates for different languages
     PYTHON_TEMPLATES = [

@@ -91,13 +91,13 @@ def test_docker_docs_use_current_image_package_only():
         assert "ghcr.io/viperjuice/code-index-mcp" in _read(path)
 
 
-def test_active_release_docs_name_rc3_and_alpha_or_beta_status():
+def test_active_release_docs_name_rc4_and_alpha_or_beta_status():
     for path in ACTIVE_DOCS:
         text = _read(path).lower()
-        assert "1.2.0-rc3" in text, f"{path.relative_to(REPO_ROOT)} missing 1.2.0-rc3"
-        assert ("alpha" in text) or ("beta" in text), (
-            f"{path.relative_to(REPO_ROOT)} missing alpha/beta status language"
-        )
+        assert "1.2.0-rc4" in text, f"{path.relative_to(REPO_ROOT)} missing 1.2.0-rc4"
+        assert ("alpha" in text) or (
+            "beta" in text
+        ), f"{path.relative_to(REPO_ROOT)} missing alpha/beta status language"
 
 
 def test_active_docs_link_to_support_matrix_for_language_claims():
@@ -110,9 +110,7 @@ def test_agent_docs_point_to_support_matrix_and_current_install_path():
     for path in AGENT_DOCS:
         text = _read(path)
         assert "SUPPORT_MATRIX.md" in text, f"{path.relative_to(REPO_ROOT)} missing support matrix"
-        assert "uv sync --locked" in text, (
-            f"{path.relative_to(REPO_ROOT)} missing uv sync --locked"
-        )
+        assert "uv sync --locked" in text, f"{path.relative_to(REPO_ROOT)} missing uv sync --locked"
 
 
 def test_markdown_index_routes_current_support_docs():

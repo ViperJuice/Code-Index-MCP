@@ -9,7 +9,6 @@ from mcp_server.plugins.plugin_factory import (
     PluginUnavailableError,
 )
 
-
 P24_FIELDS = {
     "language",
     "state",
@@ -75,7 +74,5 @@ def test_create_all_plugins_quietly_skips_expected_unavailable(caplog):
 
     assert "ruby" not in plugins
     assert not [
-        record
-        for record in caplog.records
-        if "Failed to create plugin" in record.getMessage()
+        record for record in caplog.records if "Failed to create plugin" in record.getMessage()
     ]

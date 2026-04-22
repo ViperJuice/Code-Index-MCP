@@ -3,6 +3,7 @@
 Imports server_commands directly to avoid triggering the circular import chain
 that exists when artifact_commands is loaded transitively through __init__.py.
 """
+
 import click
 
 from mcp_server.cli.preflight_commands import preflight_env

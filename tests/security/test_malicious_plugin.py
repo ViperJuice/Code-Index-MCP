@@ -104,28 +104,24 @@ def test_malicious_plugin_is_contained(
     try:
         # 1. supports — tries to read /etc/passwd. Returns True only if the
         #    read succeeded. Under a proper sandbox, False.
-        assert p.supports("x.py") is False, (
-            "sandbox failed: plugin read /etc/passwd"
-        )
+        assert p.supports("x.py") is False, "sandbox failed: plugin read /etc/passwd"
 
         # 2. indexFile — attempts socket.socket() and create_connection.
         #    The smuggled ``symbols`` list tells us which attacks fired.
         shard = p.indexFile("x.py", "content")
         attacks = {a["attack"]: a for a in shard["symbols"]}
-        assert attacks["socket"]["succeeded"] is False, (
-            f"sandbox failed: socket opened: {attacks['socket']}"
-        )
-        assert attacks["create_connection"]["succeeded"] is False, (
-            f"sandbox failed: create_connection opened: {attacks['create_connection']}"
-        )
+        assert (
+            attacks["socket"]["succeeded"] is False
+        ), f"sandbox failed: socket opened: {attacks['socket']}"
+        assert (
+            attacks["create_connection"]["succeeded"] is False
+        ), f"sandbox failed: create_connection opened: {attacks['create_connection']}"
 
         # 3. getDefinition — leaked_token must be empty (env scrubbed);
         #    subprocess is policy-allowed so "pwned" appears on stdout.
         defn = p.getDefinition("foo")
         doc = (defn or {}).get("doc", "")
-        assert "leaked_token=''" in doc, (
-            f"sandbox failed: GITHUB_TOKEN leaked: {defn}"
-        )
+        assert "leaked_token=''" in doc, f"sandbox failed: GITHUB_TOKEN leaked: {defn}"
         assert "subprocess_out='pwned'" in doc, (
             "subprocess should be policy-allowed per P15 spec; got: " + doc
         )
@@ -136,31 +132,25 @@ def test_malicious_plugin_is_contained(
         refs = list(p.findReferences("foo"))
         assert len(refs) == 1, refs
         marker = refs[0].file
-        assert "SandboxViolation" in marker, (
-            f"sandbox failed: Python open() not guarded: {marker!r}"
-        )
+        assert (
+            "SandboxViolation" in marker
+        ), f"sandbox failed: Python open() not guarded: {marker!r}"
 
         # 5. search — sqlite3.connect(host_db) must be blocked.
         results = list(p.search("anything"))
         snippet = results[0]["snippet"] if results else ""
-        assert "sqlite_attack_ok=False" in snippet, (
-            f"sandbox failed: sqlite opened: {snippet}"
-        )
-        assert "SandboxViolation" in snippet, (
-            f"sandbox failed: sqlite blocked by wrong exception: {snippet}"
-        )
+        assert "sqlite_attack_ok=False" in snippet, f"sandbox failed: sqlite opened: {snippet}"
+        assert (
+            "SandboxViolation" in snippet
+        ), f"sandbox failed: sqlite blocked by wrong exception: {snippet}"
     finally:
         p.close()
 
     # 6. Canary written via Python ``open`` must not exist (that write path
     #    goes through the FS guard and is blocked). HOST_DB also must not
     #    exist (sqlite=none blocks connect, so no file created).
-    assert not HOST_CANARY.exists(), (
-        f"sandbox failed: plugin created host canary at {HOST_CANARY}"
-    )
-    assert not HOST_DB.exists(), (
-        f"sandbox failed: plugin created host DB at {HOST_DB}"
-    )
+    assert not HOST_CANARY.exists(), f"sandbox failed: plugin created host canary at {HOST_CANARY}"
+    assert not HOST_DB.exists(), f"sandbox failed: plugin created host DB at {HOST_DB}"
 
     # 7. Host env is unchanged.
     assert os.environ["GITHUB_TOKEN"] == "super-secret-host-token-xyz"

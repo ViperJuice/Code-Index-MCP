@@ -5,6 +5,7 @@ configured, every tool call is blocked until the client sends the correct
 secret via the 'handshake' tool.  Constant-time comparison prevents timing
 attacks.
 """
+
 from __future__ import annotations
 
 import hmac

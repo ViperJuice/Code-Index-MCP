@@ -1,4 +1,5 @@
 """Health probes: HealthView aggregator + FastAPI router factories for /ready and /liveness."""
+
 import time
 from typing import Any, Callable
 
@@ -21,11 +22,7 @@ class HealthView:
         self._startup_time = startup_time
 
     def snapshot(self) -> dict[str, Any]:
-        uptime = (
-            time.monotonic() - self._startup_time
-            if self._startup_time is not None
-            else 0.0
-        )
+        uptime = time.monotonic() - self._startup_time if self._startup_time is not None else 0.0
         return {
             "sqlite": self._sqlite_store is not None,
             "registry": self._registry is not None,
@@ -66,6 +63,7 @@ def make_liveness_router() -> APIRouter:
     @router.get("/liveness")
     async def liveness() -> JSONResponse:
         import asyncio
+
         await asyncio.sleep(0)
         return JSONResponse(content={"status": "ok"}, status_code=200)
 

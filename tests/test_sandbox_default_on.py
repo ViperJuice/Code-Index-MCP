@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-import os
 import importlib
+import os
 
 import pytest
 
 
 def _reload_plugin_factory():
     import mcp_server.plugins.plugin_factory as m
+
     importlib.reload(m)
     return m
 
@@ -28,7 +29,9 @@ def test_sandbox_on_by_default(monkeypatch):
     @classmethod
     def patched_create(cls, language, capabilities=None, **kw):
         # Simulate the use_sandbox computation
-        use_sandbox = capabilities is not None or os.environ.get("MCP_PLUGIN_SANDBOX_DISABLE") != "1"
+        use_sandbox = (
+            capabilities is not None or os.environ.get("MCP_PLUGIN_SANDBOX_DISABLE") != "1"
+        )
         captured["use_sandbox"] = use_sandbox
         # Return a real plugin so we don't need subprocess
         if use_sandbox and capabilities is None:
@@ -88,6 +91,6 @@ def test_plugin_factory_sandbox_off_when_disabled(monkeypatch):
     from mcp_server.plugins.plugin_factory import PluginFactory
 
     p = PluginFactory.create_plugin("python")
-    assert type(p).__name__ != "SandboxedPlugin", (
-        "sandbox should be off when MCP_PLUGIN_SANDBOX_DISABLE=1 and no capabilities passed"
-    )
+    assert (
+        type(p).__name__ != "SandboxedPlugin"
+    ), "sandbox should be off when MCP_PLUGIN_SANDBOX_DISABLE=1 and no capabilities passed"

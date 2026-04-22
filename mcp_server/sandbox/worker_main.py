@@ -23,17 +23,15 @@ from __future__ import annotations
 import dataclasses
 import importlib
 import inspect
-import json
 import os
 import sys
 import traceback
-from typing import Any, Iterable, List, Optional
+from typing import Any, List, Optional
 
 from mcp_server.plugin_base import IPlugin, Reference
 from mcp_server.sandbox import caps_apply
 from mcp_server.sandbox.capabilities import CapabilitySet, SandboxViolation
 from mcp_server.sandbox.protocol import Envelope, ProtocolError, decode, encode
-
 
 _MATERIALIZE_CAP = 1000  # max generator results to materialize per call
 
@@ -53,7 +51,9 @@ def _normalize_startup_error(exc: BaseException, plugin_module_name: str) -> dic
     }
     if isinstance(exc, ModuleNotFoundError):
         missing = getattr(exc, "name", "") or str(exc)
-        payload["state"] = "missing_extra" if missing in _MISSING_EXTRA_REMEDIATION else "unsupported"
+        payload["state"] = (
+            "missing_extra" if missing in _MISSING_EXTRA_REMEDIATION else "unsupported"
+        )
         payload["missing_extra"] = missing
         payload["required_extras"] = [missing]
         payload["remediation"] = _MISSING_EXTRA_REMEDIATION.get(
@@ -62,7 +62,9 @@ def _normalize_startup_error(exc: BaseException, plugin_module_name: str) -> dic
         )
     elif "No IPlugin subclass" in str(exc) or "Multiple IPlugin subclasses" in str(exc):
         payload["state"] = "unsupported"
-        payload["remediation"] = "Plugin module does not expose a single IPlugin-compatible Plugin class."
+        payload["remediation"] = (
+            "Plugin module does not expose a single IPlugin-compatible Plugin class."
+        )
     return payload
 
 
@@ -94,7 +96,13 @@ def _normalize_result(method: str, value: Any) -> Any:
     if method == "getDefinition":
         if value is None:
             return {"value": None}
-        return {"value": dict(value) if isinstance(value, dict) else getattr(value, "__dict__", {"repr": repr(value)})}
+        return {
+            "value": (
+                dict(value)
+                if isinstance(value, dict)
+                else getattr(value, "__dict__", {"repr": repr(value)})
+            )
+        }
     if method == "indexFile":
         # IndexShard is a TypedDict — dict passthrough is JSON-safe.
         return dict(value) if isinstance(value, dict) else {"repr": repr(value)}
@@ -124,9 +132,7 @@ def _find_plugin_class(module) -> type:
                 candidates.append(obj)
     candidates = list(dict.fromkeys(candidates))
     if not candidates:
-        raise RuntimeError(
-            f"No IPlugin subclass found in module {module.__name__!r}"
-        )
+        raise RuntimeError(f"No IPlugin subclass found in module {module.__name__!r}")
     if len(candidates) > 1:
         # Pick the one literally named "Plugin" if present — deterministic.
         named = [c for c in candidates if c.__name__ == "Plugin"]

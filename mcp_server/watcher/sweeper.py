@@ -15,11 +15,49 @@ logger = logging.getLogger(__name__)
 
 # Supported code-file extensions (mirrors _Handler.code_extensions)
 _CODE_EXTENSIONS = {
-    ".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".c", ".cpp", ".cc", ".cxx",
-    ".h", ".hpp", ".cs", ".go", ".rb", ".rs", ".swift", ".kt", ".scala",
-    ".php", ".r", ".m", ".mm", ".dart", ".lua", ".pl", ".sh", ".sql",
-    ".html", ".css", ".scss", ".vue", ".elm", ".ex", ".exs", ".erl",
-    ".clj", ".cljs", ".hs", ".ml", ".mli", ".f90", ".f95",
+    ".py",
+    ".js",
+    ".ts",
+    ".jsx",
+    ".tsx",
+    ".java",
+    ".c",
+    ".cpp",
+    ".cc",
+    ".cxx",
+    ".h",
+    ".hpp",
+    ".cs",
+    ".go",
+    ".rb",
+    ".rs",
+    ".swift",
+    ".kt",
+    ".scala",
+    ".php",
+    ".r",
+    ".m",
+    ".mm",
+    ".dart",
+    ".lua",
+    ".pl",
+    ".sh",
+    ".sql",
+    ".html",
+    ".css",
+    ".scss",
+    ".vue",
+    ".elm",
+    ".ex",
+    ".exs",
+    ".erl",
+    ".clj",
+    ".cljs",
+    ".hs",
+    ".ml",
+    ".mli",
+    ".f90",
+    ".f95",
 }
 
 ENV_SWEEP_MINUTES: str = "MCP_WATCHER_SWEEP_MINUTES"
@@ -103,11 +141,7 @@ class WatcherSweeper:
 
             # Build set of known relative paths from SQLite
             known_files = self._store.get_all_files(repository_id=sqlite_repo_id)
-            known_rel_paths = {
-                f["relative_path"]
-                for f in known_files
-                if f.get("relative_path")
-            }
+            known_rel_paths = {f["relative_path"] for f in known_files if f.get("relative_path")}
 
             gitignore_filter = build_walker_filter(repo_root)
             repo_has_drift = False

@@ -122,7 +122,12 @@ class TestDownloadSelectedArtifactFallback:
                 self._artifact(), output_dir=tmp_path, backup=False
             )
         assert result.installed_items == []
-        assert any("warn" in r.message.lower() or "outage" in r.message.lower() or "local" in r.message.lower() for r in caplog.records)
+        assert any(
+            "warn" in r.message.lower()
+            or "outage" in r.message.lower()
+            or "local" in r.message.lower()
+            for r in caplog.records
+        )
 
     def test_attribute_error_reraises(self, tmp_path):
         """Programming errors must not be swallowed."""
@@ -149,8 +154,9 @@ class TestEnvVarMaxAgeDays:
         meta = _meta(commit="abc123", days_ago=13)
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0)
-            from mcp_server.artifacts.artifact_download import IndexArtifactDownloader
             from pathlib import Path
+
+            from mcp_server.artifacts.artifact_download import IndexArtifactDownloader
 
             with patch.object(
                 IndexArtifactDownloader, "_detect_repository", return_value="owner/repo"

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -76,11 +76,12 @@ def test_boot_warn_when_probe_false_and_enforce_mode(caplog, monkeypatch):
     mock_result.returncode = 1
     with patch("subprocess.run", return_value=mock_result):
         from mcp_server.artifacts.attestation import warn_if_gh_attestation_missing
+
         with caplog.at_level(logging.WARNING, logger="mcp_server.artifacts.attestation"):
             warn_if_gh_attestation_missing()
-        assert any("ATTESTATION_PREREQ" in r.message for r in caplog.records), (
-            "Expected ATTESTATION_PREREQ warning when probe=False and enforce mode"
-        )
+        assert any(
+            "ATTESTATION_PREREQ" in r.message for r in caplog.records
+        ), "Expected ATTESTATION_PREREQ warning when probe=False and enforce mode"
 
 
 def test_no_boot_warn_when_probe_true(caplog, monkeypatch):
@@ -90,6 +91,7 @@ def test_no_boot_warn_when_probe_true(caplog, monkeypatch):
     mock_result.returncode = 0
     with patch("subprocess.run", return_value=mock_result):
         from mcp_server.artifacts.attestation import warn_if_gh_attestation_missing
+
         with caplog.at_level(logging.WARNING, logger="mcp_server.artifacts.attestation"):
             warn_if_gh_attestation_missing()
         assert not any("ATTESTATION_PREREQ" in r.message for r in caplog.records)
@@ -102,6 +104,7 @@ def test_no_boot_warn_when_not_enforce_mode(caplog, monkeypatch):
     mock_result.returncode = 1
     with patch("subprocess.run", return_value=mock_result):
         from mcp_server.artifacts.attestation import warn_if_gh_attestation_missing
+
         with caplog.at_level(logging.WARNING, logger="mcp_server.artifacts.attestation"):
             warn_if_gh_attestation_missing()
         assert not any("ATTESTATION_PREREQ" in r.message for r in caplog.records)

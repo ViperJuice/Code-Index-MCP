@@ -4,7 +4,14 @@ import time
 from pathlib import Path
 from typing import Iterable, Optional
 
-from mcp_server.plugin_base import IPlugin, IndexShard, Reference, SearchOpts, SearchResult, SymbolDef
+from mcp_server.plugin_base import (
+    IndexShard,
+    IPlugin,
+    Reference,
+    SearchOpts,
+    SearchResult,
+    SymbolDef,
+)
 
 
 class SlowPlugin(IPlugin):

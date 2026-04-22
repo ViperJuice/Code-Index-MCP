@@ -6,6 +6,7 @@ No cwd capture, no preloaded sqlite_store.
 
 Every MCP tool call resolves a RepoContext per-request via RepoResolver.
 """
+
 from __future__ import annotations
 
 import os
@@ -24,7 +25,9 @@ from mcp_server.storage.store_registry import StoreRegistry
 
 def initialize_stateless_services(
     registry_path: Optional[Path] = None,
-) -> Tuple[StoreRegistry, RepoResolver, DispatcherProtocol, RepositoryRegistry, GitAwareIndexManager]:
+) -> Tuple[
+    StoreRegistry, RepoResolver, DispatcherProtocol, RepositoryRegistry, GitAwareIndexManager
+]:
     """Construct the process-wide service pool.
 
     Returns (StoreRegistry, RepoResolver, dispatcher, RepositoryRegistry, GitAwareIndexManager).
@@ -51,11 +54,12 @@ def initialize_stateless_services(
     else:
         _explicit = os.getenv("RERANKER_TYPE", "").strip().lower()
         reranker_type = _explicit if _explicit else "none"
+        semantic_enabled = os.getenv("SEMANTIC_SEARCH_ENABLED", "true").lower() == "true"
         dispatcher = EnhancedDispatcher(
             enable_advanced_features=True,
             use_plugin_factory=True,
             lazy_load=True,
-            semantic_search_enabled=True,
+            semantic_search_enabled=semantic_enabled,
             memory_aware=True,
             multi_repo_enabled=None,
             reranker_type=reranker_type,
@@ -70,54 +74,63 @@ def reset_process_singletons() -> None:
     """Null all module-level process singletons; tolerates pruned installs."""
     try:
         import mcp_server.metrics.prometheus_exporter as _m
+
         setattr(_m, "_exporter", None)
     except ImportError:
         pass
 
     try:
         import mcp_server.gateway as _m
+
         setattr(_m, "_repo_registry", None)
     except ImportError:
         pass
 
     try:
         import mcp_server.plugin_system.loader as _m
+
         setattr(_m, "_loader", None)
     except ImportError:
         pass
 
     try:
         import mcp_server.plugin_system.discovery as _m
+
         setattr(_m, "_discovery", None)
     except ImportError:
         pass
 
     try:
         import mcp_server.plugin_system.config as _m
+
         setattr(_m, "_config_manager", None)
     except ImportError:
         pass
 
     try:
         import mcp_server.plugins.memory_aware_manager as _m
+
         setattr(_m, "_manager_instance", None)
     except ImportError:
         pass
 
     try:
         import mcp_server.storage.multi_repo_manager as _m
+
         setattr(_m, "_manager_instance", None)
     except ImportError:
         pass
 
     try:
         import mcp_server.dispatcher.cross_repo_coordinator as _m
+
         setattr(_m, "_coordinator_instance", None)
     except ImportError:
         pass
 
     try:
         import mcp_server.plugins.repository_plugin_loader as _m
+
         setattr(_m, "_loader_instance", None)
     except ImportError:
         pass
@@ -143,7 +156,9 @@ def _allowed_roots() -> list[Path]:
             if not entry:
                 continue
             try:
-                roots.append(Path(entry).expanduser().resolve())  # resolve() exempt: boot-time root canonicalization
+                roots.append(
+                    Path(entry).expanduser().resolve()
+                )  # resolve() exempt: boot-time root canonicalization
             except Exception:
                 continue
         if roots:
@@ -151,7 +166,9 @@ def _allowed_roots() -> list[Path]:
     ws = os.environ.get("MCP_WORKSPACE_ROOT", "").strip()
     if ws:
         try:
-            return [Path(ws).expanduser().resolve()]  # resolve() exempt: boot-time root canonicalization
+            return [
+                Path(ws).expanduser().resolve()
+            ]  # resolve() exempt: boot-time root canonicalization
         except Exception:
             pass
     return [Path.cwd().resolve()]
@@ -159,6 +176,7 @@ def _allowed_roots() -> list[Path]:
 
 def _path_within_allowed(target: Path, roots: list[Path]) -> bool:
     from mcp_server.security.path_allowlist import path_within_allowed
+
     return path_within_allowed(target, tuple(roots))
 
 

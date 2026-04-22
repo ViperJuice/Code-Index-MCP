@@ -113,6 +113,7 @@ class PluginUnavailableError(ValueError):
             "error_type": self.error_type,
         }
 
+
 try:
     from .python_plugin import Plugin as PythonPlugin
 
@@ -326,6 +327,7 @@ class PluginFactory:
 
         # Reuse the executor owned by the global PluginLoader (4 workers).
         from ..plugin_system.loader import get_plugin_loader
+
         executor = get_plugin_loader()._executor
 
         fut: asyncio.Future = loop.run_in_executor(

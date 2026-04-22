@@ -19,10 +19,10 @@ from mcp_server.artifacts.attestation import (
     verify_attestation,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
@@ -35,7 +35,12 @@ def _make_archive(tmp_path: Path, content: bytes = b"fake archive content") -> P
 
 
 def _ok_run(*args, **kwargs):
-    return CompletedProcess(args=args[0], returncode=0, stdout="bundle: https://github.com/owner/repo/attestations/1\n", stderr="")
+    return CompletedProcess(
+        args=args[0],
+        returncode=0,
+        stdout="bundle: https://github.com/owner/repo/attestations/1\n",
+        stderr="",
+    )
 
 
 def _fail_run(*args, **kwargs):
@@ -45,6 +50,7 @@ def _fail_run(*args, **kwargs):
 # ---------------------------------------------------------------------------
 # Test (a): attest returns Attestation with correct digest
 # ---------------------------------------------------------------------------
+
 
 class TestAttest:
     @pytest.mark.requires_gh_auth
@@ -85,6 +91,7 @@ class TestAttest:
 # Test (b): verify_attestation returns cleanly on success
 # ---------------------------------------------------------------------------
 
+
 class TestVerifyAttestation:
     def test_verify_returns_none_on_success(self, tmp_path, monkeypatch):
         monkeypatch.delenv("MCP_ATTESTATION_MODE", raising=False)
@@ -106,6 +113,7 @@ class TestVerifyAttestation:
 # Test (c): tampered archive under enforce mode raises AttestationError
 # ---------------------------------------------------------------------------
 
+
 class TestVerifyEnforceMode:
     def test_tampered_raises_attestation_error(self, tmp_path, monkeypatch):
         monkeypatch.setenv("MCP_ATTESTATION_MODE", "enforce")
@@ -125,6 +133,7 @@ class TestVerifyEnforceMode:
 # ---------------------------------------------------------------------------
 # Test (d): warn mode logs and continues
 # ---------------------------------------------------------------------------
+
 
 class TestVerifyWarnMode:
     def test_warn_mode_logs_and_returns_none(self, tmp_path, monkeypatch, caplog):
@@ -148,6 +157,7 @@ class TestVerifyWarnMode:
 # ---------------------------------------------------------------------------
 # Test (e): skip mode does not call subprocess
 # ---------------------------------------------------------------------------
+
 
 class TestSkipMode:
     def test_skip_mode_no_subprocess(self, tmp_path, monkeypatch):
@@ -183,11 +193,13 @@ class TestSkipMode:
 # Test (f): publish_on_reindex stubbed flow returns metadata with attestation_url
 # ---------------------------------------------------------------------------
 
+
 class TestPublishOnReindexAttestationUrl:
     def test_publish_on_reindex_metadata_has_attestation_url(self, monkeypatch):
-        from mcp_server.artifacts.publisher import ArtifactPublisher
-        from mcp_server.artifacts.artifact_upload import IndexArtifactUploader
         from unittest.mock import MagicMock as _MM
+
+        from mcp_server.artifacts.artifact_upload import IndexArtifactUploader
+        from mcp_server.artifacts.publisher import ArtifactPublisher
 
         monkeypatch.delenv("MCP_ATTESTATION_MODE", raising=False)
 
@@ -218,7 +230,9 @@ class TestPublishOnReindexAttestationUrl:
 
         def gh_side_effect(args, **kwargs):
             if "view" in args and "index-latest" in args:
-                return MagicMock(returncode=0, stdout=f'{{"targetCommitish": "{commit}"}}', stderr="")
+                return MagicMock(
+                    returncode=0, stdout=f'{{"targetCommitish": "{commit}"}}', stderr=""
+                )
             return MagicMock(returncode=0, stdout="", stderr="")
 
         with patch("mcp_server.artifacts.publisher.attest", return_value=_synthetic_attestation):

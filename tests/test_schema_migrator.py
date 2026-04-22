@@ -1,13 +1,14 @@
 """Unit tests for SchemaMigrator."""
 
-import pytest
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
 from mcp_server.storage.schema_migrator import (
+    SchemaMigrationError,
     SchemaMigrator,
     UnknownSchemaVersionError,
-    SchemaMigrationError,
 )
 
 

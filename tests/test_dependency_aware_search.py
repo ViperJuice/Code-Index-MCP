@@ -8,7 +8,6 @@ import pytest
 
 from mcp_server.dependency_graph.aggregator import DependencyGraphAnalyzer
 
-
 # ---------------------------------------------------------------------------
 # Minimal RepositoryInfo stub (mirrors the real dataclass API we need)
 # ---------------------------------------------------------------------------
@@ -49,12 +48,8 @@ async def test_three_repo_dep_graph_nonempty(tmp_path: Path) -> None:
         d.mkdir()
 
     (repo_a2 / "requirements.txt").write_text("lib-b\nlib-c\n")
-    (repo_b2 / "package.json").write_text(
-        '{"name": "lib-b", "dependencies": {"lib-c": "1.0"}}'
-    )
-    (repo_c2 / "go.mod").write_text(
-        "module lib-c\n\ngo 1.21\n\nrequire lib-a v0.1.0\n"
-    )
+    (repo_b2 / "package.json").write_text('{"name": "lib-b", "dependencies": {"lib-c": "1.0"}}')
+    (repo_c2 / "go.mod").write_text("module lib-c\n\ngo 1.21\n\nrequire lib-a v0.1.0\n")
 
     repos2 = [
         _make_repo_info("id-a2", "lib-b", repo_b2),

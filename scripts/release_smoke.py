@@ -23,7 +23,10 @@ IMAGE = "ghcr.io/viperjuice/code-index-mcp:local-smoke"
 
 def _run(cmd: list[str], *, cwd: Path = REPO, env: dict[str, str] | None = None) -> None:
     print("+", " ".join(cmd), flush=True)
-    subprocess.run(cmd, cwd=str(cwd), env=env, check=True)
+    run_env = os.environ.copy()
+    if env:
+        run_env.update(env)
+    subprocess.run(cmd, cwd=str(cwd), env=run_env, check=True)
 
 
 def _venv_bin(root: Path, name: str) -> Path:
@@ -53,7 +56,10 @@ def smoke_wheel() -> None:
         venv.EnvBuilder(with_pip=True, clear=True).create(venv_dir)
         python = _venv_bin(venv_dir, "python")
         mcp_index = _venv_bin(venv_dir, "mcp-index")
-        _run([str(python), "-m", "pip", "install", str(wheels[-1])])
+        _run(
+            [str(python), "-m", "pip", "install", str(wheels[-1])],
+            env={"PIP_DISABLE_PIP_VERSION_CHECK": "1"},
+        )
         _run([str(mcp_index), "--help"])
 
 
@@ -77,7 +83,9 @@ def release_smoke_token():
             seed_files={"smoke.py": source.lstrip()},
         )
         old_qdrant_path = os.environ.get("QDRANT_PATH")
+        old_semantic_enabled = os.environ.get("SEMANTIC_SEARCH_ENABLED")
         os.environ["QDRANT_PATH"] = str(tmp_path / "missing-vector-index.qdrant")
+        os.environ["SEMANTIC_SEARCH_ENABLED"] = "false"
         try:
             with boot_test_server(tmp_path, [repo_path]) as server:
                 search = server.call_tool(
@@ -103,6 +111,10 @@ def release_smoke_token():
                 os.environ.pop("QDRANT_PATH", None)
             else:
                 os.environ["QDRANT_PATH"] = old_qdrant_path
+            if old_semantic_enabled is None:
+                os.environ.pop("SEMANTIC_SEARCH_ENABLED", None)
+            else:
+                os.environ["SEMANTIC_SEARCH_ENABLED"] = old_semantic_enabled
 
 
 def _poll_health(port: int, *, timeout: float = 60.0) -> None:

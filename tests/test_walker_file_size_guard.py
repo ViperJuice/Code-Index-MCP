@@ -3,7 +3,7 @@
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -22,6 +22,7 @@ class TestWalkerFileSizeGuard:
 
             with patch.dict(os.environ, {"MCP_MAX_FILE_SIZE_BYTES": "100"}):
                 from mcp_server.config.env_vars import get_max_file_size_bytes
+
                 assert get_max_file_size_bytes() == 100
 
                 # Verify the guard logic directly
@@ -38,6 +39,7 @@ class TestWalkerFileSizeGuard:
 
             with patch.dict(os.environ, {"MCP_MAX_FILE_SIZE_BYTES": "100"}):
                 from mcp_server.config.env_vars import get_max_file_size_bytes
+
                 max_size = get_max_file_size_bytes()
                 assert edge_file.stat().st_size <= max_size
 
@@ -72,6 +74,7 @@ class TestWalkerFileSizeGuard:
                 # We can't import EnhancedDispatcher easily in tests without full deps,
                 # so test the guard logic inline to confirm it works as specified.
                 from mcp_server.config.env_vars import get_max_file_size_bytes
+
                 max_size = get_max_file_size_bytes()
 
                 ignored = 0

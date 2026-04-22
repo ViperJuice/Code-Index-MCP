@@ -21,8 +21,9 @@ class TestPrometheusExporterHTTP:
     """Test HTTP lifecycle of PrometheusExporter."""
 
     def setup_method(self):
-        from mcp_server.metrics.prometheus_exporter import PrometheusExporter
         from prometheus_client import CollectorRegistry
+
+        from mcp_server.metrics.prometheus_exporter import PrometheusExporter
 
         self.registry = CollectorRegistry()
         self.exporter = PrometheusExporter(registry=self.registry)

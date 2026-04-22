@@ -158,15 +158,12 @@ class RepositoryRegistry:
                     (new_id, old_id),
                 )
                 logger.debug(
-                    f"Migrated {cursor.rowcount} rows in {table} "
-                    f"({old_id} → {new_id})"
+                    f"Migrated {cursor.rowcount} rows in {table} " f"({old_id} → {new_id})"
                 )
             conn.commit()
             conn.close()
         except Exception as exc:
-            logger.warning(
-                f"SQLite migration failed for {db_path} ({old_id} → {new_id}): {exc}"
-            )
+            logger.warning(f"SQLite migration failed for {db_path} ({old_id} → {new_id}): {exc}")
 
     def _serialize_registry(self) -> Dict[str, Any]:
         """Return a JSON-serializable snapshot of self._registry."""

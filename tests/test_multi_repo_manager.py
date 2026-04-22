@@ -419,9 +419,10 @@ class TestMultiRepositoryManager:
         """
         manager.registry.register(mock_repo_info)
 
-        with patch("mcp_server.storage.store_registry.SQLiteStore") as mock_store_class, patch(
-            "mcp_server.storage.store_registry.ConnectionPool"
-        ) as mock_pool_class:
+        with (
+            patch("mcp_server.storage.store_registry.SQLiteStore") as mock_store_class,
+            patch("mcp_server.storage.store_registry.ConnectionPool") as mock_pool_class,
+        ):
             mock_store = Mock()
             mock_store_class.return_value = mock_store
             mock_pool_class.return_value = Mock()
@@ -590,8 +591,14 @@ class TestSL2Delegation:
     def test_generate_repository_id_delegates_to_compute_repo_id(self, manager, tmp_path):
         """_generate_repository_id delegates to compute_repo_id."""
         import subprocess as sp
+
         sp.run(["git", "init", "-b", "main", str(tmp_path)], check=True, capture_output=True)
-        sp.run(["git", "config", "user.email", "t@t.com"], cwd=tmp_path, check=True, capture_output=True)
+        sp.run(
+            ["git", "config", "user.email", "t@t.com"],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+        )
         sp.run(["git", "config", "user.name", "T"], cwd=tmp_path, check=True, capture_output=True)
         (tmp_path / "f.txt").write_text("x")
         sp.run(["git", "add", "f.txt"], cwd=tmp_path, check=True, capture_output=True)
@@ -599,6 +606,7 @@ class TestSL2Delegation:
 
         with patch("mcp_server.storage.multi_repo_manager.compute_repo_id") as mock_compute:
             from mcp_server.storage.repo_identity import RepoIdentity
+
             mock_compute.return_value = RepoIdentity(
                 repo_id="abcd1234abcd1234",
                 git_common_dir=tmp_path / ".git",
@@ -612,8 +620,14 @@ class TestSL2Delegation:
     def test_resolve_repo_id_delegates_to_compute_repo_id_for_path(self, tmp_path):
         """resolve_repo_id calls compute_repo_id for filesystem paths."""
         import subprocess as sp
+
         sp.run(["git", "init", "-b", "main", str(tmp_path)], check=True, capture_output=True)
-        sp.run(["git", "config", "user.email", "t@t.com"], cwd=tmp_path, check=True, capture_output=True)
+        sp.run(
+            ["git", "config", "user.email", "t@t.com"],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+        )
         sp.run(["git", "config", "user.name", "T"], cwd=tmp_path, check=True, capture_output=True)
         (tmp_path / "f.txt").write_text("x")
         sp.run(["git", "add", "f.txt"], cwd=tmp_path, check=True, capture_output=True)
@@ -621,6 +635,7 @@ class TestSL2Delegation:
 
         with patch("mcp_server.storage.multi_repo_manager.compute_repo_id") as mock_compute:
             from mcp_server.storage.repo_identity import RepoIdentity
+
             mock_compute.return_value = RepoIdentity(
                 repo_id="deadbeefdeadbeef",
                 git_common_dir=tmp_path / ".git",

@@ -7,6 +7,7 @@ import sqlite3
 import threading
 from typing import Dict
 
+from mcp_server.core.path_resolver import PathResolver
 from mcp_server.storage.connection_pool import ConnectionPool
 from mcp_server.storage.repository_registry import RepositoryRegistry
 from mcp_server.storage.sqlite_store import SQLiteStore
@@ -74,7 +75,7 @@ class StoreRegistry:
                 factory=lambda p=index_path: sqlite3.connect(p, check_same_thread=False),
                 size=4,
             )
-            store = SQLiteStore(index_path, pool=pool)
+            store = SQLiteStore(index_path, path_resolver=PathResolver(info.path), pool=pool)
             with self._lock:
                 self._cache[repo_id] = store
             return store

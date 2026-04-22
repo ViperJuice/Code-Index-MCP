@@ -34,7 +34,7 @@ _EXCLUDED_DIR_PARTS: frozenset[str] = frozenset(
         "build",
         ".next",
         ".nuxt",
-        "target",          # rust
+        "target",  # rust
         ".gradle",
         ".idea",
         ".vscode",
@@ -130,9 +130,7 @@ class _Handler(FileSystemEventHandler):
                     elif action == "move" and extra is not None:
                         self._handle_file_move(path, extra)
                 except Exception:
-                    logger.exception(
-                        "watcher drain failed for %s (action=%s)", path, action
-                    )
+                    logger.exception("watcher drain failed for %s (action=%s)", path, action)
             self._stop_event.wait(self.DRAIN_TICK_SECONDS)
 
     def stop(self) -> None:

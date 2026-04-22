@@ -66,9 +66,7 @@ class SandboxSupervisor:
                     self._proc.kill()
                 except Exception:
                     pass
-                raise SandboxTimeout(
-                    f"worker did not respond within {timeout:.1f}s"
-                )
+                raise SandboxTimeout(f"worker did not respond within {timeout:.1f}s")
         finally:
             sel.close()
 
@@ -114,9 +112,7 @@ class SandboxSupervisor:
         try:
             resp = decode(line)
         except ProtocolError as exc:
-            raise SandboxCallError(
-                {"type": "ProtocolError", "message": str(exc)}
-            ) from exc
+            raise SandboxCallError({"type": "ProtocolError", "message": str(exc)}) from exc
 
         if resp.kind == "error":
             raise SandboxCallError(resp.payload)

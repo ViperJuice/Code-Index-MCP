@@ -15,6 +15,7 @@ Cross-repo methods take ``List[RepoContext]`` and fan out across repos.
 This module is imported at runtime by test code (via ``typing.runtime_checkable``).
 Consumers should import ``DispatcherProtocol`` from ``mcp_server.dispatcher``.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -75,9 +76,7 @@ class DispatcherProtocol(Protocol):
         """Documentation-only search scoped to ``ctx.repo_id``."""
         ...
 
-    def get_plugins_for_file(
-        self, ctx: RepoContext, path: Path
-    ) -> List[Tuple[IPlugin, float]]:
+    def get_plugins_for_file(self, ctx: RepoContext, path: Path) -> List[Tuple[IPlugin, float]]:
         """Plugins capable of handling ``path``, with match scores."""
         ...
 
@@ -190,8 +189,6 @@ class DispatcherProtocol(Protocol):
         """Fan code-search across the provided repo contexts."""
         ...
 
-    async def get_cross_repo_statistics(
-        self, contexts: List[RepoContext]
-    ) -> Dict[str, Any]:
+    async def get_cross_repo_statistics(self, contexts: List[RepoContext]) -> Dict[str, Any]:
         """Aggregate statistics across the provided repo contexts."""
         ...

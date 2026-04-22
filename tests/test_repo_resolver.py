@@ -1,4 +1,5 @@
 """Tests for mcp_server.core.repo_resolver — SL-3."""
+
 import sqlite3
 import subprocess
 from pathlib import Path
@@ -7,14 +8,14 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from mcp_server.storage.multi_repo_manager import RepositoryInfo
-from mcp_server.storage.repository_registry import RepositoryRegistry
 from mcp_server.storage.repo_identity import compute_repo_id
+from mcp_server.storage.repository_registry import RepositoryRegistry
 from mcp_server.storage.sqlite_store import SQLiteStore
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def git(*args, cwd=None):
     subprocess.run(["git"] + list(args), cwd=cwd, check=True, capture_output=True)
@@ -48,11 +49,13 @@ def make_registry_with_repo(tmp_path: Path, repo_path: Path):
 
 def make_store_registry(registry):
     from mcp_server.storage.store_registry import StoreRegistry
+
     return StoreRegistry.for_registry(registry)
 
 
 def make_resolver(registry, store_registry):
     from mcp_server.core.repo_resolver import RepoResolver
+
     return RepoResolver(registry, store_registry)
 
 
@@ -67,6 +70,7 @@ def make_resolver(registry, store_registry):
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 class TestRepoResolver:
 
@@ -141,6 +145,7 @@ class TestRepoResolver:
         registry_file = tmp_path / "registry.json"
         registry = RepositoryRegistry(registry_file)
         from mcp_server.storage.store_registry import StoreRegistry
+
         store_registry = StoreRegistry.for_registry(registry)
         resolver = make_resolver(registry, store_registry)
 
@@ -158,6 +163,7 @@ class TestRepoResolver:
         registry_file = tmp_path / "registry.json"
         registry = RepositoryRegistry(registry_file)
         from mcp_server.storage.store_registry import StoreRegistry
+
         store_registry = StoreRegistry.for_registry(registry)
         resolver = make_resolver(registry, store_registry)
 
@@ -167,6 +173,7 @@ class TestRepoResolver:
     # 6. find_by_path fast-path is used when registered
     def test_find_by_path_fast_path_called(self, tmp_path):
         from mcp_server.core.repo_resolver import RepoResolver
+
         repo_path = make_git_repo(tmp_path / "myrepo")
         registry, repo_id = make_registry_with_repo(tmp_path, repo_path)
         store_registry = make_store_registry(registry)
@@ -187,6 +194,7 @@ class TestRepoResolver:
     # 7. find_by_path miss → compute_repo_id fallback still returns correct context
     def test_find_by_path_miss_uses_compute_fallback(self, tmp_path):
         from mcp_server.core.repo_resolver import RepoResolver
+
         repo_path = make_git_repo(tmp_path / "myrepo")
         registry, repo_id = make_registry_with_repo(tmp_path, repo_path)
         store_registry = make_store_registry(registry)

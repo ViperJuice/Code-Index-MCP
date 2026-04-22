@@ -1,15 +1,16 @@
 """Tests for SL-1 health probes: HealthView + /ready + /liveness endpoints."""
-import time
+
 import importlib
+import time
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-
 # ---------------------------------------------------------------------------
 # SL-1.1 — HealthView standalone (no gateway import cycle)
 # ---------------------------------------------------------------------------
+
 
 def test_health_view_standalone_import():
     """HealthView must be importable and probes.py must not statically import gateway."""
@@ -17,6 +18,7 @@ def test_health_view_standalone_import():
     assert hasattr(mod, "HealthView")
     # Verify probes module source has no static gateway import (no circular dep at module load)
     import inspect
+
     source = inspect.getsource(mod)
     assert "from mcp_server.gateway" not in source
     assert "import mcp_server.gateway" not in source
@@ -72,17 +74,20 @@ def test_health_view_uptime_is_float_when_startup_none():
 # Minimal FastAPI app for route tests (avoids full gateway startup)
 # ---------------------------------------------------------------------------
 
+
 def _make_test_app(dispatcher=None, sqlite_store=None, registry=None, startup_time=None):
     """Build a minimal FastAPI with /ready and /liveness routes."""
-    from mcp_server.health.probes import HealthView, make_ready_router, make_liveness_router
+    from mcp_server.health.probes import HealthView, make_liveness_router, make_ready_router
 
     app = FastAPI()
-    app.include_router(make_ready_router(
-        get_dispatcher=lambda: dispatcher,
-        get_sqlite_store=lambda: sqlite_store,
-        get_registry=lambda: registry,
-        get_startup_time=lambda: startup_time,
-    ))
+    app.include_router(
+        make_ready_router(
+            get_dispatcher=lambda: dispatcher,
+            get_sqlite_store=lambda: sqlite_store,
+            get_registry=lambda: registry,
+            get_startup_time=lambda: startup_time,
+        )
+    )
     app.include_router(make_liveness_router())
     return app
 
@@ -90,6 +95,7 @@ def _make_test_app(dispatcher=None, sqlite_store=None, registry=None, startup_ti
 # ---------------------------------------------------------------------------
 # /ready tests
 # ---------------------------------------------------------------------------
+
 
 def test_ready_503_when_dispatcher_none():
     client = TestClient(_make_test_app(), raise_server_exceptions=False)
@@ -143,6 +149,7 @@ def test_ready_completes_under_100ms():
 # ---------------------------------------------------------------------------
 # /liveness tests
 # ---------------------------------------------------------------------------
+
 
 def test_liveness_200_when_loop_responsive():
     app = _make_test_app()

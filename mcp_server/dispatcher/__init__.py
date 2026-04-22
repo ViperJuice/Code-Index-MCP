@@ -9,12 +9,11 @@ This package provides advanced dispatcher capabilities including:
 - Load balancing across plugins
 """
 
-# Legacy import for backwards compatibility
-from .fallback import run_gated_fallback
 from .dispatcher_enhanced import EnhancedDispatcher
 from .dispatcher_enhanced import EnhancedDispatcher as Dispatcher
-from .simple_dispatcher import SimpleDispatcher
-from .protocol import DispatcherProtocol
+
+# Legacy import for backwards compatibility
+from .fallback import run_gated_fallback
 from .plugin_router import (
     FileTypeInfo,
     FileTypeMatcher,
@@ -24,6 +23,7 @@ from .plugin_router import (
     PluginRouter,
     RouteResult,
 )
+from .protocol import DispatcherProtocol
 from .result_aggregator import (
     AggregatedResult,
     AggregationStats,
@@ -34,6 +34,7 @@ from .result_aggregator import (
     SimpleAggregationStrategy,
     SmartAggregationStrategy,
 )
+from .simple_dispatcher import SimpleDispatcher
 
 __all__ = [
     "run_gated_fallback",

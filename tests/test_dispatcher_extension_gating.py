@@ -10,11 +10,17 @@ import pytest
 
 from mcp_server.core.repo_context import RepoContext
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
-from mcp_server.plugin_base import IPlugin, IndexShard, Reference, SearchOpts, SearchResult, SymbolDef
+from mcp_server.plugin_base import (
+    IndexShard,
+    IPlugin,
+    Reference,
+    SearchOpts,
+    SearchResult,
+    SymbolDef,
+)
 from mcp_server.plugins.plugin_set_registry import PluginSetRegistry
 from mcp_server.storage.multi_repo_manager import RepositoryInfo
 from mcp_server.storage.sqlite_store import SQLiteStore
-
 
 REPO_ID = "test-gating-repo"
 
@@ -63,6 +69,7 @@ def _make_dispatcher_with_plugins(plugins: list) -> EnhancedDispatcher:
 
 class FakePyPlugin(IPlugin):
     """Plugin that claims to handle .py files."""
+
     lang = "python"
 
     def supports(self, path) -> bool:
@@ -83,6 +90,7 @@ class FakePyPlugin(IPlugin):
 
 class SpyPlugin(IPlugin):
     """Plugin that records getDefinition calls."""
+
     lang = "spy"
 
     def __init__(self) -> None:

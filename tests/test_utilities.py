@@ -328,6 +328,8 @@ class GitCommit:
 class TestRepository:
     """Test repository information."""
 
+    __test__ = False
+
     path: Path
     name: str
     language: str

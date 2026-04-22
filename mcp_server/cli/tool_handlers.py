@@ -3,6 +3,7 @@
 Each handler resolves a RepoContext via RepoResolver from the tool's path/repository
 argument or the MCP_WORKSPACE_ROOT default, then delegates to the dispatcher.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -67,9 +68,7 @@ def _translate_path(path: str) -> str:
     if not path:
         return ""
     if path.startswith("PathUtils.get_workspace_root() / "):
-        translated = path.replace(
-            "PathUtils.get_workspace_root() / ", str(Path.cwd()) + "/", 1
-        )
+        translated = path.replace("PathUtils.get_workspace_root() / ", str(Path.cwd()) + "/", 1)
         if Path(translated).exists():
             return translated
         return path.replace("PathUtils.get_workspace_root() / ", "", 1)
@@ -106,21 +105,33 @@ async def handle_symbol_lookup(
 ) -> Sequence[types.TextContent]:
     symbol = (arguments or {}).get("symbol")
     if not symbol:
-        return [types.TextContent(type="text", text=_ensure_response(
-            {"error": "Missing parameter", "details": "'symbol' parameter is required"}
-        ))]
+        return [
+            types.TextContent(
+                type="text",
+                text=_ensure_response(
+                    {"error": "Missing parameter", "details": "'symbol' parameter is required"}
+                ),
+            )
+        ]
 
     repository = (arguments or {}).get("repository")
     if repository and _looks_like_path(repository):
         allowed = _allowed_roots()
         if not _path_within_allowed(Path(repository), allowed):
-            return [types.TextContent(type="text", text=_ensure_response({
-                "error": "Path outside allowed roots",
-                "code": "path_outside_allowed_roots",
-                "path": str(Path(repository).resolve()),
-                "allowed_roots": [str(r) for r in allowed],
-                "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
-            }))]
+            return [
+                types.TextContent(
+                    type="text",
+                    text=_ensure_response(
+                        {
+                            "error": "Path outside allowed roots",
+                            "code": "path_outside_allowed_roots",
+                            "path": str(Path(repository).resolve()),
+                            "allowed_roots": [str(r) for r in allowed],
+                            "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
+                        }
+                    ),
+                )
+            ]
 
     ctx = _resolve_ctx(repo_resolver, repository)
 
@@ -134,18 +145,38 @@ async def handle_symbol_lookup(
         result = dispatcher.lookup(symbol)  # type: ignore[call-arg]
 
     if result:
-        defined_in = result.get("defined_in", "") if isinstance(result, dict) else getattr(result, "defined_in", "")
+        defined_in = (
+            result.get("defined_in", "")
+            if isinstance(result, dict)
+            else getattr(result, "defined_in", "")
+        )
         translated_path = _translate_path(defined_in)
         line = result.get("line") if isinstance(result, dict) else getattr(result, "line", None)
         response_data: dict = {
-            "symbol": result.get("symbol") if isinstance(result, dict) else getattr(result, "symbol", symbol),
-            "kind": result.get("kind") if isinstance(result, dict) else getattr(result, "kind", None),
-            "language": result.get("language") if isinstance(result, dict) else getattr(result, "language", None),
-            "signature": result.get("signature") if isinstance(result, dict) else getattr(result, "signature", None),
+            "symbol": (
+                result.get("symbol")
+                if isinstance(result, dict)
+                else getattr(result, "symbol", symbol)
+            ),
+            "kind": (
+                result.get("kind") if isinstance(result, dict) else getattr(result, "kind", None)
+            ),
+            "language": (
+                result.get("language")
+                if isinstance(result, dict)
+                else getattr(result, "language", None)
+            ),
+            "signature": (
+                result.get("signature")
+                if isinstance(result, dict)
+                else getattr(result, "signature", None)
+            ),
             "doc": result.get("doc") if isinstance(result, dict) else getattr(result, "doc", None),
             "defined_in": translated_path,
             "line": line,
-            "span": result.get("span") if isinstance(result, dict) else getattr(result, "span", None),
+            "span": (
+                result.get("span") if isinstance(result, dict) else getattr(result, "span", None)
+            ),
         }
         if line and translated_path:
             offset = line - 1
@@ -178,9 +209,14 @@ async def handle_search_code(
 ) -> Sequence[types.TextContent]:
     query = (arguments or {}).get("query")
     if not query:
-        return [types.TextContent(type="text", text=_ensure_response(
-            {"error": "Missing parameter", "details": "'query' parameter is required"}
-        ))]
+        return [
+            types.TextContent(
+                type="text",
+                text=_ensure_response(
+                    {"error": "Missing parameter", "details": "'query' parameter is required"}
+                ),
+            )
+        ]
 
     semantic = (arguments or {}).get("semantic", False)
     fuzzy = (arguments or {}).get("fuzzy", False)
@@ -190,13 +226,20 @@ async def handle_search_code(
     if repository and _looks_like_path(repository):
         allowed = _allowed_roots()
         if not _path_within_allowed(Path(repository), allowed):
-            return [types.TextContent(type="text", text=_ensure_response({
-                "error": "Path outside allowed roots",
-                "code": "path_outside_allowed_roots",
-                "path": str(Path(repository).resolve()),
-                "allowed_roots": [str(r) for r in allowed],
-                "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
-            }))]
+            return [
+                types.TextContent(
+                    type="text",
+                    text=_ensure_response(
+                        {
+                            "error": "Path outside allowed roots",
+                            "code": "path_outside_allowed_roots",
+                            "path": str(Path(repository).resolve()),
+                            "allowed_roots": [str(r) for r in allowed],
+                            "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
+                        }
+                    ),
+                )
+            ]
 
     # Resolve ctx via RepoResolver (replaces old multi-repo bypass)
     ctx = _resolve_ctx(repo_resolver, repository)
@@ -221,17 +264,33 @@ async def handle_search_code(
             )
         results = list(results_iter)
     except asyncio.TimeoutError:
-        return [types.TextContent(type="text", text=_ensure_response({
-            "error": "Search timeout",
-            "details": "Search operation exceeded 10 second timeout",
-            "query": query,
-            "suggestion": "Try a simpler query or check index status with get_status",
-        }))]
+        return [
+            types.TextContent(
+                type="text",
+                text=_ensure_response(
+                    {
+                        "error": "Search timeout",
+                        "details": "Search operation exceeded 10 second timeout",
+                        "query": query,
+                        "suggestion": "Try a simpler query or check index status with get_status",
+                    }
+                ),
+            )
+        ]
     except Exception as e:
         logger.error(f"Search failed: {e}")
-        return [types.TextContent(type="text", text=_ensure_response({
-            "error": "Search failed", "details": str(e), "query": query,
-        }))]
+        return [
+            types.TextContent(
+                type="text",
+                text=_ensure_response(
+                    {
+                        "error": "Search failed",
+                        "details": str(e),
+                        "query": query,
+                    }
+                ),
+            )
+        ]
 
     logger.info(f"Search completed with {len(results)} results")
 
@@ -240,15 +299,23 @@ async def handle_search_code(
     if results:
         results_data = []
         for r in results:
-            file_path = _translate_path(r.get("file", "") if isinstance(r, dict) else getattr(r, "file", ""))
+            file_path = _translate_path(
+                r.get("file", "") if isinstance(r, dict) else getattr(r, "file", "")
+            )
             line = r.get("line") if isinstance(r, dict) else getattr(r, "line", None)
             result_item = {
                 "file": file_path,
                 "line": line,
-                "line_end": r.get("line_end") if isinstance(r, dict) else getattr(r, "line_end", None),
+                "line_end": (
+                    r.get("line_end") if isinstance(r, dict) else getattr(r, "line_end", None)
+                ),
                 "symbol": r.get("symbol") if isinstance(r, dict) else getattr(r, "symbol", None),
                 "snippet": r.get("snippet") if isinstance(r, dict) else getattr(r, "snippet", None),
-                "last_indexed": r.get("last_modified") if isinstance(r, dict) else getattr(r, "last_modified", None),
+                "last_indexed": (
+                    r.get("last_modified")
+                    if isinstance(r, dict)
+                    else getattr(r, "last_modified", None)
+                ),
             }
             if line and file_path:
                 offset = line - 1
@@ -346,7 +413,13 @@ async def handle_get_status(
             }
             health = {"status": "unknown"}
     except TypeError:
-        stats = {"total_plugins": 0, "loaded_languages": [], "supported_languages": 0, "operations": {}, "by_language": {}}
+        stats = {
+            "total_plugins": 0,
+            "loaded_languages": [],
+            "supported_languages": 0,
+            "operations": {},
+            "by_language": {},
+        }
         health = {"status": "unknown"}
 
     _is_enhanced = isinstance(dispatcher, EnhancedDispatcher)
@@ -365,13 +438,16 @@ async def handle_get_status(
         ),
     }
     if _is_enhanced:
-        features.update({
-            "dynamic_loading": getattr(dispatcher, "_use_factory", False),
-            "lazy_loading": getattr(dispatcher, "_lazy_load", False),
-            "advanced_features": getattr(dispatcher, "_enable_advanced", False),
-            "semantic_search_enabled": getattr(dispatcher, "_semantic_enabled", False),
-            "semantic_indexer_active": getattr(dispatcher, "_semantic_indexer", None) is not None,
-        })
+        features.update(
+            {
+                "dynamic_loading": getattr(dispatcher, "_use_factory", False),
+                "lazy_loading": getattr(dispatcher, "_lazy_load", False),
+                "advanced_features": getattr(dispatcher, "_enable_advanced", False),
+                "semantic_search_enabled": getattr(dispatcher, "_semantic_enabled", False),
+                "semantic_indexer_active": getattr(dispatcher, "_semantic_indexer", None)
+                is not None,
+            }
+        )
 
     status_data = {
         "status": health.get("status", "operational"),
@@ -392,12 +468,14 @@ async def handle_get_status(
         "health": health,
         "summarization": {
             "available": lazy_summarizer.can_summarize() if lazy_summarizer else False,
-            "mcp_sampling": lazy_summarizer._has_sampling_capability() if lazy_summarizer else False,
+            "mcp_sampling": (
+                lazy_summarizer._has_sampling_capability() if lazy_summarizer else False
+            ),
             "direct_api": lazy_summarizer._has_direct_api() if lazy_summarizer else False,
             "api_provider": (
-                "anthropic" if os.environ.get("ANTHROPIC_API_KEY")
-                else "openai" if os.environ.get("OPENAI_API_KEY")
-                else None
+                "anthropic"
+                if os.environ.get("ANTHROPIC_API_KEY")
+                else "openai" if os.environ.get("OPENAI_API_KEY") else None
             ),
             "client": client_name,
             "session_available": current_session is not None,
@@ -441,15 +519,17 @@ async def handle_list_plugins(
         plugin_status = plugin_manager.get_plugin_status()
         for info in plugin_infos:
             status = plugin_status.get(info.name, {})
-            response_data["plugin_manager_plugins"].append({
-                "name": info.name,
-                "version": info.version,
-                "description": info.description,
-                "language": info.language,
-                "file_extensions": info.file_extensions,
-                "state": status.get("state", "unknown"),
-                "enabled": status.get("enabled", False),
-            })
+            response_data["plugin_manager_plugins"].append(
+                {
+                    "name": info.name,
+                    "version": info.version,
+                    "description": info.description,
+                    "language": info.language,
+                    "file_extensions": info.file_extensions,
+                    "state": status.get("state", "unknown"),
+                    "enabled": status.get("enabled", False),
+                }
+            )
 
     if hasattr(dispatcher, "supported_languages"):
         try:
@@ -486,27 +566,44 @@ async def handle_reindex(
     if repository and _looks_like_path(repository):
         allowed = _allowed_roots()
         if not _path_within_allowed(Path(repository), allowed):
-            return [types.TextContent(type="text", text=_ensure_response({
-                "error": "Path outside allowed roots",
-                "code": "path_outside_allowed_roots",
-                "path": str(Path(repository).resolve()),
-                "allowed_roots": [str(r) for r in allowed],
-                "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
-            }))]
+            return [
+                types.TextContent(
+                    type="text",
+                    text=_ensure_response(
+                        {
+                            "error": "Path outside allowed roots",
+                            "code": "path_outside_allowed_roots",
+                            "path": str(Path(repository).resolve()),
+                            "allowed_roots": [str(r) for r in allowed],
+                            "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
+                        }
+                    ),
+                )
+            ]
 
     # Conflict detection: both path and repository provided but resolve to different repos
     if path and repository:
         ctx_from_path = _resolve_ctx(repo_resolver, str(path))
         ctx_from_repo = _resolve_ctx(repo_resolver, repository)
-        if (ctx_from_path is not None and ctx_from_repo is not None
-                and ctx_from_path.repo_id != ctx_from_repo.repo_id):
-            return [types.TextContent(type="text", text=_ensure_response({
-                "error": "Conflicting scope",
-                "code": "conflicting_path_and_repository",
-                "path": str(path),
-                "repository": repository,
-                "hint": "Provide only one, or ensure both resolve to the same repo.",
-            }))]
+        if (
+            ctx_from_path is not None
+            and ctx_from_repo is not None
+            and ctx_from_path.repo_id != ctx_from_repo.repo_id
+        ):
+            return [
+                types.TextContent(
+                    type="text",
+                    text=_ensure_response(
+                        {
+                            "error": "Conflicting scope",
+                            "code": "conflicting_path_and_repository",
+                            "path": str(path),
+                            "repository": repository,
+                            "hint": "Provide only one, or ensure both resolve to the same repo.",
+                        }
+                    ),
+                )
+            ]
 
     # Resolve ctx — repository takes precedence when both are set and consistent
     ctx = _resolve_ctx(repo_resolver, repository or (str(path) if path else None))
@@ -522,17 +619,27 @@ async def handle_reindex(
         target_path = allowed[0]
 
     if not target_path.exists():
-        return [types.TextContent(type="text", text=_ensure_response(
-            {"error": "Path not found", "path": str(target_path)}
-        ))]
+        return [
+            types.TextContent(
+                type="text",
+                text=_ensure_response({"error": "Path not found", "path": str(target_path)}),
+            )
+        ]
 
     if not _path_within_allowed(target_path, allowed):
-        return [types.TextContent(type="text", text=_ensure_response({
-            "error": "Path outside allowed roots",
-            "path": str(target_path.resolve()),
-            "allowed_roots": [str(r) for r in allowed],
-            "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
-        }))]
+        return [
+            types.TextContent(
+                type="text",
+                text=_ensure_response(
+                    {
+                        "error": "Path outside allowed roots",
+                        "path": str(target_path.resolve()),
+                        "allowed_roots": [str(r) for r in allowed],
+                        "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
+                    }
+                ),
+            )
+        ]
 
     if path and target_path.is_file():
         try:
@@ -599,27 +706,48 @@ async def handle_write_summaries(
     if repository and _looks_like_path(repository):
         allowed = _allowed_roots()
         if not _path_within_allowed(Path(repository), allowed):
-            return [types.TextContent(type="text", text=_ensure_response({
-                "error": "Path outside allowed roots",
-                "code": "path_outside_allowed_roots",
-                "path": str(Path(repository).resolve()),
-                "allowed_roots": [str(r) for r in allowed],
-                "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
-            }))]
+            return [
+                types.TextContent(
+                    type="text",
+                    text=_ensure_response(
+                        {
+                            "error": "Path outside allowed roots",
+                            "code": "path_outside_allowed_roots",
+                            "path": str(Path(repository).resolve()),
+                            "allowed_roots": [str(r) for r in allowed],
+                            "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
+                        }
+                    ),
+                )
+            ]
 
     ctx = _resolve_ctx(repo_resolver, repository)
     active_store = ctx.sqlite_store if ctx is not None else sqlite_store
 
     if lazy_summarizer is None or not lazy_summarizer.can_summarize():
-        return [types.TextContent(type="text", text=_ensure_response({
-            "error": "Summarization not available",
-            "details": "No API key configured. Set CEREBRAS_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY.",
-        }))]
+        return [
+            types.TextContent(
+                type="text",
+                text=_ensure_response(
+                    {
+                        "error": "Summarization not available",
+                        "details": "No API key configured. Set CEREBRAS_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY.",
+                    }
+                ),
+            )
+        ]
 
     if active_store is None:
-        return [types.TextContent(type="text", text=_ensure_response({
-            "error": "sqlite_store not initialized",
-        }))]
+        return [
+            types.TextContent(
+                type="text",
+                text=_ensure_response(
+                    {
+                        "error": "sqlite_store not initialized",
+                    }
+                ),
+            )
+        ]
 
     db_path = active_store.db_path
     limit_arg = int((arguments or {}).get("limit", 500))
@@ -637,12 +765,19 @@ async def handle_write_summaries(
     )
     chunks_written = await writer.process_all(limit=limit_arg)
 
-    return [types.TextContent(type="text", text=_ensure_response({
-        "chunks_summarized": chunks_written,
-        "limit": limit_arg,
-        "model_used": model_used,
-        "persisted": True,
-    }))]
+    return [
+        types.TextContent(
+            type="text",
+            text=_ensure_response(
+                {
+                    "chunks_summarized": chunks_written,
+                    "limit": limit_arg,
+                    "model_used": model_used,
+                    "persisted": True,
+                }
+            ),
+        )
+    ]
 
 
 async def handle_summarize_sample(
@@ -664,25 +799,43 @@ async def handle_summarize_sample(
     if repository and _looks_like_path(repository):
         allowed = _allowed_roots()
         if not _path_within_allowed(Path(repository), allowed):
-            return [types.TextContent(type="text", text=_ensure_response({
-                "error": "Path outside allowed roots",
-                "code": "path_outside_allowed_roots",
-                "path": str(Path(repository).resolve()),
-                "allowed_roots": [str(r) for r in allowed],
-                "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
-            }))]
+            return [
+                types.TextContent(
+                    type="text",
+                    text=_ensure_response(
+                        {
+                            "error": "Path outside allowed roots",
+                            "code": "path_outside_allowed_roots",
+                            "path": str(Path(repository).resolve()),
+                            "allowed_roots": [str(r) for r in allowed],
+                            "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
+                        }
+                    ),
+                )
+            ]
 
     ctx = _resolve_ctx(repo_resolver, repository)
     active_store = ctx.sqlite_store if ctx is not None else sqlite_store
 
     if lazy_summarizer is None or not lazy_summarizer.can_summarize():
-        return [types.TextContent(type="text", text=_ensure_response({
-            "error": "Summarization not available",
-            "details": "No API key configured. Set CEREBRAS_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY.",
-        }))]
+        return [
+            types.TextContent(
+                type="text",
+                text=_ensure_response(
+                    {
+                        "error": "Summarization not available",
+                        "details": "No API key configured. Set CEREBRAS_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY.",
+                    }
+                ),
+            )
+        ]
 
     if active_store is None:
-        return [types.TextContent(type="text", text=_ensure_response({"error": "sqlite_store not initialized"}))]
+        return [
+            types.TextContent(
+                type="text", text=_ensure_response({"error": "sqlite_store not initialized"})
+            )
+        ]
 
     paths_arg = (arguments or {}).get("paths")
     n_arg = int((arguments or {}).get("n", 3))
@@ -694,13 +847,20 @@ async def handle_summarize_sample(
         allowed = _allowed_roots()
         for p in paths_arg:
             if _looks_like_path(p) and not _path_within_allowed(Path(p), allowed):
-                return [types.TextContent(type="text", text=_ensure_response({
-                    "error": "Path outside allowed roots",
-                    "code": "path_outside_allowed_roots",
-                    "path": str(Path(p).resolve()),
-                    "allowed_roots": [str(r) for r in allowed],
-                    "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
-                }))]
+                return [
+                    types.TextContent(
+                        type="text",
+                        text=_ensure_response(
+                            {
+                                "error": "Path outside allowed roots",
+                                "code": "path_outside_allowed_roots",
+                                "path": str(Path(p).resolve()),
+                                "allowed_roots": [str(r) for r in allowed],
+                                "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
+                            }
+                        ),
+                    )
+                ]
 
     with _sqlite3.connect(db_path) as _conn:
         if paths_arg:
@@ -740,9 +900,14 @@ async def handle_summarize_sample(
 
         chunks = [
             {
-                "chunk_id": r[0], "line_start": r[1], "line_end": r[2],
-                "content": r[3], "node_type": r[4], "parent_chunk_id": r[5],
-                "language": r[6] or language, "symbol_id": r[7],
+                "chunk_id": r[0],
+                "line_start": r[1],
+                "line_end": r[2],
+                "content": r[3],
+                "node_type": r[4],
+                "parent_chunk_id": r[5],
+                "language": r[6] or language,
+                "symbol_id": r[7],
             }
             for r in chunk_rows
         ]
@@ -772,28 +937,35 @@ async def handle_summarize_sample(
         summary_list = []
         for s in summaries:
             meta = chunk_meta.get(s.chunk_id, {})
-            sym_name = (
-                symbol_map.get(meta.get("symbol_id"))
-                or meta.get("node_type")
-                or s.chunk_id
+            sym_name = symbol_map.get(meta.get("symbol_id")) or meta.get("node_type") or s.chunk_id
+            summary_list.append(
+                {
+                    "symbol": sym_name,
+                    "lines": f"{meta.get('line_start', '?')}-{meta.get('line_end', '?')}",
+                    "summary": s.summary,
+                }
             )
-            summary_list.append({
-                "symbol": sym_name,
-                "lines": f"{meta.get('line_start', '?')}-{meta.get('line_end', '?')}",
-                "summary": s.summary,
-            })
 
         total_chunks += len(summaries)
-        file_results.append({
-            "file_path": file_path,
-            "chunk_count": len(summaries),
-            "summaries": summary_list,
-        })
+        file_results.append(
+            {
+                "file_path": file_path,
+                "chunk_count": len(summaries),
+                "summaries": summary_list,
+            }
+        )
 
-    return [types.TextContent(type="text", text=_ensure_response({
-        "files_processed": len(file_results),
-        "total_chunks": total_chunks,
-        "model_used": model_used,
-        "persisted": persist_flag,
-        "files": file_results,
-    }))]
+    return [
+        types.TextContent(
+            type="text",
+            text=_ensure_response(
+                {
+                    "files_processed": len(file_results),
+                    "total_chunks": total_chunks,
+                    "model_used": model_used,
+                    "persisted": persist_flag,
+                    "files": file_results,
+                }
+            ),
+        )
+    ]

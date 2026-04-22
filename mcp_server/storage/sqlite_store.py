@@ -216,7 +216,7 @@ class SQLiteStore:
                     except sqlite3.OperationalError as e:
                         # Handle duplicate column errors gracefully (for ALTER TABLE ADD COLUMN)
                         if "duplicate column name" in str(e).lower():
-                            logger.warning(
+                            logger.info(
                                 f"Migration {migration_file.name} encountered duplicate column (likely already applied), continuing..."
                             )
                         else:
@@ -229,9 +229,7 @@ class SQLiteStore:
         with self._get_connection() as conn:
             for col in ("tracked_branch", "git_common_dir"):
                 try:
-                    conn.execute(
-                        f"ALTER TABLE repositories ADD COLUMN {col} TEXT"
-                    )
+                    conn.execute(f"ALTER TABLE repositories ADD COLUMN {col} TEXT")
                     logger.debug(f"Added column repositories.{col}")
                 except sqlite3.OperationalError:
                     pass  # column already exists
@@ -255,7 +253,10 @@ class SQLiteStore:
                     conn.rollback()
                     if "disk I/O error" in str(e) or "database or disk is full" in str(e):
                         self._readonly = True
-                        from mcp_server.metrics.prometheus_exporter import mcp_storage_readonly_total
+                        from mcp_server.metrics.prometheus_exporter import (
+                            mcp_storage_readonly_total,
+                        )
+
                         mcp_storage_readonly_total.inc()
                         raise TransientArtifactError(str(e)) from e
                     raise
@@ -274,6 +275,7 @@ class SQLiteStore:
                 if "disk I/O error" in str(e) or "database or disk is full" in str(e):
                     self._readonly = True
                     from mcp_server.metrics.prometheus_exporter import mcp_storage_readonly_total
+
                     mcp_storage_readonly_total.inc()
                     raise TransientArtifactError(str(e)) from e
                 raise
@@ -965,9 +967,7 @@ class SQLiteStore:
     def count_symbols_for_file(self, file_id: int) -> int:
         """Return the number of symbols stored for a given file."""
         with self._get_connection() as conn:
-            cursor = conn.execute(
-                "SELECT COUNT(*) FROM symbols WHERE file_id = ?", (file_id,)
-            )
+            cursor = conn.execute("SELECT COUNT(*) FROM symbols WHERE file_id = ?", (file_id,))
             return cursor.fetchone()[0]
 
     # Code Chunk operations

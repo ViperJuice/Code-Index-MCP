@@ -16,7 +16,6 @@ from mcp_server.artifacts.attestation import (
     verify_attestation,
 )
 
-
 FAKE_ARCHIVE = Path("/tmp/fake_archive.tar.gz")
 REPO = "owner/repo"
 
@@ -111,20 +110,26 @@ class TestVerifyAttestation:
             subject_digest="sha256stub",
             signed_at=datetime.now(timezone.utc),
         )
-        with patch("subprocess.run", return_value=MagicMock(returncode=1, stdout="", stderr="verify failed")):
+        with patch(
+            "subprocess.run",
+            return_value=MagicMock(returncode=1, stdout="", stderr="verify failed"),
+        ):
             with pytest.raises(AttestationError):
                 verify_attestation(FAKE_ARCHIVE, att, expected_repo=REPO)
 
     def test_warn_mode_logs_on_verify_failure(self, monkeypatch, caplog):
         monkeypatch.setenv("MCP_ATTESTATION_MODE", "warn")
         import logging
+
         att = Attestation(
             bundle_url="https://github.com/owner/repo/attestations/1",
             bundle_path=Path("/tmp/fake.jsonl"),
             subject_digest="sha256stub",
             signed_at=datetime.now(timezone.utc),
         )
-        with patch("subprocess.run", return_value=MagicMock(returncode=1, stdout="", stderr="fail")):
+        with patch(
+            "subprocess.run", return_value=MagicMock(returncode=1, stdout="", stderr="fail")
+        ):
             with caplog.at_level(logging.WARNING, logger="mcp_server.artifacts.attestation"):
                 verify_attestation(FAKE_ARCHIVE, att, expected_repo=REPO)
 

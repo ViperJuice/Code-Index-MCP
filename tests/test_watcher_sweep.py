@@ -6,16 +6,17 @@ from unittest.mock import Mock
 
 import pytest
 
-from mcp_server.watcher.sweeper import WatcherSweeper, DEFAULT_SWEEP_MINUTES, ENV_SWEEP_MINUTES
-
+from mcp_server.watcher.sweeper import DEFAULT_SWEEP_MINUTES, ENV_SWEEP_MINUTES, WatcherSweeper
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_sqlite_store(tmp_path: Path):
     """Return a real SQLiteStore backed by a temp DB with a file entry."""
     from mcp_server.storage.sqlite_store import SQLiteStore
+
     db_path = tmp_path / "test.db"
     store = SQLiteStore(str(db_path))
     return store
@@ -34,6 +35,7 @@ def _store_file(store, repo_id_int: int, relative_path: str):
 # ---------------------------------------------------------------------------
 # test_sweeper_recovers_missed_event (acceptance #5)
 # ---------------------------------------------------------------------------
+
 
 class TestSweeperRecoversMissedEvent:
     """Sweeper detects a file present on disk but absent from SQLite."""
@@ -77,6 +79,7 @@ class TestSweeperRecoversMissedEvent:
 # test_sweeper_interval_env_override
 # ---------------------------------------------------------------------------
 
+
 class TestSweeperIntervalEnvOverride:
     """ENV_SWEEP_MINUTES overrides the default interval."""
 
@@ -96,6 +99,7 @@ class TestSweeperIntervalEnvOverride:
 # ---------------------------------------------------------------------------
 # test_sweeper_noop_when_no_drift
 # ---------------------------------------------------------------------------
+
 
 class TestSweeperNoopWhenNoDrift:
     """Sweeper finds no missed paths when filesystem matches SQLite."""
@@ -137,6 +141,7 @@ class TestSweeperNoopWhenNoDrift:
 # ---------------------------------------------------------------------------
 # test_sweeper_start_stop
 # ---------------------------------------------------------------------------
+
 
 class TestSweeperStartStop:
     """start/stop lifecycle — sweeper thread must not leak."""

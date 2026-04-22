@@ -14,9 +14,7 @@ class FreshnessVerdict(str, Enum):
     INVALID = "invalid"
 
 
-def verify_artifact_freshness(
-    meta: dict, head_commit: str, max_age_days: int
-) -> FreshnessVerdict:
+def verify_artifact_freshness(meta: dict, head_commit: str, max_age_days: int) -> FreshnessVerdict:
     """Return a verdict for the artifact described by *meta*.
 
     Args:

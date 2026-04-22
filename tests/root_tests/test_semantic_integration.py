@@ -127,7 +127,7 @@ class DataTransformer:
 ''')
 
     # File 3: Web utilities
-    (test_dir / "web_utils.py").write_text('''
+    (test_dir / "web_utils.py").write_text(r'''
 """Web-related utilities and helpers."""
 
 import re

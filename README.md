@@ -5,7 +5,7 @@ Modular, extensible local-first code indexer designed to enhance Claude Code and
 > **Beta status**: Multi-repo support and the MCP STDIO interface are in beta. The MCP tool interface (`search_code`, `symbol_lookup`, and friends) is the primary surface for LLM-driven use; the FastAPI REST gateway is a secondary admin surface for diagnostics and manual operations. Expect API surface changes before stable release.
 
 ## Project Status
-**Version**: 1.2.0-rc3 (beta)
+**Version**: 1.2.0-rc4 (beta)
 **Primary surface**: MCP tools (`search_code`, `symbol_lookup`) via the STDIO runner — always use these first from an LLM
 **Secondary surface**: FastAPI admin REST gateway for diagnostics and scripting — see "Admin REST Interface (secondary)" below
 **Core features**: local indexing, symbol/text search, registry-based language coverage; see [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md)
@@ -1108,10 +1108,10 @@ Maintainers can create new releases with pre-built indexes:
 
 ```bash
 # Create a new release (as draft)
-python scripts/create-release.py --version 1.2.0-rc3
+python scripts/create-release.py --version 1.2.0-rc4
 
 # Create and publish immediately
-python scripts/create-release.py --version 1.2.0-rc3 --publish
+python scripts/create-release.py --version 1.2.0-rc4 --publish
 ```
 
 ### Automatic Index Synchronization
@@ -1181,7 +1181,7 @@ For detailed architectural documentation, see the [architecture/](architecture/)
 
 See [ROADMAP.md](ROADMAP.md) for detailed development plans and current progress.
 
-**Current Status**: 1.2.0-rc3 beta release candidate
+**Current Status**: 1.2.0-rc4 beta release candidate
 - ✅ **Core Indexing**: SQLite + FTS5 for fast local search
 - ✅ **Multi-Language**: Specialized and registry-backed language coverage; see `docs/SUPPORT_MATRIX.md`
 - ✅ **MCP Protocol**: Full compatibility with Claude Code and other MCP clients

@@ -147,7 +147,9 @@ class MultiRepositoryHandler(FileSystemEventHandler):
         if not should_reindex_for_branch(current_branch, self.ctx.tracked_branch):
             logger.debug(
                 "Dropping reindex event for %s: branch %s != tracked %s",
-                path, current_branch, self.ctx.tracked_branch,
+                path,
+                current_branch,
+                self.ctx.tracked_branch,
             )
             return
 
@@ -176,7 +178,9 @@ class MultiRepositoryHandler(FileSystemEventHandler):
         if not should_reindex_for_branch(current_branch, self.ctx.tracked_branch):
             logger.debug(
                 "Dropping remove event for %s: branch %s != tracked %s",
-                path, current_branch, self.ctx.tracked_branch,
+                path,
+                current_branch,
+                self.ctx.tracked_branch,
             )
             return
 
@@ -270,9 +274,13 @@ class MultiRepositoryWatcher:
 
     def enqueue_full_rescan(self, repo_id: str) -> None:
         """Submit a force-full reindex to the thread pool; returns immediately."""
+
         def _rescan():
             # bypass_branch_guard=True prevents infinite drift→rescan→drift→rescan loops
-            self.index_manager.sync_repository_index(repo_id, force_full=True, bypass_branch_guard=True)
+            self.index_manager.sync_repository_index(
+                repo_id, force_full=True, bypass_branch_guard=True
+            )
+
         self.executor.submit(_rescan)
 
     def start_watching_all(self):
@@ -367,7 +375,6 @@ class MultiRepositoryWatcher:
                 repo_info = self.registry.get_repository(repo_id)
                 tracked = (repo_info.tracked_branch if repo_info else None) or ""
                 # Build a bare RepoContext without a live sqlite_store.
-                from .storage.multi_repo_manager import RepositoryInfo as _RI
                 ctx = RepoContext(
                     repo_id=repo_id,
                     sqlite_store=None,  # type: ignore[arg-type]
@@ -439,7 +446,11 @@ class MultiRepositoryWatcher:
                     try:
                         self._artifact_publisher.publish_on_reindex(repo_id, commit)
                     except Exception as pub_exc:
-                        logger.error("ArtifactPublisher.publish_on_reindex failed for %s: %s", repo_id, pub_exc)
+                        logger.error(
+                            "ArtifactPublisher.publish_on_reindex failed for %s: %s",
+                            repo_id,
+                            pub_exc,
+                        )
 
         except Exception as e:
             logger.error(f"Failed to sync repository {repo_id}: {e}")
@@ -489,9 +500,11 @@ class MultiRepositoryWatcher:
 
         for repo_id, repo_info in self.registry.get_all_repositories().items():
             if repo_info.auto_sync:
+
                 def _locked_sync(rid=repo_id):
                     with lock_registry.acquire(rid):
                         return self.index_manager.sync_repository_index(rid)
+
                 future = self.executor.submit(_locked_sync)
                 futures.append((repo_id, future))
 

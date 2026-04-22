@@ -6,6 +6,7 @@ IMPORTANT: Do NOT import mock_file_system from tests/conftest.py here.
 That fixture monkey-patches Path.exists() globally and breaks pytest-xdist
 parallelism. All repo state is created under tmp_path via subprocess git calls.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -13,7 +14,6 @@ import json
 import logging
 import os
 import subprocess
-import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # build_temp_repo
 # ---------------------------------------------------------------------------
+
 
 def build_temp_repo(
     tmp_path: Path,
@@ -45,15 +46,21 @@ def build_temp_repo(
     # Initialize with explicit 'main' branch to avoid host-config variation
     subprocess.run(
         ["git", "init", "-b", "main"],
-        cwd=str(repo_path), check=True, capture_output=True,
+        cwd=str(repo_path),
+        check=True,
+        capture_output=True,
     )
     subprocess.run(
         ["git", "config", "user.email", "test@test.com"],
-        cwd=str(repo_path), check=True, capture_output=True,
+        cwd=str(repo_path),
+        check=True,
+        capture_output=True,
     )
     subprocess.run(
         ["git", "config", "user.name", "Test User"],
-        cwd=str(repo_path), check=True, capture_output=True,
+        cwd=str(repo_path),
+        check=True,
+        capture_output=True,
     )
 
     files = seed_files or {"placeholder.py": "# placeholder\n"}
@@ -61,12 +68,16 @@ def build_temp_repo(
         (repo_path / filename).write_text(content)
         subprocess.run(
             ["git", "add", filename],
-            cwd=str(repo_path), check=True, capture_output=True,
+            cwd=str(repo_path),
+            check=True,
+            capture_output=True,
         )
 
     subprocess.run(
         ["git", "commit", "-m", "initial commit"],
-        cwd=str(repo_path), check=True, capture_output=True,
+        cwd=str(repo_path),
+        check=True,
+        capture_output=True,
     )
 
     repo_id = compute_repo_id(repo_path).repo_id
@@ -76,6 +87,7 @@ def build_temp_repo(
 # ---------------------------------------------------------------------------
 # TestServerHandle
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class TestServerHandle:
@@ -155,6 +167,7 @@ class TestServerHandle:
 # Internal: populate SQLite store from seed files
 # ---------------------------------------------------------------------------
 
+
 def _index_repo_into_sqlite(store_registry: Any, repo_id: str, repo_path: Path) -> None:
     """Walk repo_path and insert Python files into the SQLite store directly.
 
@@ -215,6 +228,7 @@ def _index_repo_into_sqlite(store_registry: Any, repo_id: str, repo_path: Path) 
 # ---------------------------------------------------------------------------
 # boot_test_server
 # ---------------------------------------------------------------------------
+
 
 @contextmanager
 def boot_test_server(
@@ -280,8 +294,8 @@ def boot_test_server(
         ref_poller = None
 
         if enable_watchers:
-            from mcp_server.watcher_multi_repo import MultiRepositoryWatcher
             from mcp_server.watcher.ref_poller import RefPoller
+            from mcp_server.watcher_multi_repo import MultiRepositoryWatcher
 
             multi_watcher = MultiRepositoryWatcher(
                 registry=repo_registry,

@@ -4,6 +4,7 @@ Wires the MCP Server, list_tools(), and call_tool() dispatcher using
 tool_handlers. Invoked by server_commands:stdio() and the shim at
 scripts/cli/mcp_server_cli.py.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -15,23 +16,22 @@ import time
 from pathlib import Path
 from typing import Any, Optional, Sequence
 
-from mcp_server.metrics.prometheus_exporter import PrometheusExporter, record_tool_call
-
 import mcp.types as types
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 
-from mcp_server.cli.bootstrap import initialize_stateless_services, timeout, validate_index
 from mcp_server.cli import tool_handlers
+from mcp_server.cli.bootstrap import initialize_stateless_services, timeout, validate_index
 from mcp_server.cli.handshake import HandshakeGate
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher
+from mcp_server.metrics.prometheus_exporter import PrometheusExporter, record_tool_call
 from mcp_server.plugin_system import PluginManager
 from mcp_server.storage.sqlite_store import SQLiteStore
 from mcp_server.utils.index_discovery import IndexDiscovery
 from mcp_server.watcher import FileWatcher
-from mcp_server.watcher_multi_repo import MultiRepositoryWatcher
 from mcp_server.watcher.ref_poller import RefPoller
+from mcp_server.watcher_multi_repo import MultiRepositoryWatcher
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,10 @@ def _build_tool_list() -> list[types.Tool]:
                 "type": "object",
                 "properties": {
                     "symbol": {"type": "string", "description": "The symbol name to look up"},
-                    "repository": {"type": "string", "description": "Repository ID, path, or git URL. Defaults to current repository."},
+                    "repository": {
+                        "type": "string",
+                        "description": "Repository ID, path, or git URL. Defaults to current repository.",
+                    },
                 },
                 "required": ["symbol"],
             },
@@ -105,10 +108,25 @@ def _build_tool_list() -> list[types.Tool]:
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "The search query"},
-                    "repository": {"type": "string", "description": "Repository ID, path, or git URL. Defaults to current repository."},
-                    "semantic": {"type": "boolean", "description": "Whether to use semantic search", "default": False},
-                    "fuzzy": {"type": "boolean", "description": "Trigram-based fuzzy match for misspelled queries", "default": False},
-                    "limit": {"type": "integer", "description": "Maximum number of results", "default": 20},
+                    "repository": {
+                        "type": "string",
+                        "description": "Repository ID, path, or git URL. Defaults to current repository.",
+                    },
+                    "semantic": {
+                        "type": "boolean",
+                        "description": "Whether to use semantic search",
+                        "default": False,
+                    },
+                    "fuzzy": {
+                        "type": "boolean",
+                        "description": "Trigram-based fuzzy match for misspelled queries",
+                        "default": False,
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of results",
+                        "default": 20,
+                    },
                 },
                 "required": ["query"],
             },
@@ -129,8 +147,14 @@ def _build_tool_list() -> list[types.Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Optional path to reindex. If not provided, reindexes all files."},
-                    "repository": {"type": "string", "description": "Repository ID, path, or git URL. Defaults to current repository."},
+                    "path": {
+                        "type": "string",
+                        "description": "Optional path to reindex. If not provided, reindexes all files.",
+                    },
+                    "repository": {
+                        "type": "string",
+                        "description": "Repository ID, path, or git URL. Defaults to current repository.",
+                    },
                 },
             },
         ),
@@ -143,8 +167,15 @@ def _build_tool_list() -> list[types.Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "limit": {"type": "integer", "description": "Maximum number of chunks to summarize in this call.", "default": 500},
-                    "repository": {"type": "string", "description": "Repository ID, path, or git URL. Defaults to current repository."},
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of chunks to summarize in this call.",
+                        "default": 500,
+                    },
+                    "repository": {
+                        "type": "string",
+                        "description": "Repository ID, path, or git URL. Defaults to current repository.",
+                    },
                 },
             },
         ),
@@ -158,10 +189,25 @@ def _build_tool_list() -> list[types.Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "paths": {"type": "array", "items": {"type": "string"}, "description": "Specific file paths to summarize (optional)."},
-                    "n": {"type": "integer", "description": "Number of random files to sample when paths not given.", "default": 3},
-                    "persist": {"type": "boolean", "description": "Save summaries to index (default false for evaluation).", "default": False},
-                    "repository": {"type": "string", "description": "Repository ID, path, or git URL. Defaults to current repository."},
+                    "paths": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Specific file paths to summarize (optional).",
+                    },
+                    "n": {
+                        "type": "integer",
+                        "description": "Number of random files to sample when paths not given.",
+                        "default": 3,
+                    },
+                    "persist": {
+                        "type": "boolean",
+                        "description": "Save summaries to index (default false for evaluation).",
+                        "default": False,
+                    },
+                    "repository": {
+                        "type": "string",
+                        "description": "Repository ID, path, or git URL. Defaults to current repository.",
+                    },
                 },
             },
         ),
@@ -237,6 +283,7 @@ async def _graceful_shutdown(
 # Module-level initialize_services() — hoisted from _serve()'s lazy_initialize()
 # ---------------------------------------------------------------------------
 
+
 async def initialize_services() -> None:
     """Initialize all services needed for the MCP server."""
     global dispatcher, plugin_manager, sqlite_store, initialization_error
@@ -284,7 +331,9 @@ async def initialize_services() -> None:
                     except Exception as _fts_err:
                         logger.warning(f"BM25 FTS rebuild failed (non-fatal): {_fts_err}")
 
-                _fts_rebuild_thread = threading.Thread(target=_rebuild_fts, daemon=True, name="mcp-fts-rebuild")
+                _fts_rebuild_thread = threading.Thread(
+                    target=_rebuild_fts, daemon=True, name="mcp-fts-rebuild"
+                )
                 _fts_rebuild_thread.start()
         else:
             index_dir = current_dir / ".mcp-index"
@@ -302,7 +351,9 @@ async def initialize_services() -> None:
                 ".mcp-index/.index_metadata.json",
             ]
             try:
-                existing = gitignore_path.read_text(encoding="utf-8") if gitignore_path.exists() else ""
+                existing = (
+                    gitignore_path.read_text(encoding="utf-8") if gitignore_path.exists() else ""
+                )
                 missing = [e for e in gitignore_entries if e not in existing]
                 if missing:
                     with gitignore_path.open("a", encoding="utf-8") as _gf:
@@ -359,11 +410,17 @@ async def initialize_services() -> None:
         if sqlite_store is not None and _local_ctx is None:
             try:
                 from datetime import datetime as _dt
-                from mcp_server.storage.multi_repo_manager import RepositoryInfo
+
                 from mcp_server.core.repo_context import RepoContext
+                from mcp_server.storage.multi_repo_manager import RepositoryInfo
                 from mcp_server.storage.repo_identity import compute_repo_id
+
                 _repo_id_result = compute_repo_id(current_dir)
-                _repo_id = _repo_id_result.repo_id if hasattr(_repo_id_result, "repo_id") else str(_repo_id_result)
+                _repo_id = (
+                    _repo_id_result.repo_id
+                    if hasattr(_repo_id_result, "repo_id")
+                    else str(_repo_id_result)
+                )
                 _reg_entry = RepositoryInfo(
                     repository_id=_repo_id,
                     name=current_dir.name,
@@ -387,9 +444,14 @@ async def initialize_services() -> None:
 
         # Pre-create plugins with sqlite_store so BM25 indexing persists via ctx.repo_id lookup
         # This ensures _match_plugin finds a store-aware plugin before lazy-loading a bare one.
-        if _local_ctx is not None and isinstance(dispatcher, EnhancedDispatcher) and sqlite_store is not None:
+        if (
+            _local_ctx is not None
+            and isinstance(dispatcher, EnhancedDispatcher)
+            and sqlite_store is not None
+        ):
             try:
                 from mcp_server.plugins.plugin_factory import PluginFactory as _PF
+
                 _languages_to_preload = ["python", "javascript", "typescript", "go", "rust", "java"]
                 for _lang in _languages_to_preload:
                     try:
@@ -408,7 +470,10 @@ async def initialize_services() -> None:
             except Exception as _inj_err:
                 logger.debug(f"Plugin preload with store failed (non-fatal): {_inj_err}")
 
-        if isinstance(dispatcher, EnhancedDispatcher) and getattr(dispatcher, "_semantic_indexer", None) is None:
+        if (
+            isinstance(dispatcher, EnhancedDispatcher)
+            and getattr(dispatcher, "_semantic_indexer", None) is None
+        ):
             logger.warning(
                 "Semantic search not available — running in BM25-only mode. "
                 "Set VOYAGE_API_KEY (Voyage AI) or configure a vLLM endpoint in "
@@ -455,7 +520,9 @@ async def initialize_services() -> None:
                 logger.info("Background initial index started...")
                 try:
                     if _captured_ctx is not None:
-                        stats = dispatcher.index_directory(_captured_ctx, _captured_dir, recursive=True)
+                        stats = dispatcher.index_directory(
+                            _captured_ctx, _captured_dir, recursive=True
+                        )
                     else:
                         # Fallback: walk files and index without ctx (BM25 only via sqlite_store)
                         stats = {"indexed_files": 0}
@@ -463,13 +530,21 @@ async def initialize_services() -> None:
                             for _f in _captured_dir.rglob("*.py"):
                                 try:
                                     _content = _f.read_text(encoding="utf-8")
-                                    _hash = __import__("hashlib").sha256(_content.encode()).hexdigest()
+                                    _hash = (
+                                        __import__("hashlib").sha256(_content.encode()).hexdigest()
+                                    )
                                     _fid = _captured_store.store_file(
-                                        "local", str(_f), str(_f.relative_to(_captured_dir)),
-                                        language="python", size=len(_content), hash=_hash,
+                                        "local",
+                                        str(_f),
+                                        str(_f.relative_to(_captured_dir)),
+                                        language="python",
+                                        size=len(_content),
+                                        hash=_hash,
                                     )
                                     if _fid:
-                                        _captured_store.store_code_chunk(_fid, _content, 1, _content.count("\n") + 1)
+                                        _captured_store.store_code_chunk(
+                                            _fid, _content, 1, _content.count("\n") + 1
+                                        )
                                         stats["indexed_files"] += 1
                                 except Exception:
                                     pass
@@ -482,7 +557,9 @@ async def initialize_services() -> None:
                     if _file_watcher is not None:
                         try:
                             _file_watcher.start()
-                            logger.info(f"FileWatcher started after initial index, watching {_captured_dir}")
+                            logger.info(
+                                f"FileWatcher started after initial index, watching {_captured_dir}"
+                            )
                         except Exception as _fw_err:
                             logger.warning(f"FileWatcher failed to start (non-fatal): {_fw_err}")
 
@@ -512,12 +589,13 @@ _init_lock: Optional[asyncio.Lock] = None
 async def call_tool(
     name: str, arguments: dict | None
 ) -> Sequence[types.TextContent | types.ImageContent | types.EmbeddedResource]:
-    global _lazy_summarizer, initialization_error, _init_lock, sqlite_store, _gate
+    global _lazy_summarizer, _init_lock, _gate
 
     _current_session = None
     _client_name = None
     try:
         from mcp.server.lowlevel.server import request_ctx
+
         _ctx = request_ctx.get()
         _current_session = _ctx.session
         _params = getattr(_current_session, "client_params", None)
@@ -534,18 +612,26 @@ async def call_tool(
                 await initialize_services()
 
     if initialization_error:
-        return [types.TextContent(type="text", text=tool_handlers._ensure_response({
-            "error": "MCP server initialization failed",
-            "details": initialization_error,
-            "suggestion": (
-                "No index found. Run 'mcp-index index' or "
-                "'python scripts/reindex_current_repo.py' in your repository root."
-            ),
-        }))]
+        return [
+            types.TextContent(
+                type="text",
+                text=tool_handlers._ensure_response(
+                    {
+                        "error": "MCP server initialization failed",
+                        "details": initialization_error,
+                        "suggestion": (
+                            "No index found. Run 'mcp-index index' or "
+                            "'python scripts/reindex_current_repo.py' in your repository root."
+                        ),
+                    }
+                ),
+            )
+        ]
 
     if _lazy_summarizer is None and sqlite_store is not None:
         from mcp_server.config.settings import Settings
         from mcp_server.indexing.summarization import LazyChunkWriter
+
         _settings = Settings.from_environment()
         _lazy_summarizer = LazyChunkWriter(
             db_path=sqlite_store.db_path,
@@ -572,8 +658,10 @@ async def call_tool(
     logger.info(f"=== MCP Tool Call: {name} args={arguments} ===")
     start_time = time.time()
 
-    _effective_resolver = _repo_resolver if _repo_resolver is not None else (
-        _LocalRepoResolver() if _local_ctx is not None else None
+    _effective_resolver = (
+        _repo_resolver
+        if _repo_resolver is not None
+        else (_LocalRepoResolver() if _local_ctx is not None else None)
     )
     common_kwargs = dict(
         arguments=arguments or {},
@@ -586,12 +674,23 @@ async def call_tool(
         if name == "handshake":
             _secret = (arguments or {}).get("secret", "")
             if _gate.verify(_secret):
-                response = [types.TextContent(type="text", text=tool_handlers._ensure_response({"authenticated": True}))]
+                response = [
+                    types.TextContent(
+                        type="text", text=tool_handlers._ensure_response({"authenticated": True})
+                    )
+                ]
             else:
-                response = [types.TextContent(type="text", text=tool_handlers._ensure_response({
-                    "error": "Invalid secret.",
-                    "code": "handshake_required",
-                }))]
+                response = [
+                    types.TextContent(
+                        type="text",
+                        text=tool_handlers._ensure_response(
+                            {
+                                "error": "Invalid secret.",
+                                "code": "handshake_required",
+                            }
+                        ),
+                    )
+                ]
         elif name == "symbol_lookup":
             response = await tool_handlers.handle_symbol_lookup(
                 **common_kwargs,
@@ -645,23 +744,42 @@ async def call_tool(
                 client_name=_client_name,
             )
         else:
-            response = [types.TextContent(type="text", text=tool_handlers._ensure_response({
-                "error": "Unknown tool",
-                "tool": name,
-                "available_tools": [
-                    "symbol_lookup", "search_code", "get_status",
-                    "list_plugins", "reindex", "write_summaries", "summarize_sample",
-                    "handshake",
-                ],
-            }))]
+            response = [
+                types.TextContent(
+                    type="text",
+                    text=tool_handlers._ensure_response(
+                        {
+                            "error": "Unknown tool",
+                            "tool": name,
+                            "available_tools": [
+                                "symbol_lookup",
+                                "search_code",
+                                "get_status",
+                                "list_plugins",
+                                "reindex",
+                                "write_summaries",
+                                "summarize_sample",
+                                "handshake",
+                            ],
+                        }
+                    ),
+                )
+            ]
     except Exception as e:
         _tool_status = "error"
         logger.error(f"Error in tool {name}: {e}", exc_info=True)
-        response = [types.TextContent(type="text", text=tool_handlers._ensure_response({
-            "error": f"Tool execution failed: {name}",
-            "details": str(e),
-            "tool": name,
-        }))]
+        response = [
+            types.TextContent(
+                type="text",
+                text=tool_handlers._ensure_response(
+                    {
+                        "error": f"Tool execution failed: {name}",
+                        "details": str(e),
+                        "tool": name,
+                    }
+                ),
+            )
+        ]
 
     record_tool_call(name, _tool_status)
 
@@ -669,9 +787,18 @@ async def call_tool(
     logger.info(f"=== MCP Tool Response: {name} ({elapsed:.2f}s) ===")
 
     if not response:
-        response = [types.TextContent(type="text", text=tool_handlers._ensure_response({
-            "error": "No response generated", "tool": name, "elapsed": elapsed,
-        }))]
+        response = [
+            types.TextContent(
+                type="text",
+                text=tool_handlers._ensure_response(
+                    {
+                        "error": "No response generated",
+                        "tool": name,
+                        "elapsed": elapsed,
+                    }
+                ),
+            )
+        ]
 
     return response
 
@@ -679,6 +806,7 @@ async def call_tool(
 # ---------------------------------------------------------------------------
 # _serve() — thin orchestrator
 # ---------------------------------------------------------------------------
+
 
 async def _serve(registry_path=None) -> None:
     """Set up and run the MCP stdio server."""
@@ -698,14 +826,18 @@ async def _serve(registry_path=None) -> None:
 
     logger.info("=" * 60)
     logger.info("Code Index MCP Server Starting")
-    logger.info(f"Dispatcher Mode: {'Simple (BM25-only)' if USE_SIMPLE_DISPATCHER else 'Enhanced (with plugins)'}")
+    logger.info(
+        f"Dispatcher Mode: {'Simple (BM25-only)' if USE_SIMPLE_DISPATCHER else 'Enhanced (with plugins)'}"
+    )
     logger.info(f"Plugin Timeout: {PLUGIN_LOAD_TIMEOUT} seconds")
     logger.info("=" * 60)
-    from mcp_server.artifacts.attestation import warn_if_gh_attestation_missing; warn_if_gh_attestation_missing()
+    from mcp_server.artifacts.attestation import warn_if_gh_attestation_missing
+
+    warn_if_gh_attestation_missing()
 
     # Process-wide service pool — stateless, no cwd capture
-    store_registry, repo_resolver, _disp, repo_registry, git_index_manager = initialize_stateless_services(
-        registry_path=registry_path
+    store_registry, repo_resolver, _disp, repo_registry, git_index_manager = (
+        initialize_stateless_services(registry_path=registry_path)
     )
     _repo_resolver = repo_resolver
     _store_registry = store_registry
@@ -719,6 +851,7 @@ async def _serve(registry_path=None) -> None:
     ref_poller: Optional[RefPoller] = None
     try:
         from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher as _ED
+
         if isinstance(_disp, _ED):
             multi_watcher = MultiRepositoryWatcher(
                 registry=repo_registry,
@@ -774,9 +907,7 @@ async def _serve(registry_path=None) -> None:
 
     try:
         async with stdio_server() as (read_stream, write_stream):
-            await server.run(
-                read_stream, write_stream, server.create_initialization_options()
-            )
+            await server.run(read_stream, write_stream, server.create_initialization_options())
     finally:
         await _graceful_shutdown(multi_watcher, ref_poller, store_registry, exporter, timeout=5.0)
 

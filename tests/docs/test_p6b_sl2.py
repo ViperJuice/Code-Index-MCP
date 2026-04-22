@@ -1,5 +1,5 @@
-import re
 import pathlib
+import re
 
 ARCH_PATH = pathlib.Path(__file__).parents[2] / "specs" / "active" / "architecture.md"
 

@@ -6,7 +6,6 @@ import json
 import re
 from pathlib import Path
 
-
 REPO = Path(__file__).resolve().parents[2]
 DECISION_MD = REPO / "docs" / "validation" / "private-alpha-decision.md"
 DECISION_JSON = REPO / "docs" / "validation" / "private-alpha-decision.json"

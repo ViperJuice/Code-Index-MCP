@@ -25,6 +25,7 @@ def _arch_text() -> str:
 # Stale-claim greps — must return zero matches
 # ---------------------------------------------------------------------------
 
+
 def test_no_fully_operational():
     """'Fully operational' (any capitalisation) must not appear in AGENTS.md."""
     text = _agents_text()
@@ -50,6 +51,7 @@ def test_no_100_percent_implemented():
 # FastAPI-primary framing greps — must return zero matches
 # ---------------------------------------------------------------------------
 
+
 def test_no_fastapi_primary_framing():
     """'FastAPI gateway with all endpoints' must not appear in AGENTS.md."""
     text = _agents_text()
@@ -67,6 +69,7 @@ def test_no_app_get_symbol_or_search():
 # ---------------------------------------------------------------------------
 # Positive checks — required content must be present
 # ---------------------------------------------------------------------------
+
 
 def test_stdio_present():
     """STDIO must be mentioned at least once in AGENTS.md."""
@@ -97,7 +100,11 @@ def test_beta_admonition_present():
     text = _agents_text()
     # Look for lines that contain "Beta" along with either "STDIO" or "FastAPI" in context
     # The admonition should mention beta status for multi-repo/STDIO context
-    beta_lines = [line for line in text.splitlines() if "Beta" in line and ("STDIO" in line or "FastAPI" in line or "beta" in line.lower())]
+    beta_lines = [
+        line
+        for line in text.splitlines()
+        if "Beta" in line and ("STDIO" in line or "FastAPI" in line or "beta" in line.lower())
+    ]
     # We require at least one such admonition line
     assert len(beta_lines) >= 1, "No beta status admonition found naming STDIO/FastAPI context"
     # The admonition block: find the single > [!NOTE] / > **Beta** style block
@@ -109,14 +116,15 @@ def test_beta_admonition_present():
         re.MULTILINE,
     )
     beta_stdio_blocks = [b for b in admonition_blocks if "Beta" in b and "STDIO" in b]
-    assert len(beta_stdio_blocks) == 1, (
-        f"Expected exactly 1 beta+STDIO admonition block, found {len(beta_stdio_blocks)}: {beta_stdio_blocks}"
-    )
+    assert (
+        len(beta_stdio_blocks) == 1
+    ), f"Expected exactly 1 beta+STDIO admonition block, found {len(beta_stdio_blocks)}: {beta_stdio_blocks}"
 
 
 # ---------------------------------------------------------------------------
 # architecture.md L3 checks
 # ---------------------------------------------------------------------------
+
 
 def test_l3_contains_multi_repo_watcher():
     """L3 Component Diagram must contain a MultiRepositoryWatcher component node."""
@@ -125,9 +133,9 @@ def test_l3_contains_multi_repo_watcher():
     l3_match = re.search(r"Level 3.*?```mermaid(.*?)```", text, re.DOTALL | re.IGNORECASE)
     assert l3_match, "Level 3 mermaid block not found in architecture.md"
     l3_block = l3_match.group(1)
-    assert "MultiRepositoryWatcher" in l3_block, (
-        "MultiRepositoryWatcher not found in L3 Component Diagram"
-    )
+    assert (
+        "MultiRepositoryWatcher" in l3_block
+    ), "MultiRepositoryWatcher not found in L3 Component Diagram"
 
 
 def test_l3_multi_repo_watcher_has_rel_edge():
@@ -141,6 +149,6 @@ def test_l3_multi_repo_watcher_has_rel_edge():
         r"Rel\([^)]*multi_repo_watcher[^)]*\)",
         l3_block,
     )
-    assert len(rel_lines) >= 1, (
-        f"No Rel(...) edge found for multi_repo_watcher in L3 diagram. Block:\n{l3_block}"
-    )
+    assert (
+        len(rel_lines) >= 1
+    ), f"No Rel(...) edge found for multi_repo_watcher in L3 diagram. Block:\n{l3_block}"

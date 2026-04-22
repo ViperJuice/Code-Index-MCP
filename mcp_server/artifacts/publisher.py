@@ -81,7 +81,6 @@ class ArtifactPublisher:
                 attestation=attestation,
             )
             self._ensure_sha_release(sha_tag, commit, repo)
-            sha_release_created = True
             try:
                 self._move_latest_pointer(sha_tag, commit, repo)
             except Exception:
@@ -115,7 +114,16 @@ class ArtifactPublisher:
     def _get_latest_commit(self, repo: str) -> Optional[str]:
         """Return the target commit of index-latest, or None if it doesn't exist."""
         result = subprocess.run(
-            [self._gh_cmd, "release", "view", "index-latest", "--repo", repo, "--json", "targetCommitish"],
+            [
+                self._gh_cmd,
+                "release",
+                "view",
+                "index-latest",
+                "--repo",
+                repo,
+                "--json",
+                "targetCommitish",
+            ],
             capture_output=True,
             text=True,
         )
@@ -154,11 +162,17 @@ class ArtifactPublisher:
         # Create new SHA-keyed release
         self._run(
             [
-                "release", "create", sha_tag,
-                "--repo", repo,
-                "--target", commit,
-                "--title", f"Index: {sha_tag}",
-                "--notes", f"Auto-published index artifact for commit {commit}",
+                "release",
+                "create",
+                sha_tag,
+                "--repo",
+                repo,
+                "--target",
+                commit,
+                "--title",
+                f"Index: {sha_tag}",
+                "--notes",
+                f"Auto-published index artifact for commit {commit}",
             ]
         )
 
@@ -173,20 +187,31 @@ class ArtifactPublisher:
             # First-ever publish: create index-latest
             self._run(
                 [
-                    "release", "create", "index-latest",
-                    "--repo", repo,
-                    "--target", commit,
-                    "--title", "Index: latest",
-                    "--notes", f"Auto-updated index artifact. Commit: {commit}",
+                    "release",
+                    "create",
+                    "index-latest",
+                    "--repo",
+                    repo,
+                    "--target",
+                    commit,
+                    "--title",
+                    "Index: latest",
+                    "--notes",
+                    f"Auto-updated index artifact. Commit: {commit}",
                 ]
             )
         else:
             self._run(
                 [
-                    "release", "edit", "index-latest",
-                    "--repo", repo,
-                    "--target", commit,
-                    "--title", f"Index: latest ({commit[:8]})",
+                    "release",
+                    "edit",
+                    "index-latest",
+                    "--repo",
+                    repo,
+                    "--target",
+                    commit,
+                    "--title",
+                    f"Index: latest ({commit[:8]})",
                 ]
             )
 
@@ -194,9 +219,14 @@ class ArtifactPublisher:
         """Return True iff index-latest currently points at our commit."""
         result = subprocess.run(
             [
-                self._gh_cmd, "release", "view", "index-latest",
-                "--repo", repo,
-                "--json", "targetCommitish",
+                self._gh_cmd,
+                "release",
+                "view",
+                "index-latest",
+                "--repo",
+                repo,
+                "--json",
+                "targetCommitish",
             ],
             capture_output=True,
             text=True,

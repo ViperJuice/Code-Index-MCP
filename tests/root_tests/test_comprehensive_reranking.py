@@ -36,6 +36,8 @@ logger = logging.getLogger(__name__)
 class TestQuery:
     """Represents a test query with expected results."""
 
+    __test__ = False
+
     query: str
     query_type: str  # 'symbol', 'pattern', 'semantic', 'natural'
     expected_top_results: List[str] = field(default_factory=list)
@@ -45,6 +47,8 @@ class TestQuery:
 @dataclass
 class TestResult:
     """Stores test execution results."""
+
+    __test__ = False
 
     query: TestQuery
     search_time_ms: float

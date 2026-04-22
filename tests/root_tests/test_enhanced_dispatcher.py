@@ -12,8 +12,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from mcp_server.core.repo_context import RepoContext
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
-from mcp_server.storage.sqlite_store import SQLiteStore
 from mcp_server.storage.multi_repo_manager import RepositoryInfo
+from mcp_server.storage.sqlite_store import SQLiteStore
 
 
 def _make_ctx(store):

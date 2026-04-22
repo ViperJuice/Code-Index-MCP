@@ -35,12 +35,8 @@ def test_save_is_flocked(tmp_path: Path):
     """Two processes each register 50 repos; after both exit all 100 must be present."""
     registry_path = tmp_path / "registry.json"
 
-    p1 = multiprocessing.Process(
-        target=_worker_save_many, args=(registry_path, 0, 50)
-    )
-    p2 = multiprocessing.Process(
-        target=_worker_save_many, args=(registry_path, 50, 50)
-    )
+    p1 = multiprocessing.Process(target=_worker_save_many, args=(registry_path, 0, 50))
+    p2 = multiprocessing.Process(target=_worker_save_many, args=(registry_path, 50, 50))
     p1.start()
     p2.start()
     p1.join(timeout=30)
@@ -50,9 +46,7 @@ def test_save_is_flocked(tmp_path: Path):
     assert p2.exitcode == 0, f"Worker 2 exited with code {p2.exitcode}"
 
     final = RepositoryRegistry(registry_path=registry_path)
-    assert len(final._registry) == 100, (
-        f"Expected 100 entries, got {len(final._registry)}"
-    )
+    assert len(final._registry) == 100, f"Expected 100 entries, got {len(final._registry)}"
 
 
 def _worker_slow_replace(registry_path: Path, start_idx: int, count: int, delay_s: float) -> None:
@@ -62,7 +56,9 @@ def _worker_slow_replace(registry_path: Path, start_idx: int, count: int, delay_
     original_save = _mod.RepositoryRegistry.save
 
     def slow_save(self):
-        import fcntl, json as _json
+        import fcntl
+        import json as _json
+
         lock_path = self.registry_path.with_suffix(".lock")
         fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o600)
         try:
@@ -110,12 +106,8 @@ def test_save_holds_lock_during_rename(tmp_path: Path):
     delay = 0.1
 
     t0 = time.monotonic()
-    p1 = multiprocessing.Process(
-        target=_worker_slow_replace, args=(registry_path, 0, 1, delay)
-    )
-    p2 = multiprocessing.Process(
-        target=_worker_slow_replace, args=(registry_path, 1, 1, delay)
-    )
+    p1 = multiprocessing.Process(target=_worker_slow_replace, args=(registry_path, 0, 1, delay))
+    p2 = multiprocessing.Process(target=_worker_slow_replace, args=(registry_path, 1, 1, delay))
     p1.start()
     p2.start()
     p1.join(timeout=10)
@@ -168,6 +160,7 @@ def test_save_releases_lock_on_exception(tmp_path: Path):
         return original_json_dumps(*args, **kwargs)
 
     import mcp_server.storage.repository_registry as _mod
+
     original_json_mod = _mod.json
 
     class _PatchedJson:

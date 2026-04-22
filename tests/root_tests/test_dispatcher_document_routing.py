@@ -382,7 +382,9 @@ def test_myclass_process():
 
         if results:
             top_result = results[0]
-            assert "exact_match.md" in top_result["file"] or "exact" in top_result["snippet"].lower()
+            assert (
+                "exact_match.md" in top_result["file"] or "exact" in top_result["snippet"].lower()
+            )
 
     def test_dispatcher_handles_special_queries(self, dispatcher, ctx):
         """Test dispatcher with special query patterns."""

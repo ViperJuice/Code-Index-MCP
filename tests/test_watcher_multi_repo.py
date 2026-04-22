@@ -11,10 +11,10 @@ from watchdog.observers import Observer
 from mcp_server.core.repo_context import RepoContext
 from mcp_server.watcher_multi_repo import MultiRepositoryHandler, MultiRepositoryWatcher
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_repo_context(workspace_root: Path, tracked_branch: str = "main") -> RepoContext:
     store = Mock()
@@ -49,14 +49,17 @@ def _make_repo_info(path: str, auto_sync: bool = True):
 
 def _make_dispatcher():
     from mcp_server.dispatcher.dispatcher_enhanced import IndexResult, IndexResultStatus
+
     d = Mock()
     d.index_file = Mock()
-    d.index_file_guarded = Mock(return_value=IndexResult(
-        status=IndexResultStatus.INDEXED,
-        path=Path("/mock"),
-        observed_hash="abc",
-        actual_hash="abc",
-    ))
+    d.index_file_guarded = Mock(
+        return_value=IndexResult(
+            status=IndexResultStatus.INDEXED,
+            path=Path("/mock"),
+            observed_hash="abc",
+            actual_hash="abc",
+        )
+    )
     d.remove_file = Mock()
     d.move_file = Mock()
     return d
@@ -66,11 +69,13 @@ def _make_repo_resolver(ctx_map=None):
     """Return a mock RepoResolver whose resolve() returns ctx based on path."""
     resolver = Mock()
     ctx_map = ctx_map or {}
+
     def _resolve(path):
         for root, ctx in ctx_map.items():
             if str(path).startswith(str(root)):
                 return ctx
         return None
+
     resolver.resolve.side_effect = _resolve
     return resolver
 
@@ -78,6 +83,7 @@ def _make_repo_resolver(ctx_map=None):
 # ---------------------------------------------------------------------------
 # SL-1.1 tests: handler branch + gitignore filtering
 # ---------------------------------------------------------------------------
+
 
 class TestHandlerBranchFilter:
     """Handler drops event when current_branch != ctx.tracked_branch."""
@@ -191,6 +197,7 @@ class TestHandlerGitignoreFilter:
 # SL-1.1 tests: MultiRepositoryWatcher lifecycle
 # ---------------------------------------------------------------------------
 
+
 class TestMultiRepositoryWatcherLifecycle:
     """MultiRepositoryWatcher observer management."""
 
@@ -212,7 +219,9 @@ class TestMultiRepositoryWatcherLifecycle:
         ctx2 = _make_repo_context(repo2)
         resolver = _make_repo_resolver({repo1: ctx1, repo2: ctx2})
 
-        watcher = MultiRepositoryWatcher(registry, dispatcher, index_manager, repo_resolver=resolver)
+        watcher = MultiRepositoryWatcher(
+            registry, dispatcher, index_manager, repo_resolver=resolver
+        )
 
         try:
             watcher.start_watching_all()
@@ -242,7 +251,9 @@ class TestMultiRepositoryWatcherLifecycle:
         ctx_new = _make_repo_context(new_repo)
         resolver = _make_repo_resolver({repo1: ctx1, new_repo: ctx_new})
 
-        watcher = MultiRepositoryWatcher(registry, dispatcher, index_manager, repo_resolver=resolver)
+        watcher = MultiRepositoryWatcher(
+            registry, dispatcher, index_manager, repo_resolver=resolver
+        )
 
         try:
             watcher.start_watching_all()
@@ -275,7 +286,9 @@ class TestMultiRepositoryWatcherLifecycle:
         ctx2 = _make_repo_context(repo2)
         resolver = _make_repo_resolver({repo1: ctx1, repo2: ctx2})
 
-        watcher = MultiRepositoryWatcher(registry, dispatcher, index_manager, repo_resolver=resolver)
+        watcher = MultiRepositoryWatcher(
+            registry, dispatcher, index_manager, repo_resolver=resolver
+        )
 
         try:
             watcher.start_watching_all()
@@ -306,7 +319,9 @@ class TestMultiRepositoryWatcherLifecycle:
         ctx1 = _make_repo_context(repo1)
         resolver = _make_repo_resolver({repo1: ctx1})
 
-        watcher = MultiRepositoryWatcher(registry, dispatcher, index_manager, repo_resolver=resolver)
+        watcher = MultiRepositoryWatcher(
+            registry, dispatcher, index_manager, repo_resolver=resolver
+        )
         watcher.start_watching_all()
         time.sleep(0.1)
 
@@ -335,7 +350,9 @@ class TestMultiRepositoryWatcherLifecycle:
         ctx1 = _make_repo_context(repo1)
         resolver = _make_repo_resolver({repo1: ctx1})
 
-        watcher = MultiRepositoryWatcher(registry, dispatcher, index_manager, repo_resolver=resolver)
+        watcher = MultiRepositoryWatcher(
+            registry, dispatcher, index_manager, repo_resolver=resolver
+        )
 
         try:
             watcher.start_watching_all()

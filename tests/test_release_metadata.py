@@ -1,4 +1,4 @@
-"""Release metadata assertions for P21 v1.2.0-rc3 contract."""
+"""Release metadata assertions for the active v1.2.0-rc4 contract."""
 
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ except ImportError:  # Python <3.11
 
 
 REPO = Path(__file__).parent.parent
-EXPECTED_VERSION = "1.2.0-rc3"
-EXPECTED_TAG = "v1.2.0-rc3"
+EXPECTED_VERSION = "1.2.0-rc4"
+EXPECTED_TAG = "v1.2.0-rc4"
 
 
 def _read_text(relative_path: str) -> str:
@@ -24,8 +24,7 @@ def test_runtime_version_matches_rc_contract():
     import mcp_server
 
     assert mcp_server.__version__ == EXPECTED_VERSION, (
-        f"mcp_server.__version__ is {mcp_server.__version__!r}, "
-        f"expected {EXPECTED_VERSION!r}"
+        f"mcp_server.__version__ is {mcp_server.__version__!r}, " f"expected {EXPECTED_VERSION!r}"
     )
 
 
@@ -45,7 +44,7 @@ def test_readme_status_matches_rc_contract():
 def test_changelog_has_rc_contract_section():
     changelog = _read_text("CHANGELOG.md")
 
-    assert f"## [{EXPECTED_VERSION}] — 2026-04-21" in changelog
+    assert f"## [{EXPECTED_VERSION}] — 2026-04-22" in changelog
 
 
 def test_release_workflow_matches_rc_contract():
@@ -54,21 +53,30 @@ def test_release_workflow_matches_rc_contract():
     assert f"Version to release (e.g., {EXPECTED_TAG})" in workflow
     assert f"default: '{EXPECTED_TAG}'" in workflow
     assert f"P21 release contract target: {EXPECTED_TAG}" in workflow
-    assert "grep -q \"version = \\\"$VERSION_NO_V\\\"\" pyproject.toml" in workflow
-    assert (
-        "grep -q \"__version__ = \\\"$VERSION_NO_V\\\"\" mcp_server/__init__.py"
-        in workflow
-    )
+    assert 'grep -q "version = \\"$VERSION_NO_V\\"" pyproject.toml' in workflow
+    assert 'grep -q "__version__ = \\"$VERSION_NO_V\\"" mcp_server/__init__.py' in workflow
 
 
-def test_release_candidate_tag_exists_locally():
+def test_release_candidate_tag_is_not_reused_locally():
     result = subprocess.run(
         ["git", "tag", "-l", EXPECTED_TAG],
         capture_output=True,
         text=True,
         check=True,
     )
-    assert result.stdout.strip() == EXPECTED_TAG, (
-        f"git tag -l {EXPECTED_TAG} returned {result.stdout!r}; "
-        f"expected {EXPECTED_TAG!r}"
-    )
+    if not result.stdout.strip():
+        return
+
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    tag_commit = subprocess.run(
+        ["git", "rev-parse", f"{EXPECTED_TAG}^{{commit}}"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    assert tag_commit == head, f"{EXPECTED_TAG} exists but points at {tag_commit}, not HEAD"

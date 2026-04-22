@@ -27,7 +27,6 @@ from __future__ import annotations
 import builtins
 import logging
 import os
-import sys
 import tempfile
 from pathlib import Path
 from typing import Callable, Optional
@@ -118,9 +117,7 @@ def _apply_rlimits(caps: CapabilitySet) -> None:
         import resource
 
         try:
-            resource.setrlimit(
-                resource.RLIMIT_CPU, (caps.cpu_seconds, caps.cpu_seconds)
-            )
+            resource.setrlimit(resource.RLIMIT_CPU, (caps.cpu_seconds, caps.cpu_seconds))
         except (ValueError, OSError) as exc:
             logger.debug("RLIMIT_CPU setrlimit failed: %s", exc)
 
@@ -141,6 +138,7 @@ def _patch_sqlite(caps: CapabilitySet) -> None:
         return
 
     if caps.sqlite == "none":
+
         def _denied_connect(*args, **kwargs):
             raise SandboxViolation("sqlite disabled by CapabilitySet")
 

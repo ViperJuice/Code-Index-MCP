@@ -1,4 +1,5 @@
 """Tests for PluginSetRegistry (IF-0-P3-1 — SL-1)."""
+
 from __future__ import annotations
 
 from pathlib import Path

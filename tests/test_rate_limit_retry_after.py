@@ -35,8 +35,9 @@ class TestRetryAfterParsing:
         assert slept == 300.0
 
     def test_429_with_retry_after_http_date(self):
-        from email.utils import formatdate
         import datetime
+        from email.utils import formatdate
+
         future_ts = time.time() + 30
         http_date = formatdate(future_ts, usegmt=True)
         headers = {"Retry-After": http_date}
@@ -142,6 +143,7 @@ class TestAttestationPreflight:
         """With MCP_ATTESTATION_MODE=warn and missing scope, log ATTESTATION_PREREQ and skip sign."""
         import os
         from pathlib import Path as _Path
+
         from mcp_server.artifacts.attestation import attest
 
         monkeypatch.setenv("MCP_ATTESTATION_MODE", "warn")
@@ -161,6 +163,7 @@ class TestAttestationPreflight:
             return MagicMock(returncode=1, stdout="", stderr="not supported")
 
         import logging
+
         log_records: list[logging.LogRecord] = []
 
         class Capture(logging.Handler):
@@ -168,13 +171,18 @@ class TestAttestationPreflight:
                 log_records.append(record)
 
         import mcp_server.artifacts.attestation as att_mod
+
         att_mod.logger.addHandler(Capture())
         att_mod.logger.setLevel(logging.WARNING)
 
         try:
             with patch("subprocess.run", side_effect=fake_run):
-                with patch("mcp_server.artifacts.attestation._sha256_of", return_value="sha256stub"):
-                    result = attest(_Path("/tmp/fake_archive.tar.gz"), repo="owner/repo", gh_cmd="gh")
+                with patch(
+                    "mcp_server.artifacts.attestation._sha256_of", return_value="sha256stub"
+                ):
+                    result = attest(
+                        _Path("/tmp/fake_archive.tar.gz"), repo="owner/repo", gh_cmd="gh"
+                    )
         finally:
             att_mod.logger.handlers = [
                 h for h in att_mod.logger.handlers if not isinstance(h, Capture)
@@ -193,6 +201,7 @@ class TestAttestationPreflight:
     def test_present_scope_allows_sign(self, monkeypatch):
         """With attestations:write scope present, sign is attempted normally."""
         from pathlib import Path as _Path
+
         from mcp_server.artifacts.attestation import attest
 
         monkeypatch.setenv("MCP_ATTESTATION_MODE", "warn")

@@ -331,9 +331,7 @@ class IndexManager:
             requested_schema_version is not None or requested_embedding_model is not None
         ):
             # Pick the first candidate with a manifest to surface its version in the error.
-            mismatch_candidate = next(
-                (c for c in candidates if c.get("manifest")), candidates[0]
-            )
+            mismatch_candidate = next((c for c in candidates if c.get("manifest")), candidates[0])
             found_version = (
                 mismatch_candidate["manifest"].schema_version
                 if mismatch_candidate.get("manifest")

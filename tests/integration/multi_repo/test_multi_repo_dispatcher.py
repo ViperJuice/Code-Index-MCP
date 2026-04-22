@@ -12,7 +12,7 @@ using the admin credentials injected into the gateway subprocess environment.
 import pytest
 import requests
 
-from tests.integration.multi_repo.conftest import MultiRepoContext, _ADMIN_PASSWORD
+from tests.integration.multi_repo.conftest import _ADMIN_PASSWORD, MultiRepoContext
 
 
 def _get_auth_token(base_url: str) -> str:
@@ -22,9 +22,7 @@ def _get_auth_token(base_url: str) -> str:
         json={"username": "admin", "password": _ADMIN_PASSWORD},
         timeout=10,
     )
-    assert resp.status_code == 200, (
-        f"Login failed ({resp.status_code}): {resp.text[:400]}"
-    )
+    assert resp.status_code == 200, f"Login failed ({resp.status_code}): {resp.text[:400]}"
     data = resp.json()
     token = data.get("access_token") or data.get("token")
     assert token, f"No token in login response: {data}"
@@ -65,9 +63,7 @@ def test_dispatcher_repo_id_isolation(multi_repo_fixture):
         headers=headers,
         timeout=15,
     )
-    assert resp.status_code == 200, (
-        f"Search failed ({resp.status_code}): {resp.text[:400]}"
-    )
+    assert resp.status_code == 200, f"Search failed ({resp.status_code}): {resp.text[:400]}"
 
     results = resp.json()
     assert isinstance(results, list), f"Expected list, got {type(results)}: {results}"
@@ -77,6 +73,6 @@ def test_dispatcher_repo_id_isolation(multi_repo_fixture):
     for result in results:
         file_path = result.get("file") or result.get("path") or result.get("filepath") or ""
         if file_path:
-            assert file_path.startswith(repo_b_path_str), (
-                f"Result file {file_path!r} is outside repo-B workspace {repo_b_path_str!r}"
-            )
+            assert file_path.startswith(
+                repo_b_path_str
+            ), f"Result file {file_path!r} is outside repo-B workspace {repo_b_path_str!r}"

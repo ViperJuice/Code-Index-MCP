@@ -5,14 +5,14 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from mcp_server.storage.sqlite_store import SQLiteStore
-from mcp_server.core.repo_context import RepoContext
 from mcp_server.core.errors import IndexingError
-
+from mcp_server.core.repo_context import RepoContext
+from mcp_server.storage.sqlite_store import SQLiteStore
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_store(tmp_path: Path) -> SQLiteStore:
     db_path = tmp_path / "idx.db"
@@ -34,6 +34,7 @@ def _make_ctx(store: SQLiteStore, workspace_root: Path, repo_id: str = "repo-1")
 def _make_dispatcher(store: SQLiteStore):
     """Return a minimal EnhancedDispatcher with SQLite store and no semantic indexer."""
     from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
+
     dispatcher = EnhancedDispatcher.__new__(EnhancedDispatcher)
     dispatcher._operation_stats = {}
     dispatcher._legacy_plugins = []
@@ -51,6 +52,7 @@ def _make_dispatcher(store: SQLiteStore):
 # ---------------------------------------------------------------------------
 # test_rename_single_remove_single_add (acceptance #6)
 # ---------------------------------------------------------------------------
+
 
 class TestRenameSingleRemoveSingleAdd:
     """After move_file(foo.py → bar.py) SQLite shows only bar.py."""
@@ -96,6 +98,7 @@ class TestRenameSingleRemoveSingleAdd:
 # ---------------------------------------------------------------------------
 # test_rename_rollback_on_semantic_failure (acceptance #6 + metric check)
 # ---------------------------------------------------------------------------
+
 
 class TestRenameRollbackOnSemanticFailure:
     """When semantic indexer raises, SQLite must be rolled back to old path."""
@@ -175,10 +178,13 @@ class TestRenameRollbackOnSemanticFailure:
         def fake_record_handled_error(module, exc):
             call_count.append((module, type(exc).__name__))
 
-        with patch(
-            "mcp_server.dispatcher.dispatcher_enhanced.record_handled_error",
-            side_effect=fake_record_handled_error,
-        ), patch.object(dispatcher, "_match_plugin", return_value=plugin_with_indexer):
+        with (
+            patch(
+                "mcp_server.dispatcher.dispatcher_enhanced.record_handled_error",
+                side_effect=fake_record_handled_error,
+            ),
+            patch.object(dispatcher, "_match_plugin", return_value=plugin_with_indexer),
+        ):
             with pytest.raises(Exception):
                 dispatcher.move_file(ctx, foo_abs, bar_abs, content_hash="abc123")
 

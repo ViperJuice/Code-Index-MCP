@@ -4,14 +4,12 @@ import pytest
 
 import mcp_server.metrics.prometheus_exporter as prometheus_exporter
 from mcp_server.metrics.prometheus_exporter import (
+    _DISPATCHER_FALLBACK_BUCKETS,
     PROMETHEUS_AVAILABLE,
     PrometheusExporter,
-    _DISPATCHER_FALLBACK_BUCKETS,
 )
 
-pytestmark = pytest.mark.skipif(
-    not PROMETHEUS_AVAILABLE, reason="prometheus_client not installed"
-)
+pytestmark = pytest.mark.skipif(not PROMETHEUS_AVAILABLE, reason="prometheus_client not installed")
 
 
 def test_histogram_registered():

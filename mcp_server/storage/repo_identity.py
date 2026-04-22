@@ -4,6 +4,7 @@ NOTE: Tier-1 (git_common_dir) and Tier-2 (remote URL) ids may disagree across
 environments where the clone lacks a .git directory (e.g. some shallow CI setups).
 That divergence is accepted as out-of-scope for P1 and noted as a future hardening item.
 """
+
 import hashlib
 import logging
 import subprocess
@@ -16,8 +17,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class RepoIdentity:
-    repo_id: str                                # 16-hex sha256 prefix, lowercase
-    git_common_dir: Optional[Path]              # resolved .git common dir; None if not-a-repo
+    repo_id: str  # 16-hex sha256 prefix, lowercase
+    git_common_dir: Optional[Path]  # resolved .git common dir; None if not-a-repo
     source: Literal["git_common_dir", "remote_url", "abs_path"]
 
 
@@ -52,7 +53,7 @@ def _normalize_remote_url(url: str) -> str:
     # Lowercase the scheme and host portion for http(s)/git/ssh URLs
     for scheme in ("https://", "http://", "git://", "ssh://"):
         if url.lower().startswith(scheme):
-            rest = url[len(scheme):]
+            rest = url[len(scheme) :]
             slash = rest.find("/")
             if slash != -1:
                 url = scheme.lower() + rest[:slash].lower() + rest[slash:]
@@ -132,7 +133,7 @@ def resolve_tracked_branch(git_common_dir: Optional[Path]) -> str:
     if ref is not None:
         prefix = "refs/remotes/origin/"
         if ref.startswith(prefix):
-            return ref[len(prefix):]
+            return ref[len(prefix) :]
         return ref
 
     # Step 2: prefer main / master from local branches

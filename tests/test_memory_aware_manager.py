@@ -150,9 +150,7 @@ class TestMemoryAwarePluginManager:
         for i in range(2):
             plugin = Mock()
             key = (None, f"lang{i}")
-            manager._plugins[key] = LoadedPlugin(
-                name=f"lang{i}", instance=plugin, metadata={}
-            )
+            manager._plugins[key] = LoadedPlugin(name=f"lang{i}", instance=plugin, metadata={})
             manager._plugin_info[key] = PluginMemoryInfo(
                 plugin_name=f"lang{i}",
                 memory_bytes=1024 * 1024 * 10,
@@ -348,9 +346,7 @@ class TestMemoryMonitoring:
             is_high_priority=False,
         )
 
-        manager._weak_refs[key] = weakref.ref(
-            plugin, lambda ref: manager._on_plugin_deleted(key)
-        )
+        manager._weak_refs[key] = weakref.ref(plugin, lambda ref: manager._on_plugin_deleted(key))
 
         del manager._plugins[key]
         del plugin

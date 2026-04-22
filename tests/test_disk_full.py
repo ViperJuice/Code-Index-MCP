@@ -9,10 +9,10 @@ from mcp_server.core.errors import TransientArtifactError
 from mcp_server.metrics.prometheus_exporter import mcp_storage_readonly_total
 from mcp_server.storage.sqlite_store import SQLiteStore
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_store(tmp_path):
     db = str(tmp_path / "test.db")
@@ -29,6 +29,7 @@ def _counter_value() -> int:
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 class TestEnospcReadonly:
     def test_commit_enospc_sets_readonly(self, tmp_path):

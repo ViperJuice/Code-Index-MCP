@@ -1,4 +1,5 @@
 """Tests for RepoContext dataclass (SL-1)."""
+
 from __future__ import annotations
 
 import typing
@@ -11,8 +12,9 @@ import pytest
 
 def _make_repo_info(**overrides):
     """Create a minimal RepositoryInfo for testing."""
-    from mcp_server.storage.multi_repo_manager import RepositoryInfo
     from datetime import datetime
+
+    from mcp_server.storage.multi_repo_manager import RepositoryInfo
 
     defaults = dict(
         repository_id="abcdef1234567890",
@@ -39,6 +41,7 @@ def _make_stub_store():
 # Test 1: field set + frozen
 # ---------------------------------------------------------------------------
 
+
 def test_is_dataclass_and_frozen():
     from mcp_server.core.repo_context import RepoContext
 
@@ -58,9 +61,11 @@ def test_field_names():
 # Test 2: construction + frozen enforcement
 # ---------------------------------------------------------------------------
 
+
 def test_construction_and_attribute_access():
-    from mcp_server.core.repo_context import RepoContext
     from dataclasses import FrozenInstanceError
+
+    from mcp_server.core.repo_context import RepoContext
 
     info = _make_repo_info()
     store = _make_stub_store()
@@ -80,8 +85,9 @@ def test_construction_and_attribute_access():
 
 
 def test_frozen_raises_on_direct_assignment():
-    from mcp_server.core.repo_context import RepoContext
     from dataclasses import FrozenInstanceError
+
+    from mcp_server.core.repo_context import RepoContext
 
     info = _make_repo_info()
     ctx = RepoContext(
@@ -123,6 +129,7 @@ def test_replace_returns_new_instance():
 # Test 3: mutation-through-reference
 # ---------------------------------------------------------------------------
 
+
 def test_mutation_through_registry_entry_reference():
     """Mutating the RepositoryInfo object is visible via ctx.registry_entry."""
     from mcp_server.core.repo_context import RepoContext
@@ -143,6 +150,7 @@ def test_mutation_through_registry_entry_reference():
 # ---------------------------------------------------------------------------
 # Test 4: sqlite_store non-Optional type hint
 # ---------------------------------------------------------------------------
+
 
 def test_sqlite_store_type_hint_is_not_optional():
     """Type annotation for sqlite_store must not include None/Optional."""

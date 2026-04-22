@@ -9,7 +9,6 @@ import pytest
 
 from mcp_server.artifacts.delta_resolver import resolve_delta_chain
 
-
 COMMIT_B_FULL = "aaaa0000bbbb0001"  # repo-B's baseline commit
 COMMIT_A_TARGET = "cccc0000dddd0002"  # repo-A's new commit built on top
 
@@ -44,9 +43,9 @@ def test_cross_repo_delta_chain_resolution():
     assert chain[0]["repo_id"] == "repo-b-id", "Full artifact must be from repo-B"
     assert chain[1]["artifact_type"] == "delta", "Second element must be the delta"
     assert chain[1]["repo_id"] == "repo-a-id", "Delta must be from repo-A"
-    assert chain[1]["base_commit"] == COMMIT_B_FULL, (
-        "Delta base_commit must reference repo-B's commit"
-    )
+    assert (
+        chain[1]["base_commit"] == COMMIT_B_FULL
+    ), "Delta base_commit must reference repo-B's commit"
 
 
 def test_cross_repo_delta_chain_contains_repo_b_base():
@@ -69,6 +68,6 @@ def test_cross_repo_delta_chain_contains_repo_b_base():
 
     chain = resolve_delta_chain([full_artifact_b, delta_artifact_a], COMMIT_A_TARGET)
     base_commits = {a.get("target_commit") for a in chain}
-    assert COMMIT_B_FULL in base_commits, (
-        f"repo-B's base commit {COMMIT_B_FULL!r} must appear in the resolved chain"
-    )
+    assert (
+        COMMIT_B_FULL in base_commits
+    ), f"repo-B's base commit {COMMIT_B_FULL!r} must appear in the resolved chain"

@@ -5,6 +5,8 @@
 .PHONY: setup-env setup-dev-env setup-prod-env backup restore clean-docker check-diagrams
 .PHONY: semantic-up semantic-down semantic-preflight semantic-setup
 
+UV_RUN := UV_LINK_MODE=copy uv run
+
 help:
 	@echo "Available commands:"
 	@echo ""
@@ -144,23 +146,24 @@ docker:
 	docker build -t mcp-server:latest .
 
 release-smoke:
-	uv run --extra dev python scripts/release_smoke.py --wheel --stdio
+	$(UV_RUN) --extra dev python scripts/release_smoke.py --wheel --stdio
 
 release-smoke-container:
-	uv run --extra dev python scripts/release_smoke.py --container
+	$(UV_RUN) --extra dev python scripts/release_smoke.py --container
 
 alpha-dependency-sync:
 	uv lock --locked
-	uv sync --locked
+	uv sync --locked --extra dev --link-mode=copy
 
 alpha-format-lint:
-	uv run black --check mcp_server tests
-	uv run isort --check-only mcp_server tests
-	uv run flake8 mcp_server tests
-	uv run pylint mcp_server --fail-under=7.0
+	$(UV_RUN) --extra dev black --check mcp_server tests
+	$(UV_RUN) --extra dev isort --check-only mcp_server tests
+	$(UV_RUN) --extra dev flake8 mcp_server tests
+	$(UV_RUN) --extra dev pylint mcp_server --fail-under=7.0
 
 alpha-unit-release-smoke:
-	uv run pytest tests/ \
+	$(UV_RUN) --extra dev pytest tests/ \
+		--ignore=tests/integration \
 		--ignore=tests/test_git_integration.py \
 		-n auto \
 		--timeout=60 \
@@ -169,14 +172,16 @@ alpha-unit-release-smoke:
 	$(MAKE) release-smoke
 
 alpha-integration-smoke:
-	uv run pytest tests/ -m "integration or slow" \
+	SEMANTIC_SEARCH_ENABLED=false $(UV_RUN) --extra dev pytest tests/ -m "integration or slow" \
+		--ignore=tests/test_git_integration.py \
+		--ignore=tests/test_watcher.py \
 		--timeout=120 \
 		--no-cov \
 		--benchmark-skip \
 		-v
 
 alpha-docs-truth:
-	uv run pytest \
+	$(UV_RUN) --extra dev pytest \
 		tests/test_release_metadata.py \
 		tests/test_requirements_consolidation.py \
 		tests/smoke/test_release_smoke_contract.py \

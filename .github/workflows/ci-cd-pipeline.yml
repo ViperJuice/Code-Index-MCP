@@ -46,6 +46,8 @@ jobs:
 
       - name: Install dependencies
         run: |
+          sudo apt-get update
+          sudo apt-get install -y ripgrep
           python -m pip install --upgrade pip uv
           uv sync --locked --extra dev --extra semantic
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
@@ -70,7 +72,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libffi-dev
+          sudo apt-get install -y build-essential libffi-dev ripgrep
 
       - name: Install Python dependencies
         run: |
@@ -104,7 +106,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libffi-dev
+          sudo apt-get install -y build-essential libffi-dev ripgrep
 
       - name: Install Python dependencies
         run: |
@@ -176,10 +178,19 @@ jobs:
           uv sync --locked --extra dev
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
+      - name: Install ripgrep
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            brew install ripgrep
+          elif [ "$RUNNER_OS" = "Windows" ]; then
+            choco install ripgrep -y
+          fi
+
       - name: Run cross-platform tests
         shell: bash
         run: |
-          pytest tests/ \
+          uv run pytest tests/ \
             --ignore=tests/test_git_integration.py \
             -n ${{ matrix.workers }} \
             --timeout=60 \

@@ -148,12 +148,10 @@ def test_no_sigalrm_usage():
         registry=registry,
     )
 
-    assert signal.getsignal(signal.SIGALRM) == original_handler, (
-        "run_gated_fallback must not modify SIGALRM handler"
-    )
-    assert "signal" not in dir(fallback_module), (
-        "fallback module must not import signal"
-    )
+    assert (
+        signal.getsignal(signal.SIGALRM) == original_handler
+    ), "run_gated_fallback must not modify SIGALRM handler"
+    assert "signal" not in dir(fallback_module), "fallback module must not import signal"
 
 
 def test_hit_observed_correctly():

@@ -1,6 +1,6 @@
 # Path Traversal Guard
 
-> **Beta status**: This page targets `1.2.0-rc3`. `MCP_ALLOWED_ROOTS` is the
+> **Beta status**: This page targets `1.2.0-rc4`. `MCP_ALLOWED_ROOTS` is the
 > current path boundary knob for MCP tools in beta multi-repo deployments.
 
 ## Overview

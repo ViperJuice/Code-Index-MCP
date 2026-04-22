@@ -16,7 +16,9 @@ def _make_registry(repos):
     return registry
 
 
-def _make_repo(repo_id="repo1", path="/tmp/fake_repo", tracked_branch="main", last_indexed_commit="abc123"):
+def _make_repo(
+    repo_id="repo1", path="/tmp/fake_repo", tracked_branch="main", last_indexed_commit="abc123"
+):
     return SimpleNamespace(
         repository_id=repo_id,
         path=path,
@@ -91,8 +93,10 @@ class TestForcePush:
             result.returncode = 1  # not an ancestor
             return result
 
-        with patch.object(poller, "_read_ref", return_value=new_tip), \
-             patch("subprocess.run", side_effect=fake_run):
+        with (
+            patch.object(poller, "_read_ref", return_value=new_tip),
+            patch("subprocess.run", side_effect=fake_run),
+        ):
             poller._poll_one(repo)
 
         gim.enqueue_full_rescan.assert_called_once_with("repo1")
@@ -110,8 +114,10 @@ class TestForcePush:
             result.returncode = 0  # is an ancestor (normal advance)
             return result
 
-        with patch.object(poller, "_read_ref", return_value=new_tip), \
-             patch("subprocess.run", side_effect=fake_run):
+        with (
+            patch.object(poller, "_read_ref", return_value=new_tip),
+            patch("subprocess.run", side_effect=fake_run),
+        ):
             poller._poll_one(repo)
 
         gim.sync_repository_index.assert_called_once_with("repo1")
@@ -122,8 +128,10 @@ class TestForcePush:
         repo = _make_repo(last_indexed_commit="abc123")
         poller, gim = _make_poller([repo])
 
-        with patch.object(poller, "_read_ref", return_value="abc123"), \
-             patch("subprocess.run") as mock_run:
+        with (
+            patch.object(poller, "_read_ref", return_value="abc123"),
+            patch("subprocess.run") as mock_run,
+        ):
             poller._poll_one(repo)
 
         gim.sync_repository_index.assert_not_called()

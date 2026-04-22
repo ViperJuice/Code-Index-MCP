@@ -1,4 +1,5 @@
 """Checkpoint schema and helpers for durable reindex resume (IF-0-P13-1)."""
+
 from __future__ import annotations
 
 import json
@@ -16,9 +17,9 @@ _TMP_FILE = ".reindex-state.tmp"
 @dataclass
 class ReindexCheckpoint:
     repo_id: str
-    started_at: str            # ISO-8601 UTC
-    last_completed_path: str   # relative path; "" if none yet
-    remaining_paths: List[str] # relative paths still to process
+    started_at: str  # ISO-8601 UTC
+    last_completed_path: str  # relative path; "" if none yet
+    remaining_paths: List[str]  # relative paths still to process
     errors: List[dict] = field(default_factory=list)  # [{"path": ..., "error": ...}]
     schema_version: int = REINDEX_STATE_VERSION
 

@@ -76,8 +76,10 @@ class TestSweeperExceptionObservability:
         stop_event_holder["event"] = sweeper._stop_event
 
         # Patch where the sweeper module bound the name (not the exporter module)
-        with patch("mcp_server.watcher.sweeper.mcp_watcher_sweep_errors_total") as mock_ctr, \
-             patch("mcp_server.watcher.sweeper.logger"):
+        with (
+            patch("mcp_server.watcher.sweeper.mcp_watcher_sweep_errors_total") as mock_ctr,
+            patch("mcp_server.watcher.sweeper.logger"),
+        ):
             sweeper.start()
             sweeper._thread.join(timeout=2.0)
 

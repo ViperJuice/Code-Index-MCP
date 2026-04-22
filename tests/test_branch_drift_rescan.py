@@ -9,7 +9,7 @@ Covers:
 
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -18,7 +18,6 @@ from mcp_server.storage.git_index_manager import (
     should_reindex_for_branch,
 )
 from mcp_server.watcher_multi_repo import MultiRepositoryWatcher
-
 
 # ---------------------------------------------------------------------------
 # SL-3.1a: should_reindex_for_branch must still return False for drift
@@ -50,7 +49,9 @@ def test_should_reindex_for_branch_returns_false_no_current():
 # ---------------------------------------------------------------------------
 
 
-def _make_registry_with_drift(repo_id="test-repo", current_branch="feature/noise", tracked_branch="main"):
+def _make_registry_with_drift(
+    repo_id="test-repo", current_branch="feature/noise", tracked_branch="main"
+):
     """Build a mock registry that simulates branch drift."""
     repo_info = MagicMock()
     repo_info.path = "/tmp/repo"
@@ -72,7 +73,9 @@ def _make_registry_with_drift(repo_id="test-repo", current_branch="feature/noise
 def test_drift_emits_warn_log_with_all_three_fields(caplog):
     """When current != tracked (both non-None), a WARN log is emitted with all 3 extra fields."""
     repo_id = "test-repo"
-    registry, _ = _make_registry_with_drift(repo_id=repo_id, current_branch="feature/noise", tracked_branch="main")
+    registry, _ = _make_registry_with_drift(
+        repo_id=repo_id, current_branch="feature/noise", tracked_branch="main"
+    )
     enqueue_cb = MagicMock()
     manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
     manager.on_branch_drift = enqueue_cb
@@ -139,7 +142,9 @@ def test_no_drift_log_when_no_tracked_branch(caplog):
 def test_on_branch_drift_callback_called_once_per_drift():
     """on_branch_drift is called exactly once when drift is detected."""
     repo_id = "test-repo"
-    registry, _ = _make_registry_with_drift(repo_id=repo_id, current_branch="feature/noise", tracked_branch="main")
+    registry, _ = _make_registry_with_drift(
+        repo_id=repo_id, current_branch="feature/noise", tracked_branch="main"
+    )
     enqueue_cb = MagicMock()
     manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
     manager.on_branch_drift = enqueue_cb
@@ -167,7 +172,9 @@ def test_on_branch_drift_not_called_on_same_branch():
 def test_on_branch_drift_not_called_when_no_callback():
     """sync_repository_index does not raise when on_branch_drift is None."""
     repo_id = "test-repo"
-    registry, _ = _make_registry_with_drift(repo_id=repo_id, current_branch="feature/noise", tracked_branch="main")
+    registry, _ = _make_registry_with_drift(
+        repo_id=repo_id, current_branch="feature/noise", tracked_branch="main"
+    )
     manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
     # on_branch_drift intentionally not set (None by default)
 
@@ -234,7 +241,9 @@ def test_enqueue_full_rescan_passes_repo_id():
     fn, args, kwargs = submitted_callables[0]
     # Call the submitted closure — it should invoke index_manager.sync_repository_index with force_full=True
     fn()
-    index_manager.sync_repository_index.assert_called_once_with("my-repo", force_full=True, bypass_branch_guard=True)
+    index_manager.sync_repository_index.assert_called_once_with(
+        "my-repo", force_full=True, bypass_branch_guard=True
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -274,7 +283,9 @@ def test_bypass_branch_guard_prevents_infinite_loop(caplog):
     """sync_repository_index with bypass_branch_guard=True must not emit drift log or fire callback
     even when current != tracked (i.e., the rescan path won't re-trigger drift)."""
     repo_id = "test-repo"
-    registry, _ = _make_registry_with_drift(repo_id=repo_id, current_branch="feature/noise", tracked_branch="main")
+    registry, _ = _make_registry_with_drift(
+        repo_id=repo_id, current_branch="feature/noise", tracked_branch="main"
+    )
     # Mock out _full_index so it returns without actually indexing
     manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
     manager.on_branch_drift = MagicMock()

@@ -35,7 +35,9 @@ def test_setup_logging_uses_json_in_production(tmp_path):
     log_file = str(tmp_path / "test.log")
     stream = StringIO()
 
-    with patch.dict(os.environ, {"MCP_ENVIRONMENT": "production", "MCP_LOG_FORMAT": ""}, clear=False):
+    with patch.dict(
+        os.environ, {"MCP_ENVIRONMENT": "production", "MCP_LOG_FORMAT": ""}, clear=False
+    ):
         # Reset root logger handlers to isolate this test
         root = logging.getLogger()
         original_handlers = root.handlers[:]
@@ -44,17 +46,18 @@ def test_setup_logging_uses_json_in_production(tmp_path):
         handler = logging.StreamHandler(stream)
         root.addHandler(handler)
 
-        from mcp_server.core import logging as mcp_logging
         import importlib
+
+        from mcp_server.core import logging as mcp_logging
+
         importlib.reload(mcp_logging)
-        from mcp_server.core.logging import setup_logging, JSONFormatter
+        from mcp_server.core.logging import JSONFormatter, setup_logging
 
         setup_logging(log_level="INFO", log_file=log_file)
 
         # Check that at least one handler uses JSONFormatter
         json_used = any(
-            isinstance(h.formatter, JSONFormatter)
-            for h in logging.getLogger().handlers
+            isinstance(h.formatter, JSONFormatter) for h in logging.getLogger().handlers
         )
         assert json_used, "JSONFormatter not found in production mode handlers"
 
@@ -66,12 +69,16 @@ def test_setup_logging_uses_json_format_env_var(tmp_path):
     """setup_logging installs JSONFormatter when MCP_LOG_FORMAT=json."""
     log_file = str(tmp_path / "test.log")
 
-    with patch.dict(os.environ, {"MCP_ENVIRONMENT": "development", "MCP_LOG_FORMAT": "json"}, clear=False):
-        from mcp_server.core.logging import setup_logging, JSONFormatter
+    with patch.dict(
+        os.environ, {"MCP_ENVIRONMENT": "development", "MCP_LOG_FORMAT": "json"}, clear=False
+    ):
         import importlib
+
         import mcp_server.core.logging as mcp_logging
+        from mcp_server.core.logging import JSONFormatter, setup_logging
+
         importlib.reload(mcp_logging)
-        from mcp_server.core.logging import setup_logging, JSONFormatter
+        from mcp_server.core.logging import JSONFormatter, setup_logging
 
         root = logging.getLogger()
         original_handlers = root.handlers[:]
@@ -80,8 +87,7 @@ def test_setup_logging_uses_json_format_env_var(tmp_path):
         setup_logging(log_level="INFO", log_file=log_file)
 
         json_used = any(
-            isinstance(h.formatter, JSONFormatter)
-            for h in logging.getLogger().handlers
+            isinstance(h.formatter, JSONFormatter) for h in logging.getLogger().handlers
         )
         assert json_used, "JSONFormatter not found when MCP_LOG_FORMAT=json"
 
@@ -100,11 +106,13 @@ def test_setup_logging_plain_text_in_dev(tmp_path):
     env.pop("MCP_LOG_FORMAT", None)
 
     with patch.dict(os.environ, env, clear=True):
-        from mcp_server.core.logging import setup_logging, JSONFormatter
         import importlib
+
         import mcp_server.core.logging as mcp_logging
+        from mcp_server.core.logging import JSONFormatter, setup_logging
+
         importlib.reload(mcp_logging)
-        from mcp_server.core.logging import setup_logging, JSONFormatter
+        from mcp_server.core.logging import JSONFormatter, setup_logging
 
         root = logging.getLogger()
         original_handlers = root.handlers[:]
@@ -113,8 +121,7 @@ def test_setup_logging_plain_text_in_dev(tmp_path):
         setup_logging(log_level="INFO", log_file=log_file)
 
         json_used = any(
-            isinstance(h.formatter, JSONFormatter)
-            for h in logging.getLogger().handlers
+            isinstance(h.formatter, JSONFormatter) for h in logging.getLogger().handlers
         )
         assert not json_used, "JSONFormatter should NOT be used in development mode"
 

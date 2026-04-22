@@ -16,7 +16,12 @@ from ..dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from ..storage.sqlite_store import SQLiteStore
 from ..storage.two_phase import two_phase_commit
 from .change_detector import FileChange
-from .checkpoint import ReindexCheckpoint, clear as _clear_ckpt, load as _load_ckpt, save as _save_ckpt
+from .checkpoint import (
+    ReindexCheckpoint,
+)
+from .checkpoint import clear as _clear_ckpt
+from .checkpoint import load as _load_ckpt
+from .checkpoint import save as _save_ckpt
 from .lock_registry import lock_registry
 
 logger = logging.getLogger(__name__)
@@ -333,9 +338,7 @@ class IncrementalIndexer:
                     try:
                         self.dispatcher.move_file(new_full_path, old_full_path, content_hash)
                     except Exception as rb_exc:
-                        logger.warning(
-                            f"Rollback of dispatcher move {old_path} failed: {rb_exc}"
-                        )
+                        logger.warning(f"Rollback of dispatcher move {old_path} failed: {rb_exc}")
 
                 two_phase_commit(primary_op, shadow_op, rollback)
             else:
@@ -354,9 +357,7 @@ class IncrementalIndexer:
                     try:
                         self.store.move_file(new_relative, old_relative, repo_id, content_hash)
                     except Exception as rb_exc:
-                        logger.warning(
-                            f"Rollback of SQLite move {old_path} failed: {rb_exc}"
-                        )
+                        logger.warning(f"Rollback of SQLite move {old_path} failed: {rb_exc}")
 
                 two_phase_commit(primary_op, shadow_op, rollback)
 

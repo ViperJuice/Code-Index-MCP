@@ -1,4 +1,5 @@
 """Tests for HandshakeGate (SL-2)."""
+
 from __future__ import annotations
 
 import inspect
@@ -9,10 +10,10 @@ import pytest
 
 from mcp_server.cli.handshake import HandshakeGate
 
-
 # ---------------------------------------------------------------------------
 # HandshakeGate unit tests
 # ---------------------------------------------------------------------------
+
 
 class TestHandshakeGateDisabled:
     """Gate with no secret configured — always passes."""
@@ -117,6 +118,7 @@ class TestHandshakeGateEnvRead:
 # Startup warning tests (caplog)
 # ---------------------------------------------------------------------------
 
+
 def _emit_startup_warning_if_needed(gate: HandshakeGate) -> None:
     """Mirrors the warning emission logic from _serve()."""
     _logger = logging.getLogger("mcp_server.cli.stdio_runner")
@@ -155,6 +157,7 @@ class TestStartupWarning:
 # ---------------------------------------------------------------------------
 # Integration-ish: gate.check() flow simulation
 # ---------------------------------------------------------------------------
+
 
 class TestHandshakeFlow:
     """Simulate the call_tool flow with gate."""

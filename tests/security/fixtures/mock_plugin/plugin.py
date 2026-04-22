@@ -5,12 +5,11 @@ from __future__ import annotations
 from typing import Iterable
 
 from mcp_server.plugin_base import (
-    IPlugin,
     IndexShard,
+    IPlugin,
     Reference,
     SearchOpts,
     SearchResult,
-    SymbolDef,
 )
 
 

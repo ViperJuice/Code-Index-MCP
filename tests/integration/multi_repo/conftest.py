@@ -13,6 +13,7 @@ import shutil
 import signal
 import socket
 import subprocess
+import sys
 import tempfile
 import time
 from dataclasses import dataclass
@@ -32,6 +33,7 @@ _PROJECT_ROOT = Path(__file__).parents[3]
 # Frozen interface contracts — IF-0-P20-1
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class GatewayHandle:
     pid: int
@@ -42,24 +44,27 @@ class GatewayHandle:
 @dataclass(frozen=True)
 class RepoHandle:
     path: Path
-    repo_id: str          # 16-hex sha256 from RepositoryRegistry.register_repository
-    sqlite_path: Path     # per-repo SQLite store
+    repo_id: str  # 16-hex sha256 from RepositoryRegistry.register_repository
+    sqlite_path: Path  # per-repo SQLite store
 
 
 @dataclass(frozen=True)
 class MultiRepoContext:
     gateways: Tuple[GatewayHandle, ...]  # len == n_gateways, default 2
-    registry_path: Path                   # shared across all gateways
-    repos: Dict[str, RepoHandle]          # keyed by repo_id; len == n_repos
+    registry_path: Path  # shared across all gateways
+    repos: Dict[str, RepoHandle]  # keyed by repo_id; len == n_repos
 
 
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+
 class GatewayBootTimeout(Exception):
     def __init__(self, port: int, stderr: bytes):
-        super().__init__(f"Gateway on port {port} did not become healthy in time")
+        stderr_text = stderr.decode("utf-8", errors="replace").strip()
+        detail = f"\nGateway stderr:\n{stderr_text[-4000:]}" if stderr_text else ""
+        super().__init__(f"Gateway on port {port} did not become healthy in time{detail}")
         self.port = port
         self.stderr = stderr
 
@@ -80,7 +85,9 @@ def _alloc_free_ports(n: int):
     return ports
 
 
-def _spawn_gateway(port: int, registry_path: Path, workspace_root: Path) -> Tuple[subprocess.Popen, GatewayHandle]:
+def _spawn_gateway(
+    port: int, registry_path: Path, workspace_root: Path
+) -> Tuple[subprocess.Popen, GatewayHandle]:
     env = {
         **os.environ,
         "MCP_REPO_REGISTRY": str(registry_path),
@@ -102,8 +109,16 @@ def _spawn_gateway(port: int, registry_path: Path, workspace_root: Path) -> Tupl
     for attempt in range(2):
         try:
             proc = subprocess.Popen(
-                ["python", "-m", "uvicorn", "mcp_server.gateway:app",
-                 "--host", "127.0.0.1", "--port", str(port)],
+                [
+                    sys.executable,
+                    "-m",
+                    "uvicorn",
+                    "mcp_server.gateway:app",
+                    "--host",
+                    "127.0.0.1",
+                    "--port",
+                    str(port),
+                ],
                 env=env,
                 cwd=str(_PROJECT_ROOT),
                 start_new_session=True,
@@ -119,7 +134,7 @@ def _spawn_gateway(port: int, registry_path: Path, workspace_root: Path) -> Tupl
             raise
 
     # Poll GET /health (no auth required) until 200 or timeout
-    deadline = time.monotonic() + 30.0
+    deadline = time.monotonic() + 90.0
     url = f"http://127.0.0.1:{port}/health"
     while time.monotonic() < deadline:
         try:
@@ -165,6 +180,7 @@ def _terminate_gateway(proc: subprocess.Popen) -> None:
 # Fixture factory
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="module")
 def multi_repo_fixture():
     """
@@ -188,6 +204,7 @@ def multi_repo_fixture():
         def _atexit_cleanup():
             for p in _active_procs:
                 _terminate_gateway(p)
+
         atexit.register(_atexit_cleanup)
 
         # Create repo workspaces and register them BEFORE spawning gateways
@@ -198,6 +215,26 @@ def multi_repo_fixture():
             repo_dir.mkdir()
             # Give each repo at least one file so it's a valid workspace
             (repo_dir / "README.txt").write_text(f"repo-{i} workspace\n")
+            subprocess.run(["git", "init"], cwd=repo_dir, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.name", "Integration Test"],
+                cwd=repo_dir,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "integration@example.invalid"],
+                cwd=repo_dir,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(["git", "add", "."], cwd=repo_dir, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "commit", "-m", "Initial commit"],
+                cwd=repo_dir,
+                check=True,
+                capture_output=True,
+            )
             repo_id = reg.register_repository(str(repo_dir))
             sqlite_path = repo_dir / ".mcp-index" / "current.db"
             repos[repo_id] = RepoHandle(

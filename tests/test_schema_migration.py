@@ -1,9 +1,10 @@
 """Integration tests for schema migration wired into check_compatibility."""
 
 import json
-import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from mcp_server.artifacts.artifact_download import IndexArtifactDownloader as ArtifactDownloader
 from mcp_server.storage.schema_migrator import UnknownSchemaVersionError

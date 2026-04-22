@@ -52,8 +52,8 @@ class RepositoryInfo:
     available_semantic_profiles: Optional[List[str]] = None
     artifact_backend: Optional[str] = None
     artifact_health: Optional[str] = None
-    tracked_branch: Optional[str] = None   # pinned default branch; never auto-mutates
-    git_common_dir: Optional[str] = None   # str for JSON-safety; __post_init__ coerces Path→str
+    tracked_branch: Optional[str] = None  # pinned default branch; never auto-mutates
+    git_common_dir: Optional[str] = None  # str for JSON-safety; __post_init__ coerces Path→str
     staleness_reason: Optional[str] = None
 
     def __post_init__(self) -> None:
@@ -113,7 +113,9 @@ class MultiRepositoryManager:
             central_index_path: Path to central repository registry
             max_workers: Maximum parallel search workers
         """
-        self.central_index_path = Path(central_index_path) if central_index_path else self._get_default_registry_path()
+        self.central_index_path = (
+            Path(central_index_path) if central_index_path else self._get_default_registry_path()
+        )
         self.max_workers = max_workers
 
         # Repository registry

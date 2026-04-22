@@ -1,6 +1,6 @@
 # Code-Index-MCP Support Matrix
 
-This matrix is the canonical P23 support statement for version `1.2.0-rc3`.
+This matrix is the canonical P23 support statement for version `1.2.0-rc4`.
 The project is in beta/alpha documentation-hardening status: MCP STDIO is the
 primary LLM surface, FastAPI is a secondary admin surface, and language support
 varies by plugin path and optional dependencies.

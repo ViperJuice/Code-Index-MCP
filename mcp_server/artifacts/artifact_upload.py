@@ -14,10 +14,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+from mcp_server.artifacts.attestation import Attestation
 from mcp_server.artifacts.delta_policy import DeltaPolicy
 from mcp_server.config.settings import get_settings
 from mcp_server.core.errors import record_handled_error
-from mcp_server.artifacts.attestation import Attestation
 
 from .secure_export import SecureIndexExporter
 from .semantic_profiles import (

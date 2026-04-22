@@ -21,7 +21,6 @@ from mcp_server.security.security_middleware import (
     require_auth,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -125,6 +124,7 @@ def client(metrics_app: FastAPI) -> TestClient:
 # (a) Unauthenticated GET /metrics → 401
 # ---------------------------------------------------------------------------
 
+
 def test_metrics_unauthenticated_returns_401(client: TestClient) -> None:
     resp = client.get("/metrics")
     assert resp.status_code == 401, resp.text
@@ -133,6 +133,7 @@ def test_metrics_unauthenticated_returns_401(client: TestClient) -> None:
 # ---------------------------------------------------------------------------
 # (b) Admin token → 200 + Prometheus payload
 # ---------------------------------------------------------------------------
+
 
 def test_metrics_admin_returns_200(client: TestClient, admin_token: str) -> None:
     resp = client.get("/metrics", headers={"Authorization": f"Bearer {admin_token}"})
@@ -146,6 +147,7 @@ def test_metrics_admin_returns_200(client: TestClient, admin_token: str) -> None
 # (c) Read-only token → 403
 # ---------------------------------------------------------------------------
 
+
 def test_metrics_readonly_returns_403(client: TestClient, readonly_token: str) -> None:
     resp = client.get("/metrics", headers={"Authorization": f"Bearer {readonly_token}"})
     assert resp.status_code == 403, resp.text
@@ -155,6 +157,7 @@ def test_metrics_readonly_returns_403(client: TestClient, readonly_token: str) -
 # (d) Unaffected routes still work
 # ---------------------------------------------------------------------------
 
+
 def test_health_without_auth_returns_200(client: TestClient) -> None:
     resp = client.get("/health")
     assert resp.status_code == 200, resp.text
@@ -162,4 +165,7 @@ def test_health_without_auth_returns_200(client: TestClient) -> None:
 
 def test_search_with_admin_token_not_401_or_403(client: TestClient, admin_token: str) -> None:
     resp = client.get("/search?q=foo", headers={"Authorization": f"Bearer {admin_token}"})
-    assert resp.status_code not in (401, 403), f"Unexpected auth failure: {resp.status_code} {resp.text}"
+    assert resp.status_code not in (
+        401,
+        403,
+    ), f"Unexpected auth failure: {resp.status_code} {resp.text}"

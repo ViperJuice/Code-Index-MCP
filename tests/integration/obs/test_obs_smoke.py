@@ -33,6 +33,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+
 def _find_repo_root(start: Path) -> Path:
     """Walk upward until a directory containing `mcp_server/__init__.py` is found.
 
@@ -244,7 +245,7 @@ def test_json_log_parse_rate(gateway_proc):
             pass
 
     lines = _drain_lines(proc.stderr, max_lines=50, timeout=30)
-    log_lines = [l for l in lines if l.lstrip().startswith("{")]
+    log_lines = [line for line in lines if line.lstrip().startswith("{")]
 
     if len(log_lines) < 5:
         pytest.skip(
@@ -297,9 +298,7 @@ def test_metrics_endpoint_reachable(gateway_proc, admin_token):
         headers={"Authorization": f"Bearer {admin_token}"},
         timeout=10,
     )
-    assert resp.status_code == 200, (
-        f"/metrics returned {resp.status_code}: {resp.text[:500]}"
-    )
+    assert resp.status_code == 200, f"/metrics returned {resp.status_code}: {resp.text[:500]}"
 
     body = resp.text
 
@@ -320,16 +319,16 @@ def test_metrics_endpoint_reachable(gateway_proc, admin_token):
             f"(registry-split regression — counter missing from exporter registry).\n"
             f"First 2000 chars:\n{body[:2000]}"
         )
-        assert re.search(rf"^# TYPE {name} counter", body, re.MULTILINE), (
-            f"Expected '# TYPE {name} counter' in /metrics output."
-        )
+        assert re.search(
+            rf"^# TYPE {name} counter", body, re.MULTILINE
+        ), f"Expected '# TYPE {name} counter' in /metrics output."
 
     # mcp_requests_total is also served by the exporter registry; assert its
     # HELP line is present (sample is not incremented by the gateway's
     # current middleware stack, so we do not require a non-zero value).
-    assert re.search(r"^# HELP mcp_requests_total", body, re.MULTILINE), (
-        "Expected '# HELP mcp_requests_total' in /metrics output."
-    )
+    assert re.search(
+        r"^# HELP mcp_requests_total", body, re.MULTILINE
+    ), "Expected '# HELP mcp_requests_total' in /metrics output."
 
 
 def test_secret_redaction_via_http(gateway_proc):

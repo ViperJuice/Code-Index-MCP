@@ -21,14 +21,18 @@ def _fake_urlopen(scopes: str):
 
 
 def test_missing_scope_raises():
-    with patch("urllib.request.urlopen", return_value=_fake_urlopen("contents:read, metadata:read")):
+    with patch(
+        "urllib.request.urlopen", return_value=_fake_urlopen("contents:read, metadata:read")
+    ):
         with pytest.raises(InsufficientScopesError) as exc_info:
             TokenValidator.validate_scopes(["attestations:write"], token="fake-token")
     assert "attestations:write" in str(exc_info.value)
 
 
 def test_sufficient_scopes_returns_none():
-    with patch("urllib.request.urlopen", return_value=_fake_urlopen("contents:read, metadata:read")):
+    with patch(
+        "urllib.request.urlopen", return_value=_fake_urlopen("contents:read, metadata:read")
+    ):
         result = TokenValidator.validate_scopes(["contents:read"], token="fake-token")
     assert result is None
 
@@ -52,7 +56,13 @@ def test_multiple_scopes_all_granted():
     scopes_str = "contents:read, metadata:read, actions:read, actions:write, attestations:write"
     with patch("urllib.request.urlopen", return_value=_fake_urlopen(scopes_str)):
         result = TokenValidator.validate_scopes(
-            ["contents:read", "metadata:read", "actions:read", "actions:write", "attestations:write"],
+            [
+                "contents:read",
+                "metadata:read",
+                "actions:read",
+                "actions:write",
+                "attestations:write",
+            ],
             token="fake-token",
         )
     assert result is None

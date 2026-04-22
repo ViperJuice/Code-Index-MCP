@@ -15,17 +15,17 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
+from mcp_server.core.repo_context import RepoContext
 from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
-from mcp_server.dispatcher.query_intent import QueryIntent, classify
-from mcp_server.plugin_base import IPlugin, SearchResult, SymbolDef
-from tests.conftest import measure_time
 
 # ---------------------------------------------------------------------------
 # SL-1.1 imports (new Protocol-conformance tests)
 # ---------------------------------------------------------------------------
 from mcp_server.dispatcher.protocol import DispatcherProtocol
+from mcp_server.dispatcher.query_intent import QueryIntent, classify
 from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher
-from mcp_server.core.repo_context import RepoContext
+from mcp_server.plugin_base import IPlugin, SearchResult, SymbolDef
+from tests.conftest import measure_time
 
 
 class TestDispatcherInitialization:
@@ -134,9 +134,7 @@ class TestSymbolLookup:
         expected_symbol = SymbolDef(name="test_func", kind="function", path="/test.py", line=10)
         mock_plugin.getDefinition.return_value = expected_symbol
 
-        result = run_gated_fallback(
-            [mock_plugin], "test_func", source_ext=".py", timeout_ms=1000
-        )
+        result = run_gated_fallback([mock_plugin], "test_func", source_ext=".py", timeout_ms=1000)
 
         assert result == expected_symbol
         mock_plugin.getDefinition.assert_called_once_with("test_func")
@@ -147,9 +145,7 @@ class TestSymbolLookup:
 
         mock_plugin.getDefinition.return_value = None
 
-        result = run_gated_fallback(
-            [mock_plugin], "nonexistent", source_ext=".py", timeout_ms=1000
-        )
+        result = run_gated_fallback([mock_plugin], "nonexistent", source_ext=".py", timeout_ms=1000)
 
         assert result is None
         mock_plugin.getDefinition.assert_called_once_with("nonexistent")
@@ -632,9 +628,10 @@ class TestConcurrency:
         """Test concurrent search operations (plugin fallback path, no sqlite)."""
         import concurrent.futures
         from pathlib import Path
+        from unittest.mock import MagicMock as _MM
+
         from mcp_server.core.repo_context import RepoContext
         from mcp_server.storage.multi_repo_manager import RepositoryInfo
-        from unittest.mock import MagicMock as _MM
 
         _REPO_ID = "test-repo"
         psr = _make_psr_with_plugins(_REPO_ID, [mock_plugin])
@@ -689,9 +686,7 @@ class TestPerformance:
 
         with measure_time("dispatcher_lookup", benchmark_results):
             for _ in range(1000):
-                result = run_gated_fallback(
-                    plugins, "target", source_ext=".py", timeout_ms=1000
-                )
+                result = run_gated_fallback(plugins, "target", source_ext=".py", timeout_ms=1000)
                 assert result is not None
 
     @pytest.mark.benchmark

@@ -1,4 +1,5 @@
 """Fixtures for health surface tests (SL-4)."""
+
 from __future__ import annotations
 
 import subprocess
@@ -27,7 +28,9 @@ def make_repo_info(
     # Create a minimal git repo so .git exists
     subprocess.run(
         ["git", "init", "-b", "main"],
-        cwd=str(repo_dir), check=True, capture_output=True,
+        cwd=str(repo_dir),
+        check=True,
+        capture_output=True,
     )
 
     git_dir = repo_dir / ".git"
@@ -37,10 +40,13 @@ def make_repo_info(
     index_file.touch()
 
     git_common_dir = None if missing_git_dir else str(git_dir)
-    index_path = str(index_file) if not missing_index else str(tmp_path / "nonexistent" / "index.db")
+    index_path = (
+        str(index_file) if not missing_index else str(tmp_path / "nonexistent" / "index.db")
+    )
 
     if missing_git_dir:
         import shutil
+
         shutil.rmtree(str(git_dir))
         git_common_dir = str(git_dir)  # points to now-deleted path
 

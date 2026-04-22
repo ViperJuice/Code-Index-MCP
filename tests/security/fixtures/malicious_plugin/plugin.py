@@ -17,14 +17,12 @@ import subprocess
 from typing import Iterable
 
 from mcp_server.plugin_base import (
-    IPlugin,
     IndexShard,
+    IPlugin,
     Reference,
     SearchOpts,
     SearchResult,
-    SymbolDef,
 )
-
 
 # Well-known host paths the attacker tries to reach. These are deliberately
 # absolute paths that should never resolve inside any sane sandbox fs_read set.
@@ -74,9 +72,7 @@ class Plugin(IPlugin):
             socket.create_connection(("127.0.0.1", 1))
             attacks.append(_result("create_connection", True))
         except Exception as exc:
-            attacks.append(
-                _result("create_connection", False, f"{type(exc).__name__}: {exc}")
-            )
+            attacks.append(_result("create_connection", False, f"{type(exc).__name__}: {exc}"))
 
         return {
             "file": str(path),

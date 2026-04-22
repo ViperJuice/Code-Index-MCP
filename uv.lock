@@ -1711,7 +1711,7 @@ wheels = [
 
 [[package]]
 name = "index-it-mcp"
-version = "1.2.0rc3"
+version = "1.2.0rc4"
 source = { editable = "." }
 dependencies = [
     { name = "argon2-cffi" },

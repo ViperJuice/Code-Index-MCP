@@ -4,6 +4,7 @@ Tests that search_code, symbol_lookup, and summarize_sample reject
 repository/path args that lie outside MCP_ALLOWED_ROOTS, and that
 write_summaries (no path args) is unaffected.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -13,7 +14,6 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -53,40 +53,49 @@ def _mock_resolver(ctx=None):
 class TestLooksLikePath:
     def test_absolute_unix_path(self):
         from mcp_server.cli.tool_handlers import _looks_like_path
+
         assert _looks_like_path("/tmp/foo") is True
 
     def test_relative_with_separator(self):
         from mcp_server.cli.tool_handlers import _looks_like_path
+
         assert _looks_like_path("./foo") is True
 
     def test_windows_style_path(self):
         from mcp_server.cli.tool_handlers import _looks_like_path
+
         assert _looks_like_path("C:\\foo\\bar") is True
 
     def test_plain_repo_name(self):
         from mcp_server.cli.tool_handlers import _looks_like_path
+
         assert _looks_like_path("my-repo") is False
 
     def test_plain_repo_name_with_dots(self):
         from mcp_server.cli.tool_handlers import _looks_like_path
+
         assert _looks_like_path("my.repo.name") is False
 
     def test_empty_string(self):
         from mcp_server.cli.tool_handlers import _looks_like_path
+
         assert _looks_like_path("") is False
 
     def test_existing_filesystem_entity(self, tmp_path):
         from mcp_server.cli.tool_handlers import _looks_like_path
+
         # tmp_path exists and has '/' in it, so both conditions fire
         assert _looks_like_path(str(tmp_path)) is True
 
     def test_nonexistent_no_separator(self):
         from mcp_server.cli.tool_handlers import _looks_like_path
+
         # no separator, doesn't exist → False
         assert _looks_like_path("nonexistent-repo-xyz") is False
 
     def test_subdir_path(self):
         from mcp_server.cli.tool_handlers import _looks_like_path
+
         assert _looks_like_path("some/sub/dir") is True
 
 
@@ -106,15 +115,17 @@ class TestSearchCodePathSandbox:
 
         monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(allowed))
 
-        result = _run(handle_search_code(
-            arguments={"query": "foo", "repository": str(outside)},
-            dispatcher=_mock_dispatcher(),
-            repo_resolver=_mock_resolver(),
-        ))
-        data = _parsed(result)
-        assert "path_outside_allowed_roots" in json.dumps(data), (
-            f"Expected path_outside_allowed_roots in response; got: {data}"
+        result = _run(
+            handle_search_code(
+                arguments={"query": "foo", "repository": str(outside)},
+                dispatcher=_mock_dispatcher(),
+                repo_resolver=_mock_resolver(),
+            )
         )
+        data = _parsed(result)
+        assert "path_outside_allowed_roots" in json.dumps(
+            data
+        ), f"Expected path_outside_allowed_roots in response; got: {data}"
 
     def test_accepts_path_inside_allowed_roots(self, tmp_path, monkeypatch):
         from mcp_server.cli.tool_handlers import handle_search_code
@@ -126,15 +137,17 @@ class TestSearchCodePathSandbox:
 
         monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(allowed))
 
-        result = _run(handle_search_code(
-            arguments={"query": "foo", "repository": str(subdir)},
-            dispatcher=_mock_dispatcher(),
-            repo_resolver=_mock_resolver(),
-        ))
-        data = _parsed(result)
-        assert "path_outside_allowed_roots" not in json.dumps(data), (
-            f"Should not reject path inside allowed roots; got: {data}"
+        result = _run(
+            handle_search_code(
+                arguments={"query": "foo", "repository": str(subdir)},
+                dispatcher=_mock_dispatcher(),
+                repo_resolver=_mock_resolver(),
+            )
         )
+        data = _parsed(result)
+        assert "path_outside_allowed_roots" not in json.dumps(
+            data
+        ), f"Should not reject path inside allowed roots; got: {data}"
 
     def test_repo_name_passes_through_guard(self, tmp_path, monkeypatch):
         """A plain repo name (no separator) must not be rejected by the path guard."""
@@ -143,15 +156,17 @@ class TestSearchCodePathSandbox:
         # Narrow allowed roots to tmp_path — repo name has no separator so guard is bypassed
         monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
 
-        result = _run(handle_search_code(
-            arguments={"query": "foo", "repository": "registered-name"},
-            dispatcher=_mock_dispatcher(),
-            repo_resolver=_mock_resolver(),
-        ))
-        data = _parsed(result)
-        assert "path_outside_allowed_roots" not in json.dumps(data), (
-            f"Repo name should bypass path guard; got: {data}"
+        result = _run(
+            handle_search_code(
+                arguments={"query": "foo", "repository": "registered-name"},
+                dispatcher=_mock_dispatcher(),
+                repo_resolver=_mock_resolver(),
+            )
         )
+        data = _parsed(result)
+        assert "path_outside_allowed_roots" not in json.dumps(
+            data
+        ), f"Repo name should bypass path guard; got: {data}"
 
     def test_no_repository_arg_bypasses_guard(self, tmp_path, monkeypatch):
         """No repository arg → guard not applicable (falls back to workspace root)."""
@@ -159,11 +174,13 @@ class TestSearchCodePathSandbox:
 
         monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
 
-        result = _run(handle_search_code(
-            arguments={"query": "foo"},
-            dispatcher=_mock_dispatcher(),
-            repo_resolver=_mock_resolver(),
-        ))
+        result = _run(
+            handle_search_code(
+                arguments={"query": "foo"},
+                dispatcher=_mock_dispatcher(),
+                repo_resolver=_mock_resolver(),
+            )
+        )
         data = _parsed(result)
         assert "path_outside_allowed_roots" not in json.dumps(data)
 
@@ -184,15 +201,17 @@ class TestSymbolLookupPathSandbox:
 
         monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(allowed))
 
-        result = _run(handle_symbol_lookup(
-            arguments={"symbol": "MyClass", "repository": str(outside)},
-            dispatcher=_mock_dispatcher(),
-            repo_resolver=_mock_resolver(),
-        ))
-        data = _parsed(result)
-        assert "path_outside_allowed_roots" in json.dumps(data), (
-            f"Expected path_outside_allowed_roots in response; got: {data}"
+        result = _run(
+            handle_symbol_lookup(
+                arguments={"symbol": "MyClass", "repository": str(outside)},
+                dispatcher=_mock_dispatcher(),
+                repo_resolver=_mock_resolver(),
+            )
         )
+        data = _parsed(result)
+        assert "path_outside_allowed_roots" in json.dumps(
+            data
+        ), f"Expected path_outside_allowed_roots in response; got: {data}"
 
     def test_accepts_path_inside_allowed_roots(self, tmp_path, monkeypatch):
         from mcp_server.cli.tool_handlers import handle_symbol_lookup
@@ -204,11 +223,13 @@ class TestSymbolLookupPathSandbox:
 
         monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(allowed))
 
-        result = _run(handle_symbol_lookup(
-            arguments={"symbol": "MyClass", "repository": str(subdir)},
-            dispatcher=_mock_dispatcher(),
-            repo_resolver=_mock_resolver(),
-        ))
+        result = _run(
+            handle_symbol_lookup(
+                arguments={"symbol": "MyClass", "repository": str(subdir)},
+                dispatcher=_mock_dispatcher(),
+                repo_resolver=_mock_resolver(),
+            )
+        )
         data = _parsed(result)
         assert "path_outside_allowed_roots" not in json.dumps(data)
 
@@ -218,11 +239,13 @@ class TestSymbolLookupPathSandbox:
 
         monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
 
-        result = _run(handle_symbol_lookup(
-            arguments={"symbol": "MyClass", "repository": "registered-name"},
-            dispatcher=_mock_dispatcher(),
-            repo_resolver=_mock_resolver(),
-        ))
+        result = _run(
+            handle_symbol_lookup(
+                arguments={"symbol": "MyClass", "repository": "registered-name"},
+                dispatcher=_mock_dispatcher(),
+                repo_resolver=_mock_resolver(),
+            )
+        )
         data = _parsed(result)
         assert "path_outside_allowed_roots" not in json.dumps(data)
 
@@ -231,11 +254,13 @@ class TestSymbolLookupPathSandbox:
 
         monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
 
-        result = _run(handle_symbol_lookup(
-            arguments={"symbol": "MyClass"},
-            dispatcher=_mock_dispatcher(),
-            repo_resolver=_mock_resolver(),
-        ))
+        result = _run(
+            handle_symbol_lookup(
+                arguments={"symbol": "MyClass"},
+                dispatcher=_mock_dispatcher(),
+                repo_resolver=_mock_resolver(),
+            )
+        )
         data = _parsed(result)
         assert "path_outside_allowed_roots" not in json.dumps(data)
 
@@ -270,17 +295,19 @@ class TestSummarizeSamplePathSandbox:
         db_file = tmp_path / "test.db"
         db_file.touch()
 
-        result = _run(handle_summarize_sample(
-            arguments={"paths": [str(outside / "file.py")]},
-            dispatcher=_mock_dispatcher(),
-            repo_resolver=_mock_resolver(),
-            sqlite_store=self._make_sqlite_store(db_file),
-            lazy_summarizer=self._make_lazy_summarizer(),
-        ))
-        data = _parsed(result)
-        assert "path_outside_allowed_roots" in json.dumps(data), (
-            f"Expected path_outside_allowed_roots in response; got: {data}"
+        result = _run(
+            handle_summarize_sample(
+                arguments={"paths": [str(outside / "file.py")]},
+                dispatcher=_mock_dispatcher(),
+                repo_resolver=_mock_resolver(),
+                sqlite_store=self._make_sqlite_store(db_file),
+                lazy_summarizer=self._make_lazy_summarizer(),
+            )
         )
+        data = _parsed(result)
+        assert "path_outside_allowed_roots" in json.dumps(
+            data
+        ), f"Expected path_outside_allowed_roots in response; got: {data}"
 
     def test_rejects_any_bad_path_in_list(self, tmp_path, monkeypatch):
         """Even one outside path in the list triggers rejection."""
@@ -299,13 +326,15 @@ class TestSummarizeSamplePathSandbox:
         good_path = str(allowed / "good.py")
         bad_path = str(outside / "bad.py")
 
-        result = _run(handle_summarize_sample(
-            arguments={"paths": [good_path, bad_path]},
-            dispatcher=_mock_dispatcher(),
-            repo_resolver=_mock_resolver(),
-            sqlite_store=self._make_sqlite_store(db_file),
-            lazy_summarizer=self._make_lazy_summarizer(),
-        ))
+        result = _run(
+            handle_summarize_sample(
+                arguments={"paths": [good_path, bad_path]},
+                dispatcher=_mock_dispatcher(),
+                repo_resolver=_mock_resolver(),
+                sqlite_store=self._make_sqlite_store(db_file),
+                lazy_summarizer=self._make_lazy_summarizer(),
+            )
+        )
         data = _parsed(result)
         assert "path_outside_allowed_roots" in json.dumps(data)
 
@@ -334,13 +363,15 @@ class TestSummarizeSamplePathSandbox:
         mock_conn.execute.return_value.fetchall.return_value = []
 
         with patch("sqlite3.connect", return_value=mock_conn):
-            result = _run(handle_summarize_sample(
-                arguments={"paths": [inside_path]},
-                dispatcher=_mock_dispatcher(),
-                repo_resolver=_mock_resolver(),
-                sqlite_store=self._make_sqlite_store(db_file),
-                lazy_summarizer=self._make_lazy_summarizer(),
-            ))
+            result = _run(
+                handle_summarize_sample(
+                    arguments={"paths": [inside_path]},
+                    dispatcher=_mock_dispatcher(),
+                    repo_resolver=_mock_resolver(),
+                    sqlite_store=self._make_sqlite_store(db_file),
+                    lazy_summarizer=self._make_lazy_summarizer(),
+                )
+            )
         data = _parsed(result)
         assert "path_outside_allowed_roots" not in json.dumps(data)
 
@@ -361,13 +392,15 @@ class TestSummarizeSamplePathSandbox:
         mock_conn.execute.return_value.fetchall.return_value = []
 
         with patch("sqlite3.connect", return_value=mock_conn):
-            result = _run(handle_summarize_sample(
-                arguments={},
-                dispatcher=_mock_dispatcher(),
-                repo_resolver=_mock_resolver(),
-                sqlite_store=self._make_sqlite_store(db_file),
-                lazy_summarizer=self._make_lazy_summarizer(),
-            ))
+            result = _run(
+                handle_summarize_sample(
+                    arguments={},
+                    dispatcher=_mock_dispatcher(),
+                    repo_resolver=_mock_resolver(),
+                    sqlite_store=self._make_sqlite_store(db_file),
+                    lazy_summarizer=self._make_lazy_summarizer(),
+                )
+            )
         data = _parsed(result)
         assert "path_outside_allowed_roots" not in json.dumps(data)
 
@@ -389,17 +422,19 @@ class TestReindexUnchanged:
 
         monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(allowed))
 
-        result = _run(handle_reindex(
-            arguments={"path": str(outside)},
-            dispatcher=_mock_dispatcher(),
-            repo_resolver=_mock_resolver(),
-        ))
+        result = _run(
+            handle_reindex(
+                arguments={"path": str(outside)},
+                dispatcher=_mock_dispatcher(),
+                repo_resolver=_mock_resolver(),
+            )
+        )
         data = _parsed(result)
         # reindex uses "Path outside allowed roots" — slightly different wording, that's OK
         dumped = json.dumps(data).lower()
-        assert "outside" in dumped or "allowed" in dumped, (
-            f"Expected outside-allowed indication in reindex response; got: {data}"
-        )
+        assert (
+            "outside" in dumped or "allowed" in dumped
+        ), f"Expected outside-allowed indication in reindex response; got: {data}"
 
 
 # ---------------------------------------------------------------------------
@@ -428,16 +463,23 @@ class TestWriteSummariesUnguarded:
         mock_writer = MagicMock()
         mock_writer.process_all = AsyncMock(return_value=0)
 
-        with patch("mcp_server.cli.tool_handlers.handle_write_summaries.__module__"), \
-             patch("mcp_server.indexing.summarization.ComprehensiveChunkWriter", return_value=mock_writer):
-            result = _run(handle_write_summaries(
-                arguments={"limit": 1},
-                dispatcher=_mock_dispatcher(),
-                repo_resolver=_mock_resolver(),
-                sqlite_store=sqlite_store,
-                lazy_summarizer=lazy_summarizer,
-            ))
+        with (
+            patch("mcp_server.cli.tool_handlers.handle_write_summaries.__module__"),
+            patch(
+                "mcp_server.indexing.summarization.ComprehensiveChunkWriter",
+                return_value=mock_writer,
+            ),
+        ):
+            result = _run(
+                handle_write_summaries(
+                    arguments={"limit": 1},
+                    dispatcher=_mock_dispatcher(),
+                    repo_resolver=_mock_resolver(),
+                    sqlite_store=sqlite_store,
+                    lazy_summarizer=lazy_summarizer,
+                )
+            )
         data = _parsed(result)
-        assert "path_outside_allowed_roots" not in json.dumps(data), (
-            f"write_summaries should not be path-guarded; got: {data}"
-        )
+        assert "path_outside_allowed_roots" not in json.dumps(
+            data
+        ), f"write_summaries should not be path-guarded; got: {data}"

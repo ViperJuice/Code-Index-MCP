@@ -11,16 +11,13 @@ from mcp_server.dependency_graph.parsers import (
     PythonRequirementsParser,
 )
 
-
 # ---------------------------------------------------------------------------
 # PythonRequirementsParser
 # ---------------------------------------------------------------------------
 
 
 def test_python_requirements_parser(tmp_path: Path) -> None:
-    (tmp_path / "requirements.txt").write_text(
-        "requests==2.31.0\nflask>=2.0\n# comment\nnumpy\n"
-    )
+    (tmp_path / "requirements.txt").write_text("requests==2.31.0\nflask>=2.0\n# comment\nnumpy\n")
     parser = PythonRequirementsParser()
     assert parser.manifest_filename == "requirements.txt"
     result = parser.parse(tmp_path)
@@ -105,8 +102,8 @@ def test_go_mod_parser_missing(tmp_path: Path) -> None:
 def test_cargo_toml_parser(tmp_path: Path) -> None:
     (tmp_path / "Cargo.toml").write_text(
         '[package]\nname = "my-crate"\nversion = "0.1.0"\n\n'
-        "[dependencies]\nserde = { version = \"1\", features = [\"derive\"] }\ntokio = \"1.0\"\n\n"
-        "[dev-dependencies]\npretty_assertions = \"1\"\n"
+        '[dependencies]\nserde = { version = "1", features = ["derive"] }\ntokio = "1.0"\n\n'
+        '[dev-dependencies]\npretty_assertions = "1"\n'
     )
     parser = CargoTomlParser()
     assert parser.manifest_filename == "Cargo.toml"

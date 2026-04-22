@@ -15,7 +15,6 @@ import pytest
 
 from mcp_server.artifacts.artifact_download import IndexArtifactDownloader
 
-
 REPO = "owner/repo"
 
 
@@ -85,10 +84,13 @@ class TestDeltaBaseFallback:
             return MagicMock(passed=True, manifest_v2_validated=False, reasons=[])
 
         monkeypatch.setattr(dl_mod.IndexArtifactDownloader, "_run_integrity_gate", fake_gate)
-        monkeypatch.setattr(dl_mod.IndexArtifactDownloader, "check_compatibility", lambda self, m: (True, []))
+        monkeypatch.setattr(
+            dl_mod.IndexArtifactDownloader, "check_compatibility", lambda self, m: (True, [])
+        )
         monkeypatch.setattr(dl_mod, "verify_attestation", MagicMock())
 
         import logging
+
         log_records: list[logging.LogRecord] = []
 
         class CapturingHandler(logging.Handler):
@@ -97,6 +99,7 @@ class TestDeltaBaseFallback:
 
         handler = CapturingHandler()
         import mcp_server.artifacts.artifact_download as dl
+
         dl.logger.addHandler(handler)
         dl.logger.setLevel(logging.WARNING)
 
@@ -116,13 +119,12 @@ class TestDeltaBaseFallback:
 
         # Either delta_from was cleared in metadata or a warning was logged
         delta_cleared = any(
-            m.get("delta_from") is None or m.get("delta_from") == ""
-            for m in captured_metadata
+            m.get("delta_from") is None or m.get("delta_from") == "" for m in captured_metadata
         )
         warned = any("delta" in r.getMessage().lower() for r in log_records)
-        assert delta_cleared or warned, (
-            "Expected delta_from to be cleared or a warning logged when base release is missing"
-        )
+        assert (
+            delta_cleared or warned
+        ), "Expected delta_from to be cleared or a warning logged when base release is missing"
 
     def test_present_delta_base_not_cleared(self, tmp_path, monkeypatch):
         """If the base release exists, delta_from is NOT cleared."""
@@ -154,7 +156,9 @@ class TestDeltaBaseFallback:
             return MagicMock(passed=True, manifest_v2_validated=False, reasons=[])
 
         monkeypatch.setattr(dl_mod.IndexArtifactDownloader, "_run_integrity_gate", fake_gate)
-        monkeypatch.setattr(dl_mod.IndexArtifactDownloader, "check_compatibility", lambda self, m: (True, []))
+        monkeypatch.setattr(
+            dl_mod.IndexArtifactDownloader, "check_compatibility", lambda self, m: (True, [])
+        )
         monkeypatch.setattr(dl_mod, "verify_attestation", MagicMock())
         monkeypatch.setattr(
             dl_mod.IndexArtifactDownloader,
@@ -170,9 +174,9 @@ class TestDeltaBaseFallback:
 
         # delta_from should still be set (not cleared) when base exists
         if captured_metadata:
-            assert captured_metadata[0].get("delta_from") == "index-abc1234", (
-                "delta_from should not be cleared when base release exists"
-            )
+            assert (
+                captured_metadata[0].get("delta_from") == "index-abc1234"
+            ), "delta_from should not be cleared when base release exists"
 
     def test_no_delta_from_skips_probe(self, tmp_path, monkeypatch):
         """Artifacts without delta_from should not trigger any 'release view' probe."""
@@ -188,7 +192,9 @@ class TestDeltaBaseFallback:
         import mcp_server.artifacts.artifact_download as dl_mod
 
         def fake_run(args, **kwargs):
-            if "actions/artifacts" in " ".join(str(a) for a in args) and "/zip" in " ".join(str(a) for a in args):
+            if "actions/artifacts" in " ".join(str(a) for a in args) and "/zip" in " ".join(
+                str(a) for a in args
+            ):
                 dest = kwargs.get("stdout")
                 if dest is not None:
                     dest.write(zip_path.read_bytes())
@@ -197,12 +203,20 @@ class TestDeltaBaseFallback:
                 release_view_calls.append(list(args))
             return MagicMock(returncode=0, stdout="", stderr="")
 
-        monkeypatch.setattr(dl_mod.IndexArtifactDownloader, "_run_integrity_gate",
-                            lambda self, m, a, c: MagicMock(passed=True, manifest_v2_validated=False, reasons=[]))
-        monkeypatch.setattr(dl_mod.IndexArtifactDownloader, "check_compatibility", lambda self, m: (True, []))
+        monkeypatch.setattr(
+            dl_mod.IndexArtifactDownloader,
+            "_run_integrity_gate",
+            lambda self, m, a, c: MagicMock(passed=True, manifest_v2_validated=False, reasons=[]),
+        )
+        monkeypatch.setattr(
+            dl_mod.IndexArtifactDownloader, "check_compatibility", lambda self, m: (True, [])
+        )
         monkeypatch.setattr(dl_mod, "verify_attestation", MagicMock())
-        monkeypatch.setattr(dl_mod.IndexArtifactDownloader, "install_indexes",
-                            MagicMock(return_value=["code_index.db"]))
+        monkeypatch.setattr(
+            dl_mod.IndexArtifactDownloader,
+            "install_indexes",
+            MagicMock(return_value=["code_index.db"]),
+        )
 
         with patch("subprocess.run", side_effect=fake_run):
             try:
@@ -210,6 +224,6 @@ class TestDeltaBaseFallback:
             except Exception:
                 pass
 
-        assert not release_view_calls, (
-            f"Should not call 'gh release view' for full artifacts; got: {release_view_calls}"
-        )
+        assert (
+            not release_view_calls
+        ), f"Should not call 'gh release view' for full artifacts; got: {release_view_calls}"

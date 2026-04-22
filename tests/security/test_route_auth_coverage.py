@@ -95,10 +95,12 @@ def _has_auth_dependency(route: APIRoute) -> bool:
     all_deps = list(route.dependencies or [])
     all_deps += list(route.dependant.dependencies if hasattr(route, "dependant") else [])
     dep_names = {
-        getattr(dep.call, "__name__", "") if hasattr(dep, "call") else ""
-        for dep in all_deps
+        getattr(dep.call, "__name__", "") if hasattr(dep, "call") else "" for dep in all_deps
     }
-    return bool(dep_names & {"require_permission", "require_auth", "require_role", "get_current_active_user"})
+    return bool(
+        dep_names
+        & {"require_permission", "require_auth", "require_role", "get_current_active_user"}
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -131,11 +133,6 @@ def test_all_protected_routes_return_401_without_token() -> None:
         if resp.status_code not in (401, 422, 503):
             # 422 = missing required body/query param (not an auth bypass)
             # 503 = service not started in test context (e.g. dispatcher)
-            failures.append(
-                f"  {method} {path} → {resp.status_code} (expected 401 or 503)"
-            )
+            failures.append(f"  {method} {path} → {resp.status_code} (expected 401 or 503)")
     if failures:
-        pytest.fail(
-            "Routes returned unexpected status without auth token:\n"
-            + "\n".join(failures)
-        )
+        pytest.fail("Routes returned unexpected status without auth token:\n" + "\n".join(failures))

@@ -1,4 +1,5 @@
 """Tests for SL-6 — strict schema compatibility and --rebuild-on-schema-mismatch flag."""
+
 from __future__ import annotations
 
 import os
@@ -10,7 +11,6 @@ from click.testing import CliRunner
 
 from mcp_server.storage.index_manager import IndexManager, IndexManifest
 from mcp_server.storage.schema_errors import SchemaMismatchError
-
 
 CURRENT_VERSION = "005"
 
@@ -102,17 +102,20 @@ class TestRebuildFlag:
 
     def test_stdio_has_rebuild_flag(self):
         from mcp_server.cli.server_commands import stdio
+
         param_names = [p.name for p in stdio.params]
         assert "rebuild_on_schema_mismatch" in param_names
 
     def test_serve_has_rebuild_flag(self):
         from mcp_server.cli.server_commands import serve
+
         param_names = [p.name for p in serve.params]
         assert "rebuild_on_schema_mismatch" in param_names
 
     def test_rebuild_flag_sets_env_var(self):
         """When --rebuild-on-schema-mismatch is passed, the env var is set before startup."""
         from mcp_server.cli.server_commands import stdio
+
         runner = CliRunner()
 
         with patch("mcp_server.cli.stdio_runner.run") as mock_run:

@@ -33,9 +33,7 @@ def encode(e: Envelope) -> bytes:
     """Serialize an Envelope to a single UTF-8 JSON line ending in ``\\n``."""
     line = e.model_dump_json().encode("utf-8")
     if len(line) + 1 > MAX_LINE_BYTES:
-        raise ProtocolError(
-            f"envelope too large: {len(line) + 1} > {MAX_LINE_BYTES} bytes"
-        )
+        raise ProtocolError(f"envelope too large: {len(line) + 1} > {MAX_LINE_BYTES} bytes")
     return line + b"\n"
 
 
@@ -46,9 +44,7 @@ def decode(line: bytes) -> Envelope:
     :class:`ProtocolError` on oversize or malformed JSON.
     """
     if len(line) > MAX_LINE_BYTES:
-        raise ProtocolError(
-            f"envelope too large: {len(line)} > {MAX_LINE_BYTES} bytes"
-        )
+        raise ProtocolError(f"envelope too large: {len(line)} > {MAX_LINE_BYTES} bytes")
     if line.endswith(b"\n"):
         line = line[:-1]
     try:

@@ -4,7 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from mcp_server.core.ignore_patterns import IgnorePatternManager, build_walker_filter, EXCLUDED_DIR_PARTS
+from mcp_server.core.ignore_patterns import (
+    EXCLUDED_DIR_PARTS,
+    IgnorePatternManager,
+    build_walker_filter,
+)
 
 
 class TestDefaultPatterns:
@@ -143,10 +147,27 @@ class TestExcludedDirParts:
     """EXCLUDED_DIR_PARTS must cover all expected directory names."""
 
     REQUIRED_DIRS = [
-        ".git", "node_modules", "__pycache__", ".venv", "venv",
-        ".mcp-index", ".indexes", "dist", "build", ".ruff_cache",
-        ".mypy_cache", "htmlcov", ".tox", ".pytest_cache", ".idea",
-        ".vscode", ".gradle", ".next", ".nuxt", "target", "coverage",
+        ".git",
+        "node_modules",
+        "__pycache__",
+        ".venv",
+        "venv",
+        ".mcp-index",
+        ".indexes",
+        "dist",
+        "build",
+        ".ruff_cache",
+        ".mypy_cache",
+        "htmlcov",
+        ".tox",
+        ".pytest_cache",
+        ".idea",
+        ".vscode",
+        ".gradle",
+        ".next",
+        ".nuxt",
+        "target",
+        "coverage",
     ]
 
     def test_excluded_dir_parts_completeness(self, tmp_path):

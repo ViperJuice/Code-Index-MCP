@@ -1,4 +1,5 @@
 """Tests for RepositoryRegistry — SL-2."""
+
 import json
 import sqlite3
 import subprocess
@@ -97,8 +98,9 @@ class TestRepositoryInfoAdditiveFields:
 
 
 class TestRegistryRekey:
-    def _write_legacy_registry(self, registry_path: Path, old_id: str, repo_path: Path,
-                                index_path: Path) -> None:
+    def _write_legacy_registry(
+        self, registry_path: Path, old_id: str, repo_path: Path, index_path: Path
+    ) -> None:
         data = {
             old_id: {
                 "repository_id": old_id,
@@ -200,12 +202,8 @@ class TestSQLiteMigrationDuringRekey:
     def _build_sqlite_with_text_repo_id(self, db_path: str, old_repo_id: str) -> None:
         """Create a minimal SQLite db with a text repository_id column in files."""
         conn = sqlite3.connect(db_path)
-        conn.execute(
-            "CREATE TABLE files (id INTEGER PRIMARY KEY, repository_id TEXT, path TEXT)"
-        )
-        conn.execute(
-            "CREATE TABLE symbols (id INTEGER PRIMARY KEY, repository_id TEXT, name TEXT)"
-        )
+        conn.execute("CREATE TABLE files (id INTEGER PRIMARY KEY, repository_id TEXT, path TEXT)")
+        conn.execute("CREATE TABLE symbols (id INTEGER PRIMARY KEY, repository_id TEXT, name TEXT)")
         conn.execute("INSERT INTO files (repository_id, path) VALUES (?, ?)", (old_repo_id, "a.py"))
         conn.execute(
             "INSERT INTO symbols (repository_id, name) VALUES (?, ?)", (old_repo_id, "func_a")
@@ -263,12 +261,12 @@ class TestSQLiteMigrationDuringRekey:
         symbol_rows = conn.execute("SELECT repository_id FROM symbols").fetchall()
         conn.close()
 
-        assert all(r[0] == expected_id for r in rows), (
-            f"Expected all files.repository_id={expected_id}, got {rows}"
-        )
-        assert all(r[0] == expected_id for r in symbol_rows), (
-            f"Expected all symbols.repository_id={expected_id}, got {symbol_rows}"
-        )
+        assert all(
+            r[0] == expected_id for r in rows
+        ), f"Expected all files.repository_id={expected_id}, got {rows}"
+        assert all(
+            r[0] == expected_id for r in symbol_rows
+        ), f"Expected all symbols.repository_id={expected_id}, got {symbol_rows}"
 
 
 # ---------------------------------------------------------------------------

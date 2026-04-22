@@ -8,9 +8,9 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
+from mcp_server.artifacts.artifact_upload import IndexArtifactUploader
 from mcp_server.artifacts.attestation import Attestation
 from mcp_server.artifacts.publisher import ArtifactError, ArtifactPublisher
-from mcp_server.artifacts.artifact_upload import IndexArtifactUploader
 
 REPO = "owner/repo"
 COMMIT = "abcdef1234567890abcdef1234567890abcdef12"
@@ -121,7 +121,9 @@ class TestPublishRollback:
 
         sha_deletes = [c for c in delete_calls if SHA_TAG in c]
         if sha_deletes:
-            assert "--yes" in sha_deletes[0], f"--yes flag missing from delete call: {sha_deletes[0]}"
+            assert (
+                "--yes" in sha_deletes[0]
+            ), f"--yes flag missing from delete call: {sha_deletes[0]}"
 
     def test_original_error_reraised_after_rollback(self):
         """The original exception (not the delete exception) must propagate."""
@@ -169,4 +171,6 @@ class TestPublishRollback:
                 publisher.publish_on_reindex("repo", COMMIT)
 
         sha_deletes = [c for c in delete_calls if SHA_TAG in c]
-        assert not sha_deletes, f"Should not delete SHA release we never created; got: {sha_deletes}"
+        assert (
+            not sha_deletes
+        ), f"Should not delete SHA release we never created; got: {sha_deletes}"

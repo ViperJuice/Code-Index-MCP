@@ -1,9 +1,10 @@
 [project]
 name = "index-it-mcp"
-version = "1.2.0-rc3"
+version = "1.2.0-rc4"
 description = "Local-first code indexer for AI assistants via Model Context Protocol (MCP)"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     {name = "Jenner Torrence"}
 ]
@@ -11,7 +12,6 @@ requires-python = ">=3.12"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
@@ -152,7 +152,7 @@ Repository = "https://github.com/ViperJuice/Code-Index-MCP"
 Issues = "https://github.com/ViperJuice/Code-Index-MCP/issues"
 
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
@@ -186,10 +186,3 @@ python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-asyncio_mode = "auto"
-filterwarnings = [
-    "ignore::DeprecationWarning",
-]

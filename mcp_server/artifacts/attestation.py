@@ -77,7 +77,16 @@ def attest(artifact_path: Path, *, repo: str, gh_cmd: str = "gh") -> Attestation
         )
     sidecar = artifact_path.with_suffix(artifact_path.suffix + ".attestation.jsonl")
     result = subprocess.run(
-        [gh_cmd, "attestation", "sign", str(artifact_path), "--repo", repo, "--bundle", str(sidecar)],
+        [
+            gh_cmd,
+            "attestation",
+            "sign",
+            str(artifact_path),
+            "--repo",
+            repo,
+            "--bundle",
+            str(sidecar),
+        ],
         capture_output=True,
         text=True,
     )
@@ -113,9 +122,14 @@ def verify_attestation(
         return
     result = subprocess.run(
         [
-            gh_cmd, "attestation", "verify", str(archive_path),
-            "--bundle", str(attestation.bundle_path),
-            "--repo", expected_repo,
+            gh_cmd,
+            "attestation",
+            "verify",
+            str(archive_path),
+            "--bundle",
+            str(attestation.bundle_path),
+            "--repo",
+            expected_repo,
         ],
         capture_output=True,
         text=True,

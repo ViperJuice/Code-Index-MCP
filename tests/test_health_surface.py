@@ -1,4 +1,5 @@
 """Tests for IF-0-P10-4 and IF-0-P10-7: multi-repo health surface (SL-4)."""
+
 from __future__ import annotations
 
 import asyncio
@@ -10,12 +11,20 @@ import pytest
 
 from tests.fixtures.health_repo import make_repo_info
 
-EXPECTED_KEYS = {"repo_id", "tracked_branch", "index_path_exists", "git_dir_exists", "last_indexed_commit", "staleness_reason"}
+EXPECTED_KEYS = {
+    "repo_id",
+    "tracked_branch",
+    "index_path_exists",
+    "git_dir_exists",
+    "last_indexed_commit",
+    "staleness_reason",
+}
 
 
 # ---------------------------------------------------------------------------
 # build_health_row unit tests
 # ---------------------------------------------------------------------------
+
 
 class TestBuildHealthRow:
     def test_returns_expected_keys(self, tmp_path):
@@ -82,6 +91,7 @@ class TestBuildHealthRow:
 # ---------------------------------------------------------------------------
 # stdio handle_get_status includes repositories
 # ---------------------------------------------------------------------------
+
 
 class TestStdioHandleGetStatusRepositories:
     def _make_registry_mock(self, tmp_path):
@@ -154,6 +164,7 @@ class TestStdioHandleGetStatusRepositories:
 # HTTP gateway.get_status includes repositories
 # ---------------------------------------------------------------------------
 
+
 class TestGatewayGetStatusRepositories:
     def _make_gateway_registry(self, tmp_path):
         info = make_repo_info(tmp_path, repo_id="repo-b")
@@ -163,8 +174,9 @@ class TestGatewayGetStatusRepositories:
 
     def test_gateway_repositories_key_present(self, tmp_path, monkeypatch):
         try:
-            from mcp_server.gateway import app
             from fastapi.testclient import TestClient
+
+            from mcp_server.gateway import app
         except Exception:
             pytest.skip("FastAPI gateway unavailable")
 
@@ -174,8 +186,15 @@ class TestGatewayGetStatusRepositories:
         monkeypatch.setattr(gateway, "_repo_registry", registry, raising=False)
 
         from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher
+
         monkeypatch.setattr(gateway, "dispatcher", SimpleDispatcher())
-        for attr in ("bm25_indexer", "hybrid_search", "fuzzy_indexer", "semantic_indexer", "query_cache"):
+        for attr in (
+            "bm25_indexer",
+            "hybrid_search",
+            "fuzzy_indexer",
+            "semantic_indexer",
+            "query_cache",
+        ):
             if hasattr(gateway, attr):
                 monkeypatch.setattr(gateway, attr, None)
 
@@ -197,8 +216,9 @@ class TestGatewayGetStatusRepositories:
 
     def test_gateway_repositories_entries_match_registry(self, tmp_path, monkeypatch):
         try:
-            from mcp_server.gateway import app
             from fastapi.testclient import TestClient
+
+            from mcp_server.gateway import app
         except Exception:
             pytest.skip("FastAPI gateway unavailable")
 
@@ -208,8 +228,15 @@ class TestGatewayGetStatusRepositories:
         monkeypatch.setattr(gateway, "_repo_registry", registry, raising=False)
 
         from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher
+
         monkeypatch.setattr(gateway, "dispatcher", SimpleDispatcher())
-        for attr in ("bm25_indexer", "hybrid_search", "fuzzy_indexer", "semantic_indexer", "query_cache"):
+        for attr in (
+            "bm25_indexer",
+            "hybrid_search",
+            "fuzzy_indexer",
+            "semantic_indexer",
+            "query_cache",
+        ):
             if hasattr(gateway, attr):
                 monkeypatch.setattr(gateway, attr, None)
 

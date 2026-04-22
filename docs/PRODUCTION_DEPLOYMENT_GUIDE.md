@@ -104,7 +104,7 @@ git clone https://github.com/your-org/code-index-mcp.git
 cd code-index-mcp
 
 # Run deployment script
-VERSION=v1.2.0-rc3 ./scripts/deploy-production.sh
+VERSION=v1.2.0-rc4 ./scripts/deploy-production.sh
 ```
 
 ### Method 2: Kubernetes Manifests
@@ -277,7 +277,7 @@ rules:
 ### 4. Security Scanning
 ```bash
 # Scan image for vulnerabilities
-trivy image ghcr.io/your-org/code-index-mcp:v1.2.0-rc3
+trivy image ghcr.io/your-org/code-index-mcp:v1.2.0-rc4
 
 # Runtime security
 kubectl apply -f https://raw.githubusercontent.com/falcosecurity/falco/master/deploy/kubernetes/falco-daemonset-configmap.yaml
@@ -435,10 +435,10 @@ kubectl port-forward -n mcp-system deployment/code-index-mcp 8000:8000
 ./scripts/backup-production.sh
 
 # 2. Test in staging
-VERSION=v1.2.0-rc3 DEPLOYMENT_ENV=staging ./scripts/deploy-production.sh
+VERSION=v1.2.0-rc4 DEPLOYMENT_ENV=staging ./scripts/deploy-production.sh
 
 # 3. Deploy to production
-VERSION=v1.2.0-rc3 ./scripts/deploy-production.sh
+VERSION=v1.2.0-rc4 ./scripts/deploy-production.sh
 
 # 4. Verify deployment
 ./scripts/verify-deployment.sh

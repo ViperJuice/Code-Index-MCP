@@ -194,7 +194,9 @@ class MCPClientWrapper:
                 ]
             else:
                 # Use dispatcher search
-                search_results = list(self.dispatcher.search(self._ctx, pattern, semantic=semantic, limit=20))
+                search_results = list(
+                    self.dispatcher.search(self._ctx, pattern, semantic=semantic, limit=20)
+                )
                 results = [
                     {
                         "file": r.file,

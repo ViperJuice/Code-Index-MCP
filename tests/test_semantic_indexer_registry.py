@@ -10,7 +10,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -114,9 +113,7 @@ class TestSemanticIndexerRegistry:
         second = registry.get("repo-a")
         assert first is second
 
-    def test_shutdown_closes_all_indexers(
-        self, tmp_path, mock_qdrant, mock_embedding_provider
-    ):
+    def test_shutdown_closes_all_indexers(self, tmp_path, mock_qdrant, mock_embedding_provider):
         """shutdown() must close all cached indexers."""
         from mcp_server.utils.semantic_indexer_registry import SemanticIndexerRegistry
 

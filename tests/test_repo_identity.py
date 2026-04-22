@@ -1,4 +1,5 @@
 """Tests for mcp_server.storage.repo_identity — SL-1."""
+
 import subprocess
 from pathlib import Path
 
@@ -74,9 +75,9 @@ class TestComputeRepoId:
         id_wt1 = compute_repo_id(wt1).repo_id
         id_wt2 = compute_repo_id(wt2).repo_id
 
-        assert id_bare == id_wt1 == id_wt2, (
-            f"IDs diverge: bare={id_bare}, wt1={id_wt1}, wt2={id_wt2}"
-        )
+        assert (
+            id_bare == id_wt1 == id_wt2
+        ), f"IDs diverge: bare={id_bare}, wt1={id_wt1}, wt2={id_wt2}"
 
     def test_tier1_source_label(self, tmp_path):
         """Normal git repo uses git_common_dir source."""
@@ -95,7 +96,11 @@ class TestComputeRepoId:
         Instead we test tier-2 more directly: a git repo whose git-common-dir lookup
         fails (bare = False, no .git dir) but whose cwd has a parseable config.
         """
-        from mcp_server.storage.repo_identity import compute_repo_id, _sha256_hex16, _normalize_remote_url
+        from mcp_server.storage.repo_identity import (
+            _normalize_remote_url,
+            _sha256_hex16,
+            compute_repo_id,
+        )
 
         # Create a normal repo first to get a valid config we can reference
         _, clone = make_clone_with_origin(tmp_path)
@@ -117,8 +122,7 @@ class TestComputeRepoId:
         pseudo_git_dir = tmp_path / "pseudo_gitdir"
         pseudo_git_dir.mkdir()
         (pseudo_git_dir / "config").write_text(
-            f"[core]\n\trepositoryformatversion = 0\n"
-            f"[remote \"origin\"]\n\turl = {remote_url}\n"
+            f"[core]\n\trepositoryformatversion = 0\n" f'[remote "origin"]\n\turl = {remote_url}\n'
         )
 
         # Make a working dir that has .git pointing to pseudo_git_dir (gitfile worktree syntax)
@@ -198,7 +202,9 @@ class TestResolveTrackedBranch:
         # Verify origin/HEAD is set
         result = subprocess.run(
             ["git", "symbolic-ref", "refs/remotes/origin/HEAD"],
-            cwd=clone, capture_output=True, text=True,
+            cwd=clone,
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 0, "origin/HEAD should be set after clone"
 

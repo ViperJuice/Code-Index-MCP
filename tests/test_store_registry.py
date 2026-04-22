@@ -13,10 +13,10 @@ from mcp_server.storage.multi_repo_manager import RepositoryInfo
 from mcp_server.storage.repository_registry import RepositoryRegistry
 from mcp_server.storage.sqlite_store import SQLiteStore
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_registry_with_repo(tmp_path: Path) -> tuple:
     """Return (RepositoryRegistry, repo_id, index_path) backed by tmp_path."""
@@ -52,7 +52,6 @@ def _make_registry_with_repo(tmp_path: Path) -> tuple:
 # ---------------------------------------------------------------------------
 
 from mcp_server.storage.store_registry import StoreRegistry  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Tests
@@ -140,6 +139,7 @@ class TestStoreRegistry:
     def test_multi_repo_manager_search_symbol_still_works(self, tmp_path):
         """After delegation refactor, search_symbol works end-to-end."""
         import asyncio
+
         from mcp_server.storage.multi_repo_manager import MultiRepositoryManager
 
         registry_file = tmp_path / "test_registry.json"
@@ -161,8 +161,16 @@ class TestStoreRegistry:
                     "(repository_id, path, relative_path, language, size, hash, content_hash, "
                     " last_modified, indexed_at, metadata, is_deleted) "
                     "VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, FALSE)",
-                    (repo_row_id, str(tmp_path / "test_module.py"), "test_module.py",
-                     "python", 100, "abc123", "abc123content", "{}"),
+                    (
+                        repo_row_id,
+                        str(tmp_path / "test_module.py"),
+                        "test_module.py",
+                        "python",
+                        100,
+                        "abc123",
+                        "abc123content",
+                        "{}",
+                    ),
                 ).lastrowid
 
                 conn.execute(
@@ -191,5 +199,6 @@ class TestStoreRegistry:
         manager.registry.register(repo_info)
 
         results = asyncio.run(manager.search_symbol("MyTestClass", repository_ids=[repo_id]))
-        assert any("MyTestClass" in str(r) for r in results), \
-            f"Expected MyTestClass in results, got: {results}"
+        assert any(
+            "MyTestClass" in str(r) for r in results
+        ), f"Expected MyTestClass in results, got: {results}"

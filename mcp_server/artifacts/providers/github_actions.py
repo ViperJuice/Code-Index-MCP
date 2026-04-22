@@ -13,13 +13,12 @@ from typing import List, Mapping, Optional, Tuple
 
 from mcp_server.core.errors import TerminalArtifactError, TransientArtifactError
 
-from mcp_server.core.errors import TerminalArtifactError
 from .base import ArtifactRecord
 
 try:
     from mcp_server.metrics.prometheus_exporter import (
-        mcp_rate_limit_sleeps_total,
         mcp_artifact_errors_by_class_total,
+        mcp_rate_limit_sleeps_total,
     )
 except ImportError:
     mcp_rate_limit_sleeps_total = None
@@ -50,9 +49,7 @@ def _respect_rate_limit(headers: Mapping[str, str], status_code: int = 200) -> f
     if status_code == 403:
         if mcp_artifact_errors_by_class_total is not None:
             try:
-                mcp_artifact_errors_by_class_total.labels(
-                    error_class="TerminalArtifactError"
-                ).inc()
+                mcp_artifact_errors_by_class_total.labels(error_class="TerminalArtifactError").inc()
             except Exception:
                 pass
         raise TerminalArtifactError("forbidden / missing scope (HTTP 403)")
@@ -254,9 +251,7 @@ def delete_releases_older_than(
 
     # Step 1: Remove protected releases (pointers + isLatest)
     candidates = [
-        ref
-        for ref in all_refs
-        if not ref.is_latest and ref.tag_name not in _PROTECTED_TAGS
+        ref for ref in all_refs if not ref.is_latest and ref.tag_name not in _PROTECTED_TAGS
     ]
 
     # Step 2: Age filter

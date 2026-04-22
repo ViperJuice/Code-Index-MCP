@@ -10,7 +10,6 @@ import pytest
 
 from mcp_server.storage.multi_repo_manager import RepositoryInfo
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -35,7 +34,10 @@ def _make_git_repo(tmp_path: Path) -> Path:
 def _head_sha(repo: Path) -> str:
     return subprocess.run(
         ["git", "rev-parse", "HEAD"],
-        cwd=repo, check=True, capture_output=True, text=True,
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout.strip()
 
 
@@ -61,7 +63,9 @@ def _advance_branch(repo: Path) -> str:
     """Make an empty commit on main and return new HEAD SHA."""
     subprocess.run(
         ["git", "commit", "--allow-empty", "-m", "advance"],
-        cwd=repo, check=True, capture_output=True,
+        cwd=repo,
+        check=True,
+        capture_output=True,
     )
     return _head_sha(repo)
 
@@ -142,6 +146,7 @@ def test_unset_tracked_branch_is_skipped(tmp_path):
 def test_missing_ref_file_is_skipped_with_warning(tmp_path, caplog):
     """Repos whose refs/heads/<branch> doesn't exist are skipped (no crash)."""
     import logging
+
     from mcp_server.watcher.ref_poller import RefPoller
 
     repo = _make_git_repo(tmp_path)
@@ -167,7 +172,10 @@ def test_missing_ref_file_is_skipped_with_warning(tmp_path, caplog):
             time.sleep(1.5)
             mock_git_index_manager.sync_repository_index.assert_not_called()
             # Should have logged a warning
-            assert any("nonexistent-branch" in r.message or "nonexistent-branch" in str(r) for r in caplog.records)
+            assert any(
+                "nonexistent-branch" in r.message or "nonexistent-branch" in str(r)
+                for r in caplog.records
+            )
         finally:
             poller.stop()
 
@@ -218,10 +226,12 @@ def test_exception_in_one_repo_does_not_kill_poller(tmp_path):
     mock_registry.list_all.return_value = [info1, info2]
 
     mock_git_index_manager = MagicMock()
+
     # First repo raises, second should still get called
     def side_effect(repo_id):
         if repo_id == "repo-1":
             raise RuntimeError("simulated failure")
+
     mock_git_index_manager.sync_repository_index.side_effect = side_effect
 
     poller = RefPoller(

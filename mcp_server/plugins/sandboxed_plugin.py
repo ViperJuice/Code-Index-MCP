@@ -22,8 +22,8 @@ from pathlib import Path
 from typing import Iterable, List
 
 from mcp_server.plugin_base import (
-    IPlugin,
     IndexShard,
+    IPlugin,
     Reference,
     SearchOpts,
     SearchResult,
@@ -90,9 +90,7 @@ class SandboxedPlugin(IPlugin):
         return bool(resp.get("value", False))
 
     def indexFile(self, path: str | Path, content: str) -> IndexShard:
-        resp = self._supervisor.call(
-            "indexFile", {"path": str(path), "content": content}
-        )
+        resp = self._supervisor.call("indexFile", {"path": str(path), "content": content})
         # IndexShard is a TypedDict; the raw dict is the shape.
         return resp  # type: ignore[return-value]
 
@@ -117,9 +115,7 @@ class SandboxedPlugin(IPlugin):
                 continue
         return out
 
-    def search(
-        self, query: str, opts: SearchOpts | None = None
-    ) -> Iterable[SearchResult]:
+    def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:
         resp = self._supervisor.call(
             "search", {"query": query, "opts": dict(opts) if opts else None}
         )

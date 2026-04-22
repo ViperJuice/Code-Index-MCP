@@ -24,6 +24,5 @@ def test_sandbox_unsupported_file_is_quiet_skip(tmp_path, repo_ctx, caplog):
     assert not [
         record
         for record in caplog.records
-        if "Failed to index" in record.getMessage()
-        or "Error loading plugin" in record.getMessage()
+        if "Failed to index" in record.getMessage() or "Error loading plugin" in record.getMessage()
     ]

@@ -7,7 +7,6 @@ from dataclasses import fields, is_dataclass
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # IF-0-P16-1: Error taxonomy
 # ---------------------------------------------------------------------------
@@ -159,12 +158,15 @@ def test_validation_error_dataclass():
 
 def test_validate_production_config_signature(monkeypatch):
     import types
+
     from mcp_server.config import validate_production_config
     from mcp_server.config.validation import ValidationError
 
     # Use a minimal real-shaped config with a strong JWT secret and no CORS wildcard.
     strong_secret = "a" * 40  # 40 hex chars — not in weak-credential blocklist
-    cfg = types.SimpleNamespace(jwt_secret_key=strong_secret, cors_origins=[], rate_limit_requests=100)
+    cfg = types.SimpleNamespace(
+        jwt_secret_key=strong_secret, cors_origins=[], rate_limit_requests=100
+    )
 
     # Ensure DEFAULT_ADMIN_PASSWORD is strong (required in production env check)
     monkeypatch.setenv("DEFAULT_ADMIN_PASSWORD", "Strong-Admin-Password-xyz!")
@@ -185,7 +187,6 @@ def test_validate_production_config_signature(monkeypatch):
 
 def test_validate_production_config_reexported():
     import mcp_server.config as config_mod
-
     from mcp_server.config import ValidationError, validate_production_config  # noqa: F401
 
     assert "ValidationError" in config_mod.__all__
@@ -222,7 +223,6 @@ def test_reset_process_singletons_nulls_all(module_path, attr_name):
 def test_reset_process_singletons_leaves_lock_alone():
     """reset_process_singletons must NOT touch _manager_lock."""
     import mcp_server.plugins.memory_aware_manager as mam_mod
-
     from mcp_server.cli.bootstrap import reset_process_singletons
 
     original_lock = getattr(mam_mod, "_manager_lock", None)

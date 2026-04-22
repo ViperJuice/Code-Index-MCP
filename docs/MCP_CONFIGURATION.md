@@ -2,7 +2,7 @@
 
 This guide provides comprehensive information on configuring the Code-Index-MCP for different environments and use cases.
 
-> **Beta status**: This guide targets `1.2.0-rc3`. MCP STDIO is the primary
+> **Beta status**: This guide targets `1.2.0-rc4`. MCP STDIO is the primary
 > LLM surface. Docker examples use `ghcr.io/viperjuice/code-index-mcp`.
 > Language behavior is defined in [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md).
 

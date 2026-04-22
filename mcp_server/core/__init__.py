@@ -22,8 +22,10 @@ def __getattr__(name: str):
     # mcp_server.storage is imported before mcp_server.core).
     if name == "RepoContext":
         from .repo_context import RepoContext
+
         return RepoContext
     if name == "RepoResolver":
         from .repo_resolver import RepoResolver
+
         return RepoResolver
     raise AttributeError(f"module 'mcp_server.core' has no attribute {name!r}")

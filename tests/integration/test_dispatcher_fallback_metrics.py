@@ -10,9 +10,7 @@ import pytest
 
 from mcp_server.metrics.prometheus_exporter import PROMETHEUS_AVAILABLE
 
-pytestmark = pytest.mark.skipif(
-    not PROMETHEUS_AVAILABLE, reason="prometheus_client not installed"
-)
+pytestmark = pytest.mark.skipif(not PROMETHEUS_AVAILABLE, reason="prometheus_client not installed")
 
 
 def _make_slow_db(tmp_path: Path, filepath: str) -> str:
@@ -36,8 +34,9 @@ def test_fallback_timeout_histogram_on_metrics_endpoint(tmp_path, monkeypatch):
 
     # Reset the global exporter so a fresh PrometheusExporter picks up our histogram
     import mcp_server.metrics.prometheus_exporter as exp_mod
+
     original_exporter = exp_mod._exporter
-    exp_mod._exporter = None
+    exp_mod._exporter = exp_mod.PrometheusExporter()
 
     try:
         from mcp_server.core.repo_context import RepoContext
@@ -88,22 +87,22 @@ def test_fallback_timeout_histogram_on_metrics_endpoint(tmp_path, monkeypatch):
             for s in m.samples
             if s.name.endswith("_count")
         }
-        assert samples.get("timeout", 0) >= 1, (
-            f"Expected timeout count >=1, got samples={samples}"
-        )
+        assert samples.get("timeout", 0) >= 1, f"Expected timeout count >=1, got samples={samples}"
 
         # Verify the PrometheusExporter generates metrics text with the histogram
         metrics_bytes = exporter.generate_metrics()
-        metrics_text = metrics_bytes.decode("utf-8") if isinstance(metrics_bytes, bytes) else metrics_bytes
-        assert "mcp_dispatcher_fallback_duration_seconds_bucket" in metrics_text, (
-            "Expected bucket metric in PrometheusExporter output"
+        metrics_text = (
+            metrics_bytes.decode("utf-8") if isinstance(metrics_bytes, bytes) else metrics_bytes
         )
-        assert 'outcome="timeout"' in metrics_text, (
-            "Expected timeout label in PrometheusExporter output"
-        )
-        assert "mcp_dispatcher_fallback_duration_seconds_count" in metrics_text, (
-            "Expected count metric in PrometheusExporter output"
-        )
+        assert (
+            "mcp_dispatcher_fallback_duration_seconds_bucket" in metrics_text
+        ), "Expected bucket metric in PrometheusExporter output"
+        assert (
+            'outcome="timeout"' in metrics_text
+        ), "Expected timeout label in PrometheusExporter output"
+        assert (
+            "mcp_dispatcher_fallback_duration_seconds_count" in metrics_text
+        ), "Expected count metric in PrometheusExporter output"
 
     finally:
         exp_mod._exporter = original_exporter

@@ -14,7 +14,6 @@ from mcp_server.storage.git_index_manager import (
 )
 from mcp_server.storage.multi_repo_manager import RepositoryInfo
 
-
 # ---------------------------------------------------------------------------
 # SL-3.1a: should_reindex_for_branch unit tests
 # ---------------------------------------------------------------------------
@@ -54,16 +53,17 @@ def _make_git_repo(tmp_path: Path) -> Path:
     )
     (repo / "hello.py").write_text("print('hello')\n")
     subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
-    subprocess.run(
-        ["git", "commit", "-m", "init"], cwd=repo, check=True, capture_output=True
-    )
+    subprocess.run(["git", "commit", "-m", "init"], cwd=repo, check=True, capture_output=True)
     return repo
 
 
 def _get_head_commit(repo: Path) -> str:
     return subprocess.run(
         ["git", "rev-parse", "HEAD"],
-        cwd=repo, check=True, capture_output=True, text=True,
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout.strip()
 
 
@@ -142,9 +142,7 @@ def test_same_branch_advance_triggers_incremental(tmp_path):
     # Make a new commit on main
     (repo / "hello.py").write_text("print('updated')\n")
     subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
-    subprocess.run(
-        ["git", "commit", "-m", "update"], cwd=repo, check=True, capture_output=True
-    )
+    subprocess.run(["git", "commit", "-m", "update"], cwd=repo, check=True, capture_output=True)
     new_commit = _get_head_commit(repo)
 
     registry = MagicMock()
@@ -157,11 +155,12 @@ def test_same_branch_advance_triggers_incremental(tmp_path):
     manager._should_full_reindex = MagicMock(return_value=False)
 
     from mcp_server.storage.git_index_manager import UpdateResult
+
     incremental_mock = MagicMock(return_value=UpdateResult(indexed=1))
     manager._incremental_index_update = incremental_mock
 
     result = manager.sync_repository_index("test-repo-id")
 
-    assert incremental_mock.call_count == 1, (
-        f"_incremental_index_update should be called once; got {incremental_mock.call_count}"
-    )
+    assert (
+        incremental_mock.call_count == 1
+    ), f"_incremental_index_update should be called once; got {incremental_mock.call_count}"

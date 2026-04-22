@@ -40,8 +40,7 @@ class VoyageEmbeddingProvider(EmbeddingProvider):
                 self.client = voyageai.Client()
             except Exception as exc:
                 raise RuntimeError(
-                    "Semantic search requires Voyage AI API key. "
-                    "Set VOYAGE_API_KEY."
+                    "Semantic search requires Voyage AI API key. " "Set VOYAGE_API_KEY."
                 ) from exc
 
         self.model_name = model_name

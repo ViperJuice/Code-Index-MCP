@@ -50,7 +50,9 @@ class RefPoller:
                 try:
                     self._poll_one(repo)
                 except Exception:
-                    logger.exception("Unhandled error polling repo %s", getattr(repo, "repository_id", repo))
+                    logger.exception(
+                        "Unhandled error polling repo %s", getattr(repo, "repository_id", repo)
+                    )
             self._stop_event.wait(self._interval)
 
     def _poll_one(self, repo_info: Any) -> None:

@@ -137,7 +137,7 @@ git clone https://github.com/your-org/code-index-mcp.git
 cd code-index-mcp
 
 # Deploy to production
-VERSION=v1.2.0-rc3 ./scripts/deploy-production.sh
+VERSION=v1.2.0-rc4 ./scripts/deploy-production.sh
 ```
 
 ### Monitoring

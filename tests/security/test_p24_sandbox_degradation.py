@@ -11,7 +11,6 @@ from mcp_server.plugins.sandboxed_plugin import SandboxedPlugin
 from mcp_server.sandbox.capabilities import CapabilitySet
 from mcp_server.sandbox.supervisor import SandboxCallError
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 

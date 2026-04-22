@@ -28,9 +28,7 @@ class TokenValidator:
         require_flag = os.environ.get("MCP_REQUIRE_TOKEN_SCOPES") == "1"
         if token is None:
             if require_flag:
-                raise InsufficientScopesError(
-                    "GITHUB_TOKEN unset but MCP_REQUIRE_TOKEN_SCOPES=1"
-                )
+                raise InsufficientScopesError("GITHUB_TOKEN unset but MCP_REQUIRE_TOKEN_SCOPES=1")
             logger.warning("GITHUB_TOKEN unset; skipping scope validation")
             return
         req = urllib.request.Request(

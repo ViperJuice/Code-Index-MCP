@@ -2,7 +2,7 @@
 
 This guide walks you through installing and using Code-Index-MCP to index and search your codebase.
 
-> **Beta status**: This guide targets `1.2.0-rc3`. MCP STDIO is the primary
+> **Beta status**: This guide targets `1.2.0-rc4`. MCP STDIO is the primary
 > LLM surface; FastAPI is a secondary admin surface. Language behavior is
 > documented in [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md).
 

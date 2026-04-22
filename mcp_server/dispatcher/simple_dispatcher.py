@@ -59,7 +59,14 @@ class SimpleDispatcher:
             logger.error(f"Symbol lookup failed for '{symbol}': {e}")
         return None
 
-    def search(self, ctx: RepoContext, query: str, semantic: bool = False, fuzzy: bool = False, limit: int = 10) -> Iterable[SearchResult]:
+    def search(
+        self,
+        ctx: RepoContext,
+        query: str,
+        semantic: bool = False,
+        fuzzy: bool = False,
+        limit: int = 10,
+    ) -> Iterable[SearchResult]:
         """Search using direct BM25 via ctx.sqlite_store."""
         if not ctx.sqlite_store:
             logger.warning("No SQLite store available for search")
@@ -110,7 +117,9 @@ class SimpleDispatcher:
     def index_file(self, ctx: RepoContext, path: Path, do_semantic: bool = True) -> None:
         raise NotImplementedError("SimpleDispatcher does not support index_file")
 
-    def index_directory(self, ctx: RepoContext, directory: Path, recursive: bool = True) -> Dict[str, int]:
+    def index_directory(
+        self, ctx: RepoContext, directory: Path, recursive: bool = True
+    ) -> Dict[str, int]:
         raise NotImplementedError("SimpleDispatcher does not support index_directory")
 
     def remove_file(self, ctx: RepoContext, path: Union[Path, str]) -> None:
@@ -150,10 +159,14 @@ class SimpleDispatcher:
     ) -> Optional[GraphCutResult]:
         raise NotImplementedError("SimpleDispatcher does not support get_context_for_symbols")
 
-    def find_symbol_dependencies(self, ctx: RepoContext, symbol: str, max_depth: int = 3) -> List[Dict[str, Any]]:
+    def find_symbol_dependencies(
+        self, ctx: RepoContext, symbol: str, max_depth: int = 3
+    ) -> List[Dict[str, Any]]:
         raise NotImplementedError("SimpleDispatcher does not support find_symbol_dependencies")
 
-    def find_symbol_dependents(self, ctx: RepoContext, symbol: str, max_depth: int = 3) -> List[Dict[str, Any]]:
+    def find_symbol_dependents(
+        self, ctx: RepoContext, symbol: str, max_depth: int = 3
+    ) -> List[Dict[str, Any]]:
         raise NotImplementedError("SimpleDispatcher does not support find_symbol_dependents")
 
     def get_code_hotspots(self, ctx: RepoContext, top_n: int = 10) -> List[Dict[str, Any]]:
@@ -172,7 +185,11 @@ class SimpleDispatcher:
         }
 
     def health_check(self, ctx: RepoContext) -> Dict[str, Any]:
-        health: Dict[str, Any] = {"status": "healthy", "sqlite_store": False, "search_available": False}
+        health: Dict[str, Any] = {
+            "status": "healthy",
+            "sqlite_store": False,
+            "search_available": False,
+        }
 
         if ctx.sqlite_store:
             health["sqlite_store"] = True
