@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -72,6 +73,36 @@ class TestInitializeStatelessServices:
             not hasattr(dispatcher, "_sqlite_store")
             or getattr(dispatcher, "_sqlite_store", None) is None
         )
+
+
+class TestAllowedRootsParsing:
+    """MCP_ALLOWED_ROOTS parsing must match documented multi-repo setup."""
+
+    def test_allowed_roots_accepts_os_pathsep(self, tmp_path, monkeypatch):
+        from mcp_server.cli.bootstrap import _allowed_roots
+
+        root_a = tmp_path / "repo-a"
+        root_b = tmp_path / "repo-b"
+        root_a.mkdir()
+        root_b.mkdir()
+
+        monkeypatch.setenv("MCP_ALLOWED_ROOTS", os.pathsep.join([str(root_a), str(root_b)]))
+        monkeypatch.delenv("MCP_WORKSPACE_ROOT", raising=False)
+
+        assert _allowed_roots() == [root_a.resolve(), root_b.resolve()]
+
+    def test_allowed_roots_accepts_legacy_comma_separator(self, tmp_path, monkeypatch):
+        from mcp_server.cli.bootstrap import _allowed_roots
+
+        root_a = tmp_path / "repo-a"
+        root_b = tmp_path / "repo-b"
+        root_a.mkdir()
+        root_b.mkdir()
+
+        monkeypatch.setenv("MCP_ALLOWED_ROOTS", f"{root_a},{root_b}")
+        monkeypatch.delenv("MCP_WORKSPACE_ROOT", raising=False)
+
+        assert _allowed_roots() == [root_a.resolve(), root_b.resolve()]
 
 
 class TestStdioCommandHelp:

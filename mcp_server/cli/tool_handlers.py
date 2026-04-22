@@ -127,7 +127,7 @@ async def handle_symbol_lookup(
                             "code": "path_outside_allowed_roots",
                             "path": str(Path(repository).resolve()),
                             "allowed_roots": [str(r) for r in allowed],
-                            "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
+                            "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
                         }
                     ),
                 )
@@ -235,7 +235,7 @@ async def handle_search_code(
                             "code": "path_outside_allowed_roots",
                             "path": str(Path(repository).resolve()),
                             "allowed_roots": [str(r) for r in allowed],
-                            "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
+                            "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
                         }
                     ),
                 )
@@ -575,7 +575,7 @@ async def handle_reindex(
                             "code": "path_outside_allowed_roots",
                             "path": str(Path(repository).resolve()),
                             "allowed_roots": [str(r) for r in allowed],
-                            "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
+                            "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
                         }
                     ),
                 )
@@ -635,7 +635,7 @@ async def handle_reindex(
                         "error": "Path outside allowed roots",
                         "path": str(target_path.resolve()),
                         "allowed_roots": [str(r) for r in allowed],
-                        "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
+                        "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
                     }
                 ),
             )
@@ -715,7 +715,7 @@ async def handle_write_summaries(
                             "code": "path_outside_allowed_roots",
                             "path": str(Path(repository).resolve()),
                             "allowed_roots": [str(r) for r in allowed],
-                            "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
+                            "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
                         }
                     ),
                 )
@@ -808,7 +808,7 @@ async def handle_summarize_sample(
                             "code": "path_outside_allowed_roots",
                             "path": str(Path(repository).resolve()),
                             "allowed_roots": [str(r) for r in allowed],
-                            "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
+                            "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
                         }
                     ),
                 )
@@ -856,7 +856,7 @@ async def handle_summarize_sample(
                                 "code": "path_outside_allowed_roots",
                                 "path": str(Path(p).resolve()),
                                 "allowed_roots": [str(r) for r in allowed],
-                                "hint": "Set MCP_ALLOWED_ROOTS (comma-separated) to expand the allowlist.",
+                                "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
                             }
                         ),
                     )

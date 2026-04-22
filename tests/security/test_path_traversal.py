@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -74,3 +75,39 @@ def test_normalize_result_allows_valid_path(tmp_path, monkeypatch):
     result = _normalize_search_result(raw)
     assert result is not None
     assert "foo.py" in result["file"]
+
+
+def test_gateway_path_guard_accepts_os_pathsep_roots(tmp_path, monkeypatch):
+    root_a = tmp_path / "repo-a"
+    root_b = tmp_path / "repo-b"
+    root_a.mkdir()
+    root_b.mkdir()
+    allowed_file = root_b / "foo.py"
+    allowed_file.touch()
+
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", os.pathsep.join([str(root_a), str(root_b)]))
+
+    from mcp_server.gateway import _normalize_search_result
+
+    raw = {"file": str(allowed_file), "line": 1, "snippet": "x = 1"}
+    result = _normalize_search_result(raw)
+    assert result is not None
+    assert result["file"] == str(allowed_file)
+
+
+def test_gateway_path_guard_accepts_legacy_comma_roots(tmp_path, monkeypatch):
+    root_a = tmp_path / "repo-a"
+    root_b = tmp_path / "repo-b"
+    root_a.mkdir()
+    root_b.mkdir()
+    allowed_file = root_b / "foo.py"
+    allowed_file.touch()
+
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", f"{root_a},{root_b}")
+
+    from mcp_server.gateway import _normalize_search_result
+
+    raw = {"file": str(allowed_file), "line": 1, "snippet": "x = 1"}
+    result = _normalize_search_result(raw)
+    assert result is not None
+    assert result["file"] == str(allowed_file)

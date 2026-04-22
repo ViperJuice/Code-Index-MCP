@@ -103,6 +103,14 @@ def test_private_alpha_harness_entrypoint_and_cli_contract_exist():
         assert flag in text
 
 
+def test_private_alpha_harness_uses_permission_tolerant_repo_walk():
+    script = REPO / "scripts" / "private_alpha_evidence.py"
+    text = script.read_text(encoding="utf-8")
+
+    assert "os.walk" in text
+    assert "onerror=" in text
+
+
 def test_private_alpha_committed_artifacts_are_redacted():
     for relative_path in (
         "docs/validation/private-alpha-decision.md",

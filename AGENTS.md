@@ -149,7 +149,7 @@ These commands enforce MCP-first searching and are available in `.claude/command
 
 ### Path Sandbox
 
-Set `MCP_ALLOWED_ROOTS=/path/a:/path/b` (colon-separated) to restrict which paths the server may index or read. Tools `search_code`, `symbol_lookup`, `summarize_sample`, and `reindex` reject any path outside the allowlist with uniform error code `path_outside_allowed_roots`. Registered repo *names* (not paths) bypass the path check.
+Set `MCP_ALLOWED_ROOTS=/path/a:/path/b` using the OS path separator (`:` on Unix, `;` on Windows) to restrict which paths the server may index or read. Tools `search_code`, `symbol_lookup`, `summarize_sample`, and `reindex` reject any path outside the allowlist with uniform error code `path_outside_allowed_roots`. Registered repo *names* (not paths) bypass the path check.
 
 ### Client Auth (Optional)
 

@@ -43,13 +43,13 @@ This document provides a comprehensive reference of all environment variables su
   export MCP_WORKSPACE_ROOT="/home/user/projects"
   ```
 
-### `MCP_ALLOWED_PATHS`
-- **Description**: Comma-separated list of allowed paths for indexing (security feature)
-- **Type**: String (comma-separated paths)
+### `MCP_ALLOWED_ROOTS`
+- **Description**: OS-path-separator-separated list of allowed roots for indexing and read tools (security feature)
+- **Type**: String (`:` on Unix, `;` on Windows; comma accepted only as a legacy fallback)
 - **Default**: Current workspace only
 - **Example**: 
   ```bash
-  export MCP_ALLOWED_PATHS="/home/user/projects,/workspace"
+  export MCP_ALLOWED_ROOTS="/home/user/projects:/workspace"
   ```
 
 ### `MCP_DENIED_PATTERNS`
@@ -381,7 +381,7 @@ MCP_LOG_LEVEL=INFO
 
 # Security
 MCP_AUTH_ENABLED=false
-MCP_ALLOWED_PATHS=/workspace
+MCP_ALLOWED_ROOTS=/workspace
 
 # Performance
 MCP_INDEX_THREADS=4

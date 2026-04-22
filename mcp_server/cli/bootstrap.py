@@ -146,21 +146,13 @@ def _default_registry_path() -> Path:
 def _allowed_roots() -> list[Path]:
     """Resolve the list of directories that reindex/read tools may touch.
 
-    Precedence: MCP_ALLOWED_ROOTS (comma-separated) > MCP_WORKSPACE_ROOT > cwd.
+    Precedence: MCP_ALLOWED_ROOTS (os.pathsep-separated) > MCP_WORKSPACE_ROOT > cwd.
     """
+    from mcp_server.security.path_allowlist import parse_allowed_roots
+
     raw = os.environ.get("MCP_ALLOWED_ROOTS", "").strip()
     if raw:
-        roots = []
-        for entry in raw.split(","):
-            entry = entry.strip()
-            if not entry:
-                continue
-            try:
-                roots.append(
-                    Path(entry).expanduser().resolve()
-                )  # resolve() exempt: boot-time root canonicalization
-            except Exception:
-                continue
+        roots = list(parse_allowed_roots(raw))
         if roots:
             return roots
     ws = os.environ.get("MCP_WORKSPACE_ROOT", "").strip()

@@ -113,13 +113,15 @@ _repo_registry = None
 
 
 def _get_path_guard() -> Optional[PathTraversalGuard]:
+    from mcp_server.security.path_allowlist import parse_allowed_roots
+
     # Read env lazily so tests can monkeypatch MCP_ALLOWED_ROOTS before calling.
     raw = os.environ.get("MCP_ALLOWED_ROOTS", "")
-    roots = [p for p in raw.split(os.pathsep) if p]
+    roots = parse_allowed_roots(raw)
     if not roots:
         # No roots configured — guard short-circuits (allow-all for dev/test).
         return None
-    return PathTraversalGuard([Path(p) for p in roots])
+    return PathTraversalGuard(roots)
 
 
 def _normalize_search_result(raw_result: Any) -> Optional[SearchResult]:

@@ -127,10 +127,13 @@ def test_container_alpha_gate_builds_and_smokes_without_push():
 
 def test_release_automation_refuses_before_mutating_or_publishing():
     jobs = _jobs(".github/workflows/release-automation.yml")
+    workflow_text = _read(".github/workflows/release-automation.yml")
 
     assert jobs["preflight-release-gates"]["name"] == "Preflight Release Gates"
-    assert "make alpha-release-gates" in _read(".github/workflows/release-automation.yml")
+    assert "make alpha-release-gates" in workflow_text
     assert _needs(jobs["prepare-release"]) == {"preflight-release-gates"}
+    assert "default: 'custom'" in workflow_text
+    assert "Prerelease tags must use release_type=custom" in workflow_text
 
     downstream = {
         "run-tests",
@@ -146,6 +149,17 @@ def test_release_automation_refuses_before_mutating_or_publishing():
             or "build-artifacts" in _needs(jobs[job_id])
             or "create-release" in _needs(jobs[job_id])
         )
+
+
+def test_release_automation_marks_prerelease_and_keeps_latest_stable_only():
+    workflow_text = _read(".github/workflows/release-automation.yml")
+
+    assert "is_prerelease: ${{ steps.release_flags.outputs.is_prerelease }}" in workflow_text
+    assert "prerelease: ${{ needs.prepare-release.outputs.is_prerelease }}" in workflow_text
+    assert "tags: ${{ needs.prepare-release.outputs.docker_tags }}" in workflow_text
+    assert 'if [ "$IS_PRERELEASE" = "false" ]; then' in workflow_text
+    assert "ghcr.io/viperjuice/code-index-mcp:latest" in workflow_text
+    assert 'find docs -name "*.md" -exec sed -i' not in workflow_text
 
 
 def test_attestation_private_alpha_fallback_is_explicit():

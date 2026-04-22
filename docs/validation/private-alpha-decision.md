@@ -6,88 +6,88 @@ Raw private-alpha evidence belongs only under ignored `private-alpha-evidence/`.
 This committed record contains redacted fixture categories, aggregate timings,
 issue classifications, and the public-alpha decision.
 
-Generated at: `2026-04-22T04:34:25+00:00`
+Generated at: `2026-04-22T23:04:35+00:00`
 Schema version: `1.0`
-Decision summary: `go`
+Decision summary: `conditional_go`
 
 ## Fixture Inventory
 
 | Fixture category | Install time | First index time | p50 | p95 | Blocker classification |
 |---|---:|---:|---:|---:|---|
-| python_repo | 37.076 | 2.414 | 41.288 | 41.288 | post_alpha_backlog |
-| typescript_js_repo | 37.076 | 2.244 | 42.564 | 42.564 | post_alpha_backlog |
-| mixed_docs_code_repo | 37.076 | 2.259 | 43.285 | 43.285 | post_alpha_backlog |
-| multi_repo_workspace | 37.076 | 2.305 | 45.535 | 45.535 | post_alpha_backlog |
-| large_ignored_vendor_repo | 37.076 | 2.249 | 43.243 | 43.243 | post_alpha_backlog |
+| python_repo | 32.864 | 0.041 | 39.289 | 39.289 | post_alpha_backlog |
+| typescript_js_repo | 32.864 | 0.089 | 84.544 | 84.544 | post_alpha_backlog |
+| mixed_docs_code_repo | 32.864 | 0.001 | 0.289 | 0.518 | post_alpha_backlog |
+| multi_repo_workspace | 32.864 | 0.073 | 34.837 | 63.454 | post_alpha_backlog |
+| large_ignored_vendor_repo | 32.864 | 0.122 | 121.124 | 121.124 | post_alpha_backlog |
 
 ## Install/Index/Query Evidence
 
 ### python_repo
 
-- Install time: `37.076` seconds.
-- First index time: `2.414` seconds.
-- Query latency p50: `41.288` ms.
-- Query latency p95: `41.288` ms.
+- Install time: `32.864` seconds.
+- First index time: `0.041` seconds.
+- Query latency p50: `39.289` ms.
+- Query latency p95: `39.289` ms.
 - Result quality notes: Matched 1/1 expected path fragments in redacted fixture checks.
-- Log noise classification: `medium`.
-- Branch/default-branch behavior: Local checkout confirmed suitable for default-branch evidence smoke; multi-repo production policy remains documented in the deployment runbook.
-- Rollback/rebuild behavior: Release smoke rebuild path completed during the harness run.
+- Log noise classification: `low`.
+- Branch/default-branch behavior: Operator-owned Python checkout exercised default-branch-neutral file discovery; documented default-branch tracking remains the production policy.
+- Rollback/rebuild behavior: Release smoke rebuild path completed during this evidence run.
 - Blocker classification: `post_alpha_backlog`.
 
 ### typescript_js_repo
 
-- Install time: `37.076` seconds.
-- First index time: `2.244` seconds.
-- Query latency p50: `42.564` ms.
-- Query latency p95: `42.564` ms.
+- Install time: `32.864` seconds.
+- First index time: `0.089` seconds.
+- Query latency p50: `84.544` ms.
+- Query latency p95: `84.544` ms.
 - Result quality notes: Matched 1/1 expected path fragments in redacted fixture checks.
-- Log noise classification: `medium`.
-- Branch/default-branch behavior: Local checkout used as a mixed-language stand-in; default-branch behavior remained non-blocking for this smoke.
-- Rollback/rebuild behavior: Release smoke rebuild path completed during the harness run.
+- Log noise classification: `low`.
+- Branch/default-branch behavior: Operator-owned TypeScript checkout exercised default-branch-neutral file discovery.
+- Rollback/rebuild behavior: Release smoke rebuild path completed during this evidence run.
 - Blocker classification: `post_alpha_backlog`.
 
 ### mixed_docs_code_repo
 
-- Install time: `37.076` seconds.
-- First index time: `2.259` seconds.
-- Query latency p50: `43.285` ms.
-- Query latency p95: `43.285` ms.
-- Result quality notes: Matched 1/1 expected path fragments in redacted fixture checks.
-- Log noise classification: `medium`.
-- Branch/default-branch behavior: Local docs/code checkout exercised branch-neutral file discovery.
-- Rollback/rebuild behavior: Release smoke rebuild path completed during the harness run.
+- Install time: `32.864` seconds.
+- First index time: `0.001` seconds.
+- Query latency p50: `0.289` ms.
+- Query latency p95: `0.518` ms.
+- Result quality notes: Matched 2/2 expected path fragments in redacted fixture checks.
+- Log noise classification: `low`.
+- Branch/default-branch behavior: Operator-owned mixed docs/code checkout exercised branch-neutral file discovery across Markdown and TypeScript.
+- Rollback/rebuild behavior: Release smoke rebuild path completed during this evidence run.
 - Blocker classification: `post_alpha_backlog`.
 
 ### multi_repo_workspace
 
-- Install time: `37.076` seconds.
-- First index time: `2.305` seconds.
-- Query latency p50: `45.535` ms.
-- Query latency p95: `45.535` ms.
-- Result quality notes: Matched 1/1 expected path fragments in redacted fixture checks.
-- Log noise classification: `medium`.
-- Branch/default-branch behavior: Local checkout confirmed the public multi-repo docs and tests remain discoverable; real multi-repo fleet evidence should replace this smoke before promotion.
-- Rollback/rebuild behavior: Release smoke rebuild path completed during the harness run.
+- Install time: `32.864` seconds.
+- First index time: `0.073` seconds.
+- Query latency p50: `34.837` ms.
+- Query latency p95: `63.454` ms.
+- Result quality notes: Matched 2/2 expected path fragments in redacted fixture checks.
+- Log noise classification: `low`.
+- Branch/default-branch behavior: Operator-owned nested workspace exercised file discovery across root and nested repository boundaries; registered-repo default-branch tracking remains covered by the multi-repo tests.
+- Rollback/rebuild behavior: Release smoke rebuild path completed during this evidence run.
 - Blocker classification: `post_alpha_backlog`.
 
 ### large_ignored_vendor_repo
 
-- Install time: `37.076` seconds.
-- First index time: `2.249` seconds.
-- Query latency p50: `43.243` ms.
-- Query latency p95: `43.243` ms.
+- Install time: `32.864` seconds.
+- First index time: `0.122` seconds.
+- Query latency p50: `121.124` ms.
+- Query latency p95: `121.124` ms.
 - Result quality notes: Matched 1/1 expected path fragments in redacted fixture checks.
-- Log noise classification: `medium`.
-- Branch/default-branch behavior: Local checkout exercised ignored-output boundary checks for P26 evidence.
-- Rollback/rebuild behavior: Release smoke rebuild path completed during the harness run.
+- Log noise classification: `low`.
+- Branch/default-branch behavior: Operator-owned vendor-heavy checkout exercised discovery in a repo containing ignored/generated dependency directories.
+- Rollback/rebuild behavior: Release smoke rebuild path completed during this evidence run.
 - Blocker classification: `post_alpha_backlog`.
 
 ## Known Issue Classification
 
 | Issue ID | Classification | Summary | Disposition |
 |---|---|---|---|
-| P26-LOCAL-001 | `documented_limitation` | This run uses a local checkout as fixture evidence rather than customer repositories. | Acceptable for machine-local smoke; replace with operator-selected private repositories before external release approval. |
-| P26-LOCAL-002 | `post_alpha_backlog` | Harness quality checks currently use path-fragment evidence rather than full MCP semantic relevance scoring. | Keep the harness conservative and extend retrieval scoring after public alpha. |
+| P26-LOCAL-001 | `documented_limitation` | Private-alpha evidence uses operator-owned local repositories selected on this workstation rather than external customer repositories. | Acceptable for public-alpha readiness smoke; repeat with named customer opt-in repositories before stable release. |
+| P26-LOCAL-002 | `post_alpha_backlog` | Harness quality checks currently use redacted path-fragment matching rather than full MCP semantic relevance scoring. | Keep the conservative harness for public alpha and extend retrieval scoring before stable release. |
 
 Issue buckets used for this decision: `public_alpha_blocker`,
 `documented_limitation`, and `post_alpha_backlog`.
@@ -102,4 +102,4 @@ Issue buckets used for this decision: `public_alpha_blocker`,
 
 ## Public Alpha Decision
 
-Final decision: `go`
+Final decision: `conditional_go`

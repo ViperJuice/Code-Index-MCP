@@ -5,13 +5,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-
 
 REPO = Path(__file__).resolve().parents[1]
 REQUIRED_FIXTURE_CATEGORIES = (
@@ -85,7 +85,11 @@ def _classify_log_noise(raw_lines: list[str]) -> str:
 
 def _scan_repo(repo_path: Path, fixture: dict[str, Any]) -> dict[str, Any]:
     started = time.perf_counter()
-    files = [path for path in repo_path.rglob("*") if path.is_file()]
+    files = [
+        Path(root) / filename
+        for root, _dirs, filenames in os.walk(repo_path, onerror=lambda _error: None)
+        for filename in filenames
+    ]
     first_index_time = round(time.perf_counter() - started, 3)
 
     query_runs: list[dict[str, Any]] = []
@@ -114,7 +118,9 @@ def _scan_repo(repo_path: Path, fixture: dict[str, Any]) -> dict[str, Any]:
 
     quality_notes = fixture.get("result_quality_notes")
     if not quality_notes:
-        expected_total = sum(len(case.get("expected_path_fragments", [])) for case in fixture.get("query_cases", []))
+        expected_total = sum(
+            len(case.get("expected_path_fragments", [])) for case in fixture.get("query_cases", [])
+        )
         matched_total = sum(len(run["matched_expected_fragments"]) for run in query_runs)
         quality_notes = f"Matched {matched_total}/{expected_total} expected path fragments in redacted fixture checks."
 
@@ -134,8 +140,7 @@ def _validate_fixture_categories(fixtures: list[dict[str, Any]]) -> list[str]:
     errors: list[str] = []
     if actual != expected:
         errors.append(
-            "fixture categories must be exactly "
-            f"{sorted(expected)}; got {sorted(actual)}"
+            f"fixture categories must be exactly {sorted(expected)}; got {sorted(actual)}"
         )
     duplicates = sorted(category for category in actual if categories.count(category) > 1)
     if duplicates:

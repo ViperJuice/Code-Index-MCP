@@ -34,6 +34,8 @@ export MCP_ALLOWED_ROOTS="/home/user/repo1:/home/user/repo2:/var/indexed-code"
 ```
 
 Paths are separated by the OS path separator (`os.pathsep`; `:` on Unix, `;` on Windows).
+Comma-separated values are accepted as a legacy fallback, but new automation
+should use the OS separator.
 
 ## Fallback Behavior
 

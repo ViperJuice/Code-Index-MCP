@@ -5,16 +5,16 @@ Create a GitHub release with index artifacts.
 This script creates a new GitHub release and uploads the index files as release assets.
 """
 
-import os
-import sys
-import json
-import subprocess
 import argparse
-import tempfile
 import hashlib
-from pathlib import Path
+import json
+import os
+import subprocess
+import sys
+import tempfile
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 # Add project root to Python path
 project_root = Path(__file__).parent.parent
@@ -115,7 +115,7 @@ Download the pre-built index archive below to get started quickly.
    ```
 3. Install Code Index MCP:
    ```bash
-   pip install index-it-mcp
+   pip install --pre index-it-mcp==1.2.0rc4
    ```
 4. Start using the index!
 
@@ -192,9 +192,7 @@ See [CHANGELOG.md](https://github.com/{self.repo}/blob/main/CHANGELOG.md) for de
 
                 if result.returncode == 0:
                     print(f"✅ Release created successfully!")
-                    print(
-                        f"🔗 View at: https://github.com/{self.repo}/releases/tag/{tag}"
-                    )
+                    print(f"🔗 View at: https://github.com/{self.repo}/releases/tag/{tag}")
                     return True
                 else:
                     print(f"❌ Failed to create release: {result.stderr}")
@@ -210,17 +208,13 @@ See [CHANGELOG.md](https://github.com/{self.repo}/blob/main/CHANGELOG.md) for de
 
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(
-        description="Create GitHub release with index artifacts"
-    )
+    parser = argparse.ArgumentParser(description="Create GitHub release with index artifacts")
     parser.add_argument(
         "--version",
         "-v",
         help="Version tag (e.g., 1.0.0). Auto-generated if not specified.",
     )
-    parser.add_argument(
-        "--name", "-n", help='Release name. Defaults to "Code Index MCP vX.Y.Z"'
-    )
+    parser.add_argument("--name", "-n", help='Release name. Defaults to "Code Index MCP vX.Y.Z"')
     parser.add_argument(
         "--repo", help="GitHub repository (owner/name). Auto-detected if not specified."
     )

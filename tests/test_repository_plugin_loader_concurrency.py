@@ -5,7 +5,7 @@ SL-2.1 — Verifies:
   1. 8 threads × 100 iterations on same repo_id all return the same
      RepositoryProfile instance (id() equality).
   2. Two different repo_ids analyzed concurrently do NOT block each
-     other: parallel wall-clock < 1.8× serial wall-clock.
+     other: their index-analysis sections overlap.
 """
 
 import asyncio
@@ -151,19 +151,14 @@ def test_same_repo_id_returns_identical_instance():
 
 
 # ---------------------------------------------------------------------------
-# Test 2: distinct repo_ids must not serialize — parallel < 1.8× serial
+# Test 2: distinct repo_ids must not serialize
 # ---------------------------------------------------------------------------
 
 
 def test_distinct_repo_ids_do_not_block_each_other():
     """Two different repo_ids analyzed in parallel must not wait for each other."""
-    DELAY = 0.10  # seconds per analysis
-
-    def make_loader(delay):
-        loader = _make_loader_with_slow_analysis(delay=delay)
-        return loader
-
-    loader = make_loader(DELAY)
+    loader = _make_loader_with_slow_analysis(delay=0)
+    loader._get_repository_id = lambda path: Path(path).name
 
     fake_index_path = Path("/fake/index.db")
 
@@ -174,65 +169,59 @@ def test_distinct_repo_ids_do_not_block_each_other():
         def get_local_index_path(self):
             return fake_index_path
 
-    async def analyze_one(repo_id: str):
-        loader._get_repository_id = lambda path: repo_id
-        with patch(
-            "mcp_server.plugins.repository_plugin_loader.IndexDiscovery",
-            FakeDiscovery,
-        ):
-            return await loader.analyze_repository(Path("/fake/repo"))
-
-    # Serial baseline: run repo_a then repo_b sequentially
-    loader_serial = make_loader(DELAY)
-    t0 = time.monotonic()
-
-    async def run_serial():
-        loader_serial._get_repository_id = lambda path: "repo_a"
-        with patch(
-            "mcp_server.plugins.repository_plugin_loader.IndexDiscovery",
-            FakeDiscovery,
-        ):
-            await loader_serial.analyze_repository(Path("/fake/repo"))
-        loader_serial._get_repository_id = lambda path: "repo_b"
-        with patch(
-            "mcp_server.plugins.repository_plugin_loader.IndexDiscovery",
-            FakeDiscovery,
-        ):
-            await loader_serial.analyze_repository(Path("/fake/repo_b"))
-
-    asyncio.new_event_loop().run_until_complete(run_serial())
-    serial_time = time.monotonic() - t0
-
-    # Parallel: two threads each analyze a distinct repo_id
-    loader_parallel = make_loader(DELAY)
-    times = []
     errors = []
+    results = []
+    results_lock = threading.Lock()
+    start_barrier = threading.Barrier(2)
+
+    active_lock = threading.Lock()
+    active_count = 0
+    max_active_count = 0
+    both_active = threading.Event()
+
+    def observed_analyze(index_path):
+        nonlocal active_count, max_active_count
+
+        with active_lock:
+            active_count += 1
+            max_active_count = max(max_active_count, active_count)
+            if active_count == 2:
+                both_active.set()
+
+        try:
+            both_active.wait(timeout=2)
+            return {"python": 10}
+        finally:
+            with active_lock:
+                active_count -= 1
+
+    loader._analyze_index = observed_analyze
 
     def thread_worker(rid):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            loader_parallel._get_repository_id = lambda path: rid
+            start_barrier.wait(timeout=2)
             with patch(
                 "mcp_server.plugins.repository_plugin_loader.IndexDiscovery",
                 FakeDiscovery,
             ):
-                loop.run_until_complete(loader_parallel.analyze_repository(Path(f"/fake/{rid}")))
+                profile = loop.run_until_complete(loader.analyze_repository(Path(f"/fake/{rid}")))
+            with results_lock:
+                results.append(profile.repository_id)
         except Exception as exc:
             errors.append(exc)
         finally:
             loop.close()
 
-    t0 = time.monotonic()
     threads = [threading.Thread(target=thread_worker, args=(rid,)) for rid in ("repo_x", "repo_y")]
     for t in threads:
         t.start()
     for t in threads:
         t.join()
-    parallel_time = time.monotonic() - t0
 
     assert not errors, f"Worker exceptions: {errors}"
-    assert parallel_time < serial_time * 1.8, (
-        f"Parallel ({parallel_time:.3f}s) >= 1.8× serial ({serial_time:.3f}s): "
-        "distinct repo_ids are being serialized"
-    )
+    assert sorted(results) == ["repo_x", "repo_y"]
+    assert (
+        max_active_count == 2
+    ), "distinct repo_ids did not overlap in _analyze_index; profile builds are being serialized"

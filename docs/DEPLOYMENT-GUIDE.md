@@ -262,7 +262,7 @@ spec:
     spec:
       containers:
       - name: mcp-server
-        image: your-registry/code-index-mcp:latest
+        image: your-registry/code-index-mcp:v1.2.0-rc4
         ports:
         - containerPort: 8000
         env:
@@ -845,7 +845,7 @@ without client authentication.
 
 #### MCP_ALLOWED_ROOTS
 
-`MCP_ALLOWED_ROOTS` defines a comma-separated list of absolute filesystem
+`MCP_ALLOWED_ROOTS` defines an OS-path-separator-separated list of absolute filesystem
 paths that form the path-prefix allowlist for multi-repository access. All
 `symbol_lookup`, `search_code`, and `reindex` operations resolve the target
 path against this list; requests that target a path outside every listed
@@ -853,7 +853,8 @@ root return a `path_outside_allowed_roots` error rather than proceeding.
 
 The server resolves paths in the following precedence order:
 
-1. `MCP_ALLOWED_ROOTS` (comma-separated list of absolute paths) — highest
+1. `MCP_ALLOWED_ROOTS` (OS path separator list of absolute paths; `:` on Unix,
+   `;` on Windows) — highest
    priority; overrides both other mechanisms.
 2. `MCP_WORKSPACE_ROOT` — a single root, used when `MCP_ALLOWED_ROOTS` is
    absent.
@@ -870,8 +871,8 @@ workspace boundaries.
 # with this value before any other tool will respond.
 export MCP_CLIENT_SECRET="$(openssl rand -hex 32)"
 
-# Allow access to two repositories; comma-separate additional paths as needed.
-export MCP_ALLOWED_ROOTS="/home/deploy/repos/project-a,/home/deploy/repos/project-b"
+# Allow access to two repositories; use ; instead of : on Windows.
+export MCP_ALLOWED_ROOTS="/home/deploy/repos/project-a:/home/deploy/repos/project-b"
 ```
 
 In a systemd unit or Docker environment, pass these through the appropriate

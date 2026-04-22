@@ -107,7 +107,7 @@ The setup script automatically detects your environment:
         "-e", "MCP_WORKSPACE_ROOT=/workspace",
         "-e", "LOG_LEVEL=${LOG_LEVEL:-INFO}",
         "-e", "MCP_ARTIFACT_SYNC=false",
-        "${MCP_DOCKER_IMAGE:-ghcr.io/viperjuice/code-index-mcp:latest}"
+        "${MCP_DOCKER_IMAGE:-ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4}"
       ]
     }
   }
@@ -140,7 +140,7 @@ The setup script automatically detects your environment:
         "-e", "SEMANTIC_SEARCH_ENABLED=${SEMANTIC_SEARCH_ENABLED:-true}",
         "-e", "MCP_ARTIFACT_SYNC=${MCP_ARTIFACT_SYNC:-true}",
         "-e", "LOG_LEVEL=${LOG_LEVEL:-INFO}",
-        "${MCP_DOCKER_IMAGE:-ghcr.io/viperjuice/code-index-mcp:latest}"
+        "${MCP_DOCKER_IMAGE:-ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4}"
       ]
     }
   }
@@ -262,7 +262,7 @@ Configure multiple repositories in one `.mcp.json`:
       "args": [
         "run", "-i", "--rm",
         "-v", "${HOME}/projects/frontend:/workspace",
-        "ghcr.io/viperjuice/code-index-mcp:latest"
+        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4"
       ]
     },
     "project-backend": {
@@ -270,7 +270,7 @@ Configure multiple repositories in one `.mcp.json`:
       "args": [
         "run", "-i", "--rm",
         "-v", "${HOME}/projects/backend:/workspace",
-        "ghcr.io/viperjuice/code-index-mcp:latest"
+        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4"
       ]
     }
   }
@@ -310,7 +310,7 @@ Add Docker resource constraints:
         "--memory", "2g",
         "--cpus", "2",
         "-v", "${workspace}:/workspace",
-        "ghcr.io/viperjuice/code-index-mcp:latest"
+        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4"
       ]
     }
   }
@@ -330,7 +330,7 @@ For maximum security:
         "run", "-i", "--rm",
         "--network", "none",
         "-v", "${workspace}:/workspace:ro",
-        "ghcr.io/viperjuice/code-index-mcp:latest"
+        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4"
       ],
       "env": {
         "MCP_ARTIFACT_SYNC": "false"
@@ -407,7 +407,7 @@ Enable debug logging:
         "-v", "${workspace}:/workspace",
         "-e", "LOG_LEVEL=DEBUG",
         "-e", "MCP_DEBUG=true",
-        "ghcr.io/viperjuice/code-index-mcp:latest"
+        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4"
       ]
     }
   }
@@ -420,7 +420,7 @@ Test your configuration:
 
 ```bash
 # Test MCP connection
-echo '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{}}' | docker run -i --rm ghcr.io/viperjuice/code-index-mcp:latest
+echo '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{}}' | docker run -i --rm ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4
 
 # Expected response:
 # {"jsonrpc":"2.0","id":1,"result":{"capabilities":...}}
@@ -496,7 +496,7 @@ Enable security audit logs:
         "-v", "${HOME}/mcp-audit:/app/logs",
         "-e", "MCP_AUDIT_LOG=/app/logs/audit.log",
         "-e", "MCP_SECURITY_MODE=strict",
-        "ghcr.io/viperjuice/code-index-mcp:latest"
+        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4"
       ]
     }
   }

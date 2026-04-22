@@ -1,102 +1,102 @@
 {
-  "final_decision": "go",
+  "final_decision": "conditional_go",
   "fixtures": [
     {
       "category": "python_repo",
-      "display_alias": "local_python_fixture",
+      "display_alias": "operator_python_fixture",
       "fixture_id": "fixture-1",
       "measurements": {
         "blocker_classification": "post_alpha_backlog",
-        "branch_default_branch_behavior": "Local checkout confirmed suitable for default-branch evidence smoke; multi-repo production policy remains documented in the deployment runbook.",
-        "first_index_time_seconds": 2.414,
-        "install_time_seconds": 37.076,
-        "log_noise_classification": "medium",
-        "query_latency_p50_ms": 41.288,
-        "query_latency_p95_ms": 41.288,
+        "branch_default_branch_behavior": "Operator-owned Python checkout exercised default-branch-neutral file discovery; documented default-branch tracking remains the production policy.",
+        "first_index_time_seconds": 0.041,
+        "install_time_seconds": 32.864,
+        "log_noise_classification": "low",
+        "query_latency_p50_ms": 39.289,
+        "query_latency_p95_ms": 39.289,
         "result_quality_notes": "Matched 1/1 expected path fragments in redacted fixture checks.",
-        "rollback_rebuild_behavior": "Release smoke rebuild path completed during the harness run."
+        "rollback_rebuild_behavior": "Release smoke rebuild path completed during this evidence run."
       }
     },
     {
       "category": "typescript_js_repo",
-      "display_alias": "local_typescript_js_fixture",
+      "display_alias": "operator_typescript_fixture",
       "fixture_id": "fixture-2",
       "measurements": {
         "blocker_classification": "post_alpha_backlog",
-        "branch_default_branch_behavior": "Local checkout used as a mixed-language stand-in; default-branch behavior remained non-blocking for this smoke.",
-        "first_index_time_seconds": 2.244,
-        "install_time_seconds": 37.076,
-        "log_noise_classification": "medium",
-        "query_latency_p50_ms": 42.564,
-        "query_latency_p95_ms": 42.564,
+        "branch_default_branch_behavior": "Operator-owned TypeScript checkout exercised default-branch-neutral file discovery.",
+        "first_index_time_seconds": 0.089,
+        "install_time_seconds": 32.864,
+        "log_noise_classification": "low",
+        "query_latency_p50_ms": 84.544,
+        "query_latency_p95_ms": 84.544,
         "result_quality_notes": "Matched 1/1 expected path fragments in redacted fixture checks.",
-        "rollback_rebuild_behavior": "Release smoke rebuild path completed during the harness run."
+        "rollback_rebuild_behavior": "Release smoke rebuild path completed during this evidence run."
       }
     },
     {
       "category": "mixed_docs_code_repo",
-      "display_alias": "local_docs_code_fixture",
+      "display_alias": "operator_mixed_docs_code_fixture",
       "fixture_id": "fixture-3",
       "measurements": {
         "blocker_classification": "post_alpha_backlog",
-        "branch_default_branch_behavior": "Local docs/code checkout exercised branch-neutral file discovery.",
-        "first_index_time_seconds": 2.259,
-        "install_time_seconds": 37.076,
-        "log_noise_classification": "medium",
-        "query_latency_p50_ms": 43.285,
-        "query_latency_p95_ms": 43.285,
-        "result_quality_notes": "Matched 1/1 expected path fragments in redacted fixture checks.",
-        "rollback_rebuild_behavior": "Release smoke rebuild path completed during the harness run."
+        "branch_default_branch_behavior": "Operator-owned mixed docs/code checkout exercised branch-neutral file discovery across Markdown and TypeScript.",
+        "first_index_time_seconds": 0.001,
+        "install_time_seconds": 32.864,
+        "log_noise_classification": "low",
+        "query_latency_p50_ms": 0.289,
+        "query_latency_p95_ms": 0.518,
+        "result_quality_notes": "Matched 2/2 expected path fragments in redacted fixture checks.",
+        "rollback_rebuild_behavior": "Release smoke rebuild path completed during this evidence run."
       }
     },
     {
       "category": "multi_repo_workspace",
-      "display_alias": "local_multi_repo_fixture",
+      "display_alias": "operator_multi_repo_fixture",
       "fixture_id": "fixture-4",
       "measurements": {
         "blocker_classification": "post_alpha_backlog",
-        "branch_default_branch_behavior": "Local checkout confirmed the public multi-repo docs and tests remain discoverable; real multi-repo fleet evidence should replace this smoke before promotion.",
-        "first_index_time_seconds": 2.305,
-        "install_time_seconds": 37.076,
-        "log_noise_classification": "medium",
-        "query_latency_p50_ms": 45.535,
-        "query_latency_p95_ms": 45.535,
-        "result_quality_notes": "Matched 1/1 expected path fragments in redacted fixture checks.",
-        "rollback_rebuild_behavior": "Release smoke rebuild path completed during the harness run."
+        "branch_default_branch_behavior": "Operator-owned nested workspace exercised file discovery across root and nested repository boundaries; registered-repo default-branch tracking remains covered by the multi-repo tests.",
+        "first_index_time_seconds": 0.073,
+        "install_time_seconds": 32.864,
+        "log_noise_classification": "low",
+        "query_latency_p50_ms": 34.837,
+        "query_latency_p95_ms": 63.454,
+        "result_quality_notes": "Matched 2/2 expected path fragments in redacted fixture checks.",
+        "rollback_rebuild_behavior": "Release smoke rebuild path completed during this evidence run."
       }
     },
     {
       "category": "large_ignored_vendor_repo",
-      "display_alias": "local_large_ignored_fixture",
+      "display_alias": "operator_large_vendor_fixture",
       "fixture_id": "fixture-5",
       "measurements": {
         "blocker_classification": "post_alpha_backlog",
-        "branch_default_branch_behavior": "Local checkout exercised ignored-output boundary checks for P26 evidence.",
-        "first_index_time_seconds": 2.249,
-        "install_time_seconds": 37.076,
-        "log_noise_classification": "medium",
-        "query_latency_p50_ms": 43.243,
-        "query_latency_p95_ms": 43.243,
+        "branch_default_branch_behavior": "Operator-owned vendor-heavy checkout exercised discovery in a repo containing ignored/generated dependency directories.",
+        "first_index_time_seconds": 0.122,
+        "install_time_seconds": 32.864,
+        "log_noise_classification": "low",
+        "query_latency_p50_ms": 121.124,
+        "query_latency_p95_ms": 121.124,
         "result_quality_notes": "Matched 1/1 expected path fragments in redacted fixture checks.",
-        "rollback_rebuild_behavior": "Release smoke rebuild path completed during the harness run."
+        "rollback_rebuild_behavior": "Release smoke rebuild path completed during this evidence run."
       }
     }
   ],
-  "generated_at": "2026-04-22T04:34:25+00:00",
+  "generated_at": "2026-04-22T23:04:35+00:00",
   "known_issues": [
     {
       "classification": "documented_limitation",
-      "disposition": "Acceptable for machine-local smoke; replace with operator-selected private repositories before external release approval.",
+      "disposition": "Acceptable for public-alpha readiness smoke; repeat with named customer opt-in repositories before stable release.",
       "id": "P26-LOCAL-001",
-      "summary": "This run uses a local checkout as fixture evidence rather than customer repositories."
+      "summary": "Private-alpha evidence uses operator-owned local repositories selected on this workstation rather than external customer repositories."
     },
     {
       "classification": "post_alpha_backlog",
-      "disposition": "Keep the harness conservative and extend retrieval scoring after public alpha.",
+      "disposition": "Keep the conservative harness for public alpha and extend retrieval scoring before stable release.",
       "id": "P26-LOCAL-002",
-      "summary": "Harness quality checks currently use path-fragment evidence rather than full MCP semantic relevance scoring."
+      "summary": "Harness quality checks currently use redacted path-fragment matching rather than full MCP semantic relevance scoring."
     }
   ],
-  "run_id": "p26-local-machine-20260422",
+  "run_id": "p26-local-fixture-rerun-20260422",
   "schema_version": "1.0"
 }

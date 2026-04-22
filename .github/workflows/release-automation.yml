@@ -11,13 +11,13 @@ on:
       release_type:
         description: 'Release type'
         required: true
-        default: 'minor'
+        default: 'custom'
         type: choice
         options:
+          - custom
           - patch
           - minor
           - major
-          - custom
       auto_merge:
         description: 'Automatically merge the release PR'
         required: false
@@ -64,9 +64,22 @@ jobs:
         run: |
           VERSION="${{ inputs.version }}"
           VERSION_NO_V=${VERSION#v}
+          RELEASE_TYPE="${{ inputs.release_type }}"
+          case "$VERSION" in
+            v*) ;;
+            *)
+              echo "::error::Release version must start with v, got '$VERSION'"
+              exit 1
+              ;;
+          esac
           grep -q "default: 'v1.2.0-rc4'" .github/workflows/release-automation.yml
-          grep -q "version = \"$VERSION_NO_V\"" pyproject.toml
-          grep -q "__version__ = \"$VERSION_NO_V\"" mcp_server/__init__.py
+          if [ "$RELEASE_TYPE" = "custom" ]; then
+            grep -q "version = \"$VERSION_NO_V\"" pyproject.toml
+            grep -q "__version__ = \"$VERSION_NO_V\"" mcp_server/__init__.py
+          elif [[ "$VERSION_NO_V" == *-* ]]; then
+            echo "::error::Prerelease tags must use release_type=custom"
+            exit 1
+          fi
 
       - name: Run alpha release gates
         run: |
@@ -79,6 +92,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.determine_version.outputs.version }}
+      is_prerelease: ${{ steps.release_flags.outputs.is_prerelease }}
+      docker_tags: ${{ steps.release_flags.outputs.docker_tags }}
       changelog: ${{ steps.generate_changelog.outputs.changelog }}
     steps:
       - uses: actions/checkout@v6
@@ -97,7 +112,7 @@ jobs:
           if [ "${{ inputs.release_type }}" == "custom" ]; then
             VERSION="${{ inputs.version }}"
           else
-            LATEST_TAG=$(git tag --list 'v[0-9]*' --sort=-version:refname | head -1 || true)
+            LATEST_TAG=$(git tag --list 'v[0-9]*' --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
             [ -z "$LATEST_TAG" ] && LATEST_TAG="v0.0.0"
             VERSION_MAJOR=$(echo "$LATEST_TAG" | sed 's/v//' | cut -d. -f1)
             VERSION_MINOR=$(echo "$LATEST_TAG" | sed 's/v//' | cut -d. -f2)
@@ -120,6 +135,26 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Version will be: $VERSION"
+
+      - name: Compute Release Flags
+        id: release_flags
+        run: |
+          VERSION="${{ steps.determine_version.outputs.version }}"
+          VERSION_NO_V=${VERSION#v}
+          if [[ "$VERSION_NO_V" == *-* ]]; then
+            IS_PRERELEASE=true
+          else
+            IS_PRERELEASE=false
+          fi
+          echo "is_prerelease=$IS_PRERELEASE" >> "$GITHUB_OUTPUT"
+          {
+            echo "docker_tags<<EOF"
+            echo "ghcr.io/viperjuice/code-index-mcp:$VERSION"
+            if [ "$IS_PRERELEASE" = "false" ]; then
+              echo "ghcr.io/viperjuice/code-index-mcp:latest"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Update Version Files
         run: |
@@ -247,9 +282,7 @@ jobs:
           file: ./docker/dockerfiles/Dockerfile.production
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ghcr.io/viperjuice/code-index-mcp:${{ needs.prepare-release.outputs.version }}
-            ghcr.io/viperjuice/code-index-mcp:latest
+          tags: ${{ needs.prepare-release.outputs.docker_tags }}
           build-args: |
             VERSION=${{ needs.prepare-release.outputs.version }}
             BUILD_DATE=${{ github.event.repository.updated_at }}
@@ -301,7 +334,7 @@ jobs:
           name: Release ${{ needs.prepare-release.outputs.version }}
           body: ${{ needs.prepare-release.outputs.changelog }}
           draft: false
-          prerelease: false
+          prerelease: ${{ needs.prepare-release.outputs.is_prerelease }}
           files: |
             dist/*
             sbom.spdx.json
@@ -371,8 +404,7 @@ jobs:
       - name: Update documentation
         run: |
           VERSION="${{ needs.prepare-release.outputs.version }}"
-          sed -i "s/Latest Version: .*/Latest Version: $VERSION/" README.md || true
-          find docs -name "*.md" -exec sed -i "s/code-index-mcp:.*/code-index-mcp:$VERSION/g" {} \;
+          echo "No automatic documentation rewrite for $VERSION; release docs are version-gated in source."
 
       - name: Notify Slack
         if: env.SLACK_WEBHOOK != ''

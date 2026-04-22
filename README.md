@@ -6,6 +6,8 @@ Modular, extensible local-first code indexer designed to enhance Claude Code and
 
 ## Project Status
 **Version**: 1.2.0-rc4 (beta)
+**Python distribution**: `index-it-mcp`
+**Container image**: `ghcr.io/viperjuice/code-index-mcp`
 **Primary surface**: MCP tools (`search_code`, `symbol_lookup`) via the STDIO runner — always use these first from an LLM
 **Secondary surface**: FastAPI admin REST gateway for diagnostics and scripting — see "Admin REST Interface (secondary)" below
 **Core features**: local indexing, symbol/text search, registry-based language coverage; see [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md)
@@ -135,7 +137,7 @@ This automatically detects your environment and creates the appropriate `.mcp.js
 curl -sSL https://raw.githubusercontent.com/ViperJuice/Code-Index-MCP/main/scripts/install-mcp-docker.sh | bash
 
 # Index your current directory
-docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:latest
+docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4
 ```
 
 #### Option 2: AI-Powered Search
@@ -144,7 +146,7 @@ docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:latest
 export VOYAGE_API_KEY=your-key
 
 # Run with semantic search enabled explicitly
-docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY ghcr.io/viperjuice/code-index-mcp:latest
+docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4
 ```
 
 ### 💻 Environment-Specific Setup
@@ -155,7 +157,7 @@ docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_AP
 .\scripts\setup-mcp-json.ps1
 
 # Or manually with Docker Desktop
-docker run -it -v ${PWD}:/workspace ghcr.io/viperjuice/code-index-mcp:latest
+docker run -it -v ${PWD}:/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4
 ```
 
 #### 🍎 macOS
@@ -223,7 +225,7 @@ The setup script creates the appropriate `.mcp.json` for your environment. Manua
       "args": [
         "run", "-i", "--rm",
         "-v", "${workspace}:/workspace",
-        "ghcr.io/viperjuice/code-index-mcp:latest"
+        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4"
       ]
     }
   }
@@ -241,7 +243,7 @@ make release-smoke-container
 
 Index multiple repositories from a single running server instance.
 
-**Prerequisites**: set `MCP_ALLOWED_ROOTS` to a colon-separated list of absolute directory paths that the server is allowed to index before starting the server:
+**Prerequisites**: set `MCP_ALLOWED_ROOTS` to an OS-path-separator-separated list of absolute directory paths (`:` on Unix, `;` on Windows) that the server is allowed to index before starting the server:
 
 ```bash
 export MCP_ALLOWED_ROOTS=/abs/a:/abs/b
@@ -315,11 +317,11 @@ for language/runtime support details.
 
 #### Option 1: Install via pip (Recommended)
 ```bash
-# Install the package
-pip install index-it-mcp
+# After the public-alpha package is published, install the rc package
+pip install --pre index-it-mcp==1.2.0rc4
 
 # Or install with dev tools for testing
-pip install index-it-mcp[dev]
+pip install --pre "index-it-mcp[dev]==1.2.0rc4"
 ```
 
 #### Option 2: Install from Source

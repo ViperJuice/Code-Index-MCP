@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -148,6 +149,30 @@ class TestSearchCodePathSandbox:
         assert "path_outside_allowed_roots" not in json.dumps(
             data
         ), f"Should not reject path inside allowed roots; got: {data}"
+
+    def test_accepts_path_inside_second_os_pathsep_root(self, tmp_path, monkeypatch):
+        from mcp_server.cli.tool_handlers import handle_search_code
+
+        root_a = tmp_path / "repo-a"
+        root_b = tmp_path / "repo-b"
+        root_a.mkdir()
+        root_b.mkdir()
+        subdir = root_b / "sub"
+        subdir.mkdir()
+
+        monkeypatch.setenv("MCP_ALLOWED_ROOTS", os.pathsep.join([str(root_a), str(root_b)]))
+
+        result = _run(
+            handle_search_code(
+                arguments={"query": "foo", "repository": str(subdir)},
+                dispatcher=_mock_dispatcher(),
+                repo_resolver=_mock_resolver(),
+            )
+        )
+        data = _parsed(result)
+        assert "path_outside_allowed_roots" not in json.dumps(
+            data
+        ), f"Should not reject path inside second allowed root; got: {data}"
 
     def test_repo_name_passes_through_guard(self, tmp_path, monkeypatch):
         """A plain repo name (no separator) must not be rejected by the path guard."""

@@ -18,8 +18,8 @@ This guide walks you through installing and using Code-Index-MCP to index and se
 ### Option 1: Install via pip (Recommended)
 
 ```bash
-# Install core package
-pip install index-it-mcp
+# After the public-alpha package is published, install the rc package
+pip install --pre index-it-mcp==1.2.0rc4
 
 # Verify installation
 mcp-index --version
@@ -87,6 +87,7 @@ If you work across multiple local repositories on one machine, register each
 checkout and inspect readiness before starting work:
 
 ```bash
+export MCP_ALLOWED_ROOTS="/path/to/repo-a:/path/to/repo-b"  # use ; instead of : on Windows
 mcp-index repository register /path/to/repo-a
 mcp-index repository register /path/to/repo-b
 mcp-index repository list -v
