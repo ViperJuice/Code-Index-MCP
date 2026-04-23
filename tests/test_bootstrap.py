@@ -41,6 +41,8 @@ class TestInitializeStatelessServices:
         # Dispatcher must have the core protocol methods
         assert callable(getattr(dispatcher, "search", None)), "dispatcher must have search()"
         assert callable(getattr(dispatcher, "lookup", None)), "dispatcher must have lookup()"
+        assert git_index_manager.repo_resolver is repo_resolver
+        assert git_index_manager.store_registry is store_registry
 
     def test_no_cwd_capture(self, tmp_path, monkeypatch):
         """Service construction must not depend on os.getcwd()."""

@@ -12,8 +12,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from ..artifacts.commit_artifacts import CommitArtifactManager
+from ..core.path_resolver import PathResolver
+from ..core.repo_context import RepoContext
+from ..core.repo_resolver import RepoResolver
 from ..dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from .repository_registry import RepositoryRegistry
+from .sqlite_store import SQLiteStore
+from .store_registry import StoreRegistry
 
 
 def should_reindex_for_branch(current: Optional[str], tracked: Optional[str]) -> bool:
@@ -51,7 +56,7 @@ class ChangeSet:
 class IndexSyncResult:
     """Result of index synchronization operation."""
 
-    action: str  # "downloaded", "indexed", "up_to_date", "failed"
+    action: str  # "downloaded", "incremental_update", "full_index", "up_to_date", "failed"
     commit: str
     files_processed: int = 0
     error: Optional[str] = None
@@ -66,7 +71,21 @@ class UpdateResult:
     deleted: int = 0
     moved: int = 0
     failed: int = 0
+    skipped: int = 0
+    errors: List[str] = None
     duration_seconds: float = 0.0
+
+    def __post_init__(self) -> None:
+        if self.errors is None:
+            self.errors = []
+
+    @property
+    def files_processed(self) -> int:
+        return self.indexed + self.deleted + self.moved
+
+    @property
+    def clean(self) -> bool:
+        return self.failed == 0 and not self.errors
 
 
 class GitAwareIndexManager:
@@ -76,9 +95,13 @@ class GitAwareIndexManager:
         self,
         registry: RepositoryRegistry,
         dispatcher: Optional[EnhancedDispatcher] = None,
+        repo_resolver: Optional[RepoResolver] = None,
+        store_registry: Optional[StoreRegistry] = None,
     ):
         self.registry = registry
         self.dispatcher = dispatcher
+        self.repo_resolver = repo_resolver
+        self.store_registry = store_registry
         self.artifact_manager = CommitArtifactManager()
         # Wired post-construction by MultiRepositoryWatcher to avoid circular import.
         # Signature: (repo_id: str, current_branch: str, tracked_branch: str) -> None
@@ -107,6 +130,7 @@ class GitAwareIndexManager:
             )
 
         repo_path = Path(repo_info.path)
+        index_exists_before_mutation = self._index_exists(repo_info)
 
         # Update current git state
         git_state = self.registry.update_git_state(repo_id)
@@ -165,7 +189,7 @@ class GitAwareIndexManager:
             if self._has_remote_artifact(repo_id, current_commit):
                 # Download existing index for this commit
                 if self._download_commit_index(repo_id, current_commit):
-                    if self.registry.update_indexed_commit(
+                    if self._index_exists(repo_info) and self.registry.update_indexed_commit(
                         repo_id, current_commit, branch=current_branch
                     ):
                         repo_info.last_indexed_commit = current_commit
@@ -174,6 +198,15 @@ class GitAwareIndexManager:
                             commit=current_commit,
                             duration_seconds=(datetime.now() - start_time).total_seconds(),
                         )
+
+        ctx = self._resolve_ctx(repo_id)
+        if ctx is None:
+            return IndexSyncResult(
+                action="failed",
+                commit=current_commit,
+                error=f"Failed to resolve repository context: {repo_id}",
+                duration_seconds=(datetime.now() - start_time).total_seconds(),
+            )
 
         # Determine what changed since last index
         if last_indexed_commit and not force_full:
@@ -188,33 +221,121 @@ class GitAwareIndexManager:
                             repo_id,
                             changed_files.total_changes(),
                         )
+                    elif not index_exists_before_mutation:
+                        logger.warning(
+                            "No existing durable index for %s; using full reindex",
+                            repo_id,
+                        )
                     else:
                         # Incremental update - only reindex changed files
-                        result = self._incremental_index_update(repo_id, changed_files)
-                        if self.registry.update_indexed_commit(
+                        result = self._incremental_index_update(repo_id, ctx, changed_files)
+                        if not result.clean:
+                            return IndexSyncResult(
+                                action="failed",
+                                commit=current_commit,
+                                files_processed=result.files_processed,
+                                error="; ".join(result.errors) or "Incremental index update failed",
+                                duration_seconds=(datetime.now() - start_time).total_seconds(),
+                            )
+                        if self._index_exists(repo_info) and self.registry.update_indexed_commit(
                             repo_id, current_commit, branch=current_branch
                         ):
                             repo_info.last_indexed_commit = current_commit
                             return IndexSyncResult(
                                 action="incremental_update",
                                 commit=current_commit,
-                                files_processed=result.indexed + result.deleted + result.moved,
+                                files_processed=result.files_processed,
                                 duration_seconds=(datetime.now() - start_time).total_seconds(),
                             )
             except Exception as e:
                 logger.warning(f"Incremental update failed, falling back to full index: {e}")
 
         # Full index needed
-        files_indexed = self._full_index(repo_id)
-        if self.registry.update_indexed_commit(repo_id, current_commit, branch=current_branch):
+        result = self._normalize_update_result(self._full_index(repo_id, ctx))
+        if not result.clean:
+            return IndexSyncResult(
+                action="failed",
+                commit=current_commit,
+                files_processed=result.files_processed,
+                error="; ".join(result.errors) or "Full index failed",
+                duration_seconds=(datetime.now() - start_time).total_seconds(),
+            )
+        if self._index_exists(repo_info) and self.registry.update_indexed_commit(
+            repo_id, current_commit, branch=current_branch
+        ):
             repo_info.last_indexed_commit = current_commit
+        elif not self._index_exists(repo_info):
+            return IndexSyncResult(
+                action="failed",
+                commit=current_commit,
+                files_processed=result.files_processed,
+                error="Full index did not create a durable SQLite index",
+                duration_seconds=(datetime.now() - start_time).total_seconds(),
+            )
 
         return IndexSyncResult(
             action="full_index",
             commit=current_commit,
-            files_processed=files_indexed,
+            files_processed=result.indexed,
             duration_seconds=(datetime.now() - start_time).total_seconds(),
         )
+
+    def _resolve_ctx(self, repo_id: str) -> Optional[RepoContext]:
+        """Resolve a RepoContext for the registered repository before mutation."""
+        repo_info = self.registry.get_repository(repo_id)
+        if not repo_info:
+            return None
+
+        repo_path = Path(repo_info.path)
+        if self.repo_resolver is not None:
+            ctx = self.repo_resolver.resolve(repo_path)
+            if ctx is not None and ctx.repo_id == repo_id:
+                return ctx
+            return None
+
+        try:
+            if self.store_registry is not None:
+                store = self.store_registry.get(repo_id)
+            else:
+                registry_get = getattr(self.registry, "get", None)
+                registered_info = registry_get(repo_id) if callable(registry_get) else None
+                if registered_info is repo_info:
+                    self.store_registry = StoreRegistry.for_registry(self.registry)
+                    store = self.store_registry.get(repo_id)
+                else:
+                    if not isinstance(repo_info.index_path, (str, Path)):
+                        return None
+                    store = SQLiteStore(
+                        str(repo_info.index_path),
+                        path_resolver=PathResolver(repo_path),
+                    )
+        except Exception as exc:
+            logger.error("Failed to resolve store for %s: %s", repo_id, exc)
+            return None
+
+        return RepoContext(
+            repo_id=repo_id,
+            sqlite_store=store,
+            workspace_root=repo_path,
+            tracked_branch=getattr(repo_info, "tracked_branch", "") or "",
+            registry_entry=repo_info,
+        )
+
+    def _index_exists(self, repo_info: Any) -> bool:
+        index_path = getattr(repo_info, "index_path", None)
+        if index_path is not None:
+            return Path(index_path).exists()
+        index_location = getattr(repo_info, "index_location", None)
+        if index_location is None:
+            return False
+        return (Path(index_location) / "current.db").exists()
+
+    def _normalize_update_result(self, value: Any) -> UpdateResult:
+        if isinstance(value, UpdateResult):
+            return value
+        if isinstance(value, int):
+            return UpdateResult(indexed=value)
+        return UpdateResult(failed=1, errors=[f"Unexpected update result: {value!r}"])
 
     def _get_changed_files(self, repo_path: Path, from_commit: str, to_commit: str) -> ChangeSet:
         """Get files changed between two commits.
@@ -260,7 +381,9 @@ class GitAwareIndexManager:
 
         return changes
 
-    def _incremental_index_update(self, repo_id: str, changes: ChangeSet) -> UpdateResult:
+    def _incremental_index_update(
+        self, repo_id: str, ctx: RepoContext, changes: ChangeSet
+    ) -> UpdateResult:
         """Update index incrementally based on file changes.
 
         Args:
@@ -275,18 +398,13 @@ class GitAwareIndexManager:
 
         repo_info = self.registry.get_repository(repo_id)
         if not repo_info:
+            result.failed += 1
+            result.errors.append(f"Repository not found: {repo_id}")
             return result
 
-        index_path = Path(repo_info.index_location) / "current.db"
-        if not index_path.exists():
-            # Fall back to dry-run accounting when persistent index is unavailable.
-            logger.warning(
-                "No existing index for %s, applying incremental dry-run accounting",
-                repo_id,
-            )
-            result.indexed = len(changes.modified) + len(changes.added)
-            result.deleted = len(changes.deleted)
-            result.moved = len(changes.renamed)
+        if not self._index_exists(repo_info):
+            result.failed += 1
+            result.errors.append(f"Missing durable index for incremental update: {repo_id}")
             result.duration_seconds = (datetime.now() - start_time).total_seconds()
             return result
 
@@ -297,11 +415,12 @@ class GitAwareIndexManager:
             # Handle deletions first
             for path in changes.deleted:
                 try:
-                    self.dispatcher.remove_file(repo_path / path)
+                    self.dispatcher.remove_file(ctx, repo_path / path)
                     result.deleted += 1
                 except Exception as e:
                     logger.error(f"Failed to remove {path}: {e}")
                     result.failed += 1
+                    result.errors.append(f"Failed to remove {path}: {e}")
 
             # Handle renames
             for old_path, new_path in changes.renamed:
@@ -309,28 +428,33 @@ class GitAwareIndexManager:
                     old_full = repo_path / old_path
                     new_full = repo_path / new_path
                     if new_full.exists():
-                        self.dispatcher.move_file(old_full, new_full)
+                        self.dispatcher.move_file(ctx, old_full, new_full)
                         result.moved += 1
                     else:
                         # New path doesn't exist, just remove old
-                        self.dispatcher.remove_file(old_full)
+                        self.dispatcher.remove_file(ctx, old_full)
                         result.deleted += 1
                 except Exception as e:
                     logger.error(f"Failed to move {old_path} -> {new_path}: {e}")
                     result.failed += 1
+                    result.errors.append(f"Failed to move {old_path} -> {new_path}: {e}")
 
             # Handle modifications and additions
             for path in changes.modified + changes.added:
                 try:
                     full_path = repo_path / path
                     if full_path.exists() and full_path.is_file():
-                        self.dispatcher.index_file(full_path)
+                        self.dispatcher.index_file(ctx, full_path)
                         result.indexed += 1
+                    else:
+                        result.skipped += 1
                 except Exception as e:
                     logger.error(f"Failed to index {path}: {e}")
                     result.failed += 1
+                    result.errors.append(f"Failed to index {path}: {e}")
         else:
-            logger.warning("No dispatcher available for incremental update")
+            result.failed += 1
+            result.errors.append("No dispatcher available for incremental update")
 
         result.duration_seconds = (datetime.now() - start_time).total_seconds()
         return result
@@ -355,22 +479,28 @@ class GitAwareIndexManager:
         except subprocess.CalledProcessError:
             return False
 
-    def _full_index(self, repo_id: str) -> int:
+    def _full_index(self, repo_id: str, ctx: RepoContext) -> UpdateResult:
         """Perform full repository indexing.
 
         Args:
             repo_id: Repository ID
 
         Returns:
-            Number of files indexed
+            UpdateResult with durability/failure details
         """
+        start_time = datetime.now()
+        result = UpdateResult()
         repo_info = self.registry.get_repository(repo_id)
         if not repo_info:
-            return 0
+            result.failed += 1
+            result.errors.append(f"Repository not found: {repo_id}")
+            return result
 
         if not self.dispatcher:
             logger.error("No dispatcher available for indexing")
-            return 0
+            result.failed += 1
+            result.errors.append("No dispatcher available for indexing")
+            return result
 
         repo_path = Path(repo_info.path)
 
@@ -380,12 +510,24 @@ class GitAwareIndexManager:
 
         # Index the directory
         logger.info(f"Starting full index of {repo_info.name}")
-        stats = self.dispatcher.index_directory(repo_path, recursive=True)
+        try:
+            stats = self.dispatcher.index_directory(ctx, repo_path, recursive=True)
+        except Exception as exc:
+            result.failed += 1
+            result.errors.append(f"Full index failed: {exc}")
+            result.duration_seconds = (datetime.now() - start_time).total_seconds()
+            return result
 
-        total_indexed = stats.get("indexed_files", 0)
+        total_indexed = stats.get("indexed_files", 0) if isinstance(stats, dict) else 0
+        failed_files = stats.get("failed_files", 0) if isinstance(stats, dict) else 0
+        errors = stats.get("errors", []) if isinstance(stats, dict) else []
+        result.indexed = total_indexed
+        result.failed = failed_files
+        result.errors.extend(str(error) for error in errors)
+        result.duration_seconds = (datetime.now() - start_time).total_seconds()
         logger.info(f"Indexed {total_indexed} files in {repo_info.name}")
 
-        return total_indexed
+        return result
 
     def _has_remote_artifact(self, repo_id: str, commit: str) -> bool:
         """Check if remote artifact exists for commit.

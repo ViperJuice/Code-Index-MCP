@@ -53,6 +53,7 @@ from .security.token_validator import TokenValidator
 from .setup.qdrant_autostart import ensure_qdrant_running
 from .setup.semantic_preflight import run_semantic_preflight
 from .storage.sqlite_store import SQLiteStore
+from .storage.store_registry import StoreRegistry
 from .utils.fuzzy_indexer import FuzzyIndexer
 from .utils.index_discovery import IndexDiscovery
 from .utils.language_detector import detect_repository_languages
@@ -110,6 +111,7 @@ semantic_indexer = None
 profile_hydration_status: Dict[str, Any] | None = None
 semantic_setup_status: Dict[str, Any] | None = None
 _repo_registry = None
+_store_registry: StoreRegistry | None = None
 
 
 def _get_path_guard() -> Optional[PathTraversalGuard]:
@@ -318,7 +320,7 @@ app.add_middleware(SecretRedactionResponseMiddleware)
 @app.on_event("startup")
 async def startup_event():
     """Initialize the dispatcher and register plugins on startup."""
-    global dispatcher, repo_resolver, sqlite_store, multi_watcher, ref_poller, plugin_manager, plugin_loader, auth_manager, security_config, cache_manager, query_cache, bm25_indexer, hybrid_search, fuzzy_indexer, semantic_indexer, profile_hydration_status, semantic_setup_status, language_detection_status
+    global dispatcher, repo_resolver, sqlite_store, multi_watcher, ref_poller, plugin_manager, plugin_loader, auth_manager, security_config, cache_manager, query_cache, bm25_indexer, hybrid_search, fuzzy_indexer, semantic_indexer, profile_hydration_status, semantic_setup_status, language_detection_status, _store_registry
 
     app.state.startup_time = time.monotonic()
 
@@ -541,8 +543,6 @@ async def startup_event():
         # Initialize RepoResolver for per-request repo context resolution.
         try:
             from .storage.repository_registry import RepositoryRegistry
-            from .storage.store_registry import StoreRegistry
-
             _local_repo_registry = RepositoryRegistry()
             _store_registry = StoreRegistry.for_registry(_local_repo_registry)
             repo_resolver = RepoResolver(_local_repo_registry, _store_registry)
@@ -805,7 +805,10 @@ async def startup_event():
                 from .storage.git_index_manager import GitAwareIndexManager
 
                 _git_index_manager = GitAwareIndexManager(
-                    registry=_repo_registry, dispatcher=dispatcher
+                    registry=_repo_registry,
+                    dispatcher=dispatcher,
+                    repo_resolver=repo_resolver,
+                    store_registry=_store_registry,
                 )
                 multi_watcher = MultiRepositoryWatcher(
                     registry=_repo_registry,

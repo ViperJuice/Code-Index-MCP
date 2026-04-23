@@ -57,6 +57,8 @@ class TestInitializeStatelessServicesExtended:
         assert isinstance(store_registry, StoreRegistry)
         assert isinstance(repo_registry, RepositoryRegistry)
         assert isinstance(git_index_manager, GitAwareIndexManager)
+        assert git_index_manager.repo_resolver is repo_resolver
+        assert git_index_manager.store_registry is store_registry
 
     def test_backward_compat_destructuring(self, tmp_path):
         """Old callers that do store, resolver, dispatcher = result still work if they unpack 3."""

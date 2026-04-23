@@ -17,9 +17,11 @@ sys.path.insert(0, str(project_root))
 
 from mcp_server.artifacts.commit_artifacts import CommitArtifactManager  # noqa: E402
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher  # noqa: E402
+from mcp_server.core.repo_resolver import RepoResolver  # noqa: E402
 from mcp_server.storage.git_index_manager import GitAwareIndexManager  # noqa: E402
 from mcp_server.storage.repository_registry import RepositoryRegistry  # noqa: E402
 from mcp_server.storage.sqlite_store import SQLiteStore  # noqa: E402
+from mcp_server.storage.store_registry import StoreRegistry  # noqa: E402
 from mcp_server.watcher_multi_repo import MultiRepositoryWatcher  # noqa: E402
 
 
@@ -183,13 +185,19 @@ def sync(repo_id: Optional[str], force_full: bool, sync_all: bool):
     """Synchronize repository index with current git state."""
     try:
         registry = RepositoryRegistry()
+        store_registry = StoreRegistry.for_registry(registry)
+        repo_resolver = RepoResolver(registry, store_registry)
 
         if sync_all:
             # Sync all repositories
             click.echo("Synchronizing all repositories...")
 
             # Create index manager
-            index_manager = GitAwareIndexManager(registry)
+            index_manager = GitAwareIndexManager(
+                registry,
+                repo_resolver=repo_resolver,
+                store_registry=store_registry,
+            )
             results = index_manager.sync_all_repositories()
 
             for rid, result in results.items():
@@ -199,7 +207,7 @@ def sync(repo_id: Optional[str], force_full: bool, sync_all: bool):
                         click.echo(
                             click.style(f"✓ {repo_info.name}: Already up to date", fg="green")
                         )
-                    elif result.action == "indexed":
+                    elif result.action in {"indexed", "incremental_update", "full_index"}:
                         click.echo(
                             click.style(
                                 f"✓ {repo_info.name}: Indexed {result.files_processed} files in {result.duration_seconds:.1f}s",
@@ -246,10 +254,13 @@ def sync(repo_id: Optional[str], force_full: bool, sync_all: bool):
                 sys.exit(1)
 
             # Create necessary components
-            index_path = Path(repo_info.index_location) / "current.db"
-            store = SQLiteStore(str(index_path)) if index_path.exists() else None
-            dispatcher = EnhancedDispatcher(sqlite_store=store)
-            index_manager = GitAwareIndexManager(registry, dispatcher)
+            dispatcher = EnhancedDispatcher()
+            index_manager = GitAwareIndexManager(
+                registry,
+                dispatcher,
+                repo_resolver=repo_resolver,
+                store_registry=store_registry,
+            )
 
             click.echo(f"Synchronizing {repo_info.name}...")
 
@@ -261,7 +272,7 @@ def sync(repo_id: Optional[str], force_full: bool, sync_all: bool):
 
             if result.action == "up_to_date":
                 click.echo(click.style("✓ Repository is already up to date", fg="green"))
-            elif result.action == "indexed":
+            elif result.action in {"indexed", "incremental_update", "full_index"}:
                 click.echo(
                     click.style(
                         f"✓ Indexed {result.files_processed} files in {result.duration_seconds:.1f}s",
@@ -288,6 +299,8 @@ def status(repo_id: Optional[str]):
     """Show detailed repository status."""
     try:
         registry = RepositoryRegistry()
+        store_registry = StoreRegistry.for_registry(registry)
+        repo_resolver = RepoResolver(registry, store_registry)
 
         if not repo_id:
             # Try current directory
@@ -304,7 +317,11 @@ def status(repo_id: Optional[str]):
         assert repo_id is not None
 
         # Get repository status
-        index_manager = GitAwareIndexManager(registry)
+        index_manager = GitAwareIndexManager(
+            registry,
+            repo_resolver=repo_resolver,
+            store_registry=store_registry,
+        )
         repo_id_str = repo_id
         status = index_manager.get_repository_status(repo_id_str)
 
@@ -442,7 +459,14 @@ def watch(watch_all: bool, daemon: bool):
 
         # Create components
         dispatcher = EnhancedDispatcher()
-        index_manager = GitAwareIndexManager(registry, dispatcher)
+        store_registry = StoreRegistry.for_registry(registry)
+        repo_resolver = RepoResolver(registry, store_registry)
+        index_manager = GitAwareIndexManager(
+            registry,
+            dispatcher,
+            repo_resolver=repo_resolver,
+            store_registry=store_registry,
+        )
         artifact_manager = CommitArtifactManager()
 
         # Create watcher
@@ -451,6 +475,7 @@ def watch(watch_all: bool, daemon: bool):
             dispatcher=dispatcher,
             index_manager=index_manager,
             artifact_manager=artifact_manager,
+            repo_resolver=repo_resolver,
         )
 
         click.echo("Starting multi-repository watcher...")

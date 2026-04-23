@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..core.path_resolver import PathResolver
+from ..core.repo_context import RepoContext
 from ..dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from ..storage.sqlite_store import SQLiteStore
 from ..storage.two_phase import two_phase_commit
@@ -59,12 +60,19 @@ class IncrementalIndexer:
         dispatcher: Optional[EnhancedDispatcher] = None,
         repo_path: Optional[Path] = None,
         semantic_indexer: Optional[Any] = None,
+        ctx: Optional[RepoContext] = None,
     ):
         self.store = store
         self.dispatcher = dispatcher
+        self.ctx = ctx
         self.repo_path = repo_path or Path.cwd()
         self.path_resolver = PathResolver(self.repo_path)
         self.semantic_indexer = semantic_indexer
+
+    def _dispatcher_ctx(self) -> RepoContext:
+        if self.ctx is None:
+            raise ValueError("dispatcher-backed incremental indexing requires RepoContext")
+        return self.ctx
 
     def _get_chunk_ids_for_path(
         self, path: str, limit: Optional[int] = None, offset: int = 0
@@ -266,9 +274,10 @@ class IncrementalIndexer:
 
             if self.dispatcher:
                 full_path = self.repo_path / path
+                ctx = self._dispatcher_ctx()
 
                 def primary_op():
-                    self.dispatcher.remove_file(full_path)
+                    self.dispatcher.remove_file(ctx, full_path)
                     return chunk_ids
 
                 def shadow_op(captured_chunk_ids):
@@ -326,9 +335,10 @@ class IncrementalIndexer:
 
             if self.dispatcher:
                 old_full_path = self.repo_path / old_path
+                ctx = self._dispatcher_ctx()
 
                 def primary_op():
-                    self.dispatcher.move_file(old_full_path, new_full_path, content_hash)
+                    self.dispatcher.move_file(ctx, old_full_path, new_full_path, content_hash)
                     return chunk_ids
 
                 def shadow_op(captured_chunk_ids):
@@ -336,7 +346,7 @@ class IncrementalIndexer:
 
                 def rollback(captured_chunk_ids):
                     try:
-                        self.dispatcher.move_file(new_full_path, old_full_path, content_hash)
+                        self.dispatcher.move_file(ctx, new_full_path, old_full_path, content_hash)
                     except Exception as rb_exc:
                         logger.warning(f"Rollback of dispatcher move {old_path} failed: {rb_exc}")
 
@@ -403,7 +413,8 @@ class IncrementalIndexer:
 
             if self.dispatcher:
                 # Use dispatcher if available
-                self.dispatcher.index_file(full_path)
+                ctx = self._dispatcher_ctx()
+                self.dispatcher.index_file(ctx, full_path)
             else:
                 # Direct indexing would go here
                 logger.warning(f"No dispatcher available to index {path}")

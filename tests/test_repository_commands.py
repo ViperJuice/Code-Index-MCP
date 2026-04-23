@@ -116,7 +116,7 @@ def test_sync_guidance_matches_local_first_workflow(monkeypatch, tmp_path: Path)
         error = None
 
     class FakeIndexManager:
-        def __init__(self, registry, dispatcher=None):
+        def __init__(self, registry, dispatcher=None, **kwargs):
             pass
 
         def sync_repository_index(self, repo_id, force_full=False):

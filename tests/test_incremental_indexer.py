@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from mcp_server.core.path_resolver import PathResolver
+from mcp_server.core.repo_context import RepoContext
 from mcp_server.indexing.change_detector import FileChange
 from mcp_server.indexing.incremental_indexer import IncrementalIndexer
 from mcp_server.storage.sqlite_store import SQLiteStore
@@ -15,13 +16,18 @@ class DummyDispatcher:
         self.removed = []
         self.moved = []
 
-    def index_file(self, path: Path) -> None:
+    def index_file(self, ctx: RepoContext, path: Path) -> None:
+        self.ctx = ctx
         self.indexed.append(Path(path))
 
-    def remove_file(self, path: Path) -> None:
+    def remove_file(self, ctx: RepoContext, path: Path) -> None:
+        self.ctx = ctx
         self.removed.append(Path(path))
 
-    def move_file(self, old_path: Path, new_path: Path, content_hash: str) -> None:
+    def move_file(
+        self, ctx: RepoContext, old_path: Path, new_path: Path, content_hash: str
+    ) -> None:
+        self.ctx = ctx
         self.moved.append((Path(old_path), Path(new_path), content_hash))
 
 
@@ -51,19 +57,27 @@ def incremental_indexer(tmp_path: Path):
 
     dispatcher = DummyDispatcher()
     semantic_indexer = DummySemanticIndexer()
+    ctx = RepoContext(
+        repo_id=repo_id,
+        sqlite_store=store,
+        workspace_root=repo_path,
+        tracked_branch="main",
+        registry_entry=SimpleNamespace(repository_id=repo_id, path=repo_path),
+    )
     indexer = IncrementalIndexer(
         store=store,
         dispatcher=dispatcher,
         repo_path=repo_path,
         semantic_indexer=semantic_indexer,
+        ctx=ctx,
     )  # type: ignore[arg-type]
     indexer._get_repository_id = lambda: repo_id  # type: ignore[method-assign]
 
-    return repo_path, store, dispatcher, indexer, semantic_indexer
+    return repo_path, store, dispatcher, indexer, semantic_indexer, ctx
 
 
 def test_incremental_addition_handles_new_files(incremental_indexer):
-    repo_path, _, dispatcher, indexer, _ = incremental_indexer
+    repo_path, _, dispatcher, indexer, _, ctx = incremental_indexer
     new_file = repo_path / "new_file.py"
     new_file.write_text("print('hello')\n")
 
@@ -72,10 +86,25 @@ def test_incremental_addition_handles_new_files(incremental_indexer):
     assert stats.files_indexed == 1
     assert stats.errors == 0
     assert dispatcher.indexed == [new_file]
+    assert dispatcher.ctx is ctx
+
+
+def test_dispatcher_without_repo_context_returns_errors(tmp_path: Path):
+    repo_path = tmp_path / "repo"
+    repo_path.mkdir()
+    test_file = repo_path / "new_file.py"
+    test_file.write_text("print('hello')\n")
+    store = SQLiteStore(str(tmp_path / "code_index.db"), path_resolver=PathResolver(repo_path))
+    indexer = IncrementalIndexer(store=store, dispatcher=DummyDispatcher(), repo_path=repo_path)
+
+    stats = indexer.update_from_changes([FileChange("new_file.py", "added")])
+
+    assert stats.files_indexed == 0
+    assert stats.errors == 1
 
 
 def test_incremental_modification_without_hash(incremental_indexer):
-    repo_path, store, dispatcher, indexer, semantic_indexer = incremental_indexer
+    repo_path, store, dispatcher, indexer, semantic_indexer, ctx = incremental_indexer
     existing_file = repo_path / "existing.py"
     existing_file.write_text("value = 1\n")
 
@@ -109,11 +138,12 @@ def test_incremental_modification_without_hash(incremental_indexer):
     assert stats.files_indexed == 1
     assert stats.errors == 0
     assert dispatcher.indexed[-1] == existing_file
+    assert dispatcher.ctx is ctx
     assert semantic_indexer.cleanup_calls[-1]["chunk_ids"] == ["chunk-existing-1"]
 
 
 def test_incremental_deletion_handles_missing_files(incremental_indexer):
-    repo_path, store, dispatcher, indexer, semantic_indexer = incremental_indexer
+    repo_path, store, dispatcher, indexer, semantic_indexer, ctx = incremental_indexer
     removed_file = repo_path / "removed.py"
     removed_file.write_text("# to be removed\n")
 
@@ -143,11 +173,12 @@ def test_incremental_deletion_handles_missing_files(incremental_indexer):
     assert stats.files_removed == 1
     assert stats.errors == 0
     assert dispatcher.removed == [repo_path / "removed.py"]
+    assert dispatcher.ctx is ctx
     assert semantic_indexer.cleanup_calls[-1]["chunk_ids"] == ["chunk-removed-1"]
 
 
 def test_incremental_cleanup_includes_split_semantic_chunk_ids(incremental_indexer):
-    repo_path, store, dispatcher, indexer, semantic_indexer = incremental_indexer
+    repo_path, store, dispatcher, indexer, semantic_indexer, ctx = incremental_indexer
     existing_file = repo_path / "split.py"
     existing_file.write_text("value = 1\n")
 
@@ -199,6 +230,7 @@ def test_incremental_cleanup_includes_split_semantic_chunk_ids(incremental_index
     assert stats.files_indexed == 1
     assert stats.errors == 0
     assert dispatcher.indexed[-1] == existing_file
+    assert dispatcher.ctx is ctx
     assert semantic_indexer.cleanup_calls[-1]["chunk_ids"] == [
         "chunk-split-1",
         "chunk-split-1:part:1:3",

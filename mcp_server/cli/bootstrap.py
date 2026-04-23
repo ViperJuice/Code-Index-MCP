@@ -65,7 +65,12 @@ def initialize_stateless_services(
             reranker_type=reranker_type,
         )
 
-    git_index_manager = GitAwareIndexManager(registry=repo_registry, dispatcher=dispatcher)
+    git_index_manager = GitAwareIndexManager(
+        registry=repo_registry,
+        dispatcher=dispatcher,
+        repo_resolver=repo_resolver,
+        store_registry=store_registry,
+    )
 
     return store_registry, repo_resolver, dispatcher, repo_registry, git_index_manager
 
