@@ -15,7 +15,7 @@ from mcp_server.artifacts.publisher import ArtifactError, ArtifactPublisher
 REPO = "owner/repo"
 COMMIT = "abcdef1234567890abcdef1234567890abcdef12"
 SHORT_SHA = COMMIT[:7]
-SHA_TAG = f"index-{SHORT_SHA}"
+SHA_TAG = f"index-repo-main-{SHORT_SHA}"
 
 _SYNTHETIC_ATTESTATION = Attestation(
     bundle_url="https://github.com/owner/repo/attestations/1",

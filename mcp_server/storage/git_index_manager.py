@@ -16,6 +16,8 @@ from ..core.path_resolver import PathResolver
 from ..core.repo_context import RepoContext
 from ..core.repo_resolver import RepoResolver
 from ..dispatcher.dispatcher_enhanced import EnhancedDispatcher
+from ..health.repository_readiness import RepositoryReadiness, RepositoryReadinessState
+from ..indexing.change_detector import ChangeDetector
 from .repository_registry import RepositoryRegistry
 from .sqlite_store import SQLiteStore
 from .store_registry import StoreRegistry
@@ -56,11 +58,13 @@ class ChangeSet:
 class IndexSyncResult:
     """Result of index synchronization operation."""
 
-    action: str  # "downloaded", "incremental_update", "full_index", "up_to_date", "failed"
+    action: str
     commit: str
     files_processed: int = 0
     error: Optional[str] = None
     duration_seconds: float = 0.0
+    code: Optional[str] = None
+    readiness: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -115,8 +119,8 @@ class GitAwareIndexManager:
         Args:
             repo_id: Repository ID
             force_full: Force full reindex instead of incremental
-            bypass_branch_guard: Skip branch-drift check (used by enqueue_full_rescan to
-                prevent infinite drift→rescan→drift→rescan loops)
+            bypass_branch_guard: Compatibility parameter; production sync paths always
+                respect the tracked-branch guard.
 
         Returns:
             IndexSyncResult
@@ -144,9 +148,7 @@ class GitAwareIndexManager:
         last_indexed_commit = repo_info.last_indexed_commit
         current_branch = getattr(repo_info, "current_branch", None)
 
-        if not bypass_branch_guard and not should_reindex_for_branch(
-            current_branch, repo_info.tracked_branch
-        ):
+        if not should_reindex_for_branch(current_branch, repo_info.tracked_branch):
             # Distinguish true drift (both non-None, different) from unconfigured (tracked is None)
             if (
                 current_branch
@@ -161,8 +163,32 @@ class GitAwareIndexManager:
                         "tracked_branch": repo_info.tracked_branch,
                     },
                 )
-                if self.on_branch_drift is not None:
-                    self.on_branch_drift(repo_id, current_branch, repo_info.tracked_branch)
+                readiness = RepositoryReadiness(
+                    state=RepositoryReadinessState.WRONG_BRANCH,
+                    repository_id=repo_id,
+                    repository_name=getattr(repo_info, "name", None),
+                    registered_path=str(Path(repo_info.path).resolve(strict=False)),
+                    tracked_branch=repo_info.tracked_branch,
+                    current_branch=current_branch,
+                    current_commit=current_commit,
+                    last_indexed_commit=last_indexed_commit,
+                    index_path=(
+                        str(Path(repo_info.index_path).resolve(strict=False))
+                        if getattr(repo_info, "index_path", None)
+                        else None
+                    ),
+                    remediation=(
+                        f"Switch to the tracked branch '{repo_info.tracked_branch}' "
+                        "or register the intended repository path."
+                    ),
+                )
+                return IndexSyncResult(
+                    action="wrong_branch",
+                    commit=current_commit,
+                    duration_seconds=(datetime.now() - start_time).total_seconds(),
+                    code=RepositoryReadinessState.WRONG_BRANCH.value,
+                    readiness=readiness.to_dict(),
+                )
             else:
                 logger.info(
                     "Skipping reindex for %s: current branch %r != tracked branch %r",
@@ -349,35 +375,15 @@ class GitAwareIndexManager:
             ChangeSet
         """
         changes = ChangeSet(added=[], modified=[], deleted=[], renamed=[])
-
-        try:
-            # Get diff between commits
-            cmd = ["git", "diff", "--name-status", from_commit, to_commit]
-            result = subprocess.run(cmd, cwd=repo_path, capture_output=True, text=True, check=True)
-
-            for line in result.stdout.strip().splitlines():
-                if not line:
-                    continue
-
-                parts = line.split("\t")
-                if len(parts) < 2:
-                    continue
-
-                status = parts[0]
-
-                if status == "A":  # Added
-                    changes.added.append(parts[1])
-                elif status == "M":  # Modified
-                    changes.modified.append(parts[1])
-                elif status == "D":  # Deleted
-                    changes.deleted.append(parts[1])
-                elif status.startswith("R"):  # Renamed
-                    if len(parts) >= 3:
-                        changes.renamed.append((parts[1], parts[2]))
-
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to get git diff: {e}")
-            raise
+        for change in ChangeDetector(repo_path).get_changes_since_commit(from_commit, to_commit):
+            if change.change_type == "added":
+                changes.added.append(change.path)
+            elif change.change_type == "modified":
+                changes.modified.append(change.path)
+            elif change.change_type == "deleted":
+                changes.deleted.append(change.path)
+            elif change.change_type == "renamed" and change.old_path:
+                changes.renamed.append((change.old_path, change.path))
 
         return changes
 
@@ -581,18 +587,8 @@ class GitAwareIndexManager:
         return self.artifact_manager.create_commit_artifact(repo_id, commit, index_path)
 
     def enqueue_full_rescan(self, repo_id: str) -> IndexSyncResult:
-        """Mark repo stale and trigger a full rescan (IF-0-P17-2).
-
-        Clears last_indexed_commit so sync_repository_index performs a full
-        re-index regardless of the current tip.  bypass_branch_guard=True
-        prevents the branch-drift short-circuit from blocking the rescan when
-        HEAD is detached or the branch has been renamed.
-
-        Choice: update_indexed_commit(repo_id, None) sets last_indexed_commit to
-        None via the registry mutator — None is the declared Optional[str] type.
-        """
-        self.registry.update_indexed_commit(repo_id, None)
-        return self.sync_repository_index(repo_id, force_full=True, bypass_branch_guard=True)
+        """Trigger a guarded full rescan without bypassing the tracked-branch check."""
+        return self.sync_repository_index(repo_id, force_full=True)
 
     def sync_all_repositories(self, parallel: bool = True) -> Dict[str, IndexSyncResult]:
         """Sync all repositories that need updates.

@@ -25,6 +25,7 @@ from mcp_server.cli.bootstrap import initialize_stateless_services, timeout, val
 from mcp_server.cli.handshake import HandshakeGate
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher
+from mcp_server.health.repository_readiness import ReadinessClassifier
 from mcp_server.metrics.prometheus_exporter import PrometheusExporter, record_tool_call
 from mcp_server.plugin_system import PluginManager
 from mcp_server.storage.sqlite_store import SQLiteStore
@@ -39,10 +40,11 @@ logger = logging.getLogger(__name__)
 _SERVER_NAME = "code-index-mcp-fast-search"
 _SERVER_INSTRUCTIONS = (
     "This server provides a pre-built code index (BM25 + semantic vector search). "
-    "ALWAYS use search_code and symbol_lookup BEFORE grep, glob, or find. "
-    "search_code: pattern/keyword/natural-language search, <500ms, ranked results with line numbers. "
-    "symbol_lookup: exact class/function/method lookup by name, <100ms. "
-    "Fall back to native tools ONLY if a search returns 0 results."
+    "Indexed search is authoritative when repository readiness is ready. "
+    "Use get_status to inspect readiness, or honor an index_unavailable response from "
+    "search_code or symbol_lookup. index_unavailable includes safe_fallback=native_search "
+    "and remediation; use native search while following remediation such as reindex. "
+    "Ready indexes with no matches return ordinary empty results or not_found."
 )
 
 try:
@@ -80,6 +82,14 @@ _local_ctx: Any = None  # RepoContext for the local repo, built by initialize_se
 class _LocalRepoResolver:
     """Minimal resolver that returns _local_ctx for any path, used when no registry is available."""
 
+    def classify(self, path: Any) -> Any:
+        if _local_ctx is None:
+            return None
+        return ReadinessClassifier.classify_registered(
+            _local_ctx.registry_entry,
+            requested_path=Path(path),
+        )
+
     def resolve(self, path: Any) -> Any:
         return _local_ctx
 
@@ -88,7 +98,7 @@ def _build_tool_list() -> list[types.Tool]:
     return [
         types.Tool(
             name="symbol_lookup",
-            description="[USE BEFORE GREP] Look up any class, function, or method definition. 100x faster than grep. Returns file + line number. Fall back to Grep ONLY if this returns not_found. Accepts optional repository param (registered repo name or filesystem path); filesystem paths must be inside MCP_ALLOWED_ROOTS or the tool returns path_outside_allowed_roots.",
+            description="Look up a class, function, method, or variable definition from the index when repository readiness is ready. If the tool returns index_unavailable with safe_fallback=native_search, use native search and follow the readiness remediation, such as reindex. Ready misses return not_found with readiness metadata. Accepts optional repository param (registered repo name or filesystem path); filesystem paths must be inside MCP_ALLOWED_ROOTS or the tool returns path_outside_allowed_roots.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -103,7 +113,7 @@ def _build_tool_list() -> list[types.Tool]:
         ),
         types.Tool(
             name="search_code",
-            description="[USE BEFORE GREP] Search code by pattern, keyword, or natural language (semantic=true). Indexed, <500ms, returns ranked results with line numbers and last_indexed timestamp. Fall back to Grep ONLY if this returns 0 results. Accepts optional repository param (registered repo name or filesystem path); filesystem paths must be inside MCP_ALLOWED_ROOTS or the tool returns path_outside_allowed_roots.",
+            description="Search indexed code by pattern, keyword, or natural language (semantic=true) when repository readiness is ready. If the tool returns index_unavailable with safe_fallback=native_search, use native search and follow the readiness remediation, such as reindex. Ready misses return results=[] with readiness metadata. Accepts optional repository param (registered repo name or filesystem path); filesystem paths must be inside MCP_ALLOWED_ROOTS or the tool returns path_outside_allowed_roots.",
             inputSchema={
                 "type": "object",
                 "properties": {

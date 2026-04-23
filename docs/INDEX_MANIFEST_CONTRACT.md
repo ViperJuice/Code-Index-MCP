@@ -24,11 +24,17 @@ Requests are provided via `IndexDiscovery.get_local_index_path(requested_schema_
 
 ## Artifact metadata contract (full and delta)
 Artifact payloads published via CI must include `artifact-metadata.json` with:
+- `repo_id`: stable v3 repository identity
+- `tracked_branch`: tracked/default branch represented by the artifact
+- `commit`: commit represented by artifact contents
+- `schema_version`: artifact/index schema version
+- `semantic_profile_hash`: SHA256 over sorted semantic profile ids and compatibility fingerprints, or `lexical-only`
 - `artifact_type`: `full` or `delta`
 - `base_commit`: required for `delta`, null for `full`
 - `target_commit`: commit represented by artifact contents
 - `checksum`: SHA256 of archive payload
 - `compatibility.schema_version` and `compatibility.embedding_model`
+- `manifest_v2`: canonical manifest payload carrying the same identity fields
 
 Delta artifacts must also include a `delta-manifest.json` containing:
 - `delta_schema_version`
@@ -36,4 +42,29 @@ Delta artifacts must also include a `delta-manifest.json` containing:
 - ordered `operations` (`add`, `modify`, `delete`)
 - `checksums` for changed file payloads
 
-Consumers must fail closed when required metadata is missing or checksums do not match.
+Consumers must fail closed when required metadata is missing, checksums do not match,
+the repo id or tracked branch differs, the schema version is unknown, the commit is
+stale, or the semantic profile hash is incompatible. Legacy release names such as
+`index-latest`, `index-*`, `mcp-index-*`, and root-level `code_index.db` are only
+candidate discovery or compatibility inputs; they are never sufficient without
+metadata validation.
+
+## Canonical P31 artifact identity
+
+Canonical artifact ids use:
+
+```text
+mcp-index-<repo_id>-<tracked_branch>-<short_commit>-<semantic_profile_hash>-<artifact_type>
+```
+
+`repo_id` and `tracked_branch` are sanitized for transport names. The archive
+must hydrate the lexical SQLite index to `.mcp-index/current.db`. Metadata,
+semantic profile metadata, and vector state live under the same `.mcp-index`
+directory. Root-level `code_index.db` is read/write compatibility only.
+
+`tracked_branch` is the canonical field. The legacy `branch` field may be
+emitted as a duplicate alias during migration, but consumers normalize to
+`tracked_branch`.
+
+S3, GCS, and Azure artifact providers are not production-selectable until their
+provider implementations exist. `auto` routing skips unimplemented providers.

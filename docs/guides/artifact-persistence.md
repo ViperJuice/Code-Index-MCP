@@ -6,11 +6,11 @@ drift without adding a complicated remote delta-download protocol.
 
 ## Lifecycle Overview
 
-1. Local index build creates lexical and semantic assets (`code_index.db`, `.index_metadata.json`, and `vector_index.qdrant`).
+1. Local index build creates lexical and semantic assets under `.mcp-index/` (`current.db`, `.index_metadata.json`, and `vector_index.qdrant`).
 2. `mcp-index artifact push` packages and uploads a full snapshot artifact.
 3. Teammates or fresh clones run `mcp-index preflight` first to see whether they are behind remote or missing local runtime state.
 4. `mcp-index artifact pull --latest` hydrates local indexes from the full snapshot when needed.
-5. MCP reads the restored local runtime files directly from disk (`code_index.db`, `.index_metadata.json`, `vector_index.qdrant`).
+5. MCP reads the restored local runtime files directly from disk (`.mcp-index/current.db`, `.mcp-index/.index_metadata.json`, `.mcp-index/vector_index.qdrant`).
 6. The CLI reports the restored artifact commit and compares it to local `HEAD`.
 7. If your branch or working tree has drifted, use local incremental reindexing to reconcile only changed files.
 8. On branch/commit targeting, `mcp-index artifact recover --branch ... --commit ...` resolves and restores matching artifact state.
@@ -29,6 +29,9 @@ mcp-index artifact sync
 
 # Recover by branch and/or commit
 mcp-index artifact recover --branch main --commit <sha>
+
+# Explicit unsafe recovery override; prints rejected validation reasons
+mcp-index artifact recover --branch main --commit <sha> --unsafe-allow-mismatched-artifact
 ```
 
 ## What Gets Persisted
@@ -40,6 +43,10 @@ mcp-index artifact recover --branch main --commit <sha>
 These files are expected to exist locally for MCP runtime use, but they are
 distributed through GitHub artifacts rather than committed to normal git
 history.
+
+`.mcp-index/current.db` is canonical. Root-level `code_index.db` is accepted only
+as a legacy archive member after artifact metadata has validated successfully,
+and it is installed as `.mcp-index/current.db`.
 
 The canonical published baseline includes two semantic profiles in separate
 collections inside `vector_index.qdrant`:
@@ -56,6 +63,9 @@ semantic profile without rebuilding the whole repository.
 - **Canonical semantic storage:** file-backed `vector_index.qdrant` built in CI.
 - **Local efficiency:** incremental reindex after restore based on git diff and
   watcher-driven file changes.
+- **Provider safety:** `auto` routes only to implemented providers. S3, GCS, and
+  Azure are documented placeholders and cannot be selected in production until
+  implemented.
 
 This keeps the GitHub path simple while still avoiding full local rebuilds for
 normal development.
@@ -111,6 +121,13 @@ When `main` advances:
    reconciliation handle added, modified, deleted, and renamed files when the
    drift volume is small enough.
 5. If drift is very large, prefer a local rebuild instead of forcing incremental catch-up.
+
+Downloads fail closed by default. Wrong `repo_id`, wrong `tracked_branch`, stale
+commit, unknown schema, missing metadata, checksum mismatch, and semantic profile
+mismatch block extraction or install unless the caller explicitly supplies
+`allow_unsafe=True` through the API or
+`--unsafe-allow-mismatched-artifact` through the CLI. Unsafe installs report the
+rejected reasons.
 
 ## Branch Switching Strategy
 

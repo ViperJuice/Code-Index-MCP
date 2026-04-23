@@ -20,6 +20,13 @@ from mcp_server.config.settings import get_settings
 from mcp_server.core.errors import record_handled_error
 
 from .secure_export import SecureIndexExporter
+from .manifest_v2 import (
+    LEXICAL_ONLY_SEMANTIC_PROFILE_HASH,
+    ArtifactManifestV2,
+    ManifestUnit,
+    build_logical_artifact_id,
+    build_semantic_profile_hash,
+)
 from .semantic_profiles import (
     extract_semantic_profile_metadata,
     get_primary_semantic_profile_metadata,
@@ -33,7 +40,7 @@ class IndexArtifactUploader:
         self.repo = repo or self._detect_repository()
         self.token = token or os.environ.get("GITHUB_TOKEN", "")
         self.index_files = [
-            "code_index.db",
+            "current.db",
             "vector_index.qdrant",
             ".index_metadata.json",
         ]
@@ -61,11 +68,24 @@ class IndexArtifactUploader:
             ) from exc
 
     def compress_indexes(
-        self, output_path: Path = Path("index-archive.tar.gz"), secure: bool = True
+        self,
+        output_path: Path = Path("index-archive.tar.gz"),
+        secure: bool = True,
+        *,
+        repo_path: Path | str = ".",
+        index_location: Path | str | None = None,
+        index_path: Path | str | None = None,
     ) -> Tuple[Path, str, int]:
+        repo_root = Path(repo_path)
+        index_root = Path(index_location) if index_location is not None else repo_root / ".mcp-index"
+        db_path = Path(index_path) if index_path is not None else index_root / "current.db"
         if secure:
             print("🔒 Creating secure index archive (filtering sensitive files)...")
-            exporter = SecureIndexExporter()
+            exporter = SecureIndexExporter(
+                repo_path=repo_root,
+                index_location=index_root,
+                index_path=db_path,
+            )
             stats = exporter.create_secure_archive(str(output_path))
             checksum = self._calculate_checksum(output_path)
             size = output_path.stat().st_size
@@ -77,13 +97,19 @@ class IndexArtifactUploader:
 
         print("📦 Compressing index files (unsafe mode - includes all files)...")
         with tarfile.open(output_path, "w:gz", compresslevel=9) as tar:
-            for file_name in self.index_files:
-                file_path = Path(file_name)
+            candidates = [
+                (db_path, "current.db"),
+                (index_root / ".index_metadata.json", ".index_metadata.json"),
+                (index_root / "vector_index.qdrant", "vector_index.qdrant"),
+            ]
+            if not db_path.exists():
+                candidates[0] = (repo_root / "code_index.db", "code_index.db")
+            for file_path, arcname in candidates:
                 if file_path.exists():
-                    print(f"  Adding {file_name}...")
-                    tar.add(file_path, arcname=file_name)
+                    print(f"  Adding {arcname}...")
+                    tar.add(file_path, arcname=arcname)
                 else:
-                    print(f"  ⚠️  Skipping {file_name} (not found)")
+                    print(f"  ⚠️  Skipping {arcname} (not found)")
 
         checksum = self._calculate_checksum(output_path)
         size = output_path.stat().st_size
@@ -107,48 +133,99 @@ class IndexArtifactUploader:
         delta_from: Optional[str] = None,
         *,
         attestation: Optional[Attestation] = None,
+        repo_id: Optional[str] = None,
+        tracked_branch: Optional[str] = None,
+        commit: Optional[str] = None,
+        schema_version: Optional[str] = None,
+        semantic_profile_hash: Optional[str] = None,
+        index_location: Path | str | None = None,
+        index_path: Path | str | None = None,
     ) -> Dict[str, Any]:
-        try:
-            commit = subprocess.run(
-                ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
-            ).stdout.strip()
-            branch = subprocess.run(
-                ["git", "branch", "--show-current"],
-                capture_output=True,
-                text=True,
-                check=True,
-            ).stdout.strip()
-        except Exception as exc:
-            record_handled_error(__name__, exc)
-            commit = "unknown"
-            branch = "unknown"
+        if commit is None or tracked_branch is None:
+            try:
+                detected_commit = subprocess.run(
+                    ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+                ).stdout.strip()
+                detected_branch = subprocess.run(
+                    ["git", "branch", "--show-current"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                ).stdout.strip()
+                commit = commit or detected_commit
+                tracked_branch = tracked_branch or detected_branch
+            except Exception as exc:
+                record_handled_error(__name__, exc)
+                commit = commit or "unknown"
+                tracked_branch = tracked_branch or "unknown"
 
-        schema_version = self._get_schema_version()
-        compatibility = self._build_compatibility_metadata(schema_version)
+        schema_version = schema_version or self._get_schema_version(index_path=index_path)
+        compatibility = self._build_compatibility_metadata(
+            schema_version, index_location=index_location
+        )
+        semantic_profiles = compatibility.get("semantic_profiles")
+        semantic_profile_hash = semantic_profile_hash or build_semantic_profile_hash(
+            semantic_profiles if isinstance(semantic_profiles, dict) else None
+        )
+        repo_id = repo_id or self.repo
+        logical_artifact_id = build_logical_artifact_id(
+            repo_id, tracked_branch or "unknown", commit or "unknown", semantic_profile_hash, artifact_type
+        )
+        manifest = ArtifactManifestV2(
+            logical_artifact_id=logical_artifact_id,
+            repo_id=repo_id,
+            branch=tracked_branch or "unknown",
+            tracked_branch=tracked_branch or "unknown",
+            commit=commit or "unknown",
+            schema_version=schema_version,
+            semantic_profile_hash=semantic_profile_hash,
+            checksum=checksum,
+            artifact_type=artifact_type,
+            chunk_schema_version=str(compatibility.get("chunk_schema_version", schema_version)),
+            chunk_identity_algorithm="treesitter_chunk_id_v1",
+            units=[
+                ManifestUnit(
+                    unit_type="lexical",
+                    unit_id=f"lexical-{(commit or 'unknown')[:8]}",
+                    checksum=checksum,
+                    size_bytes=size,
+                )
+            ],
+        )
         meta: Dict[str, Any] = {
             "version": "1.0",
             "timestamp": datetime.utcnow().isoformat() + "Z",
+            "repo_id": repo_id,
             "commit": commit,
-            "branch": branch,
+            "tracked_branch": tracked_branch,
+            "branch": tracked_branch,
+            "schema_version": schema_version,
+            "semantic_profile_hash": semantic_profile_hash,
+            "logical_artifact_id": logical_artifact_id,
             "artifact_type": artifact_type,
             "base_commit": delta_from,
             "target_commit": commit,
             "checksum": checksum,
             "compressed_size": size,
-            "index_stats": self._get_index_stats(),
+            "index_stats": self._get_index_stats(index_path=index_path, index_location=index_location),
             "compatibility": compatibility,
             "security": {
                 "filtered": secure,
                 "filter_type": "gitignore + mcp-index-ignore" if secure else "none",
                 "export_method": "secure" if secure else "unsafe",
             },
+            "manifest_v2": manifest.to_dict(),
         }
         if attestation is not None:
             meta["attestation_url"] = attestation.bundle_url
         return meta
 
-    def _read_index_metadata(self) -> Dict[str, Any]:
-        metadata_path = Path(".index_metadata.json")
+    def _read_index_metadata(self, index_location: Path | str | None = None) -> Dict[str, Any]:
+        metadata_path = (
+            Path(index_location) / ".index_metadata.json"
+            if index_location is not None
+            else Path(".index_metadata.json")
+        )
         if not metadata_path.exists():
             return {}
         try:
@@ -158,8 +235,10 @@ class IndexArtifactUploader:
             return {}
         return payload if isinstance(payload, dict) else {}
 
-    def _build_compatibility_metadata(self, schema_version: str) -> Dict[str, Any]:
-        index_metadata = self._read_index_metadata()
+    def _build_compatibility_metadata(
+        self, schema_version: str, index_location: Path | str | None = None
+    ) -> Dict[str, Any]:
+        index_metadata = self._read_index_metadata(index_location=index_location)
         profile_id, primary_profile = get_primary_semantic_profile_metadata(index_metadata)
         semantic_profiles = extract_semantic_profile_metadata(index_metadata)
         settings = get_settings()
@@ -196,8 +275,8 @@ class IndexArtifactUploader:
 
         return compatibility
 
-    def _get_schema_version(self) -> str:
-        db_path = Path("code_index.db")
+    def _get_schema_version(self, index_path: Path | str | None = None) -> str:
+        db_path = Path(index_path) if index_path is not None else Path("code_index.db")
         if not db_path.exists():
             return os.environ.get("INDEX_SCHEMA_VERSION", "2")
         try:
@@ -218,16 +297,24 @@ class IndexArtifactUploader:
             record_handled_error(__name__, exc)
             return os.environ.get("INDEX_SCHEMA_VERSION", "2")
 
-    def _get_index_stats(self) -> Dict[str, Any]:
+    def _get_index_stats(
+        self,
+        *,
+        index_path: Path | str | None = None,
+        index_location: Path | str | None = None,
+    ) -> Dict[str, Any]:
         stats: Dict[str, Any] = {}
-        if Path("code_index.db").exists():
-            size = Path("code_index.db").stat().st_size
+        db_path = Path(index_path) if index_path is not None else Path(".mcp-index/current.db")
+        if not db_path.exists():
+            db_path = Path("code_index.db")
+        if db_path.exists():
+            size = db_path.stat().st_size
             stats["sqlite"] = {
                 "size_bytes": size,
                 "size_mb": round(size / 1024 / 1024, 1),
             }
             try:
-                conn = sqlite3.connect("code_index.db")
+                conn = sqlite3.connect(str(db_path))
                 cursor = conn.cursor()
                 cursor.execute("SELECT COUNT(*) FROM files")
                 stats["sqlite"]["files"] = cursor.fetchone()[0]
@@ -237,10 +324,17 @@ class IndexArtifactUploader:
             except Exception as exc:
                 record_handled_error(__name__, exc)
                 pass
-        if Path("vector_index.qdrant").exists():
+        vector_path = (
+            Path(index_location) / "vector_index.qdrant"
+            if index_location is not None
+            else Path(".mcp-index/vector_index.qdrant")
+        )
+        if not vector_path.exists():
+            vector_path = Path("vector_index.qdrant")
+        if vector_path.exists():
             total_size = sum(
                 item.stat().st_size
-                for item in Path("vector_index.qdrant").rglob("*")
+                for item in vector_path.rglob("*")
                 if item.is_file()
             )
             stats["vector"] = {
@@ -265,7 +359,7 @@ class IndexArtifactUploader:
                 "gh CLI is required for artifact upload. " "Install from https://cli.github.com"
             ) from exc
 
-        tag = "index-latest"
+        tag = str(metadata.get("logical_artifact_id") or "index-latest")
         commit = metadata.get("commit", "")[:8]
 
         # Create the release if it doesn't exist (ignore failure if it already exists)

@@ -3,7 +3,7 @@
 import sqlite3
 import subprocess
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -134,11 +134,15 @@ class TestRepoResolver:
         store_registry = make_store_registry(registry)
         resolver = make_resolver(registry, store_registry)
 
-        ctx = resolver.resolve(wt)
+        ctx = resolver.resolve(bare)
+        worktree_ctx = resolver.resolve(wt)
+        readiness = resolver.classify(wt)
 
         assert ctx is not None
-        assert ctx.repo_id == compute_repo_id(wt).repo_id
+        assert ctx.repo_id == compute_repo_id(bare).repo_id
         assert ctx.repo_id == bare_repo_id
+        assert worktree_ctx is None
+        assert readiness.state.value == "unsupported_worktree"
 
     # 4. Path outside any registered repo returns None
     def test_path_outside_registry_returns_none(self, tmp_path):
@@ -184,14 +188,12 @@ class TestRepoResolver:
 
         resolver = RepoResolver(mock_registry, store_registry)
 
-        with patch("mcp_server.core.repo_resolver.compute_repo_id") as mock_compute:
-            ctx = resolver.resolve(repo_path)
+        ctx = resolver.resolve(repo_path)
 
         mock_registry.find_by_path.assert_called_once()
-        mock_compute.assert_not_called()
         assert ctx is not None
 
-    # 7. find_by_path miss → compute_repo_id fallback still returns correct context
+    # 7. find_by_path miss → classifier fallback still returns correct context for same path
     def test_find_by_path_miss_uses_compute_fallback(self, tmp_path):
         from mcp_server.core.repo_resolver import RepoResolver
 
@@ -205,12 +207,38 @@ class TestRepoResolver:
 
         resolver = RepoResolver(mock_registry, store_registry)
 
-        with patch(
-            "mcp_server.core.repo_resolver.compute_repo_id",
-            wraps=compute_repo_id,
-        ) as mock_compute:
-            ctx = resolver.resolve(repo_path)
+        ctx = resolver.resolve(repo_path)
 
-        mock_compute.assert_called_once()
         assert ctx is not None
         assert ctx.repo_id == repo_id
+
+    def test_classify_registered_root_and_nested_path(self, tmp_path):
+        repo_path = make_git_repo(tmp_path / "myrepo")
+        registry, _repo_id = make_registry_with_repo(tmp_path, repo_path)
+        resolver = make_resolver(registry, make_store_registry(registry))
+        nested = repo_path / "pkg"
+        nested.mkdir()
+
+        assert resolver.classify(repo_path).state.value == "index_empty"
+        assert resolver.classify(nested).state.value == "index_empty"
+
+    def test_classify_unregistered_git_repo_and_path_outside_git(self, tmp_path):
+        registry = RepositoryRegistry(tmp_path / "registry.json")
+        resolver = make_resolver(registry, make_store_registry(registry))
+        unregistered = make_git_repo(tmp_path / "unregistered")
+        outside = tmp_path / "outside"
+        outside.mkdir()
+
+        assert resolver.classify(unregistered).state.value == "unregistered_repository"
+        assert resolver.classify(outside).state.value == "unregistered_repository"
+
+    def test_classify_unsupported_sibling_worktree(self, tmp_path):
+        source = make_git_repo(tmp_path / "source")
+        worktree = tmp_path / "wt"
+        git("worktree", "add", str(worktree), "-b", "feature", cwd=source)
+
+        registry, _repo_id = make_registry_with_repo(tmp_path, source)
+        resolver = make_resolver(registry, make_store_registry(registry))
+
+        assert resolver.classify(worktree).state.value == "unsupported_worktree"
+        assert resolver.resolve(worktree) is None

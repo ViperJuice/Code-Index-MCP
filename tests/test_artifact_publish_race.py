@@ -36,9 +36,13 @@ def _stub_attest(monkeypatch):
 
 
 SHORT_SHA = COMMIT[:7]
-TAG = f"index-{SHORT_SHA}"
+TAG = f"index-my-repo-main-{SHORT_SHA}"
 RELEASE_URL = f"https://github.com/{REPO}/releases/tag/{TAG}"
 LATEST_URL = f"https://github.com/{REPO}/releases/tag/index-latest"
+
+
+def _canonical_tag(repo_id: str, commit: str, tracked_branch: str = "main") -> str:
+    return f"index-{repo_id.replace('/', '_').replace(':', '_')}-{tracked_branch}-{commit[:7]}"
 
 
 def _make_uploader() -> IndexArtifactUploader:
@@ -149,7 +153,7 @@ class TestIdempotency:
         with patch("subprocess.run", side_effect=side_effect):
             ref = publisher.publish_on_reindex("repo-x", COMMIT)
 
-        assert ref.tag == f"index-{COMMIT[:7]}"
+        assert ref.tag == _canonical_tag("repo-x", COMMIT)
         assert ref.commit == COMMIT
         assert ref.repo_id == "repo-x"
 
@@ -196,11 +200,11 @@ class TestConcurrentRace:
                 ref_b = fut_b.result(timeout=10)
 
         # Each has its own SHA tag
-        assert ref_a.tag == f"index-{sha_a}"
-        assert ref_b.tag == f"index-{sha_b}"
+        assert ref_a.tag == _canonical_tag("repo", commit_a)
+        assert ref_b.tag == _canonical_tag("repo", commit_b)
         # Both have valid release URLs
-        assert f"index-{sha_a}" in ref_a.release_url
-        assert f"index-{sha_b}" in ref_b.release_url
+        assert _canonical_tag("repo", commit_a) in ref_a.release_url
+        assert _canonical_tag("repo", commit_b) in ref_b.release_url
         # Exactly one is latest
         assert ref_a.is_latest != ref_b.is_latest or (ref_a.is_latest and ref_b.is_latest) is False
 
@@ -227,7 +231,7 @@ class TestConcurrentRace:
 
         assert ref_b.is_latest is False
         # SHA-keyed URL is still set (not empty, not pointing at index-latest)
-        assert f"index-{commit_b[:7]}" in ref_b.release_url
+        assert _canonical_tag("repo", commit_b) in ref_b.release_url
 
 
 # ---------------------------------------------------------------------------
@@ -338,7 +342,12 @@ class TestCallOrder:
 
         # SHA-keyed create must precede index-latest edit
         sha_create_idx = next(
-            (i for i, s in enumerate(observed) if f"create:index-{COMMIT[:7]}" == s), None
+            (
+                i
+                for i, s in enumerate(observed)
+                if f"create:{_canonical_tag('repo', COMMIT)}" == s
+            ),
+            None,
         )
         latest_edit_idx = next(
             (i for i, s in enumerate(observed) if "edit:index-latest" == s), None

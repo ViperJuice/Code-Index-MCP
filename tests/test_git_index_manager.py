@@ -132,11 +132,11 @@ def _make_ctx(repo_id: str, repo_path: Path, index_path: Path) -> RepoContext:
 
 
 # ---------------------------------------------------------------------------
-# SL-3.1b: Integration — branch-switch yields up_to_date
+# SL-3.1b: Integration — branch-switch yields wrong_branch
 # ---------------------------------------------------------------------------
 
 
-def test_branch_switch_yields_up_to_date(tmp_path):
+def test_branch_switch_yields_wrong_branch(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)
 
@@ -160,13 +160,24 @@ def test_branch_switch_yields_up_to_date(tmp_path):
     manager._full_index = MagicMock(return_value=0)
     manager._incremental_index_update = MagicMock()
 
+    manager._has_remote_artifact = MagicMock()
+    manager._download_commit_index = MagicMock()
+    manager.on_branch_drift = MagicMock()
+
     result = manager.sync_repository_index("test-repo-id")
 
-    assert result.action == "up_to_date", f"Expected up_to_date, got {result.action!r}"
+    assert result.action == "wrong_branch", f"Expected wrong_branch, got {result.action!r}"
+    assert result.code == "wrong_branch"
+    assert result.readiness is not None
+    assert result.readiness["state"] == "wrong_branch"
     assert manager._full_index.call_count == 0, "_full_index should not be called on branch switch"
     assert (
         manager._incremental_index_update.call_count == 0
     ), "_incremental_index_update should not be called on branch switch"
+    manager._has_remote_artifact.assert_not_called()
+    manager._download_commit_index.assert_not_called()
+    registry.update_indexed_commit.assert_not_called()
+    manager.on_branch_drift.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

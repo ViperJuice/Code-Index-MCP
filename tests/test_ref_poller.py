@@ -180,6 +180,48 @@ def test_missing_ref_file_is_skipped_with_warning(tmp_path, caplog):
             poller.stop()
 
 
+def test_wrong_branch_checkout_is_skipped(tmp_path):
+    """Wrong-branch checkout does not schedule sync or full rescan."""
+    from mcp_server.watcher.ref_poller import RefPoller
+
+    repo = _make_git_repo(tmp_path)
+    initial_sha = _head_sha(repo)
+    repo_info = _make_repo_info(repo, initial_sha, tracked_branch="main")
+    subprocess.run(["git", "checkout", "-b", "feature"], cwd=repo, check=True, capture_output=True)
+
+    mock_registry = MagicMock()
+    mock_registry.list_all.return_value = [repo_info]
+    mock_git_index_manager = MagicMock()
+
+    poller = RefPoller(
+        mock_registry,
+        mock_git_index_manager,
+        MagicMock(),
+        MagicMock(),
+        interval_seconds=1,
+    )
+
+    poller._poll_one(repo_info)
+
+    mock_git_index_manager.sync_repository_index.assert_not_called()
+    mock_git_index_manager.enqueue_full_rescan.assert_not_called()
+
+
+def test_read_ref_uses_git_c_for_packed_refs(tmp_path):
+    """_read_ref resolves packed refs through git -C instead of direct .git files."""
+    from mcp_server.watcher.ref_poller import RefPoller
+
+    repo = _make_git_repo(tmp_path)
+    initial_sha = _head_sha(repo)
+    subprocess.run(["git", "pack-refs", "--all"], cwd=repo, check=True, capture_output=True)
+    loose_ref = repo / ".git" / "refs" / "heads" / "main"
+    assert not loose_ref.exists()
+
+    poller = RefPoller(MagicMock(), MagicMock(), MagicMock(), MagicMock())
+
+    assert poller._read_ref(repo, "main") == initial_sha
+
+
 def test_exception_in_one_repo_does_not_kill_poller(tmp_path):
     """Exception in one repo's poll doesn't stop polling of other repos."""
     from mcp_server.watcher.ref_poller import RefPoller

@@ -1,6 +1,10 @@
 # MCP Tools Quick Reference
 
 Complete guide to using MCP (Model Context Protocol) tools for efficient code exploration.
+Indexed search is authoritative only when repository readiness is `ready`. If
+`search_code` or `symbol_lookup` returns `index_unavailable` with
+`safe_fallback: "native_search"`, use native search and follow the remediation,
+such as `reindex`.
 
 ## Available MCP Tools
 
@@ -25,7 +29,7 @@ mcp__code-index-mcp__search_code(query="pattern", limit=10, semantic=false)
 mcp__code-index-mcp__get_status()
 ```
 - **Purpose**: Check index health and statistics
-- **Returns**: Indexed files, languages, plugin status
+- **Returns**: Indexed files, languages, plugin status, repository readiness
 
 ### 4. List Plugins
 ```python
@@ -43,21 +47,22 @@ mcp__code-index-mcp__reindex(path="specific/path")
 
 ## Search Strategy
 
-### DO Use MCP For:
+### Use MCP Indexed Search When Readiness Is `ready` For:
 - Finding symbol definitions
 - Searching code patterns
 - Understanding code relationships
 - Locating usage examples
 - Semantic concept searches
 
-### DON'T Use Native Tools For:
-- ❌ Grep/find for searching
-- ❌ Reading multiple files to find patterns
-- ❌ Glob to discover files with content
+### Use Native Search For:
+- Non-ready repositories
+- Query responses with `code: "index_unavailable"`
+- Any response carrying `safe_fallback: "native_search"`
+- Work while `reindex` or other remediation is pending
 
 ## Performance Comparison
 
-| Operation | Traditional | MCP | Speedup |
+| Operation | Native search | Ready MCP index | Speedup |
 |-----------|------------|-----|---------|
 | Find class definition | 45s | 0.1s | 450x |
 | Search pattern | 30s | 0.5s | 60x |
@@ -85,4 +90,5 @@ mcp__code-index-mcp__search_code(query="authentication flow", semantic=true)
 mcp__code-index-mcp__get_status()
 ```
 
-Remember: The MCP index covers 312 files across 48 languages with instant search!
+Remember: check readiness first; ready MCP indexes are fast, and
+`index_unavailable` means `native_search` is the safe fallback.

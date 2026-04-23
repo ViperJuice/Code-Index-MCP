@@ -306,3 +306,41 @@ class TestRegisterRepositoryUsesComputeRepoId:
         id1 = registry.register_repository(str(repo_path))
         id2 = registry.register_repository(str(repo_path))
         assert id1 == id2
+
+    def test_register_sibling_worktree_is_rejected(self, tmp_path):
+        from mcp_server.storage.repository_registry import (
+            MultipleWorktreesUnsupportedError,
+            RepositoryRegistry,
+        )
+
+        source = make_git_repo(tmp_path / "source")
+        worktree = tmp_path / "wt"
+        git("worktree", "add", str(worktree), "-b", "feature", cwd=source)
+
+        registry = RepositoryRegistry(registry_path=tmp_path / "registry.json")
+        repo_id = registry.register_repository(str(source))
+
+        with pytest.raises(MultipleWorktreesUnsupportedError) as exc_info:
+            registry.register_repository(str(worktree))
+
+        details = exc_info.value.to_dict()
+        assert details["code"] == "multiple_worktrees_unsupported"
+        assert details["registered_path"] == str(source.resolve())
+        assert details["requested_path"] == str(worktree.resolve())
+        assert details["git_common_dir"] == str(compute_repo_id(source).git_common_dir)
+        assert "unregister" in details["remediation"]
+        assert registry.get(repo_id).path == source.resolve()
+        assert len(registry.get_all_repositories()) == 1
+
+    def test_unrelated_git_repositories_register_independently(self, tmp_path):
+        from mcp_server.storage.repository_registry import RepositoryRegistry
+
+        repo_a = make_git_repo(tmp_path / "repo-a")
+        repo_b = make_git_repo(tmp_path / "repo-b")
+        registry = RepositoryRegistry(registry_path=tmp_path / "registry.json")
+
+        id_a = registry.register_repository(str(repo_a))
+        id_b = registry.register_repository(str(repo_b))
+
+        assert id_a != id_b
+        assert set(registry.get_all_repositories()) == {id_a, id_b}

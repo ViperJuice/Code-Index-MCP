@@ -141,7 +141,7 @@ class MultiRepositoryHandler(FileSystemEventHandler):
             pass
         return None
 
-    def _trigger_reindex_with_ctx(self, path: Path) -> None:
+    def _trigger_reindex_with_ctx(self, path: Path) -> bool:
         """Branch + gitignore guarded reindex via ctx-aware dispatcher."""
         current_branch = self._get_current_branch()
         if not should_reindex_for_branch(current_branch, self.ctx.tracked_branch):
@@ -151,28 +151,29 @@ class MultiRepositoryHandler(FileSystemEventHandler):
                 current_branch,
                 self.ctx.tracked_branch,
             )
-            return
+            return False
 
         if self._gitignore_filter(path):
             logger.debug("Dropping reindex event for %s: matched gitignore filter", path)
-            return
+            return False
 
         if path.suffix not in self._inner_handler.code_extensions:
-            return
+            return False
         if not path.exists():
-            return
+            return False
 
         logger.info("Re-indexing %s (repo=%s)", path, self.repo_id)
         try:
             observed_hash = hashlib.sha256(path.read_bytes()).hexdigest()
         except OSError:
             logger.warning("Could not read %s for hash; skipping reindex", path)
-            return
+            return False
         with lock_registry.acquire(self.repo_id):
             self.parent_watcher.dispatcher.remove_file(self.ctx, path)
             self.parent_watcher.dispatcher.index_file_guarded(self.ctx, path, observed_hash)
+        return True
 
-    def _remove_with_ctx(self, path: Path) -> None:
+    def _remove_with_ctx(self, path: Path) -> bool:
         """Branch + gitignore guarded remove via ctx-aware dispatcher."""
         current_branch = self._get_current_branch()
         if not should_reindex_for_branch(current_branch, self.ctx.tracked_branch):
@@ -182,34 +183,36 @@ class MultiRepositoryHandler(FileSystemEventHandler):
                 current_branch,
                 self.ctx.tracked_branch,
             )
-            return
+            return False
 
         if self._gitignore_filter(path):
-            return
+            return False
 
         if path.suffix not in self._inner_handler.code_extensions:
-            return
+            return False
 
         logger.info("Removing from index: %s (repo=%s)", path, self.repo_id)
         with lock_registry.acquire(self.repo_id):
             self.parent_watcher.dispatcher.remove_file(self.ctx, path)
+        return True
 
-    def _move_with_ctx(self, old_path: Path, new_path: Path) -> None:
+    def _move_with_ctx(self, old_path: Path, new_path: Path) -> bool:
         """Branch + gitignore guarded move via ctx-aware dispatcher."""
         current_branch = self._get_current_branch()
         if not should_reindex_for_branch(current_branch, self.ctx.tracked_branch):
-            return
+            return False
 
         if self._gitignore_filter(new_path):
-            return
+            return False
 
         exts = self._inner_handler.code_extensions
         if old_path.suffix not in exts and new_path.suffix not in exts:
-            return
+            return False
 
         logger.info("Moving in index: %s -> %s (repo=%s)", old_path, new_path, self.repo_id)
         with lock_registry.acquire(self.repo_id):
             self.parent_watcher.dispatcher.move_file(self.ctx, old_path, new_path)
+        return True
 
     def on_any_event(self, event):
         """Route watchdog events through branch + gitignore guards."""
@@ -222,14 +225,17 @@ class MultiRepositoryHandler(FileSystemEventHandler):
         etype = event.event_type
 
         if etype in ("created", "modified"):
-            self._trigger_reindex_with_ctx(src)
+            mutated = self._trigger_reindex_with_ctx(src)
         elif etype == "moved":
             dest = Path(event.dest_path)
-            self._move_with_ctx(src, dest)
+            mutated = self._move_with_ctx(src, dest)
         elif etype == "deleted":
-            self._remove_with_ctx(src)
+            mutated = self._remove_with_ctx(src)
+        else:
+            mutated = False
 
-        self.parent_watcher.mark_repository_changed(self.repo_id)
+        if mutated:
+            self.parent_watcher.mark_repository_changed(self.repo_id)
 
 
 class MultiRepositoryWatcher:
@@ -249,7 +255,7 @@ class MultiRepositoryWatcher:
         self.index_manager = index_manager
         self.artifact_manager = artifact_manager or CommitArtifactManager()
         self.repo_resolver = repo_resolver
-        self.sweeper: Optional[WatcherSweeper] = sweeper
+        self.sweeper: Optional[WatcherSweeper] = sweeper or self._build_default_sweeper()
 
         self.watchers = {}  # repo_id -> MultiRepositoryHandler
         self.observers = {}  # repo_id -> Observer instance
@@ -265,23 +271,87 @@ class MultiRepositoryWatcher:
         # Injected by caller; never instantiated here (circular-import guard).
         self._artifact_publisher = None
 
-        # Wire drift detection callback — avoids circular import (git_index_manager never imports watcher)
+        # Keep the diagnostic hook available; wrong-branch sync is non-mutating.
         self.index_manager.on_branch_drift = self._on_branch_drift
 
     def _on_branch_drift(self, repo_id: str, current_branch: str, tracked_branch: str) -> None:
         """Called by GitAwareIndexManager when branch drift is detected."""
-        self.enqueue_full_rescan(repo_id)
+        logger.warning(
+            "branch drift observed for %s: current=%s tracked=%s",
+            repo_id,
+            current_branch,
+            tracked_branch,
+        )
+
+    def _build_default_sweeper(self) -> Optional[WatcherSweeper]:
+        store_registry = getattr(self.index_manager, "store_registry", None)
+        if store_registry is None:
+            logger.warning("WatcherSweeper default wiring unavailable: no store registry")
+            return None
+
+        def _repo_roots() -> Dict[str, Path]:
+            return {
+                repo_id: Path(repo.path)
+                for repo_id, repo in self.registry.get_all_repositories().items()
+            }
+
+        if not self.registry.get_all_repositories():
+            return None
+        return WatcherSweeper(
+            on_missed_path=None,
+            repo_roots_provider=_repo_roots,
+            store=None,
+            store_provider=store_registry.get,
+            on_missed_create=self._on_missed_create,
+            on_missed_delete=self._on_missed_delete,
+            on_missed_rename=self._on_missed_rename,
+        )
 
     def enqueue_full_rescan(self, repo_id: str) -> None:
         """Submit a force-full reindex to the thread pool; returns immediately."""
 
         def _rescan():
-            # bypass_branch_guard=True prevents infinite drift→rescan→drift→rescan loops
-            self.index_manager.sync_repository_index(
-                repo_id, force_full=True, bypass_branch_guard=True
-            )
+            self.index_manager.sync_repository_index(repo_id, force_full=True)
 
         self.executor.submit(_rescan)
+
+    def _handler_for_missed_event(self, repo_id: str) -> Optional[MultiRepositoryHandler]:
+        handler = self.watchers.get(repo_id)
+        if handler is not None:
+            return handler
+        repo_info = self.registry.get_repository(repo_id)
+        if repo_info is None:
+            return None
+        path = Path(repo_info.path)
+        ctx = self.repo_resolver.resolve(path) if self.repo_resolver is not None else None
+        if ctx is None:
+            tracked = getattr(repo_info, "tracked_branch", None) or ""
+            ctx = RepoContext(
+                repo_id=repo_id,
+                sqlite_store=None,  # type: ignore[arg-type]
+                workspace_root=path,
+                tracked_branch=tracked,
+                registry_entry=repo_info,
+            )
+        return MultiRepositoryHandler(repo_id, path, self, ctx=ctx)
+
+    def _on_missed_create(self, repo_id: str, relative_path: str) -> None:
+        handler = self._handler_for_missed_event(repo_id)
+        if handler and handler._trigger_reindex_with_ctx(handler.repo_path / relative_path):
+            self.mark_repository_changed(repo_id)
+
+    def _on_missed_delete(self, repo_id: str, relative_path: str) -> None:
+        handler = self._handler_for_missed_event(repo_id)
+        if handler and handler._remove_with_ctx(handler.repo_path / relative_path):
+            self.mark_repository_changed(repo_id)
+
+    def _on_missed_rename(self, repo_id: str, old_relative_path: str, new_relative_path: str) -> None:
+        handler = self._handler_for_missed_event(repo_id)
+        if handler and handler._move_with_ctx(
+            handler.repo_path / old_relative_path,
+            handler.repo_path / new_relative_path,
+        ):
+            self.mark_repository_changed(repo_id)
 
     def start_watching_all(self):
         """Start watching all registered repositories."""
@@ -431,7 +501,8 @@ class MultiRepositoryWatcher:
             # Sync the index
             result = self.index_manager.sync_repository_index(repo_id)
 
-            if result.action == "indexed" and result.files_processed > 0:
+            successful_mutation = result.action in {"full_index", "incremental_update"}
+            if successful_mutation and result.files_processed > 0:
                 logger.info(
                     f"Repository {repo_id} synced: "
                     f"{result.files_processed} files in {result.duration_seconds:.2f}s"
@@ -440,17 +511,35 @@ class MultiRepositoryWatcher:
                 # Create and upload artifact if enabled
                 repo_info = self.registry.get_repository(repo_id)
                 if repo_info and repo_info.artifact_enabled:
-                    self._create_and_upload_artifact(repo_id, commit)
+                    synced_commit = getattr(result, "commit", None) or commit
+                    self._create_and_upload_artifact(repo_id, synced_commit)
 
                 if self._artifact_publisher is not None:
                     try:
-                        self._artifact_publisher.publish_on_reindex(repo_id, commit)
+                        self._artifact_publisher.publish_on_reindex(
+                            repo_id,
+                            synced_commit,
+                            tracked_branch=getattr(repo_info, "tracked_branch", None) or "main",
+                            index_location=getattr(repo_info, "index_location", None),
+                        )
                     except Exception as pub_exc:
                         logger.error(
                             "ArtifactPublisher.publish_on_reindex failed for %s: %s",
                             repo_id,
                             pub_exc,
                         )
+                        if repo_info and hasattr(self.registry, "update_artifact_state"):
+                            self.registry.update_artifact_state(
+                                repo_id,
+                                artifact_health="publish_failed",
+                            )
+                elif repo_info and repo_info.artifact_enabled and hasattr(
+                    self.registry, "update_artifact_state"
+                ):
+                    self.registry.update_artifact_state(
+                        repo_id,
+                        artifact_health="local_only",
+                    )
 
         except Exception as e:
             logger.error(f"Failed to sync repository {repo_id}: {e}")
@@ -471,7 +560,10 @@ class MultiRepositoryWatcher:
 
             # Create artifact
             artifact_path = self.artifact_manager.create_commit_artifact(
-                repo_id, commit, index_path
+                repo_id,
+                commit,
+                index_path,
+                tracked_branch=getattr(repo_info, "tracked_branch", None) or "main",
             )
 
             if artifact_path:
@@ -485,6 +577,12 @@ class MultiRepositoryWatcher:
                     f"Artifact created locally for {repo_id} but not uploaded. "
                     "Run the CI workflow to upload indexes to GitHub Artifacts."
                 )
+                if hasattr(self.registry, "update_artifact_state"):
+                    self.registry.update_artifact_state(
+                        repo_id,
+                        last_published_commit=commit,
+                        artifact_health="local_only",
+                    )
 
                 # Clean up old artifacts
                 removed = self.artifact_manager.cleanup_old_artifacts(repo_id, keep_last=5)

@@ -19,14 +19,23 @@ logger = logging.getLogger(__name__)
 class SecureIndexExporter:
     """Export index artifacts with gitignore filtering."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        repo_path: Path | str = ".",
+        index_location: Path | str | None = None,
+        index_path: Path | str | None = None,
+    ) -> None:
+        self.repo_path = Path(repo_path)
+        self.index_location = Path(index_location) if index_location is not None else self.repo_path
+        self.index_path = Path(index_path) if index_path is not None else self.index_location / "current.db"
         self.gitignore_patterns = self._load_gitignore_patterns()
         self.mcp_ignore_patterns = self._load_mcp_ignore_patterns()
         self.all_patterns = self.gitignore_patterns + self.mcp_ignore_patterns
 
     def _load_gitignore_patterns(self) -> List[str]:
         patterns = []
-        gitignore_path = Path(".gitignore")
+        gitignore_path = self.repo_path / ".gitignore"
 
         if gitignore_path.exists():
             for line in gitignore_path.read_text(encoding="utf-8").splitlines():
@@ -37,7 +46,7 @@ class SecureIndexExporter:
         return patterns
 
     def _load_mcp_ignore_patterns(self) -> List[str]:
-        ignore_path = Path(".mcp-index-ignore")
+        ignore_path = self.repo_path / ".mcp-index-ignore"
         default_patterns = [
             "*.env",
             ".env*",
@@ -211,15 +220,18 @@ class SecureIndexExporter:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
-            source_db = Path("code_index.db")
+            source_db = self.index_path
+            legacy_db = self.repo_path / "code_index.db"
+            if not source_db.exists() and legacy_db.exists():
+                source_db = legacy_db
             if source_db.exists():
-                target_db = temp_path / "code_index.db"
+                target_db = temp_path / "current.db"
                 included, excluded = self.create_filtered_database(str(source_db), str(target_db))
                 stats["files_included"] = included
                 stats["files_excluded"] = excluded
-                stats["components"].append("code_index.db")
+                stats["components"].append("current.db")
 
-            vector_dir = Path("vector_index.qdrant")
+            vector_dir = self.index_location / "vector_index.qdrant"
             if vector_dir.exists():
                 vec_included, vec_excluded = self.filter_qdrant_vectors(
                     vector_dir, temp_path / "vector_index.qdrant"
@@ -228,7 +240,7 @@ class SecureIndexExporter:
                 stats["vector_points_excluded"] = vec_excluded
                 stats["components"].append("vector_index.qdrant")
 
-            metadata_path = Path(".index_metadata.json")
+            metadata_path = self.index_location / ".index_metadata.json"
             if metadata_path.exists():
                 metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
                 metadata["security"] = {

@@ -8,7 +8,7 @@ Modular, extensible local-first code indexer designed to enhance Claude Code and
 **Version**: 1.2.0-rc4 (beta)
 **Python distribution**: `index-it-mcp`
 **Container image**: `ghcr.io/viperjuice/code-index-mcp`
-**Primary surface**: MCP tools (`search_code`, `symbol_lookup`) via the STDIO runner — always use these first from an LLM
+**Primary surface**: MCP tools (`search_code`, `symbol_lookup`) via the STDIO runner when repository readiness is `ready`
 **Secondary surface**: FastAPI admin REST gateway for diagnostics and scripting — see "Admin REST Interface (secondary)" below
 **Core features**: local indexing, symbol/text search, registry-based language coverage; see [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md)
 **Optional features**: semantic search (requires Voyage AI or a local vLLM endpoint), GitHub Artifacts index sync
@@ -269,7 +269,7 @@ search_code(query="def parse", repository="my-repo")
 symbol_lookup(symbol="Parser", repository="my-repo")
 ```
 
-**Index tracking**: each repo's default branch is tracked by `MultiRepositoryWatcher` (`RefPoller` every 30 s). Non-default branches and worktrees of the same repo use the same index as the main checkout — `repo_id` is stable across worktree switches.
+**Index tracking**: each repo's default branch is tracked by `MultiRepositoryWatcher` (`RefPoller` every 30 s). Same-repo multiple worktrees are unsupported in v3 query routing: non-default or sibling worktrees return `index_unavailable` with `safe_fallback: "native_search"` and readiness remediation instead of reusing another checkout's index.
 
 **Path sandbox**: tools `search_code`, `symbol_lookup`, `summarize_sample`, and `reindex` reject paths outside `MCP_ALLOWED_ROOTS` with error code `path_outside_allowed_roots`. Registered repo names bypass the check.
 
@@ -368,7 +368,10 @@ mcp-index serve --port 9123   # alternate port
 From an LLM (Claude Code, Cursor, …) register the STDIO runner in
 `.mcp.json` and invoke the indexer as MCP tool calls. The two primary tools
 are `search_code` (pattern / keyword / semantic search, <500 ms) and
-`symbol_lookup` (exact class/function lookup, <100 ms):
+`symbol_lookup` (exact class/function lookup, <100 ms). Call `get_status` to
+confirm repository readiness is `ready`, or handle a query response with
+`code: "index_unavailable"` and `safe_fallback: "native_search"` by using native
+search while following the returned remediation, such as `reindex`:
 
 ```json
 {
@@ -392,7 +395,10 @@ are `search_code` (pattern / keyword / semantic search, <500 ms) and
 
 Both tools accept an optional `"repository"` argument (registered repo name or
 an absolute path inside `MCP_ALLOWED_ROOTS`) for multi-repo scoping. See the
-"Using Against Many Repos" section above.
+"Using Against Many Repos" section above. A ready index with no matches returns
+ordinary no-match payloads (`results: []` for `search_code` or
+`result: "not_found"` for `symbol_lookup`) with readiness metadata; unavailable
+indexes return `index_unavailable` instead.
 
 ### 🔧 Configuration
 

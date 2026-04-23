@@ -20,6 +20,10 @@ from mcp_server.cli.bootstrap import _allowed_roots, _path_within_allowed, valid
 from mcp_server.core.repo_context import RepoContext
 from mcp_server.core.repo_resolver import RepoResolver
 from mcp_server.dispatcher.protocol import DispatcherProtocol
+from mcp_server.health.repository_readiness import (
+    RepositoryReadiness,
+    RepositoryReadinessState,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +90,13 @@ def _resolve_ctx(
     path_arg: Optional[str],
 ) -> Optional[RepoContext]:
     """Resolve a RepoContext from path_arg or MCP_WORKSPACE_ROOT fallback."""
+    readiness = _classify_ctx(repo_resolver, path_arg)
+    if readiness is not None and readiness.state in {
+        RepositoryReadinessState.UNREGISTERED_REPOSITORY,
+        RepositoryReadinessState.UNSUPPORTED_WORKTREE,
+    }:
+        return None
+
     target = path_arg or os.environ.get("MCP_WORKSPACE_ROOT", "")
     if not target:
         target = str(Path.cwd())
@@ -94,6 +105,64 @@ def _resolve_ctx(
     except Exception as exc:
         logger.debug("RepoResolver.resolve(%s) failed: %s", target, exc)
         return None
+
+
+def _classify_ctx(
+    repo_resolver: RepoResolver,
+    path_arg: Optional[str],
+) -> Optional[RepositoryReadiness]:
+    """Classify a tool repository/path target when the resolver supports it."""
+    target = path_arg or os.environ.get("MCP_WORKSPACE_ROOT", "")
+    if not target:
+        target = str(Path.cwd())
+    classifier = getattr(repo_resolver, "classify", None)
+    if not callable(classifier):
+        return None
+    try:
+        readiness = classifier(Path(target))
+    except Exception as exc:
+        logger.debug("RepoResolver.classify(%s) failed: %s", target, exc)
+        return None
+    return readiness if isinstance(readiness, RepositoryReadiness) else None
+
+
+def _unsupported_worktree_response(readiness: RepositoryReadiness) -> list[types.TextContent]:
+    return [
+        types.TextContent(
+            type="text",
+            text=_ensure_response(
+                {
+                    "results": [],
+                    "code": readiness.code,
+                    "readiness": readiness.to_dict(),
+                    "message": "Repository path is an unsupported sibling worktree.",
+                }
+            ),
+        )
+    ]
+
+
+def _index_unavailable_response(
+    readiness: RepositoryReadiness,
+    tool: str,
+    *,
+    query: Optional[str] = None,
+    symbol: Optional[str] = None,
+) -> list[types.TextContent]:
+    response: dict[str, Any] = {
+        "error": "Index unavailable",
+        "code": "index_unavailable",
+        "tool": tool,
+        "safe_fallback": "native_search",
+        "readiness": readiness.to_dict(),
+        "message": "Indexed search is available only when repository readiness is ready.",
+        "remediation": readiness.remediation,
+    }
+    if query is not None:
+        response["query"] = query
+    if symbol is not None:
+        response["symbol"] = symbol
+    return [types.TextContent(type="text", text=_ensure_response(response))]
 
 
 async def handle_symbol_lookup(
@@ -132,6 +201,10 @@ async def handle_symbol_lookup(
                     ),
                 )
             ]
+
+    readiness = _classify_ctx(repo_resolver, repository)
+    if readiness is not None and not readiness.ready:
+        return _index_unavailable_response(readiness, "symbol_lookup", symbol=symbol)
 
     ctx = _resolve_ctx(repo_resolver, repository)
 
@@ -190,6 +263,8 @@ async def handle_symbol_lookup(
             "symbol": symbol,
             "message": f"Symbol '{symbol}' not found in index",
         }
+        if readiness is not None:
+            response_data["readiness"] = readiness.to_dict()
         if sqlite_store is not None:
             validation_result = validate_index(sqlite_store, Path.cwd())
             if not validation_result["valid"]:
@@ -240,6 +315,10 @@ async def handle_search_code(
                     ),
                 )
             ]
+
+    readiness = _classify_ctx(repo_resolver, repository)
+    if readiness is not None and not readiness.ready:
+        return _index_unavailable_response(readiness, "search_code", query=query)
 
     # Resolve ctx via RepoResolver (replaces old multi-repo bypass)
     ctx = _resolve_ctx(repo_resolver, repository)
@@ -353,6 +432,8 @@ async def handle_search_code(
                 else "No results found in index"
             ),
         }
+        if readiness is not None:
+            response_data["readiness"] = readiness.to_dict()
         if _indexing_active:
             response_data["indexing_in_progress"] = True
         return [types.TextContent(type="text", text=_ensure_response(response_data))]
@@ -605,8 +686,13 @@ async def handle_reindex(
                 )
             ]
 
+    scope_arg = repository or (str(path) if path else None)
+    readiness = _classify_ctx(repo_resolver, scope_arg)
+    if readiness is not None and readiness.state == RepositoryReadinessState.UNSUPPORTED_WORKTREE:
+        return _unsupported_worktree_response(readiness)
+
     # Resolve ctx — repository takes precedence when both are set and consistent
-    ctx = _resolve_ctx(repo_resolver, repository or (str(path) if path else None))
+    ctx = _resolve_ctx(repo_resolver, scope_arg)
     active_store = ctx.sqlite_store if ctx is not None else sqlite_store
 
     allowed = _allowed_roots()

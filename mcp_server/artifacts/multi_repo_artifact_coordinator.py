@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
-from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
@@ -29,16 +27,6 @@ class RepoArtifactLifecycleResult:
     error: Optional[str] = None
 
 
-@contextmanager
-def _pushd(path: Path):
-    previous = Path.cwd()
-    os.chdir(path)
-    try:
-        yield
-    finally:
-        os.chdir(previous)
-
-
 class MultiRepoArtifactCoordinator:
     """Coordinate artifact lifecycle across registered repositories."""
 
@@ -54,8 +42,12 @@ class MultiRepoArtifactCoordinator:
         wanted = set(repository_ids)
         return [repo for repo in repos if repo.repository_id in wanted]
 
-    def _read_local_profiles(self, repo_path: Path) -> List[str]:
-        metadata_path = repo_path / ".index_metadata.json"
+    def _read_local_profiles(self, repo_path: Path, index_location: Path | str | None = None) -> List[str]:
+        metadata_path = (
+            Path(index_location) / ".index_metadata.json"
+            if index_location is not None
+            else repo_path / ".mcp-index" / ".index_metadata.json"
+        )
         if not metadata_path.exists():
             return []
         try:
@@ -125,21 +117,41 @@ class MultiRepoArtifactCoordinator:
         results = []
         for repo in self._iter_repositories(repository_ids):
             try:
-                with _pushd(repo.path):
-                    uploader = IndexArtifactUploader()
-                    archive_path, checksum, size = uploader.compress_indexes(
-                        Path("index-archive.tar.gz"), secure=True
-                    )
-                    metadata = uploader.create_metadata(checksum, size, secure=True)
+                index_location = Path(repo.index_location or repo.index_path.parent)
+                archive_path = index_location / "index-archive.tar.gz"
+                uploader = IndexArtifactUploader()
+                archive_path, checksum, size = uploader.compress_indexes(
+                    archive_path,
+                    secure=True,
+                    repo_path=repo.path,
+                    index_location=index_location,
+                    index_path=repo.index_path,
+                )
+                metadata = uploader.create_metadata(
+                    checksum,
+                    size,
+                    secure=True,
+                    repo_id=repo.repository_id,
+                    tracked_branch=repo.tracked_branch or repo.current_branch or "main",
+                    commit=repo.current_commit or "unknown",
+                    index_location=index_location,
+                    index_path=repo.index_path,
+                )
+                try:
                     uploader.upload_direct(archive_path, metadata)
+                    health = "prepared"
+                except Exception:
+                    health = "publish_failed"
+                    raise
+                finally:
                     archive_path.unlink(missing_ok=True)
 
-                profiles = self._read_local_profiles(repo.path)
+                profiles = self._read_local_profiles(repo.path, index_location)
                 self.multi_repo_manager.registry.update_artifact_state(
                     repo.repository_id,
                     last_published_commit=repo.current_commit,
                     artifact_backend="local_workspace",
-                    artifact_health="prepared",
+                    artifact_health=health,
                     available_semantic_profiles=profiles,
                 )
                 results.append(
@@ -175,26 +187,38 @@ class MultiRepoArtifactCoordinator:
         results = []
         for repo in self._iter_repositories(repository_ids):
             try:
-                with _pushd(repo.path):
-                    downloader = IndexArtifactDownloader()
-                    output_dir = Path("artifact_download")
-                    output_dir.mkdir(exist_ok=True)
-                    try:
-                        result = downloader.download_latest(output_dir=output_dir, backup=True)
-                    finally:
-                        import shutil
+                downloader = IndexArtifactDownloader()
+                index_location = Path(repo.index_location or repo.index_path.parent)
+                output_dir = index_location / "artifact_download"
+                output_dir.mkdir(parents=True, exist_ok=True)
+                try:
+                    result = downloader.download_latest(
+                        output_dir=output_dir,
+                        backup=True,
+                        repo_id=repo.repository_id,
+                        repo_path=repo.path,
+                        tracked_branch=repo.tracked_branch or repo.current_branch or "main",
+                        target_commit=repo.current_commit,
+                        index_location=index_location,
+                        index_path=repo.index_path,
+                    )
+                finally:
+                    import shutil
 
-                        shutil.rmtree(output_dir, ignore_errors=True)
+                    shutil.rmtree(output_dir, ignore_errors=True)
 
                 artifact = result.artifact or {}
-                profiles = self._read_local_profiles(repo.path)
+                profiles = self._read_local_profiles(repo.path, repo.index_location)
+                health = "ready" if Path(repo.index_path).exists() else "missing"
+                if health != "ready":
+                    raise RuntimeError(f"Artifact download did not hydrate {repo.index_path}")
                 self.multi_repo_manager.registry.update_artifact_state(
                     repo.repository_id,
                     last_recovered_commit=artifact.get("workflow_run", {}).get("head_sha")
                     or artifact.get("head_sha")
                     or repo.current_commit,
                     artifact_backend=repo.artifact_backend or "github_actions",
-                    artifact_health="ready",
+                    artifact_health=health,
                     available_semantic_profiles=profiles,
                 )
                 results.append(
@@ -231,12 +255,12 @@ class MultiRepoArtifactCoordinator:
     ) -> List[RepoArtifactLifecycleResult]:
         results = []
         for repo in self._iter_repositories(repository_ids):
-            has_local_index = (repo.path / "code_index.db").exists()
+            has_local_index = Path(repo.index_path).exists()
             health = "ready" if has_local_index else "missing"
             self.multi_repo_manager.registry.update_artifact_state(
                 repo.repository_id,
                 artifact_health=health,
-                available_semantic_profiles=self._read_local_profiles(repo.path),
+                available_semantic_profiles=self._read_local_profiles(repo.path, repo.index_location),
             )
             results.append(
                 RepoArtifactLifecycleResult(
@@ -250,7 +274,9 @@ class MultiRepoArtifactCoordinator:
                         "current_commit": repo.current_commit,
                         "last_published_commit": repo.last_published_commit,
                         "last_recovered_commit": repo.last_recovered_commit,
-                        "available_semantic_profiles": self._read_local_profiles(repo.path),
+                        "available_semantic_profiles": self._read_local_profiles(
+                            repo.path, repo.index_location
+                        ),
                     },
                 )
             )

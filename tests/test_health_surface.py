@@ -18,6 +18,10 @@ EXPECTED_KEYS = {
     "git_dir_exists",
     "last_indexed_commit",
     "staleness_reason",
+    "readiness",
+    "ready",
+    "readiness_code",
+    "remediation",
 }
 
 
@@ -40,6 +44,8 @@ class TestBuildHealthRow:
         info = make_repo_info(tmp_path)
         row = build_health_row(info)
         assert row["staleness_reason"] is None
+        assert row["readiness"] == "ready"
+        assert row["ready"] is True
         assert row["index_path_exists"] is True
         assert row["git_dir_exists"] is True
 
@@ -57,7 +63,42 @@ class TestBuildHealthRow:
         info = make_repo_info(tmp_path, missing_index=True)
         row = build_health_row(info)
         assert row["staleness_reason"] == "missing_index"
+        assert row["readiness"] == "missing_index"
         assert row["index_path_exists"] is False
+
+    def test_empty_index(self, tmp_path):
+        from mcp_server.health.repo_status import build_health_row
+
+        info = make_repo_info(tmp_path, empty_index=True)
+        row = build_health_row(info)
+        assert row["staleness_reason"] == "index_empty"
+        assert row["readiness"] == "index_empty"
+
+    def test_stale_commit(self, tmp_path):
+        from mcp_server.health.repo_status import build_health_row
+
+        info = make_repo_info(tmp_path, current_commit="bbbb", last_indexed_commit="aaaa")
+        row = build_health_row(info)
+        assert row["staleness_reason"] == "stale_commit"
+        assert row["readiness"] == "stale_commit"
+
+    def test_wrong_branch(self, tmp_path):
+        from mcp_server.health.repo_status import build_health_row
+
+        info = make_repo_info(tmp_path, tracked_branch="main", current_branch="feature")
+        row = build_health_row(info)
+        assert row["staleness_reason"] == "wrong_branch"
+        assert row["readiness"] == "wrong_branch"
+
+    def test_index_building(self, tmp_path):
+        from mcp_server.health.repo_status import build_health_row
+        from mcp_server.health.repository_readiness import ReadinessClassifier
+
+        info = make_repo_info(tmp_path)
+        readiness = ReadinessClassifier.classify_registered(info, indexing_active=True)
+        row = build_health_row(info, readiness=readiness)
+        assert row["staleness_reason"] == "index_building"
+        assert row["readiness"] == "index_building"
 
     def test_missing_git_dir_takes_priority_over_missing_index(self, tmp_path):
         from mcp_server.health.repo_status import build_health_row

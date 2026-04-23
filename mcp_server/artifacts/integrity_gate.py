@@ -25,10 +25,31 @@ def validate_required_metadata_fields(metadata: Dict[str, Any]) -> List[str]:
     """Validate mandatory metadata structure and fields."""
     reasons: List[str] = []
 
-    required_keys = ["checksum", "commit", "branch", "timestamp", "compatibility"]
+    if "tracked_branch" not in metadata and "branch" in metadata:
+        metadata = dict(metadata)
+        metadata["tracked_branch"] = metadata["branch"]
+
+    required_keys = [
+        "repo_id",
+        "tracked_branch",
+        "commit",
+        "schema_version",
+        "semantic_profile_hash",
+        "checksum",
+        "artifact_type",
+        "timestamp",
+        "compatibility",
+    ]
     for key in required_keys:
         if key not in metadata:
             reasons.append(f"missing key: {key}")
+
+    semantic_profile_hash = metadata.get("semantic_profile_hash")
+    if semantic_profile_hash is not None:
+        from mcp_server.artifacts.manifest_v2 import validate_semantic_profile_hash
+
+        if not validate_semantic_profile_hash(str(semantic_profile_hash)):
+            reasons.append(f"malformed semantic_profile_hash: {semantic_profile_hash}")
 
     compatibility = metadata.get("compatibility")
     if compatibility is None:

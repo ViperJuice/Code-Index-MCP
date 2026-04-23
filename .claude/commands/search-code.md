@@ -1,6 +1,10 @@
 # Search Code Patterns
 
 Search for code patterns, text, or concepts across the entire codebase using the MCP index.
+Use indexed results as authoritative only when repository readiness is `ready`.
+If `search_code` returns `index_unavailable` with
+`safe_fallback: "native_search"`, use native `rg`/file search and follow the
+readiness remediation, such as `reindex`.
 
 ## Usage
 ```
@@ -24,4 +28,6 @@ This command uses `mcp__code-index-mcp__search_code` with these features:
 - Context snippets with highlighting
 - <500ms response time
 
-Never use grep - MCP search is 100x faster and understands code semantics!
+Ready indexes return ordinary `results: []` for no matches. Non-ready indexes
+return `index_unavailable`, where `native_search` is expected until remediation
+is complete.

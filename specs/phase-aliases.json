@@ -26,5 +26,13 @@
   "P23": "Phase 23 — Customer Docs Truth & Support Matrix",
   "P24": "Phase 24 — Sandbox & Plugin Runtime Hardening",
   "P25": "Phase 25 — Blocking Release Gates & Automation",
-  "P26": "Phase 26 — Private Alpha Evidence & Public Alpha Decision"
+  "P26": "Phase 26 — Private Alpha Evidence & Public Alpha Decision",
+  "P27": "Phase 27 — Repository Scope & Readiness Contracts",
+  "P28": "Phase 28 — MCP Tool Handoff & Fail-Closed Query Behavior",
+  "P29": "Phase 29 — Incremental Indexing Interface Repair",
+  "P30": "Phase 30 — Branch Drift, Reversions & Watcher Recovery",
+  "P31": "Phase 31 — Artifact Identity, Hydration & Freshness",
+  "P32": "Phase 32 — Runtime Isolation & Dispatcher State Cleanup",
+  "P33": "Phase 33 — Production Multi-Repo Matrix & Release Gates",
+  "P34": "Phase 34 — Outside Developer Readiness & Public Alpha Recut"
 }

@@ -1,0 +1,52 @@
+"""P28 STDIO readiness handoff tests."""
+
+from __future__ import annotations
+
+from mcp_server.cli.stdio_runner import _SERVER_INSTRUCTIONS, _build_tool_list
+
+
+def _tools_by_name():
+    return {tool.name: tool for tool in _build_tool_list()}
+
+
+def test_server_instructions_are_readiness_gated():
+    text = _SERVER_INSTRUCTIONS
+    for expected in ("readiness", "ready", "index_unavailable", "native_search", "reindex"):
+        assert expected in text
+
+
+def test_query_tool_descriptions_are_readiness_gated():
+    tools = _tools_by_name()
+    for tool_name in ("search_code", "symbol_lookup"):
+        description = tools[tool_name].description
+        for expected in (
+            "readiness",
+            "ready",
+            "index_unavailable",
+            "native_search",
+            "reindex",
+        ):
+            assert expected in description
+
+
+def test_query_tool_descriptions_remove_unconditional_mcp_first_language():
+    tools = _tools_by_name()
+    forbidden = (
+        "[USE BEFORE GREP]",
+        "ALWAYS use",
+        "Fall back to Grep ONLY",
+        "0 results",
+        "returns not_found",
+    )
+    for tool_name in ("search_code", "symbol_lookup"):
+        description = tools[tool_name].description
+        for phrase in forbidden:
+            assert phrase not in description
+
+
+def test_query_repository_inputs_remain_optional():
+    tools = _tools_by_name()
+    for tool_name in ("search_code", "symbol_lookup"):
+        schema = tools[tool_name].inputSchema
+        assert "repository" in schema["properties"]
+        assert "repository" not in schema.get("required", [])

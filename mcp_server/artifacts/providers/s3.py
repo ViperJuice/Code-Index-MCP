@@ -9,7 +9,7 @@ from .base import ArtifactRecord
 
 
 class S3ArtifactProvider:
-    """S3 provider placeholder for production remote cache."""
+    """Unimplemented placeholder; provider factory must not select this in production."""
 
     def __init__(self, bucket: str, prefix: str = ""):
         self.bucket = bucket

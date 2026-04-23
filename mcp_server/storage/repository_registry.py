@@ -22,6 +22,39 @@ from mcp_server.storage.repo_identity import compute_repo_id, resolve_tracked_br
 logger = logging.getLogger(__name__)
 
 
+class MultipleWorktreesUnsupportedError(ValueError):
+    """Raised when a second filesystem path targets an already registered git common dir."""
+
+    code = "multiple_worktrees_unsupported"
+
+    def __init__(
+        self,
+        *,
+        registered_path: Path,
+        requested_path: Path,
+        git_common_dir: Path,
+    ) -> None:
+        self.registered_path = str(Path(registered_path).resolve(strict=False))
+        self.requested_path = str(Path(requested_path).resolve(strict=False))
+        self.git_common_dir = str(Path(git_common_dir).resolve(strict=False))
+        self.remediation = (
+            "Use the registered path or unregister it before registering another worktree."
+        )
+        super().__init__(
+            f"{self.code}: {self.requested_path} shares git common dir "
+            f"{self.git_common_dir} with registered path {self.registered_path}"
+        )
+
+    def to_dict(self) -> Dict[str, str]:
+        return {
+            "code": self.code,
+            "registered_path": self.registered_path,
+            "requested_path": self.requested_path,
+            "git_common_dir": self.git_common_dir,
+            "remediation": self.remediation,
+        }
+
+
 class RepositoryRegistry:
     """
     Manages persistent registry of repositories for multi-repository search.
@@ -269,6 +302,17 @@ class RepositoryRegistry:
         from mcp_server.storage.multi_repo_manager import RepositoryInfo
 
         identity = compute_repo_id(path)
+        if identity.git_common_dir is not None:
+            existing_common = self.find_by_git_common_dir(identity.git_common_dir)
+            if existing_common:
+                existing_info = self.get(existing_common)
+                if existing_info is not None and Path(existing_info.path).resolve() != path:
+                    raise MultipleWorktreesUnsupportedError(
+                        registered_path=existing_info.path,
+                        requested_path=path,
+                        git_common_dir=identity.git_common_dir,
+                    )
+
         repo_id = identity.repo_id
         tracked = resolve_tracked_branch(identity.git_common_dir)
         index_base = path / ".mcp-index"
@@ -693,6 +737,37 @@ class RepositoryRegistry:
                     return repo_id
 
             return None
+
+    def find_by_git_common_dir(self, git_common_dir: Path) -> Optional[str]:
+        """Find a repository ID by normalized git common directory."""
+        target = Path(git_common_dir).resolve(strict=False)
+        with self._lock:
+            for repo_id, repo_data in self._registry.items():
+                stored = repo_data.get("git_common_dir")
+                if not stored:
+                    continue
+                if Path(stored).resolve(strict=False) == target:
+                    return repo_id
+        return None
+
+    def find_unsupported_worktree(self, path: Path) -> Optional[Any]:
+        """Return registered repo info when *path* is another worktree of it."""
+        try:
+            requested = Path(path).resolve(strict=False)
+            identity = compute_repo_id(requested)
+        except Exception:
+            return None
+        if identity.git_common_dir is None:
+            return None
+        repo_id = self.find_by_git_common_dir(identity.git_common_dir)
+        if repo_id is None:
+            return None
+        repo_info = self.get(repo_id)
+        if repo_info is None:
+            return None
+        if Path(repo_info.path).resolve(strict=False) == requested:
+            return None
+        return repo_info
 
     def get_statistics(self) -> Dict[str, Any]:
         """Get registry statistics."""

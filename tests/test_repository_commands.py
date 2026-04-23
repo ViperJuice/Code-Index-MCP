@@ -1,5 +1,6 @@
 from datetime import datetime
 from pathlib import Path
+import sqlite3
 
 from click.testing import CliRunner
 
@@ -12,11 +13,19 @@ def _repo_info(tmp_path: Path) -> RepositoryInfo:
     repo_path.mkdir(exist_ok=True)
     index_base = repo_path / ".mcp-index"
     index_base.mkdir(exist_ok=True)
+    index_path = index_base / "current.db"
+    conn = sqlite3.connect(index_path)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS files (id INTEGER PRIMARY KEY, path TEXT, is_deleted BOOLEAN DEFAULT 0)"
+    )
+    conn.execute("INSERT INTO files (path, is_deleted) VALUES ('README.md', 0)")
+    conn.commit()
+    conn.close()
     return RepositoryInfo(
         repository_id="repo-1",
         name="repo",
         path=repo_path,
-        index_path=index_base / "current.db",
+        index_path=index_path,
         language_stats={"python": 1},
         total_files=1,
         total_symbols=1,
@@ -72,6 +81,35 @@ def test_list_shows_artifact_readiness_fields(monkeypatch, tmp_path: Path):
     assert "Artifact backend: local_workspace" in result.output
     assert "Artifact health: ready" in result.output
     assert "Semantic profiles: commercial_high, oss_high" in result.output
+    assert "Readiness: ready" in result.output
+
+
+def test_register_surfaces_multiple_worktrees_error(monkeypatch, tmp_path: Path):
+    from mcp_server.storage.repository_registry import MultipleWorktreesUnsupportedError
+
+    runner = CliRunner()
+    registered = tmp_path / "registered"
+    requested = tmp_path / "requested"
+    git_common = tmp_path / "common.git"
+    requested.mkdir()
+
+    class FakeRegistry:
+        def register_repository(self, path, auto_sync=True, artifact_enabled=True, priority=0):
+            raise MultipleWorktreesUnsupportedError(
+                registered_path=registered,
+                requested_path=requested,
+                git_common_dir=git_common,
+            )
+
+    monkeypatch.setattr("mcp_server.cli.repository_commands.RepositoryRegistry", FakeRegistry)
+
+    result = runner.invoke(repository, ["register", str(requested)])
+
+    assert result.exit_code == 1
+    assert "multiple_worktrees_unsupported" in result.output
+    assert str(registered.resolve()) in result.output
+    assert str(requested.resolve()) in result.output
+    assert "unregister" in result.output
 
 
 def test_unregister_removes_repo_from_registry(monkeypatch, tmp_path: Path):

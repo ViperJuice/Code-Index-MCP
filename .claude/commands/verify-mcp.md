@@ -11,15 +11,15 @@ Check if MCP tools are being used correctly and efficiently.
 
 This command performs a self-check to verify:
 1. MCP tools are available and working
-2. The index is loaded and healthy
+2. Repository readiness is `ready`
 3. Search performance is optimal
-4. MCP-first strategy is being followed
+4. `index_unavailable` responses are treated as `native_search` fallback signals
 
 ## Verification Steps
 
 1. **Check MCP Status**
    - Uses `mcp__code-index-mcp__get_status()`
-   - Verifies index health
+   - Verifies index health and repository readiness
 
 2. **Test Symbol Lookup**
    - Quick test: `mcp__code-index-mcp__symbol_lookup(symbol="PluginManager")`
@@ -38,11 +38,13 @@ This command performs a self-check to verify:
 ```
 ✅ MCP Verification Results:
 - Status: Healthy
+- Repository Readiness: ready
 - Indexed Files: 312
 - Languages: 48
 - Symbol Lookup: <100ms
 - Code Search: <500ms
-- MCP-First: Enabled
+- Indexed Search: ready
+- Fallback: index_unavailable -> safe_fallback native_search
 
 All systems operational!
 ```
@@ -52,6 +54,7 @@ All systems operational!
 If verification fails:
 - Check if MCP server is running
 - Verify index exists in .mcp-index/
+- If readiness is non-ready, use native_search and run reindex when remediation asks for it
 - Ensure AGENTS.md is loaded
 - Review recent tool usage patterns
 

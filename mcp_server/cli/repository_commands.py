@@ -17,10 +17,14 @@ sys.path.insert(0, str(project_root))
 
 from mcp_server.artifacts.commit_artifacts import CommitArtifactManager  # noqa: E402
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher  # noqa: E402
+from mcp_server.health.repo_status import build_health_row  # noqa: E402
 from mcp_server.core.repo_resolver import RepoResolver  # noqa: E402
 from mcp_server.storage.git_index_manager import GitAwareIndexManager  # noqa: E402
-from mcp_server.storage.repository_registry import RepositoryRegistry  # noqa: E402
-from mcp_server.storage.sqlite_store import SQLiteStore  # noqa: E402
+from mcp_server.storage.repository_registry import (  # noqa: E402
+    MultipleWorktreesUnsupportedError,
+    RepositoryRegistry,
+)
+from mcp_server.storage.sqlite_store import SQLiteStore  # noqa: E402,F401
 from mcp_server.storage.store_registry import StoreRegistry  # noqa: E402
 from mcp_server.watcher_multi_repo import MultiRepositoryWatcher  # noqa: E402
 
@@ -68,6 +72,15 @@ def register(path: str, auto_sync: bool, artifacts: bool):
                 )
             )
 
+    except MultipleWorktreesUnsupportedError as e:
+        details = e.to_dict()
+        click.echo(click.style("✗ Failed to register repository", fg="red"), err=True)
+        click.echo(f"  Code: {details['code']}", err=True)
+        click.echo(f"  Registered path: {details['registered_path']}", err=True)
+        click.echo(f"  Requested path: {details['requested_path']}", err=True)
+        click.echo(f"  Git common dir: {details['git_common_dir']}", err=True)
+        click.echo(f"  Remediation: {details['remediation']}", err=True)
+        sys.exit(1)
     except Exception as e:
         click.echo(click.style(f"✗ Failed to register repository: {e}", fg="red"), err=True)
         sys.exit(1)
@@ -125,8 +138,14 @@ def list(verbose: bool):
                     f"  Last published commit: {repo_info.last_published_commit[:8] if repo_info.last_published_commit else 'Never'}"
                 )
 
-                if repo_info.needs_update():
-                    click.echo(click.style("  Status: Stale", fg="yellow"))
+                health_row = build_health_row(repo_info)
+                readiness = health_row["readiness"]
+                color = "green" if health_row["ready"] else "yellow"
+                click.echo(click.style(f"  Readiness: {readiness}", fg=color))
+                if health_row["remediation"]:
+                    click.echo(f"  Remediation: {health_row['remediation']}")
+                if readiness != "ready":
+                    click.echo(click.style(f"  Status: {readiness}", fg="yellow"))
                 else:
                     if repo_info.artifact_health in {"ready", "prepared", "published"}:
                         click.echo(click.style("  Status: Ready", fg="green"))
@@ -378,6 +397,8 @@ def discover(search_paths: tuple, register: bool):
     """Discover git repositories in given paths."""
     try:
         registry = RepositoryRegistry()
+        store_registry = StoreRegistry.for_registry(registry)
+        repo_resolver = RepoResolver(registry, store_registry)
 
         # Expand paths
         paths = []
@@ -459,8 +480,6 @@ def watch(watch_all: bool, daemon: bool):
 
         # Create components
         dispatcher = EnhancedDispatcher()
-        store_registry = StoreRegistry.for_registry(registry)
-        repo_resolver = RepoResolver(registry, store_registry)
         index_manager = GitAwareIndexManager(
             registry,
             dispatcher,

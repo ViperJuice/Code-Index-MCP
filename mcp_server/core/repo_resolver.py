@@ -7,7 +7,11 @@ from pathlib import Path
 from typing import Optional
 
 from mcp_server.core.repo_context import RepoContext
-from mcp_server.storage.repo_identity import compute_repo_id
+from mcp_server.health.repository_readiness import (
+    ReadinessClassifier,
+    RepositoryReadiness,
+    RepositoryReadinessState,
+)
 from mcp_server.storage.repository_registry import RepositoryRegistry
 from mcp_server.storage.store_registry import StoreRegistry
 
@@ -36,14 +40,21 @@ class RepoResolver:
         self._registry = registry
         self._store_registry = store_registry
 
+    def classify(self, path: Path) -> RepositoryReadiness:
+        """Classify repository readiness for a path without registering it."""
+        return ReadinessClassifier.classify_path(self._registry, path)
+
     def resolve(self, path: Path) -> Optional[RepoContext]:
-        git_root = _find_git_root(path)
-        if git_root is None:
+        readiness = self.classify(path)
+        if readiness.state in {
+            RepositoryReadinessState.UNREGISTERED_REPOSITORY,
+            RepositoryReadinessState.UNSUPPORTED_WORKTREE,
+        }:
             return None
 
-        repo_id = self._registry.find_by_path(git_root)
+        repo_id = readiness.repository_id
         if repo_id is None:
-            repo_id = compute_repo_id(git_root).repo_id
+            return None
 
         info = self._registry.get(repo_id)
         if info is None:

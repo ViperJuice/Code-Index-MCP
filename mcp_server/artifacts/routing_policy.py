@@ -57,11 +57,17 @@ class ArtifactRoutingPolicy:
         self.large_artifact_threshold_bytes = max(0, large_artifact_threshold_bytes)
         self.s3_configured = s3_configured
         self.fallback_order = tuple(fallback_order)
+        self.unimplemented_providers = {"s3", "gcs", "azure"}
 
     def choose(self, context: ArtifactRoutingContext) -> ArtifactRoutingDecision:
         """Choose a backend for the provided context."""
         explicit = (context.explicit_override or "").strip().lower()
         if explicit:
+            if explicit in self.unimplemented_providers:
+                return ArtifactRoutingDecision(
+                    provider=explicit,
+                    reasons=[f"explicit override requested unimplemented provider: {explicit}"],
+                )
             return ArtifactRoutingDecision(
                 provider=explicit,
                 reasons=[f"explicit override requested: {explicit}"],
@@ -87,12 +93,11 @@ class ArtifactRoutingPolicy:
         if is_private or is_large:
             reasons = ["private/sensitive profile or large artifact requires durable backend"]
             if self.s3_configured:
-                reasons.append("s3 is configured")
-                reasons.append("default route: s3")
-                return ArtifactRoutingDecision(provider="s3", reasons=reasons)
+                reasons.append("s3 is configured but not implemented")
 
             fallback = self._pick_fallback()
-            reasons.append("s3 not configured")
+            if not self.s3_configured:
+                reasons.append("s3 not configured")
             reasons.append(f"fallback route: {fallback}")
             return ArtifactRoutingDecision(provider=fallback, reasons=reasons)
 
@@ -104,6 +109,8 @@ class ArtifactRoutingPolicy:
     def _pick_fallback(self) -> str:
         for provider in self.fallback_order:
             normalized = provider.strip().lower()
+            if normalized in self.unimplemented_providers:
+                continue
             if normalized in {"local_fs", "github_actions"}:
                 return normalized
         return "local_fs"

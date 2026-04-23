@@ -46,9 +46,14 @@ def _write_archive(tmp_path: Path, payload: bytes = b"index-archive") -> Path:
 
 def _base_metadata(checksum: str) -> dict:
     return {
+        "repo_id": "owner/repo",
         "checksum": checksum,
         "commit": "0123456789abcdef",
+        "tracked_branch": "main",
         "branch": "main",
+        "schema_version": "2",
+        "semantic_profile_hash": "lexical-only",
+        "artifact_type": "full",
         "timestamp": "2026-03-03T00:00:00Z",
         "compatibility": {
             "schema_version": "2",
@@ -106,8 +111,12 @@ def test_integrity_gate_validates_optional_manifest_v2_payload(tmp_path: Path):
         logical_artifact_id="repo-main-abc123",
         repo_id="owner/repo",
         branch="main",
+        tracked_branch="main",
         commit="abc123",
         schema_version="2",
+        semantic_profile_hash="lexical-only",
+        checksum="deadbeef",
+        artifact_type="full",
         chunk_schema_version="2.0",
         chunk_identity_algorithm="treesitter_chunk_id_v1",
         units=[
@@ -162,6 +171,7 @@ def test_downloader_run_integrity_gate_fails_closed(tmp_path: Path):
     archive_path = _write_archive(tmp_path)
     checksum = hashlib.sha256(archive_path.read_bytes()).hexdigest()
     metadata = _base_metadata(checksum)
+    metadata.pop("tracked_branch")
     metadata.pop("branch")
 
     with pytest.raises(ValueError, match="Artifact integrity gate failed"):

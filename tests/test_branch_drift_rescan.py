@@ -1,10 +1,10 @@
-"""Tests for SL-3: branch-drift loud path.
+"""Tests for branch-drift readiness and non-mutating rescan guards.
 
 Covers:
 - should_reindex_for_branch still returns False for drift
 - drift triggers exactly one `branch.drift.detected` WARN log with all 3 fields
-- enqueue_full_rescan(repo_id) called exactly once per drift
-- rescan is enqueued (not executed inline)
+- drift returns wrong_branch readiness without scheduling mutation
+- guarded full rescan stays on the tracked branch guard
 """
 
 import logging
@@ -135,12 +135,12 @@ def test_no_drift_log_when_no_tracked_branch(caplog):
 
 
 # ---------------------------------------------------------------------------
-# SL-3.1c: on_branch_drift callback called exactly once per drift
+# SL-3.1c: on_branch_drift callback is not invoked by wrong-branch sync
 # ---------------------------------------------------------------------------
 
 
-def test_on_branch_drift_callback_called_once_per_drift():
-    """on_branch_drift is called exactly once when drift is detected."""
+def test_on_branch_drift_callback_not_called_on_drift():
+    """on_branch_drift is diagnostic-only and not called from sync drift."""
     repo_id = "test-repo"
     registry, _ = _make_registry_with_drift(
         repo_id=repo_id, current_branch="feature/noise", tracked_branch="main"
@@ -151,7 +151,7 @@ def test_on_branch_drift_callback_called_once_per_drift():
 
     manager.sync_repository_index(repo_id)
 
-    enqueue_cb.assert_called_once_with(repo_id, "feature/noise", "main")
+    enqueue_cb.assert_not_called()
 
 
 def test_on_branch_drift_not_called_on_same_branch():
@@ -239,15 +239,13 @@ def test_enqueue_full_rescan_passes_repo_id():
 
     assert len(submitted_callables) == 1
     fn, args, kwargs = submitted_callables[0]
-    # Call the submitted closure — it should invoke index_manager.sync_repository_index with force_full=True
+    # Call the submitted closure — it should invoke a guarded force-full sync.
     fn()
-    index_manager.sync_repository_index.assert_called_once_with(
-        "my-repo", force_full=True, bypass_branch_guard=True
-    )
+    index_manager.sync_repository_index.assert_called_once_with("my-repo", force_full=True)
 
 
 # ---------------------------------------------------------------------------
-# SL-3.1e: watcher wires on_branch_drift to enqueue_full_rescan at init
+# SL-3.1e: watcher wires on_branch_drift as a diagnostic hook
 # ---------------------------------------------------------------------------
 
 
@@ -262,8 +260,8 @@ def test_watcher_wires_drift_callback_to_index_manager():
     assert callable(cb)
 
 
-def test_watcher_drift_callback_calls_enqueue_full_rescan():
-    """The wired drift callback calls enqueue_full_rescan with the repo_id."""
+def test_watcher_drift_callback_does_not_enqueue_full_rescan():
+    """The wired drift callback records diagnostics without scheduling mutation."""
     index_manager = MagicMock()
     watcher = _make_watcher(index_manager=index_manager)
 
@@ -271,17 +269,16 @@ def test_watcher_drift_callback_calls_enqueue_full_rescan():
         # Simulate drift: call the wired callback directly
         cb = index_manager.on_branch_drift
         cb("my-repo", "feature/x", "main")
-        mock_enqueue.assert_called_once_with("my-repo")
+        mock_enqueue.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
-# SL-3.1f: bypass_branch_guard prevents infinite drift→rescan loop
+# SL-3.1f: bypass_branch_guard is inert on wrong-branch sync
 # ---------------------------------------------------------------------------
 
 
-def test_bypass_branch_guard_prevents_infinite_loop(caplog):
-    """sync_repository_index with bypass_branch_guard=True must not emit drift log or fire callback
-    even when current != tracked (i.e., the rescan path won't re-trigger drift)."""
+def test_bypass_branch_guard_is_inert_on_wrong_branch(caplog):
+    """The compatibility bypass parameter must not bypass wrong-branch readiness."""
     repo_id = "test-repo"
     registry, _ = _make_registry_with_drift(
         repo_id=repo_id, current_branch="feature/noise", tracked_branch="main"
@@ -293,8 +290,10 @@ def test_bypass_branch_guard_prevents_infinite_loop(caplog):
     registry.update_indexed_commit = MagicMock(return_value=True)
 
     with caplog.at_level(logging.WARNING, logger="mcp_server.storage.git_index_manager"):
-        manager.sync_repository_index(repo_id, force_full=True, bypass_branch_guard=True)
+        result = manager.sync_repository_index(repo_id, force_full=True, bypass_branch_guard=True)
 
     drift_records = [r for r in caplog.records if r.getMessage() == "branch.drift.detected"]
-    assert len(drift_records) == 0, "bypass_branch_guard must suppress drift log on rescan path"
+    assert len(drift_records) == 1
+    assert result.action == "wrong_branch"
     manager.on_branch_drift.assert_not_called()
+    manager._full_index.assert_not_called()

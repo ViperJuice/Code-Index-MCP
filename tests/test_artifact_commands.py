@@ -9,8 +9,10 @@ from mcp_server.indexing.change_detector import FileChange
 def test_artifact_pull_confirms_local_restore(monkeypatch, tmp_path):
     runner = CliRunner()
 
-    def _fake_download_latest(self, output_dir, backup=True, full_only=False):
-        Path("code_index.db").write_text("db", encoding="utf-8")
+    def _fake_download_latest(self, output_dir, backup=True, full_only=False, **kwargs):
+        Path(".mcp-index").mkdir(exist_ok=True)
+        Path(".mcp-index/current.db").write_text("db", encoding="utf-8")
+        return type("Result", (), {"validation_reasons": []})()
 
     monkeypatch.setattr(
         "mcp_server.cli.artifact_commands.IndexArtifactDownloader.download_latest",
@@ -30,7 +32,7 @@ def test_artifact_pull_confirms_local_restore(monkeypatch, tmp_path):
 
     assert result.exit_code == 0
     assert "Local index files restored" in result.output
-    assert "code_index.db" in result.output
+    assert "current.db" in result.output
     assert "guidance" in result.output
 
 
@@ -39,7 +41,7 @@ def test_artifact_pull_fails_when_no_index_restored(monkeypatch, tmp_path):
 
     monkeypatch.setattr(
         "mcp_server.cli.artifact_commands.IndexArtifactDownloader.download_latest",
-        lambda self, output_dir, backup=True, full_only=False: None,
+        lambda self, output_dir, backup=True, full_only=False, **kwargs: None,
     )
     monkeypatch.setattr(
         "mcp_server.cli.artifact_commands.IndexArtifactDownloader._detect_repository",
@@ -60,8 +62,10 @@ def test_artifact_pull_fails_when_no_index_restored(monkeypatch, tmp_path):
 def test_artifact_recover_confirms_local_restore(monkeypatch, tmp_path):
     runner = CliRunner()
 
-    def _fake_recover(self, branch, commit, output_dir, backup=True):
-        Path("artifact-metadata.json").write_text("{}", encoding="utf-8")
+    def _fake_recover(self, branch, commit, output_dir, backup=True, **kwargs):
+        Path(".mcp-index").mkdir(exist_ok=True)
+        Path(".mcp-index/artifact-metadata.json").write_text("{}", encoding="utf-8")
+        return type("Result", (), {"validation_reasons": []})()
 
     monkeypatch.setattr(
         "mcp_server.cli.artifact_commands.IndexArtifactDownloader.recover",
@@ -84,8 +88,9 @@ def test_artifact_recover_confirms_local_restore(monkeypatch, tmp_path):
 def test_artifact_sync_bootstraps_local_indexes(monkeypatch, tmp_path):
     runner = CliRunner()
 
-    def _fake_download_latest(self, output_dir, backup=True, full_only=False):
-        Path(".index_metadata.json").write_text("{}", encoding="utf-8")
+    def _fake_download_latest(self, output_dir, backup=True, full_only=False, **kwargs):
+        Path(".mcp-index").mkdir(exist_ok=True)
+        Path(".mcp-index/.index_metadata.json").write_text("{}", encoding="utf-8")
 
     monkeypatch.setattr(
         "mcp_server.cli.artifact_commands.IndexArtifactDownloader.download_latest",
@@ -131,7 +136,8 @@ def test_artifact_sync_reports_existing_local_drift(monkeypatch, tmp_path):
     )
 
     with runner.isolated_filesystem(temp_dir=str(tmp_path)):
-        Path("code_index.db").write_text("db", encoding="utf-8")
+        Path(".mcp-index").mkdir(exist_ok=True)
+        Path(".mcp-index/current.db").write_text("db", encoding="utf-8")
         result = runner.invoke(artifact, ["sync"])
 
     assert result.exit_code == 0
@@ -155,7 +161,8 @@ def test_incremental_reconcile_uses_python_plugin_without_preindex(monkeypatch, 
             return {"file": str(path), "symbols": [], "language": "python"}
 
     monkeypatch.chdir(tmp_path)
-    Path("code_index.db").write_text("placeholder", encoding="utf-8")
+    Path(".mcp-index").mkdir(exist_ok=True)
+    Path(".mcp-index/current.db").write_text("placeholder", encoding="utf-8")
     monkeypatch.setattr("mcp_server.cli.artifact_commands.SQLiteStore", lambda path: object())
     monkeypatch.setattr("mcp_server.cli.artifact_commands.PythonPlugin", FakePythonPlugin)
     monkeypatch.setattr(

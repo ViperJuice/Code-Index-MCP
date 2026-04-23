@@ -10,6 +10,7 @@ from watchdog.observers import Observer
 
 from mcp_server.core.repo_context import RepoContext
 from mcp_server.watcher_multi_repo import MultiRepositoryHandler, MultiRepositoryWatcher
+from mcp_server.watcher.sweeper import WatcherSweeper
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -44,6 +45,7 @@ def _make_repo_info(path: str, auto_sync: bool = True):
     info = Mock()
     info.path = path
     info.auto_sync = auto_sync
+    info.tracked_branch = "main"
     return info
 
 
@@ -201,6 +203,50 @@ class TestHandlerGitignoreFilter:
 class TestMultiRepositoryWatcherLifecycle:
     """MultiRepositoryWatcher observer management."""
 
+    def test_default_sweeper_is_created_when_store_registry_available(self, tmp_path):
+        repo1 = tmp_path / "repo1"
+        repo1.mkdir()
+        repos = {"repo-1": _make_repo_info(str(repo1))}
+        registry = _make_registry(repos)
+        index_manager = Mock()
+        index_manager.store_registry = Mock()
+        index_manager.store_registry.get.return_value = Mock()
+
+        watcher = MultiRepositoryWatcher(registry, _make_dispatcher(), index_manager)
+
+        assert isinstance(watcher.sweeper, WatcherSweeper)
+
+    def test_explicit_sweeper_is_honored(self, tmp_path):
+        registry = _make_registry({})
+        index_manager = Mock()
+        explicit_sweeper = Mock()
+
+        watcher = MultiRepositoryWatcher(
+            registry,
+            _make_dispatcher(),
+            index_manager,
+            sweeper=explicit_sweeper,
+        )
+
+        assert watcher.sweeper is explicit_sweeper
+
+    def test_default_sweeper_starts_and_stops_with_watcher(self, tmp_path):
+        registry = _make_registry({})
+        index_manager = Mock()
+        explicit_sweeper = Mock()
+        watcher = MultiRepositoryWatcher(
+            registry,
+            _make_dispatcher(),
+            index_manager,
+            sweeper=explicit_sweeper,
+        )
+
+        watcher.start_watching_all()
+        watcher.stop_watching_all()
+
+        explicit_sweeper.start.assert_called_once()
+        explicit_sweeper.stop.assert_called_once()
+
     def test_start_watching_all_spawns_one_observer_per_repo(self, tmp_path):
         repo1 = tmp_path / "repo1"
         repo2 = tmp_path / "repo2"
@@ -232,6 +278,85 @@ class TestMultiRepositoryWatcherLifecycle:
                 assert obs.is_alive()
         finally:
             watcher.stop_watching_all()
+
+
+class TestArtifactPublishTriggers:
+    """Watcher publishes only after successful mutating sync actions."""
+
+    def _watcher_for_sync(self, tmp_path, action, files_processed=1):
+        repo_path = tmp_path / "repo"
+        repo_path.mkdir()
+        repo_info = _make_repo_info(str(repo_path))
+        repo_info.artifact_enabled = True
+        repo_info.index_location = str(repo_path / ".mcp-index")
+        repo_info.index_path = repo_path / ".mcp-index" / "current.db"
+        repos = {"repo-1": repo_info}
+        registry = _make_registry(repos)
+        registry.update_artifact_state = Mock()
+        index_manager = Mock()
+        index_manager.sync_repository_index.return_value = type(
+            "Result",
+            (),
+            {
+                "action": action,
+                "files_processed": files_processed,
+                "duration_seconds": 0.1,
+                "commit": "synced123",
+            },
+        )()
+        artifact_manager = Mock()
+        artifact_manager.create_commit_artifact.return_value = repo_path / "artifact.tar.gz"
+        artifact_manager.cleanup_old_artifacts.return_value = 0
+        watcher = MultiRepositoryWatcher(
+            registry,
+            _make_dispatcher(),
+            index_manager,
+            artifact_manager=artifact_manager,
+            sweeper=Mock(),
+        )
+        watcher._artifact_publisher = Mock()
+        return watcher, registry, artifact_manager
+
+    @pytest.mark.parametrize("action", ["full_index", "incremental_update"])
+    def test_mutating_sync_actions_publish_once(self, tmp_path, action):
+        watcher, registry, artifact_manager = self._watcher_for_sync(tmp_path, action)
+
+        watcher._sync_repository("repo-1", "callback123")
+
+        artifact_manager.create_commit_artifact.assert_called_once()
+        watcher._artifact_publisher.publish_on_reindex.assert_called_once_with(
+            "repo-1",
+            "synced123",
+            tracked_branch="main",
+            index_location=str(tmp_path / "repo" / ".mcp-index"),
+        )
+        registry.update_artifact_state.assert_any_call(
+            "repo-1",
+            last_published_commit="synced123",
+            artifact_health="local_only",
+        )
+
+    @pytest.mark.parametrize("action", ["wrong_branch", "up_to_date", "downloaded", "failed"])
+    def test_non_mutating_sync_actions_do_not_publish(self, tmp_path, action):
+        watcher, _registry, artifact_manager = self._watcher_for_sync(tmp_path, action)
+
+        watcher._sync_repository("repo-1", "callback123")
+
+        artifact_manager.create_commit_artifact.assert_not_called()
+        watcher._artifact_publisher.publish_on_reindex.assert_not_called()
+
+    def test_remote_publish_failure_records_publish_failed(self, tmp_path):
+        watcher, registry, artifact_manager = self._watcher_for_sync(
+            tmp_path, "full_index"
+        )
+        watcher._artifact_publisher.publish_on_reindex.side_effect = RuntimeError("boom")
+
+        watcher._sync_repository("repo-1", "callback123")
+
+        artifact_manager.create_commit_artifact.assert_called_once()
+        registry.update_artifact_state.assert_any_call(
+            "repo-1", artifact_health="publish_failed"
+        )
 
     def test_add_repository_after_start_begins_watching(self, tmp_path):
         repo1 = tmp_path / "repo1"

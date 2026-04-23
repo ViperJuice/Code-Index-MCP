@@ -27,17 +27,41 @@ from mcp_server.indexing.incremental_indexer import IncrementalIndexer
 from mcp_server.plugins.language_registry import get_language_by_extension
 from mcp_server.plugins.plugin_factory import PluginFactory
 from mcp_server.plugins.python_plugin.plugin import Plugin as PythonPlugin
+from mcp_server.storage.multi_repo_manager import MultiRepositoryManager, RepositoryInfo
 from mcp_server.storage.sqlite_store import SQLiteStore
+
+
+def _canonical_index_location(repo_info: RepositoryInfo | None = None) -> Path:
+    if repo_info is not None:
+        return Path(repo_info.index_location or repo_info.index_path.parent)
+    return Path(".mcp-index")
+
+
+def _canonical_index_path(repo_info: RepositoryInfo | None = None) -> Path:
+    if repo_info is not None:
+        return Path(repo_info.index_path)
+    return Path(".mcp-index") / "current.db"
+
+
+def _resolve_repository(repository: Optional[str]) -> RepositoryInfo | None:
+    if not repository:
+        return None
+    manager = MultiRepositoryManager()
+    for repo in manager.list_repositories(active_only=True):
+        if repo.repository_id == repository or repo.name == repository:
+            return repo
+    raise click.ClickException(f"Registered repository not found: {repository}")
 
 
 def _get_restored_index_paths() -> List[Path]:
     """Return restored index artifacts present in the working directory."""
+    index_root = Path(".mcp-index")
     expected_paths = [
-        Path("code_index.db"),
-        Path(".index_metadata.json"),
-        Path("artifact-metadata.json"),
-        Path("semantic_index_metadata.json"),
-        Path("vector_index.qdrant"),
+        index_root / "current.db",
+        index_root / ".index_metadata.json",
+        index_root / "artifact-metadata.json",
+        index_root / "semantic_index_metadata.json",
+        index_root / "vector_index.qdrant",
     ]
     return [path for path in expected_paths if path.exists()]
 
@@ -51,7 +75,7 @@ def _print_runtime_restore_note() -> None:
     """Explain that restored index files are local runtime state for MCP use."""
     click.echo(
         "ℹ️  These restored index files are local runtime state for the MCP "
-        "(`code_index.db`, `.index_metadata.json`, `vector_index.qdrant`) and are "
+        "(`.mcp-index/current.db`, `.mcp-index/.index_metadata.json`, `.mcp-index/vector_index.qdrant`) and are "
         "normally distributed via GitHub artifacts rather than git history."
     )
 
@@ -68,8 +92,8 @@ def _load_json_file(path: Path) -> dict | None:
 
 def _get_artifact_identity() -> dict[str, str | None]:
     """Return restored artifact commit and branch metadata."""
-    artifact_metadata = _load_json_file(Path("artifact-metadata.json")) or {}
-    index_metadata = _load_json_file(Path(".index_metadata.json")) or {}
+    artifact_metadata = _load_json_file(Path(".mcp-index") / "artifact-metadata.json") or {}
+    index_metadata = _load_json_file(Path(".mcp-index") / ".index_metadata.json") or {}
     compatibility = artifact_metadata.get("compatibility", {})
     profile_source = compatibility if compatibility else index_metadata
     semantic_profiles = extract_semantic_profile_metadata(profile_source)
@@ -77,7 +101,7 @@ def _get_artifact_identity() -> dict[str, str | None]:
 
     return {
         "commit": artifact_metadata.get("commit") or index_metadata.get("git_commit"),
-        "branch": artifact_metadata.get("branch"),
+        "branch": artifact_metadata.get("tracked_branch") or artifact_metadata.get("branch"),
         "embedding_model": compatibility.get("embedding_model")
         or index_metadata.get("embedding_model"),
         "schema_version": compatibility.get("schema_version")
@@ -162,12 +186,14 @@ def _get_local_drift() -> tuple[ChangeDetector, List[FileChange]]:
     return detector, filtered_changes
 
 
-def _run_incremental_reconcile(changes: List[FileChange]) -> bool:
+def _run_incremental_reconcile(
+    changes: List[FileChange], repo_info: RepositoryInfo | None = None
+) -> bool:
     """Apply local drift incrementally against the restored artifact baseline."""
     if not changes:
         return True
 
-    store = SQLiteStore("code_index.db")
+    store = SQLiteStore(str(_canonical_index_path(repo_info)))
     plugins = []
     loaded_languages = set()
     for change in changes:
@@ -279,8 +305,8 @@ def push(validate: bool, compress_only: bool, no_secure: bool, skip_if_current: 
                     pass
 
         # Check if indexes exist
-        if not Path("code_index.db").exists():
-            click.echo("❌ No code_index.db found. Run indexing first.")
+        if not _canonical_index_path().exists():
+            click.echo("❌ No .mcp-index/current.db found. Run indexing first.")
             return
 
         uploader = IndexArtifactUploader()
@@ -292,9 +318,18 @@ def push(validate: bool, compress_only: bool, no_secure: bool, skip_if_current: 
         secure = not no_secure
         method = "direct" if compress_only else "workflow"
         archive_path, checksum, size = uploader.compress_indexes(
-            Path("index-archive.tar.gz"), secure=secure
+            Path("index-archive.tar.gz"),
+            secure=secure,
+            index_location=_canonical_index_location(),
+            index_path=_canonical_index_path(),
         )
-        metadata = uploader.create_metadata(checksum, size, secure=secure)
+        metadata = uploader.create_metadata(
+            checksum,
+            size,
+            secure=secure,
+            index_location=_canonical_index_location(),
+            index_path=_canonical_index_path(),
+        )
 
         if method == "workflow":
             uploader.trigger_workflow(archive_path, metadata)
@@ -309,28 +344,58 @@ def push(validate: bool, compress_only: bool, no_secure: bool, skip_if_current: 
 @artifact.command()
 @click.option("--latest", is_flag=True, help="Download latest compatible artifact")
 @click.option("--artifact-id", type=int, help="Download specific artifact by ID")
+@click.option("--repository", help="Registered repository id or name")
+@click.option(
+    "--unsafe-allow-mismatched-artifact",
+    is_flag=True,
+    help="Allow install after identity/freshness rejection and print rejected reasons",
+)
 @click.option("--no-backup", is_flag=True, help="Skip backup of existing indexes")
-def pull(latest: bool, artifact_id: Optional[int], no_backup: bool):
+def pull(
+    latest: bool,
+    artifact_id: Optional[int],
+    repository: Optional[str],
+    unsafe_allow_mismatched_artifact: bool,
+    no_backup: bool,
+):
     """Download indexes from GitHub Actions Artifacts."""
     try:
         if not latest and not artifact_id:
             click.echo("❌ Specify --latest or --artifact-id")
             return
 
+        repo_info = _resolve_repository(repository)
         downloader = IndexArtifactDownloader()
         output_dir = Path("artifact_download")
         output_dir.mkdir(exist_ok=True)
         try:
             if latest:
-                downloader.download_latest(output_dir=output_dir, backup=not no_backup)
+                result = downloader.download_latest(
+                    output_dir=output_dir,
+                    backup=not no_backup,
+                    allow_unsafe=unsafe_allow_mismatched_artifact,
+                    repo_id=repo_info.repository_id if repo_info else None,
+                    tracked_branch=repo_info.tracked_branch if repo_info else None,
+                    target_commit=repo_info.current_commit if repo_info else None,
+                    index_location=_canonical_index_location(repo_info),
+                    index_path=_canonical_index_path(repo_info),
+                )
             else:
                 artifacts = downloader.list_artifacts()
                 artifact = next(
                     (item for item in artifacts if item["id"] == artifact_id),
                     {"id": artifact_id, "name": str(artifact_id)},
                 )
-                downloader.download_selected_artifact(
-                    artifact, output_dir=output_dir, backup=not no_backup
+                result = downloader.download_selected_artifact(
+                    artifact,
+                    output_dir=output_dir,
+                    backup=not no_backup,
+                    allow_unsafe=unsafe_allow_mismatched_artifact,
+                    repo_id=repo_info.repository_id if repo_info else None,
+                    tracked_branch=repo_info.tracked_branch if repo_info else None,
+                    target_commit=repo_info.current_commit if repo_info else None,
+                    index_location=_canonical_index_location(repo_info),
+                    index_path=_canonical_index_path(repo_info),
                 )
         finally:
             import shutil
@@ -343,6 +408,10 @@ def pull(latest: bool, artifact_id: Optional[int], no_backup: bool):
 
         restored = ", ".join(path.name for path in _get_restored_index_paths())
         click.echo(f"✅ Local index files restored: {restored}")
+        if result.validation_reasons:
+            click.echo("⚠️  Unsafe artifact install accepted:")
+            for reason in result.validation_reasons:
+                click.echo(f"   {reason}")
         _print_runtime_restore_note()
         _print_reconcile_guidance()
 
@@ -374,7 +443,7 @@ def sync():
         click.echo("🔄 Checking index synchronization status...")
 
         # Check if we have local indexes
-        has_local = Path("code_index.db").exists()
+        has_local = _canonical_index_path().exists()
 
         if not has_local:
             click.echo("📥 No local indexes found. Pulling latest...")
@@ -382,7 +451,12 @@ def sync():
             output_dir = Path("artifact_download")
             output_dir.mkdir(exist_ok=True)
             try:
-                downloader.download_latest(output_dir=output_dir, backup=True)
+                downloader.download_latest(
+                    output_dir=output_dir,
+                    backup=True,
+                    index_location=_canonical_index_location(),
+                    index_path=_canonical_index_path(),
+                )
             finally:
                 import shutil
 
@@ -413,7 +487,7 @@ def sync():
             # Get local stats
             import sqlite3
 
-            conn = sqlite3.connect("code_index.db")
+            conn = sqlite3.connect(str(_canonical_index_path()))
             cursor = conn.cursor()
 
             try:
@@ -504,23 +578,42 @@ def info(artifact_id: int):
 @artifact.command()
 @click.option("--branch", help="Recover artifact for a branch")
 @click.option("--commit", help="Recover artifact for a commit SHA")
+@click.option("--repository", help="Registered repository id or name")
+@click.option(
+    "--unsafe-allow-mismatched-artifact",
+    is_flag=True,
+    help="Allow install after identity/freshness rejection and print rejected reasons",
+)
 @click.option("--no-backup", is_flag=True, help="Skip backup of existing indexes")
-def recover(branch: Optional[str], commit: Optional[str], no_backup: bool):
+def recover(
+    branch: Optional[str],
+    commit: Optional[str],
+    repository: Optional[str],
+    unsafe_allow_mismatched_artifact: bool,
+    no_backup: bool,
+):
     """Recover indexes from artifact matching branch/commit."""
     try:
         if not branch and not commit:
             click.echo("❌ Specify at least one of --branch or --commit", err=True)
             raise click.Abort()
 
+        repo_info = _resolve_repository(repository)
         downloader = IndexArtifactDownloader()
         output_dir = Path("artifact_recovery")
         output_dir.mkdir(exist_ok=True)
         try:
-            downloader.recover(
+            result = downloader.recover(
                 branch=branch,
                 commit=commit,
                 output_dir=output_dir,
                 backup=not no_backup,
+                allow_unsafe=unsafe_allow_mismatched_artifact,
+                repo_id=repo_info.repository_id if repo_info else None,
+                tracked_branch=repo_info.tracked_branch if repo_info else branch,
+                target_commit=repo_info.current_commit if repo_info else commit,
+                index_location=_canonical_index_location(repo_info),
+                index_path=_canonical_index_path(repo_info),
             )
         finally:
             import shutil
@@ -533,6 +626,10 @@ def recover(branch: Optional[str], commit: Optional[str], no_backup: bool):
 
         restored = ", ".join(path.name for path in _get_restored_index_paths())
         click.echo(f"✅ Local index files restored: {restored}")
+        if result.validation_reasons:
+            click.echo("⚠️  Unsafe artifact install accepted:")
+            for reason in result.validation_reasons:
+                click.echo(f"   {reason}")
         _print_reconcile_guidance()
 
     except Exception as e:

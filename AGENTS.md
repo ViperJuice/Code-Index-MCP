@@ -5,7 +5,7 @@ This file defines the capabilities and constraints for AI agents working with th
 ## Current State
 
 **System Complexity**: 5/5 (High — SQLite FTS5 + Qdrant vector index, 48 language plugins, rerankers, query-intent routing)
-**MCP Status**: Use MCP tools first for all code search; STDIO is the primary surface
+**MCP Status**: Use MCP indexed search when repository readiness is `ready`; STDIO is the primary surface
 **Last Updated**: 2026-04-18
 **Support matrix**: Customer-facing language/runtime support claims live in `docs/SUPPORT_MATRIX.md`.
 **Dependency truth**: Use `uv sync --locked`; `pyproject.toml` and `uv.lock` are canonical.
@@ -57,40 +57,44 @@ This file defines the capabilities and constraints for AI agents working with th
 
 ## MCP SEARCH STRATEGY (CRITICAL)
 
-### ALWAYS USE MCP TOOLS FIRST (When Available)
-The codebase has a pre-built index with 312 files across 48 languages. 
-When MCP is available, use it instead of Grep, Glob, or Read for searching.
+### Use Indexed Search When Readiness Is Ready
+The codebase can use a pre-built index across 48 languages. Before treating
+indexed results as authoritative, check `mcp__code-index-mcp__get_status()` for
+repository readiness `ready` or honor the query tool response. If `search_code`
+or `symbol_lookup` returns `code: "index_unavailable"` with
+`safe_fallback: "native_search"`, use native `rg`/file tools and follow the
+readiness remediation, usually `reindex`.
 
 ### Tool Priority Order:
-1. **mcp__code-index-mcp__symbol_lookup** - [USE BEFORE GREP] For finding definitions
+1. **mcp__code-index-mcp__symbol_lookup** - For finding definitions when readiness is `ready`
    - Use for: Classes, functions, methods, variables
    - Returns: Exact location, signature, documentation
    - Speed: <100ms
-   - Fall back to Grep ONLY if this returns not_found
+   - `result: "not_found"` from a ready index means no symbol match; `index_unavailable` means use `native_search`
    - Example: `mcp__code-index-mcp__symbol_lookup(symbol="PluginManager")`
 
-2. **mcp__code-index-mcp__search_code** - [USE BEFORE GREP] For pattern/content search
+2. **mcp__code-index-mcp__search_code** - For pattern/content search when readiness is `ready`
    - Use for: Code patterns, text search, semantic queries
    - Supports: Regex, semantic search with semantic=true
    - Speed: <500ms, returns ranked results with line numbers and `last_indexed` timestamp
-   - Fall back to Grep ONLY if this returns 0 results
+   - `results: []` from a ready index means no code match; `index_unavailable` means use `native_search`
    - Example: `mcp__code-index-mcp__search_code(query="def.*process", limit=10)`
    - Semantic: `mcp__code-index-mcp__search_code(query="authentication flow", semantic=true)`
 
-3. **Native tools (Glob/Read)** - ONLY after MCP search returns no results
-   - Use for: Reading specific files after MCP search
-   - Fall back to Grep/Glob ONLY if search_code returns 0 results
-   - Never use for: Initial discovery or exploration
+3. **Native tools (`rg`, file reads)** - Safe fallback for non-ready indexes
+   - Use when MCP tools are unavailable or return `safe_fallback: "native_search"`
+   - Use for reading specific files after indexed search identifies candidates
+   - Use while `reindex` or other readiness remediation is pending
 
 ### Examples:
-❌ WRONG: Using Grep to search for "class.*Plugin"
-✅ RIGHT: mcp__code-index-mcp__search_code(query="class.*Plugin")
+Check readiness first:
+`mcp__code-index-mcp__get_status()`
 
-❌ WRONG: Using find/grep to locate "IndexDiscovery" class
-✅ RIGHT: mcp__code-index-mcp__symbol_lookup(symbol="IndexDiscovery")
+When readiness is `ready`:
+`mcp__code-index-mcp__search_code(query="class.*Plugin")`
 
-❌ WRONG: Reading multiple files to find a pattern
-✅ RIGHT: mcp__code-index-mcp__search_code(query="pattern", limit=20)
+When `index_unavailable` is returned:
+use `rg` or file tools and follow the returned remediation.
 
 ### Performance Impact:
 - Traditional grep through 312 files: ~45 seconds
@@ -107,7 +111,7 @@ When MCP is available, use it instead of Grep, Glob, or Read for searching.
 - **/search-code** - Pattern search using MCP index
 - **/mcp-tools** - Complete MCP tools reference
 
-These commands enforce MCP-first searching and are available in `.claude/commands/`
+These commands are readiness-aware quick references and are available in `.claude/commands/`
 
 ## Agent Constraints
 
@@ -141,7 +145,7 @@ These commands enforce MCP-first searching and are available in `.claude/command
 
 ### Repo Identity
 
-`compute_repo_id()` (`mcp_server/storage/repo_identity.py`) uses `git rev-parse --git-common-dir` (Tier 1) to derive a stable `repo_id`. All worktrees of the same repository share a single `repo_id`; switching branches does NOT change `repo_id`. The result is stored in a `RepoContext` frozen dataclass (`mcp_server/core/repo_context.py`) that captures all per-repo runtime state.
+`compute_repo_id()` (`mcp_server/storage/repo_identity.py`) uses `git rev-parse --git-common-dir` (Tier 1) to derive a stable `repo_id`. All worktrees of the same repository share a single `repo_id`; switching branches does NOT change `repo_id`. Query tools classify sibling worktrees with the P27 unsupported-worktree readiness contract and return `index_unavailable` with `safe_fallback: "native_search"` instead of dispatching against the registered checkout's index. The result is stored in a `RepoContext` frozen dataclass (`mcp_server/core/repo_context.py`) that captures all per-repo runtime state.
 
 ### Default-Branch Policy
 
@@ -214,7 +218,7 @@ make docker                     # Build Docker image
 # Architecture
 docker run --rm -p 8080:8080 -v "$(pwd)/architecture":/usr/local/structurizr structurizr/lite
 
-# MCP Search Commands (USE THESE FIRST!)
+# MCP Search Commands (check readiness first)
 # Find symbol definition
 mcp__code-index-mcp__symbol_lookup(symbol="ClassName")
 
@@ -313,10 +317,11 @@ class SecurityError(Exception):
 ## ARCHITECTURAL_PATTERNS
 
 ```python
-# MCP Search Pattern: ALWAYS use MCP tools first
-# Step 1: Search with MCP
+# MCP Search Pattern: use indexed MCP search when readiness is ready
+# Step 1: Check get_status readiness or handle index_unavailable/native_search
+# Step 2: Search with MCP when ready
 results = mcp__code-index-mcp__search_code(query="pattern")
-# Step 2: Read specific files from results
+# Step 3: Read specific files from results
 for result in results:
     content = read_file(result['file_path'])
 

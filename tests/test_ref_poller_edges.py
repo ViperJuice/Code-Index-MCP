@@ -42,8 +42,8 @@ def _make_poller(repos, git_index_manager=None):
 
 
 class TestDetachedHead:
-    def test_detached_head_fires_enqueue_full_rescan(self):
-        """When _read_ref returns None (detached HEAD), enqueue_full_rescan should fire."""
+    def test_detached_head_does_not_enqueue_full_rescan(self):
+        """Detached HEAD is a non-mutating poll outcome."""
         repo = _make_repo()
         poller, gim = _make_poller([repo])
 
@@ -53,7 +53,7 @@ class TestDetachedHead:
         with patch.object(poller, "_read_ref", return_value=None):
             poller._poll_one(repo)
 
-        gim.enqueue_full_rescan.assert_called_once_with("repo1")
+        gim.enqueue_full_rescan.assert_not_called()
         gim.sync_repository_index.assert_not_called()
 
     def test_detached_head_no_rescan_if_was_already_detached(self):
@@ -68,8 +68,8 @@ class TestDetachedHead:
 
         gim.enqueue_full_rescan.assert_not_called()
 
-    def test_first_poll_with_detached_head_fires_rescan(self):
-        """No prior state + detached HEAD → fires enqueue_full_rescan (treat unknown as attached)."""
+    def test_first_poll_with_detached_head_skips_mutation(self):
+        """No prior state + detached HEAD skips mutation."""
         repo = _make_repo()
         poller, gim = _make_poller([repo])
         # No entry in _last_branch_state
@@ -77,7 +77,8 @@ class TestDetachedHead:
         with patch.object(poller, "_read_ref", return_value=None):
             poller._poll_one(repo)
 
-        gim.enqueue_full_rescan.assert_called_once_with("repo1")
+        gim.enqueue_full_rescan.assert_not_called()
+        gim.sync_repository_index.assert_not_called()
 
 
 class TestForcePush:
@@ -94,6 +95,7 @@ class TestForcePush:
             return result
 
         with (
+            patch.object(poller, "_current_branch", return_value="main"),
             patch.object(poller, "_read_ref", return_value=new_tip),
             patch("subprocess.run", side_effect=fake_run),
         ):
@@ -115,6 +117,7 @@ class TestForcePush:
             return result
 
         with (
+            patch.object(poller, "_current_branch", return_value="main"),
             patch.object(poller, "_read_ref", return_value=new_tip),
             patch("subprocess.run", side_effect=fake_run),
         ):
@@ -129,6 +132,7 @@ class TestForcePush:
         poller, gim = _make_poller([repo])
 
         with (
+            patch.object(poller, "_current_branch", return_value="main"),
             patch.object(poller, "_read_ref", return_value="abc123"),
             patch("subprocess.run") as mock_run,
         ):
@@ -140,14 +144,18 @@ class TestForcePush:
 
 
 class TestBranchRename:
-    def test_branch_renamed_fires_enqueue_full_rescan(self):
-        """When tracked branch ref disappears, enqueue_full_rescan fires."""
+    def test_branch_renamed_skips_mutation(self):
+        """When tracked branch ref disappears, poller does not mutate."""
         repo = _make_repo(tracked_branch="main", last_indexed_commit="abc123")
         poller, gim = _make_poller([repo])
         poller._last_branch_state["repo1"] = "attached"
 
         # main ref returns None (branch disappeared), fallbacks also None
-        with patch.object(poller, "_read_ref", return_value=None):
+        with (
+            patch.object(poller, "_current_branch", return_value="main"),
+            patch.object(poller, "_read_ref", return_value=None),
+        ):
             poller._poll_one(repo)
 
-        gim.enqueue_full_rescan.assert_called_once_with("repo1")
+        gim.enqueue_full_rescan.assert_not_called()
+        gim.sync_repository_index.assert_not_called()

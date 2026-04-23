@@ -77,13 +77,14 @@ def test_coordinator_fetch_updates_registry(monkeypatch, tmp_path: Path):
     repo_info = _repo_info("repo-1", repo_path)
     manager.registry.register(repo_info)
 
-    (repo_path / ".index_metadata.json").write_text(
+    (repo_path / ".mcp-index").mkdir(exist_ok=True)
+    (repo_path / ".mcp-index" / ".index_metadata.json").write_text(
         '{"semantic_profiles": {"commercial_high": {}, "oss_high": {}}}',
         encoding="utf-8",
     )
 
-    def _fake_download_latest(self, output_dir, backup=True, full_only=False):
-        (repo_path / "code_index.db").write_text("db", encoding="utf-8")
+    def _fake_download_latest(self, output_dir, backup=True, full_only=False, **kwargs):
+        (repo_path / ".mcp-index" / "current.db").write_text("db", encoding="utf-8")
         return type("Result", (), {"artifact": {"head_sha": "recover123"}})()
 
     monkeypatch.setattr(
@@ -117,7 +118,8 @@ def test_reconcile_workspace_marks_missing_or_ready(tmp_path: Path):
     results = coordinator.reconcile_workspace(["repo-1"])
     assert results[0].details["artifact_health"] == "missing"
 
-    (repo_path / "code_index.db").write_text("db", encoding="utf-8")
+    (repo_path / ".mcp-index").mkdir(exist_ok=True)
+    (repo_path / ".mcp-index" / "current.db").write_text("db", encoding="utf-8")
     results = coordinator.reconcile_workspace(["repo-1"])
     assert results[0].details["artifact_health"] == "ready"
 
@@ -129,18 +131,19 @@ def test_publish_workspace_uses_local_first_wording(monkeypatch, tmp_path: Path)
     repo_info = _repo_info("repo-1", repo_path)
     manager.registry.register(repo_info)
 
-    (repo_path / ".index_metadata.json").write_text(
+    (repo_path / ".mcp-index").mkdir(exist_ok=True)
+    (repo_path / ".mcp-index" / ".index_metadata.json").write_text(
         '{"semantic_profiles": {"commercial_high": {}, "oss_high": {}}}',
         encoding="utf-8",
     )
 
     monkeypatch.setattr(
         "mcp_server.artifacts.multi_repo_artifact_coordinator.IndexArtifactUploader.compress_indexes",
-        lambda self, output_path, secure=True: (Path(output_path), "checksum", 123),
+        lambda self, output_path, secure=True, **kwargs: (Path(output_path), "checksum", 123),
     )
     monkeypatch.setattr(
         "mcp_server.artifacts.multi_repo_artifact_coordinator.IndexArtifactUploader.create_metadata",
-        lambda self, checksum, size, secure=True: {"ok": True},
+        lambda self, checksum, size, secure=True, **kwargs: {"ok": True},
     )
     monkeypatch.setattr(
         "mcp_server.artifacts.multi_repo_artifact_coordinator.IndexArtifactUploader.upload_direct",
@@ -155,6 +158,48 @@ def test_publish_workspace_uses_local_first_wording(monkeypatch, tmp_path: Path)
     assert results[0].success is True
     assert results[0].details["artifact_backend"] == "local_workspace"
     assert results[0].details["prepared_archive"] == "index-archive.tar.gz"
+
+
+def test_workspace_publish_and_fetch_do_not_chdir(monkeypatch, tmp_path: Path):
+    manager = MultiRepositoryManager(central_index_path=tmp_path / "registry.json")
+    repo_path = tmp_path / "repo"
+    repo_path.mkdir()
+    repo_info = _repo_info("repo-1", repo_path)
+    manager.registry.register(repo_info)
+    (repo_path / ".mcp-index").mkdir(exist_ok=True)
+    (repo_path / ".mcp-index" / "current.db").write_text("db", encoding="utf-8")
+
+    monkeypatch.setattr("os.chdir", lambda path: (_ for _ in ()).throw(AssertionError(path)))
+    monkeypatch.setattr(
+        "mcp_server.artifacts.multi_repo_artifact_coordinator.IndexArtifactUploader.compress_indexes",
+        lambda self, output_path, secure=True, **kwargs: (Path(output_path), "checksum", 123),
+    )
+    monkeypatch.setattr(
+        "mcp_server.artifacts.multi_repo_artifact_coordinator.IndexArtifactUploader.create_metadata",
+        lambda self, checksum, size, secure=True, **kwargs: {"ok": True},
+    )
+    monkeypatch.setattr(
+        "mcp_server.artifacts.multi_repo_artifact_coordinator.IndexArtifactUploader.upload_direct",
+        lambda self, archive_path, metadata: None,
+    )
+    monkeypatch.setattr(
+        "mcp_server.artifacts.multi_repo_artifact_coordinator.IndexArtifactUploader._detect_repository",
+        lambda self: "owner/repo",
+    )
+    monkeypatch.setattr(
+        "mcp_server.artifacts.multi_repo_artifact_coordinator.IndexArtifactDownloader.download_latest",
+        lambda self, output_dir, backup=True, full_only=False, **kwargs: type(
+            "Result", (), {"artifact": {"head_sha": "recover123"}}
+        )(),
+    )
+    monkeypatch.setattr(
+        "mcp_server.artifacts.multi_repo_artifact_coordinator.IndexArtifactDownloader._detect_repository",
+        lambda self: "owner/repo",
+    )
+
+    coordinator = MultiRepoArtifactCoordinator(manager)
+    assert coordinator.publish_workspace(["repo-1"])[0].success is True
+    assert coordinator.fetch_workspace(["repo-1"])[0].success is True
 
 
 def test_workspace_status_cli_reports_registered_repositories(monkeypatch, tmp_path: Path):

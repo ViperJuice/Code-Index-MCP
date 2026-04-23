@@ -46,53 +46,15 @@ class ChangeDetector:
         changes = []
 
         try:
-            # Get diff between commits
-            cmd = ["git", "diff", "--name-status", "--no-renames", from_commit, to_commit]
+            cmd = ["git", "diff", "--name-status", "--find-renames", from_commit, to_commit]
             result = subprocess.run(
                 cmd, cwd=self.repo_path, capture_output=True, text=True, check=True
             )
 
             for line in result.stdout.strip().splitlines():
-                if not line:
-                    continue
-
-                parts = line.split("\t")
-                if len(parts) < 2:
-                    continue
-
-                status = parts[0]
-                path = parts[1]
-
-                # Filter by supported extensions
-                if not self._is_supported_file(path):
-                    continue
-
-                if status == "A":
-                    changes.append(FileChange(path, "added"))
-                elif status == "M":
-                    changes.append(FileChange(path, "modified"))
-                elif status == "D":
-                    changes.append(FileChange(path, "deleted"))
-
-            # Also check for renames
-            cmd_renames = ["git", "diff", "--name-status", "--find-renames", from_commit, to_commit]
-            result = subprocess.run(
-                cmd_renames, cwd=self.repo_path, capture_output=True, text=True, check=True
-            )
-
-            for line in result.stdout.strip().splitlines():
-                if not line:
-                    continue
-
-                parts = line.split("\t")
-                if len(parts) >= 2 and parts[0].startswith("R"):
-                    if len(parts) >= 3:
-                        old_path = parts[1]
-                        new_path = parts[2]
-
-                        # Only track if either path is supported
-                        if self._is_supported_file(old_path) or self._is_supported_file(new_path):
-                            changes.append(FileChange(new_path, "renamed", old_path))
+                change = self._parse_status_line(line)
+                if change:
+                    changes.append(change)
 
         except subprocess.CalledProcessError as e:
             logger.error(f"Failed to get git diff: {e}")
@@ -109,7 +71,7 @@ class ChangeDetector:
 
         try:
             # Get staged changes
-            cmd = ["git", "diff", "--cached", "--name-status"]
+            cmd = ["git", "diff", "--cached", "--name-status", "--find-renames"]
             result = subprocess.run(
                 cmd, cwd=self.repo_path, capture_output=True, text=True, check=True
             )
@@ -120,7 +82,7 @@ class ChangeDetector:
                     changes.append(change)
 
             # Get unstaged changes
-            cmd = ["git", "diff", "--name-status"]
+            cmd = ["git", "diff", "--name-status", "--find-renames"]
             result = subprocess.run(
                 cmd, cwd=self.repo_path, capture_output=True, text=True, check=True
             )
@@ -162,19 +124,23 @@ class ChangeDetector:
             return None
 
         status = parts[0]
-        path = parts[1]
-
-        if not self._is_supported_file(path):
-            return None
-
         if status == "A":
-            return FileChange(path, "added")
+            path = parts[1]
+            if self._is_supported_file(path):
+                return FileChange(path, "added")
         elif status == "M":
-            return FileChange(path, "modified")
+            path = parts[1]
+            if self._is_supported_file(path):
+                return FileChange(path, "modified")
         elif status == "D":
-            return FileChange(path, "deleted")
+            path = parts[1]
+            if self._is_supported_file(path):
+                return FileChange(path, "deleted")
         elif status.startswith("R") and len(parts) >= 3:
-            return FileChange(parts[2], "renamed", parts[1])
+            old_path = parts[1]
+            new_path = parts[2]
+            if self._is_supported_file(old_path) or self._is_supported_file(new_path):
+                return FileChange(new_path, "renamed", old_path)
 
         return None
 

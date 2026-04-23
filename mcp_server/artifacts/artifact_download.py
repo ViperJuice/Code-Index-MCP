@@ -30,6 +30,7 @@ from .integrity_gate import (
     validate_artifact_integrity,
     validate_required_metadata_fields,
 )
+from .manifest_v2 import validate_semantic_profile_hash
 from .semantic_profiles import extract_semantic_profile_metadata
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,7 @@ logger = logging.getLogger(__name__)
 class ArtifactDownloadResult:
     artifact: Optional[Dict[str, Any]] = None
     installed_items: Optional[List[str]] = None
+    validation_reasons: Optional[List[str]] = None
 
 
 class IndexArtifactDownloader:
@@ -105,7 +107,17 @@ class IndexArtifactDownloader:
         artifacts.sort(key=lambda item: item["created_at"], reverse=True)
         return artifacts
 
-    def download_artifact(self, artifact_id: int, output_dir: Path) -> Path:
+    def download_artifact(
+        self,
+        artifact_id: int,
+        output_dir: Path,
+        *,
+        repo_id: Optional[str] = None,
+        tracked_branch: Optional[str] = None,
+        target_commit: Optional[str] = None,
+        semantic_profile_hash: Optional[str] = None,
+        allow_unsafe: bool = False,
+    ) -> Path:
         print(f"📥 Downloading artifact {artifact_id}...")
         temp_dir = Path(tempfile.mkdtemp())
         try:
@@ -160,6 +172,23 @@ class IndexArtifactDownloader:
             gate_result = self._run_integrity_gate(metadata, archive_path, checksum_path)
             if gate_result.manifest_v2_validated:
                 print("✅ Manifest v2 verified")
+
+            identity_reasons = self.validate_artifact_identity(
+                metadata,
+                repo_id=repo_id,
+                tracked_branch=tracked_branch,
+                target_commit=target_commit,
+                semantic_profile_hash=semantic_profile_hash,
+            )
+            if identity_reasons and not allow_unsafe:
+                raise ValueError(
+                    "Artifact identity validation failed: " + "; ".join(identity_reasons)
+                )
+            if identity_reasons:
+                logger.warning(
+                    "Unsafe artifact identity override accepted: %s",
+                    "; ".join(identity_reasons),
+                )
 
             compatible, issues = self.check_compatibility(metadata)
             if not compatible:
@@ -355,6 +384,64 @@ class IndexArtifactDownloader:
         promoted = [artifact for artifact in selected if "-promoted" in artifact["name"]]
         return promoted[0] if promoted else selected[0]
 
+    def validate_artifact_identity(
+        self,
+        metadata: Dict[str, Any],
+        *,
+        repo_id: Optional[str] = None,
+        tracked_branch: Optional[str] = None,
+        target_commit: Optional[str] = None,
+        semantic_profile_hash: Optional[str] = None,
+    ) -> List[str]:
+        """Validate artifact identity metadata against expected repository state."""
+        reasons = validate_required_metadata_fields(metadata)
+        actual_repo_id = metadata.get("repo_id")
+        actual_branch = metadata.get("tracked_branch") or metadata.get("branch")
+        actual_commit = metadata.get("commit") or metadata.get("target_commit")
+        actual_schema = metadata.get("schema_version") or metadata.get("compatibility", {}).get(
+            "schema_version"
+        )
+        actual_profile_hash = metadata.get("semantic_profile_hash")
+
+        if repo_id and actual_repo_id != repo_id:
+            reasons.append(f"repo_id mismatch: expected={repo_id}, actual={actual_repo_id}")
+        if tracked_branch and actual_branch != tracked_branch:
+            reasons.append(
+                f"tracked_branch mismatch: expected={tracked_branch}, actual={actual_branch}"
+            )
+        if target_commit and actual_commit != target_commit:
+            reasons.append(f"commit mismatch: expected={target_commit}, actual={actual_commit}")
+        if semantic_profile_hash and actual_profile_hash != semantic_profile_hash:
+            reasons.append(
+                "semantic_profile_hash mismatch: "
+                f"expected={semantic_profile_hash}, actual={actual_profile_hash}"
+            )
+        if actual_profile_hash and not validate_semantic_profile_hash(str(actual_profile_hash)):
+            reasons.append(f"malformed semantic_profile_hash: {actual_profile_hash}")
+        if actual_schema is not None:
+            migrator = SchemaMigrator(store=None)
+            if not migrator.is_known(str(actual_schema)):
+                reasons.append(f"unknown schema_version: {actual_schema}")
+
+        manifest = metadata.get("manifest_v2")
+        if isinstance(manifest, dict):
+            manifest_branch = manifest.get("tracked_branch") or manifest.get("branch")
+            checks = [
+                ("manifest repo_id", repo_id, manifest.get("repo_id")),
+                ("manifest tracked_branch", tracked_branch, manifest_branch),
+                ("manifest commit", target_commit, manifest.get("commit")),
+                (
+                    "manifest semantic_profile_hash",
+                    semantic_profile_hash,
+                    manifest.get("semantic_profile_hash"),
+                ),
+            ]
+            for label, expected, actual in checks:
+                if expected and actual != expected:
+                    reasons.append(f"{label} mismatch: expected={expected}, actual={actual}")
+
+        return reasons
+
     def _run_integrity_gate(
         self,
         metadata: Dict[str, Any],
@@ -398,57 +485,68 @@ class IndexArtifactDownloader:
                 return False
         return not member.isdev()
 
-    def install_indexes(self, source_dir: Path, backup: bool = True) -> List[str]:
+    def install_indexes(
+        self,
+        source_dir: Path,
+        index_location: Path | str | None = None,
+        index_path: Path | str | None = None,
+        backup: bool = True,
+    ) -> List[str]:
         print("\n📝 Installing indexes...")
+        index_root = Path(index_location) if index_location is not None else Path(".mcp-index")
+        target_db = Path(index_path) if index_path is not None else index_root / "current.db"
+        index_root.mkdir(parents=True, exist_ok=True)
         if backup:
-            backup_dir = Path(f"index_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+            backup_dir = index_root / f"index_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             backup_dir.mkdir(exist_ok=True)
-            for file_name in [
-                "code_index.db",
-                "vector_index.qdrant",
-                ".index_metadata.json",
+            for src in [
+                target_db,
+                index_root / "vector_index.qdrant",
+                index_root / ".index_metadata.json",
             ]:
-                src = Path(file_name)
                 if not src.exists():
                     continue
-                print(f"  Backing up {file_name}...")
+                print(f"  Backing up {src.name}...")
                 if src.is_dir():
-                    shutil.copytree(src, backup_dir / file_name)
+                    shutil.copytree(src, backup_dir / src.name)
                 else:
-                    shutil.copy2(src, backup_dir / file_name)
+                    shutil.copy2(src, backup_dir / src.name)
             print(f"  ✅ Backup created in {backup_dir}")
 
         installed_items: List[str] = []
+        install_map = {
+            "current.db": target_db,
+            "code_index.db": target_db,
+            ".index_metadata.json": index_root / ".index_metadata.json",
+            "artifact-metadata.json": index_root / "artifact-metadata.json",
+            "vector_index.qdrant": index_root / "vector_index.qdrant",
+        }
         for item in source_dir.iterdir():
-            if item.name not in {
-                "code_index.db",
-                "vector_index.qdrant",
-                ".index_metadata.json",
-                "artifact-metadata.json",
-            }:
+            dest = install_map.get(item.name)
+            if dest is None:
                 continue
-            dest = Path(item.name)
             if dest.exists():
                 if dest.is_dir():
                     shutil.rmtree(dest)
                 else:
                     dest.unlink()
             print(f"  Installing {item.name}...")
+            dest.parent.mkdir(parents=True, exist_ok=True)
             if item.is_dir():
                 shutil.copytree(item, dest)
             else:
                 shutil.copy2(item, dest)
-            installed_items.append(item.name)
+            installed_items.append(str(dest))
 
         print("✅ Indexes installed successfully!")
         if installed_items:
             print(f"📦 Restored items: {', '.join(installed_items)}")
-        metadata_path = source_dir / "artifact-metadata.json"
+        metadata_path = index_root / "artifact-metadata.json"
         if metadata_path.exists():
             try:
                 metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
                 commit = metadata.get("commit")
-                branch = metadata.get("branch")
+                branch = metadata.get("tracked_branch") or metadata.get("branch")
                 if commit:
                     label = f"{commit} ({branch})" if branch else commit
                     print(f"🔖 Restored artifact commit: {label}")
@@ -463,9 +561,25 @@ class IndexArtifactDownloader:
         *,
         output_dir: Path,
         backup: bool = True,
+        repo_id: Optional[str] = None,
+        repo_path: Path | str | None = None,
+        tracked_branch: Optional[str] = None,
+        target_commit: Optional[str] = None,
+        index_location: Path | str | None = None,
+        index_path: Path | str | None = None,
+        semantic_profile_hash: Optional[str] = None,
+        allow_unsafe: bool = False,
     ) -> ArtifactDownloadResult:
         try:
-            extracted_dir = self.download_artifact(artifact["id"], output_dir)
+            extracted_dir = self.download_artifact(
+                artifact["id"],
+                output_dir,
+                repo_id=repo_id,
+                tracked_branch=tracked_branch,
+                target_commit=target_commit,
+                semantic_profile_hash=semantic_profile_hash,
+                allow_unsafe=allow_unsafe,
+            )
         except (subprocess.CalledProcessError, urllib.error.URLError, RuntimeError) as exc:
             logger.warning(
                 "GitHub outage detected, keeping local index (artifact download failed: %s)", exc
@@ -485,25 +599,32 @@ class IndexArtifactDownloader:
 
         max_age_days = int(os.environ.get("MCP_ARTIFACT_MAX_AGE_DAYS", "14"))
         head_commit = artifact.get("workflow_run", {}).get("head_sha", "HEAD")
+        if target_commit:
+            head_commit = target_commit
         verdict = verify_artifact_freshness(meta, head_commit, max_age_days)
-        if verdict is FreshnessVerdict.STALE_COMMIT:
+        rejected_reasons: List[str] = []
+        if verdict is not FreshnessVerdict.FRESH:
+            rejected_reasons.append(f"freshness verdict: {verdict.value}")
+            if not allow_unsafe:
+                raise ValueError(
+                    "Artifact freshness validation failed: " + "; ".join(rejected_reasons)
+                )
             logger.warning(
-                "Artifact commit %s is not an ancestor of %s (STALE_COMMIT); proceeding with install",
-                meta.get("commit"),
-                head_commit,
-            )
-        elif verdict is FreshnessVerdict.STALE_AGE:
-            logger.warning(
-                "Artifact is older than %d days (STALE_AGE); proceeding with install",
-                max_age_days,
-            )
-        elif verdict is FreshnessVerdict.INVALID:
-            logger.warning(
-                "Artifact metadata missing or malformed (INVALID); proceeding with install"
+                "Unsafe artifact freshness override accepted: %s",
+                "; ".join(rejected_reasons),
             )
 
-        installed_items = self.install_indexes(extracted_dir, backup=backup)
-        return ArtifactDownloadResult(artifact=artifact, installed_items=installed_items)
+        installed_items = self.install_indexes(
+            extracted_dir,
+            index_location=index_location,
+            index_path=index_path,
+            backup=backup,
+        )
+        return ArtifactDownloadResult(
+            artifact=artifact,
+            installed_items=installed_items,
+            validation_reasons=rejected_reasons,
+        )
 
     def download_latest(
         self,
@@ -511,6 +632,7 @@ class IndexArtifactDownloader:
         output_dir: Path,
         backup: bool = True,
         full_only: bool = False,
+        **kwargs: Any,
     ) -> ArtifactDownloadResult:
         artifacts = self.list_artifacts()
         if full_only:
@@ -519,7 +641,7 @@ class IndexArtifactDownloader:
         if not best:
             raise RuntimeError("No compatible artifacts found")
         print(f"\n✅ Selected: {best['name']}")
-        return self.download_selected_artifact(best, output_dir=output_dir, backup=backup)
+        return self.download_selected_artifact(best, output_dir=output_dir, backup=backup, **kwargs)
 
     def recover(
         self,
@@ -528,6 +650,7 @@ class IndexArtifactDownloader:
         commit: Optional[str],
         output_dir: Path,
         backup: bool = True,
+        **kwargs: Any,
     ) -> ArtifactDownloadResult:
         artifacts = self.list_artifacts()
         selected = self.find_recovery_artifact(artifacts, branch=branch, commit=commit)
@@ -542,7 +665,9 @@ class IndexArtifactDownloader:
                 + (f" ({', '.join(details)})" if details else "")
             )
         print(f"\n✅ Recovery artifact selected: {selected['name']}")
-        return self.download_selected_artifact(selected, output_dir=output_dir, backup=backup)
+        return self.download_selected_artifact(
+            selected, output_dir=output_dir, backup=backup, **kwargs
+        )
 
 
 def format_artifact_table(artifacts: List[Dict[str, Any]]) -> None:

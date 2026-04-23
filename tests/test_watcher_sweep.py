@@ -1,6 +1,7 @@
 """Tests for WatcherSweeper — periodic full-tree sweep for inotify/FSEvents drop recovery."""
 
 import os
+import hashlib
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -22,13 +23,14 @@ def _make_sqlite_store(tmp_path: Path):
     return store
 
 
-def _store_file(store, repo_id_int: int, relative_path: str):
+def _store_file(store, repo_id_int: int, relative_path: str, content_hash: str = None):
     """Insert a file record directly via the store."""
     store.store_file(
         file_path=Path(f"/repo/{relative_path}"),
         language="python",
         repository_id=repo_id_int,
         relative_path=relative_path,
+        content_hash=content_hash,
     )
 
 
@@ -73,6 +75,89 @@ class TestSweeperRecoversMissedEvent:
         assert len(missed_calls) == 1
         assert missed_calls[0][0] == repo_id
         assert missed_calls[0][1] == "missed.py"
+
+    def test_sweeper_recovers_missed_delete(self, tmp_path):
+        repo_id = "repo-delete"
+        repo_root = tmp_path / "deleterepo"
+        repo_root.mkdir()
+
+        store = _make_sqlite_store(tmp_path)
+        store.create_repository(path=str(repo_root), name="deleterepo")
+        _store_file(store, 1, "missing.py")
+
+        delete_calls = []
+        sweeper = WatcherSweeper(
+            on_missed_path=lambda _r, _p: None,
+            repo_roots_provider=lambda: {repo_id: repo_root},
+            store=store,
+            on_missed_delete=lambda r, p: delete_calls.append((r, p)),
+            interval_minutes=60,
+        )
+
+        drifted = sweeper.sweep_once()
+
+        assert drifted == [repo_id]
+        assert delete_calls == [(repo_id, "missing.py")]
+
+    def test_sweeper_recovers_unambiguous_rename(self, tmp_path):
+        repo_id = "repo-rename"
+        repo_root = tmp_path / "renamerepo"
+        repo_root.mkdir()
+        content = b"x = 1\n"
+        content_hash = hashlib.sha256(content).hexdigest()
+        (repo_root / "new.py").write_bytes(content)
+
+        store = _make_sqlite_store(tmp_path)
+        store.create_repository(path=str(repo_root), name="renamerepo")
+        _store_file(store, 1, "old.py", content_hash=content_hash)
+
+        create_calls = []
+        delete_calls = []
+        rename_calls = []
+        sweeper = WatcherSweeper(
+            on_missed_path=lambda r, p: create_calls.append((r, p)),
+            repo_roots_provider=lambda: {repo_id: repo_root},
+            store=store,
+            on_missed_delete=lambda r, p: delete_calls.append((r, p)),
+            on_missed_rename=lambda r, old, new: rename_calls.append((r, old, new)),
+            interval_minutes=60,
+        )
+
+        drifted = sweeper.sweep_once()
+
+        assert drifted == [repo_id]
+        assert rename_calls == [(repo_id, "old.py", "new.py")]
+        assert create_calls == []
+        assert delete_calls == []
+
+    def test_sweeper_ambiguous_rename_falls_back_to_create_delete(self, tmp_path):
+        repo_id = "repo-ambiguous"
+        repo_root = tmp_path / "ambiguousrepo"
+        repo_root.mkdir()
+        (repo_root / "new.py").write_text("x = 1\n")
+
+        store = _make_sqlite_store(tmp_path)
+        store.create_repository(path=str(repo_root), name="ambiguousrepo")
+        _store_file(store, 1, "old.py")
+
+        create_calls = []
+        delete_calls = []
+        rename_calls = []
+        sweeper = WatcherSweeper(
+            on_missed_path=lambda r, p: create_calls.append((r, p)),
+            repo_roots_provider=lambda: {repo_id: repo_root},
+            store=store,
+            on_missed_delete=lambda r, p: delete_calls.append((r, p)),
+            on_missed_rename=lambda r, old, new: rename_calls.append((r, old, new)),
+            interval_minutes=60,
+        )
+
+        drifted = sweeper.sweep_once()
+
+        assert drifted == [repo_id]
+        assert rename_calls == []
+        assert create_calls == [(repo_id, "new.py")]
+        assert delete_calls == [(repo_id, "old.py")]
 
 
 # ---------------------------------------------------------------------------

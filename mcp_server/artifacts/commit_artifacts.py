@@ -9,9 +9,15 @@ import logging
 import os
 import shutil
 import tarfile
+import hashlib
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+from mcp_server.artifacts.manifest_v2 import (
+    LEXICAL_ONLY_SEMANTIC_PROFILE_HASH,
+    build_logical_artifact_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -19,18 +25,39 @@ logger = logging.getLogger(__name__)
 class CommitArtifact:
     """Represents an index artifact for a specific commit."""
 
-    def __init__(self, repo_id: str, commit: str, metadata: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        repo_id: str,
+        commit: str,
+        metadata: Optional[Dict[str, Any]] = None,
+        *,
+        tracked_branch: str = "main",
+        semantic_profile_hash: str = LEXICAL_ONLY_SEMANTIC_PROFILE_HASH,
+    ):
         self.repo_id = repo_id
         self.commit = commit
         self.short_commit = commit[:8] if commit else ""
+        self.tracked_branch = tracked_branch
+        self.semantic_profile_hash = semantic_profile_hash
         self.metadata = metadata or {}
-        self.artifact_name = f"{repo_id}-{self.short_commit}-index.tar.gz"
+        self.artifact_name = (
+            build_logical_artifact_id(
+                repo_id,
+                tracked_branch,
+                commit,
+                semantic_profile_hash,
+                "full",
+            )
+            + ".tar.gz"
+        )
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "repo_id": self.repo_id,
             "commit": self.commit,
+            "tracked_branch": self.tracked_branch,
+            "semantic_profile_hash": self.semantic_profile_hash,
             "artifact_name": self.artifact_name,
             "metadata": self.metadata,
         }
@@ -63,7 +90,16 @@ class CommitArtifactManager:
         except Exception as e:
             logger.error(f"Failed to save artifacts metadata: {e}")
 
-    def create_commit_artifact(self, repo_id: str, commit: str, index_path: Path) -> Optional[Path]:
+    def create_commit_artifact(
+        self,
+        repo_id: str,
+        commit: str,
+        index_path: Path,
+        *,
+        tracked_branch: str = "main",
+        schema_version: str = "2",
+        semantic_profile_hash: str = LEXICAL_ONLY_SEMANTIC_PROFILE_HASH,
+    ) -> Optional[Path]:
         """Create artifact for specific commit.
 
         Args:
@@ -78,16 +114,33 @@ class CommitArtifactManager:
             logger.error(f"Index path does not exist: {index_path}")
             return None
 
-        artifact = CommitArtifact(repo_id, commit)
+        artifact = CommitArtifact(
+            repo_id,
+            commit,
+            tracked_branch=tracked_branch,
+            semantic_profile_hash=semantic_profile_hash,
+        )
         artifact_path = self.artifacts_dir / artifact.artifact_name
 
         try:
             # Create metadata for artifact
+            checksum = self._compute_tree_checksum(index_path)
             metadata = {
                 "repo_id": repo_id,
+                "tracked_branch": tracked_branch,
+                "branch": tracked_branch,
                 "commit": commit,
+                "schema_version": schema_version,
+                "semantic_profile_hash": semantic_profile_hash,
+                "checksum": checksum,
+                "artifact_type": "full",
                 "created": datetime.now().isoformat(),
+                "timestamp": datetime.now().isoformat() + "Z",
                 "compatible_with": self._get_compatibility_info(),
+                "compatibility": {
+                    "schema_version": schema_version,
+                    "embedding_model": "lexical-only",
+                },
                 "index_stats": self._get_index_stats(index_path),
             }
 
@@ -155,6 +208,11 @@ class CommitArtifactManager:
                     m for m in tar.getmembers() if not m.name.startswith("/") and ".." not in m.name
                 ]
                 tar.extractall(target_path, members=safe_members)  # nosec B202
+
+            legacy_db = target_path / "code_index.db"
+            current_db = target_path / "current.db"
+            if legacy_db.exists() and not current_db.exists():
+                legacy_db.replace(current_db)
 
             logger.info(f"Extracted artifact: {artifact.artifact_name}")
             return True
@@ -286,8 +344,17 @@ class CommitArtifactManager:
             source: Source index directory
             target: Target directory
         """
+        current_db = source / "current.db"
+        if current_db.exists():
+            shutil.copy2(current_db, target / "current.db")
+        legacy_db = source / "code_index.db"
+        if legacy_db.exists() and not current_db.exists():
+            shutil.copy2(legacy_db, target / "current.db")
+
         # Copy database files
         for db_file in source.glob("*.db"):
+            if db_file.name in {"current.db", "code_index.db"}:
+                continue
             shutil.copy2(db_file, target / db_file.name)
 
         # Copy metadata files
@@ -319,3 +386,11 @@ class CommitArtifactManager:
         repo_artifacts.sort(key=lambda x: x.get("created", ""), reverse=True)
 
         return repo_artifacts[0].get("commit")
+
+    def _compute_tree_checksum(self, index_path: Path) -> str:
+        """Compute a deterministic checksum over index files."""
+        sha = hashlib.sha256()
+        for path in sorted(p for p in index_path.rglob("*") if p.is_file()):
+            sha.update(str(path.relative_to(index_path)).encode("utf-8"))
+            sha.update(path.read_bytes())
+        return sha.hexdigest()

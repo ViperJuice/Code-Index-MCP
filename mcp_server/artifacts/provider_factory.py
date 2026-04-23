@@ -9,7 +9,6 @@ from mcp_server.config.settings import get_settings
 
 from .providers.github_actions import GitHubActionsArtifactProvider
 from .providers.local_fs import LocalFilesystemArtifactProvider
-from .providers.s3 import S3ArtifactProvider
 from .routing_policy import (
     ArtifactRoutingContext,
     ArtifactRoutingDecision,
@@ -20,7 +19,8 @@ from .routing_policy import (
 class ArtifactProviderFactory:
     """Create artifact providers from runtime settings."""
 
-    _SUPPORTED_PROVIDERS = {"github_actions", "local_fs", "s3", "auto"}
+    _SUPPORTED_PROVIDERS = {"github_actions", "local_fs", "auto"}
+    _UNIMPLEMENTED_PROVIDERS = {"s3", "gcs", "azure"}
 
     @staticmethod
     def create(
@@ -47,14 +47,6 @@ class ArtifactProviderFactory:
             return GitHubActionsArtifactProvider(repo)
         if provider == "local_fs":
             return LocalFilesystemArtifactProvider(Path(settings.artifact_local_cache_dir))
-        if provider == "s3":
-            if not settings.artifact_s3_bucket:
-                raise ValueError("ARTIFACT_S3_BUCKET is required for s3 provider")
-            return S3ArtifactProvider(
-                bucket=settings.artifact_s3_bucket,
-                prefix=settings.artifact_s3_prefix,
-            )
-
         raise ValueError(f"Unsupported artifact provider: {provider}")
 
     @staticmethod
@@ -78,6 +70,10 @@ class ArtifactProviderFactory:
         )
         configured_provider = configured_provider.lower()
 
+        if configured_provider in ArtifactProviderFactory._UNIMPLEMENTED_PROVIDERS:
+            raise ValueError(
+                f"Artifact provider '{configured_provider}' is not implemented and cannot be selected"
+            )
         if configured_provider not in ArtifactProviderFactory._SUPPORTED_PROVIDERS:
             raise ValueError(f"Unsupported artifact provider: {configured_provider}")
 

@@ -25,7 +25,7 @@ def test_commit_artifact_create_extract_roundtrip(tmp_path: Path):
     manager = CommitArtifactManager(artifacts_dir=str(tmp_path / "artifacts"))
 
     index_dir = tmp_path / "index"
-    _write(index_dir / "code_index.db", "db-bytes")
+    _write(index_dir / "current.db", "db-bytes")
     _write(index_dir / "artifact-metadata.json", '{"ok": true}')
 
     artifact = manager.create_commit_artifact("repo", "abcdef123456", index_dir)
@@ -35,7 +35,14 @@ def test_commit_artifact_create_extract_roundtrip(tmp_path: Path):
     target_dir = tmp_path / "restore"
     restored = manager.extract_commit_artifact("repo", "abcdef123456", target_dir)
     assert restored is True
-    assert (target_dir / "code_index.db").read_text(encoding="utf-8") == "db-bytes"
+    assert (target_dir / "current.db").read_text(encoding="utf-8") == "db-bytes"
+
+    info = manager.list_artifacts("repo")[0]
+    assert info["repo_id"] == "repo"
+    assert info["tracked_branch"] == "main"
+    assert info["schema_version"] == "2"
+    assert info["semantic_profile_hash"] == "lexical-only"
+    assert info["checksum"]
 
 
 def test_delta_manifest_apply_roundtrip(tmp_path: Path):

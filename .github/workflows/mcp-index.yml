@@ -42,7 +42,7 @@ jobs:
       - name: Check for existing index
         id: check_index
         run: |
-          if [ -f ".mcp-index/code_index.db" ]; then
+          if [ -f ".mcp-index/current.db" ]; then
             echo "found=true" >> $GITHUB_OUTPUT
             echo "Index found in repository"
           else
@@ -102,7 +102,7 @@ jobs:
           from pathlib import Path
 
           index_dir = Path('.mcp-index')
-          index_db = index_dir / 'code_index.db'
+          index_db = index_dir / 'current.db'
           metadata_path = index_dir / '.index_metadata.json'
 
           if metadata_path.exists():
@@ -129,6 +129,7 @@ jobs:
               "version": "1.0",
               "created_at": datetime.utcnow().isoformat() + 'Z',
               "commit": "${{ github.sha }}",
+              "tracked_branch": "${{ github.ref_name }}",
               "branch": "${{ github.ref_name }}",
               "repository": "${{ github.repository }}",
               "compatibility": {
@@ -144,6 +145,7 @@ jobs:
         run: |
           python <<'PY'
           import json
+          import hashlib
           from datetime import datetime
           from pathlib import Path
 
@@ -169,8 +171,14 @@ jobs:
           artifact_metadata = {
               'version': '1.0',
               'created_at': datetime.utcnow().isoformat() + 'Z',
+              'timestamp': datetime.utcnow().isoformat() + 'Z',
+              'repo_id': '${{ github.repository }}',
               'commit': '${{ github.sha }}',
+              'tracked_branch': '${{ github.ref_name }}',
               'branch': '${{ github.ref_name }}',
+              'schema_version': compatibility.get('schema_version') or '2',
+              'semantic_profile_hash': 'lexical-only',
+              'artifact_type': 'full',
               'repository': '${{ github.repository }}',
               'compatibility': compatibility,
           }
@@ -185,6 +193,7 @@ jobs:
           CHECKSUM=$(cut -d' ' -f1 mcp-index-archive.tar.gz.sha256)
           python <<'PY'
           import json
+          import hashlib
           from datetime import datetime
           from pathlib import Path
 
@@ -202,17 +211,56 @@ jobs:
                   "available_semantic_profiles",
                   sorted(index_metadata["semantic_profiles"].keys()),
               )
+          profiles = compatibility.get("semantic_profiles") or {}
+          if profiles:
+              raw = "\n".join(
+                  f"{pid}:{(payload or {}).get('compatibility_fingerprint') or (payload or {}).get('compatibility_hash') or ''}"
+                  for pid, payload in sorted(profiles.items())
+              )
+              semantic_profile_hash = hashlib.sha256(raw.encode()).hexdigest()
+          else:
+              semantic_profile_hash = "lexical-only"
 
           artifact_metadata = {
               "version": "1.0",
               "timestamp": datetime.utcnow().isoformat() + 'Z',
+              "repo_id": "${{ github.repository }}",
               "commit": "${{ github.sha }}",
+              "tracked_branch": "${{ github.ref_name }}",
               "branch": "${{ github.ref_name }}",
+              "schema_version": compatibility.get("schema_version") or "2",
+              "semantic_profile_hash": semantic_profile_hash,
               "artifact_type": "full",
               "base_commit": None,
               "target_commit": "${{ github.sha }}",
               "checksum": "__CHECKSUM__",
               "compatibility": compatibility,
+              "manifest_v2": {
+                "manifest_version": "2",
+                "logical_artifact_id": "mcp-index-${{ github.repository }}-${{ github.ref_name }}-${{ github.sha }}",
+                "repo_id": "${{ github.repository }}",
+                "tracked_branch": "${{ github.ref_name }}",
+                "branch": "${{ github.ref_name }}",
+                "commit": "${{ github.sha }}",
+                "schema_version": compatibility.get("schema_version") or "2",
+                "semantic_profile_hash": semantic_profile_hash,
+                "checksum": "__CHECKSUM__",
+                "artifact_type": "full",
+                "chunk_schema_version": compatibility.get("schema_version") or "2",
+                "chunk_identity_algorithm": "treesitter_chunk_id_v1",
+                "units": [
+                  {
+                    "unit_type": "lexical",
+                    "unit_id": "lexical-${{ github.sha }}",
+                    "checksum": "__CHECKSUM__",
+                    "size_bytes": 0,
+                    "profile_id": None,
+                    "compatibility_fingerprint": None,
+                    "transport_ref": "current.db",
+                    "metadata": {}
+                  }
+                ]
+              },
           }
 
           Path('artifact-metadata.json').write_text(json.dumps(artifact_metadata, indent=2))
@@ -256,7 +304,7 @@ jobs:
       - name: Upload index artifact
         uses: actions/upload-artifact@v7
         with:
-          name: mcp-index-${{ github.sha }}
+          name: mcp-index-${{ github.repository_id }}-${{ github.ref_name }}-${{ github.sha }}
           path: |
             mcp-index-archive.tar.gz
             mcp-index-archive.tar.gz.sha256
@@ -317,7 +365,7 @@ jobs:
             --bm25-only \
             --fail-below 0.55 \
             --no-native \
-            --db .mcp-index/code_index.db \
+            --db .mcp-index/current.db \
             --json-out /tmp/benchmark-smoke.json \
             --md-out /tmp/benchmark-smoke.md
 

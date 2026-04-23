@@ -2,10 +2,11 @@
 
 import logging
 import os
+import hashlib
 import threading
 import time
 from pathlib import Path
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Optional
 
 from ..core.ignore_patterns import build_walker_filter
 from ..metrics.prometheus_exporter import mcp_watcher_sweep_errors_total
@@ -75,15 +76,22 @@ class WatcherSweeper:
 
     def __init__(
         self,
-        on_missed_path: Callable[[str, str], None],
+        on_missed_path: Optional[Callable[[str, str], None]],
         repo_roots_provider: Callable[[], Dict[str, Path]],
-        store: SQLiteStore,
+        store: Optional[SQLiteStore],
+        on_missed_create: Optional[Callable[[str, str], None]] = None,
+        on_missed_delete: Optional[Callable[[str, str], None]] = None,
+        on_missed_rename: Optional[Callable[[str, str, str], None]] = None,
+        store_provider: Optional[Callable[[str], SQLiteStore]] = None,
         interval_minutes: int = DEFAULT_SWEEP_MINUTES,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
-        self._on_missed_path = on_missed_path
+        self._on_missed_create = on_missed_create or on_missed_path or (lambda _r, _p: None)
+        self._on_missed_delete = on_missed_delete or (lambda _r, _p: None)
+        self._on_missed_rename = on_missed_rename or (lambda _r, _o, _n: None)
         self._repo_roots_provider = repo_roots_provider
         self._store = store
+        self._store_provider = store_provider
         self._clock = clock
 
         # Env var overrides constructor arg when set
@@ -132,20 +140,23 @@ class WatcherSweeper:
             repo_root = Path(repo_root)
             if not repo_root.exists():
                 continue
+            store = self._store_provider(repo_id) if self._store_provider else self._store
+            if store is None:
+                continue
 
             # Resolve SQLite integer repo id
-            repo_record = self._store.get_repository(str(repo_root))
+            repo_record = store.get_repository(str(repo_root))
             if repo_record is None:
                 continue
             sqlite_repo_id: int = repo_record["id"]
 
-            # Build set of known relative paths from SQLite
-            known_files = self._store.get_all_files(repository_id=sqlite_repo_id)
-            known_rel_paths = {f["relative_path"] for f in known_files if f.get("relative_path")}
+            known_files = store.get_all_files(repository_id=sqlite_repo_id)
+            known_by_path = {f["relative_path"]: f for f in known_files if f.get("relative_path")}
 
             gitignore_filter = build_walker_filter(repo_root)
             repo_has_drift = False
 
+            fs_by_path: Dict[str, str] = {}
             for fs_path in repo_root.rglob("*"):
                 if not fs_path.is_file():
                     continue
@@ -160,11 +171,70 @@ class WatcherSweeper:
                     continue
 
                 rel_str = str(rel).replace("\\", "/")
-                if rel_str not in known_rel_paths:
-                    self._on_missed_path(repo_id, rel_str)
-                    repo_has_drift = True
+                fs_by_path[rel_str] = self._hash_file(fs_path)
+
+            created = set(fs_by_path) - set(known_by_path)
+            deleted = {
+                rel
+                for rel in set(known_by_path) - set(fs_by_path)
+                if self._indexed_path_should_report_delete(repo_root, rel, gitignore_filter)
+            }
+            renamed = self._match_renames(created, deleted, fs_by_path, known_by_path)
+            renamed_created = {new for _old, new in renamed}
+            renamed_deleted = {old for old, _new in renamed}
+
+            for old_rel, new_rel in sorted(renamed):
+                self._on_missed_rename(repo_id, old_rel, new_rel)
+                repo_has_drift = True
+
+            for rel_str in sorted(created - renamed_created):
+                self._on_missed_create(repo_id, rel_str)
+                repo_has_drift = True
+
+            for rel_str in sorted(deleted - renamed_deleted):
+                self._on_missed_delete(repo_id, rel_str)
+                repo_has_drift = True
 
             if repo_has_drift:
                 drifted.append(repo_id)
 
         return drifted
+
+    def _hash_file(self, path: Path) -> str:
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(65536), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+
+    def _indexed_path_should_report_delete(self, repo_root: Path, rel: str, gitignore_filter) -> bool:
+        path = repo_root / rel
+        if path.suffix not in _CODE_EXTENSIONS:
+            return False
+        return not gitignore_filter(path)
+
+    def _match_renames(
+        self,
+        created: set[str],
+        deleted: set[str],
+        fs_by_path: Dict[str, str],
+        known_by_path: Dict[str, Dict],
+    ) -> List[tuple[str, str]]:
+        created_by_hash: Dict[str, List[str]] = {}
+        deleted_by_hash: Dict[str, List[str]] = {}
+
+        for rel in created:
+            content_hash = fs_by_path.get(rel)
+            if content_hash:
+                created_by_hash.setdefault(content_hash, []).append(rel)
+        for rel in deleted:
+            content_hash = known_by_path[rel].get("content_hash") or known_by_path[rel].get("hash")
+            if content_hash:
+                deleted_by_hash.setdefault(content_hash, []).append(rel)
+
+        renames: List[tuple[str, str]] = []
+        for content_hash, old_paths in deleted_by_hash.items():
+            new_paths = created_by_hash.get(content_hash, [])
+            if len(old_paths) == 1 and len(new_paths) == 1:
+                renames.append((old_paths[0], new_paths[0]))
+        return renames

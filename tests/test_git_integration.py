@@ -62,10 +62,13 @@ class TestGitIntegration:
 
     def _align_tracked_branch(self, registry, repo_id):
         info = registry.get_repository(repo_id)
-        if info and info.current_branch:
-            registry._registry[repo_id]["tracked_branch"] = info.current_branch
+        if info:
+            current_branch = registry._get_git_branch(Path(info.path))
+            registry._registry[repo_id]["tracked_branch"] = current_branch
+            registry._registry[repo_id]["current_branch"] = current_branch
             registry.save()
-            info.tracked_branch = info.current_branch
+            info.tracked_branch = current_branch
+            info.current_branch = current_branch
         if info:
             Path(info.index_location).mkdir(parents=True, exist_ok=True)
         return info
@@ -141,6 +144,44 @@ class TestGitIntegration:
         assert len(renames) == 1
         assert renames[0].old_path == "src/services.py"
         assert renames[0].path == "src/user_services.py"
+        assert not [
+            c
+            for c in changes
+            if c.change_type in {"added", "deleted"}
+            and c.path in {"src/services.py", "src/user_services.py"}
+        ]
+
+    def test_uncommitted_rename_keeps_paths_when_one_side_supported(self, test_env):
+        """Uncommitted rename parsing accepts either supported side exactly once."""
+        repo = TestRepositoryBuilder.create_repository(
+            test_env, "uncommitted_rename_repo", language="python"
+        )
+
+        old_path = repo.path / "src/services.py"
+        new_path = repo.path / "src/services.txt"
+        old_path.rename(new_path)
+
+        detector = ChangeDetector(str(repo.path))
+        change = detector._parse_status_line("R100\tsrc/services.py\tsrc/services.txt")
+
+        assert change is not None
+        assert change.change_type == "renamed"
+        assert change.old_path == "src/services.py"
+        assert change.path == "src/services.txt"
+
+    def test_change_detection_delete_is_preserved(self, test_env):
+        """Committed deletes are reported as deletes for supported files."""
+        repo = TestRepositoryBuilder.create_repository(test_env, "delete_repo", language="python")
+        initial_commit = repo.commit_history[0]
+
+        (repo.path / "src/services.py").unlink()
+        TestRepositoryBuilder.run_git_command("git add -A", repo.path)
+        TestRepositoryBuilder.run_git_command("git commit -m 'Delete services'", repo.path)
+
+        detector = ChangeDetector(str(repo.path))
+        changes = detector.get_changes_since_commit(initial_commit)
+
+        assert [c.change_type for c in changes if c.path == "src/services.py"] == ["deleted"]
 
     def test_incremental_vs_full_decision(self, test_env, registry):
         """Test decision making for incremental vs full indexing."""
@@ -163,9 +204,7 @@ class TestGitIntegration:
         manager = self._make_manager(registry)
 
         # Initial index should be full
-        result = manager.sync_repository_index(
-            repo_id, force_full=True, bypass_branch_guard=True
-        )
+        result = manager.sync_repository_index(repo_id, force_full=True)
         assert result.action == "full_index"
 
         # Small change should trigger incremental
@@ -174,7 +213,7 @@ class TestGitIntegration:
         TestRepositoryBuilder.run_git_command("git commit -m 'Small change'", repo.path)
         registry.update_current_commit(repo_id)
 
-        result = manager.sync_repository_index(repo_id, bypass_branch_guard=True)
+        result = manager.sync_repository_index(repo_id)
         assert result.action == "incremental_update"
 
         # Large changes should trigger full reindex
@@ -185,7 +224,7 @@ class TestGitIntegration:
         TestRepositoryBuilder.run_git_command("git commit -m 'Major refactoring'", repo.path)
         registry.update_current_commit(repo_id)
 
-        result = manager.sync_repository_index(repo_id, bypass_branch_guard=True)
+        result = manager.sync_repository_index(repo_id)
         # When >50% files changed, should do full index
         assert result.action == "full_index"
 
@@ -205,9 +244,7 @@ class TestGitIntegration:
 
         # Initial full index
         perf.start_timing("full_index")
-        result = manager.sync_repository_index(
-            repo_id, force_full=True, bypass_branch_guard=True
-        )
+        result = manager.sync_repository_index(repo_id, force_full=True)
         full_time = perf.end_timing("full_index")
         assert result.action == "full_index"
 
@@ -225,7 +262,7 @@ class TestGitIntegration:
 
             # Measure incremental update
             perf.start_timing(f"incremental_{i}")
-            result = manager.sync_repository_index(repo_id, bypass_branch_guard=True)
+            result = manager.sync_repository_index(repo_id)
             inc_time = perf.end_timing(f"incremental_{i}")
 
             print(f"Incremental {i}: {result.files_processed} files in {inc_time:.3f}s")

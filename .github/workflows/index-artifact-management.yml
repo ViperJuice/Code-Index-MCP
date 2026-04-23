@@ -50,7 +50,7 @@ env:
   COMPRESSION_LEVEL: '9'
   MAX_ARTIFACT_SIZE_MB: '500'
   INDEX_FILES: |
-    code_index.db
+    current.db
     vector_index.qdrant/
     .index_metadata.json
 
@@ -74,16 +74,18 @@ jobs:
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
           COMMIT_SHORT=$(git rev-parse --short HEAD)
           SUFFIX="${{ inputs.artifact_suffix }}"
+          REPO_ID="${GITHUB_REPOSITORY_ID:-${GITHUB_REPOSITORY//\//_}}"
+          TRACKED_BRANCH="$(git branch --show-current | tr '/:' '__')"
           if [ -n "$SUFFIX" ]; then
-            ARTIFACT_NAME="index-${COMMIT_SHORT}-${SUFFIX}-${TIMESTAMP}"
+            ARTIFACT_NAME="mcp-index-${REPO_ID}-${TRACKED_BRANCH}-${COMMIT_SHORT}-${SUFFIX}-${TIMESTAMP}"
           else
-            ARTIFACT_NAME="index-${COMMIT_SHORT}-${TIMESTAMP}"
+            ARTIFACT_NAME="mcp-index-${REPO_ID}-${TRACKED_BRANCH}-${COMMIT_SHORT}-${TIMESTAMP}"
           fi
           echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
           
           # Get index stats
-          if [ -f "${{ inputs.index_path }}/code_index.db" ]; then
-            DB_SIZE=$(stat -c%s "${{ inputs.index_path }}/code_index.db" 2>/dev/null || stat -f%z "${{ inputs.index_path }}/code_index.db" 2>/dev/null || echo "0")
+          if [ -f "${{ inputs.index_path }}/current.db" ]; then
+            DB_SIZE=$(stat -c%s "${{ inputs.index_path }}/current.db" 2>/dev/null || stat -f%z "${{ inputs.index_path }}/current.db" 2>/dev/null || echo "0")
             echo "db_size=$DB_SIZE" >> $GITHUB_OUTPUT
           fi
 
@@ -110,7 +112,7 @@ jobs:
                   'schema_version': metadata.get('chunk_schema_version') or '2',
                   'embedding_model': metadata.get('embedding_model'),
               }
-              if isinstance(metadata.get('semantic_profiles'), dict):
+          if isinstance(metadata.get('semantic_profiles'), dict):
                   compatibility['semantic_profiles'] = metadata['semantic_profiles']
                   compatibility['available_semantic_profiles'] = metadata.get('available_semantic_profiles', sorted(metadata['semantic_profiles'].keys()))
               print(json.dumps(compatibility))
@@ -140,24 +142,74 @@ jobs:
             exit 1
           fi
           
-          # Create metadata file
-          cat > artifact-metadata.json <<EOF
-          {
-            "artifact_name": "${{ steps.metadata.outputs.artifact_name }}",
-            "commit": "$(git rev-parse HEAD)",
-            "branch": "$(git branch --show-current)",
-            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "compressed_size": $SIZE,
-            "checksum": "$CHECKSUM",
-            "files_included": $(echo '${{ env.INDEX_FILES }}' | jq -R -s -c 'split("\n") | map(select(length > 0))'),
-            "compression_level": ${{ env.COMPRESSION_LEVEL }},
-            "index_stats": {
-              "db_size": ${{ steps.metadata.outputs.db_size || 0 }},
-              "vector_size": ${{ steps.metadata.outputs.vector_size || 0 }}
-            },
-            "compatibility": $COMPATIBILITY_JSON
+          python <<PY
+          import hashlib, json, os, subprocess
+          from datetime import datetime
+          from pathlib import Path
+
+          compatibility = json.loads('''$COMPATIBILITY_JSON''')
+          profiles = compatibility.get("semantic_profiles") or {}
+          if profiles:
+              raw = "\n".join(
+                  f"{pid}:{(payload or {}).get('compatibility_fingerprint') or (payload or {}).get('compatibility_hash') or ''}"
+                  for pid, payload in sorted(profiles.items())
+              )
+              semantic_profile_hash = hashlib.sha256(raw.encode()).hexdigest()
+          else:
+              semantic_profile_hash = "lexical-only"
+          commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          tracked_branch = subprocess.check_output(["git", "branch", "--show-current"], text=True).strip()
+          repo_id = os.environ.get("GITHUB_REPOSITORY_ID") or os.environ.get("GITHUB_REPOSITORY")
+          schema_version = compatibility.get("schema_version") or "2"
+          checksum = "$CHECKSUM"
+          metadata = {
+              "artifact_name": "${{ steps.metadata.outputs.artifact_name }}",
+              "repo_id": repo_id,
+              "tracked_branch": tracked_branch,
+              "branch": tracked_branch,
+              "commit": commit,
+              "schema_version": schema_version,
+              "semantic_profile_hash": semantic_profile_hash,
+              "artifact_type": "full",
+              "timestamp": datetime.utcnow().isoformat() + "Z",
+              "compressed_size": $SIZE,
+              "checksum": checksum,
+              "files_included": [line for line in """${{ env.INDEX_FILES }}""".splitlines() if line],
+              "compression_level": ${{ env.COMPRESSION_LEVEL }},
+              "index_stats": {
+                "db_size": ${{ steps.metadata.outputs.db_size || 0 }},
+                "vector_size": ${{ steps.metadata.outputs.vector_size || 0 }}
+              },
+              "compatibility": compatibility,
+              "manifest_v2": {
+                "manifest_version": "2",
+                "logical_artifact_id": "${{ steps.metadata.outputs.artifact_name }}",
+                "repo_id": repo_id,
+                "tracked_branch": tracked_branch,
+                "branch": tracked_branch,
+                "commit": commit,
+                "schema_version": schema_version,
+                "semantic_profile_hash": semantic_profile_hash,
+                "checksum": checksum,
+                "artifact_type": "full",
+                "chunk_schema_version": schema_version,
+                "chunk_identity_algorithm": "treesitter_chunk_id_v1",
+                "units": [
+                  {
+                    "unit_type": "lexical",
+                    "unit_id": f"lexical-{commit[:8]}",
+                    "checksum": checksum,
+                    "size_bytes": $SIZE,
+                    "profile_id": None,
+                    "compatibility_fingerprint": None,
+                    "transport_ref": "current.db",
+                    "metadata": {}
+                  }
+                ]
+              }
           }
-          EOF
+          Path("artifact-metadata.json").write_text(json.dumps(metadata, indent=2))
+          PY
       
       - name: Upload artifact
         id: upload

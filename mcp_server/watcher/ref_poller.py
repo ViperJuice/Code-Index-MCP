@@ -6,6 +6,8 @@ import threading
 from pathlib import Path
 from typing import Any, Dict
 
+from ..health.repository_readiness import RepositoryReadinessState
+
 logger = logging.getLogger(__name__)
 
 # Per-repo attachment state: "attached" | "detached"
@@ -28,6 +30,7 @@ class RefPoller:
     ) -> None:
         self._registry = registry
         self._git_index_manager = git_index_manager
+        self._repo_resolver = repo_resolver
         self._interval = interval_seconds
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
@@ -62,18 +65,48 @@ class RefPoller:
 
         repo_id = repo_info.repository_id
         repo_path = Path(repo_info.path)
+        if self._is_unsupported_worktree(repo_path):
+            logger.warning("ref_poller: unsupported worktree for %s; skipping", repo_id)
+            return
+
+        current_branch = self._current_branch(repo_path)
+        if current_branch is not None and current_branch != tracked_branch:
+            if self._read_ref(repo_path, tracked_branch) is None:
+                logger.warning(
+                    "ref_poller: tracked ref %s missing for %s; skipping",
+                    tracked_branch,
+                    repo_id,
+                )
+            else:
+                logger.info(
+                    "ref_poller: skipping %s because current branch %r != tracked branch %r",
+                    repo_id,
+                    current_branch,
+                    tracked_branch,
+                )
+            self._last_branch_state[repo_id] = "attached"
+            return
+
+        if current_branch != tracked_branch:
+            self._last_branch_state[repo_id] = "detached" if current_branch is None else "attached"
+            logger.info(
+                "ref_poller: skipping %s because current branch %r != tracked branch %r",
+                repo_id,
+                current_branch,
+                tracked_branch,
+            )
+            return
+
         tip_sha = self._read_ref(repo_path, tracked_branch)
 
         # --- Detached HEAD / branch-rename detection ---
         if tip_sha is None:
-            prior_state = self._last_branch_state.get(repo_id, "attached")
             self._last_branch_state[repo_id] = "detached"
-            if prior_state != "detached":
-                logger.warning(
-                    "ref_poller: detached HEAD or branch disappeared for %s (was attached); enqueueing full rescan",
-                    repo_id,
-                )
-                self._git_index_manager.enqueue_full_rescan(repo_id)
+            logger.warning(
+                "ref_poller: tracked ref %s missing for %s; skipping",
+                tracked_branch,
+                repo_id,
+            )
             return
 
         # Tip resolved — mark as attached
@@ -109,14 +142,9 @@ class RefPoller:
         return result.returncode == 0
 
     def _read_ref(self, repo_path: Path, branch: str) -> str | None:
-        ref_file = repo_path / ".git" / "refs" / "heads" / branch
-        if ref_file.exists():
-            return ref_file.read_text().strip()
-
-        # Fallback: packed refs via git rev-parse
         try:
             result = subprocess.run(
-                ["git", "--git-dir", str(repo_path / ".git"), "rev-parse", f"refs/heads/{branch}"],
+                ["git", "-C", str(repo_path), "rev-parse", "--verify", f"refs/heads/{branch}"],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -129,3 +157,26 @@ class RefPoller:
                 repo_path,
             )
             return None
+
+    def _current_branch(self, repo_path: Path) -> str | None:
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(repo_path), "rev-parse", "--abbrev-ref", "HEAD"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except subprocess.CalledProcessError:
+            return None
+        value = result.stdout.strip()
+        return value if value and value != "HEAD" else None
+
+    def _is_unsupported_worktree(self, repo_path: Path) -> bool:
+        classify = getattr(self._repo_resolver, "classify", None)
+        if not callable(classify):
+            return False
+        try:
+            readiness = classify(repo_path)
+        except Exception:
+            return False
+        return getattr(readiness, "state", None) == RepositoryReadinessState.UNSUPPORTED_WORKTREE

@@ -37,6 +37,7 @@ class ArtifactRef:
     tag: str
     release_url: str
     is_latest: bool
+    tracked_branch: str = ""
 
 
 class ArtifactPublisher:
@@ -50,7 +51,14 @@ class ArtifactPublisher:
     # Public API (frozen by IF-0-P13-4)
     # ------------------------------------------------------------------
 
-    def publish_on_reindex(self, repo_id: str, commit: str) -> ArtifactRef:
+    def publish_on_reindex(
+        self,
+        repo_id: str,
+        commit: str,
+        *,
+        tracked_branch: str = "main",
+        index_location: Path | str | None = None,
+    ) -> ArtifactRef:
         """Idempotent publish: creates a SHA-keyed release and atomically moves index-latest.
 
         Calling twice with the same (repo_id, commit) returns the same ArtifactRef.
@@ -58,14 +66,17 @@ class ArtifactPublisher:
         only is_latest differs.
         """
         short_sha = commit[:7]
-        sha_tag = f"index-{short_sha}"
+        safe_repo = repo_id.replace("/", "_").replace(":", "_")
+        safe_branch = tracked_branch.replace("/", "_").replace(":", "_")
+        sha_tag = f"index-{safe_repo}-{safe_branch}-{short_sha}"
         repo = self._uploader.repo
         release_url = f"https://github.com/{repo}/releases/tag/{sha_tag}"
 
         try:
             previous_artifact_id = self._get_latest_commit(repo)
             archive_path, checksum, size = self._uploader.compress_indexes(
-                Path(f"index-archive-{short_sha}.tar.gz")
+                Path(f"index-archive-{safe_repo}-{safe_branch}-{short_sha}.tar.gz"),
+                index_location=index_location,
             )
             attestation = attest(archive_path, repo=repo, gh_cmd=self._gh_cmd)
             policy = DeltaPolicy()
@@ -79,6 +90,10 @@ class ArtifactPublisher:
                 artifact_type=decision.strategy,
                 delta_from=decision.base_artifact_id,
                 attestation=attestation,
+                repo_id=repo_id,
+                tracked_branch=tracked_branch,
+                commit=commit,
+                index_location=index_location,
             )
             self._ensure_sha_release(sha_tag, commit, repo)
             try:
@@ -105,6 +120,7 @@ class ArtifactPublisher:
             tag=sha_tag,
             release_url=release_url,
             is_latest=is_latest,
+            tracked_branch=tracked_branch,
         )
 
     # ------------------------------------------------------------------

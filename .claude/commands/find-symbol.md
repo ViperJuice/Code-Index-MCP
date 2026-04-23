@@ -1,6 +1,10 @@
 # Find Symbol Definition
 
 Quickly locate any symbol (class, function, method, variable) in the codebase using the MCP index.
+Use indexed results as authoritative only when repository readiness is `ready`.
+If `symbol_lookup` returns `index_unavailable` with
+`safe_fallback: "native_search"`, use native `rg`/file search and follow the
+readiness remediation, such as `reindex`.
 
 ## Usage
 ```
@@ -20,4 +24,6 @@ Benefits:
 - **Accuracy**: Exact definition location with line numbers
 - **Context**: Returns signature and documentation
 
-Never use grep or file searching - the MCP index is 100x faster!
+Ready indexes return ordinary `result: "not_found"` for misses. Non-ready
+indexes return `index_unavailable`, where `native_search` is expected until
+remediation is complete.

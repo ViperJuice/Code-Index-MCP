@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import sqlite3
 from datetime import datetime
 from pathlib import Path
 
@@ -15,7 +16,11 @@ def make_repo_info(
     repo_id: str = "test-repo",
     missing_git_dir: bool = False,
     missing_index: bool = False,
+    empty_index: bool = False,
     tracked_branch: str = "main",
+    current_branch: str = "main",
+    current_commit: str | None = None,
+    last_indexed_commit: str | None = None,
 ) -> RepositoryInfo:
     """Create a RepositoryInfo pointing at a tmp_path-based repo.
 
@@ -37,7 +42,15 @@ def make_repo_info(
     index_dir = repo_dir / ".mcp-index"
     index_dir.mkdir(exist_ok=True)
     index_file = index_dir / "code_index.db"
-    index_file.touch()
+    if not missing_index:
+        conn = sqlite3.connect(index_file)
+        conn.execute(
+            "CREATE TABLE files (id INTEGER PRIMARY KEY, path TEXT, is_deleted BOOLEAN DEFAULT 0)"
+        )
+        if not empty_index:
+            conn.execute("INSERT INTO files (path, is_deleted) VALUES ('README.md', 0)")
+        conn.commit()
+        conn.close()
 
     git_common_dir = None if missing_git_dir else str(git_dir)
     index_path = (
@@ -60,6 +73,8 @@ def make_repo_info(
         total_symbols=0,
         indexed_at=datetime.now(),
         tracked_branch=tracked_branch,
+        current_branch=current_branch,
+        current_commit=current_commit,
         git_common_dir=git_common_dir,
-        last_indexed_commit=None,
+        last_indexed_commit=last_indexed_commit,
     )
