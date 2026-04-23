@@ -81,7 +81,7 @@ function Select-Variant {
     Write-Host ""
     Write-Host "Choose MCP Index variant:"
     Write-Host "1) latest      - Current production image (recommended)"
-    Write-Host "2) v1.2.0-rc4  - Release candidate image"
+    Write-Host "2) v1.2.0-rc5  - Release candidate image"
     Write-Host "3) local-smoke - Local smoke image built by make release-smoke-container"
     Write-Host ""
     
@@ -89,8 +89,8 @@ function Select-Variant {
     
     switch ($choice) {
         "2" {
-            $script:Variant = "v1.2.0-rc4"
-            Write-Host "[INFO] Selected: v1.2.0-rc4" -ForegroundColor Green
+            $script:Variant = "v1.2.0-rc5"
+            Write-Host "[INFO] Selected: v1.2.0-rc5" -ForegroundColor Green
         }
         "3" {
             $script:Variant = "local-smoke"

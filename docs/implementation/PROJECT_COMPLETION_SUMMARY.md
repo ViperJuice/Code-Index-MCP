@@ -136,7 +136,7 @@ The Code-Index-MCP Server project has been successfully completed. Starting from
 git clone https://github.com/your-org/code-index-mcp.git
 cd code-index-mcp
 
-# Deploy to production
+# Historical rc4 production deploy example; non-current.
 VERSION=v1.2.0-rc4 ./scripts/deploy-production.sh
 ```
 

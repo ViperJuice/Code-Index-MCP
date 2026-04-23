@@ -83,8 +83,10 @@ jobs:
 
       - name: Run alpha release gates
         run: |
+          # Covers P34 docs truth, P33 matrix, and wheel/stdio smoke.
           make alpha-release-gates
-          # release smoke and the P33 production multi-repo matrix are invoked by alpha-release-gates.
+          # Container smoke is the final preflight before release mutation jobs.
+          make release-smoke-container
 
   prepare-release:
     name: Prepare Release

@@ -14,6 +14,7 @@ REQUIRED_GATES = {
     "Alpha Gate - Format And Lint",
     "Alpha Gate - Unit And Release Smoke",
     "Alpha Gate - Integration Smoke",
+    "Alpha Gate - Production Multi-Repo Matrix",
     "Alpha Gate - Docker Build And Smoke",
     "Alpha Gate - Docs Truth",
     "Alpha Gate - Required Gates Passed",
@@ -132,6 +133,13 @@ def test_release_automation_refuses_before_mutating_or_publishing():
 
     assert jobs["preflight-release-gates"]["name"] == "Preflight Release Gates"
     assert "make alpha-release-gates" in workflow_text
+    assert "make release-smoke-container" in workflow_text
+    assert workflow_text.index("make alpha-release-gates") < workflow_text.index(
+        "make release-smoke-container"
+    )
+    assert workflow_text.index("make release-smoke-container") < workflow_text.index(
+        "prepare-release:"
+    )
     assert _needs(jobs["prepare-release"]) == {"preflight-release-gates"}
     assert "default: 'custom'" in workflow_text
     assert "Prerelease tags must use release_type=custom" in workflow_text

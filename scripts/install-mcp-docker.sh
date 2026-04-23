@@ -116,7 +116,7 @@ choose_variant() {
     echo
     echo "Choose MCP Index variant:"
     echo "1) latest      - Current production image (recommended)"
-    echo "2) v1.2.0-rc4  - Release candidate image"
+    echo "2) v1.2.0-rc5  - Release candidate image"
     echo "3) local-smoke - Local smoke image built by make release-smoke-container"
     echo
     
@@ -125,8 +125,8 @@ choose_variant() {
     
     case $REPLY in
         2)
-            MCP_VARIANT="v1.2.0-rc4"
-            print_info "Selected: v1.2.0-rc4"
+            MCP_VARIANT="v1.2.0-rc5"
+            print_info "Selected: v1.2.0-rc5"
             ;;
         3)
             MCP_VARIANT="local-smoke"

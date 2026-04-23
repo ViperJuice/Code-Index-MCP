@@ -91,7 +91,7 @@ Plugins can include a `plugin.yaml` manifest file:
 
 ```yaml
 name: "Python Plugin"
-version: "1.2.0-rc4"
+version: "1.2.0-rc5"
 description: "Advanced Python language support"
 languages:
   - python

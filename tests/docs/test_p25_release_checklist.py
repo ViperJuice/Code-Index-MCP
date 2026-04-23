@@ -11,6 +11,7 @@ REQUIRED_GATES = [
     "Alpha Gate - Format And Lint",
     "Alpha Gate - Unit And Release Smoke",
     "Alpha Gate - Integration Smoke",
+    "Alpha Gate - Production Multi-Repo Matrix",
     "Alpha Gate - Docker Build And Smoke",
     "Alpha Gate - Docs Truth",
     "Alpha Gate - Required Gates Passed",
@@ -27,6 +28,14 @@ def test_deployment_runbook_maps_each_required_alpha_gate():
         "| Required job | Operator decision | Command/workflow source | Block/fallback behavior |"
         in text
     )
+
+
+def test_user_action_runbook_names_each_required_alpha_gate():
+    text = USER_ACTIONS.read_text(encoding="utf-8")
+
+    assert "Require the public alpha gate set before release evidence is accepted" in text
+    for gate in REQUIRED_GATES:
+        assert gate in text
 
 
 def test_attestation_prerequisite_and_private_alpha_fallback_documented():

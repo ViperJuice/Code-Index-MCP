@@ -262,7 +262,7 @@ spec:
     spec:
       containers:
       - name: mcp-server
-        image: your-registry/code-index-mcp:v1.2.0-rc4
+        image: your-registry/code-index-mcp:v1.2.0-rc5
         ports:
         - containerPort: 8000
         env:

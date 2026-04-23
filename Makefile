@@ -188,6 +188,7 @@ alpha-docs-truth:
 		tests/smoke/test_release_smoke_contract.py \
 		tests/docs/test_p23_doc_truth.py \
 		tests/docs/test_p25_release_checklist.py \
+		tests/docs/test_p34_public_alpha_recut.py \
 		-v --no-cov
 
 alpha-production-matrix:

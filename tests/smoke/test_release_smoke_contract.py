@@ -74,6 +74,25 @@ def test_workflows_reuse_shared_release_smoke_commands():
     assert "pip install build wheel" not in workflows["release-automation.yml"]
 
 
+def test_alpha_docs_truth_and_release_preflight_cover_p34_and_container_smoke():
+    makefile = _read("Makefile")
+    release_automation = _read(".github/workflows/release-automation.yml")
+
+    alpha_docs_truth = makefile.split("alpha-docs-truth:", 1)[1].split(
+        "alpha-production-matrix:", 1
+    )[0]
+    assert "tests/docs/test_p34_public_alpha_recut.py" in alpha_docs_truth
+
+    assert "make alpha-release-gates" in release_automation
+    assert "make release-smoke-container" in release_automation
+    assert release_automation.index("make alpha-release-gates") < release_automation.index(
+        "make release-smoke-container"
+    )
+    assert release_automation.index("make release-smoke-container") < release_automation.index(
+        "prepare-release:"
+    )
+
+
 def test_ghcr_image_name_is_frozen_across_release_surfaces():
     stale_patterns = (
         "ghcr.io/code-index-mcp/mcp-index",

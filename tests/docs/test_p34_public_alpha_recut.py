@@ -21,6 +21,15 @@ PUBLIC_SURFACES = [
     "CLAUDE.md",
 ]
 
+ACTIVE_RC4_DRIFT_SURFACES = [
+    "docs/DEPLOYMENT-GUIDE.md",
+    "docs/PRODUCTION_DEPLOYMENT_GUIDE.md",
+    "docs/DYNAMIC_PLUGIN_LOADING.md",
+    "docs/api/API-REFERENCE.md",
+    "scripts/install-mcp-docker.sh",
+    "scripts/install-mcp-docker.ps1",
+]
+
 MODEL_TERMS = [
     "many unrelated repositories",
     "one registered worktree",
@@ -79,6 +88,14 @@ def test_release_surfaces_use_rc5_identifier():
         if relative != "CHANGELOG.md":
             assert "1.2.0-rc4" not in text, relative
     assert PUBLIC_ALPHA_TAG in _read(".github/workflows/release-automation.yml")
+
+
+def test_active_release_instructions_do_not_reference_rc4():
+    for relative in ACTIVE_RC4_DRIFT_SURFACES:
+        text = _read(relative)
+        assert PUBLIC_ALPHA_VERSION in text or PUBLIC_ALPHA_TAG in text, relative
+        assert "1.2.0-rc4" not in text, relative
+        assert "v1.2.0-rc4" not in text, relative
 
 
 def test_agent_docs_are_readiness_gated():

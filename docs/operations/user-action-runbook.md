@@ -170,13 +170,16 @@ No operator actions required. P12 is fully codebase-internal.
 - [ ] **Require the public alpha gate set before release evidence is accepted.**
   The required jobs are `Alpha Gate - Dependency Sync`,
   `Alpha Gate - Format And Lint`, `Alpha Gate - Unit And Release Smoke`,
-  `Alpha Gate - Integration Smoke`, `Alpha Gate - Docker Build And Smoke`,
-  `Alpha Gate - Docs Truth`, and `Alpha Gate - Required Gates Passed`.
+  `Alpha Gate - Integration Smoke`, `Alpha Gate - Production Multi-Repo Matrix`,
+  `Alpha Gate - Docker Build And Smoke`, `Alpha Gate - Docs Truth`, and
+  `Alpha Gate - Required Gates Passed`.
 - [ ] **Verify release automation refuses early.** Before approving a release
   workflow run, confirm `preflight-release-gates` completed before
   `prepare-release`; version mutation, branch creation, artifact build, tag
   creation, GitHub release creation, PyPI publish, and container publish must
-  remain downstream of that gate.
+  remain downstream of that gate. Confirm `make release-smoke-container` ran in
+  preflight before approving manual dispatch, or that release automation
+  preflight ran it after `make alpha-release-gates`.
 - [ ] **Record informational leftovers explicitly.** Cross-platform tests,
   authenticated attestation tests without `ATTESTATION_GH_TOKEN`, benchmarks,
   vulnerability scans, cleanup, signing, and publish-only container manifest work
