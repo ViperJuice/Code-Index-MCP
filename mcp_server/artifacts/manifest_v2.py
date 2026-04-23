@@ -22,9 +22,7 @@ def build_semantic_profile_hash(
     for profile_id, payload in sorted(profiles.items()):
         if isinstance(payload, dict):
             fingerprint = (
-                payload.get("compatibility_fingerprint")
-                or payload.get("compatibility_hash")
-                or ""
+                payload.get("compatibility_fingerprint") or payload.get("compatibility_hash") or ""
             )
         else:
             fingerprint = str(payload or "")
@@ -121,9 +119,7 @@ class ArtifactManifestV2:
         if self.artifact_type not in {"full", "delta"}:
             raise ValueError(f"Invalid artifact_type: {self.artifact_type}")
         if not validate_semantic_profile_hash(self.semantic_profile_hash):
-            raise ValueError(
-                f"Malformed semantic_profile_hash: {self.semantic_profile_hash}"
-            )
+            raise ValueError(f"Malformed semantic_profile_hash: {self.semantic_profile_hash}")
         if not self.units:
             raise ValueError("Manifest v2 requires at least one unit")
 

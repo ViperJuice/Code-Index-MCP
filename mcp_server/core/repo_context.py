@@ -20,10 +20,11 @@ class RepoContext:
     Fields:
       repo_id:         canonical 16-hex sha256 from compute_repo_id
       sqlite_store:    hydrated from StoreRegistry; non-Optional by contract
-      workspace_root:  the path the caller resolved this from (pre-walk-up)
+      workspace_root:  registered repository root
       tracked_branch:  pinned default branch from RepositoryInfo.tracked_branch
       registry_entry:  live RepositoryInfo reference for read-through access
                        to mutable fields (priority, current_commit, etc.)
+      requested_path:  original caller path resolved for diagnostics
     """
 
     repo_id: str
@@ -31,3 +32,4 @@ class RepoContext:
     workspace_root: Path
     tracked_branch: str
     registry_entry: RepositoryInfo
+    requested_path: Path | None = None

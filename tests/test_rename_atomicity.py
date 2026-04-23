@@ -22,6 +22,8 @@ def _make_store(tmp_path: Path) -> SQLiteStore:
 def _make_ctx(store: SQLiteStore, workspace_root: Path, repo_id: str = "repo-1") -> RepoContext:
     info = Mock()
     info.tracked_branch = "main"
+    info.path = workspace_root
+    info.name = workspace_root.name
     return RepoContext(
         repo_id=repo_id,
         sqlite_store=store,
@@ -46,6 +48,8 @@ def _make_dispatcher(store: SQLiteStore):
     dispatcher._semantic_indexer_fallback = None
     dispatcher._plugin_set_registry = Mock()
     dispatcher._plugin_set_registry.plugins_for.return_value = []
+    dispatcher._file_cache = {}
+    dispatcher._file_cache_lock = __import__("threading").RLock()
     return dispatcher
 
 

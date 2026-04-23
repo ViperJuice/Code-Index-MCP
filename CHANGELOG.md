@@ -7,7 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-[Unreleased]: # placeholder for post-rc4 work
+[Unreleased]: # placeholder for post-rc5 work
+
+## [1.2.0-rc5] — 2026-04-23
+
+### Fixed (P27-P33 — v3 multi-repo blocker closeout)
+- Added fail-closed readiness handling for missing, empty, stale, building,
+  wrong-branch, and unsupported-worktree indexes. Query tools now return
+  `index_unavailable` with `safe_fallback: "native_search"` instead of
+  dispatching against an unsafe index.
+- Hardened the v3 repository model around many unrelated repositories on one
+  machine, one registered worktree per git common directory, and tracked/default
+  branch indexing only.
+- Added the P33 production multi-repo matrix for unrelated repo isolation,
+  same-repo worktree rejection, wrong-branch safety, stale/missing index
+  fallback, incremental repair, rename/delete/revert, force-push recovery, and
+  wrong-artifact rejection.
+
+### Changed (P34 — public alpha recut)
+- Recut the public-alpha release contract to `1.2.0-rc5` / `v1.2.0-rc5` across
+  package metadata, runtime metadata, release automation, README status,
+  Docker/MCP setup docs, and `docs/SUPPORT_MATRIX.md`.
+- Aligned outside-developer docs, operator runbooks, and agent handoffs on the
+  readiness contract: indexed MCP results are authoritative only when readiness
+  is `ready`; otherwise users should use native search or follow the returned
+  remediation.
+- Updated `docs/operations/deployment-runbook.md` to require P27-P33 gates,
+  `make alpha-production-matrix`, docs truth tests, release metadata tests, and
+  clean-checkout wheel/container smoke before public-alpha promotion.
+
+### Known limitations
+- Same-repo sibling worktrees and non-default branch queries are not independent
+  indexed-search contexts in v3; they return `index_unavailable` with
+  `safe_fallback: "native_search"` until a future release expands the topology
+  contract.
+- Language/runtime support remains scoped by `docs/SUPPORT_MATRIX.md`, release
+  promotion remains gated by `docs/operations/deployment-runbook.md`, and the
+  public-alpha go/no-go evidence remains linked from
+  `docs/validation/private-alpha-decision.md`.
 
 ## [1.2.0-rc4] — 2026-04-22
 

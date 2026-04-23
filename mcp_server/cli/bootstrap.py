@@ -40,6 +40,7 @@ def initialize_stateless_services(
 
     from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
     from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher
+    from mcp_server.utils.semantic_indexer_registry import SemanticIndexerRegistry
 
     # Build registry + store registry
     resolved_registry_path = registry_path or _default_registry_path()
@@ -55,6 +56,7 @@ def initialize_stateless_services(
         _explicit = os.getenv("RERANKER_TYPE", "").strip().lower()
         reranker_type = _explicit if _explicit else "none"
         semantic_enabled = os.getenv("SEMANTIC_SEARCH_ENABLED", "true").lower() == "true"
+        semantic_registry = SemanticIndexerRegistry(repo_registry) if semantic_enabled else None
         dispatcher = EnhancedDispatcher(
             enable_advanced_features=True,
             use_plugin_factory=True,
@@ -63,6 +65,7 @@ def initialize_stateless_services(
             memory_aware=True,
             multi_repo_enabled=None,
             reranker_type=reranker_type,
+            semantic_indexer_registry=semantic_registry,
         )
 
     git_index_manager = GitAwareIndexManager(

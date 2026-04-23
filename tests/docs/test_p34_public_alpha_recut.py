@@ -1,0 +1,124 @@
+"""P34 public-alpha recut documentation contract checks."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+REPO = Path(__file__).parent.parent.parent
+
+PUBLIC_ALPHA_VERSION = "1.2.0-rc5"
+PUBLIC_ALPHA_TAG = "v1.2.0-rc5"
+
+PUBLIC_SURFACES = [
+    "README.md",
+    "docs/GETTING_STARTED.md",
+    "docs/MCP_CONFIGURATION.md",
+    "docs/DOCKER_GUIDE.md",
+    "docs/operations/deployment-runbook.md",
+    "docs/operations/user-action-runbook.md",
+    "docs/SUPPORT_MATRIX.md",
+    "AGENTS.md",
+    "CLAUDE.md",
+]
+
+MODEL_TERMS = [
+    "many unrelated repositories",
+    "one registered worktree",
+    "git common directory",
+    "tracked/default branch",
+    "readiness",
+    "ready",
+    "index_unavailable",
+    "safe_fallback",
+    "native_search",
+]
+
+FORBIDDEN_UNCONDITIONAL_AGENT_PHRASES = [
+    "Always search with MCP tools",
+    "before using Grep or Glob",
+    "ONLY if MCP search returns 0 results",
+    "MCP-FIRST",
+]
+
+FORBIDDEN_UNRESTRICTED_CLAIMS = [
+    "unrestricted multi-worktree",
+    "unrestricted multi-branch",
+    "indexes every branch",
+    "all worktrees are supported",
+]
+
+
+def _read(relative: str) -> str:
+    return (REPO / relative).read_text(encoding="utf-8")
+
+
+def _normalized(relative: str) -> str:
+    return " ".join(_read(relative).replace("\n> ", " ").split())
+
+
+def test_public_surfaces_share_v3_operating_model():
+    for relative in PUBLIC_SURFACES:
+        text = _normalized(relative)
+        missing = [term for term in MODEL_TERMS if term not in text]
+        assert missing == [], f"{relative} missing {missing}"
+
+
+def test_release_surfaces_use_rc5_identifier():
+    surfaces = [
+        "README.md",
+        "docs/GETTING_STARTED.md",
+        "docs/MCP_CONFIGURATION.md",
+        "docs/DOCKER_GUIDE.md",
+        "docs/operations/deployment-runbook.md",
+        "docs/SUPPORT_MATRIX.md",
+        "CHANGELOG.md",
+    ]
+    for relative in surfaces:
+        text = _read(relative)
+        assert PUBLIC_ALPHA_VERSION in text, relative
+        if relative != "CHANGELOG.md":
+            assert "1.2.0-rc4" not in text, relative
+    assert PUBLIC_ALPHA_TAG in _read(".github/workflows/release-automation.yml")
+
+
+def test_agent_docs_are_readiness_gated():
+    for relative in ("AGENTS.md", "CLAUDE.md"):
+        text = _read(relative)
+        for expected in ("get_status", "index_unavailable", "safe_fallback", "native_search"):
+            assert expected in text, f"{relative} missing {expected}"
+        for forbidden in FORBIDDEN_UNCONDITIONAL_AGENT_PHRASES:
+            assert forbidden not in text, f"{relative} still contains {forbidden!r}"
+
+
+def test_public_alpha_checklist_names_required_p34_gates():
+    text = _read("docs/operations/deployment-runbook.md")
+    for expected in (
+        "P27-P33",
+        "make alpha-production-matrix",
+        "uv run pytest tests/smoke tests/docs tests/test_release_metadata.py",
+        "make release-smoke release-smoke-container",
+        "tests/docs/test_p34_public_alpha_recut.py",
+        "git tag -l v1.2.0-rc5",
+    ):
+        assert expected in text
+
+
+def test_changelog_records_recut_and_remaining_limitations():
+    text = _normalized("CHANGELOG.md")
+    for expected in (
+        "## [1.2.0-rc5] — 2026-04-23",
+        "P27-P33",
+        "P34",
+        "many unrelated repositories",
+        "one registered worktree",
+        "tracked/default branch",
+        "index_unavailable",
+        "safe_fallback",
+        "native_search",
+        "docs/SUPPORT_MATRIX.md",
+        "docs/operations/deployment-runbook.md",
+        "docs/validation/private-alpha-decision.md",
+    ):
+        assert expected in text
+    for forbidden in FORBIDDEN_UNRESTRICTED_CLAIMS:
+        assert forbidden not in text

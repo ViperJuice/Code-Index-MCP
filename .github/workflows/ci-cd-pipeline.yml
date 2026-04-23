@@ -135,6 +135,34 @@ jobs:
       - name: Run docs and release truth checks
         run: make alpha-docs-truth
 
+  alpha-production-matrix:
+    name: Alpha Gate - Production Multi-Repo Matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libffi-dev ripgrep
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip uv
+          uv sync --locked --extra dev
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Run production multi-repo matrix
+        run: make alpha-production-matrix
+
   alpha-required-gates-passed:
     name: Alpha Gate - Required Gates Passed
     runs-on: ubuntu-latest
@@ -143,6 +171,7 @@ jobs:
       - alpha-unit-release-smoke
       - alpha-integration-smoke
       - alpha-docs-truth
+      - alpha-production-matrix
     steps:
       - name: Confirm required main CI gates passed
         run: echo "Required main CI alpha gates passed."

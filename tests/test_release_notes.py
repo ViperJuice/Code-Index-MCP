@@ -11,6 +11,24 @@ def test_changelog_has_rc1_section():
     ), "CHANGELOG missing [1.2.0-rc1] section with date"
 
 
+def test_changelog_has_rc5_public_alpha_recut_section():
+    """Assert CHANGELOG contains the P34 rc5 public-alpha recut section."""
+    changelog_path = Path(__file__).parent.parent / "CHANGELOG.md"
+    content = " ".join(changelog_path.read_text().split())
+    assert "## [1.2.0-rc5] — 2026-04-23" in content
+    for expected in (
+        "P27-P33",
+        "P34",
+        "many unrelated repositories",
+        "one registered worktree",
+        "tracked/default branch",
+        "index_unavailable",
+        "safe_fallback",
+        "native_search",
+    ):
+        assert expected in content
+
+
 def test_changelog_unreleased_empty():
     """Assert [Unreleased] section exists and is empty (no subsections)."""
     changelog_path = Path(__file__).parent.parent / "CHANGELOG.md"

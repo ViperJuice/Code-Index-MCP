@@ -9,8 +9,8 @@ import pytest
 from watchdog.observers import Observer
 
 from mcp_server.core.repo_context import RepoContext
-from mcp_server.watcher_multi_repo import MultiRepositoryHandler, MultiRepositoryWatcher
 from mcp_server.watcher.sweeper import WatcherSweeper
+from mcp_server.watcher_multi_repo import MultiRepositoryHandler, MultiRepositoryWatcher
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -64,6 +64,7 @@ def _make_dispatcher():
     )
     d.remove_file = Mock()
     d.move_file = Mock()
+    d.evict_repository_state = Mock()
     return d
 
 
@@ -265,8 +266,17 @@ class TestMultiRepositoryWatcherLifecycle:
         ctx2 = _make_repo_context(repo2)
         resolver = _make_repo_resolver({repo1: ctx1, repo2: ctx2})
 
+        store_registry = Mock()
+        plugin_registry = Mock()
+        semantic_registry = Mock()
         watcher = MultiRepositoryWatcher(
-            registry, dispatcher, index_manager, repo_resolver=resolver
+            registry,
+            dispatcher,
+            index_manager,
+            repo_resolver=resolver,
+            store_registry=store_registry,
+            plugin_set_registry=plugin_registry,
+            semantic_indexer_registry=semantic_registry,
         )
 
         try:
@@ -346,17 +356,13 @@ class TestArtifactPublishTriggers:
         watcher._artifact_publisher.publish_on_reindex.assert_not_called()
 
     def test_remote_publish_failure_records_publish_failed(self, tmp_path):
-        watcher, registry, artifact_manager = self._watcher_for_sync(
-            tmp_path, "full_index"
-        )
+        watcher, registry, artifact_manager = self._watcher_for_sync(tmp_path, "full_index")
         watcher._artifact_publisher.publish_on_reindex.side_effect = RuntimeError("boom")
 
         watcher._sync_repository("repo-1", "callback123")
 
         artifact_manager.create_commit_artifact.assert_called_once()
-        registry.update_artifact_state.assert_any_call(
-            "repo-1", artifact_health="publish_failed"
-        )
+        registry.update_artifact_state.assert_any_call("repo-1", artifact_health="publish_failed")
 
     def test_add_repository_after_start_begins_watching(self, tmp_path):
         repo1 = tmp_path / "repo1"
@@ -411,8 +417,17 @@ class TestArtifactPublishTriggers:
         ctx2 = _make_repo_context(repo2)
         resolver = _make_repo_resolver({repo1: ctx1, repo2: ctx2})
 
+        store_registry = Mock()
+        plugin_registry = Mock()
+        semantic_registry = Mock()
         watcher = MultiRepositoryWatcher(
-            registry, dispatcher, index_manager, repo_resolver=resolver
+            registry,
+            dispatcher,
+            index_manager,
+            repo_resolver=resolver,
+            store_registry=store_registry,
+            plugin_set_registry=plugin_registry,
+            semantic_indexer_registry=semantic_registry,
         )
 
         try:
@@ -429,6 +444,12 @@ class TestArtifactPublishTriggers:
             # repo-1 observer still running
             assert "repo-1" in watcher.observers
             assert watcher.observers["repo-1"].is_alive()
+            store_registry.close.assert_called_once_with("repo-2")
+            plugin_registry.evict.assert_called_once_with("repo-2")
+            semantic_registry.evict.assert_called_once_with("repo-2")
+            dispatcher.evict_repository_state.assert_called_once_with(
+                "repo-2", repo_root=Path(repos["repo-2"].path)
+            )
         finally:
             watcher.stop_watching_all()
 

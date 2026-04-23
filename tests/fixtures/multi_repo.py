@@ -132,6 +132,8 @@ class TestServerHandle:
                 coro = tool_handlers.handle_search_code(**common)
             elif name == "reindex":
                 coro = tool_handlers.handle_reindex(**common)
+            elif name == "get_status":
+                coro = tool_handlers.handle_get_status(**common)
             elif name == "write_summaries":
                 coro = tool_handlers.handle_write_summaries(**common)
             elif name == "summarize_sample":
@@ -146,6 +148,14 @@ class TestServerHandle:
         if result:
             return json.loads(result[0].text)
         return {}
+
+    def seed_repo_index(self, repo_id: str, repo_path: Path) -> None:
+        """Refresh the direct SQLite fixture index and mark HEAD as indexed."""
+        _index_repo_into_sqlite(self.store_registry, repo_id, repo_path)
+        head = git_head(repo_path)
+        branch = git_branch(repo_path)
+        self.registry.update_git_state(repo_id)
+        self.registry.update_indexed_commit(repo_id, head, branch=branch)
 
     def stop(self) -> None:
         """Stop all background threads with a 5s bounded join; log-but-swallow on timeout."""
@@ -183,7 +193,51 @@ def _index_repo_into_sqlite(store_registry: Any, repo_id: str, repo_path: Path) 
         return
 
     # Create a repository entry in the sqlite store (integer PK used by files table)
-    internal_repo_id = store.create_repository(str(repo_path), repo_path.name)
+    store.create_repository(str(repo_path), repo_path.name)
+    with store._get_connection() as conn:
+        row = conn.execute(
+            "SELECT id FROM repositories WHERE path = ?", (str(repo_path.resolve()),)
+        ).fetchone()
+    internal_repo_id = (
+        int(row[0]) if row else store.create_repository(str(repo_path), repo_path.name)
+    )
+
+    with store._get_connection() as conn:
+        conn.execute("PRAGMA foreign_keys = OFF")
+        file_ids = [
+            row[0]
+            for row in conn.execute(
+                "SELECT id FROM files WHERE repository_id = ?", (internal_repo_id,)
+            ).fetchall()
+        ]
+        if file_ids:
+            placeholders = ",".join("?" for _ in file_ids)
+            existing_tables = {
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type IN ('table', 'view')"
+                ).fetchall()
+            }
+            for table in (
+                "symbol_references",
+                "imports",
+                "embeddings",
+                "code_chunks",
+            ):
+                if table in existing_tables:
+                    conn.execute(f"DELETE FROM {table} WHERE file_id IN ({placeholders})", file_ids)
+            if "symbol_trigrams" in existing_tables and "symbols" in existing_tables:
+                conn.execute(
+                    "DELETE FROM symbol_trigrams WHERE symbol_id IN "
+                    f"(SELECT id FROM symbols WHERE file_id IN ({placeholders}))",
+                    file_ids,
+                )
+            if "fts_code" in existing_tables:
+                conn.execute(f"DELETE FROM fts_code WHERE file_id IN ({placeholders})", file_ids)
+            if "symbols" in existing_tables:
+                conn.execute(f"DELETE FROM symbols WHERE file_id IN ({placeholders})", file_ids)
+            conn.execute(f"DELETE FROM files WHERE id IN ({placeholders})", file_ids)
+        conn.execute("PRAGMA foreign_keys = ON")
 
     for py_file in repo_path.rglob("*.py"):
         if ".mcp-index" in py_file.parts:
@@ -193,9 +247,11 @@ def _index_repo_into_sqlite(store_registry: Any, repo_id: str, repo_path: Path) 
         except Exception:
             continue
 
+        relative_path = py_file.relative_to(repo_path).as_posix()
         file_id = store.store_file(
             internal_repo_id,
             path=py_file,
+            relative_path=relative_path,
             language="python",
             size=len(content.encode()),
         )
@@ -267,6 +323,7 @@ def boot_test_server(
     env_overrides = {
         "MCP_ALLOWED_ROOTS": allowed_roots_str,
         "MCP_REPO_REGISTRY": str(registry_path),
+        "SEMANTIC_SEARCH_ENABLED": "false",
     }
     if client_secret is not None:
         env_overrides["MCP_CLIENT_SECRET"] = client_secret
@@ -286,6 +343,11 @@ def boot_test_server(
             # SQLiteStore requires the parent directory to exist
             (repo_path / ".mcp-index").mkdir(exist_ok=True)
             _index_repo_into_sqlite(store_registry, repo_id, repo_path)
+            repo_registry.update_indexed_commit(
+                repo_id,
+                git_head(repo_path),
+                branch=git_branch(repo_path),
+            )
 
         # Build HandshakeGate (reads MCP_CLIENT_SECRET from env, already set above)
         gate = HandshakeGate()
@@ -335,3 +397,127 @@ def boot_test_server(
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = original
+
+
+def git(repo_path: Path, *args: str) -> str:
+    """Run git in repo_path and return stdout."""
+    result = subprocess.run(
+        ["git", *args],
+        cwd=str(repo_path),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
+
+
+def git_head(repo_path: Path) -> str:
+    return git(repo_path, "rev-parse", "HEAD")
+
+
+def git_branch(repo_path: Path) -> str:
+    return git(repo_path, "rev-parse", "--abbrev-ref", "HEAD")
+
+
+@dataclass(frozen=True)
+class ProductionRepoFixture:
+    path: Path
+    repo_id: str
+    token: str
+    symbol: str
+
+    def write_file(self, relative_path: str, content: str) -> Path:
+        target = self.path / relative_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+        return target
+
+    def commit_all(self, message: str) -> str:
+        git(self.path, "add", ".")
+        git(self.path, "commit", "-m", message)
+        return git_head(self.path)
+
+    def checkout_new_branch(self, branch: str) -> None:
+        git(self.path, "checkout", "-b", branch)
+
+    def checkout(self, branch: str) -> None:
+        git(self.path, "checkout", branch)
+
+    def rename_file(self, old_relative_path: str, new_relative_path: str, message: str) -> str:
+        target = self.path / new_relative_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        git(self.path, "mv", old_relative_path, new_relative_path)
+        git(self.path, "commit", "-m", message)
+        return git_head(self.path)
+
+    def delete_file(self, relative_path: str, message: str) -> str:
+        target = self.path / relative_path
+        if target.exists():
+            target.unlink()
+        git(self.path, "add", "-A")
+        git(self.path, "commit", "-m", message)
+        return git_head(self.path)
+
+    def revert_last_commit(self, message: str = "revert last change") -> str:
+        git(self.path, "revert", "--no-edit", "HEAD")
+        git(self.path, "commit", "--allow-empty", "-m", message)
+        return git_head(self.path)
+
+
+@dataclass(frozen=True)
+class LinkedWorktreeFixture:
+    source_path: Path
+    worktree_path: Path
+
+
+@dataclass(frozen=True)
+class ProductionMatrixFixture:
+    alpha: ProductionRepoFixture
+    beta: ProductionRepoFixture
+
+    @property
+    def repos(self) -> list[Path]:
+        return [self.alpha.path, self.beta.path]
+
+    def linked_worktree(self) -> LinkedWorktreeFixture:
+        worktree_path = self.alpha.path.parent / f"{self.alpha.path.name}-linked-worktree"
+        git(self.alpha.path, "worktree", "add", str(worktree_path), "-b", "p33-linked-worktree")
+        return LinkedWorktreeFixture(source_path=self.alpha.path, worktree_path=worktree_path)
+
+
+def build_production_matrix(tmp_path: Path) -> ProductionMatrixFixture:
+    """Build two unrelated git repos with distinct lexical evidence."""
+    alpha_symbol = "P33AlphaWidget"
+    beta_symbol = "P33BetaWidget"
+    alpha_token = "p33_alpha_unique_token"
+    beta_token = "p33_beta_unique_token"
+
+    alpha_path, alpha_repo_id = build_temp_repo(
+        tmp_path,
+        "p33_alpha_repo",
+        seed_files={
+            "alpha.py": (
+                f"class {alpha_symbol}:\n"
+                f"    marker = '{alpha_token}'\n\n"
+                f"def {alpha_token}():\n"
+                f"    return '{alpha_symbol}'\n"
+            )
+        },
+    )
+    beta_path, beta_repo_id = build_temp_repo(
+        tmp_path,
+        "p33_beta_repo",
+        seed_files={
+            "beta.py": (
+                f"class {beta_symbol}:\n"
+                f"    marker = '{beta_token}'\n\n"
+                f"def {beta_token}():\n"
+                f"    return '{beta_symbol}'\n"
+            )
+        },
+    )
+
+    return ProductionMatrixFixture(
+        alpha=ProductionRepoFixture(alpha_path, alpha_repo_id, alpha_token, alpha_symbol),
+        beta=ProductionRepoFixture(beta_path, beta_repo_id, beta_token, beta_symbol),
+    )

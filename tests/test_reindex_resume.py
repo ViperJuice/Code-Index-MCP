@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import List
 from unittest.mock import MagicMock, patch
@@ -10,6 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from mcp_server.core.path_resolver import PathResolver
+from mcp_server.core.repo_context import RepoContext
 from mcp_server.indexing.change_detector import FileChange
 from mcp_server.indexing.checkpoint import (
     REINDEX_STATE_VERSION,
@@ -20,6 +22,7 @@ from mcp_server.indexing.checkpoint import (
 )
 from mcp_server.indexing.incremental_indexer import IncrementalIndexer
 from mcp_server.indexing.lock_registry import IndexingLockRegistry, lock_registry
+from mcp_server.storage.multi_repo_manager import RepositoryInfo
 from mcp_server.storage.sqlite_store import SQLiteStore
 
 # ---------------------------------------------------------------------------
@@ -124,7 +127,8 @@ class _CountingDispatcher:
         self.indexed: list[Path] = []
         self._fail_on = fail_on
 
-    def index_file(self, path: Path) -> None:
+    def index_file(self, *args) -> None:
+        path = args[-1]
         if self._fail_on and Path(path).name == self._fail_on:
             raise RuntimeError(f"Simulated failure on {path}")
         self.indexed.append(Path(path))
@@ -153,7 +157,26 @@ def repo_env(tmp_path: Path):
     )
     store.create_repository(str(repo_path), "test-repo")
 
-    return repo_path, store
+    repo_info = RepositoryInfo(
+        repository_id="test-repo",
+        name="test-repo",
+        path=repo_path,
+        index_path=Path(store.db_path),
+        language_stats={},
+        total_files=0,
+        total_symbols=0,
+        indexed_at=datetime.now(),
+        tracked_branch="main",
+    )
+    ctx = RepoContext(
+        repo_id="test-repo",
+        sqlite_store=store,
+        workspace_root=repo_path,
+        tracked_branch="main",
+        registry_entry=repo_info,
+    )
+
+    return repo_path, store, ctx
 
 
 def _make_changes(repo_path: Path, n: int = 1000) -> List[FileChange]:
@@ -174,7 +197,7 @@ def test_crash_at_file_500_leaves_correct_checkpoint(repo_env, tmp_path: Path) -
     real process crash by patching ``_clear_ckpt`` to raise.  Any exception
     that escapes ``update_from_changes`` leaves the on-disk checkpoint intact.
     """
-    repo_path, store = repo_env
+    repo_path, store, ctx = repo_env
     fail_name = "file_0499.py"
     dispatcher = _CountingDispatcher(fail_on=fail_name)
 
@@ -182,6 +205,7 @@ def test_crash_at_file_500_leaves_correct_checkpoint(repo_env, tmp_path: Path) -
         store=store,
         dispatcher=dispatcher,
         repo_path=repo_path,
+        ctx=ctx,
     )
 
     changes = _make_changes(repo_path)
@@ -221,7 +245,7 @@ def test_resume_skips_already_indexed_files(repo_env, tmp_path: Path) -> None:
     exercise the resume path we simulate a process crash on the first run so
     the checkpoint survives into the second run.
     """
-    repo_path, store = repo_env
+    repo_path, store, ctx = repo_env
     fail_name = "file_0499.py"
 
     class _Crash(Exception):
@@ -232,7 +256,12 @@ def test_resume_skips_already_indexed_files(repo_env, tmp_path: Path) -> None:
 
     # First run: crash after file 499 is recorded in checkpoint, before cleanup
     dispatcher1 = _CountingDispatcher(fail_on=fail_name)
-    indexer1 = IncrementalIndexer(store=store, dispatcher=dispatcher1, repo_path=repo_path)
+    indexer1 = IncrementalIndexer(
+        store=store,
+        dispatcher=dispatcher1,
+        repo_path=repo_path,
+        ctx=ctx,
+    )
     changes = _make_changes(repo_path)
     with patch(
         "mcp_server.indexing.incremental_indexer._clear_ckpt",
@@ -247,7 +276,12 @@ def test_resume_skips_already_indexed_files(repo_env, tmp_path: Path) -> None:
 
     # Second run: no failures — resume from checkpoint at file_0499
     dispatcher2 = _CountingDispatcher(fail_on=None)
-    indexer2 = IncrementalIndexer(store=store, dispatcher=dispatcher2, repo_path=repo_path)
+    indexer2 = IncrementalIndexer(
+        store=store,
+        dispatcher=dispatcher2,
+        repo_path=repo_path,
+        ctx=ctx,
+    )
     indexer2.update_from_changes(changes)
 
     # Should only have indexed from file_0499 onward (501 files: 499..999)
@@ -259,9 +293,9 @@ def test_resume_skips_already_indexed_files(repo_env, tmp_path: Path) -> None:
 
 def test_resume_wraps_lock_registry(repo_env) -> None:
     """update_from_changes acquires the per-repo lock from lock_registry."""
-    repo_path, store = repo_env
+    repo_path, store, ctx = repo_env
     dispatcher = _CountingDispatcher()
-    indexer = IncrementalIndexer(store=store, dispatcher=dispatcher, repo_path=repo_path)
+    indexer = IncrementalIndexer(store=store, dispatcher=dispatcher, repo_path=repo_path, ctx=ctx)
     changes = _make_changes(repo_path, n=5)
 
     acquired_ids: list[str] = []
@@ -283,9 +317,9 @@ def test_resume_wraps_lock_registry(repo_env) -> None:
 
 def test_checkpoint_cleared_on_clean_completion(repo_env) -> None:
     """After a clean run (no errors), the checkpoint file is removed."""
-    repo_path, store = repo_env
+    repo_path, store, ctx = repo_env
     dispatcher = _CountingDispatcher()
-    indexer = IncrementalIndexer(store=store, dispatcher=dispatcher, repo_path=repo_path)
+    indexer = IncrementalIndexer(store=store, dispatcher=dispatcher, repo_path=repo_path, ctx=ctx)
     changes = _make_changes(repo_path, n=10)
 
     indexer.update_from_changes(changes)

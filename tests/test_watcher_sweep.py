@@ -1,7 +1,7 @@
 """Tests for WatcherSweeper — periodic full-tree sweep for inotify/FSEvents drop recovery."""
 
-import os
 import hashlib
+import os
 from pathlib import Path
 from unittest.mock import Mock
 

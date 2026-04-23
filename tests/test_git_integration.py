@@ -10,9 +10,9 @@ import pytest
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+from mcp_server.core.repo_resolver import RepoResolver
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
 from mcp_server.indexing.change_detector import ChangeDetector
-from mcp_server.core.repo_resolver import RepoResolver
 from mcp_server.storage.git_index_manager import GitAwareIndexManager
 from mcp_server.storage.repository_registry import RepositoryRegistry
 from mcp_server.storage.store_registry import StoreRegistry

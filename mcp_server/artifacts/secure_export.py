@@ -28,7 +28,9 @@ class SecureIndexExporter:
     ) -> None:
         self.repo_path = Path(repo_path)
         self.index_location = Path(index_location) if index_location is not None else self.repo_path
-        self.index_path = Path(index_path) if index_path is not None else self.index_location / "current.db"
+        self.index_path = (
+            Path(index_path) if index_path is not None else self.index_location / "current.db"
+        )
         self.gitignore_patterns = self._load_gitignore_patterns()
         self.mcp_ignore_patterns = self._load_mcp_ignore_patterns()
         self.all_patterns = self.gitignore_patterns + self.mcp_ignore_patterns

@@ -1,4 +1,4 @@
-"""Release metadata assertions for the active v1.2.0-rc4 contract."""
+"""Release metadata assertions for the active v1.2.0-rc5 contract."""
 
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ except ImportError:  # Python <3.11
 
 
 REPO = Path(__file__).parent.parent
-EXPECTED_VERSION = "1.2.0-rc4"
-EXPECTED_TAG = "v1.2.0-rc4"
+EXPECTED_VERSION = "1.2.0-rc5"
+EXPECTED_TAG = "v1.2.0-rc5"
 
 
 def _read_text(relative_path: str) -> str:
@@ -56,7 +56,7 @@ def test_readme_status_matches_rc_contract():
 def test_changelog_has_rc_contract_section():
     changelog = _read_text("CHANGELOG.md")
 
-    assert f"## [{EXPECTED_VERSION}] — 2026-04-22" in changelog
+    assert f"## [{EXPECTED_VERSION}] — 2026-04-23" in changelog
 
 
 def test_release_workflow_matches_rc_contract():

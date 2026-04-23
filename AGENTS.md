@@ -6,11 +6,17 @@ This file defines the capabilities and constraints for AI agents working with th
 
 **System Complexity**: 5/5 (High — SQLite FTS5 + Qdrant vector index, 48 language plugins, rerankers, query-intent routing)
 **MCP Status**: Use MCP indexed search when repository readiness is `ready`; STDIO is the primary surface
-**Last Updated**: 2026-04-18
+**Last Updated**: 2026-04-23
 **Support matrix**: Customer-facing language/runtime support claims live in `docs/SUPPORT_MATRIX.md`.
 **Dependency truth**: Use `uv sync --locked`; `pyproject.toml` and `uv.lock` are canonical.
 
 > **Beta status**: Multi-repo support and the STDIO interface are in beta. STDIO is the primary surface for LLM tool calls; FastAPI is a secondary admin surface for diagnostics and manual operations. Expect API surface changes before stable release.
+>
+> **Public alpha repository model**: v3 supports many unrelated repositories on
+> one machine, with one registered worktree per git common directory. Only the
+> tracked/default branch is indexed automatically. Indexed results are
+> authoritative only when readiness is `ready`; unavailable indexes return
+> `index_unavailable` with `safe_fallback: "native_search"`.
 
 ### What's Actually Implemented
 - ✅ STDIO transport (`search_code`, `symbol_lookup`, `summarize_sample`, `reindex` MCP tools)

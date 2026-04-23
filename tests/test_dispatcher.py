@@ -1049,6 +1049,53 @@ class TestEnhancedDispatcherProtocolConformance:
         d = Dispatcher([])
         d.move_file(ctx, tmp_path / "old.py", tmp_path / "new.py")  # must not raise
 
+    def test_remove_file_uses_ctx_repository_row(self, tmp_path):
+        """remove_file must delete from the repository row matching ctx root, not row 1."""
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo_a = tmp_path / "repo-a"
+        repo_b = tmp_path / "repo-b"
+        repo_a.mkdir()
+        repo_b.mkdir()
+        target_a = repo_a / "same.py"
+        target_b = repo_b / "same.py"
+        target_a.write_text("a = 1\n")
+        target_b.write_text("b = 1\n")
+
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        row_a = store.ensure_repository_row(repo_a, name="a")
+        row_b = store.ensure_repository_row(repo_b, name="b")
+        store.store_file(repository_id=row_a, path=target_a, relative_path="same.py")
+        store.store_file(repository_id=row_b, path=target_b, relative_path="same.py")
+
+        ctx = _make_repo_ctx(store)
+        ctx.registry_entry.path = repo_b
+        ctx.registry_entry.name = "b"
+        ctx = RepoContext(
+            repo_id=ctx.repo_id,
+            sqlite_store=store,
+            workspace_root=repo_b,
+            tracked_branch=ctx.tracked_branch,
+            registry_entry=ctx.registry_entry,
+        )
+
+        Dispatcher([]).remove_file(ctx, target_b)
+
+        assert store.get_file_by_path("same.py", row_a) is not None
+        assert store.get_file_by_path("same.py", row_b) is None
+
+    def test_runtime_feature_status_registered_semantic_unavailable_without_fallback(self):
+        ctx = _make_repo_ctx(MagicMock())
+        ctx.registry_entry.path = ctx.workspace_root
+        d = Dispatcher([])
+        d._semantic_registry = None
+        d._semantic_indexer_fallback = object()
+
+        status = d.get_runtime_feature_status(ctx)
+
+        assert status["semantic"]["status"] == "unavailable"
+        assert status["semantic"]["reason"] == "semantic_registry_unavailable"
+
     def test_plugins_takes_no_ctx(self):
         """plugins() is process-global; must accept no ctx arg."""
         d = Dispatcher([])

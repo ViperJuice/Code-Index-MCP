@@ -22,6 +22,7 @@ EXPECTED_KEYS = {
     "ready",
     "readiness_code",
     "remediation",
+    "features",
 }
 
 

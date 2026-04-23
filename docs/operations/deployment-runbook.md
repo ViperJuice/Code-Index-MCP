@@ -1,8 +1,8 @@
-# Deployment Runbook (1.2.0-rc4 beta)
+# Deployment Runbook (1.2.0-rc5 beta)
 
 ## Overview
 
-This runbook is the operator's playbook for the Code-Index-MCP `1.2.0-rc4`
+This runbook is the operator's playbook for the Code-Index-MCP `1.2.0-rc5`
 beta release candidate. It is a staged rollout guide, not a GA production
 claim. The documented container package is `ghcr.io/viperjuice/code-index-mcp`.
 Language and sandbox limitations are tracked in
@@ -35,6 +35,7 @@ blocker.
 | Alpha Gate - Format And Lint | Focused formatting and lint checks are clean enough to trust the release branch. | `.github/workflows/ci-cd-pipeline.yml` -> `make alpha-format-lint` | Blocks release on failure; fix code or lint configuration before continuing. |
 | Alpha Gate - Unit And Release Smoke | Unit coverage and P22 wheel/stdio release smoke pass on the release candidate. | `.github/workflows/ci-cd-pipeline.yml` -> `make alpha-unit-release-smoke` and `make release-smoke` | Blocks release on failure; no promotion until smoke is green. |
 | Alpha Gate - Integration Smoke | Integration and slow smoke coverage still works against the current repository state. | `.github/workflows/ci-cd-pipeline.yml` -> `make alpha-integration-smoke` | Blocks release on failure; quarantine only with a tracked release-blocker decision. |
+| Alpha Gate - Production Multi-Repo Matrix | P33 verifies unrelated multi-repo isolation and fail-closed release behavior for same-repo worktree rejection, wrong-branch safety, stale/missing index fallback, incremental repair, rename/delete/revert, force-push recovery, and wrong-artifact rejection. | `.github/workflows/ci-cd-pipeline.yml` -> `make alpha-production-matrix` | Blocks release on any regression; inspect the failing matrix row and do not fall back to native search as release evidence unless the tool returned `index_unavailable` with `safe_fallback: native_search`. |
 | Alpha Gate - Docker Build And Smoke | The production container image builds locally in CI and passes the P22 container smoke. | `.github/workflows/container-registry.yml` -> `make release-smoke-container` | Blocks release on failure; scan/sign/publish jobs remain informational until publication. |
 | Alpha Gate - Docs Truth | Release metadata, dependency source-of-truth, smoke contract, and customer docs truth checks are current. | `.github/workflows/ci-cd-pipeline.yml` -> `make alpha-docs-truth` | Blocks release on failure; docs must be corrected before release evidence is accepted. |
 | Alpha Gate - Required Gates Passed | The required main CI gates completed successfully and are ready to combine with dependency/container gates. | `.github/workflows/ci-cd-pipeline.yml` aggregator job | Blocks release on failure; rerun only after the failed upstream gate is understood. |
@@ -68,6 +69,33 @@ Public alpha is blocked by any required P21-P25 gate failure or any P26
 `public_alpha_blocker`. Non-blocking issues must be classified as
 `documented_limitation` or `post_alpha_backlog` before the final go/no-go
 decision is recorded as `go`, `no_go`, or `conditional_go`.
+
+## P34 Public Alpha Recut Checklist
+
+Before promoting `1.2.0-rc5`, confirm all P27-P33 readiness and multi-repo
+blocker gates are green, including the P33 `make alpha-production-matrix` gate.
+The public release notes and customer docs must state the remaining v3 limits:
+many unrelated repositories are supported, one registered worktree per git
+common directory is supported, only the tracked/default branch is indexed
+automatically, and unavailable indexes return `index_unavailable` with
+`safe_fallback: "native_search"` until readiness is `ready`.
+
+Run the P34 clean-checkout release verification set before public-alpha
+promotion:
+
+```bash
+uv sync --locked
+uv run pytest tests/smoke tests/docs tests/test_release_metadata.py tests/test_requirements_consolidation.py -v --no-cov
+make alpha-production-matrix alpha-release-gates
+make release-smoke release-smoke-container
+git tag -l v1.2.0-rc5
+```
+
+Block release if `tests/docs/test_p34_public_alpha_recut.py`, docs truth tests,
+release metadata tests, clean-checkout wheel smoke, container smoke, or any
+P27-P33 gate fails. A native-search fallback is acceptable runtime remediation
+only when the tool returned `index_unavailable` with
+`safe_fallback: "native_search"`; it is not replacement release evidence.
 
 ## Stages
 
@@ -145,7 +173,7 @@ Any single pass criterion breached for **> 2 consecutive 1-minute windows**.
 
 ```bash
 # Delete the RC tag and roll back the Kubernetes deployment
-git tag --delete v1.2.0-rc4
+git tag --delete v1.2.0-rc5
 kubectl rollout undo deploy/mcp-gateway -n staging
 
 # Confirm rollback is live

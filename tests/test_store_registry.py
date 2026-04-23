@@ -73,7 +73,9 @@ class TestStoreRegistry:
         registry, repo_id, _ = _make_registry_with_repo(tmp_path)
         sr = StoreRegistry.for_registry(registry)
         first = sr.get(repo_id)
+        assert repo_id in sr._build_locks
         sr.close(repo_id)
+        assert repo_id not in sr._build_locks
         second = sr.get(repo_id)
         assert first is not second
 

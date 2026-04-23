@@ -1,5 +1,5 @@
 .PHONY: help install test test-unit test-integration test-all test-parallel test-interfaces test-plugins test-performance test-resilience lint format clean coverage benchmark security docker release-smoke release-smoke-container
-.PHONY: alpha-dependency-sync alpha-format-lint alpha-unit-release-smoke alpha-integration-smoke alpha-docs-truth alpha-release-gates
+.PHONY: alpha-dependency-sync alpha-format-lint alpha-unit-release-smoke alpha-integration-smoke alpha-docs-truth alpha-production-matrix alpha-release-gates
 .PHONY: docker-up docker-down docker-dev docker-prod docker-test docker-logs docker-health
 .PHONY: test-dormant test-real-world test-semantic test-redis test-advanced test-cross-lang
 .PHONY: setup-env setup-dev-env setup-prod-env backup restore clean-docker check-diagrams
@@ -28,6 +28,7 @@ help:
 	@echo "  security        Run security checks"
 	@echo "  release-smoke   Run wheel and lexical MCP release smoke"
 	@echo "  release-smoke-container Run production container release smoke"
+	@echo "  alpha-production-matrix Run P33 production multi-repo release gate"
 	@echo ""
 	@echo "🐳 Docker Operations:"
 	@echo "  docker          Build Docker image"
@@ -189,7 +190,20 @@ alpha-docs-truth:
 		tests/docs/test_p25_release_checklist.py \
 		-v --no-cov
 
-alpha-release-gates: alpha-dependency-sync alpha-format-lint alpha-unit-release-smoke alpha-integration-smoke alpha-docs-truth
+alpha-production-matrix:
+	$(UV_RUN) --extra dev pytest \
+		tests/test_multi_repo_production_matrix.py \
+		tests/test_multi_repo_failure_matrix.py \
+		tests/test_repository_readiness.py \
+		tests/test_tool_readiness_fail_closed.py \
+		tests/test_git_index_manager.py \
+		tests/test_ref_poller_edges.py \
+		tests/test_rename_atomicity.py \
+		tests/test_artifact_download.py \
+		tests/smoke/test_release_smoke_contract.py \
+		-v --no-cov
+
+alpha-release-gates: alpha-dependency-sync alpha-format-lint alpha-unit-release-smoke alpha-integration-smoke alpha-docs-truth alpha-production-matrix
 
 # Docker operations
 docker-up:

@@ -167,6 +167,26 @@ class TestRepositoryOperations:
         repo = sqlite_store.get_repository("/nonexistent")
         assert repo is None
 
+    def test_ensure_repository_row_returns_existing_non_one_id(self, sqlite_store):
+        """Helper returns the row for a path even when the row id is not 1."""
+        sqlite_store.create_repository("/first", "first")
+        repo_id = sqlite_store.create_repository("/target", "target")
+
+        ensured = sqlite_store.ensure_repository_row("/target", name="updated")
+
+        assert repo_id != 1
+        assert ensured == repo_id
+        assert sqlite_store.get_repository("/target")["name"] == "updated"
+
+    def test_ensure_repository_row_creates_once(self, sqlite_store, tmp_path):
+        repo_path = tmp_path / "repo"
+        repo_path.mkdir()
+
+        first = sqlite_store.ensure_repository_row(repo_path)
+        second = sqlite_store.ensure_repository_row(repo_path)
+
+        assert first == second
+
     def test_repository_timestamps(self, sqlite_store):
         """Test repository timestamp handling."""
         # Create repository

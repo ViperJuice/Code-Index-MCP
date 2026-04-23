@@ -89,7 +89,7 @@ class TestRepoResolver:
         assert ctx.tracked_branch == registry.get(repo_id).tracked_branch or ""
         assert isinstance(ctx.sqlite_store, SQLiteStore)
 
-    # 2. Resolve from nested subdirectory — workspace_root is caller path, not git_root
+    # 2. Resolve from nested subdirectory — workspace_root is registered repo root
     def test_resolve_from_nested_subdir(self, tmp_path):
         repo_path = make_git_repo(tmp_path / "myrepo")
         registry, repo_id = make_registry_with_repo(tmp_path, repo_path)
@@ -103,7 +103,20 @@ class TestRepoResolver:
 
         assert ctx is not None
         assert ctx.repo_id == compute_repo_id(repo_path).repo_id
-        assert ctx.workspace_root == nested
+        assert ctx.workspace_root == repo_path.resolve()
+        assert ctx.requested_path == nested.resolve()
+
+    def test_resolve_from_file_preserves_requested_path(self, tmp_path):
+        repo_path = make_git_repo(tmp_path / "myrepo")
+        registry, _repo_id = make_registry_with_repo(tmp_path, repo_path)
+        resolver = make_resolver(registry, make_store_registry(registry))
+        target = repo_path / "README.md"
+
+        ctx = resolver.resolve(target)
+
+        assert ctx is not None
+        assert ctx.workspace_root == repo_path.resolve()
+        assert ctx.requested_path == target.resolve()
 
     # 3. Resolve from .git-as-file worktree
     def test_resolve_from_worktree(self, tmp_path):

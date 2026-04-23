@@ -14,6 +14,7 @@ from mcp_server.storage.multi_repo_manager import RepositoryInfo
 def build_health_row(
     repo_info: RepositoryInfo,
     readiness: Optional[RepositoryReadiness] = None,
+    features: Optional[dict] = None,
 ) -> dict:
     if readiness is None:
         readiness = ReadinessClassifier.classify_registered(repo_info)
@@ -38,4 +39,12 @@ def build_health_row(
         "ready": readiness.ready,
         "readiness_code": readiness.code,
         "remediation": readiness.remediation,
+        "features": features
+        or {
+            "lexical": {"status": "available" if readiness.ready else "unavailable"},
+            "semantic": {"status": "unavailable", "reason": "runtime_status_unavailable"},
+            "graph": {"status": "unavailable", "reason": "runtime_status_unavailable"},
+            "plugins": {"status": "unavailable", "reason": "runtime_status_unavailable"},
+            "cross_repo": {"status": "unavailable", "reason": "runtime_status_unavailable"},
+        },
     }

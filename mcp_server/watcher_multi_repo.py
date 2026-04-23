@@ -249,12 +249,18 @@ class MultiRepositoryWatcher:
         artifact_manager: Optional[CommitArtifactManager] = None,
         repo_resolver: Optional[RepoResolver] = None,
         sweeper: Optional[WatcherSweeper] = None,
+        store_registry: Optional[object] = None,
+        plugin_set_registry: Optional[object] = None,
+        semantic_indexer_registry: Optional[object] = None,
     ):
         self.registry = registry
         self.dispatcher = dispatcher
         self.index_manager = index_manager
         self.artifact_manager = artifact_manager or CommitArtifactManager()
         self.repo_resolver = repo_resolver
+        self.store_registry = store_registry or getattr(index_manager, "store_registry", None)
+        self.plugin_set_registry = plugin_set_registry
+        self.semantic_indexer_registry = semantic_indexer_registry
         self.sweeper: Optional[WatcherSweeper] = sweeper or self._build_default_sweeper()
 
         self.watchers = {}  # repo_id -> MultiRepositoryHandler
@@ -322,18 +328,19 @@ class MultiRepositoryWatcher:
         repo_info = self.registry.get_repository(repo_id)
         if repo_info is None:
             return None
-        path = Path(repo_info.path)
-        ctx = self.repo_resolver.resolve(path) if self.repo_resolver is not None else None
+        repo_root = Path(repo_info.path)
+        ctx = self.repo_resolver.resolve(repo_root) if self.repo_resolver is not None else None
         if ctx is None:
             tracked = getattr(repo_info, "tracked_branch", None) or ""
             ctx = RepoContext(
                 repo_id=repo_id,
                 sqlite_store=None,  # type: ignore[arg-type]
-                workspace_root=path,
+                workspace_root=repo_root,
                 tracked_branch=tracked,
                 registry_entry=repo_info,
+                requested_path=repo_root,
             )
-        return MultiRepositoryHandler(repo_id, path, self, ctx=ctx)
+        return MultiRepositoryHandler(repo_id, repo_root, self, ctx=ctx)
 
     def _on_missed_create(self, repo_id: str, relative_path: str) -> None:
         handler = self._handler_for_missed_event(repo_id)
@@ -345,7 +352,9 @@ class MultiRepositoryWatcher:
         if handler and handler._remove_with_ctx(handler.repo_path / relative_path):
             self.mark_repository_changed(repo_id)
 
-    def _on_missed_rename(self, repo_id: str, old_relative_path: str, new_relative_path: str) -> None:
+    def _on_missed_rename(
+        self, repo_id: str, old_relative_path: str, new_relative_path: str
+    ) -> None:
         handler = self._handler_for_missed_event(repo_id)
         if handler and handler._move_with_ctx(
             handler.repo_path / old_relative_path,
@@ -415,6 +424,8 @@ class MultiRepositoryWatcher:
         Args:
             repo_id: Repository ID
         """
+        repo_info = self.registry.get_repository(repo_id)
+
         if repo_id in self.observers:
             observer = self.observers[repo_id]
             observer.stop()
@@ -422,6 +433,18 @@ class MultiRepositoryWatcher:
 
             del self.observers[repo_id]
             del self.watchers[repo_id]
+
+        repo_root = Path(repo_info.path) if repo_info is not None else None
+        if self.store_registry is not None and hasattr(self.store_registry, "close"):
+            self.store_registry.close(repo_id)
+        if self.plugin_set_registry is not None and hasattr(self.plugin_set_registry, "evict"):
+            self.plugin_set_registry.evict(repo_id)
+        if self.semantic_indexer_registry is not None and hasattr(
+            self.semantic_indexer_registry, "evict"
+        ):
+            self.semantic_indexer_registry.evict(repo_id)
+        if hasattr(self.dispatcher, "evict_repository_state"):
+            self.dispatcher.evict_repository_state(repo_id, repo_root=repo_root)
 
         self.registry.unregister_repository(repo_id)
 
@@ -431,15 +454,15 @@ class MultiRepositoryWatcher:
             return
 
         try:
-            path = Path(repo_path)
-            if not path.exists():
+            repo_root = Path(repo_path)
+            if not repo_root.exists():
                 logger.error("Repository path does not exist: %s", repo_path)
                 return
 
             # Resolve RepoContext for per-repo dispatcher routing.
             ctx: Optional[RepoContext] = None
             if self.repo_resolver is not None:
-                ctx = self.repo_resolver.resolve(path)
+                ctx = self.repo_resolver.resolve(repo_root)
             if ctx is None:
                 # Fallback: minimal context so the handler can still filter by branch.
                 repo_info = self.registry.get_repository(repo_id)
@@ -448,15 +471,16 @@ class MultiRepositoryWatcher:
                 ctx = RepoContext(
                     repo_id=repo_id,
                     sqlite_store=None,  # type: ignore[arg-type]
-                    workspace_root=path,
+                    workspace_root=repo_root,
                     tracked_branch=tracked,
                     registry_entry=repo_info,
+                    requested_path=repo_root,
                 )
 
-            handler = MultiRepositoryHandler(repo_id, path, self, ctx=ctx)
+            handler = MultiRepositoryHandler(repo_id, repo_root, self, ctx=ctx)
 
             observer = Observer()
-            observer.schedule(handler, str(path), recursive=True)
+            observer.schedule(handler, str(repo_root), recursive=True)
             observer.start()
 
             self.observers[repo_id] = observer
@@ -533,8 +557,10 @@ class MultiRepositoryWatcher:
                                 repo_id,
                                 artifact_health="publish_failed",
                             )
-                elif repo_info and repo_info.artifact_enabled and hasattr(
-                    self.registry, "update_artifact_state"
+                elif (
+                    repo_info
+                    and repo_info.artifact_enabled
+                    and hasattr(self.registry, "update_artifact_state")
                 ):
                     self.registry.update_artifact_state(
                         repo_id,

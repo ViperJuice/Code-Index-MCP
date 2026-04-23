@@ -52,9 +52,16 @@ def test_is_dataclass_and_frozen():
 def test_field_names():
     from mcp_server.core.repo_context import RepoContext
 
-    expected = {"repo_id", "sqlite_store", "workspace_root", "tracked_branch", "registry_entry"}
+    expected = {
+        "repo_id",
+        "sqlite_store",
+        "workspace_root",
+        "tracked_branch",
+        "registry_entry",
+        "requested_path",
+    }
     assert {f.name for f in fields(RepoContext)} == expected
-    assert len(fields(RepoContext)) == 5
+    assert len(fields(RepoContext)) == 6
 
 
 # ---------------------------------------------------------------------------

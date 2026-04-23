@@ -20,11 +20,7 @@ def test_manifest_v2_round_trip_serialization():
         commit="abc123",
         schema_version="2",
         semantic_profile_hash=build_semantic_profile_hash(
-            {
-                "commercial-high": {
-                    "compatibility_fingerprint": "0123456789abcdef0123456789abcdef"
-                }
-            }
+            {"commercial-high": {"compatibility_fingerprint": "0123456789abcdef0123456789abcdef"}}
         ),
         checksum="deadbeef",
         artifact_type="full",

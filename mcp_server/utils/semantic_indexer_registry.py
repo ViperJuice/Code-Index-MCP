@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
+import re
 import threading
+from pathlib import Path
 from typing import TYPE_CHECKING, Dict
 
 if TYPE_CHECKING:
@@ -33,11 +36,16 @@ class SemanticIndexerRegistry:
 
         from .semantic_indexer import SemanticIndexer
 
+        branch = repo_info.tracked_branch or repo_info.current_branch or "unknown"
+        qdrant_path = Path(repo_info.index_location or Path(repo_info.index_path).parent)
+        qdrant_path = qdrant_path / "semantic_qdrant"
+
         indexer = SemanticIndexer(
-            qdrant_path=":memory:",
+            qdrant_path=str(qdrant_path),
             repo_identifier=repo_id,
-            branch=repo_info.tracked_branch or repo_info.current_branch,
+            branch=branch,
             commit=repo_info.current_commit,
+            collection=self._collection_name(repo_id, branch, repo_info.current_commit),
         )
 
         with self._lock:
@@ -49,6 +57,29 @@ class SemanticIndexerRegistry:
 
         return indexer
 
+    @staticmethod
+    def _collection_name(repo_id: str, branch: str, commit: str | None) -> str:
+        repo_part = hashlib.sha256(repo_id.encode()).hexdigest()[:12]
+        branch_part = re.sub(r"[^0-9a-zA-Z]+", "_", branch.lower()).strip("_") or "branch"
+        commit_part = re.sub(r"[^0-9a-zA-Z]+", "_", (commit or "unknown").lower()).strip("_")
+        return f"ci__{repo_part}__{branch_part}__{commit_part[:12] or 'unknown'}"
+
+    def evict(self, repo_id: str) -> bool:
+        """Close and remove one cached indexer. Returns True when one existed."""
+        with self._lock:
+            indexer = self._cache.pop(repo_id, None)
+        if indexer is None:
+            return False
+        self._close_indexer(indexer)
+        return True
+
+    @staticmethod
+    def _close_indexer(indexer: "SemanticIndexer") -> None:
+        try:
+            indexer.qdrant.close()
+        except Exception:
+            pass
+
     def shutdown(self) -> None:
         """Close all cached indexers."""
         with self._lock:
@@ -56,7 +87,4 @@ class SemanticIndexerRegistry:
             self._cache.clear()
 
         for indexer in indexers:
-            try:
-                indexer.qdrant.close()
-            except Exception:
-                pass
+            self._close_indexer(indexer)

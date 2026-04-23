@@ -5,7 +5,7 @@ Modular, extensible local-first code indexer designed to enhance Claude Code and
 > **Beta status**: Multi-repo support and the MCP STDIO interface are in beta. The MCP tool interface (`search_code`, `symbol_lookup`, and friends) is the primary surface for LLM-driven use; the FastAPI REST gateway is a secondary admin surface for diagnostics and manual operations. Expect API surface changes before stable release.
 
 ## Project Status
-**Version**: 1.2.0-rc4 (beta)
+**Version**: 1.2.0-rc5 (beta)
 **Python distribution**: `index-it-mcp`
 **Container image**: `ghcr.io/viperjuice/code-index-mcp`
 **Primary surface**: MCP tools (`search_code`, `symbol_lookup`) via the STDIO runner when repository readiness is `ready`
@@ -13,7 +13,8 @@ Modular, extensible local-first code indexer designed to enhance Claude Code and
 **Core features**: local indexing, symbol/text search, registry-based language coverage; see [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md)
 **Optional features**: semantic search (requires Voyage AI or a local vLLM endpoint), GitHub Artifacts index sync
 **Performance**: sub-100ms symbol lookup and sub-500ms search on indexed repos (benchmarked on this codebase; results vary by repo size and language mix)
-**Public alpha decision**: see [docs/validation/private-alpha-decision.md](docs/validation/private-alpha-decision.md) before promotion; public alpha remains beta-status until P21-P26 gates and private evidence are green.
+**Public alpha decision**: see [docs/validation/private-alpha-decision.md](docs/validation/private-alpha-decision.md) before promotion; public alpha remains beta-status until P21-P34 gates, the P33 production multi-repo matrix, and private evidence are green.
+**Public alpha repository model**: one server can serve many unrelated repositories, with one registered worktree per git common directory. Only the tracked/default branch is indexed automatically. Indexed MCP results are authoritative only when readiness is `ready`; unavailable indexes return `index_unavailable` with `safe_fallback: "native_search"`.
 
 > **New to Code-Index-MCP?** Check out our [Getting Started Guide](docs/GETTING_STARTED.md) for a quick walkthrough.
 
@@ -137,7 +138,7 @@ This automatically detects your environment and creates the appropriate `.mcp.js
 curl -sSL https://raw.githubusercontent.com/ViperJuice/Code-Index-MCP/main/scripts/install-mcp-docker.sh | bash
 
 # Index your current directory
-docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4
+docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc5
 ```
 
 #### Option 2: AI-Powered Search
@@ -146,7 +147,7 @@ docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4
 export VOYAGE_API_KEY=your-key
 
 # Run with semantic search enabled explicitly
-docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4
+docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc5
 ```
 
 ### 💻 Environment-Specific Setup
@@ -157,7 +158,7 @@ docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_AP
 .\scripts\setup-mcp-json.ps1
 
 # Or manually with Docker Desktop
-docker run -it -v ${PWD}:/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4
+docker run -it -v ${PWD}:/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc5
 ```
 
 #### 🍎 macOS
@@ -225,7 +226,7 @@ The setup script creates the appropriate `.mcp.json` for your environment. Manua
       "args": [
         "run", "-i", "--rm",
         "-v", "${workspace}:/workspace",
-        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4"
+        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc5"
       ]
     }
   }
@@ -241,7 +242,7 @@ make release-smoke-container
 
 ## Using Against Many Repos
 
-Index multiple repositories from a single running server instance.
+Index many unrelated repositories from a single running server instance.
 
 **Prerequisites**: set `MCP_ALLOWED_ROOTS` to an OS-path-separator-separated list of absolute directory paths (`:` on Unix, `;` on Windows) that the server is allowed to index before starting the server:
 
@@ -255,7 +256,10 @@ export MCP_ALLOWED_ROOTS=/abs/a:/abs/b
 op run --env-file=.mcp.env -- python -m mcp_server.cli.server_commands
 ```
 
-**Register each repo** — links the repo's worktree to a stable `repo_id` (Tier 1: `git rev-parse --git-common-dir`, so all worktrees of the same repo share one index):
+**Register each repo** — register one worktree per git common directory. The
+stable `repo_id` comes from Tier 1 `git rev-parse --git-common-dir`, so sibling
+worktrees of the same repository share identity and are not independently
+indexed in v3:
 
 ```bash
 mcp-index repository register /abs/a
@@ -269,7 +273,13 @@ search_code(query="def parse", repository="my-repo")
 symbol_lookup(symbol="Parser", repository="my-repo")
 ```
 
-**Index tracking**: each repo's default branch is tracked by `MultiRepositoryWatcher` (`RefPoller` every 30 s). Same-repo multiple worktrees are unsupported in v3 query routing: non-default or sibling worktrees return `index_unavailable` with `safe_fallback: "native_search"` and readiness remediation instead of reusing another checkout's index.
+**Index tracking**: each repo's tracked/default branch is followed by
+`MultiRepositoryWatcher` (`RefPoller` every 30 s). Same-repo multiple worktrees
+and non-default branch queries are unsupported in v3 routing: they return
+`index_unavailable` with `safe_fallback: "native_search"` and readiness
+remediation instead of reusing another checkout's index. Check `get_status` or
+`mcp-index repository list -v` and trust indexed MCP results only when readiness
+is `ready`.
 
 **Path sandbox**: tools `search_code`, `symbol_lookup`, `summarize_sample`, and `reindex` reject paths outside `MCP_ALLOWED_ROOTS` with error code `path_outside_allowed_roots`. Registered repo names bypass the check.
 
@@ -318,10 +328,10 @@ for language/runtime support details.
 #### Option 1: Install via pip (Recommended)
 ```bash
 # After the public-alpha package is published, install the rc package
-pip install --pre index-it-mcp==1.2.0rc4
+pip install --pre index-it-mcp==1.2.0rc5
 
 # Or install with dev tools for testing
-pip install --pre "index-it-mcp[dev]==1.2.0rc4"
+pip install --pre "index-it-mcp[dev]==1.2.0rc5"
 ```
 
 #### Option 2: Install from Source
@@ -1116,10 +1126,10 @@ Maintainers can create new releases with pre-built indexes:
 
 ```bash
 # Create a new release (as draft)
-python scripts/create-release.py --version 1.2.0-rc4
+python scripts/create-release.py --version 1.2.0-rc5
 
 # Create and publish immediately
-python scripts/create-release.py --version 1.2.0-rc4 --publish
+python scripts/create-release.py --version 1.2.0-rc5 --publish
 ```
 
 ### Automatic Index Synchronization
@@ -1189,7 +1199,7 @@ For detailed architectural documentation, see the [architecture/](architecture/)
 
 See [ROADMAP.md](ROADMAP.md) for detailed development plans and current progress.
 
-**Current Status**: 1.2.0-rc4 beta release candidate
+**Current Status**: 1.2.0-rc5 beta release candidate
 - ✅ **Core Indexing**: SQLite + FTS5 for fast local search
 - ✅ **Multi-Language**: Specialized and registry-backed language coverage; see `docs/SUPPORT_MATRIX.md`
 - ✅ **MCP Protocol**: Full compatibility with Claude Code and other MCP clients

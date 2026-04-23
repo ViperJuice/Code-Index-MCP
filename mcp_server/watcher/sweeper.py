@@ -1,8 +1,8 @@
 """Periodic full-tree sweeper that recovers inotify/FSEvents drop events (IF-0-P14-5)."""
 
+import hashlib
 import logging
 import os
-import hashlib
 import threading
 import time
 from pathlib import Path
@@ -207,7 +207,9 @@ class WatcherSweeper:
                 digest.update(chunk)
         return digest.hexdigest()
 
-    def _indexed_path_should_report_delete(self, repo_root: Path, rel: str, gitignore_filter) -> bool:
+    def _indexed_path_should_report_delete(
+        self, repo_root: Path, rel: str, gitignore_filter
+    ) -> bool:
         path = repo_root / rel
         if path.suffix not in _CODE_EXTENSIONS:
             return False

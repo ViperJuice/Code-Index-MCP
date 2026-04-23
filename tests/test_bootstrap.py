@@ -76,6 +76,22 @@ class TestInitializeStatelessServices:
             or getattr(dispatcher, "_sqlite_store", None) is None
         )
 
+    def test_injects_semantic_registry_when_enabled(self, tmp_path, monkeypatch):
+        from mcp_server.cli.bootstrap import initialize_stateless_services
+        from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
+        from mcp_server.utils.semantic_indexer_registry import SemanticIndexerRegistry
+
+        monkeypatch.setenv("SEMANTIC_SEARCH_ENABLED", "true")
+        registry_path = tmp_path / "registry.json"
+
+        _, _, dispatcher, repo_registry, _ = initialize_stateless_services(
+            registry_path=registry_path
+        )
+
+        assert isinstance(dispatcher, EnhancedDispatcher)
+        assert isinstance(dispatcher._semantic_registry, SemanticIndexerRegistry)
+        assert dispatcher._semantic_registry._repo_registry is repo_registry
+
 
 class TestAllowedRootsParsing:
     """MCP_ALLOWED_ROOTS parsing must match documented multi-repo setup."""

@@ -2,9 +2,15 @@
 
 This guide walks you through installing and using Code-Index-MCP to index and search your codebase.
 
-> **Beta status**: This guide targets `1.2.0-rc4`. MCP STDIO is the primary
+> **Beta status**: This guide targets `1.2.0-rc5`. MCP STDIO is the primary
 > LLM surface; FastAPI is a secondary admin surface. Language behavior is
 > documented in [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md).
+>
+> **Public alpha repository model**: one server can serve many unrelated
+> repositories, with one registered worktree per git common directory. Only the
+> tracked/default branch is indexed automatically. Indexed MCP results are
+> authoritative only when readiness is `ready`; unavailable indexes return
+> `index_unavailable` with `safe_fallback: "native_search"`.
 
 ## Prerequisites
 
@@ -19,7 +25,7 @@ This guide walks you through installing and using Code-Index-MCP to index and se
 
 ```bash
 # After the public-alpha package is published, install the rc package
-pip install --pre index-it-mcp==1.2.0rc4
+pip install --pre index-it-mcp==1.2.0rc5
 
 # Verify installation
 mcp-index --version
@@ -84,7 +90,9 @@ The server exposes:
 ### Same-Machine Multi-Repo Setup
 
 If you work across multiple local repositories on one machine, register each
-checkout and inspect readiness before starting work:
+checkout and inspect readiness before starting work. Use one registered
+worktree per git common directory; same-repo sibling worktrees and non-default
+branch queries are outside the v3 indexed-routing contract:
 
 ```bash
 export MCP_ALLOWED_ROOTS="/path/to/repo-a:/path/to/repo-b"  # use ; instead of : on Windows
@@ -98,6 +106,10 @@ mcp-index artifact reconcile-workspace
 Newly registered repos usually start with `artifact_health: missing` until you
 restore local runtime files with `mcp-index artifact pull --latest` or build a
 local index with `mcp-index repository sync`.
+Use `mcp-index repository list -v` or the MCP `get_status` tool before trusting
+indexed results. If `search_code` or `symbol_lookup` returns
+`index_unavailable` with `safe_fallback: "native_search"`, use native search
+while following the returned readiness remediation.
 
 ### 3. Search Your Code
 

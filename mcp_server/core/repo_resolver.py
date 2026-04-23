@@ -63,10 +63,13 @@ class RepoResolver:
         tracked_branch = info.tracked_branch or ""
 
         store = self._store_registry.get(repo_id)
+        requested_path = path.expanduser().resolve()
+        workspace_root = Path(info.path).expanduser().resolve()
         return RepoContext(
             repo_id=repo_id,
             sqlite_store=store,
-            workspace_root=path,
+            workspace_root=workspace_root,
             tracked_branch=tracked_branch,
             registry_entry=info,
+            requested_path=requested_path,
         )

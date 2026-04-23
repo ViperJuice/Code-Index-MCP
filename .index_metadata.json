@@ -7,9 +7,9 @@
   "normalization_policy": "provider-default",
   "chunk_schema_version": "legacy",
   "created_at": "2026-03-05T05:10:02.226505",
-  "updated_at": "2026-04-23T02:06:02.783992",
-  "qdrant_path": ":memory:",
-  "collection_name": "ci__aaa4034450c0__legacy-default__165a4f82df00",
+  "updated_at": "2026-04-23T14:36:09.293924",
+  "qdrant_path": "/tmp/pytest-of-viperjuice/pytest-1149/popen-gw11/test_evict_closes_target_only_0/alpha/.mcp-index/semantic_qdrant",
+  "collection_name": "ci__b41c2aeeb2f1__legacy-default__e8a2133159c9",
   "compatibility_hash": "1a8eb12939e6a631",
-  "git_commit": "8df826822788354e3b47bebfdb1b09bb2dab0020"
+  "git_commit": "40015b434cca0a8ef684706e83d65b11ce749c04"
 }

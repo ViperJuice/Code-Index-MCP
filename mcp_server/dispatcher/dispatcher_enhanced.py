@@ -70,6 +70,20 @@ class IndexResult:
     error: str | None = None
 
 
+@dataclass
+class _GraphState:
+    analyzer: Optional[GraphAnalyzer] = None
+    selector: Optional[ContextSelector] = None
+    nodes: List[GraphNode] = None  # type: ignore[assignment]
+    edges: List[Any] = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.nodes is None:
+            self.nodes = []
+        if self.edges is None:
+            self.edges = []
+
+
 _INDEX_EXCLUDED_FILENAMES = {
     "full_indexing_log.txt",
     "mcp_validation_results.json",
@@ -350,10 +364,7 @@ class EnhancedDispatcher:
 
         # Graph analysis components (lazy initialized)
         self._graph_builder: Optional[XRefAdapter] = None
-        self._graph_analyzer: Optional[GraphAnalyzer] = None
-        self._context_selector: Optional[ContextSelector] = None
-        self._graph_nodes: List[GraphNode] = []
-        self._graph_edges = []
+        self._graph_state: Dict[str, _GraphState] = {}
 
         # Bounded fallback timeout (IF-0-P11-2)
         try:
@@ -1121,14 +1132,104 @@ class EnhancedDispatcher:
             logger.warning(f"_apply_reranker failed, returning original order: {e}")
             return candidates[:limit]
 
+    def _is_registered_context(self, ctx: RepoContext) -> bool:
+        entry = getattr(ctx, "registry_entry", None)
+        if entry is None:
+            return False
+        return isinstance(getattr(entry, "path", None), (str, Path))
+
     def _get_semantic_indexer(self, ctx: RepoContext) -> Optional[SemanticIndexer]:
-        """Return the SemanticIndexer for ctx.repo_id, or the fallback if no registry."""
+        """Return the SemanticIndexer for ctx.repo_id, or local fallback for legacy contexts."""
         if self._semantic_registry is not None:
             try:
                 return self._semantic_registry.get(ctx.repo_id)
             except (KeyError, Exception):
                 return None
+        if self._is_registered_context(ctx):
+            return None
         return self._semantic_indexer_fallback
+
+    def _sqlite_repository_id(self, ctx: RepoContext) -> int:
+        repo_info = ctx.registry_entry
+        raw_path = getattr(repo_info, "path", None) if repo_info is not None else None
+        if not isinstance(raw_path, (str, Path)):
+            raw_path = ctx.workspace_root
+        repo_path = Path(raw_path)
+        repo_name = getattr(repo_info, "name", None) if repo_info is not None else None
+        metadata = {"repo_id": ctx.repo_id}
+        return ctx.sqlite_store.ensure_repository_row(repo_path, name=repo_name, metadata=metadata)
+
+    def _graph_key(self, ctx: RepoContext) -> str:
+        root = Path(ctx.workspace_root).expanduser().resolve()
+        return f"{ctx.repo_id}:{root}"
+
+    def get_runtime_feature_status(self, ctx: RepoContext) -> Dict[str, Dict[str, Any]]:
+        semantic_reason = None
+        semantic_available = False
+        if not self._semantic_enabled:
+            semantic_reason = "semantic_search_disabled"
+        elif self._semantic_registry is None and self._is_registered_context(ctx):
+            semantic_reason = "semantic_registry_unavailable"
+        elif self._get_semantic_indexer(ctx) is None:
+            semantic_reason = "semantic_indexer_unavailable"
+        else:
+            semantic_available = True
+
+        graph_state = self._graph_state.get(self._graph_key(ctx))
+        graph_available = bool(graph_state and graph_state.analyzer and graph_state.selector)
+
+        return {
+            "lexical": {"status": "available" if ctx.sqlite_store else "unavailable"},
+            "semantic": {
+                "status": "available" if semantic_available else "unavailable",
+                "reason": semantic_reason,
+            },
+            "graph": {
+                "status": "available" if graph_available else "unavailable",
+                "reason": None if graph_available else "graph_not_initialized",
+            },
+            "plugins": {
+                "status": "available",
+                "loaded": len(self._plugin_set_registry.plugins_for(ctx.repo_id)),
+            },
+            "cross_repo": {
+                "status": "available" if self._cross_repo_coordinator else "unavailable",
+                "reason": None if self._cross_repo_coordinator else "cross_repo_disabled",
+            },
+        }
+
+    def evict_repository_state(
+        self, repo_id: str, repo_root: Optional[Union[str, Path]] = None
+    ) -> Dict[str, int]:
+        evicted = {"file_cache": 0, "graph": 0, "plugins": 0, "semantic": 0}
+        root: Optional[Path] = Path(repo_root).expanduser().resolve() if repo_root else None
+        with self._file_cache_lock:
+            for key in list(self._file_cache.keys()):
+                try:
+                    path = Path(key).expanduser().resolve()
+                    if root is not None and not path.is_relative_to(root):
+                        continue
+                except Exception:
+                    if root is not None:
+                        continue
+                self._file_cache.pop(key, None)
+                evicted["file_cache"] += 1
+        for key in list(self._graph_state.keys()):
+            if key.startswith(f"{repo_id}:"):
+                self._graph_state.pop(key, None)
+                evicted["graph"] += 1
+        if hasattr(self._plugin_set_registry, "evict"):
+            try:
+                self._plugin_set_registry.evict(repo_id)
+                evicted["plugins"] = 1
+            except Exception as exc:
+                logger.warning("Plugin eviction failed for %s: %s", repo_id, exc)
+        if self._semantic_registry is not None and hasattr(self._semantic_registry, "evict"):
+            try:
+                evicted["semantic"] = 1 if self._semantic_registry.evict(repo_id) else 0
+            except Exception as exc:
+                logger.warning("Semantic eviction failed for %s: %s", repo_id, exc)
+        return evicted
 
     def search(
         self,
@@ -2109,6 +2210,16 @@ class EnhancedDispatcher:
             "plugins": {},
             "errors": [],
         }
+        try:
+            health.update(
+                {
+                    "runtime_features": self.get_runtime_feature_status(ctx),
+                    "graph_initialized": self.get_runtime_feature_status(ctx)["graph"]["status"]
+                    == "available",
+                }
+            )
+        except Exception:
+            health["graph_initialized"] = False
 
         # Check plugin health
         for lang, plugin in self._lang_cache.items():
@@ -2146,10 +2257,12 @@ class EnhancedDispatcher:
             if ctx.sqlite_store:
                 from ..core.path_resolver import PathResolver
 
-                path_resolver = PathResolver()
+                path_resolver = PathResolver(repository_root=ctx.workspace_root)
                 try:
                     relative_path = path_resolver.normalize_path(path)
-                    ctx.sqlite_store.remove_file(relative_path, repository_id=1)
+                    ctx.sqlite_store.remove_file(
+                        relative_path, repository_id=self._sqlite_repository_id(ctx)
+                    )
                 except Exception as e:
                     logger.error(f"Error removing from SQLite: {e}")
 
@@ -2213,12 +2326,13 @@ class EnhancedDispatcher:
             return
 
         store = ctx.sqlite_store
+        repository_id = self._sqlite_repository_id(ctx)
 
         def _sqlite_primary() -> Tuple[str, str]:
             store.move_file(
                 old_relative,
                 new_relative,
-                repository_id=1,
+                repository_id=repository_id,
                 content_hash=content_hash,
             )
             return old_relative, new_relative
@@ -2237,7 +2351,7 @@ class EnhancedDispatcher:
                 store.move_file(
                     new_relative,
                     old_relative,
-                    repository_id=1,
+                    repository_id=repository_id,
                     content_hash=content_hash,
                 )
                 logger.info("Rolled back SQLite rename %s -> %s", new_relative, old_relative)
@@ -2376,7 +2490,9 @@ class EnhancedDispatcher:
                 "repository_details": [],
             }
 
-    def _ensure_graph_initialized(self, file_paths: Optional[List[str]] = None) -> bool:
+    def _ensure_graph_initialized(
+        self, file_paths: Optional[List[str]] = None, ctx: Optional[RepoContext] = None
+    ) -> bool:
         """
         Ensure graph components are initialized.
 
@@ -2390,8 +2506,14 @@ class EnhancedDispatcher:
             logger.warning("Graph features not available: TreeSitter Chunker not installed")
             return False
 
-        # If already initialized and no new files, return
-        if self._graph_analyzer is not None and file_paths is None:
+        if ctx is None:
+            logger.warning("Graph features require a repository context")
+            return False
+
+        key = self._graph_key(ctx)
+        state = self._graph_state.get(key)
+
+        if state is not None and state.analyzer is not None and file_paths is None:
             return True
 
         try:
@@ -2402,12 +2524,12 @@ class EnhancedDispatcher:
             # Build graph from files
             if file_paths:
                 nodes, edges = self._graph_builder.build_graph(file_paths)
-                self._graph_nodes = nodes
-                self._graph_edges = edges
-
-                # Initialize analyzer and selector
-                self._graph_analyzer = GraphAnalyzer(nodes, edges)
-                self._context_selector = ContextSelector(nodes, edges)
+                self._graph_state[key] = _GraphState(
+                    analyzer=GraphAnalyzer(nodes, edges),
+                    selector=ContextSelector(nodes, edges),
+                    nodes=nodes,
+                    edges=edges,
+                )
 
                 logger.info(f"Graph initialized: {len(nodes)} nodes, {len(edges)} edges")
                 return True
@@ -2436,9 +2558,10 @@ class EnhancedDispatcher:
             return
 
         # Try to expand with graph context
-        if self._context_selector:
+        graph_state = self._graph_state.get(self._graph_key(ctx))
+        if graph_state and graph_state.selector:
             try:
-                context_nodes = self._context_selector.expand_search_results(
+                context_nodes = graph_state.selector.expand_search_results(
                     search_results, expansion_radius, max_context_nodes
                 )
 
@@ -2482,14 +2605,15 @@ class EnhancedDispatcher:
         Returns:
             GraphCutResult or None if graph not available
         """
-        if not self._context_selector:
+        graph_state = self._graph_state.get(self._graph_key(ctx))
+        if not graph_state or not graph_state.selector:
             logger.warning("Context selector not initialized")
             return None
 
         try:
             # Find nodes matching symbols
             seed_nodes = []
-            for node in self._graph_nodes:
+            for node in graph_state.nodes:
                 if node.symbol in symbols:
                     seed_nodes.append(node.id)
 
@@ -2498,7 +2622,7 @@ class EnhancedDispatcher:
                 return None
 
             # Select context
-            result = self._context_selector.select_context(
+            result = graph_state.selector.select_context(
                 seeds=seed_nodes, radius=radius, budget=budget, weights=weights
             )
 
@@ -2516,14 +2640,15 @@ class EnhancedDispatcher:
         Returns:
             List of dependent symbols with metadata
         """
-        if not self._graph_analyzer:
+        graph_state = self._graph_state.get(self._graph_key(ctx))
+        if not graph_state or not graph_state.analyzer:
             logger.warning("Graph analyzer not initialized")
             return []
 
         try:
             # Find node with this symbol
             node_id = None
-            for node in self._graph_nodes:
+            for node in graph_state.nodes:
                 if node.symbol == symbol:
                     node_id = node.id
                     break
@@ -2533,7 +2658,7 @@ class EnhancedDispatcher:
                 return []
 
             # Get dependencies
-            deps = self._graph_analyzer.find_dependencies(node_id, max_depth)
+            deps = graph_state.analyzer.find_dependencies(node_id, max_depth)
 
             # Convert to dict format
             return [
@@ -2555,14 +2680,15 @@ class EnhancedDispatcher:
         self, ctx: RepoContext, symbol: str, max_depth: int = 3
     ) -> List[Dict[str, Any]]:
         """Incoming dependent walk into symbol within ctx.repo_id."""
-        if not self._graph_analyzer:
+        graph_state = self._graph_state.get(self._graph_key(ctx))
+        if not graph_state or not graph_state.analyzer:
             logger.warning("Graph analyzer not initialized")
             return []
 
         try:
             # Find node with this symbol
             node_id = None
-            for node in self._graph_nodes:
+            for node in graph_state.nodes:
                 if node.symbol == symbol:
                     node_id = node.id
                     break
@@ -2572,7 +2698,7 @@ class EnhancedDispatcher:
                 return []
 
             # Get dependents
-            dependents = self._graph_analyzer.find_dependents(node_id, max_depth)
+            dependents = graph_state.analyzer.find_dependents(node_id, max_depth)
 
             # Convert to dict format
             return [
@@ -2596,12 +2722,13 @@ class EnhancedDispatcher:
         Returns:
             List of hotspot information
         """
-        if not self._graph_analyzer:
+        graph_state = self._graph_state.get(self._graph_key(ctx))
+        if not graph_state or not graph_state.analyzer:
             logger.warning("Graph analyzer not initialized")
             return []
 
         try:
-            hotspots = self._graph_analyzer.get_hotspots(top_n)
+            hotspots = graph_state.analyzer.get_hotspots(top_n)
 
             return [
                 {

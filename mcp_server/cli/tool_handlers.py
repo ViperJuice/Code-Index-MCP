@@ -439,7 +439,7 @@ async def handle_search_code(
         return [types.TextContent(type="text", text=_ensure_response(response_data))]
 
 
-def _build_repositories(repo_resolver: Any) -> list:
+def _build_repositories(repo_resolver: Any, dispatcher: Any = None) -> list:
     """Return a list of health rows for all registered repositories."""
     from mcp_server.health.repo_status import build_health_row
 
@@ -452,7 +452,18 @@ def _build_repositories(repo_resolver: Any) -> list:
         all_repos = registry.get_all_repositories()
     except Exception:
         return []
-    return [build_health_row(info) for info in all_repos.values()]
+    rows = []
+    for info in all_repos.values():
+        features = None
+        if dispatcher is not None and hasattr(dispatcher, "get_runtime_feature_status"):
+            try:
+                ctx = repo_resolver.resolve(info.path)
+                if ctx is not None:
+                    features = dispatcher.get_runtime_feature_status(ctx)
+            except Exception:
+                features = None
+        rows.append(build_health_row(info, features=features))
+    return rows
 
 
 async def handle_get_status(
@@ -519,14 +530,17 @@ async def handle_get_status(
         ),
     }
     if _is_enhanced:
+        semantic_active = bool(
+            getattr(dispatcher, "_semantic_registry", None)
+            or getattr(dispatcher, "_semantic_indexer_fallback", None)
+        )
         features.update(
             {
                 "dynamic_loading": getattr(dispatcher, "_use_factory", False),
                 "lazy_loading": getattr(dispatcher, "_lazy_load", False),
                 "advanced_features": getattr(dispatcher, "_enable_advanced", False),
                 "semantic_search_enabled": getattr(dispatcher, "_semantic_enabled", False),
-                "semantic_indexer_active": getattr(dispatcher, "_semantic_indexer", None)
-                is not None,
+                "semantic_indexer_active": semantic_active,
             }
         )
 
@@ -561,7 +575,7 @@ async def handle_get_status(
             "client": client_name,
             "session_available": current_session is not None,
         },
-        "repositories": _build_repositories(repo_resolver),
+        "repositories": _build_repositories(repo_resolver, dispatcher),
     }
     availability_rows = PluginFactory.get_plugin_availability()
     counts: dict[str, int] = {}

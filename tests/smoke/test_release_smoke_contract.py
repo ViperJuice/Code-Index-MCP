@@ -40,6 +40,9 @@ def test_release_smoke_entrypoints_exist():
     text = script.read_text(encoding="utf-8")
     for mode in ("--wheel", "--stdio", "--container", "--all"):
         assert mode in text
+    for contract in ("get_status", "index_unavailable", "safe_fallback", "native_search"):
+        assert contract in text
+    assert "unregistered_repository" in text
 
     makefile = _read("Makefile")
     assert re.search(r"^release-smoke:", makefile, re.MULTILINE)

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import subprocess
 import sqlite3
+import subprocess
 from datetime import datetime
 from pathlib import Path
 

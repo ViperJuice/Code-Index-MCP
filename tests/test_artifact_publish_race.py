@@ -342,11 +342,7 @@ class TestCallOrder:
 
         # SHA-keyed create must precede index-latest edit
         sha_create_idx = next(
-            (
-                i
-                for i, s in enumerate(observed)
-                if f"create:{_canonical_tag('repo', COMMIT)}" == s
-            ),
+            (i for i, s in enumerate(observed) if f"create:{_canonical_tag('repo', COMMIT)}" == s),
             None,
         )
         latest_edit_idx = next(

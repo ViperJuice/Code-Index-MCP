@@ -225,6 +225,40 @@ No operator actions required. P12 is fully codebase-internal.
   non-blocking issues to be captured as `documented_limitation` or
   `post_alpha_backlog`.
 
+### 3.7 Phase 34 - Public Alpha Recut
+
+#### Before P34
+
+- [ ] **Confirm P33 is green.** `make alpha-production-matrix` must pass before
+  public-alpha release evidence is accepted.
+- [ ] **Choose and freeze the prerelease tag.** For this recut the selected tag
+  is `v1.2.0-rc5`; confirm `git tag -l v1.2.0-rc5` does not show a reused local
+  tag unless it points at the release commit.
+- [ ] **Review public limitations.** Customer docs must state that v3 supports
+  many unrelated repositories, one registered worktree per git common directory,
+  tracked/default branch indexing only, and readiness-gated MCP search.
+
+#### During P34
+
+- [ ] **Run the clean-checkout release verification set.**
+  ```bash
+  uv run pytest tests/smoke tests/docs tests/test_release_metadata.py tests/test_requirements_consolidation.py -v --no-cov
+  make alpha-production-matrix alpha-release-gates
+  make release-smoke release-smoke-container
+  ```
+- [ ] **Validate fail-closed fallback language.** Public docs and agent handoffs
+  must tell users that `index_unavailable` plus
+  `safe_fallback: "native_search"` means use native search or follow the
+  returned readiness remediation until readiness is `ready`.
+- [ ] **Keep raw/local evidence out of git.** Commit only redacted release
+  decision artifacts and documentation updates.
+
+#### After P34
+
+- [ ] **Approve public alpha only with explicit evidence.** Docs truth,
+  release metadata, clean-checkout wheel/container smoke, P27-P33 gates, and the
+  support matrix must all match the `1.2.0-rc5` public-alpha contract.
+
 ---
 
 ## 4. Ongoing operations

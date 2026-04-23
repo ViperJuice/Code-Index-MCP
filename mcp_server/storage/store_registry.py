@@ -84,6 +84,7 @@ class StoreRegistry:
         """Close and evict the cached store for repo_id. No-op if absent."""
         with self._lock:
             store = self._cache.pop(repo_id, None)
+            self._build_locks.pop(repo_id, None)
         if store is not None:
             try:
                 store.close()

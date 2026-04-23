@@ -82,12 +82,14 @@ def release_smoke_token():
             "fixture_repo",
             seed_files={"smoke.py": source.lstrip()},
         )
+        unregistered_path = tmp_path / "unregistered_repo"
+        unregistered_path.mkdir()
         old_qdrant_path = os.environ.get("QDRANT_PATH")
         old_semantic_enabled = os.environ.get("SEMANTIC_SEARCH_ENABLED")
         os.environ["QDRANT_PATH"] = str(tmp_path / "missing-vector-index.qdrant")
         os.environ["SEMANTIC_SEARCH_ENABLED"] = "false"
         try:
-            with boot_test_server(tmp_path, [repo_path]) as server:
+            with boot_test_server(tmp_path, [repo_path], extra_roots=[unregistered_path]) as server:
                 search = server.call_tool(
                     "search_code",
                     {
@@ -106,6 +108,26 @@ def release_smoke_token():
                 )
                 if lookup.get("symbol") != "release_smoke_token":
                     raise AssertionError(f"symbol_lookup failed: {lookup!r}")
+
+                status = server.call_tool("get_status", {})
+                rows = status.get("repositories", [])
+                if len(rows) != 1 or rows[0].get("readiness") != "ready":
+                    raise AssertionError(f"get_status readiness failed: {status!r}")
+
+                fallback = server.call_tool(
+                    "search_code",
+                    {
+                        "query": "release_smoke_token",
+                        "repository": str(unregistered_path),
+                        "semantic": False,
+                    },
+                )
+                if (
+                    fallback.get("code") != "index_unavailable"
+                    or fallback.get("safe_fallback") != "native_search"
+                    or fallback.get("readiness", {}).get("state") != "unregistered_repository"
+                ):
+                    raise AssertionError(f"fallback contract failed: {fallback!r}")
         finally:
             if old_qdrant_path is None:
                 os.environ.pop("QDRANT_PATH", None)
@@ -139,6 +161,88 @@ def smoke_container() -> None:
 
     _run(["docker", "build", "-f", "docker/dockerfiles/Dockerfile.production", "-t", IMAGE, "."])
     _run(["docker", "run", "--rm", IMAGE, "mcp-index", "--help"])
+    container_contract = r"""
+import asyncio
+import json
+import os
+import tempfile
+from pathlib import Path
+
+from mcp_server.cli.tool_handlers import handle_get_status, handle_search_code
+from mcp_server.health.repository_readiness import RepositoryReadiness, RepositoryReadinessState
+
+
+class Dispatcher:
+    def get_statistics(self):
+        return {}
+
+    def health_check(self):
+        return {}
+
+
+class Resolver:
+    def classify(self, path):
+        return RepositoryReadiness(
+            state=RepositoryReadinessState.UNREGISTERED_REPOSITORY,
+            requested_path=str(Path(path).resolve()),
+            remediation="Register this repository path before querying it.",
+        )
+
+    def resolve(self, path):
+        return None
+
+
+async def main():
+    with tempfile.TemporaryDirectory(prefix="mcp-container-fallback-") as tmp:
+        os.environ["MCP_ALLOWED_ROOTS"] = tmp
+        repo = Path(tmp) / "unregistered"
+        repo.mkdir()
+        dispatcher = Dispatcher()
+        resolver = Resolver()
+        fallback = json.loads(
+            (
+                await handle_search_code(
+                    arguments={
+                        "query": "release_smoke_token",
+                        "repository": str(repo),
+                        "semantic": False,
+                    },
+                    dispatcher=dispatcher,
+                    repo_resolver=resolver,
+                )
+            )[0].text
+        )
+        status = json.loads(
+            (
+                await handle_get_status(
+                    arguments={},
+                    dispatcher=dispatcher,
+                    repo_resolver=resolver,
+                    server_version="container-smoke",
+                )
+            )[0].text
+        )
+        assert fallback["code"] == "index_unavailable", fallback
+        assert fallback["safe_fallback"] == "native_search", fallback
+        assert fallback["readiness"]["state"] == "unregistered_repository", fallback
+        assert "repositories" in status, status
+
+
+asyncio.run(main())
+"""
+    _run(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "-e",
+            "SEMANTIC_SEARCH_ENABLED=false",
+            IMAGE,
+            "python",
+            "-c",
+            container_contract,
+        ]
+    )
 
     port = _free_port()
     container_id = subprocess.check_output(

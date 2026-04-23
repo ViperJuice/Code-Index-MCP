@@ -1,6 +1,6 @@
 [project]
 name = "index-it-mcp"
-version = "1.2.0-rc4"
+version = "1.2.0-rc5"
 description = "Local-first code indexer for AI assistants via Model Context Protocol (MCP)"
 readme = "README.md"
 license = "MIT"

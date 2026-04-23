@@ -2,9 +2,15 @@
 
 This guide provides comprehensive information on configuring the Code-Index-MCP for different environments and use cases.
 
-> **Beta status**: This guide targets `1.2.0-rc4`. MCP STDIO is the primary
+> **Beta status**: This guide targets `1.2.0-rc5`. MCP STDIO is the primary
 > LLM surface. Docker examples use `ghcr.io/viperjuice/code-index-mcp`.
 > Language behavior is defined in [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md).
+>
+> **Public alpha repository model**: one server can serve many unrelated
+> repositories, with one registered worktree per git common directory. Only the
+> tracked/default branch is indexed automatically. Indexed MCP search is
+> authoritative only when readiness is `ready`; unavailable indexes return
+> `index_unavailable` with `safe_fallback: "native_search"`.
 
 ## Table of Contents
 
@@ -107,7 +113,7 @@ The setup script automatically detects your environment:
         "-e", "MCP_WORKSPACE_ROOT=/workspace",
         "-e", "LOG_LEVEL=${LOG_LEVEL:-INFO}",
         "-e", "MCP_ARTIFACT_SYNC=false",
-        "${MCP_DOCKER_IMAGE:-ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4}"
+        "${MCP_DOCKER_IMAGE:-ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc5}"
       ]
     }
   }
@@ -140,7 +146,7 @@ The setup script automatically detects your environment:
         "-e", "SEMANTIC_SEARCH_ENABLED=${SEMANTIC_SEARCH_ENABLED:-true}",
         "-e", "MCP_ARTIFACT_SYNC=${MCP_ARTIFACT_SYNC:-true}",
         "-e", "LOG_LEVEL=${LOG_LEVEL:-INFO}",
-        "${MCP_DOCKER_IMAGE:-ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4}"
+        "${MCP_DOCKER_IMAGE:-ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc5}"
       ]
     }
   }
@@ -252,30 +258,39 @@ Every `.mcp.json` file follows this structure:
 
 ### Multi-Repository Setup
 
-Configure multiple repositories in one `.mcp.json`:
+For one shared server, mount or allow the unrelated repository roots, register
+one worktree per git common directory, and check readiness before MCP tool use:
 
 ```json
 {
   "mcpServers": {
-    "project-frontend": {
+    "code-index": {
       "command": "docker",
       "args": [
         "run", "-i", "--rm",
-        "-v", "${HOME}/projects/frontend:/workspace",
-        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4"
-      ]
-    },
-    "project-backend": {
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm",
-        "-v", "${HOME}/projects/backend:/workspace",
-        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4"
+        "-v", "${HOME}/projects/repo-a:/repos/repo-a",
+        "-v", "${HOME}/projects/repo-b:/repos/repo-b",
+        "-e", "MCP_ALLOWED_ROOTS=/repos/repo-a:/repos/repo-b",
+        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc5"
       ]
     }
   }
 }
 ```
+
+Then register and inspect:
+
+```bash
+mcp-index repository register /repos/repo-a
+mcp-index repository register /repos/repo-b
+mcp-index repository list -v
+```
+
+Same-repo sibling worktrees and non-default branch queries are unsupported in
+v3 indexed routing. They return `index_unavailable` with
+`safe_fallback: "native_search"` and readiness remediation. If you need separate
+branch checkouts as separate MCP contexts, run separate server instances rather
+than one shared multi-worktree index.
 
 ### Custom Docker Images
 
@@ -310,7 +325,7 @@ Add Docker resource constraints:
         "--memory", "2g",
         "--cpus", "2",
         "-v", "${workspace}:/workspace",
-        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4"
+        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc5"
       ]
     }
   }
@@ -330,7 +345,7 @@ For maximum security:
         "run", "-i", "--rm",
         "--network", "none",
         "-v", "${workspace}:/workspace:ro",
-        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4"
+        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc5"
       ],
       "env": {
         "MCP_ARTIFACT_SYNC": "false"
@@ -407,7 +422,7 @@ Enable debug logging:
         "-v", "${workspace}:/workspace",
         "-e", "LOG_LEVEL=DEBUG",
         "-e", "MCP_DEBUG=true",
-        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4"
+        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc5"
       ]
     }
   }
@@ -420,7 +435,7 @@ Test your configuration:
 
 ```bash
 # Test MCP connection
-echo '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{}}' | docker run -i --rm ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4
+echo '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{}}' | docker run -i --rm ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc5
 
 # Expected response:
 # {"jsonrpc":"2.0","id":1,"result":{"capabilities":...}}
@@ -496,7 +511,7 @@ Enable security audit logs:
         "-v", "${HOME}/mcp-audit:/app/logs",
         "-e", "MCP_AUDIT_LOG=/app/logs/audit.log",
         "-e", "MCP_SECURITY_MODE=strict",
-        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc4"
+        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc5"
       ]
     }
   }

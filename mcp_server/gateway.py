@@ -541,8 +541,10 @@ async def startup_event():
             sqlite_store = SQLiteStore("code_index.db")
 
         # Initialize RepoResolver for per-request repo context resolution.
+        _local_repo_registry = None
         try:
             from .storage.repository_registry import RepositoryRegistry
+
             _local_repo_registry = RepositoryRegistry()
             _store_registry = StoreRegistry.for_registry(_local_repo_registry)
             repo_resolver = RepoResolver(_local_repo_registry, _store_registry)
@@ -677,11 +679,21 @@ async def startup_event():
 
         logger.info(f"Loaded {len(plugin_instances)} active plugins")
 
+        semantic_indexer_registry = None
+        if settings.semantic_search_enabled and _local_repo_registry is not None:
+            try:
+                from .utils.semantic_indexer_registry import SemanticIndexerRegistry
+
+                semantic_indexer_registry = SemanticIndexerRegistry(_local_repo_registry)
+            except Exception as _sem_reg_err:
+                logger.warning("Semantic registry unavailable: %s", _sem_reg_err)
+
         # Create a new EnhancedDispatcher instance with the loaded plugins
         logger.info("Creating dispatcher...")
         dispatcher = EnhancedDispatcher(
             semantic_search_enabled=settings.semantic_search_enabled,
             lazy_load=settings.mcp_fast_startup,
+            semantic_indexer_registry=semantic_indexer_registry,
         )
         logger.info(
             "EnhancedDispatcher created with semantic search enabled: %s",
@@ -815,6 +827,9 @@ async def startup_event():
                     dispatcher=dispatcher,
                     index_manager=_git_index_manager,
                     repo_resolver=repo_resolver,
+                    store_registry=_store_registry,
+                    semantic_indexer_registry=semantic_indexer_registry,
+                    plugin_set_registry=getattr(dispatcher, "_plugin_set_registry", None),
                 )
                 ref_poller = RefPoller(
                     registry=_repo_registry,
@@ -1635,10 +1650,19 @@ async def get_status(
         _repositories = []
         if _repo_registry is not None:
             try:
-                _repositories = [
-                    _build_health_row(info)
-                    for info in _repo_registry.get_all_repositories().values()
-                ]
+                _repositories = []
+                for info in _repo_registry.get_all_repositories().values():
+                    _features = None
+                    if repo_resolver is not None and hasattr(
+                        dispatcher, "get_runtime_feature_status"
+                    ):
+                        try:
+                            _ctx = repo_resolver.resolve(info.path)
+                            if _ctx is not None:
+                                _features = dispatcher.get_runtime_feature_status(_ctx)
+                        except Exception:
+                            _features = None
+                    _repositories.append(_build_health_row(info, features=_features))
             except Exception as _repo_err:
                 logger.warning("Failed to build repository health rows: %s", _repo_err)
 
@@ -2555,6 +2579,9 @@ async def get_graph_status(
         from .graph import CHUNKER_AVAILABLE
 
         status: Dict[str, Any] = {"available": CHUNKER_AVAILABLE}
+        if hasattr(dispatcher, "get_runtime_feature_status"):
+            feature_status = dispatcher.get_runtime_feature_status(ctx).get("graph", {})
+            status.update(feature_status)
 
         if not CHUNKER_AVAILABLE:
             status["initialized"] = False
@@ -2565,6 +2592,9 @@ async def get_graph_status(
             # Probe availability via a zero-cost health check; graph init is lazy.
             health = dispatcher.health_check(ctx)
             status["initialized"] = health.get("graph_initialized", False)
+            if not status["initialized"]:
+                status.setdefault("status", "unavailable")
+                status.setdefault("reason", "graph_not_initialized")
 
         return status
     except Exception as e:
@@ -2596,7 +2626,7 @@ async def initialize_graph(
         # The dispatcher's graph is built lazily; priming it via index_directory
         # ensures graph structures are populated for the listed paths.
         if hasattr(dispatcher, "_ensure_graph_initialized"):
-            success = dispatcher._ensure_graph_initialized(file_paths)
+            success = dispatcher._ensure_graph_initialized(file_paths, ctx=ctx)
             if not success:
                 return {
                     "status": "failed",

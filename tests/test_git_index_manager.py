@@ -15,8 +15,8 @@ from mcp_server.storage.git_index_manager import (
     UpdateResult,
     should_reindex_for_branch,
 )
-from mcp_server.storage.sqlite_store import SQLiteStore
 from mcp_server.storage.multi_repo_manager import RepositoryInfo
+from mcp_server.storage.sqlite_store import SQLiteStore
 
 # ---------------------------------------------------------------------------
 # SL-3.1a: should_reindex_for_branch unit tests

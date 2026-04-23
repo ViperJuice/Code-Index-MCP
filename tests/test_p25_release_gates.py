@@ -24,6 +24,7 @@ MAIN_CI_REQUIRED_JOB_IDS = {
     "alpha-unit-release-smoke",
     "alpha-integration-smoke",
     "alpha-docs-truth",
+    "alpha-production-matrix",
 }
 
 

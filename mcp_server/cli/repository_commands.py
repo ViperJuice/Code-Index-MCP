@@ -16,9 +16,9 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from mcp_server.artifacts.commit_artifacts import CommitArtifactManager  # noqa: E402
+from mcp_server.core.repo_resolver import RepoResolver  # noqa: E402
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher  # noqa: E402
 from mcp_server.health.repo_status import build_health_row  # noqa: E402
-from mcp_server.core.repo_resolver import RepoResolver  # noqa: E402
 from mcp_server.storage.git_index_manager import GitAwareIndexManager  # noqa: E402
 from mcp_server.storage.repository_registry import (  # noqa: E402
     MultipleWorktreesUnsupportedError,
@@ -184,6 +184,21 @@ def unregister(repo_id: str):
         # Confirm
         if not click.confirm(f"Remove {repo_info.name} from tracking?"):
             return
+
+        store_registry = StoreRegistry.for_registry(registry)
+        store_registry.close(repo_id)
+        try:
+            from mcp_server.plugins.plugin_set_registry import PluginSetRegistry
+
+            PluginSetRegistry().evict(repo_id)
+        except Exception:
+            pass
+        try:
+            from mcp_server.utils.semantic_indexer_registry import SemanticIndexerRegistry
+
+            SemanticIndexerRegistry(registry).evict(repo_id)
+        except Exception:
+            pass
 
         if registry.unregister_repository(repo_id):
             click.echo(click.style(f"✓ Unregistered repository: {repo_info.name}", fg="green"))
@@ -397,8 +412,6 @@ def discover(search_paths: tuple, register: bool):
     """Discover git repositories in given paths."""
     try:
         registry = RepositoryRegistry()
-        store_registry = StoreRegistry.for_registry(registry)
-        repo_resolver = RepoResolver(registry, store_registry)
 
         # Expand paths
         paths = []
@@ -469,6 +482,8 @@ def watch(watch_all: bool, daemon: bool):
     """Start watching repositories for changes."""
     try:
         registry = RepositoryRegistry()
+        store_registry = StoreRegistry.for_registry(registry)
+        repo_resolver = RepoResolver(registry, store_registry)
 
         if not watch_all:
             click.echo(

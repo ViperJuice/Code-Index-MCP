@@ -20,6 +20,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from mcp_server.core.errors import record_handled_error
 from mcp_server.dependency_graph.aggregator import DependencyGraphAnalyzer
+from mcp_server.health.repository_readiness import ReadinessClassifier
 from mcp_server.indexer.reranker import IReranker as Reranker
 from mcp_server.indexer.reranker import RerankerFactory
 from mcp_server.plugins.repository_plugin_loader import get_repository_plugin_loader
@@ -932,6 +933,20 @@ class CrossRepositorySearchCoordinator:
                 "total_files": getattr(r, "total_files", 0),
                 "total_symbols": getattr(r, "total_symbols", 0),
                 "language_stats": getattr(r, "language_stats", {}),
+                "readiness": ReadinessClassifier.classify_registered(r).to_dict(),
+                "feature_availability": {
+                    "lexical": {
+                        "status": (
+                            "available"
+                            if ReadinessClassifier.classify_registered(r).ready
+                            else "unavailable"
+                        )
+                    },
+                    "semantic": {"status": "unavailable", "reason": "runtime_status_unavailable"},
+                    "graph": {"status": "unavailable", "reason": "runtime_status_unavailable"},
+                    "plugins": {"status": "unavailable", "reason": "runtime_status_unavailable"},
+                    "cross_repo": {"status": "available"},
+                },
             }
             for r in repos
         ]

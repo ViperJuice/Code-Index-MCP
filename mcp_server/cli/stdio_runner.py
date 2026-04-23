@@ -401,6 +401,14 @@ async def initialize_services() -> None:
             logger.info("Creating enhanced dispatcher with timeout protection...")
             _explicit = os.getenv("RERANKER_TYPE", "").strip().lower()
             reranker_type = _explicit if _explicit else "none"
+            semantic_registry = None
+            try:
+                if _repo_resolver is not None and getattr(_repo_resolver, "_registry", None):
+                    from mcp_server.utils.semantic_indexer_registry import SemanticIndexerRegistry
+
+                    semantic_registry = SemanticIndexerRegistry(_repo_resolver._registry)
+            except Exception as _sem_reg_err:
+                logger.warning("Semantic registry unavailable: %s", _sem_reg_err)
             dispatcher = EnhancedDispatcher(
                 plugins=plugin_instances,
                 enable_advanced_features=True,
@@ -410,6 +418,7 @@ async def initialize_services() -> None:
                 memory_aware=True,
                 multi_repo_enabled=None,
                 reranker_type=reranker_type,
+                semantic_indexer_registry=semantic_registry,
             )
 
         _supported = dispatcher.supported_languages
@@ -480,9 +489,9 @@ async def initialize_services() -> None:
             except Exception as _inj_err:
                 logger.debug(f"Plugin preload with store failed (non-fatal): {_inj_err}")
 
-        if (
-            isinstance(dispatcher, EnhancedDispatcher)
-            and getattr(dispatcher, "_semantic_indexer", None) is None
+        if isinstance(dispatcher, EnhancedDispatcher) and not (
+            getattr(dispatcher, "_semantic_registry", None)
+            or getattr(dispatcher, "_semantic_indexer_fallback", None)
         ):
             logger.warning(
                 "Semantic search not available — running in BM25-only mode. "

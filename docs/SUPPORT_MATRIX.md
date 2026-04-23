@@ -1,9 +1,17 @@
 # Code-Index-MCP Support Matrix
 
-This matrix is the canonical P23 support statement for version `1.2.0-rc4`.
+This matrix is the canonical P23 support statement for version `1.2.0-rc5`.
 The project is in beta/alpha documentation-hardening status: MCP STDIO is the
 primary LLM surface, FastAPI is a secondary admin surface, and language support
 varies by plugin path and optional dependencies.
+
+Repository-topology support is separate from language/runtime support. The v3
+public-alpha model supports many unrelated repositories on one machine, with one
+registered worktree per git common directory. Only the tracked/default branch is
+indexed automatically. Same-repo sibling worktrees and non-default branch
+queries return `index_unavailable` with `safe_fallback: "native_search"` until
+readiness remediation completes; indexed MCP results are authoritative only when
+readiness is `ready`.
 
 Runtime facts are grounded in `mcp_server/plugins/language_registry.py`,
 `mcp_server/plugins/plugin_factory.py`, `mcp_server/plugins/plugin_set_registry.py`,

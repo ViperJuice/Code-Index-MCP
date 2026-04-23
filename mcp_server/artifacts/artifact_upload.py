@@ -19,14 +19,13 @@ from mcp_server.artifacts.delta_policy import DeltaPolicy
 from mcp_server.config.settings import get_settings
 from mcp_server.core.errors import record_handled_error
 
-from .secure_export import SecureIndexExporter
 from .manifest_v2 import (
-    LEXICAL_ONLY_SEMANTIC_PROFILE_HASH,
     ArtifactManifestV2,
     ManifestUnit,
     build_logical_artifact_id,
     build_semantic_profile_hash,
 )
+from .secure_export import SecureIndexExporter
 from .semantic_profiles import (
     extract_semantic_profile_metadata,
     get_primary_semantic_profile_metadata,
@@ -77,7 +76,9 @@ class IndexArtifactUploader:
         index_path: Path | str | None = None,
     ) -> Tuple[Path, str, int]:
         repo_root = Path(repo_path)
-        index_root = Path(index_location) if index_location is not None else repo_root / ".mcp-index"
+        index_root = (
+            Path(index_location) if index_location is not None else repo_root / ".mcp-index"
+        )
         db_path = Path(index_path) if index_path is not None else index_root / "current.db"
         if secure:
             print("🔒 Creating secure index archive (filtering sensitive files)...")
@@ -169,7 +170,11 @@ class IndexArtifactUploader:
         )
         repo_id = repo_id or self.repo
         logical_artifact_id = build_logical_artifact_id(
-            repo_id, tracked_branch or "unknown", commit or "unknown", semantic_profile_hash, artifact_type
+            repo_id,
+            tracked_branch or "unknown",
+            commit or "unknown",
+            semantic_profile_hash,
+            artifact_type,
         )
         manifest = ArtifactManifestV2(
             logical_artifact_id=logical_artifact_id,
@@ -207,7 +212,9 @@ class IndexArtifactUploader:
             "target_commit": commit,
             "checksum": checksum,
             "compressed_size": size,
-            "index_stats": self._get_index_stats(index_path=index_path, index_location=index_location),
+            "index_stats": self._get_index_stats(
+                index_path=index_path, index_location=index_location
+            ),
             "compatibility": compatibility,
             "security": {
                 "filtered": secure,
@@ -333,9 +340,7 @@ class IndexArtifactUploader:
             vector_path = Path("vector_index.qdrant")
         if vector_path.exists():
             total_size = sum(
-                item.stat().st_size
-                for item in vector_path.rglob("*")
-                if item.is_file()
+                item.stat().st_size for item in vector_path.rglob("*") if item.is_file()
             )
             stats["vector"] = {
                 "size_bytes": total_size,

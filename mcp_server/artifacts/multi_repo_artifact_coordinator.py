@@ -42,7 +42,9 @@ class MultiRepoArtifactCoordinator:
         wanted = set(repository_ids)
         return [repo for repo in repos if repo.repository_id in wanted]
 
-    def _read_local_profiles(self, repo_path: Path, index_location: Path | str | None = None) -> List[str]:
+    def _read_local_profiles(
+        self, repo_path: Path, index_location: Path | str | None = None
+    ) -> List[str]:
         metadata_path = (
             Path(index_location) / ".index_metadata.json"
             if index_location is not None
@@ -260,7 +262,9 @@ class MultiRepoArtifactCoordinator:
             self.multi_repo_manager.registry.update_artifact_state(
                 repo.repository_id,
                 artifact_health=health,
-                available_semantic_profiles=self._read_local_profiles(repo.path, repo.index_location),
+                available_semantic_profiles=self._read_local_profiles(
+                    repo.path, repo.index_location
+                ),
             )
             results.append(
                 RepoArtifactLifecycleResult(

@@ -132,6 +132,40 @@ class TestSemanticIndexerRegistry:
         # One close per cached indexer (two repos)
         assert mock_qdrant.close.call_count == 2
 
+    def test_repo_indexers_use_repo_scoped_qdrant_paths(
+        self, tmp_path, mock_qdrant, mock_embedding_provider
+    ):
+        from mcp_server.utils.semantic_indexer_registry import SemanticIndexerRegistry
+
+        repo_reg = _make_registry_with_repos(tmp_path)
+        registry = SemanticIndexerRegistry(repository_registry=repo_reg)
+
+        indexer_a = registry.get("repo-a")
+        indexer_b = registry.get("repo-b")
+
+        assert indexer_a.qdrant_path != ":memory:"
+        assert indexer_b.qdrant_path != ":memory:"
+        assert indexer_a.qdrant_path != indexer_b.qdrant_path
+        assert str(tmp_path / "alpha" / ".mcp-index") in indexer_a.qdrant_path
+
+    def test_evict_closes_target_only_and_rebuilds(
+        self, tmp_path, mock_qdrant, mock_embedding_provider
+    ):
+        from mcp_server.utils.semantic_indexer_registry import SemanticIndexerRegistry
+
+        repo_reg = _make_registry_with_repos(tmp_path)
+        registry = SemanticIndexerRegistry(repository_registry=repo_reg)
+        indexer_a = registry.get("repo-a")
+        indexer_b = registry.get("repo-b")
+        mock_qdrant.close = MagicMock()
+
+        assert registry.evict("repo-a") is True
+        rebuilt_a = registry.get("repo-a")
+
+        assert mock_qdrant.close.call_count == 1
+        assert rebuilt_a is not indexer_a
+        assert registry.get("repo-b") is indexer_b
+
     def test_get_unknown_repo_raises(self, tmp_path, mock_qdrant, mock_embedding_provider):
         """get() for an unregistered repo_id should raise KeyError."""
         from mcp_server.utils.semantic_indexer_registry import SemanticIndexerRegistry

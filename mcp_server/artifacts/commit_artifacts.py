@@ -4,12 +4,12 @@ This module manages index artifacts tied to specific git commits,
 enabling efficient sharing and synchronization of indexes.
 """
 
+import hashlib
 import json
 import logging
 import os
 import shutil
 import tarfile
-import hashlib
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional

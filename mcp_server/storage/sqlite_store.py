@@ -651,6 +651,17 @@ class SQLiteStore:
             row = cursor.fetchone()
             return dict(row) if row else None
 
+    def ensure_repository_row(
+        self,
+        repo_path: Union[str, Path],
+        name: Optional[str] = None,
+        metadata: Optional[Dict] = None,
+    ) -> int:
+        """Return the internal repositories.id row for repo_path, creating it if needed."""
+        resolved_path = str(Path(repo_path).expanduser().resolve())
+        repo_name = name if name is not None else Path(resolved_path).name
+        return self.create_repository(resolved_path, repo_name, metadata)
+
     # File operations
     def store_file(
         self,
