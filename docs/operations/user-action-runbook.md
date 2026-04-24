@@ -185,6 +185,48 @@ No operator actions required. P12 is fully codebase-internal.
   vulnerability scans, cleanup, signing, and publish-only container manifest work
   are informational for private alpha unless promoted by a later phase.
 
+### 3.5A Phase GAGOV - Enforced Release Governance
+
+#### Before GAGOV
+
+- [ ] **Probe live repository governance with metadata-only GitHub CLI calls.**
+  Record only redacted metadata in `docs/validation/ga-governance-evidence.md`:
+  `gh repo view ViperJuice/Code-Index-MCP --json nameWithOwner,defaultBranchRef,visibility`,
+  `gh api repos/ViperJuice/Code-Index-MCP/branches/main --jq '{name, protected, protection_url}'`,
+  `gh api repos/ViperJuice/Code-Index-MCP/branches/main/protection`, and
+  `gh api repos/ViperJuice/Code-Index-MCP/rulesets`.
+- [ ] **Freeze the exact GABASE gate contexts.** GAGOV must enforce only:
+  `Alpha Gate - Dependency Sync`,
+  `Alpha Gate - Format And Lint`,
+  `Alpha Gate - Unit And Release Smoke`,
+  `Alpha Gate - Integration Smoke`,
+  `Alpha Gate - Production Multi-Repo Matrix`,
+  `Alpha Gate - Docker Build And Smoke`,
+  `Alpha Gate - Docs Truth`, and
+  `Alpha Gate - Required Gates Passed`.
+- [ ] **Keep the release channel split explicit.** `v1.2.0-rc5` remains the
+  active RC/public-alpha contract, GitHub Latest currently points at
+  `v2.15.0-alpha.1`, `auto_merge=false` remains the RC default, and Docker
+  latest remains stable-only until a final GA release changes those channels.
+
+#### After GAGOV
+
+- [ ] **Verify the enforced governance posture is still live.** As of
+  2026-04-24, `main` is enforced via branch protection with strict status
+  checks, `1 approving review`, stale-review dismissal, conversation
+  resolution, linear history, and administrator enforcement. No repository
+  rulesets are configured; branch protection is the active enforcement surface.
+- [ ] **Preserve the historical baseline.** Earlier RELGOV/GACLOSE evidence
+  captured manual enforcement before GAGOV applied live protection. Keep that
+  wording as input evidence, but treat
+  `docs/validation/ga-governance-evidence.md` as the canonical post-GAGOV
+  artifact.
+- [ ] **Escalate drift immediately.** If a later probe shows branch protection
+  drift, a missing required gate context, or a GitHub product limit that weakens
+  enforcement, stop release qualification, refresh
+  `docs/validation/ga-governance-evidence.md`, and route the blocker through
+  GAGOV/GAOPS before GARC dispatches another RC.
+
 ### 3.6 Phase 26 - Private Alpha Evidence & Public Alpha Decision
 
 #### Before P26
@@ -261,6 +303,175 @@ No operator actions required. P12 is fully codebase-internal.
 - [ ] **Approve public alpha only with explicit evidence.** Docs truth,
   release metadata, clean-checkout wheel/container smoke, P27-P33 gates, and the
   support matrix must all match the `1.2.0-rc5` public-alpha contract.
+
+### 3.8 Phase RELGOV - Release Governance and Channel Policy
+
+#### Before RELGOV
+
+- [ ] **Probe GitHub enforcement before accepting release evidence.** Check
+  branch protection for `main`, repository rulesets, the current GitHub Latest
+  release, and release `v1.2.0-rc5`. If branch protection and rulesets remain
+  absent, public-alpha required gates use manual enforcement.
+
+#### During RELGOV
+
+- [ ] **Accept the required gate authority.** The required public-alpha gates
+  are `Alpha Gate - Dependency Sync`, `Alpha Gate - Format And Lint`,
+  `Alpha Gate - Unit And Release Smoke`, `Alpha Gate - Integration Smoke`,
+  `Alpha Gate - Production Multi-Repo Matrix`,
+  `Alpha Gate - Docker Build And Smoke`, `Alpha Gate - Docs Truth`, and
+  `Alpha Gate - Required Gates Passed`.
+- [ ] **Record branch protection and ruleset disposition.** If `main` remains
+  without branch protection and repository rulesets remain empty, record that
+  manual enforcement is accepted by the repository operator for public alpha.
+- [ ] **Record the release-channel decision.** `v1.2.0-rc5` is the active
+  RC/public-alpha package contract. GitHub Latest currently points at
+  `v2.15.0-alpha.1`, and GitHub Latest is not the RC policy source unless a
+  later release operation deliberately changes channel state.
+- [ ] **Keep release automation in RC posture.** The release workflow treats
+  hyphenated versions as prereleases, requires `release_type=custom` for
+  prerelease tags, publishes Docker latest only for stable releases, and keeps
+  `auto_merge=false` as the RC default.
+- [ ] **Keep the GA decision singular.** Stay on RC/public-alpha until RC5
+  release evidence, RELGOV evidence, TOOLRDY evidence, and GACLOSE acceptance
+  justify GA hardening or another follow-up RC.
+- [ ] **Choose one GACLOSE outcome.** Record exactly one of
+  `stay on RC/public-alpha`, `cut a follow-up RC`, or `start a GA hardening
+  roadmap` in `docs/validation/ga-closeout-decision.md`; do not add GA launch
+  instructions while manual enforcement is the public-alpha governance posture.
+
+#### After RELGOV
+
+- [ ] **Attach release-governance evidence to GACLOSE.** Use
+  `docs/validation/release-governance-evidence.md` as the governance input for
+  GACLOSE, alongside `docs/validation/rc5-release-evidence.md` and
+  `docs/validation/secondary-tool-readiness-evidence.md`.
+- [ ] **Record post-TOOLRDY verification.** Rerun `make alpha-production-matrix`
+  and attach the result to `docs/validation/ga-closeout-decision.md` before any
+  follow-up release or GA-hardening roadmap decision.
+
+### 3.9 Phase GABASE - GA Criteria Freeze
+
+#### Before GABASE
+
+- [ ] **Use the canonical checklist as the contract source.** Freeze the GA
+  release boundary, support tiers, required gates, evidence map, rollback
+  expectations, and non-GA surfaces in
+  `docs/validation/ga-readiness-checklist.md` before changing governance,
+  support claims, release execution, or operations posture.
+- [ ] **Keep the support-tier labels shared.** Use exactly `public-alpha`,
+  `beta`, `GA`, `experimental`, `unsupported`, and `disabled-by-default` across
+  the checklist, `docs/SUPPORT_MATRIX.md`, and the operator runbooks.
+- [ ] **Keep the v3 topology limits explicit.** Preserve many unrelated
+  repositories, one registered worktree per git common directory,
+  tracked/default branch indexing only, and `index_unavailable` with
+  `safe_fallback: "native_search"` until readiness is `ready`.
+
+#### During GABASE
+
+- [ ] **Classify current evidence as input evidence.** Use
+  `docs/validation/rc5-release-evidence.md`,
+  `docs/validation/release-governance-evidence.md`,
+  `docs/validation/secondary-tool-readiness-evidence.md`, and
+  `docs/validation/ga-closeout-decision.md` as the carried-forward
+  RC/public-alpha baseline.
+- [ ] **Map refresh evidence to downstream owners.** Reserve
+  `docs/validation/ga-governance-evidence.md` for `GAGOV`,
+  `docs/validation/ga-e2e-evidence.md` for `GAE2E`,
+  `docs/validation/ga-operations-evidence.md` for `GAOPS`,
+  `docs/validation/ga-rc-evidence.md` for `GARC`, and
+  `docs/validation/ga-final-decision.md` plus
+  `docs/validation/ga-release-evidence.md` for `GAREL`.
+- [ ] **Freeze the follow-up RC target.** GARC should plan around
+  `v1.2.0-rc6` unless a later roadmap amendment changes that contract.
+- [ ] **Keep governance in manual enforcement posture.** GABASE does not change
+  branch protection, rulesets, release dispatch, or GA claims.
+
+### 3.10 Phase GAOPS - GA Operational Readiness
+
+#### Before GAOPS
+
+- [ ] **Use the canonical GA artifacts as inputs.** GAOPS consumes
+  `docs/validation/ga-readiness-checklist.md`,
+  `docs/validation/ga-governance-evidence.md`, and
+  `docs/validation/ga-e2e-evidence.md`; it does not replace them with a new
+  release decision.
+- [ ] **Keep the local-first boundary explicit.** Operators still own repo
+  registration, one registered worktree per git common directory, allowed-roots
+  policy, tracked/default branch indexing, readiness remediation, and support
+  triage.
+- [ ] **Use the exact preflight invocation.** Run
+  `./scripts/preflight_upgrade.sh /path/to/staging.env` before qualification.
+
+#### During GAOPS
+
+- [ ] **Record GAOPS evidence in one place.** Use
+  `docs/validation/ga-operations-evidence.md` as the canonical GAOPS artifact.
+- [ ] **Keep observability evidence-backed.** `/metrics` verification uses the
+  authenticated admin path, JSON-log validation, and response-redaction checks
+  from `docs/operations/observability-verification.md`; warnings or posture
+  notes are `metadata-only`, while the smoke test remains `CI`.
+- [ ] **Freeze the operator procedure set.** GAOPS must define deployment
+  preflight, deployment qualification, rollback, index rebuild, incident
+  response, and support triage without implying a hosted service. Keep
+  incident response and support triage operator-owned.
+
+#### After GAOPS
+
+- [ ] **Route downstream release work through the refreshed ops artifact.**
+  GARC and GAREL must consume `docs/validation/ga-operations-evidence.md`
+  instead of relying on older runbook assumptions.
+- [ ] **Escalate contract drift before RC dispatch.** If operator procedures,
+  readiness vocabulary, or observability posture drift, stop and route the
+  blocker through GAOPS before GARC dispatches the follow-up RC.
+
+### 3.11 Phase GARC - Follow-Up RC Soak
+
+#### Before GARC
+
+- [ ] **Freeze the `rc6` contract surfaces first.** `pyproject.toml`,
+  `mcp_server/__init__.py`, `.github/workflows/release-automation.yml`,
+  `CHANGELOG.md`, customer docs, installer helpers, and
+  `tests/test_release_metadata.py` must all agree on `v1.2.0-rc6` before any
+  release dispatch is attempted.
+- [ ] **Require a clean release candidate state.** Run
+  `git status --short --branch`; if the worktree is dirty, stop and record
+  `blocked before dispatch` in `docs/validation/ga-rc-evidence.md`.
+- [ ] **Verify branch and tag qualification.** Run
+  `git fetch origin main --tags --prune`,
+  `git rev-parse HEAD origin/main`,
+  `git tag -l v1.2.0-rc6`, and
+  `git ls-remote --tags origin refs/tags/v1.2.0-rc6`.
+- [ ] **Require fresh upstream evidence.** Treat
+  `docs/validation/ga-governance-evidence.md`,
+  `docs/validation/ga-e2e-evidence.md`, and
+  `docs/validation/ga-operations-evidence.md` as the required upstream inputs.
+
+#### During GARC
+
+- [ ] **Confirm release-workflow visibility before dispatch.** Run
+  `gh workflow view "Release Automation"` and record only metadata.
+- [ ] **Dispatch with the frozen RC policy.** Use exactly
+  `gh workflow run "Release Automation" -f version=v1.2.0-rc6 -f release_type=custom -f auto_merge=false`.
+- [ ] **Observe the workflow to completion.** Record
+  `gh run list --workflow "Release Automation" --limit 10`,
+  `gh run watch <run-id> --exit-status`,
+  `gh run view <run-id> --json url,headSha,status,conclusion,jobs`, and
+  `gh release view v1.2.0-rc6 --repo ViperJuice/Code-Index-MCP --json tagName,isPrerelease,isDraft,publishedAt,targetCommitish,url,assets`.
+- [ ] **Keep the channel split explicit.** `v1.2.0-rc6` remains prerelease
+  public-alpha/beta posture, `auto_merge=false` stays the default, GitHub
+  Latest remains excluded from the RC policy source, and Docker `latest`
+  remains stable-only.
+
+#### After GARC
+
+- [ ] **Reduce the run into one canonical artifact.** Use
+  `docs/validation/ga-rc-evidence.md` to record pre-dispatch checks, dispatch
+  inputs, workflow URL or run ID, artifact identities, release-channel state,
+  and rollback disposition using redacted metadata only.
+- [ ] **Do not imply GA readiness from a blocked or failed soak.** If dispatch
+  did not happen or the workflow failed, state that explicitly and keep GA
+  release work blocked until GARC is rerun successfully.
 
 ---
 

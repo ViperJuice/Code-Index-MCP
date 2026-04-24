@@ -38,6 +38,8 @@ async def test_list_plugins_includes_availability_rows(repo_resolver):
             "sandbox_supported",
             "specific_plugin",
             "plugin_module",
+            "availability_basis",
+            "activation_mode",
             "required_extras",
             "remediation",
             "error_type",
@@ -45,6 +47,12 @@ async def test_list_plugins_includes_availability_rows(repo_resolver):
         for row in rows
     )
     assert any(row["language"] == "ruby" and row["state"] == "unsupported" for row in rows)
+    assert any(
+        row["language"] == "ruby"
+        and row["availability_basis"] == "registry_only"
+        and row["activation_mode"] == "disabled_by_default"
+        for row in rows
+    )
 
 
 @pytest.mark.asyncio

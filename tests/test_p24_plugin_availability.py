@@ -15,6 +15,8 @@ P24_FIELDS = {
     "sandbox_supported",
     "specific_plugin",
     "plugin_module",
+    "availability_basis",
+    "activation_mode",
     "required_extras",
     "remediation",
     "error_type",
@@ -62,9 +64,21 @@ def test_missing_optional_dependency_is_machine_readable(monkeypatch):
     row = PluginFactory.get_plugin_availability("java", sandbox_enabled=True)
 
     assert row["state"] == "missing_extra"
+    assert row["availability_basis"] == "specific_plugin"
+    assert row["activation_mode"] == "extra_required"
     assert row["required_extras"] == ["javalang"]
     assert row["error_type"] == "MissingOptionalDependency"
     assert "uv sync --locked --extra java" in row["remediation"]
+
+
+def test_availability_rows_expose_default_activation_and_basis_facts():
+    python_row = PluginFactory.get_plugin_availability("python", sandbox_enabled=True)
+    ruby_row = PluginFactory.get_plugin_availability("ruby", sandbox_enabled=True)
+
+    assert python_row["availability_basis"] == "specific_plugin"
+    assert python_row["activation_mode"] == "default"
+    assert ruby_row["availability_basis"] == "registry_only"
+    assert ruby_row["activation_mode"] == "disabled_by_default"
 
 
 def test_create_all_plugins_quietly_skips_expected_unavailable(caplog):

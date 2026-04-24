@@ -10,7 +10,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from mcp_server.cli.tool_handlers import handle_search_code, handle_symbol_lookup
+from mcp_server.cli.tool_handlers import (
+    handle_reindex,
+    handle_search_code,
+    handle_summarize_sample,
+    handle_symbol_lookup,
+    handle_write_summaries,
+)
 from mcp_server.health.repository_readiness import (
     RepositoryReadiness,
     RepositoryReadinessState,
@@ -123,6 +129,80 @@ def test_symbol_lookup_non_ready_returns_index_unavailable_without_dispatch(
     assert resolver.resolve_called is False
 
 
+@pytest.mark.parametrize("state", NON_READY_STATES)
+def test_reindex_non_ready_returns_readiness_refusal_without_mutation(tmp_path, monkeypatch, state):
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    dispatcher = MagicMock()
+    store = MagicMock()
+    resolver = FakeResolver(_readiness(state, repo))
+
+    result = _run(
+        handle_reindex(
+            arguments={"repository": str(repo)},
+            dispatcher=dispatcher,
+            repo_resolver=resolver,
+            sqlite_store=store,
+        )
+    )
+
+    data = _parsed(result)
+    assert data["code"] == state.value
+    assert data["tool"] == "reindex"
+    assert data["results"] == []
+    assert data["readiness"]["state"] == state.value
+    assert data["readiness"]["ready"] is False
+    assert data["remediation"] == f"remediate {state.value}"
+    assert data["mutation_performed"] is False
+    assert "safe_fallback" not in data
+    dispatcher.index_file.assert_not_called()
+    dispatcher.index_directory.assert_not_called()
+    store.rebuild_fts_code.assert_not_called()
+    assert resolver.resolve_called is False
+
+
+@pytest.mark.parametrize("state", NON_READY_STATES)
+@pytest.mark.parametrize(
+    ("handler", "tool_name"),
+    [
+        (handle_write_summaries, "write_summaries"),
+        (handle_summarize_sample, "summarize_sample"),
+    ],
+)
+def test_summary_tools_non_ready_return_readiness_refusal_before_summarizer(
+    tmp_path, monkeypatch, state, handler, tool_name
+):
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    dispatcher = MagicMock()
+    lazy_summarizer = MagicMock()
+    resolver = FakeResolver(_readiness(state, repo))
+
+    result = _run(
+        handler(
+            arguments={"repository": str(repo)},
+            dispatcher=dispatcher,
+            repo_resolver=resolver,
+            sqlite_store=MagicMock(),
+            lazy_summarizer=lazy_summarizer,
+        )
+    )
+
+    data = _parsed(result)
+    assert data["code"] == state.value
+    assert data["tool"] == tool_name
+    assert data["results"] == []
+    assert data["readiness"]["state"] == state.value
+    assert data["readiness"]["ready"] is False
+    assert data["remediation"] == f"remediate {state.value}"
+    assert data["persisted"] is False
+    assert "safe_fallback" not in data
+    lazy_summarizer.can_summarize.assert_not_called()
+    assert resolver.resolve_called is False
+
+
 def test_ready_search_miss_keeps_empty_results_with_readiness(tmp_path, monkeypatch):
     monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
     repo = tmp_path / "repo"
@@ -195,3 +275,106 @@ def test_path_sandbox_error_precedes_readiness_gate(tmp_path, monkeypatch):
     data = _parsed(result)
     assert data["code"] == "path_outside_allowed_roots"
     dispatcher.search.assert_not_called()
+
+
+def test_reindex_path_sandbox_error_precedes_readiness_gate(tmp_path, monkeypatch):
+    allowed = tmp_path / "allowed"
+    outside = tmp_path / "outside"
+    allowed.mkdir()
+    outside.mkdir()
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(allowed))
+    dispatcher = MagicMock()
+    resolver = FakeResolver(_readiness(RepositoryReadinessState.MISSING_INDEX, outside))
+
+    result = _run(
+        handle_reindex(
+            arguments={"repository": str(outside)},
+            dispatcher=dispatcher,
+            repo_resolver=resolver,
+            sqlite_store=MagicMock(),
+        )
+    )
+
+    data = _parsed(result)
+    assert data["code"] == "path_outside_allowed_roots"
+    dispatcher.index_directory.assert_not_called()
+    assert resolver.resolve_called is False
+
+
+def test_summarize_sample_path_sandbox_error_precedes_readiness_gate(tmp_path, monkeypatch):
+    allowed = tmp_path / "allowed"
+    outside = tmp_path / "outside"
+    allowed.mkdir()
+    outside.mkdir()
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(allowed))
+    lazy_summarizer = MagicMock()
+    resolver = FakeResolver(_readiness(RepositoryReadinessState.MISSING_INDEX, outside))
+
+    result = _run(
+        handle_summarize_sample(
+            arguments={"paths": [str(outside / "sample.py")]},
+            dispatcher=MagicMock(),
+            repo_resolver=resolver,
+            sqlite_store=MagicMock(),
+            lazy_summarizer=lazy_summarizer,
+        )
+    )
+
+    data = _parsed(result)
+    assert data["code"] == "path_outside_allowed_roots"
+    lazy_summarizer.can_summarize.assert_not_called()
+    assert resolver.resolve_called is False
+
+
+def test_reindex_conflicting_path_and_repository_precedes_readiness(tmp_path, monkeypatch):
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+    repo_a = tmp_path / "repo-a"
+    repo_b = tmp_path / "repo-b"
+    repo_a.mkdir()
+    repo_b.mkdir()
+    ctx_a = SimpleNamespace(repo_id="repo-a")
+    ctx_b = SimpleNamespace(repo_id="repo-b")
+    resolver = MagicMock()
+    resolver.classify.return_value = _readiness(RepositoryReadinessState.MISSING_INDEX, repo_a)
+    resolver.resolve.side_effect = [ctx_a, ctx_b]
+
+    result = _run(
+        handle_reindex(
+            arguments={"path": str(repo_a), "repository": str(repo_b)},
+            dispatcher=MagicMock(),
+            repo_resolver=resolver,
+            sqlite_store=MagicMock(),
+        )
+    )
+
+    data = _parsed(result)
+    assert data["code"] == "conflicting_path_and_repository"
+
+
+def test_summarize_sample_conflicting_path_and_repository_precedes_readiness(tmp_path, monkeypatch):
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+    repo_a = tmp_path / "repo-a"
+    repo_b = tmp_path / "repo-b"
+    sample = repo_a / "sample.py"
+    repo_a.mkdir()
+    repo_b.mkdir()
+    sample.write_text("def sample():\n    return 1\n", encoding="utf-8")
+    readiness_a = _readiness(RepositoryReadinessState.READY, repo_a)
+    readiness_b = _readiness(RepositoryReadinessState.MISSING_INDEX, repo_b)
+    readiness_a = RepositoryReadiness(**{**readiness_a.__dict__, "repository_id": "repo-a"})
+    readiness_b = RepositoryReadiness(**{**readiness_b.__dict__, "repository_id": "repo-b"})
+    resolver = MagicMock()
+    resolver.classify.side_effect = [readiness_b, readiness_a]
+
+    result = _run(
+        handle_summarize_sample(
+            arguments={"repository": str(repo_b), "paths": [str(sample)]},
+            dispatcher=MagicMock(),
+            repo_resolver=resolver,
+            sqlite_store=MagicMock(),
+            lazy_summarizer=MagicMock(),
+        )
+    )
+
+    data = _parsed(result)
+    assert data["code"] == "conflicting_path_and_repository"

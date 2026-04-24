@@ -1,6 +1,6 @@
 # Artifact Attestation & Signing
 
-> **Beta status**: This page targets `1.2.0-rc5`. Attestation policy is part
+> **Beta status**: This page targets `1.2.0-rc6`. Attestation policy is part
 > of the current security posture for the `ghcr.io/viperjuice/code-index-mcp`
 > release path, with operational limits documented in the deployment runbook.
 

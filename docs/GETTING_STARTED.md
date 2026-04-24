@@ -2,9 +2,14 @@
 
 This guide walks you through installing and using Code-Index-MCP to index and search your codebase.
 
-> **Beta status**: This guide targets `1.2.0-rc5`. MCP STDIO is the primary
+> **Beta status**: This guide targets `1.2.0-rc6`. MCP STDIO is the primary
 > LLM surface; FastAPI is a secondary admin surface. Language behavior is
-> documented in [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md).
+> documented in [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md), and the pre-GA release
+> boundary is frozen in
+> [ga-readiness-checklist.md](validation/ga-readiness-checklist.md).
+> Install-surface and language/runtime support tiers are defined in
+> [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md); do not treat every install path or
+> language row as equivalent support.
 >
 > **Public alpha repository model**: one server can serve many unrelated
 > repositories, with one registered worktree per git common directory. Only the

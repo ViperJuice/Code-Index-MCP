@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., v1.2.0-rc5)'
+        description: 'Version to release (e.g., v1.2.0-rc6)'
         required: true
-        default: 'v1.2.0-rc5'
+        default: 'v1.2.0-rc6'
         type: string
       release_type:
         description: 'Release type'
@@ -72,7 +72,7 @@ jobs:
               exit 1
               ;;
           esac
-          grep -q "default: 'v1.2.0-rc5'" .github/workflows/release-automation.yml
+          grep -q "default: 'v1.2.0-rc6'" .github/workflows/release-automation.yml
           if [ "$RELEASE_TYPE" = "custom" ]; then
             grep -q "version = \"$VERSION_NO_V\"" pyproject.toml
             grep -q "__version__ = \"$VERSION_NO_V\"" mcp_server/__init__.py
@@ -372,7 +372,7 @@ jobs:
           body: |
             ## Release ${{ needs.prepare-release.outputs.version }}
 
-            P21 release contract target: v1.2.0-rc5
+            GARC release contract target: v1.2.0-rc6
 
             This PR contains all changes for release ${{ needs.prepare-release.outputs.version }}.
 

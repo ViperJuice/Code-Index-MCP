@@ -1,6 +1,6 @@
 # GitHub Token Scopes & Validation
 
-> **Beta status**: This page targets `1.2.0-rc5`. Token validation supports
+> **Beta status**: This page targets `1.2.0-rc6`. Token validation supports
 > artifact and attestation operations for the current beta release path.
 
 ## Overview

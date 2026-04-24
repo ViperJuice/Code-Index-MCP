@@ -1,6 +1,6 @@
 # Plugin Sandbox Architecture
 
-> **Beta status**: This page targets `1.2.0-rc5`. Default sandbox behavior is
+> **Beta status**: This page targets `1.2.0-rc6`. Default sandbox behavior is
 > documented alongside language support in [../SUPPORT_MATRIX.md](../SUPPORT_MATRIX.md).
 
 ## Overview

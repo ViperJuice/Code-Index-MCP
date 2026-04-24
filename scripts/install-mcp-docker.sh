@@ -12,8 +12,8 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-MCP_VERSION="${MCP_VERSION:-latest}"
-MCP_VARIANT="${MCP_VARIANT:-latest}"
+MCP_VERSION="${MCP_VERSION:-v1.2.0-rc6}"
+MCP_VARIANT="${MCP_VARIANT:-v1.2.0-rc6}"
 DOCKER_REGISTRY="${DOCKER_REGISTRY:-ghcr.io}"
 MCP_IMAGE="${DOCKER_REGISTRY}/viperjuice/code-index-mcp"
 
@@ -115,8 +115,8 @@ install_docker() {
 choose_variant() {
     echo
     echo "Choose MCP Index variant:"
-    echo "1) latest      - Current production image (recommended)"
-    echo "2) v1.2.0-rc5  - Release candidate image"
+    echo "1) v1.2.0-rc6  - Active RC/public-alpha image (recommended)"
+    echo "2) latest      - Stable-only channel; may not exist before GA"
     echo "3) local-smoke - Local smoke image built by make release-smoke-container"
     echo
     
@@ -125,16 +125,16 @@ choose_variant() {
     
     case $REPLY in
         2)
-            MCP_VARIANT="v1.2.0-rc5"
-            print_info "Selected: v1.2.0-rc5"
+            MCP_VARIANT="latest"
+            print_info "Selected: latest"
             ;;
         3)
             MCP_VARIANT="local-smoke"
             print_info "Selected: local-smoke"
             ;;
         *)
-            MCP_VARIANT="latest"
-            print_info "Selected: latest"
+            MCP_VARIANT="v1.2.0-rc6"
+            print_info "Selected: v1.2.0-rc6"
             ;;
     esac
 }
@@ -155,7 +155,7 @@ create_launcher() {
 # MCP Index Docker Launcher
 
 # Default settings
-MCP_VARIANT="${MCP_VARIANT:-latest}"
+MCP_VARIANT="${MCP_VARIANT:-v1.2.0-rc6}"
 MCP_IMAGE="${MCP_IMAGE:-ghcr.io/viperjuice/code-index-mcp}"
 WORKSPACE="${WORKSPACE:-$(pwd)}"
 
@@ -231,13 +231,11 @@ print_next_steps() {
     echo "   mcp-index"
     echo
     
-    if [ "$MCP_VARIANT" == "standard" ] || [ "$MCP_VARIANT" == "full" ]; then
-        echo "3. Configure semantic search:"
-        echo "   export VOYAGE_API_KEY='your-key-here'"
-        echo "   Get your key at: https://www.voyageai.com/"
-        echo
-    fi
-    
+    echo "3. Optional: configure semantic search:"
+    echo "   export VOYAGE_API_KEY='your-key-here'"
+    echo "   Get your key at: https://www.voyageai.com/"
+    echo
+
     echo "4. For Claude Code integration:"
     echo "   - Copy .mcp.json to your project root"
     echo "   - Claude will automatically use the Docker version"

@@ -73,6 +73,8 @@ class PluginAvailability:
     sandbox_supported: bool
     specific_plugin: bool
     plugin_module: Optional[str]
+    availability_basis: str
+    activation_mode: str
     required_extras: Tuple[str, ...] = ()
     remediation: Optional[str] = None
     error_type: Optional[str] = None
@@ -84,6 +86,8 @@ class PluginAvailability:
             "sandbox_supported": self.sandbox_supported,
             "specific_plugin": self.specific_plugin,
             "plugin_module": self.plugin_module,
+            "availability_basis": self.availability_basis,
+            "activation_mode": self.activation_mode,
             "required_extras": list(self.required_extras),
             "remediation": self.remediation,
             "error_type": self.error_type,
@@ -108,6 +112,8 @@ class PluginUnavailableError(ValueError):
         return {
             "language": self.language,
             "state": self.state,
+            "availability_basis": "unknown",
+            "activation_mode": "unavailable",
             "required_extras": list(self.required_extras),
             "remediation": self.remediation,
             "error_type": self.error_type,
@@ -266,24 +272,30 @@ class PluginFactory:
             known = lang in cls.get_supported_languages()
             plugin_module = SPECIFIC_PLUGIN_MODULES.get(lang)
             sandbox_supported = plugin_module is not None
-            specific_plugin = lang in SPECIFIC_PLUGINS
+            specific_plugin = lang in SPECIFIC_PLUGIN_MODULES or lang in SPECIFIC_PLUGINS
+            availability_basis = "specific_plugin" if specific_plugin else "registry_only"
             required_extras = REQUIRED_PLUGIN_EXTRAS.get(lang, ())
             missing = cls._missing_required_extras(lang)
 
             if not known:
                 state: AvailabilityState = "unsupported"
+                availability_basis = "unknown"
+                activation_mode = "unavailable"
                 remediation = "Use one of PluginFactory.get_supported_languages()."
                 error_type = "UnsupportedLanguage"
             elif sandbox and not sandbox_supported:
                 state = "unsupported"
+                activation_mode = "disabled_by_default"
                 remediation = "Sandbox mode has no hardened plugin module for this language."
                 error_type = "SandboxUnsupported"
             elif missing:
                 state = "missing_extra"
+                activation_mode = "extra_required"
                 remediation = EXTRA_REMEDIATION.get(lang)
                 error_type = "MissingOptionalDependency"
             else:
                 state = "enabled"
+                activation_mode = "default"
                 remediation = None
                 error_type = None
 
@@ -294,6 +306,8 @@ class PluginFactory:
                     sandbox_supported=sandbox_supported,
                     specific_plugin=specific_plugin,
                     plugin_module=plugin_module,
+                    availability_basis=availability_basis,
+                    activation_mode=activation_mode,
                     required_extras=tuple(required_extras),
                     remediation=remediation,
                     error_type=error_type,
@@ -398,6 +412,8 @@ class PluginFactory:
                         sandbox_supported=availability["sandbox_supported"],
                         specific_plugin=availability["specific_plugin"],
                         plugin_module=availability["plugin_module"],
+                        availability_basis=availability["availability_basis"],
+                        activation_mode=availability["activation_mode"],
                         required_extras=tuple(availability["required_extras"]),
                         remediation=availability["remediation"],
                         error_type=availability["error_type"],
@@ -451,6 +467,8 @@ class PluginFactory:
                         sandbox_supported=availability["sandbox_supported"],
                         specific_plugin=availability["specific_plugin"],
                         plugin_module=availability["plugin_module"],
+                        availability_basis=availability["availability_basis"],
+                        activation_mode=availability["activation_mode"],
                         required_extras=tuple(availability["required_extras"]),
                         remediation=availability["remediation"],
                         error_type=availability["error_type"],
