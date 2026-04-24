@@ -127,7 +127,9 @@ def test_public_docs_remain_pre_ga_and_route_to_canonical_artifacts():
             failures.append(f"{path.relative_to(REPO)} missing support matrix reference")
         for phrase in FORBIDDEN_PUBLIC_LAUNCH_PHRASES:
             if phrase in text:
-                failures.append(f"{path.relative_to(REPO)} contains forbidden launch phrase {phrase!r}")
+                failures.append(
+                    f"{path.relative_to(REPO)} contains forbidden launch phrase {phrase!r}"
+                )
 
     assert failures == []
 

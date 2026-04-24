@@ -51,8 +51,12 @@ def test_rc6_contract_surfaces_are_frozen():
 
     workflow = _read(RELEASE_WORKFLOW)
     assert "default: 'v1.2.0-rc6'" in workflow
-    assert "release_type=custom" in "\n".join([workflow, _read(DEPLOYMENT_RUNBOOK), _read(USER_ACTION_RUNBOOK)])
-    assert "auto_merge=false" in "\n".join([workflow, _read(DEPLOYMENT_RUNBOOK), _read(USER_ACTION_RUNBOOK)])
+    assert "release_type=custom" in "\n".join(
+        [workflow, _read(DEPLOYMENT_RUNBOOK), _read(USER_ACTION_RUNBOOK)]
+    )
+    assert "auto_merge=false" in "\n".join(
+        [workflow, _read(DEPLOYMENT_RUNBOOK), _read(USER_ACTION_RUNBOOK)]
+    )
 
 
 def test_public_surfaces_preserve_rc_only_channel_posture():
@@ -122,12 +126,12 @@ def test_ga_rc_evidence_exists_and_records_blocked_or_observed_state():
         "v1.2.0-rc6",
         "blocked before dispatch",
         "git status --short --branch",
-        "gh workflow view \"Release Automation\"",
+        'gh workflow view "Release Automation"',
         "auto_merge=false",
         "stable-only",
         "Release Automation",
     ):
         assert expected in evidence
 
-    for forbidden in ("gho_", "Authorization: Bearer", "\"password\":"):
+    for forbidden in ("gho_", "Authorization: Bearer", '"password":'):
         assert forbidden not in evidence

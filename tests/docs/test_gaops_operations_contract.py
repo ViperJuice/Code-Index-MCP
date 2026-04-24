@@ -147,7 +147,7 @@ def test_gaops_evidence_artifact_exists_and_records_validation_modes():
     ):
         assert expected in text
 
-    for forbidden in ("ship GA", "Authorization: Bearer", "gho_", "\"password\":"):
+    for forbidden in ("ship GA", "Authorization: Bearer", "gho_", '"password":'):
         assert forbidden not in text
 
 

@@ -37,6 +37,9 @@ tracked/default branch indexing only, and `index_unavailable` with
 ## Public Alpha Release Gate Checklist
 
 The current RC/public-alpha baseline remains blocked on these required gates:
+the original P27-P33 production-readiness contract is still part of the
+pre-release checklist, and the current follow-up RC keeps the same release-gate
+shape while advancing the artifact identity to `v1.2.0-rc6`.
 
 | Required job | Operator decision | Command/workflow source | Block/fallback behavior |
 |---|---|---|---|
@@ -61,6 +64,7 @@ input evidence and should not be rewritten out of the record.
 | Branch protection | `gh api repos/ViperJuice/Code-Index-MCP/branches/main` and `/protection` | `main` is protected and enforces the required GA gate contexts before merge. |
 | Repository ruleset | `gh api repos/ViperJuice/Code-Index-MCP/rulesets` | No repository rulesets are configured; branch protection is the active enforcement surface. |
 | Active RC contract | `docs/validation/rc5-release-evidence.md` and release `v1.2.0-rc5` | `v1.2.0-rc5` remains the active RC/public-alpha package contract. |
+| GACLOSE prerequisites | `docs/validation/release-governance-evidence.md`, `docs/validation/secondary-tool-readiness-evidence.md`, and `docs/validation/ga-closeout-decision.md` | Preserve the historical inputs before choosing `stay on RC/public-alpha`, `cut a follow-up RC`, or `start a GA hardening roadmap`. |
 | GitHub Latest | `gh api repos/ViperJuice/Code-Index-MCP/releases/latest` | GitHub Latest still points at `v2.15.0-alpha.1`; it is excluded from the RC/GA policy source until a final GA release changes that state. |
 | Release automation | `.github/workflows/release-automation.yml` | Hyphenated versions are prereleases, prerelease dispatch requires `release_type=custom`, Docker latest is stable-only, and `auto_merge=false` is the RC default. |
 
@@ -154,6 +158,17 @@ Qualification passes only when:
 If any pre-dispatch probe fails, stop before release mutation, record the
 blocked state in `docs/validation/ga-rc-evidence.md`, and leave the active
 release channel unchanged.
+
+Run the current clean-checkout release verification set before dispatch:
+
+```bash
+uv run pytest tests/smoke tests/docs tests/test_release_metadata.py
+make release-smoke release-smoke-container
+git tag -l v1.2.0-rc6
+```
+
+Keep `tests/docs/test_p34_public_alpha_recut.py` in this gate set so the
+follow-up RC continues to preserve the original public-alpha recut contract.
 
 ### Dispatch and workflow observation
 

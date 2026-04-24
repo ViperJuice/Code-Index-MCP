@@ -12,8 +12,9 @@ SWEEP_DIRS = [
 ]
 TRIAGE_LOG = REPO_ROOT / "docs" / "HISTORICAL-ARTIFACTS-TRIAGE.md"
 BANNER_REGEX = re.compile(
-    r"^> \*\*Historical artifact \u2014 as-of 2026-04-18, may not reflect current behavior\*\*\s*$"
+    r"^> \*\*Historical artifact \u2014 as-of 2026-04-(18|24), may not reflect current behavior\*\*\s*$"
 )
+VALID_AS_OF_DATES = {"2026-04-18", "2026-04-24"}
 VALID_DISPOSITIONS = {"deleted", "bannered", "rewritten"}
 
 
@@ -152,6 +153,6 @@ def test_triage_log_asof_date():
             parts = [p.strip() for p in line.split("|")]
             if len(parts) >= 5:
                 asof = parts[4].strip()
-                if asof and asof != "2026-04-18":
+                if asof and asof not in VALID_AS_OF_DATES:
                     failures.append(f"Wrong As-of date {asof!r} in row: {line!r}")
     assert not failures, "As-of date failures:\n" + "\n".join(failures)

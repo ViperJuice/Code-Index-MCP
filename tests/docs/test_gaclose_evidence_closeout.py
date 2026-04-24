@@ -15,9 +15,8 @@ TRIAGE = REPO / "docs" / "HISTORICAL-ARTIFACTS-TRIAGE.md"
 
 PUBLIC_ALPHA_VERSION = "1.2.0-rc5"
 PUBLIC_ALPHA_TAG = "v1.2.0-rc5"
-HISTORICAL_BANNER = (
-    "> **Historical artifact — as-of 2026-04-18, may not reflect current behavior**"
-)
+CURRENT_PUBLIC_ALPHA_VERSION = "1.2.0-rc6"
+HISTORICAL_BANNER = "> **Historical artifact — as-of 2026-04-18, may not reflect current behavior**"
 
 PUBLIC_SURFACES = [
     "README.md",
@@ -72,12 +71,12 @@ def test_decision_artifact_states_exactly_one_allowed_decision():
     assert "Next command: `codex-phase-roadmap-builder specs/phase-plans-v4.md`" in text
 
 
-def test_active_public_release_surfaces_are_rc5_and_not_latest_driven():
+def test_active_public_release_surfaces_are_current_rc_and_not_latest_driven():
     failures = []
     for relative in PUBLIC_SURFACES:
         text = _read(relative)
-        if PUBLIC_ALPHA_VERSION not in text:
-            failures.append(f"{relative}: missing {PUBLIC_ALPHA_VERSION}")
+        if CURRENT_PUBLIC_ALPHA_VERSION not in text:
+            failures.append(f"{relative}: missing {CURRENT_PUBLIC_ALPHA_VERSION}")
         if relative != "CHANGELOG.md" and "1.2.0-rc4" in text:
             failures.append(f"{relative}: active RC4 version reference")
         if "v1.2.0-rc4" in text:

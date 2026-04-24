@@ -76,8 +76,12 @@ def test_support_matrix_exists_with_required_columns_once():
     text = _read(SUPPORT_MATRIX)
     language_header = "| " + " | ".join(REQUIRED_SUPPORT_COLUMNS) + " |"
     surface_header = "| " + " | ".join(REQUIRED_SURFACE_COLUMNS) + " |"
-    assert text.count(language_header) == 1, "support matrix must contain one canonical language table"
-    assert text.count(surface_header) == 1, "support matrix must contain one canonical surface table"
+    assert (
+        text.count(language_header) == 1
+    ), "support matrix must contain one canonical language table"
+    assert (
+        text.count(surface_header) == 1
+    ), "support matrix must contain one canonical surface table"
 
 
 def test_active_docs_do_not_contain_stale_strings():
