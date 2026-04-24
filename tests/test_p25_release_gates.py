@@ -144,7 +144,7 @@ def test_release_automation_refuses_before_mutating_or_publishing():
     assert "default: 'custom'" in workflow_text
     assert "Prerelease tags must use release_type=custom" in workflow_text
     assert "printf '\\n' >> RELEASE_NOTES.md" in workflow_text
-    assert "DELIMITER=\"release_notes_${RANDOM}_$(date +%s%N)\"" in workflow_text
+    assert 'DELIMITER="release_notes_${RANDOM}_$(date +%s%N)"' in workflow_text
     assert "changelog<<$DELIMITER" in workflow_text
     assert 'echo "$DELIMITER"' in workflow_text
 
