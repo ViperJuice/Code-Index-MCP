@@ -1,6 +1,6 @@
 # Historical Artifacts Triage Log
 
-P8 SL-3 sweep — 2026-04-18. All 44 files in scope bannered; 0 deleted. All 16 scout-candidate deletions downgraded due to nav-coupling hit in `docs/DOCUMENTATION_FILES_TO_CONSOLIDATE.md` (inside grep set `docs/`). No rewrite eligible (<100 LOC + active callers) files found.
+P8 SL-3 sweep — 2026-04-18. All 45 files in scope bannered; 0 deleted. All 16 scout-candidate deletions downgraded due to nav-coupling hit in `docs/DOCUMENTATION_FILES_TO_CONSOLIDATE.md` (inside grep set `docs/`). No rewrite eligible (<100 LOC + active callers) files found.
 
 ### docs/implementation/
 
@@ -59,4 +59,5 @@ P8 SL-3 sweep — 2026-04-18. All 44 files in scope bannered; 0 deleted. All 16 
 | `docs/validation/comprehensive-test-report.md` | bannered | Subject active in mcp_server/benchmarks and scripts; historical test report snapshot | 2026-04-18 |
 | `docs/validation/document-processing-validation.md` | bannered | Subject (document processing) active in mcp_server/plugins; historical validation snapshot | 2026-04-18 |
 | `docs/validation/private-alpha-decision.md` | bannered | P26 redacted private-alpha decision artifact; current release gating pointer is maintained by P26 tests | 2026-04-18 |
+| `docs/validation/rc5-release-evidence.md` | bannered | RC5 release execution evidence artifact; current release state must be rechecked from GitHub Actions and registry surfaces | 2026-04-18 |
 | `docs/validation/system-validation-report.md` | bannered | Benchmark result snapshot with actual performance numbers; no code subject found but qualifies as benchmark result worth preserving | 2026-04-18 |
