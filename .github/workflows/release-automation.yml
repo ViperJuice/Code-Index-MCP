@@ -181,10 +181,12 @@ jobs:
               echo "Initial release"
             fi
           } > RELEASE_NOTES.md
+          printf '\n' >> RELEASE_NOTES.md
+          DELIMITER="release_notes_${RANDOM}_$(date +%s%N)"
           {
-            echo "changelog<<EOF"
+            echo "changelog<<$DELIMITER"
             cat RELEASE_NOTES.md
-            echo "EOF"
+            echo "$DELIMITER"
           } >> "$GITHUB_OUTPUT"
 
       - name: Update CHANGELOG.md
