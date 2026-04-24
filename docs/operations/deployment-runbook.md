@@ -1,339 +1,398 @@
-# Deployment Runbook (1.2.0-rc5 beta)
+# Deployment Runbook (v1.2.0-rc5 public-alpha / beta baseline)
 
 ## Overview
 
-This runbook is the operator's playbook for the Code-Index-MCP `1.2.0-rc5`
-beta release candidate. It is a staged rollout guide, not a GA production
-claim. The documented container package is `ghcr.io/viperjuice/code-index-mcp`.
-Language and sandbox limitations are tracked in
-[`../SUPPORT_MATRIX.md`](../SUPPORT_MATRIX.md).
+This runbook is the operator playbook for the Code-Index-MCP
+`v1.2.0-rc5` public-alpha / beta baseline. It is not a GA launch document.
+The supported deployment surfaces remain local-first and operator-owned:
 
-It covers four stages — **dev → staging → canary → full-prod** — each with measurable
-pass criteria, a bake window, rollback triggers, and a rollback procedure.
+- `uv sync --locked` plus the local checkout
+- the published Python package `index-it-mcp`
+- the container image `ghcr.io/viperjuice/code-index-mcp`
 
-Execute stages in order. Each stage is a gate: do not advance until all pass criteria
-are met and the bake window has elapsed without a rollback trigger firing.
+Use [`../SUPPORT_MATRIX.md`](../SUPPORT_MATRIX.md) for support tiers and
+[`../validation/ga-readiness-checklist.md`](../validation/ga-readiness-checklist.md)
+for the canonical GA boundary. The shared support-tier labels are
+`public-alpha`, `beta`, `GA`, `experimental`, `unsupported`, and
+`disabled-by-default`.
+
+The repository-topology contract remains unchanged: many unrelated
+repositories, one registered worktree per git common directory,
+tracked/default branch indexing only, and `index_unavailable` with
+`safe_fallback: "native_search"` until readiness is `ready`.
 
 **Related files**:
-- Pre-flight validation: [`scripts/preflight_upgrade.sh`](../../scripts/preflight_upgrade.sh)
-- Observability verification: [`docs/operations/observability-verification.md`](observability-verification.md)
-- Gateway startup: [`docs/operations/gateway-startup-checklist.md`](gateway-startup-checklist.md)
-- P18 upgrade notes: [`docs/operations/p18-upgrade.md`](p18-upgrade.md)
 
----
+- Preflight validation:
+  [`../../scripts/preflight_upgrade.sh`](../../scripts/preflight_upgrade.sh)
+- Observability verification:
+  [`observability-verification.md`](observability-verification.md)
+- GA governance evidence:
+  [`../validation/ga-governance-evidence.md`](../validation/ga-governance-evidence.md)
+- GA E2E evidence:
+  [`../validation/ga-e2e-evidence.md`](../validation/ga-e2e-evidence.md)
+- GA operations evidence:
+  [`../validation/ga-operations-evidence.md`](../validation/ga-operations-evidence.md)
 
 ## Public Alpha Release Gate Checklist
 
-The public alpha release cannot advance until each required job below is green.
-Slow, credentialed, cross-platform, benchmark, scan, signing, cleanup, and
-publication jobs are informational unless this table explicitly names them as a
-blocker.
+The current RC/public-alpha baseline remains blocked on these required gates:
 
 | Required job | Operator decision | Command/workflow source | Block/fallback behavior |
 |---|---|---|---|
-| Alpha Gate - Dependency Sync | Dependency metadata and `uv.lock` are in sync before release qualification. | `.github/workflows/lockfile-check.yml` -> `make alpha-dependency-sync` | Blocks release on failure; no fallback for public alpha. |
-| Alpha Gate - Format And Lint | Focused formatting and lint checks are clean enough to trust the release branch. | `.github/workflows/ci-cd-pipeline.yml` -> `make alpha-format-lint` | Blocks release on failure; fix code or lint configuration before continuing. |
-| Alpha Gate - Unit And Release Smoke | Unit coverage and P22 wheel/stdio release smoke pass on the release candidate. | `.github/workflows/ci-cd-pipeline.yml` -> `make alpha-unit-release-smoke` and `make release-smoke` | Blocks release on failure; no promotion until smoke is green. |
-| Alpha Gate - Integration Smoke | Integration and slow smoke coverage still works against the current repository state. | `.github/workflows/ci-cd-pipeline.yml` -> `make alpha-integration-smoke` | Blocks release on failure; quarantine only with a tracked release-blocker decision. |
-| Alpha Gate - Production Multi-Repo Matrix | P33 verifies unrelated multi-repo isolation and fail-closed release behavior for same-repo worktree rejection, wrong-branch safety, stale/missing index fallback, incremental repair, rename/delete/revert, force-push recovery, and wrong-artifact rejection. | `.github/workflows/ci-cd-pipeline.yml` -> `make alpha-production-matrix` | Blocks release on any regression; inspect the failing matrix row and do not fall back to native search as release evidence unless the tool returned `index_unavailable` with `safe_fallback: native_search`. |
-| Alpha Gate - Docker Build And Smoke | The production container image builds locally in CI and passes the P22 container smoke. | `.github/workflows/container-registry.yml` -> `make release-smoke-container` | Blocks release on failure; scan/sign/publish jobs remain informational until publication. |
-| Alpha Gate - Docs Truth | Release metadata, dependency source-of-truth, smoke contract, and customer docs truth checks are current. | `.github/workflows/ci-cd-pipeline.yml` -> `make alpha-docs-truth` | Blocks release on failure; docs must be corrected before release evidence is accepted. |
-| Alpha Gate - Required Gates Passed | The required main CI gates completed successfully and are ready to combine with dependency/container gates. | `.github/workflows/ci-cd-pipeline.yml` aggregator job | Blocks release on failure; rerun only after the failed upstream gate is understood. |
+| Alpha Gate - Dependency Sync | Dependency metadata and `uv.lock` must match before release qualification. | `.github/workflows/lockfile-check.yml` -> `make alpha-dependency-sync` | Blocks qualification on failure. |
+| Alpha Gate - Format And Lint | Formatting and lint posture must stay clean enough to trust the branch. | `.github/workflows/ci-cd-pipeline.yml` -> `make alpha-format-lint` | Blocks qualification on failure. |
+| Alpha Gate - Unit And Release Smoke | Unit tests and release smoke must pass on the candidate build. | `.github/workflows/ci-cd-pipeline.yml` -> `make alpha-unit-release-smoke`, `make release-smoke` | Blocks qualification on failure. |
+| Alpha Gate - Integration Smoke | Integration and slow-smoke coverage must stay green. | `.github/workflows/ci-cd-pipeline.yml` -> `make alpha-integration-smoke` | Blocks qualification on failure. |
+| Alpha Gate - Production Multi-Repo Matrix | Multi-repo isolation and fail-closed readiness behavior must remain frozen. | `.github/workflows/ci-cd-pipeline.yml` -> `make alpha-production-matrix` | Blocks qualification on regression. |
+| Alpha Gate - Docker Build And Smoke | The container image must build and pass smoke checks. | `.github/workflows/container-registry.yml` -> `make release-smoke-container` | Blocks qualification on failure. |
+| Alpha Gate - Docs Truth | Public docs and release metadata must match the current contract. | `.github/workflows/ci-cd-pipeline.yml` -> `make alpha-docs-truth` | Blocks qualification on failure. |
+| Alpha Gate - Required Gates Passed | The CI aggregator must report the required gate set as passed. | `.github/workflows/ci-cd-pipeline.yml` aggregator job | Blocks qualification on failure. |
 
-## Private Alpha Evidence
+## Release Governance and Channel Policy
 
-P26 adds the private-alpha go/no-go evidence step before any public alpha
-promotion. Run the harness only with local operator-owned fixture paths:
+Earlier RELGOV/GACLOSE evidence captured **manual enforcement** while `main`
+was unprotected. GAGOV supersedes that baseline with **enforced via branch
+protection** on `main`, but the historical manual enforcement wording remains
+input evidence and should not be rewritten out of the record.
+
+| Governance item | Current policy source | Disposition |
+|---|---|---|
+| Branch protection | `gh api repos/ViperJuice/Code-Index-MCP/branches/main` and `/protection` | `main` is protected and enforces the required GA gate contexts before merge. |
+| Repository ruleset | `gh api repos/ViperJuice/Code-Index-MCP/rulesets` | No repository rulesets are configured; branch protection is the active enforcement surface. |
+| Active RC contract | `docs/validation/rc5-release-evidence.md` and release `v1.2.0-rc5` | `v1.2.0-rc5` remains the active RC/public-alpha package contract. |
+| GitHub Latest | `gh api repos/ViperJuice/Code-Index-MCP/releases/latest` | GitHub Latest still points at `v2.15.0-alpha.1`; it is excluded from the RC/GA policy source until a final GA release changes that state. |
+| Release automation | `.github/workflows/release-automation.yml` | Hyphenated versions are prereleases, prerelease dispatch requires `release_type=custom`, Docker latest is stable-only, and `auto_merge=false` is the RC default. |
+
+## GAGOV Governance Status
+
+As of the GAGOV probe on 2026-04-24, `main` is **enforced via branch
+protection** with the exact GABASE gate list:
+
+- `Alpha Gate - Dependency Sync`
+- `Alpha Gate - Format And Lint`
+- `Alpha Gate - Unit And Release Smoke`
+- `Alpha Gate - Integration Smoke`
+- `Alpha Gate - Production Multi-Repo Matrix`
+- `Alpha Gate - Docker Build And Smoke`
+- `Alpha Gate - Docs Truth`
+- `Alpha Gate - Required Gates Passed`
+
+The protection disposition recorded in
+`docs/validation/ga-governance-evidence.md` is:
+
+- Required status checks: `strict`
+- Required pull request reviews: `1 approving review`
+- Dismiss stale reviews: `true`
+- Require conversation resolution: `true`
+- Require linear history: `true`
+- Enforce for administrators: `true`
+- Repository rulesets: `none`
+
+GitHub Latest still points at `v2.15.0-alpha.1`, while `v1.2.0-rc5` remains
+the active RC/public-alpha contract. That split is intentional until a final GA
+release changes the channel state. `auto_merge=false` remains the default RC
+workflow policy, and Docker latest remains stable-only.
+
+If a later probe shows branch protection drift, a missing required gate
+context, or a GitHub product constraint that weakens this policy, stop release
+qualification, refresh `docs/validation/ga-governance-evidence.md`, and route
+the blocker through GAGOV/GAOPS before GARC dispatches another RC.
+
+## GA Hardening Intake
+
+Before GAGOV, GAE2E, GAOPS, GARC, or GAREL work begins, use
+`docs/validation/ga-readiness-checklist.md` as the canonical GABASE checklist.
+It freezes the release boundary, support tiers, required gates, evidence map,
+rollback expectations, and non-GA surfaces for the active `v1.2.0-rc5`
+RC/public-alpha baseline.
+
+Refresh evidence ownership is:
+
+- `docs/validation/ga-governance-evidence.md` -> `GAGOV`
+- `docs/validation/ga-e2e-evidence.md` -> `GAE2E`
+- `docs/validation/ga-operations-evidence.md` -> `GAOPS`
+- `docs/validation/ga-rc-evidence.md` -> `GARC`
+- `docs/validation/ga-final-decision.md` -> `GAREL`
+- `docs/validation/ga-release-evidence.md` -> `GAREL`
+
+The follow-up RC version is frozen for GARC as `v1.2.0-rc6`.
+
+## GARC Follow-Up RC Procedure
+
+GARC is the first GA-hardening phase allowed to dispatch Release Automation.
+It may do so only after the repo-owned `rc6` contract surfaces, public docs,
+installer helpers, and operator procedure all agree on `v1.2.0-rc6`.
+
+### Pre-dispatch qualification
+
+Before dispatch, the release operator must record all of the following in
+`docs/validation/ga-rc-evidence.md`:
 
 ```bash
-uv run python scripts/private_alpha_evidence.py \
-  --config <private-config.json> \
-  --output-dir private-alpha-evidence/<run-id> \
-  --redacted-md docs/validation/private-alpha-decision.md \
-  --redacted-json docs/validation/private-alpha-decision.json
+git status --short --branch
+git fetch origin main --tags --prune
+git rev-parse HEAD origin/main
+git tag -l v1.2.0-rc6
+git ls-remote --tags origin refs/tags/v1.2.0-rc6
+gh workflow view "Release Automation"
 ```
 
-Raw output, absolute paths, repository names, source excerpts, and logs must stay
-under ignored `private-alpha-evidence/`. Only the redacted decision artifact
-`docs/validation/private-alpha-decision.md`, its JSON companion, and aggregate
-summary data may be committed.
+Qualification passes only when:
 
-The fixture config must include exactly these categories:
-`python_repo`, `typescript_js_repo`, `mixed_docs_code_repo`,
-`multi_repo_workspace`, and `large_ignored_vendor_repo`. Each fixture must record
-install time, first index time, p50/p95 query latency, result quality, log noise,
-branch/default-branch behavior, rollback/rebuild behavior, and blocker
-classification.
+1. `git status --short --branch` shows a clean expected release branch state.
+2. `git rev-parse HEAD origin/main` reports the same commit for local `HEAD`
+   and `origin/main`.
+3. No local or remote `v1.2.0-rc6` tag already exists.
+4. `docs/validation/ga-governance-evidence.md`,
+   `docs/validation/ga-e2e-evidence.md`, and
+   `docs/validation/ga-operations-evidence.md` are present as the current
+   upstream inputs.
+5. `gh workflow view "Release Automation"` confirms the release workflow is
+   visible to the operator.
 
-Public alpha is blocked by any required P21-P25 gate failure or any P26
-`public_alpha_blocker`. Non-blocking issues must be classified as
-`documented_limitation` or `post_alpha_backlog` before the final go/no-go
-decision is recorded as `go`, `no_go`, or `conditional_go`.
+If any pre-dispatch probe fails, stop before release mutation, record the
+blocked state in `docs/validation/ga-rc-evidence.md`, and leave the active
+release channel unchanged.
 
-## P34 Public Alpha Recut Checklist
+### Dispatch and workflow observation
 
-Before promoting `1.2.0-rc5`, confirm all P27-P33 readiness and multi-repo
-blocker gates are green, including the P33 `make alpha-production-matrix` gate.
-The public release notes and customer docs must state the remaining v3 limits:
-many unrelated repositories are supported, one registered worktree per git
-common directory is supported, only the tracked/default branch is indexed
-automatically, and unavailable indexes return `index_unavailable` with
-`safe_fallback: "native_search"` until readiness is `ready`.
-
-Run the P34 clean-checkout release verification set before public-alpha
-promotion:
+When qualification passes, dispatch exactly:
 
 ```bash
-uv sync --locked
-uv run pytest tests/smoke tests/docs tests/test_release_metadata.py tests/test_requirements_consolidation.py -v --no-cov
-make alpha-production-matrix alpha-release-gates
-make release-smoke release-smoke-container
-git tag -l v1.2.0-rc5
+gh workflow run "Release Automation" -f version=v1.2.0-rc6 -f release_type=custom -f auto_merge=false
+gh run list --workflow "Release Automation" --limit 10
+gh run watch <run-id> --exit-status
+gh run view <run-id> --json url,headSha,status,conclusion,jobs
+gh release view v1.2.0-rc6 --repo ViperJuice/Code-Index-MCP --json tagName,isPrerelease,isDraft,publishedAt,targetCommitish,url,assets
 ```
 
-Block release if `tests/docs/test_p34_public_alpha_recut.py`, docs truth tests,
-release metadata tests, clean-checkout wheel smoke, container smoke, or any
-P27-P33 gate fails. A native-search fallback is acceptable runtime remediation
-only when the tool returned `index_unavailable` with
-`safe_fallback: "native_search"`; it is not replacement release evidence.
+The operator must record run URL, run ID, `headSha`, per-job conclusions,
+release branch or PR disposition, GitHub release state, tag target, and any
+PyPI or GHCR publication identity in `docs/validation/ga-rc-evidence.md`.
+
+### RC-only channel policy
+
+The follow-up RC remains a prerelease/public-alpha or beta channel operation:
+
+- `release_type=custom` stays required for hyphenated versions.
+- `auto_merge=false` remains the default unless a fresh governance decision
+  explicitly approves an exception.
+- GitHub Latest remains excluded from the RC policy source.
+- Docker `latest` remains stable-only.
+- No GA wording or stable-channel claims may be introduced by the `rc6` soak.
+
+## GAOPS Operator Procedure Contract
+
+The operator procedure contract in this runbook consumes:
+
+- `docs/validation/ga-readiness-checklist.md`
+- `docs/validation/ga-governance-evidence.md`
+- `docs/validation/ga-e2e-evidence.md`
+- `docs/validation/ga-operations-evidence.md`
+
+GAOPS stays local-first. Operators own repo registration, allowed-roots
+configuration, reindex decisions, readiness remediation, rollback execution,
+incident containment, incident response, and support triage. This runbook does
+not assume a hosted indexing service or a managed branch-repair path.
+
+### Deployment preflight
+
+Run preflight before any operator qualification step:
+
+```bash
+./scripts/preflight_upgrade.sh /path/to/staging.env
+```
+
+If the script exits non-zero, stop. If it emits warnings only, record them in
+`docs/validation/ga-operations-evidence.md` as `metadata-only` validation, not
+as proof that qualification succeeded.
+
+### Deployment qualification
+
+Qualification requires all of the following:
+
+1. The required gate set is green.
+2. `docs/validation/ga-governance-evidence.md` still describes enforced branch
+   protection on `main`.
+3. `docs/validation/ga-e2e-evidence.md` still reflects the current
+   release-surface and readiness vocabulary.
+4. Observability checks from
+   [`observability-verification.md`](observability-verification.md) pass for the
+   target environment.
+
+Record the operator decision and evidence mode in
+`docs/validation/ga-operations-evidence.md`.
+
+### Rollback and containment
+
+Rollback is operator-owned and environment-specific. The required contract is:
+
+1. Stop further promotion immediately when gates, readiness, or observability
+   checks regress.
+2. Restore the previous known-good package, wheel, or image version in the
+   operator-managed environment.
+3. Re-run preflight and the observability procedure after the rollback.
+4. Record the rollback trigger, restored version, and follow-up owner in
+   `docs/validation/ga-operations-evidence.md`.
+
+### Index rebuild and readiness remediation
+
+When readiness is not `ready`, follow the fail-closed product contract instead
+of improvising around it:
+
+```bash
+uv run python -m mcp_server.cli.server_commands
+```
+
+Then use the MCP or CLI reindex surface for the registered repository and
+complete the required index rebuild until the repository returns `ready`. If
+the tool returns
+`index_unavailable` with `safe_fallback: "native_search"`, that is runtime
+remediation only. It is not substitute release evidence.
+
+### Incident response
+
+When a production incident occurs:
+
+1. Capture the failing symptom, affected repo or release surface, and timestamp.
+2. Run the observability procedure to confirm health, logs, `/metrics`, and
+   redaction behavior.
+3. Determine whether the failure is a release gate problem, readiness/index
+   problem, support-boundary issue, or external environment issue.
+4. If the incident weakens governance assumptions or deployment procedure
+   validity, route it through GAOPS before GARC or GAREL proceeds.
+
+### Support triage boundary
+
+Support triage stays bounded to supported deployment surfaces and the frozen
+support matrix. Use `docs/SUPPORT_MATRIX.md` for row-level support claims and
+`docs/validation/ga-readiness-checklist.md` for product-level release posture.
+
+Route unsupported requests out of the GA path when they depend on:
+
+- same-repo sibling worktrees
+- non-default branch indexed routing
+- unsupported or disabled-by-default plugin paths
+- hosted-service assumptions that the local-first product contract does not own
 
 ## Stages
 
 ### Stage: dev
 
-Single-node local environment. Purpose: validate that the build and unit/integration
-test suite pass on the release candidate before any shared infrastructure is touched.
+Single-node operator-owned validation before a shared environment is touched.
 
 #### Pass criteria
 
 | # | Criterion | Command | Expected result |
-|---|-----------|---------|----------------|
-| 1 | Full test suite passes | `pytest tests/ --no-cov --ignore=tests/real_world` | Exit code 0 |
-| 2 | No import errors | `python -c "import mcp_server"` | No traceback |
-| 3 | Pre-flight checks pass | `bash scripts/preflight_upgrade.sh` | Exit code 0 |
+|---|---|---|---|
+| 1 | Preflight is clean enough to qualify the environment. | `./scripts/preflight_upgrade.sh /path/to/staging.env` | Exit code 0 or warnings captured as metadata-only. |
+| 2 | Core smoke and docs checks pass. | `uv run pytest tests/docs/test_gaops_operations_contract.py tests/test_preflight_upgrade.py -v --no-cov` | Exit code 0. |
+| 3 | The environment can expose readiness and observability surfaces. | Follow `docs/operations/observability-verification.md` | Health and metrics procedure completes. |
 
 #### Bake window
 
-None. Dev is ephemeral — once all pass criteria are green, advance immediately.
+None. Dev is a pre-promotion validation stage.
 
 #### Rollback trigger
 
-Any test failure in the pass criteria commands above.
+Any failed gate, failed preflight, or failed observability prerequisite.
 
 #### Rollback procedure
 
-```bash
-# Identify the last known-good tag
-PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1)
-
-git checkout "$PREV_TAG"
-pytest tests/ --no-cov
-```
-
----
+Stop promotion, keep the previous known-good operator environment in place, and
+record the blocker in `docs/validation/ga-operations-evidence.md`.
 
 ### Stage: staging
 
-Shared staging environment. Purpose: validate runtime behaviour under realistic load
-with full observability. Run for at least 30 minutes after deployment.
+Shared operator-owned staging environment.
 
 #### Pass criteria
 
-All of the following must be true over the 30-minute bake window:
-
-| # | Metric | Source | Threshold |
-|---|--------|--------|-----------|
-| 1 | HTTP error rate | Prometheus `mcp_http_requests_total{status=~"5.."}` / total | < 1 % |
-| 2 | 99th-percentile latency | `histogram_quantile(0.99, mcp_request_duration_seconds_bucket)` | < 500 ms |
-| 3 | JSON log parse rate | Log pipeline parse-error counter | ≥ 99 % lines parseable |
-| 4 | MCP tool call counter | `mcp_tool_calls_total` | Increments > 0 per every 5-min window |
-
-Verify metrics:
-
-```bash
-# Error rate — should be < 0.01 (1 %)
-curl -sg "http://prometheus:9090/api/v1/query?query=sum(rate(mcp_http_requests_total{status=~'5..'}[5m]))/sum(rate(mcp_http_requests_total[5m]))" | jq '.data.result[0].value[1]'
-
-# 99p latency — should be < 0.5
-curl -sg "http://prometheus:9090/api/v1/query?query=histogram_quantile(0.99,sum(rate(mcp_request_duration_seconds_bucket[5m]))by(le))" | jq '.data.result[0].value[1]'
-
-# Tool call counter delta
-curl -sg "http://prometheus:9090/api/v1/query_range?query=mcp_tool_calls_total&start=$(date -d '-5 min' -Iseconds)&end=$(date -Iseconds)&step=60" | jq '.data.result[0].values | length'
-```
+| # | Criterion | Command | Expected result |
+|---|---|---|---|
+| 1 | Required gate set still matches GAGOV. | Review this runbook and `docs/validation/ga-governance-evidence.md` | Gate list and enforcement posture unchanged. |
+| 2 | E2E evidence still matches the candidate surface. | Review `docs/validation/ga-e2e-evidence.md` | Candidate matches the frozen RC/public-alpha surface. |
+| 3 | Observability verification passes. | `uv run pytest tests/integration/obs/test_obs_smoke.py -v --no-cov` or the manual procedure | JSON logs, `/metrics`, and redaction checks succeed. |
 
 #### Bake window
 
-**30 minutes** after the new version receives its first request in staging.
+Long enough to confirm the target environment serves requests and emits expected
+observability data.
 
 #### Rollback trigger
 
-Any single pass criterion breached for **> 2 consecutive 1-minute windows**.
+Any regression in readiness, observability, or support-boundary posture.
 
 #### Rollback procedure
 
-```bash
-# Delete the RC tag and roll back the Kubernetes deployment
-git tag --delete v1.2.0-rc5
-kubectl rollout undo deploy/mcp-gateway -n staging
-
-# Confirm rollback is live
-kubectl rollout status deploy/mcp-gateway -n staging
-```
-
----
+Restore the previous known-good build in the operator-managed staging
+environment, rerun preflight, and document the result.
 
 ### Stage: canary
 
-5 % of production traffic is routed to the new version. Purpose: validate production
-behaviour at real scale before full cutover. Run for at least 2 hours.
+Partial traffic validation in an operator-managed environment when such a stage
+exists.
 
 #### Pass criteria
 
-All of the following must be true over the 2-hour bake window for the canary pods:
-
-| # | Metric | Source | Threshold |
-|---|--------|--------|-----------|
-| 1 | HTTP error rate (canary pods) | `mcp_http_requests_total{pod=~"mcp-canary.*",status=~"5.."}` / total | < 0.5 % |
-| 2 | 99th-percentile latency (canary pods) | `histogram_quantile(0.99, …{pod=~"mcp-canary.*"})` | < 400 ms |
-| 3 | JSON log parse rate | Log pipeline (canary log stream) | ≥ 99.5 % lines parseable |
-
-Verify metrics:
-
-```bash
-# Error rate for canary pods — should be < 0.005
-curl -sg "http://prometheus:9090/api/v1/query?query=sum(rate(mcp_http_requests_total{pod=~'mcp-canary.*',status=~'5..'}[5m]))/sum(rate(mcp_http_requests_total{pod=~'mcp-canary.*'}[5m]))" | jq '.data.result[0].value[1]'
-
-# 99p latency for canary — should be < 0.4
-curl -sg "http://prometheus:9090/api/v1/query?query=histogram_quantile(0.99,sum(rate(mcp_request_duration_seconds_bucket{pod=~'mcp-canary.*'}[5m]))by(le))" | jq '.data.result[0].value[1]'
-```
+| # | Criterion | Command | Expected result |
+|---|---|---|---|
+| 1 | The target environment stays within the supported deployment surface. | Follow the operator procedure contract in this runbook | No unsupported hosted-service assumptions are introduced. |
+| 2 | Readiness remains `ready` for the affected repositories. | Reindex or query through the supported surface as needed | No unexpected `index_unavailable` regressions. |
+| 3 | Observability checks continue to pass. | Follow `docs/operations/observability-verification.md` | Health, logs, and metrics remain valid. |
 
 #### Bake window
 
-**2 hours** after canary pods first receive traffic.
+Long enough to observe real traffic without expanding scope beyond the supported
+surface.
 
 #### Rollback trigger
 
-Any pass criterion breached for **> 2 minutes sustained**.
+Any customer-visible regression, readiness drift, or observability failure.
 
 #### Rollback procedure
 
-```bash
-# Remove canary target from the load balancer
-kubectl patch svc mcp-gateway -n prod --type=json \
-  -p '[{"op":"remove","path":"/spec/selector/track"}]'
-
-# Scale canary deployment to zero
-kubectl scale deploy/mcp-gateway-canary -n prod --replicas=0
-
-# Verify no traffic is hitting canary
-kubectl get endpoints mcp-gateway-canary -n prod
-```
-
----
+Return traffic to the prior build, validate rollback health, and record the
+incident and containment decision.
 
 ### Stage: full-prod
 
-100 % of production traffic served by v1.2.0. Bake window: 72 hours. During this window
-the on-call engineer monitors the dashboards listed under pass criteria.
+Full promotion in an operator-managed environment.
 
 #### Pass criteria
 
-All of the following must be true continuously over the 72-hour bake window:
-
-| # | Metric | Source | Threshold |
-|---|--------|--------|-----------|
-| 1 | HTTP error rate | `mcp_http_requests_total{status=~"5.."}` / total | < 0.1 % |
-| 2 | 99th-percentile latency | `histogram_quantile(0.99, mcp_request_duration_seconds_bucket)` | < 300 ms |
-| 3 | JSON log parse rate | Log pipeline (prod log stream) | 100 % lines parseable |
-
-Verify metrics:
-
-```bash
-# Error rate — should be < 0.001 (0.1 %)
-curl -sg "http://prometheus:9090/api/v1/query?query=sum(rate(mcp_http_requests_total{status=~'5..'}[5m]))/sum(rate(mcp_http_requests_total[5m]))" | jq '.data.result[0].value[1]'
-
-# 99p latency — should be < 0.3
-curl -sg "http://prometheus:9090/api/v1/query?query=histogram_quantile(0.99,sum(rate(mcp_request_duration_seconds_bucket[5m]))by(le))" | jq '.data.result[0].value[1]'
-```
+| # | Criterion | Command | Expected result |
+|---|---|---|---|
+| 1 | Preflight, governance, E2E, and observability evidence all remain current. | Review the four GA artifacts named in this runbook | All remain consistent with the promoted build. |
+| 2 | Readiness and remediation vocabulary remain fail-closed. | Query the supported surface after promotion | `ready` works, and non-ready cases remain `index_unavailable` with `safe_fallback: "native_search"` when applicable. |
+| 3 | Support triage boundaries remain accurate. | Review `docs/SUPPORT_MATRIX.md` and open incidents | No unsupported surface is presented as GA-backed behavior. |
 
 #### Bake window
 
-**72 hours** post full-prod rollout.
+Long enough for the operator to confirm post-promotion stability in the chosen
+environment.
 
 #### Rollback trigger
 
-Either of:
-- Error rate criterion (< 0.1 %) breached for **> 1 minute sustained**, OR
-- Any 5xx spike **> 10× the 7-day baseline rate**.
+Any release-surface regression that weakens the frozen support, readiness, or
+observability contract.
 
 #### Rollback procedure
 
-```bash
-# Roll back the production deployment
-kubectl rollout undo deploy/mcp-gateway -n prod
-
-# Tag the rollback point for traceability
-git tag v1.2.0-rollback "$(git rev-parse HEAD~1)" \
-  -m "rollback of v1.2.0 at $(date -Iseconds)"
-
-# Confirm rollback is live
-kubectl rollout status deploy/mcp-gateway -n prod
-
-# Verify error rate dropped
-curl -sg "http://prometheus:9090/api/v1/query?query=sum(rate(mcp_http_requests_total{status=~'5..'}[5m]))/sum(rate(mcp_http_requests_total[5m]))" | jq '.data.result[0].value[1]'
-```
-
----
-
-## Bake-gate criteria
-
-Summary table for at-a-glance reference:
-
-| Stage | Error rate | 99p latency | Log parse rate | Bake window |
-|-------|-----------|------------|---------------|-------------|
-| dev | — (test suite) | — | — | None |
-| staging | < 1 % | < 500 ms | ≥ 99 % | 30 min |
-| canary | < 0.5 % | < 400 ms | ≥ 99.5 % | 2 h |
-| full-prod | < 0.1 % | < 300 ms | 100 % | 72 h |
-
----
-
-## Rollback triggers
-
-Summary of rollback triggers per stage:
-
-| Stage | Trigger |
-|-------|---------|
-| dev | Any test failure |
-| staging | Any criterion breached > 2 consecutive 1-min windows |
-| canary | Any criterion breached > 2 min sustained |
-| full-prod | Error rate > 0.1 % for > 1 min OR 5xx spike > 10× baseline |
-
----
-
-## Rollback procedure
-
-See per-stage rollback procedures above. General principle:
-
-1. Revert the Kubernetes deployment (`kubectl rollout undo`).
-2. Remove or delete any tags associated with the failed release.
-3. Page the on-call engineer and open a postmortem issue.
-4. Do **not** re-attempt the rollout until the root cause is identified and fixed.
-
----
+Roll back to the prior known-good version, rerun preflight and observability
+verification, and route any contract drift back through GAOPS before GARC or
+GAREL proceeds.
 
 ## Preflight checklist (cross-link to scripts/preflight_upgrade.sh)
 
-Before beginning any stage, run the pre-flight validation script:
+Before beginning any stage, run:
 
 ```bash
-bash scripts/preflight_upgrade.sh
+./scripts/preflight_upgrade.sh /path/to/staging.env
 ```
 
-The script (`scripts/preflight_upgrade.sh`) checks:
-- Required environment variables are set (`MCP_ENVIRONMENT`, `MCP_SERVER_HOST`, `MCP_SERVER_PORT`, `MCP_LOG_FORMAT`, `VOYAGEAI_API_KEY`).
-- The target service responds to a health probe.
-- No conflicting processes are bound to the service port.
-
-Exit code 0 means all checks passed; non-zero means at least one check failed (error
-message printed to stderr). Do **not** proceed with a stage if this script exits non-zero.
+The script validates the target env file against the `preflight_env`
+subcommand. Exit code 0 means there are no fatal errors. Warnings are
+non-blocking, but they must be recorded as metadata-only evidence if they
+influence an operator decision.

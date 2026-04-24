@@ -5,6 +5,7 @@ from pathlib import Path
 REPO = Path(__file__).parent.parent.parent
 RUNBOOK = REPO / "docs" / "operations" / "deployment-runbook.md"
 USER_ACTIONS = REPO / "docs" / "operations" / "user-action-runbook.md"
+RELEASE_GOVERNANCE = REPO / "docs" / "validation" / "release-governance-evidence.md"
 
 REQUIRED_GATES = [
     "Alpha Gate - Dependency Sync",
@@ -45,3 +46,41 @@ def test_attestation_prerequisite_and_private_alpha_fallback_documented():
     assert "Settings -> Actions -> General -> Artifact attestations" in text
     assert "private-alpha" in text
     assert "informational skipped/warn" in text
+
+
+def test_release_governance_policy_documented_in_operator_runbooks():
+    for path in (RUNBOOK, USER_ACTIONS):
+        text = path.read_text(encoding="utf-8")
+
+        assert "Release Governance and Channel Policy" in text, path
+        for expected in (
+            "manual enforcement",
+            "branch protection",
+            "ruleset",
+            "v1.2.0-rc5",
+            "v2.15.0-alpha.1",
+            "GitHub Latest",
+            "auto_merge=false",
+            "Docker latest",
+            "GACLOSE",
+        ):
+            assert expected in text, f"{path} missing {expected!r}"
+
+
+def test_release_governance_evidence_records_policy_metadata():
+    text = RELEASE_GOVERNANCE.read_text(encoding="utf-8")
+
+    for expected in (
+        "Repository: `ViperJuice/Code-Index-MCP`",
+        "Default branch: `main`",
+        "Branch protection: `not protected`",
+        "Repository rulesets: `none`",
+        "manual enforcement",
+        "v1.2.0-rc5",
+        "v2.15.0-alpha.1",
+        "GitHub Latest",
+        "auto_merge=false",
+        "Docker latest",
+        "Policy accepted by: `repository operator`",
+    ):
+        assert expected in text

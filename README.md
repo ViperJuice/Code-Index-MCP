@@ -5,7 +5,7 @@ Modular, extensible local-first code indexer designed to enhance Claude Code and
 > **Beta status**: Multi-repo support and the MCP STDIO interface are in beta. The MCP tool interface (`search_code`, `symbol_lookup`, and friends) is the primary surface for LLM-driven use; the FastAPI REST gateway is a secondary admin surface for diagnostics and manual operations. Expect API surface changes before stable release.
 
 ## Project Status
-**Version**: 1.2.0-rc5 (beta)
+**Version**: 1.2.0-rc6 (beta)
 **Python distribution**: `index-it-mcp`
 **Container image**: `ghcr.io/viperjuice/code-index-mcp`
 **Primary surface**: MCP tools (`search_code`, `symbol_lookup`) via the STDIO runner when repository readiness is `ready`
@@ -14,6 +14,7 @@ Modular, extensible local-first code indexer designed to enhance Claude Code and
 **Optional features**: semantic search (requires Voyage AI or a local vLLM endpoint), GitHub Artifacts index sync
 **Performance**: sub-100ms symbol lookup and sub-500ms search on indexed repos (benchmarked on this codebase; results vary by repo size and language mix)
 **Public alpha decision**: see [docs/validation/private-alpha-decision.md](docs/validation/private-alpha-decision.md) before promotion; public alpha remains beta-status until P21-P34 gates, the P33 production multi-repo matrix, and private evidence are green.
+**GA readiness contract**: see [docs/validation/ga-readiness-checklist.md](docs/validation/ga-readiness-checklist.md) for the frozen release boundary, support-tier labels, evidence ownership, and rollback expectations that apply before any GA claim.
 **Public alpha repository model**: one server can serve many unrelated repositories, with one registered worktree per git common directory. Only the tracked/default branch is indexed automatically. Indexed MCP results are authoritative only when readiness is `ready`; unavailable indexes return `index_unavailable` with `safe_fallback: "native_search"`.
 
 > **New to Code-Index-MCP?** Check out our [Getting Started Guide](docs/GETTING_STARTED.md) for a quick walkthrough.
@@ -23,7 +24,7 @@ Modular, extensible local-first code indexer designed to enhance Claude Code and
 - **🚀 Local-First Architecture**: All indexing happens locally for speed and privacy
 - **📂 Local Index Storage**: All indexes stored at `.indexes/` (relative to MCP server)
 - **🔌 Plugin-Based Design**: Easily extensible with language-specific plugins
-- **🔍 Language support**: Specialized plugins plus generic registry coverage documented in [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md)
+- **🔍 Language support**: Tiered language/runtime support is documented in [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md)
 - **⚡ Real-Time Updates**: File system monitoring for instant index updates
 - **🧠 Semantic Search**: AI-powered code search with Voyage AI embeddings
 - **📊 Rich Code Intelligence**: Symbol resolution, type inference, dependency tracking
@@ -114,6 +115,8 @@ quality or default sandbox behavior.
 Supported public-alpha install paths are native Python/STDIO with
 `uv sync --locked` and the `ghcr.io/viperjuice/code-index-mcp` container image.
 Language coverage is bounded by [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md),
+GA-hardening evidence ownership is frozen in
+[docs/validation/ga-readiness-checklist.md](docs/validation/ga-readiness-checklist.md),
 and rollback procedures live in
 [docs/operations/deployment-runbook.md](docs/operations/deployment-runbook.md).
 Do not treat this beta release candidate as GA or as a universal language
@@ -138,7 +141,7 @@ This automatically detects your environment and creates the appropriate `.mcp.js
 curl -sSL https://raw.githubusercontent.com/ViperJuice/Code-Index-MCP/main/scripts/install-mcp-docker.sh | bash
 
 # Index your current directory
-docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc5
+docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc6
 ```
 
 #### Option 2: AI-Powered Search
@@ -147,7 +150,7 @@ docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc5
 export VOYAGE_API_KEY=your-key
 
 # Run with semantic search enabled explicitly
-docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc5
+docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc6
 ```
 
 ### 💻 Environment-Specific Setup
@@ -158,7 +161,7 @@ docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_AP
 .\scripts\setup-mcp-json.ps1
 
 # Or manually with Docker Desktop
-docker run -it -v ${PWD}:/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc5
+docker run -it -v ${PWD}:/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc6
 ```
 
 #### 🍎 macOS
@@ -226,7 +229,7 @@ The setup script creates the appropriate `.mcp.json` for your environment. Manua
       "args": [
         "run", "-i", "--rm",
         "-v", "${workspace}:/workspace",
-        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc5"
+        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc6"
       ]
     }
   }
@@ -693,7 +696,7 @@ mcp-index init
 2. **Portable Design**:
    - Single command setup for any repository
    - Auto-detected by MCP servers and tools
-   - Works with all 48 supported languages
+   - Language/runtime behavior follows the explicit support tiers in `docs/SUPPORT_MATRIX.md`
    - Enable/disable per repository
 
 3. **Usage**:
@@ -1113,7 +1116,7 @@ For quick setup, download pre-built indexes from our GitHub releases:
 # List available releases
 python scripts/download-release.py --list
 
-# Download latest release
+# Download the current pre-built index artifact
 python scripts/download-release.py --latest
 
 # Download specific version
@@ -1126,10 +1129,10 @@ Maintainers can create new releases with pre-built indexes:
 
 ```bash
 # Create a new release (as draft)
-python scripts/create-release.py --version 1.2.0-rc5
+python scripts/create-release.py --version 1.2.0-rc6
 
 # Create and publish immediately
-python scripts/create-release.py --version 1.2.0-rc5 --publish
+python scripts/create-release.py --version 1.2.0-rc6 --publish
 ```
 
 ### Automatic Index Synchronization
@@ -1199,7 +1202,7 @@ For detailed architectural documentation, see the [architecture/](architecture/)
 
 See [ROADMAP.md](ROADMAP.md) for detailed development plans and current progress.
 
-**Current Status**: 1.2.0-rc5 beta release candidate
+**Current Status**: 1.2.0-rc6 beta release candidate
 - ✅ **Core Indexing**: SQLite + FTS5 for fast local search
 - ✅ **Multi-Language**: Specialized and registry-backed language coverage; see `docs/SUPPORT_MATRIX.md`
 - ✅ **MCP Protocol**: Full compatibility with Claude Code and other MCP clients

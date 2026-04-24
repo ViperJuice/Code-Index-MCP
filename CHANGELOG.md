@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [Unreleased]: # placeholder for post-rc5 work
 
+## [1.2.0-rc6] — 2026-04-24
+
+### Changed (GARC — follow-up RC soak freeze)
+- Advanced the active follow-up RC contract to `1.2.0-rc6` / `v1.2.0-rc6`
+  across package metadata, runtime metadata, release automation defaults,
+  installer helpers, README status, and the active Docker/MCP configuration
+  docs.
+- Added explicit follow-up RC soak operator guidance and evidence reduction for
+  GARC so dispatch prerequisites, workflow observation fields, and blocked-stop
+  handling are frozen before any new release mutation.
+
+### Known limitations
+- `v1.2.0-rc6` remains a prerelease RC/public-alpha or beta channel artifact;
+  it does not authorize GA wording, GitHub Latest promotion, or stable Docker
+  `latest`.
+- GARC dispatch still requires a clean worktree plus fresh upstream
+  governance/E2E/operations evidence before `gh workflow run` may execute.
+
 ## [1.2.0-rc5] — 2026-04-23
 
 ### Fixed (P27-P33 — v3 multi-repo blocker closeout)

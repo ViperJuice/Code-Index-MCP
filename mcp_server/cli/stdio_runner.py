@@ -148,12 +148,21 @@ def _build_tool_list() -> list[types.Tool]:
         ),
         types.Tool(
             name="list_plugins",
-            description="List all loaded plugins and plugin availability states, including enabled, unsupported, disabled, missing-extra, and load-error capabilities.",
+            description=(
+                "List all loaded plugins and machine-readable plugin availability facts, "
+                "including enabled, unsupported, disabled, missing-extra, load-error, "
+                "specific-plugin versus registry-only coverage, and default activation posture."
+            ),
             inputSchema={"type": "object", "properties": {}},
         ),
         types.Tool(
             name="reindex",
-            description="Reindex files in the codebase. Updates the index for changed files or specific paths. The path must be inside MCP_ALLOWED_ROOTS or the tool returns path_outside_allowed_roots.",
+            description=(
+                "Reindex files in the codebase only when repository readiness is ready. "
+                "Non-ready repositories return a structured readiness refusal without mutation. "
+                "Updates the index for changed files or specific paths. The path must be inside "
+                "MCP_ALLOWED_ROOTS or the tool returns path_outside_allowed_roots."
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -172,7 +181,9 @@ def _build_tool_list() -> list[types.Tool]:
             name="write_summaries",
             description=(
                 "Run the full LLM summarization pass over all un-summarized chunks in the index. "
-                "Persists results. Use summarize_sample first to validate quality."
+                "Runs only when repository readiness is ready; non-ready repositories return a "
+                "structured readiness refusal without persistence. Persists results. Use "
+                "summarize_sample first to validate quality."
             ),
             inputSchema={
                 "type": "object",
@@ -193,7 +204,9 @@ def _build_tool_list() -> list[types.Tool]:
             name="summarize_sample",
             description=(
                 "Summarize a sample of indexed files using the LLM and return results "
-                "for quality evaluation. Does not persist results by default. "
+                "for quality evaluation only when repository readiness is ready; non-ready "
+                "repositories return a structured readiness refusal without persistence. "
+                "Does not persist results by default. "
                 "Each entry in paths is checked against the sandbox; mismatches return path_outside_allowed_roots."
             ),
             inputSchema={

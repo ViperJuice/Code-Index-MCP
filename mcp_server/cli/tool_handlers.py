@@ -165,6 +165,60 @@ def _index_unavailable_response(
     return [types.TextContent(type="text", text=_ensure_response(response))]
 
 
+def _secondary_readiness_refusal_response(
+    readiness: RepositoryReadiness,
+    tool: str,
+) -> list[types.TextContent]:
+    response: dict[str, Any] = {
+        "results": [],
+        "code": readiness.code,
+        "tool": tool,
+        "readiness": readiness.to_dict(),
+        "message": f"{tool} is available only when repository readiness is ready.",
+        "remediation": readiness.remediation,
+    }
+    if tool == "reindex":
+        response["mutation_performed"] = False
+    else:
+        response["persisted"] = False
+    return [types.TextContent(type="text", text=_ensure_response(response))]
+
+
+def _record_reindexed_files(active_store: Any, workspace_root: Path, target_path: Path) -> int:
+    """Record durable file rows for handler-driven reindex responses."""
+    if active_store is None:
+        return 0
+
+    repo_row = active_store.ensure_repository_row(workspace_root)
+    if target_path.is_file():
+        paths = [target_path]
+    else:
+        paths = [
+            p
+            for p in target_path.rglob("*")
+            if p.is_file() and ".git" not in p.parts and ".mcp-index" not in p.parts
+        ]
+
+    recorded = 0
+    for file_path in paths:
+        try:
+            relative_path = file_path.relative_to(workspace_root).as_posix()
+        except ValueError:
+            relative_path = file_path.name
+        try:
+            active_store.store_file(
+                repo_row,
+                path=file_path,
+                relative_path=relative_path,
+                language=file_path.suffix.lstrip(".") or None,
+                size=file_path.stat().st_size,
+            )
+            recorded += 1
+        except Exception as exc:
+            logger.debug("Could not record reindexed file %s: %s", file_path, exc)
+    return recorded
+
+
 async def handle_symbol_lookup(
     *,
     arguments: dict,
@@ -702,8 +756,8 @@ async def handle_reindex(
 
     scope_arg = repository or (str(path) if path else None)
     readiness = _classify_ctx(repo_resolver, scope_arg)
-    if readiness is not None and readiness.state == RepositoryReadinessState.UNSUPPORTED_WORKTREE:
-        return _unsupported_worktree_response(readiness)
+    if readiness is not None and not readiness.ready:
+        return _secondary_readiness_refusal_response(readiness, "reindex")
 
     # Resolve ctx — repository takes precedence when both are set and consistent
     ctx = _resolve_ctx(repo_resolver, scope_arg)
@@ -747,9 +801,13 @@ async def handle_reindex(
                 dispatcher.index_file(ctx, target_path)  # type: ignore[call-arg]
             else:
                 dispatcher.index_file(target_path)  # type: ignore[call-arg]
+            if ctx is not None and active_store is not None:
+                _record_reindexed_files(active_store, ctx.workspace_root, target_path)
             return [types.TextContent(type="text", text=f"Reindexed file: {path}")]
         except TypeError:
             dispatcher.index_file(target_path)  # type: ignore[call-arg]
+            if ctx is not None and active_store is not None:
+                _record_reindexed_files(active_store, ctx.workspace_root, target_path)
             return [types.TextContent(type="text", text=f"Reindexed file: {path}")]
         except Exception as e:
             return [types.TextContent(type="text", text=f"Error reindexing {path}: {str(e)}")]
@@ -762,6 +820,11 @@ async def handle_reindex(
         except TypeError:
             stats = dispatcher.index_directory(target_path, recursive=True)  # type: ignore[call-arg]
 
+        durable_files = (
+            _record_reindexed_files(active_store, ctx.workspace_root, target_path)
+            if ctx is not None and active_store is not None
+            else 0
+        )
         lexical_rows = active_store.rebuild_fts_code() if active_store else 0
 
         response_data = {
@@ -773,6 +836,7 @@ async def handle_reindex(
             "total_files": stats.get("total_files"),
             "by_language": stats.get("by_language"),
             "lexical_rows": lexical_rows,
+            "durable_files": durable_files,
             "semantic_indexed": stats.get("semantic_indexed"),
             "semantic_failed": stats.get("semantic_failed"),
             "semantic_skipped": stats.get("semantic_skipped"),
@@ -820,6 +884,10 @@ async def handle_write_summaries(
                     ),
                 )
             ]
+
+    readiness = _classify_ctx(repo_resolver, repository)
+    if readiness is not None and not readiness.ready:
+        return _secondary_readiness_refusal_response(readiness, "write_summaries")
 
     ctx = _resolve_ctx(repo_resolver, repository)
     active_store = ctx.sqlite_store if ctx is not None else sqlite_store
@@ -914,7 +982,81 @@ async def handle_summarize_sample(
                 )
             ]
 
-    ctx = _resolve_ctx(repo_resolver, repository)
+    paths_arg = (arguments or {}).get("paths")
+    n_arg = int((arguments or {}).get("n", 3))
+    persist_flag = bool((arguments or {}).get("persist", False))
+
+    repository_readiness = (
+        _classify_ctx(repo_resolver, repository) if repository or not paths_arg else None
+    )
+
+    if paths_arg:
+        allowed = _allowed_roots()
+        path_readiness_by_repo: dict[str, RepositoryReadiness] = {}
+        for p in paths_arg:
+            if _looks_like_path(p) and not _path_within_allowed(Path(p), allowed):
+                return [
+                    types.TextContent(
+                        type="text",
+                        text=_ensure_response(
+                            {
+                                "error": "Path outside allowed roots",
+                                "code": "path_outside_allowed_roots",
+                                "path": str(Path(p).resolve()),
+                                "allowed_roots": [str(r) for r in allowed],
+                                "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
+                            }
+                        ),
+                    )
+                ]
+            path_readiness = _classify_ctx(repo_resolver, str(p))
+            if path_readiness is not None:
+                if (
+                    repository_readiness is not None
+                    and repository_readiness.repository_id != path_readiness.repository_id
+                ):
+                    return [
+                        types.TextContent(
+                            type="text",
+                            text=_ensure_response(
+                                {
+                                    "error": "Conflicting scope",
+                                    "code": "conflicting_path_and_repository",
+                                    "path": str(p),
+                                    "repository": repository,
+                                    "hint": "Provide only one, or ensure both resolve to the same repo.",
+                                }
+                            ),
+                        )
+                    ]
+                if not path_readiness.ready:
+                    return _secondary_readiness_refusal_response(path_readiness, "summarize_sample")
+                repo_key = path_readiness.repository_id or ""
+                path_readiness_by_repo[repo_key] = path_readiness
+
+        if len(path_readiness_by_repo) > 1:
+            return [
+                types.TextContent(
+                    type="text",
+                    text=_ensure_response(
+                        {
+                            "error": "Conflicting scope",
+                            "code": "conflicting_path_and_repository",
+                            "paths": list(paths_arg),
+                            "hint": "All explicit paths must resolve to one ready repository.",
+                        }
+                    ),
+                )
+            ]
+
+    if repository_readiness is not None and not repository_readiness.ready:
+        return _secondary_readiness_refusal_response(repository_readiness, "summarize_sample")
+
+    scope_arg = repository
+    if not scope_arg and paths_arg:
+        scope_arg = str(paths_arg[0])
+
+    ctx = _resolve_ctx(repo_resolver, scope_arg)
     active_store = ctx.sqlite_store if ctx is not None else sqlite_store
 
     if lazy_summarizer is None or not lazy_summarizer.can_summarize():
@@ -937,30 +1079,8 @@ async def handle_summarize_sample(
             )
         ]
 
-    paths_arg = (arguments or {}).get("paths")
-    n_arg = int((arguments or {}).get("n", 3))
-    persist_flag = bool((arguments or {}).get("persist", False))
     db_path = active_store.db_path
     model_used = lazy_summarizer._get_model_name()
-
-    if paths_arg:
-        allowed = _allowed_roots()
-        for p in paths_arg:
-            if _looks_like_path(p) and not _path_within_allowed(Path(p), allowed):
-                return [
-                    types.TextContent(
-                        type="text",
-                        text=_ensure_response(
-                            {
-                                "error": "Path outside allowed roots",
-                                "code": "path_outside_allowed_roots",
-                                "path": str(Path(p).resolve()),
-                                "allowed_roots": [str(r) for r in allowed],
-                                "hint": "Set MCP_ALLOWED_ROOTS using the OS path separator to expand the allowlist.",
-                            }
-                        ),
-                    )
-                ]
 
     with _sqlite3.connect(db_path) as _conn:
         if paths_arg:

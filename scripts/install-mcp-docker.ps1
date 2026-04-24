@@ -2,8 +2,8 @@
 # PowerShell script to install and configure MCP Index with Docker
 
 param(
-    [string]$Variant = "latest",
-    [string]$Version = "latest"
+    [string]$Variant = "v1.2.0-rc6",
+    [string]$Version = "v1.2.0-rc6"
 )
 
 # Configuration
@@ -80,8 +80,8 @@ function Install-Docker {
 function Select-Variant {
     Write-Host ""
     Write-Host "Choose MCP Index variant:"
-    Write-Host "1) latest      - Current production image (recommended)"
-    Write-Host "2) v1.2.0-rc5  - Release candidate image"
+    Write-Host "1) v1.2.0-rc6  - Active RC/public-alpha image (recommended)"
+    Write-Host "2) latest      - Stable-only channel; may not exist before GA"
     Write-Host "3) local-smoke - Local smoke image built by make release-smoke-container"
     Write-Host ""
     
@@ -89,16 +89,16 @@ function Select-Variant {
     
     switch ($choice) {
         "2" {
-            $script:Variant = "v1.2.0-rc5"
-            Write-Host "[INFO] Selected: v1.2.0-rc5" -ForegroundColor Green
+            $script:Variant = "latest"
+            Write-Host "[INFO] Selected: latest" -ForegroundColor Green
         }
         "3" {
             $script:Variant = "local-smoke"
             Write-Host "[INFO] Selected: local-smoke" -ForegroundColor Green
         }
         default {
-            $script:Variant = "latest"
-            Write-Host "[INFO] Selected: latest" -ForegroundColor Green
+            $script:Variant = "v1.2.0-rc6"
+            Write-Host "[INFO] Selected: v1.2.0-rc6" -ForegroundColor Green
         }
     }
 }
@@ -115,7 +115,7 @@ function Create-Launcher {
 REM MCP Index Docker Launcher for Windows
 
 SET MCP_VARIANT=%MCP_VARIANT%
-IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=latest
+IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=v1.2.0-rc6
 
 SET MCP_IMAGE=ghcr.io/viperjuice/code-index-mcp
 SET WORKSPACE=%CD%
@@ -198,13 +198,11 @@ function Show-NextSteps {
     Write-Host "   mcp-index"
     Write-Host ""
     
-    if ($Variant -eq "standard" -or $Variant -eq "full") {
-        Write-Host "4. Configure semantic search:"
-        Write-Host "   `$env:VOYAGE_AI_API_KEY = 'your-key-here'"
-        Write-Host "   Get your key at: https://www.voyageai.com/"
-        Write-Host ""
-    }
-    
+    Write-Host "4. Optional: configure semantic search:"
+    Write-Host "   `$env:VOYAGE_AI_API_KEY = 'your-key-here'"
+    Write-Host "   Get your key at: https://www.voyageai.com/"
+    Write-Host ""
+
     Write-Host "5. For Claude Code integration:"
     Write-Host "   - Copy .mcp.json to your project root"
     Write-Host "   - Claude will automatically use the Docker version"

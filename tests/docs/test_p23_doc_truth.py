@@ -30,6 +30,7 @@ DOCKER_DOCS = [
 
 REQUIRED_SUPPORT_COLUMNS = [
     "Language",
+    "Support tier",
     "Runtime behavior",
     "Parser status",
     "Sandbox support",
@@ -37,6 +38,14 @@ REQUIRED_SUPPORT_COLUMNS = [
     "Symbol quality",
     "Semantic support",
     "Known limitations",
+]
+
+REQUIRED_SURFACE_COLUMNS = [
+    "Surface",
+    "Support tier",
+    "Default posture",
+    "Evidence basis",
+    "Notes",
 ]
 
 STALE_STRINGS = [
@@ -65,8 +74,10 @@ def _read(path: Path) -> str:
 def test_support_matrix_exists_with_required_columns_once():
     assert SUPPORT_MATRIX.exists(), "docs/SUPPORT_MATRIX.md must exist"
     text = _read(SUPPORT_MATRIX)
-    header = "| " + " | ".join(REQUIRED_SUPPORT_COLUMNS) + " |"
-    assert text.count(header) == 1, "support matrix must contain one canonical table"
+    language_header = "| " + " | ".join(REQUIRED_SUPPORT_COLUMNS) + " |"
+    surface_header = "| " + " | ".join(REQUIRED_SURFACE_COLUMNS) + " |"
+    assert text.count(language_header) == 1, "support matrix must contain one canonical language table"
+    assert text.count(surface_header) == 1, "support matrix must contain one canonical surface table"
 
 
 def test_active_docs_do_not_contain_stale_strings():
@@ -91,10 +102,10 @@ def test_docker_docs_use_current_image_package_only():
         assert "ghcr.io/viperjuice/code-index-mcp" in _read(path)
 
 
-def test_active_release_docs_name_rc5_and_alpha_or_beta_status():
+def test_active_release_docs_name_rc6_and_alpha_or_beta_status():
     for path in ACTIVE_DOCS:
         text = _read(path).lower()
-        assert "1.2.0-rc5" in text, f"{path.relative_to(REPO_ROOT)} missing 1.2.0-rc5"
+        assert "1.2.0-rc6" in text, f"{path.relative_to(REPO_ROOT)} missing 1.2.0-rc6"
         assert ("alpha" in text) or (
             "beta" in text
         ), f"{path.relative_to(REPO_ROOT)} missing alpha/beta status language"

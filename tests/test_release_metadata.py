@@ -1,4 +1,4 @@
-"""Release metadata assertions for the active v1.2.0-rc5 contract."""
+"""Release metadata assertions for the active v1.2.0-rc6 contract."""
 
 from __future__ import annotations
 
@@ -12,8 +12,13 @@ except ImportError:  # Python <3.11
 
 
 REPO = Path(__file__).parent.parent
-EXPECTED_VERSION = "1.2.0-rc5"
-EXPECTED_TAG = "v1.2.0-rc5"
+EXPECTED_VERSION = "1.2.0-rc6"
+EXPECTED_TAG = "v1.2.0-rc6"
+GA_RC_EVIDENCE = REPO / "docs" / "validation" / "ga-rc-evidence.md"
+DOCKER_INSTALLERS = (
+    "scripts/install-mcp-docker.sh",
+    "scripts/install-mcp-docker.ps1",
+)
 
 
 def _read_text(relative_path: str) -> str:
@@ -56,7 +61,7 @@ def test_readme_status_matches_rc_contract():
 def test_changelog_has_rc_contract_section():
     changelog = _read_text("CHANGELOG.md")
 
-    assert f"## [{EXPECTED_VERSION}] — 2026-04-23" in changelog
+    assert f"## [{EXPECTED_VERSION}] — 2026-04-24" in changelog
 
 
 def test_release_workflow_matches_rc_contract():
@@ -65,7 +70,7 @@ def test_release_workflow_matches_rc_contract():
     assert f"Version to release (e.g., {EXPECTED_TAG})" in workflow
     assert f"default: '{EXPECTED_TAG}'" in workflow
     assert "default: 'custom'" in workflow
-    assert f"P21 release contract target: {EXPECTED_TAG}" in workflow
+    assert f"GARC release contract target: {EXPECTED_TAG}" in workflow
     assert 'grep -q "version = \\"$VERSION_NO_V\\"" pyproject.toml' in workflow
     assert 'grep -q "__version__ = \\"$VERSION_NO_V\\"" mcp_server/__init__.py' in workflow
     assert "Prerelease tags must use release_type=custom" in workflow
@@ -97,4 +102,36 @@ def test_release_candidate_tag_is_not_reused_locally():
         text=True,
         check=True,
     ).stdout.strip()
-    assert tag_commit == head, f"{EXPECTED_TAG} exists but points at {tag_commit}, not HEAD"
+    if tag_commit == head:
+        return
+
+    evidence = GA_RC_EVIDENCE.read_text(encoding="utf-8")
+    assert EXPECTED_TAG in evidence
+    assert tag_commit in evidence, f"{EXPECTED_TAG} exists but points at undocumented {tag_commit}"
+
+def test_installers_and_download_helper_match_rc6_identity_contract():
+    for relative_path in DOCKER_INSTALLERS:
+        text = _read_text(relative_path)
+        assert EXPECTED_TAG in text
+        assert "local-smoke" in text
+        assert "ghcr.io/viperjuice/code-index-mcp" in text
+        assert "latest" in text
+
+    shell = _read_text("scripts/install-mcp-docker.sh")
+    powershell = _read_text("scripts/install-mcp-docker.ps1")
+    download_helper = _read_text("scripts/download-release.py")
+
+    assert 'MCP_VARIANT="${MCP_VARIANT:-v1.2.0-rc6}"' in shell
+    assert 'param(\n    [string]$Variant = "v1.2.0-rc6"' in powershell
+    assert 'IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=v1.2.0-rc6' in powershell
+
+    for expected in (
+        "index_it_mcp-",
+        "asset_kind",
+        "wheel",
+        "sdist",
+        "CHANGELOG",
+        "sbom",
+        "ViperJuice/Code-Index-MCP",
+    ):
+        assert expected in download_helper
