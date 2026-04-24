@@ -18,10 +18,12 @@ and refresh the canonical GARC evidence from the actual workflow outcome.
 
 Current repo state gathered during planning:
 
-- The checkout is on `main` at `96998dd66de837b64914192e4967ee80fbe34e55`
-  with a clean worktree, but `origin/main` is still
-  `8d08545c15c53322128ef87b5e06308bd8b0dad3`, so the branch-sync portion of the
-  GARC pre-dispatch contract is not currently satisfied.
+- The checkout is on `main` at `03576b75d93c289e1c0c83d050bfb1df78248793`
+  with a clean worktree, and `origin/main` currently resolves to the same
+  commit, so the branch-sync portion of the GARC pre-dispatch contract is
+  satisfied at planning time. GARC execution must still rerun the git status,
+  tag, and workflow-visibility probes immediately before dispatch and stop on
+  any drift.
 - `specs/phase-plans-v5.md` is tracked and clean in this worktree, so it
   remains the active roadmap baseline for this refreshed plan.
 - `docs/validation/ga-readiness-checklist.md`,
@@ -46,8 +48,8 @@ Current repo state gathered during planning:
   prerelease proof, while `docs/validation/ga-rc-evidence.md` shows that the
   first `rc6` attempt stopped before dispatch on a dirty worktree at commit
   `8d08545c15c53322128ef87b5e06308bd8b0dad3`; this refresh supersedes that
-  stale blocker with the current branch-sync gate and preserves the same
-  canonical evidence path.
+  stale blocker with the current clean synchronized baseline and preserves the
+  same canonical evidence path.
 
 ## Interface Freeze Gates
 
@@ -313,9 +315,9 @@ Current repo state gathered during planning:
 - [ ] Repo-owned release contract surfaces are frozen to
       `1.2.0-rc6` / `v1.2.0-rc6` and pass targeted release-metadata and GARC
       contract tests before dispatch.
-- [ ] Public docs and installer helpers advance to the `rc6` follow-up RC while
-      preserving beta/public-alpha wording, support-tier limits, and stable-only
-      Docker `latest`.
+- [ ] Public docs and installer helpers remain aligned to the `rc6` follow-up
+      RC while preserving beta/public-alpha wording, support-tier limits, and
+      stable-only Docker `latest`.
 - [ ] Operator runbooks define the exact pre-dispatch checks, dispatch inputs,
       workflow observation commands, and rollback-decision capture path for the
       follow-up RC.
@@ -332,16 +334,15 @@ Current repo state gathered during planning:
 
 ```yaml
 automation:
-  status: blocked
-  next_skill: none
-  next_command: none - local main must match origin/main before GARC dispatch
-  next_model_hint: none
-  next_effort_hint: none
-  human_required: true
-  blocker_class: branch_sync_conflict
-  blocker_summary: local main is ahead of origin/main; align or publish the intended release commit before rerunning GARC
-  required_human_inputs:
-    - Align the intended release commit with origin/main before rerunning GARC dispatch.
+  status: planned
+  next_skill: codex-execute-phase
+  next_command: codex-execute-phase /home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v5-garc.md
+  next_model_hint: execute
+  next_effort_hint: medium
+  human_required: false
+  blocker_class: none
+  blocker_summary: none
+  required_human_inputs: []
   verification_status: not_run
   artifact: /home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v5-garc.md
   artifact_state: staged
