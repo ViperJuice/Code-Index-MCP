@@ -301,10 +301,26 @@ jobs:
           print(f"OK: all {len(profiles)} profiles have Qdrant collections")
           PY
 
+      - name: Resolve artifact name
+        id: artifact_name
+        run: |
+          python <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          raw_ref = os.environ.get("GITHUB_REF_NAME", "unknown")
+          safe_ref = re.sub(r'["<>:|*?/\r\n\\\\]+', "-", raw_ref).strip("-") or "unknown"
+          name = f"mcp-index-${{ github.repository_id }}-{safe_ref}-${{ github.sha }}"
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as handle:
+              handle.write(f"name={name}\n")
+          print(f"Artifact name: {name}")
+          PY
+
       - name: Upload index artifact
         uses: actions/upload-artifact@v7
         with:
-          name: mcp-index-${{ github.repository_id }}-${{ github.ref_name }}-${{ github.sha }}
+          name: ${{ steps.artifact_name.outputs.name }}
           path: |
             mcp-index-archive.tar.gz
             mcp-index-archive.tar.gz.sha256

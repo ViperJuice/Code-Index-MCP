@@ -51,6 +51,9 @@ on:
 
 env:
   PYTHON_VERSION: '3.12'
+  # Compatibility checks instantiate the legacy Voyage-backed semantic indexer
+  # but do not generate embeddings, so CI uses a non-secret placeholder.
+  VOYAGE_API_KEY: ci-compatibility-placeholder
 
 jobs:
   check-index-compatibility:
