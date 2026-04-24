@@ -104,7 +104,7 @@ def test_ga_governance_evidence_records_redacted_settings_and_policy_metadata():
     for term in REQUIRED_POLICY_TERMS:
         assert term in text
 
-    for forbidden in ("gho_", "Authorization: Bearer", "\"token\":", "\"password\":"):
+    for forbidden in ("gho_", "Authorization: Bearer", '"token":', '"password":'):
         assert forbidden not in text
 
 

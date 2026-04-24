@@ -6,8 +6,8 @@ from pathlib import Path
 
 REPO = Path(__file__).parent.parent.parent
 
-PUBLIC_ALPHA_VERSION = "1.2.0-rc5"
-PUBLIC_ALPHA_TAG = "v1.2.0-rc5"
+PUBLIC_ALPHA_VERSION = "1.2.0-rc6"
+PUBLIC_ALPHA_TAG = "v1.2.0-rc6"
 
 PUBLIC_SURFACES = [
     "README.md",
@@ -115,7 +115,7 @@ def test_public_alpha_checklist_names_required_p34_gates():
         "uv run pytest tests/smoke tests/docs tests/test_release_metadata.py",
         "make release-smoke release-smoke-container",
         "tests/docs/test_p34_public_alpha_recut.py",
-        "git tag -l v1.2.0-rc5",
+        "git tag -l v1.2.0-rc6",
     ):
         assert expected in text
 

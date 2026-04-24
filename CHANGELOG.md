@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Known limitations
 - `v1.2.0-rc6` remains a prerelease RC/public-alpha or beta channel artifact;
   it does not authorize GA wording, GitHub Latest promotion, or stable Docker
-  `latest`.
+  `latest`; GitHub Latest is not the RC policy source.
 - GARC dispatch still requires a clean worktree plus fresh upstream
   governance/E2E/operations evidence before `gh workflow run` may execute.
 

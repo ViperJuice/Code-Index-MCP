@@ -10,8 +10,9 @@ promotion, rollback, observability, and repo-readiness remediation.
 The supported deployment surfaces are:
 
 - local checkout plus `uv sync --locked`
-- the published package `index-it-mcp`
-- the container image `ghcr.io/viperjuice/code-index-mcp`
+- the published package `index-it-mcp` at the current follow-up RC
+  `1.2.0-rc6`
+- the container image `ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc6`
 
 These are the only supported deployment surfaces referenced by the GAOPS
 operator path. For executable procedures, use:
@@ -42,6 +43,39 @@ The product-level posture remains `public-alpha` / `beta`, not `GA`.
 Row-level support facts live in `docs/SUPPORT_MATRIX.md`, using the shared
 labels `public-alpha`, `beta`, `GA`, `experimental`, `unsupported`, and
 `disabled-by-default`.
+
+## Security Best Practices
+
+### 1. Authentication and Authorization
+
+Set `MCP_CLIENT_SECRET` when exposing STDIO or administrative surfaces to
+clients that are not fully trusted by the operator. Keep bearer tokens, GitHub
+tokens, and release credentials outside the repository and inject them through
+the operator-owned runtime environment.
+
+### MCP Access Controls
+
+Set `MCP_ALLOWED_ROOTS` to the smallest set of repository roots that the server
+may index or read. Registered repository names can still be used as scoped tool
+targets, but path-based access must remain constrained to the configured roots.
+
+### 2. Input Validation
+
+Treat repository paths, environment files, and release parameters as boundary
+inputs. Validate them through the documented preflight and release-smoke gates
+before promotion.
+
+### 3. Rate Limiting
+
+Use the hosting or process supervisor layer to limit repeated administrative
+requests and failed client attempts. This project does not provide a managed
+rate-limit service.
+
+### 4. Network Security
+
+Keep administrative surfaces bound to trusted networks or local operator
+sessions. Do not expose unauthenticated MCP or FastAPI endpoints directly to
+public networks.
 
 ## Qualification and rollback
 

@@ -109,6 +109,7 @@ def test_release_candidate_tag_is_not_reused_locally():
     assert EXPECTED_TAG in evidence
     assert tag_commit in evidence, f"{EXPECTED_TAG} exists but points at undocumented {tag_commit}"
 
+
 def test_installers_and_download_helper_match_rc6_identity_contract():
     for relative_path in DOCKER_INSTALLERS:
         text = _read_text(relative_path)
