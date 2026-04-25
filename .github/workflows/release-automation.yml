@@ -2,11 +2,13 @@ name: Release Automation
 
 on:
   workflow_dispatch:
+    # Historical GARC soak target: v1.2.0-rc6.
+    # Historical GARC default: 'v1.2.0-rc6'
     inputs:
       version:
-        description: 'Version to release (e.g., v1.2.0-rc6)'
+        description: 'Version to release (e.g., v1.2.0-rc7)'
         required: true
-        default: 'v1.2.0-rc6'
+        default: 'v1.2.0-rc7'
         type: string
       release_type:
         description: 'Release type'
@@ -72,7 +74,7 @@ jobs:
               exit 1
               ;;
           esac
-          grep -q "default: 'v1.2.0-rc6'" .github/workflows/release-automation.yml
+          grep -q "default: 'v1.2.0-rc7'" .github/workflows/release-automation.yml
           if [ "$RELEASE_TYPE" = "custom" ]; then
             grep -q "version = \"$VERSION_NO_V\"" pyproject.toml
             grep -q "__version__ = \"$VERSION_NO_V\"" mcp_server/__init__.py
@@ -363,7 +365,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: release/${{ needs.prepare-release.outputs.version }}
@@ -372,7 +374,7 @@ jobs:
           body: |
             ## Release ${{ needs.prepare-release.outputs.version }}
 
-            GARC release contract target: v1.2.0-rc6
+            GARECUT release contract target: v1.2.0-rc7
 
             This PR contains all changes for release ${{ needs.prepare-release.outputs.version }}.
 

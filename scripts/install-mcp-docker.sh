@@ -12,8 +12,8 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-MCP_VERSION="${MCP_VERSION:-v1.2.0-rc6}"
-MCP_VARIANT="${MCP_VARIANT:-v1.2.0-rc6}"
+MCP_VERSION="${MCP_VERSION:-v1.2.0-rc7}"
+MCP_VARIANT="${MCP_VARIANT:-v1.2.0-rc7}"
 DOCKER_REGISTRY="${DOCKER_REGISTRY:-ghcr.io}"
 MCP_IMAGE="${DOCKER_REGISTRY}/viperjuice/code-index-mcp"
 
@@ -115,7 +115,7 @@ install_docker() {
 choose_variant() {
     echo
     echo "Choose MCP Index variant:"
-    echo "1) v1.2.0-rc6  - Active RC/public-alpha image (recommended)"
+    echo "1) v1.2.0-rc7  - Active RC/public-alpha image (recommended)"
     echo "2) latest      - Stable-only channel; may not exist before GA"
     echo "3) local-smoke - Local smoke image built by make release-smoke-container"
     echo
@@ -133,8 +133,8 @@ choose_variant() {
             print_info "Selected: local-smoke"
             ;;
         *)
-            MCP_VARIANT="v1.2.0-rc6"
-            print_info "Selected: v1.2.0-rc6"
+            MCP_VARIANT="v1.2.0-rc7"
+            print_info "Selected: v1.2.0-rc7"
             ;;
     esac
 }
@@ -155,7 +155,7 @@ create_launcher() {
 # MCP Index Docker Launcher
 
 # Default settings
-MCP_VARIANT="${MCP_VARIANT:-v1.2.0-rc6}"
+MCP_VARIANT="${MCP_VARIANT:-v1.2.0-rc7}"
 MCP_IMAGE="${MCP_IMAGE:-ghcr.io/viperjuice/code-index-mcp}"
 WORKSPACE="${WORKSPACE:-$(pwd)}"
 

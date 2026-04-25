@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [Unreleased]: # placeholder for post-rc5 work
 
+## [1.2.0-rc7] — 2026-04-24
+
+### Changed (GARECUT — post-remediation RC recut freeze)
+- Advanced the active remediated RC recut contract to `1.2.0-rc7` /
+  `v1.2.0-rc7` across package metadata, runtime metadata, release automation
+  defaults, and installer helpers without widening into GA channel changes.
+- Froze the rc7 recut evidence and final-decision handoff expectations so the
+  refreshed prerelease proof can route the next downstream work back through a
+  renewed GAREL reduction instead of silently authorizing GA.
+
+### Known limitations
+- `v1.2.0-rc7` remains a prerelease RC/public-alpha or beta channel artifact;
+- it does not authorize GA wording, GitHub Latest promotion, or stable Docker
+  `latest`; GitHub Latest is not the RC policy source.
+- GARECUT dispatch still requires a clean enough release worktree, `HEAD ==
+  origin/main`, and unused local plus remote `v1.2.0-rc7` tags before
+  `gh workflow run` may execute.
+
 ## [1.2.0-rc6] — 2026-04-24
 
 ### Changed (GARC — follow-up RC soak freeze)

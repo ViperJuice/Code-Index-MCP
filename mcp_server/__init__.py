@@ -1,7 +1,8 @@
 """MCP Server - Local-first code indexer for LLMs."""
 
 # Version information
-__version__ = "1.2.0-rc6"
+# Historical GARC soak target: 1.2.0-rc6.
+__version__ = "1.2.0-rc7"
 
 # Public API exports
 __all__ = [

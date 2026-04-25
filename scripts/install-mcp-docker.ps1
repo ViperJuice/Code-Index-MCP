@@ -2,8 +2,8 @@
 # PowerShell script to install and configure MCP Index with Docker
 
 param(
-    [string]$Variant = "v1.2.0-rc6",
-    [string]$Version = "v1.2.0-rc6"
+    [string]$Variant = "v1.2.0-rc7",
+    [string]$Version = "v1.2.0-rc7"
 )
 
 # Configuration
@@ -80,7 +80,7 @@ function Install-Docker {
 function Select-Variant {
     Write-Host ""
     Write-Host "Choose MCP Index variant:"
-    Write-Host "1) v1.2.0-rc6  - Active RC/public-alpha image (recommended)"
+    Write-Host "1) v1.2.0-rc7  - Active RC/public-alpha image (recommended)"
     Write-Host "2) latest      - Stable-only channel; may not exist before GA"
     Write-Host "3) local-smoke - Local smoke image built by make release-smoke-container"
     Write-Host ""
@@ -97,8 +97,8 @@ function Select-Variant {
             Write-Host "[INFO] Selected: local-smoke" -ForegroundColor Green
         }
         default {
-            $script:Variant = "v1.2.0-rc6"
-            Write-Host "[INFO] Selected: v1.2.0-rc6" -ForegroundColor Green
+            $script:Variant = "v1.2.0-rc7"
+            Write-Host "[INFO] Selected: v1.2.0-rc7" -ForegroundColor Green
         }
     }
 }
@@ -115,7 +115,7 @@ function Create-Launcher {
 REM MCP Index Docker Launcher for Windows
 
 SET MCP_VARIANT=%MCP_VARIANT%
-IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=v1.2.0-rc6
+IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=v1.2.0-rc7
 
 SET MCP_IMAGE=ghcr.io/viperjuice/code-index-mcp
 SET WORKSPACE=%CD%
