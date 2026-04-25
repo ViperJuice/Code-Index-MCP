@@ -204,7 +204,7 @@ No operator actions required. P12 is fully codebase-internal.
   `Alpha Gate - Docker Build And Smoke`,
   `Alpha Gate - Docs Truth`, and
   `Alpha Gate - Required Gates Passed`.
-- [ ] **Keep the release channel split explicit.** `v1.2.0-rc5` remains the
+- [ ] **Keep the release channel split explicit.** `v1.2.0-rc8` remains the
   active RC/public-alpha contract, GitHub Latest currently points at
   `v2.15.0-alpha.1`, `auto_merge=false` remains the RC default, and Docker
   latest remains stable-only until a final GA release changes those channels.
@@ -277,7 +277,7 @@ No operator actions required. P12 is fully codebase-internal.
 - [ ] **Confirm P33 is green.** `make alpha-production-matrix` must pass before
   public-alpha release evidence is accepted.
 - [ ] **Choose and freeze the prerelease tag.** For this recut the selected tag
-  is `v1.2.0-rc5`; confirm `git tag -l v1.2.0-rc5` does not show a reused local
+  is `v1.2.0-rc8`; confirm `git tag -l v1.2.0-rc8` does not show a reused local
   tag unless it points at the release commit.
 - [ ] **Review public limitations.** Customer docs must state that v3 supports
   many unrelated repositories, one registered worktree per git common directory,
@@ -302,7 +302,7 @@ No operator actions required. P12 is fully codebase-internal.
 
 - [ ] **Approve public alpha only with explicit evidence.** Docs truth,
   release metadata, clean-checkout wheel/container smoke, P27-P33 gates, and the
-  support matrix must all match the `1.2.0-rc5` public-alpha contract.
+  support matrix must all match the `1.2.0-rc8` public-alpha contract.
 
 ### 3.8 Phase RELGOV - Release Governance and Channel Policy
 
@@ -310,7 +310,7 @@ No operator actions required. P12 is fully codebase-internal.
 
 - [ ] **Probe GitHub enforcement before accepting release evidence.** Check
   branch protection for `main`, repository rulesets, the current GitHub Latest
-  release, and release `v1.2.0-rc5`. If branch protection and rulesets remain
+  release, and release `v1.2.0-rc8`. If branch protection and rulesets remain
   absent, public-alpha required gates use manual enforcement.
 
 #### During RELGOV
@@ -324,7 +324,7 @@ No operator actions required. P12 is fully codebase-internal.
 - [ ] **Record branch protection and ruleset disposition.** If `main` remains
   without branch protection and repository rulesets remain empty, record that
   manual enforcement is accepted by the repository operator for public alpha.
-- [ ] **Record the release-channel decision.** `v1.2.0-rc5` is the active
+- [ ] **Record the release-channel decision.** `v1.2.0-rc8` is the active
   RC/public-alpha package contract. GitHub Latest currently points at
   `v2.15.0-alpha.1`, and GitHub Latest is not the RC policy source unless a
   later release operation deliberately changes channel state.

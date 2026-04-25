@@ -2,106 +2,77 @@
 phase_loop_plan_version: 1
 phase: GAREL
 roadmap: specs/phase-plans-v5.md
-roadmap_sha256: aab3b0f990ecc5f821e2d94dbc48faa6cc3f8a14e6a53da68f983b8be85730dd
+roadmap_sha256: b7945b960e659cf0f96f8aa112af1370b65a3e007d837abdefd8836d50f4b774
 ---
-# GAREL: GA Decision and Release
+# GAREL: GA Decision and Stable-Surface Preparation
 
 ## Context
 
-GAREL is the renewed terminal decision phase in the v5 GA-hardening roadmap.
-Its job is to reduce the completed GABASE, GAGOV, GASUPPORT, GAE2E, GAOPS,
-and GARECUT evidence into one final release decision and to stop before any
-stable release mutation unless that decision is explicitly `ship GA`.
+GAREL is the renewed decision phase in the v5 GA-hardening roadmap. `GARECUT`
+is complete, the checkout is on `main` at `2a538ad`, `origin/main` currently
+matches `HEAD`, and the repo-owned release surfaces still reflect the
+prerelease `1.2.0-rc8` / `v1.2.0-rc8` contract in
+`.github/workflows/release-automation.yml`, `tests/test_release_metadata.py`,
+package metadata, installer helpers, and the public prerelease docs.
 
-Current repo state gathered during planning:
+`docs/validation/ga-final-decision.md` is currently a historical reducer that
+records `cut another RC` after the successful `v1.2.0-rc8` soak and routes
+renewed GAREL through the remaining `actions/download-artifact@v8` `Buffer()`
+deprecation warning observed in the successful `Create GitHub Release` job.
 
-- The checkout is on `main` at `a3adcea5cd569571a2c4ce3d863317e9f14519bc`,
-  matching `origin/main`.
-- `specs/phase-plans-v5.md` is already modified and staged in the worktree, so
-  the amended roadmap is the active user-owned baseline and is protected from
-  `git clean -fd`.
-- `.codex/phase-loop/state.json` records roadmap SHA
-  `aab3b0f990ecc5f821e2d94dbc48faa6cc3f8a14e6a53da68f983b8be85730dd`,
-  marks `GARECUT` complete, marks `GAREL` unplanned, and carries ledger
-  warnings that older GAREL plan/event provenance no longer matches the
-  amended roadmap.
-- `docs/validation/ga-final-decision.md` now exists as a historical artifact
-  recording the earlier `cut another RC` outcome and explicitly routes the
-  next decision back through renewed GAREL after the successful `v1.2.0-rc7`
-  recut.
-- `docs/validation/ga-rc-evidence.md` records the successful
-  `v1.2.0-rc7` GARECUT run and the new remaining release blocker: a GitHub
-  Actions Node 20 deprecation annotation from
-  `softprops/action-gh-release@v2` in `Create GitHub Release`.
-- `.github/workflows/release-automation.yml` already uses
-  `peter-evans/create-pull-request@v8`, still uses
-  `softprops/action-gh-release@v2`, defaults to `v1.2.0-rc7`, and accepts
-  `release_type` values `custom|patch|minor|major`; there is no separate
-  `stable` input, so a stable GA dispatch must use the real workflow contract.
-- `tests/test_release_metadata.py` still freezes the active prerelease
-  contract to `1.2.0-rc7` / `v1.2.0-rc7`.
-- `docs/validation/ga-release-evidence.md` remains intentionally absent and is
-  still reserved for the `ship GA` branch only.
-- The worktree also contains user-owned in-flight updates in
-  `docs/validation/ga-final-decision.md`,
-  `docs/validation/ga-rc-evidence.md`,
-  `tests/docs/test_garecut_rc_recut_contract.py`, and
-  `tests/docs/test_garel_ga_release_contract.py`; GAREL execution must build
-  on those edits rather than revert them.
+The roadmap has now been repaired so GAREL is execution-ready again. Stable
+release dispatch no longer lives in this phase. GAREL owns the final decision,
+workflow-runtime disposition, and any repo-local stable-surface preparation. If
+the decision remains `ship GA`, the external release mutation moves downstream
+to `GADISP`, the dedicated `phase_loop_mutation: release_dispatch` phase.
 
 ## Interface Freeze Gates
 
 - [ ] IF-0-GAREL-1 - Final decision contract:
-      `docs/validation/ga-final-decision.md` states exactly one of `ship GA`,
-      `cut another RC`, or `defer GA`, cites the canonical GABASE, GAGOV,
-      GASUPPORT, GAE2E, GAOPS, and GARECUT evidence inputs, carries the
-      `softprops/action-gh-release@v2` disposition, and names the next roadmap
-      or RC scope whenever the answer is not `ship GA`.
-- [ ] IF-0-GAREL-2 - Workflow-runtime and dispatch contract:
-      `.github/workflows/release-automation.yml` and
-      `tests/test_release_metadata.py` either remove the
-      `softprops/action-gh-release@v2` Node 20 warning from the stable path or
-      freeze an explicit accepted-risk posture in the final decision artifact
-      before any GA dispatch, and the GA dispatch command uses the actual
-      workflow interface.
-- [ ] IF-0-GAREL-3 - Release-channel alignment contract:
-      if the decision is `ship GA`, repo-owned version surfaces, public docs,
-      support claims, installer defaults, GitHub Latest posture, and Docker
-      `latest` guidance align on stable `1.2.0` / `v1.2.0`; otherwise those
-      surfaces remain on prerelease `1.2.0-rc7` / `v1.2.0-rc7` with no stable
-      mutation.
-- [ ] IF-0-GAREL-4 - Post-release verification contract:
-      the selected channel state is proven by targeted docs tests,
-      release-metadata checks, release-smoke coverage, clean-checkout or fresh
-      install verification, and GitHub release metadata probes, and any
-      failure blocks GA instead of being reduced away in prose.
-- [ ] IF-0-GAREL-5 - GA evidence reducer contract:
-      `docs/validation/ga-release-evidence.md` is written only on the
-      `ship GA` branch and records dispatch inputs, workflow URL and run ID,
-      `headSha`, release/channel state, GitHub Latest posture, PyPI and GHCR
-      identities, install verification, rollback disposition, and redacted
-      metadata only.
+      `docs/validation/ga-final-decision.md` cites
+      `docs/validation/ga-readiness-checklist.md`,
+      `docs/validation/ga-governance-evidence.md`,
+      `docs/validation/ga-e2e-evidence.md`,
+      `docs/validation/ga-operations-evidence.md`, and
+      `docs/validation/ga-rc-evidence.md`, records exactly one of `ship GA`,
+      `cut another RC`, or `defer GA`, and reduces the current `v1.2.0-rc8`
+      soak rather than any pre-`rc8` assumption.
+- [ ] IF-0-GAREL-2 - Workflow-runtime disposition contract:
+      `.github/workflows/release-automation.yml`,
+      `tests/test_release_metadata.py`, and
+      `docs/validation/ga-final-decision.md` either remediate or explicitly
+      disposition the remaining `actions/download-artifact@v8` `Buffer()`
+      deprecation warning, and no GAREL contract still depends on stale
+      `softprops/action-gh-release@v2` assumptions.
+- [ ] IF-0-GAREL-3 - Stable-surface alignment contract:
+      if the final decision is `ship GA`, package metadata, changelog, public
+      docs, installer helpers, support claims, and operator runbooks align on
+      stable `1.2.0` / `v1.2.0`; otherwise they remain on prerelease
+      `1.2.0-rc8` / `v1.2.0-rc8` and no stable-channel mutation occurs.
+- [ ] IF-0-GAREL-4 - Downstream dispatch handoff contract:
+      if the final decision is `ship GA`, the next phase is `GADISP` and any
+      stable release dispatch or `docs/validation/ga-release-evidence.md`
+      creation remains blocked until that separate `release_dispatch` plan runs
+      from a clean synced tree; if the final decision is `defer GA`, both
+      `GADISP` and `GARECUT` remain blocked until a roadmap extension lands.
 
 ## Lane Index & Dependencies
 
-- SL-0 - Renewed GAREL contract tests; Depends on: GARECUT; Blocks: SL-1, SL-2, SL-3, SL-4, SL-5, SL-6; Parallel-safe: no
-- SL-1 - Release workflow warning remediation and dispatch policy; Depends on: SL-0; Blocks: SL-2, SL-3, SL-4, SL-5, SL-6; Parallel-safe: yes
-- SL-2 - Final decision reducer; Depends on: SL-0, SL-1; Blocks: SL-3, SL-4, SL-5, SL-6; Parallel-safe: no
-- SL-3 - Stable package and changelog contract; Depends on: SL-0, SL-1, SL-2; Blocks: SL-4, SL-5, SL-6; Parallel-safe: yes
-- SL-4 - Public docs and operator channel alignment; Depends on: SL-0, SL-1, SL-2, SL-3; Blocks: SL-5, SL-6; Parallel-safe: yes
-- SL-5 - GA dispatch and post-release verification; Depends on: SL-0, SL-1, SL-2, SL-3, SL-4; Blocks: SL-6; Parallel-safe: no
-- SL-6 - GA release evidence reducer; Depends on: SL-0, SL-1, SL-2, SL-3, SL-4, SL-5; Blocks: GAREL acceptance; Parallel-safe: no
+- SL-0 - Renewed GAREL contract tests; Depends on: GARECUT; Blocks: SL-1, SL-2; Parallel-safe: no
+- SL-1 - Final decision and runtime disposition; Depends on: SL-0; Blocks: SL-2; Parallel-safe: no
+- SL-2 - Stable-surface preparation and downstream handoff; Depends on: SL-0, SL-1; Blocks: GAREL acceptance; Parallel-safe: yes
 
 ## Lanes
 
 ### SL-0 - Renewed GAREL Contract Tests
 
-- **Scope**: Refresh the phase-specific contract tests so the renewed GAREL
-  path is frozen around the `rc7` evidence and the `softprops` runtime
-  warning before any stable mutation is attempted.
+- **Scope**: Refresh the GAREL-specific contract tests so the renewed decision
+  path is frozen around the successful `rc8` soak, the current
+  `actions/download-artifact@v8` warning, and the new downstream `GADISP`
+  split before any stable mutation is considered.
 - **Owned files**: `tests/docs/test_garel_ga_release_contract.py`
 - **Interfaces provided**: IF-0-GAREL-1, IF-0-GAREL-2, IF-0-GAREL-3,
-  IF-0-GAREL-4, IF-0-GAREL-5
+  IF-0-GAREL-4
 - **Interfaces consumed**: `docs/validation/ga-readiness-checklist.md`,
   `docs/validation/ga-governance-evidence.md`,
   `docs/validation/ga-e2e-evidence.md`,
@@ -110,319 +81,121 @@ Current repo state gathered during planning:
   `docs/validation/ga-final-decision.md`,
   `.github/workflows/release-automation.yml`,
   `tests/test_release_metadata.py`,
-  `tests/smoke/test_release_smoke_contract.py`,
-  `README.md`, `CHANGELOG.md`, `docs/GETTING_STARTED.md`,
-  `docs/DOCKER_GUIDE.md`, `docs/MCP_CONFIGURATION.md`,
-  `docs/SUPPORT_MATRIX.md`, `docs/operations/deployment-runbook.md`,
-  `docs/operations/user-action-runbook.md`
+  `tests/smoke/test_release_smoke_contract.py`
 - **Parallel-safe**: no
 - **Tasks**:
-  - test: Update the GAREL docs contract test to require the renewed decision
-    artifact to consume the successful `v1.2.0-rc7` recut evidence and to
-    treat any older pre-GARECUT GAREL assumptions as stale.
-  - test: Assert that the `softprops/action-gh-release@v2` Node 20 warning is
-    either remediated in the workflow or explicitly dispositioned in
-    `docs/validation/ga-final-decision.md` before any stable dispatch is
-    allowed.
+  - test: Update the GAREL contract test to require the renewed decision
+    artifact to consume the successful `v1.2.0-rc8` recut evidence and to
+    treat any older pre-`rc8` GAREL assumptions as stale.
+  - test: Assert that the remaining workflow-runtime concern is the current
+    `actions/download-artifact@v8` `Buffer()` deprecation warning and that no
+    GAREL assertions still key on the already-remediated
+    `softprops/action-gh-release@v2` path.
   - test: Assert that `docs/validation/ga-release-evidence.md` remains absent
-    unless the renewed decision actually chooses `ship GA`.
-  - test: Keep this file phase-specific and additive so GABASE, GARECUT,
-    release-metadata, and release-smoke tests remain the lower-level contracts
-    rather than being redefined here.
+    unless a separate `GADISP` dispatch artifact set exists.
+  - impl: Keep this file additive and phase-specific so GABASE, GARC, GARECUT,
+    release-metadata, and release-smoke tests remain the lower-level
+    contracts.
   - verify: `uv run pytest tests/docs/test_garel_ga_release_contract.py -v --no-cov`
 
-### SL-1 - Release Workflow Warning Remediation And Dispatch Policy
+### SL-1 - Final Decision And Runtime Disposition
 
-- **Scope**: Resolve or explicitly disposition the remaining release-workflow
-  runtime warning and freeze the real GA dispatch interface before the final
-  decision is reduced.
-- **Owned files**: `.github/workflows/release-automation.yml`,
-  `tests/test_release_metadata.py`
-- **Interfaces provided**: IF-0-GAREL-2; workflow portions of
+- **Scope**: Reduce the upstream GA-hardening evidence and the current workflow
+  runtime disposition into one renewed final decision before any stable release
+  preparation is allowed.
+- **Owned files**: `docs/validation/ga-final-decision.md`
+- **Interfaces provided**: IF-0-GAREL-1, IF-0-GAREL-2; decision input to
   IF-0-GAREL-3 and IF-0-GAREL-4
 - **Interfaces consumed**: SL-0 GAREL assertions;
-  `docs/validation/ga-rc-evidence.md`,
-  `docs/validation/ga-final-decision.md`,
-  `docs/validation/ga-governance-evidence.md`,
-  `docs/validation/ga-readiness-checklist.md`
-- **Parallel-safe**: yes
-- **Tasks**:
-  - test: Reproduce the current workflow-runtime concern from the GARECUT
-    evidence and use that exact `softprops/action-gh-release@v2` Node 20
-    warning as the repair or acceptance target.
-  - impl: Upgrade, replace, or explicitly risk-accept the
-    `softprops/action-gh-release@v2` path for stable GA dispatch without
-    reopening the already-remediated `create-pull-request@v8` work.
-  - impl: Freeze the stable dispatch semantics against the real workflow
-    shape: GA dispatch must use `gh workflow run "Release Automation" -f
-    version=v1.2.0 -f release_type=custom -f auto_merge=false` unless the
-    workflow contract itself is intentionally changed first.
-  - impl: Update `tests/test_release_metadata.py` only where it needs to
-    distinguish the stable `v1.2.0` path from the active `v1.2.0-rc7`
-    prerelease contract; do not broaden this lane into unrelated release
-    automation cleanup.
-  - verify: `uv run pytest tests/test_release_metadata.py -v --no-cov`
-  - verify: `rg -n "softprops/action-gh-release|create-pull-request@v8|release_type|is_prerelease|v1\\.2\\.0-rc7|v1\\.2\\.0" .github/workflows/release-automation.yml tests/test_release_metadata.py`
-  - verify: `gh run view 24919438766 --json url,headSha,status,conclusion,jobs`
-
-### SL-2 - Final Decision Reducer
-
-- **Scope**: Reduce the upstream GA-hardening evidence and workflow-runtime
-  disposition into the singular renewed GAREL decision artifact before any
-  stable mutation occurs.
-- **Owned files**: `docs/validation/ga-final-decision.md`
-- **Interfaces provided**: IF-0-GAREL-1; the decision input to
-  IF-0-GAREL-3 and IF-0-GAREL-5
-- **Interfaces consumed**: SL-0 GAREL assertions; SL-1 workflow-runtime
-  disposition; `docs/validation/ga-readiness-checklist.md`,
-  `docs/validation/ga-governance-evidence.md`,
-  `docs/validation/ga-e2e-evidence.md`,
-  `docs/validation/ga-operations-evidence.md`,
-  `docs/validation/ga-rc-evidence.md`
-- **Parallel-safe**: no
-- **Tasks**:
-  - test: Write the renewed decision artifact only after the `softprops`
-    warning disposition, support posture, operations evidence, and `rc7`
-    evidence have been read together; a successful recut alone does not imply
-    GA approval.
-  - impl: Record exactly one decision: `ship GA`, `cut another RC`, or
-    `defer GA`.
-  - impl: If the decision is not `ship GA`, name the next roadmap or RC scope,
-    keep all stable mutations blocked, and make
-    `docs/validation/ga-release-evidence.md` explicitly unnecessary for that
-    branch.
-  - impl: If the decision is `ship GA`, state the exact prerequisites
-    satisfied for stable `1.2.0` / `v1.2.0`, including the final disposition
-    of the `softprops` runtime warning, before SL-3 through SL-6 mutate
-    release surfaces.
-  - impl: Preserve the historical-artifact and metadata-only reporting pattern
-    already used by the GA evidence artifacts.
-  - verify: `uv run pytest tests/docs/test_garel_ga_release_contract.py -v --no-cov`
-  - verify: `rg -n "ship GA|cut another RC|defer GA|ga-readiness-checklist|ga-governance-evidence|ga-e2e-evidence|ga-operations-evidence|ga-rc-evidence|softprops/action-gh-release@v2|Node 20|v1\\.2\\.0-rc7|v1\\.2\\.0" docs/validation/ga-final-decision.md`
-
-### SL-3 - Stable Package And Changelog Contract
-
-- **Scope**: Align repo-owned release metadata to the renewed final decision
-  without directly mutating the public docs or runbooks.
-- **Owned files**: `pyproject.toml`, `mcp_server/__init__.py`, `CHANGELOG.md`
-- **Interfaces provided**: package/version portions of IF-0-GAREL-3 and
-  IF-0-GAREL-4
-- **Interfaces consumed**: SL-0 GAREL assertions; SL-1 workflow dispatch
-  policy; SL-2 final decision artifact
-- **Parallel-safe**: yes
-- **Tasks**:
-  - test: Treat this lane as conditional on SL-2. If the renewed decision is
-    not `ship GA`, verify that `1.2.0-rc7` remains the active package contract
-    and do not rewrite package metadata.
-  - impl: If the renewed decision is `ship GA`, advance the repo-owned release
-    identity from `1.2.0-rc7` / `v1.2.0-rc7` to stable `1.2.0` / `v1.2.0` in
-    `pyproject.toml`, `mcp_server/__init__.py`, and the active changelog
-    section.
-  - impl: Keep the changelog explicit about the release-channel transition and
-    any remaining non-GA or deferred surfaces instead of erasing prerelease
-    history.
-  - verify: `uv run pytest tests/test_release_metadata.py -v --no-cov`
-  - verify: `rg -n "1\\.2\\.0-rc7|1\\.2\\.0|v1\\.2\\.0-rc7|v1\\.2\\.0" pyproject.toml mcp_server/__init__.py CHANGELOG.md`
-
-### SL-4 - Public Docs And Operator Channel Alignment
-
-- **Scope**: Align user-facing docs, support tiers, installer defaults, and
-  operator runbooks with the renewed GAREL decision after repo-owned metadata
-  has settled.
-- **Owned files**: `README.md`, `docs/GETTING_STARTED.md`,
-  `docs/DOCKER_GUIDE.md`, `docs/MCP_CONFIGURATION.md`,
-  `docs/SUPPORT_MATRIX.md`, `docs/operations/deployment-runbook.md`,
-  `docs/operations/user-action-runbook.md`,
-  `scripts/install-mcp-docker.sh`, `scripts/install-mcp-docker.ps1`
-- **Interfaces provided**: public-doc portions of IF-0-GAREL-3 and
-  IF-0-GAREL-4
-- **Interfaces consumed**: SL-0 GAREL assertions; SL-1 workflow/runtime
-  policy; SL-2 final decision artifact; SL-3 package and changelog contract
-- **Parallel-safe**: yes
-- **Tasks**:
-  - test: Use SL-0 to fail first on any doc or installer surface that claims
-    GA or a stable release before the renewed decision artifact authorizes it.
-  - impl: If the decision is `ship GA`, switch the active docs, support
-    matrix, installer defaults, and operator runbooks from the current
-    prerelease `rc7` posture to stable `1.2.0` guidance, including GitHub
-    Latest and Docker `latest` expectations.
-  - impl: If the decision is `cut another RC` or `defer GA`, keep the public
-    surfaces on prerelease posture, but still refresh stale `rc5` or `rc6`
-    wording so the repo describes the current `rc7` state accurately.
-  - impl: Preserve the frozen support-tier vocabulary and v3 topology limits
-    from GABASE and GASUPPORT; GAREL may narrow channel wording, but it must
-    not broaden language/runtime claims or multi-worktree support.
-  - verify: `uv run pytest tests/docs/test_garel_ga_release_contract.py tests/docs/test_gabase_ga_readiness_contract.py -v --no-cov`
-  - verify: `rg -n "1\\.2\\.0-rc5|1\\.2\\.0-rc6|1\\.2\\.0-rc7|1\\.2\\.0|public-alpha|beta|GA|GitHub Latest|docker latest|ga-final-decision|ga-release-evidence" README.md docs/GETTING_STARTED.md docs/DOCKER_GUIDE.md docs/MCP_CONFIGURATION.md docs/SUPPORT_MATRIX.md docs/operations/deployment-runbook.md docs/operations/user-action-runbook.md scripts/install-mcp-docker.sh scripts/install-mcp-docker.ps1`
-
-### SL-5 - GA Dispatch And Post-Release Verification
-
-- **Scope**: Execute the stable release only when SL-2 chooses `ship GA`, then
-  capture the operational verification needed to prove the final channel
-  state.
-- **Owned files**: none
-- **Interfaces provided**: observed IF-0-GAREL-4 and runtime facts for
-  IF-0-GAREL-5
-- **Interfaces consumed**: SL-0 GAREL assertions; SL-1 release workflow and
-  dispatch policy; SL-2 final decision; SL-3 stable package contract; SL-4
-  public docs alignment
-- **Parallel-safe**: no
-- **Tasks**:
-  - test: If SL-2 does not choose `ship GA`, stop here with no release
-    mutation and preserve the no-op path for SL-6.
-  - test: On the `ship GA` path, rerun the narrowed contract checks before
-    dispatch so workflow policy, package metadata, changelog, docs, support
-    claims, and installer defaults are coherent.
-  - test: Re-qualify the release state with clean-branch, synchronized
-    `origin/main`, stable-tag non-reuse, and release-workflow visibility checks
-    immediately before dispatching GA.
-  - impl: Dispatch Release Automation only after the `softprops` warning has
-    been remediated or explicitly accepted in SL-2, using the real workflow
-    input contract for stable `v1.2.0`.
-  - impl: Watch the run to completion, then verify GitHub release, PyPI,
-    GHCR, clean-checkout install flows, and release smokes against the stable
-    artifacts.
-  - impl: If any dispatch, publish, or post-release verification step fails,
-    stop before claiming GA success and route the blocker back into
-    `docs/validation/ga-final-decision.md` plus
-    `docs/validation/ga-release-evidence.md`.
-  - verify: `uv run pytest tests/docs/test_garel_ga_release_contract.py tests/test_release_metadata.py tests/smoke/test_release_smoke_contract.py -v --no-cov`
-  - verify: `git status --short --branch`
-  - verify: `git fetch origin main --tags --prune`
-  - verify: `git rev-parse HEAD origin/main`
-  - verify: `git tag -l v1.2.0`
-  - verify: `git ls-remote --tags origin refs/tags/v1.2.0`
-  - verify: `gh workflow view "Release Automation"`
-  - verify: `gh workflow run "Release Automation" -f version=v1.2.0 -f release_type=custom -f auto_merge=false`
-  - verify: `gh run list --workflow "Release Automation" --limit 10`
-  - verify: `gh run watch <run-id> --exit-status`
-  - verify: `gh run view <run-id> --json url,headSha,status,conclusion,jobs`
-  - verify: `gh release view v1.2.0 --repo ViperJuice/Code-Index-MCP --json tagName,isPrerelease,isDraft,isLatest,publishedAt,targetCommitish,url,assets`
-  - verify: `python -m pip index versions index-it-mcp`
-  - verify: `docker buildx imagetools inspect ghcr.io/viperjuice/code-index-mcp:v1.2.0`
-  - verify: `make release-smoke`
-  - verify: `make release-smoke-container`
-
-### SL-6 - GA Release Evidence Reducer
-
-- **Scope**: Reduce the renewed decision, stable release execution, and
-  post-release verification into the canonical GA release evidence artifact.
-- **Owned files**: `docs/validation/ga-release-evidence.md`
-- **Interfaces provided**: IF-0-GAREL-5
-- **Interfaces consumed**: SL-0 GAREL assertions; SL-1 workflow/runtime
-  policy; SL-2 final decision artifact; SL-3 stable package contract; SL-4
-  public docs alignment; SL-5 dispatch and verification results;
   `docs/validation/ga-readiness-checklist.md`,
   `docs/validation/ga-governance-evidence.md`,
   `docs/validation/ga-e2e-evidence.md`,
   `docs/validation/ga-operations-evidence.md`,
-  `docs/validation/ga-rc-evidence.md`
+  `docs/validation/ga-rc-evidence.md`,
+  `.github/workflows/release-automation.yml`
 - **Parallel-safe**: no
 - **Tasks**:
-  - test: Write `docs/validation/ga-release-evidence.md` only when SL-2 chose
-    `ship GA` and SL-5 captured an actual stable release run plus
-    post-release verification results.
-  - impl: Record the stable dispatch inputs, run URL and run ID, `headSha`,
-    per-job conclusions, tag target, GitHub release state including Latest
-    posture, PyPI and GHCR identities, install and smoke verification, and
-    rollback disposition using redacted metadata only.
-  - impl: If SL-2 chose a non-ship path, keep this file absent and make
-    `docs/validation/ga-final-decision.md` the only reducer artifact for the
-    phase.
-  - impl: Preserve the historical-artifact banner pattern and make the
-    artifact explicit about whether the stable release succeeded, failed after
-    dispatch, or was never attempted because the renewed decision did not
-    authorize it.
-  - verify: `uv run pytest tests/docs/test_garel_ga_release_contract.py tests/test_release_metadata.py tests/smoke/test_release_smoke_contract.py -v --no-cov`
-  - verify: `rg -n "Historical artifact|v1\\.2\\.0|Release Automation|run ID|GitHub release|isLatest|PyPI|GHCR|release-smoke|rollback|ship GA" docs/validation/ga-release-evidence.md`
+  - test: Re-read the canonical GA-readiness, governance, E2E, operations, RC,
+    and workflow inputs together before writing any renewed decision language.
+  - impl: Record exactly one decision: `ship GA`, `cut another RC`, or
+    `defer GA`.
+  - impl: Cite the successful `v1.2.0-rc8` soak and explicitly disposition the
+    remaining `actions/download-artifact@v8` `Buffer()` warning in the final
+    decision instead of carrying forward stale `softprops` blocker language.
+  - impl: If the decision is not `ship GA`, keep all stable mutations blocked,
+    leave `docs/validation/ga-release-evidence.md` absent, and name the next
+    RC or roadmap scope.
+  - impl: If the decision is `ship GA`, state that stable-surface preparation
+    may proceed in this phase, but stable dispatch remains blocked until
+    `GADISP` is planned from the committed prep state.
+  - verify: `uv run pytest tests/docs/test_garel_ga_release_contract.py -v --no-cov`
+  - verify: `rg -n "ship GA|cut another RC|defer GA|ga-readiness-checklist|ga-governance-evidence|ga-e2e-evidence|ga-operations-evidence|ga-rc-evidence|actions/download-artifact@v8|Buffer\\(\\)|v1\\.2\\.0-rc8|v1\\.2\\.0|GADISP" docs/validation/ga-final-decision.md`
+
+### SL-2 - Stable-Surface Preparation And Downstream Handoff
+
+- **Scope**: Prepare the repo-owned stable package, docs, installer, support,
+  and runbook surfaces only if the renewed decision selects `ship GA`, while
+  keeping external release mutation blocked for downstream `GADISP`.
+- **Owned files**: `pyproject.toml`, `mcp_server/__init__.py`,
+  `CHANGELOG.md`, `README.md`, `docs/GETTING_STARTED.md`,
+  `docs/DOCKER_GUIDE.md`, `docs/MCP_CONFIGURATION.md`,
+  `docs/SUPPORT_MATRIX.md`, `docs/operations/deployment-runbook.md`,
+  `docs/operations/user-action-runbook.md`,
+  `scripts/install-mcp-docker.sh`, `scripts/install-mcp-docker.ps1`
+- **Interfaces provided**: IF-0-GAREL-3, IF-0-GAREL-4
+- **Interfaces consumed**: SL-0 GAREL assertions; SL-1 final decision;
+  `tests/test_release_metadata.py`,
+  `tests/smoke/test_release_smoke_contract.py`
+- **Parallel-safe**: yes
+- **Tasks**:
+  - test: Use the GAREL contract test plus release-metadata, docs, and release
+    smoke coverage to fail first on stale channel or version claims before
+    editing stable surfaces.
+  - impl: If the renewed decision is `ship GA`, advance repo-owned package,
+    changelog, docs, installer, support, and runbook surfaces from
+    `1.2.0-rc8` / `v1.2.0-rc8` to stable `1.2.0` / `v1.2.0`.
+  - impl: If the renewed decision is `cut another RC` or `defer GA`, keep the
+    public and repo-owned surfaces on prerelease posture and only repair any
+    stale pre-`rc8` wording that conflicts with the current contract.
+  - impl: Preserve the frozen support-tier vocabulary, fail-closed readiness
+    language, GitHub Latest stable-only posture, Docker `latest` stable-only
+    posture, and v3 topology limits from GABASE and GASUPPORT.
+  - impl: Do not dispatch the stable release and do not create
+    `docs/validation/ga-release-evidence.md` in this phase.
+  - impl: If the renewed decision is `ship GA`, leave the tree ready for
+    downstream `GADISP` planning from the committed prep state.
+  - verify: `uv run pytest tests/test_release_metadata.py tests/docs/test_garel_ga_release_contract.py tests/docs/test_gabase_ga_readiness_contract.py tests/smoke/test_release_smoke_contract.py -v --no-cov`
+  - verify: `rg -n "1\\.2\\.0-rc8|1\\.2\\.0|v1\\.2\\.0-rc8|v1\\.2\\.0|public-alpha|beta|GA|GitHub Latest|docker latest|ga-final-decision|ga-release-evidence" pyproject.toml mcp_server/__init__.py CHANGELOG.md README.md docs/GETTING_STARTED.md docs/DOCKER_GUIDE.md docs/MCP_CONFIGURATION.md docs/SUPPORT_MATRIX.md docs/operations/deployment-runbook.md docs/operations/user-action-runbook.md scripts/install-mcp-docker.sh scripts/install-mcp-docker.ps1`
 
 ## Verification
 
-Planning-only run: do not execute these during plan creation. Run them during
-`codex-execute-phase` or manual GAREL execution.
-
-Contract and workflow checks:
-
-```bash
-uv run pytest tests/docs/test_garel_ga_release_contract.py -v --no-cov
-uv run pytest tests/test_release_metadata.py -v --no-cov
-uv run pytest tests/smoke/test_release_smoke_contract.py -v --no-cov
-rg -n "softprops/action-gh-release|create-pull-request@v8|release_type|is_prerelease|v1\\.2\\.0-rc7|v1\\.2\\.0" \
-  .github/workflows/release-automation.yml \
-  tests/test_release_metadata.py
-gh run view 24919438766 --json url,headSha,status,conclusion,jobs
-```
-
-Decision and doc alignment checks:
-
-```bash
-uv run pytest tests/docs/test_garel_ga_release_contract.py tests/docs/test_gabase_ga_readiness_contract.py -v --no-cov
-rg -n "ship GA|cut another RC|defer GA|softprops/action-gh-release@v2|Node 20|v1\\.2\\.0-rc7|v1\\.2\\.0" \
-  docs/validation/ga-final-decision.md
-rg -n "1\\.2\\.0-rc5|1\\.2\\.0-rc6|1\\.2\\.0-rc7|1\\.2\\.0|public-alpha|beta|GA|GitHub Latest|docker latest" \
-  README.md \
-  docs/GETTING_STARTED.md \
-  docs/DOCKER_GUIDE.md \
-  docs/MCP_CONFIGURATION.md \
-  docs/SUPPORT_MATRIX.md \
-  docs/operations/deployment-runbook.md \
-  docs/operations/user-action-runbook.md \
-  scripts/install-mcp-docker.sh \
-  scripts/install-mcp-docker.ps1
-```
-
-Stable-release execution checks, only if SL-2 chooses `ship GA`:
-
-```bash
-git status --short --branch
-git fetch origin main --tags --prune
-git rev-parse HEAD origin/main
-git tag -l v1.2.0
-git ls-remote --tags origin refs/tags/v1.2.0
-gh workflow view "Release Automation"
-gh workflow run "Release Automation" -f version=v1.2.0 -f release_type=custom -f auto_merge=false
-gh run list --workflow "Release Automation" --limit 10
-gh run watch <run-id> --exit-status
-gh run view <run-id> --json url,headSha,status,conclusion,jobs
-gh release view v1.2.0 --repo ViperJuice/Code-Index-MCP --json tagName,isPrerelease,isDraft,isLatest,publishedAt,targetCommitish,url,assets
-python -m pip index versions index-it-mcp
-docker buildx imagetools inspect ghcr.io/viperjuice/code-index-mcp:v1.2.0
-make release-smoke
-make release-smoke-container
-```
+- `uv run pytest tests/docs/test_garel_ga_release_contract.py tests/docs/test_gabase_ga_readiness_contract.py tests/test_release_metadata.py tests/smoke/test_release_smoke_contract.py -v --no-cov`
+- `make alpha-production-matrix`
+- `make release-smoke`
+- `make release-smoke-container`
+- `git status --short --branch`
+- `gh workflow view "Release Automation"`
+- If `ship GA` is selected after SL-2, plan the downstream dispatch phase:
+  `codex-plan-phase specs/phase-plans-v5.md GADISP`
+- If `defer GA` is selected after SL-2, extend the roadmap before any
+  downstream release phase is reused:
+  `codex-phase-roadmap-builder specs/phase-plans-v5.md`
 
 ## Acceptance Criteria
 
-- [ ] `docs/validation/ga-final-decision.md` exists and states exactly one of
-      `ship GA`, `cut another RC`, or `defer GA`, citing the canonical
-      GABASE, GAGOV, GASUPPORT, GAE2E, GAOPS, and GARECUT evidence.
-- [ ] The remaining `softprops/action-gh-release@v2` Node 20 warning is
-      remediated or explicitly dispositioned before any GA dispatch is
-      attempted.
-- [ ] If the renewed decision is not `ship GA`, no stable release mutation
-      occurs and the final decision artifact names the next roadmap or RC
-      scope.
-- [ ] If the renewed decision is `ship GA`, repo-owned metadata, public docs,
-      support claims, installer defaults, GitHub Latest posture, and Docker
-      `latest` guidance all align on stable `1.2.0` / `v1.2.0`.
-- [ ] Stable dispatch and post-release verification either succeed and are
-      recorded in `docs/validation/ga-release-evidence.md`, or fail in an
-      explicit blocker state without silently implying GA success.
-
-## Automation
-
-```yaml
-automation:
-  status: planned
-  next_skill: codex-execute-phase
-  next_command: codex-execute-phase /home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v5-garel.md
-  next_model_hint: execute
-  next_effort_hint: medium
-  human_required: false
-  blocker_class: none
-  blocker_summary: none
-  required_human_inputs: []
-  verification_status: not_run
-  artifact: /home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v5-garel.md
-  artifact_state: staged
-```
+- [ ] `docs/validation/ga-final-decision.md` cites the current `v1.2.0-rc8`
+      soak, the current workflow-runtime warning disposition, and states
+      exactly one of `ship GA`, `cut another RC`, or `defer GA`.
+- [ ] If the decision is not `ship GA`, no stable mutation occurs,
+      `docs/validation/ga-release-evidence.md` remains absent, and the next
+      RC or roadmap scope is recorded explicitly.
+- [ ] If the decision is `ship GA`, package metadata, changelog, public docs,
+      installer helpers, support claims, and runbooks are prepared for stable
+      `1.2.0` / `v1.2.0` without broadening support tiers or topology claims.
+- [ ] Stable release dispatch is explicitly deferred to downstream `GADISP`,
+      the dedicated `phase_loop_mutation: release_dispatch` phase.
+- [ ] If the decision is `defer GA`, the artifact records the roadmap-extension
+      blocker explicitly and does not route straight to the existing `GADISP`
+      or `GARECUT` plans.
+- [ ] `docs/validation/ga-release-evidence.md` remains absent until a
+      successful downstream dispatch and post-release verification exist.

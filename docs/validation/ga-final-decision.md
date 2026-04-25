@@ -4,9 +4,9 @@
 
 ## Summary
 
-- Evidence captured: `2026-04-25T03:40:00Z`.
+- Evidence captured: `2026-04-25T12:36:07Z`.
 - Executed decision phase plan: `plans/phase-plan-v5-garel.md`.
-- Final decision: `cut another RC`.
+- Final decision: `defer GA`.
 - Stable GA dispatch: `not authorized`.
 - Stable release evidence artifact: `docs/validation/ga-release-evidence.md`
   remains intentionally absent because no GA release was attempted.
@@ -33,10 +33,11 @@ Evidence summary:
 - `docs/validation/ga-rc-evidence.md` now records the `v1.2.0-rc8` GARECUT
   recut as `recut succeeded` while preserving the earlier successful
   `v1.2.0-rc7` recut as historical evidence.
-- This GAREL execution remediated the remaining `Create GitHub Release`
-  Node 20 warning by upgrading `softprops/action-gh-release@v2` to
-  `softprops/action-gh-release@v3`, which shifts the release workflow again and
-  requires one more prerelease soak before GA can be reduced safely.
+- This GAREL execution rechecked the remaining workflow-runtime warning against
+  the live `actions/download-artifact` release line. As of 2026-04-25, GitHub
+  still publishes `actions/download-artifact` `v8.0.1` (published
+  2026-03-11T15:44:25Z), and the successful `v1.2.0-rc8` release run still
+  emitted the same `Buffer()` deprecation from the current `@v8` line.
 
 ## Workflow Runtime Disposition
 
@@ -53,27 +54,42 @@ That is the correct repair for the workflow runtime, but it means the release
 path that would own a stable GA dispatch has changed again and has not yet been
 soaked on a prerelease candidate.
 
-GARECUT has now provided that fresh prerelease soak through successful run
+GARECUT then provided a fresh prerelease soak through successful run
 `24923402398`, release `v1.2.0-rc8`, PyPI package `1.2.0rc8`, and the matching
-GHCR image. That clears the specific `softprops/action-gh-release@v3` soak
+GHCR image. That cleared the specific `softprops/action-gh-release@v3` soak
 requirement. However, the same successful `Create GitHub Release` job emitted a
 new non-fatal runtime warning from `actions/download-artifact@v8`:
-`Buffer()` deprecation. Renewed GAREL must disposition that warning before any
-future `ship GA` path is authorized.
+`Buffer()` deprecation.
+
+This phase revalidated that warning against GitHub's current published action
+metadata instead of assuming the repo pin was stale. The workflow already uses
+`actions/download-artifact@v8`, GitHub's latest published release is still
+`v8.0.1`, and no repo-local workflow change landed in this phase that would
+exercise a meaningfully different artifact-download path.
+
+That means the remaining warning is not evidence that one more prerelease soak
+would answer a new question. Another RC on the same artifact-download line
+would likely reproduce the same warning, while stable GA dispatch remains
+downstream-only and is not owned by this phase. The warning therefore remains an
+unresolved workflow-runtime concern, but it is now classified as a roadmap
+steering blocker rather than a reason to cut another identical RC immediately.
 
 ## Final Decision
 
-`cut another RC`
+`defer GA`
 
 Rationale:
 
-- Fresh `v1.2.0-rc7` evidence exists for the remediated
-  `peter-evans/create-pull-request@v8` path.
-- This GAREL execution changed the release workflow again by moving
-  `softprops/action-gh-release` from `@v2` to `@v3`.
-- Shipping GA immediately after that workflow remediation would skip the
-  roadmap's required prerelease-soak evidence on the actual release path that
-  would own stable `v1.2.0`.
+- Successful `v1.2.0-rc8` evidence already exists for the current
+  `softprops/action-gh-release@v3` path.
+- GitHub's latest published `actions/download-artifact` release remains
+  `v8.0.1`, and the repo is already on `actions/download-artifact@v8`.
+- The surviving `Buffer()` deprecation therefore appears on the current
+  artifact-download line rather than on an obviously stale repo pin.
+- Another prerelease soak without a workflow-artifact transport change would
+  likely reproduce the same warning and would not materially reduce GA risk.
+- This phase can disposition the blocker, but it does not own a separate
+  workflow-runtime remediation lane or the downstream stable dispatch itself.
 - GitHub Latest still points at `v2.15.0-alpha.1`, and no `v1.2.0` tag,
   stable GitHub release, stable PyPI release evidence, or Docker `latest`
   verification was generated in this phase.
@@ -103,31 +119,30 @@ GHCR image. The merge job left no new release PR open because the release
 branch no longer differed from `main`.
 
 That advances the repository beyond the old rerun state: the
-`softprops/action-gh-release@v3` path is now soaked, so the immediate next step
-is renewed GAREL planning. The remaining release-runtime follow-up is the new
-`actions/download-artifact@v8` `Buffer()` deprecation warning observed in the
-successful `Create GitHub Release` job.
+`softprops/action-gh-release@v3` path is now soaked. The remaining
+release-runtime follow-up is the `actions/download-artifact@v8` `Buffer()`
+deprecation warning observed in the successful `Create GitHub Release` job.
 
 ## Next Scope
 
-The roadmap now routes to the nearest downstream phase with amended steering:
+The roadmap now records that existing downstream `ship GA` and `cut another RC`
+plans are both blocked by the unresolved artifact-download warning:
 
 - Roadmap artifact: `specs/phase-plans-v5.md`
-- Phase 7: `GA Decision and Release (GAREL)` as a renewed downstream reducer on
-  top of successful `v1.2.0-rc8` evidence.
+- Nearest downstream phase boundary: `GADISP`
+- Downstream disposition: `roadmap extension required before GADISP or GARECUT`
 
-That renewed phase must:
+The next roadmap work must:
 
-- reduce the refreshed `v1.2.0-rc8` prerelease evidence instead of reusing the
-  stale blocked-run assumption,
-- disposition the newly observed `actions/download-artifact@v8`
-  `Buffer()` deprecation warning before any `ship GA` path is allowed,
+- decide whether a future phase will remediate the workflow-artifact transport
+  path, explicitly accept the remaining `actions/download-artifact@v8`
+  `Buffer()` warning as non-blocking, or wait for an upstream GitHub fix,
 - keep GitHub Latest and Docker `latest` stable-only until a deliberate GA
   release changes those channels, and
-- either authorize GA with explicit release evidence or return to another RC /
-  defer-GA decision with the new runtime warning accounted for.
+- avoid reusing the current `GADISP` or `GARECUT` plans until the roadmap is
+  extended with that explicit warning-disposition owner.
 
-Any older downstream GARECUT or GAREL plan that predates this roadmap
+Any older downstream `GADISP` or `GARECUT` plan that predates this roadmap
 amendment is stale and must not be treated as authoritative.
 
 ## Verification

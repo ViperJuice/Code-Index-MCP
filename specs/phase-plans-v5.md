@@ -74,9 +74,14 @@ and fail-closed readiness behavior for unavailable indexes.
   relying on project-history knowledge.
 - IF-0-GARC-1 — Follow-up RC soak contract: a post-hardening RC is cut,
   observed, and verified before any GA tag or GA claim.
-- IF-0-GAREL-1 — GA decision and release contract: final evidence states exactly
-  one of ship GA, cut another RC, or defer GA, and release mutation happens only
-  when the ship-GA path is selected.
+- IF-0-GAREL-1 — GA decision and stable-surface prep contract: final evidence
+  states exactly one of ship GA, cut another RC, or defer GA, and any
+  stable-surface mutation stays repo-local until a dedicated downstream
+  dispatch phase is planned.
+- IF-0-GADISP-1 — GA dispatch contract: stable release dispatch and GA release
+  evidence run only from a dedicated `phase_loop_mutation: release_dispatch`
+  phase after GAREL selects ship GA and the stable surfaces are committed and
+  synced.
 
 ## Phases
 
@@ -384,46 +389,51 @@ version as `v1.2.0-rc7` before planning this phase.
 **Produces**
 - IF-0-GARC-1 — Follow-up RC soak contract.
 
-### Phase 7 — GA Decision and Release (GAREL)
+### Phase 7 — GA Decision And Stable-Surface Preparation (GAREL)
 
 **Objective**
 
 Reduce all GA-hardening evidence into one final decision and, only if the
-decision is ship GA, execute the GA release.
+decision is ship GA, prepare the stable repo-owned surfaces for a downstream GA
+dispatch.
 
 **Exit criteria**
 - [ ] A final decision artifact states exactly one of `ship GA`, `cut another
       RC`, or `defer GA`.
 - [ ] If the decision is not `ship GA`, no GA release mutation occurs and the
       artifact names the next roadmap or RC scope.
-- [ ] If the decision is `ship GA`, Release Automation dispatches the GA version
-      with governance-approved inputs and records tag, GitHub release, PyPI,
-      GHCR, install, and rollback evidence.
+- [ ] If the decision is `ship GA`, package metadata, changelog, public docs,
+      installer helpers, support claims, and operator runbooks align on stable
+      `1.2.0` / `v1.2.0` without broadening support tiers or topology claims.
 - [ ] Release workflow dependencies and automation runtime warnings discovered
       during GARC are either remediated or explicitly dispositioned before a GA
-      dispatch is attempted.
+      dispatch phase is attempted.
 - [ ] Public docs, support matrix, changelog, runbooks, and installer flows
       match the final release channel and support-tier claims.
-- [ ] Post-release verification passes from a clean checkout and the final GA
-      evidence artifact records all command results.
+- [ ] If the decision is `ship GA`, the next phase is a dispatch-only
+      `phase_loop_mutation: release_dispatch` plan; GAREL itself performs no
+      external release mutation and writes no GA release-evidence artifact.
 
 **Scope notes**
 
-This phase is a guarded decision reducer plus release execution. It must stop
-before mutation if governance, support, E2E, operations, or RC soak evidence is
-missing. GARC surfaced a GitHub Actions warning that
+This phase is a guarded decision reducer plus stable-surface preparation. It
+must stop before external release mutation if governance, support, E2E,
+operations, or RC soak evidence is missing. GARC surfaced a GitHub Actions
+warning that
 `peter-evans/create-pull-request@v7` still runs on the deprecated Node 20
 runtime in the `Merge Release Branch` job, and GARECUT later proved that path
 was remediated on `peter-evans/create-pull-request@v8` during successful run
 `24919438766`. That same GARECUT run also emitted a new Node 20 deprecation
 annotation for `softprops/action-gh-release@v2` in `Create GitHub Release`.
 GAREL has since remediated that path to `softprops/action-gh-release@v3`, so
-the next downstream work is another prerelease soak on the newly remediated
-release path before any stable GA dispatch is reconsidered.
+renewed GAREL must disposition the remaining
+`actions/download-artifact@v8` `Buffer()` warning and either stop on a non-ship
+decision or hand off stable GA dispatch to a dedicated downstream phase.
 
 **Non-goals**
 
 - No release mutation when final evidence selects another RC or defer-GA.
+- No external GA dispatch from this phase.
 - No unreviewed support expansion.
 - No GitHub Latest policy change outside the release decision.
 
@@ -439,7 +449,6 @@ release path before any stable GA dispatch is reconsidered.
 - `docs/operations/deployment-runbook.md`
 - `docs/operations/user-action-runbook.md`
 - `docs/validation/ga-final-decision.md`
-- `docs/validation/ga-release-evidence.md`
 - `tests/docs/`
 - `tests/smoke/`
 
@@ -447,7 +456,7 @@ release path before any stable GA dispatch is reconsidered.
 - GARC
 
 **Produces**
-- IF-0-GAREL-1 — GA decision and release contract.
+- IF-0-GAREL-1 — GA decision and stable-surface prep contract.
 
 ## Phase Dependency DAG
 
@@ -458,14 +467,17 @@ GACLOSE
        ├─> GASUPPORT ─┼─> GAE2E ─┐
        │              │          ├─> GAOPS ─┐
        └──────────────┘          │          │
-                                 └──────────┴─> GARC -> GAREL -> GARECUT
+                                 └──────────┴─> GARC -> GAREL ─┬─> GADISP
+                                                               └─> GARECUT
 ```
 
 GAGOV and GASUPPORT can be planned after GABASE. GAE2E depends on the support
 contract because the E2E evidence must know which claims it is proving. GAOPS
 depends on governance and E2E evidence so operator procedures reference the
 actual enforced gates and validated runtime behavior. GARC waits for governance,
-support, E2E, and operations. GAREL waits for the follow-up RC soak.
+support, E2E, and operations. GAREL waits for the follow-up RC soak. From
+renewed GAREL, the ship-GA branch plans GADISP while the another-RC branch
+plans GARECUT and then routes back through GAREL.
 
 ## Execution Notes
 
@@ -479,14 +491,22 @@ support, E2E, and operations. GAREL waits for the follow-up RC soak.
 - GAE2E should run after GASUPPORT so evidence maps to the frozen support tiers.
 - GAOPS should consume GAGOV and GAE2E results before changing runbooks.
 - GARC is the first phase that may dispatch a release workflow.
-- GAREL must stop before any release mutation unless the final evidence selects
-  `ship GA`.
+- GAREL must stop before any release mutation; it is a decision and
+  stable-surface-preparation phase only.
+- If GAREL selects `ship GA`, plan `GADISP` next; any older stable-dispatch
+  artifact that predates the current GAREL decision and prep state is stale.
 - If GAREL remediates release-workflow runtime drift and concludes that another
   prerelease soak is required, plan `GARECUT` next and treat any older
   downstream GAREL assumptions as stale.
+- If GAREL selects `defer GA` because the latest `actions/download-artifact@v8`
+  line still emits the unresolved `Buffer()` warning and no accepted-risk
+  policy or repo-local remediation was chosen, stop the v5 execution path at
+  GAREL and extend the roadmap before reusing `GADISP` or `GARECUT`.
 - After a successful GARECUT, route back through `codex-plan-phase
   specs/phase-plans-v5.md GAREL`; any older GAREL plan that predates the
   post-GARECUT or post-remediation release-workflow steering is stale.
+- GADISP is the only stable-GA phase that may carry
+  `phase_loop_mutation: release_dispatch`.
 - Successful `v1.2.0-rc8` GARECUT evidence on run `24923402398` proved the
   `softprops/action-gh-release@v3` path, but it also surfaced a new
   `actions/download-artifact@v8` `Buffer()` deprecation warning inside the
@@ -543,7 +563,12 @@ uv run pytest tests/docs tests/smoke tests/test_release_metadata.py tests/test_r
 make alpha-production-matrix
 make release-smoke
 make release-smoke-container
+
+# GADISP
+git status --short --branch
+git rev-parse HEAD origin/main
 gh workflow run "Release Automation" -f version=<ga-version> -f release_type=custom -f auto_merge=false
+gh run watch <run-id> --exit-status
 gh release view <ga-version>
 
 # GARECUT
@@ -554,7 +579,58 @@ gh run view <run-id> --job <merge-release-job-id> --log
 gh release view <next-rc-tag>
 ```
 
-### Phase 8 — Post-Remediation RC Recut (GARECUT)
+### Phase 8 — GA Stable Dispatch And Release Evidence (GADISP)
+
+**Objective**
+
+Dispatch the stable GA release from a clean synced tree and record the
+post-release evidence only after renewed GAREL selects `ship GA`.
+
+**Exit criteria**
+- [ ] Local pre-dispatch checks confirm clean release state, expected branch,
+      synchronized `origin/main`, and the prepared stable surfaces already
+      exist in the committed tree.
+- [ ] Release Automation dispatch uses the stable GA version with
+      governance-approved inputs from a plan marked
+      `phase_loop_mutation: release_dispatch`.
+- [ ] Preflight gates, release artifact build, GitHub release, PyPI publish,
+      GHCR publish, install smokes, and container smokes are watched to
+      completion.
+- [ ] The GA release evidence artifact records workflow URL, run ID, `headSha`,
+      tag, GitHub release state, GitHub Latest posture, PyPI and GHCR
+      identities, install verification, rollback disposition, and redacted
+      metadata only.
+- [ ] No repo-owned stable-surface edits remain mixed into the dispatch plan
+      beyond evidence updates that depend on the successful dispatch result.
+
+**Scope notes**
+
+This phase is the only stable-GA mutation phase. It must start from a clean,
+synced tree whose stable surface was already prepared by GAREL. When GAREL
+records `defer GA`, this phase remains blocked until a roadmap extension owns
+the remaining `actions/download-artifact@v8` warning disposition.
+
+**Non-goals**
+
+- No additional stable-surface preparation.
+- No support-matrix expansion.
+- No topology broadening.
+
+**Key files**
+
+- `.github/workflows/release-automation.yml`
+- `docs/validation/ga-final-decision.md`
+- `docs/validation/ga-release-evidence.md`
+- `tests/test_release_metadata.py`
+- `tests/smoke/`
+
+**Depends on**
+- GAREL
+
+**Produces**
+- IF-0-GADISP-1 — GA dispatch contract.
+
+### Phase 9 — Post-Remediation RC Recut (GARECUT)
 
 **Objective**
 
@@ -576,7 +652,10 @@ any future GA ship decision is reconsidered.
 **Scope notes**
 
 This phase is a prerelease recut on the remediated workflow path. It does not
-authorize a stable release by itself.
+authorize a stable release by itself. When GAREL records `defer GA` on the
+latest published `actions/download-artifact@v8` line, this phase is not the
+next step unless a roadmap extension first lands a new workflow-artifact
+transport change to soak.
 
 **Non-goals**
 
