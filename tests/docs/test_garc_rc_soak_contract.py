@@ -44,13 +44,13 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_rc7_contract_surfaces_are_frozen():
+def test_rc8_contract_surfaces_are_frozen():
     for path in SURFACES:
         text = _read(path)
-        assert "1.2.0-rc7" in text or "v1.2.0-rc7" in text, path
+        assert "1.2.0-rc8" in text or "v1.2.0-rc8" in text, path
 
     workflow = _read(RELEASE_WORKFLOW)
-    assert "default: 'v1.2.0-rc7'" in workflow
+    assert "default: 'v1.2.0-rc8'" in workflow
     assert "release_type=custom" in "\n".join(
         [workflow, _read(DEPLOYMENT_RUNBOOK), _read(USER_ACTION_RUNBOOK)]
     )
@@ -86,14 +86,14 @@ def test_runbooks_freeze_pre_dispatch_and_observation_commands():
         "git status --short --branch",
         "git fetch origin main --tags --prune",
         "git rev-parse HEAD origin/main",
-        "git tag -l v1.2.0-rc7",
-        "git ls-remote --tags origin refs/tags/v1.2.0-rc7",
+        "git tag -l v1.2.0-rc8",
+        "git ls-remote --tags origin refs/tags/v1.2.0-rc8",
         'gh workflow view "Release Automation"',
-        'gh workflow run "Release Automation" -f version=v1.2.0-rc7 -f release_type=custom -f auto_merge=false',
+        'gh workflow run "Release Automation" -f version=v1.2.0-rc8 -f release_type=custom -f auto_merge=false',
         'gh run list --workflow "Release Automation" --limit 10',
         "gh run watch <run-id> --exit-status",
         "gh run view <run-id> --json url,headSha,status,conclusion,jobs",
-        "gh release view v1.2.0-rc7 --repo ViperJuice/Code-Index-MCP --json tagName,isPrerelease,isDraft,publishedAt,targetCommitish,url,assets",
+        "gh release view v1.2.0-rc8 --repo ViperJuice/Code-Index-MCP --json tagName,isPrerelease,isDraft,publishedAt,targetCommitish,url,assets",
         "blocked before dispatch",
         "ga-rc-evidence.md",
     ):
@@ -123,7 +123,7 @@ def test_ga_rc_evidence_exists_and_records_blocked_or_observed_state():
         "## Rollback And Next-Step Disposition",
         "## Verification",
         "plans/phase-plan-v5-garc.md",
-        "v1.2.0-rc7",
+        "v1.2.0-rc8",
         "git status --short --branch",
         'gh workflow view "Release Automation"',
         "auto_merge=false",

@@ -34,6 +34,13 @@ REQUIRED_POLICY_TERMS = [
     "auto_merge=false",
     "Docker latest",
 ]
+RUNBOOK_POLICY_TERMS = [
+    "v1.2.0-rc8",
+    "v2.15.0-alpha.1",
+    "GitHub Latest",
+    "auto_merge=false",
+    "Docker latest",
+]
 
 
 def _read(path: Path) -> str:
@@ -74,7 +81,7 @@ def test_runbooks_record_enforced_governance_and_blocker_response():
         for gate in REQUIRED_GATES:
             assert gate in text, f"{path} missing {gate!r}"
 
-        for term in REQUIRED_POLICY_TERMS:
+        for term in RUNBOOK_POLICY_TERMS:
             assert term in text, f"{path} missing {term!r}"
 
 

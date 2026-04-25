@@ -75,7 +75,7 @@ def test_release_workflow_matches_rc_contract():
     assert f"GARECUT release contract target: {EXPECTED_TAG}" in workflow
     assert (
         'gh workflow run "Release Automation" -f version=v1.2.0 '
-        '-f release_type=custom -f auto_merge=false'
+        "-f release_type=custom -f auto_merge=false"
     ) in workflow
     assert "peter-evans/create-pull-request@v8" in workflow
     assert "softprops/action-gh-release@v3" in workflow

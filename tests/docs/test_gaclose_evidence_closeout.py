@@ -15,7 +15,7 @@ TRIAGE = REPO / "docs" / "HISTORICAL-ARTIFACTS-TRIAGE.md"
 
 PUBLIC_ALPHA_VERSION = "1.2.0-rc5"
 PUBLIC_ALPHA_TAG = "v1.2.0-rc5"
-CURRENT_PUBLIC_ALPHA_VERSION = "1.2.0-rc7"
+CURRENT_PUBLIC_ALPHA_VERSION = "1.2.0-rc8"
 HISTORICAL_BANNER = "> **Historical artifact — as-of 2026-04-18, may not reflect current behavior**"
 
 PUBLIC_SURFACES = [

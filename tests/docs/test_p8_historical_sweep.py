@@ -12,9 +12,9 @@ SWEEP_DIRS = [
 ]
 TRIAGE_LOG = REPO_ROOT / "docs" / "HISTORICAL-ARTIFACTS-TRIAGE.md"
 BANNER_REGEX = re.compile(
-    r"^> \*\*Historical artifact \u2014 as-of 2026-04-(18|24), may not reflect current behavior\*\*\s*$"
+    r"^> \*\*Historical artifact \u2014 as-of 2026-04-(18|24|25), may not reflect current behavior\*\*\s*$"
 )
-VALID_AS_OF_DATES = {"2026-04-18", "2026-04-24"}
+VALID_AS_OF_DATES = {"2026-04-18", "2026-04-24", "2026-04-25"}
 VALID_DISPOSITIONS = {"deleted", "bannered", "rewritten"}
 
 
