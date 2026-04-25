@@ -4,12 +4,13 @@
 
 ## Summary
 
-- Evidence captured: `2026-04-25T12:36:07Z`.
+- Evidence captured: `2026-04-25T17:22:44Z`.
 - Executed decision phase plan: `plans/phase-plan-v5-garel.md`.
-- Final decision: `defer GA`.
-- Stable GA dispatch: `not authorized`.
+- Final decision: `ship GA`.
+- Stable GA dispatch: `authorized for downstream GADISP`.
 - Stable release evidence artifact: `docs/validation/ga-release-evidence.md`
-  remains intentionally absent because no GA release was attempted.
+  remains intentionally absent until downstream GADISP dispatches and verifies
+  the stable release.
 
 ## Decision Inputs
 
@@ -70,13 +71,15 @@ exercise a meaningfully different artifact-download path.
 That means the remaining warning is not evidence that one more prerelease soak
 would answer a new question. Another RC on the same artifact-download line
 would likely reproduce the same warning, while stable GA dispatch remains
-downstream-only and is not owned by this phase. The warning therefore remains an
-unresolved workflow-runtime concern, but it is now classified as a roadmap
-steering blocker rather than a reason to cut another identical RC immediately.
+downstream-only and is not owned by this phase. The operator disposition is that
+the warning is accepted as non-blocking for GA because the rc8 run used
+`digest-mismatch: error`, logged the expected SHA256 digest, completed artifact
+download successfully, and then completed GitHub Release, PyPI, and GHCR
+publication.
 
 ## Final Decision
 
-`defer GA`
+`ship GA`
 
 Rationale:
 
@@ -84,19 +87,21 @@ Rationale:
   `softprops/action-gh-release@v3` path.
 - GitHub's latest published `actions/download-artifact` release remains
   `v8.0.1`, and the repo is already on `actions/download-artifact@v8`.
-- The surviving `Buffer()` deprecation therefore appears on the current
-  artifact-download line rather than on an obviously stale repo pin.
+- The surviving `Buffer()` deprecation appears on the current
+  artifact-download line rather than on an obviously stale repo pin, and is
+  accepted as non-blocking based on the digest-verified rc8 publication path.
 - Another prerelease soak without a workflow-artifact transport change would
   likely reproduce the same warning and would not materially reduce GA risk.
-- This phase can disposition the blocker, but it does not own a separate
-  workflow-runtime remediation lane or the downstream stable dispatch itself.
+- This phase dispositions the blocker but does not perform the downstream
+  stable dispatch itself.
 - GitHub Latest still points at `v2.15.0-alpha.1`, and no `v1.2.0` tag,
   stable GitHub release, stable PyPI release evidence, or Docker `latest`
-  verification was generated in this phase.
+  verification was generated in this phase; those belong to GADISP.
 
-Because the decision is not `ship GA`, no stable release mutation was
-performed, `docs/validation/ga-release-evidence.md` remains intentionally
-absent, and all stable-channel changes stay blocked.
+Because the decision is `ship GA`, stable release mutation is authorized only
+for downstream GADISP from a clean synced tree. This phase performed no stable
+release mutation, and `docs/validation/ga-release-evidence.md` remains
+intentionally absent until GADISP records the actual stable-release evidence.
 
 ## GARECUT Status
 
@@ -104,7 +109,7 @@ absent, and all stable-channel changes stay blocked.
 - Previous recut outcome: `recut succeeded`
 - Current recut target: `v1.2.0-rc8`
 - Current recut outcome: `recut succeeded`
-- Current readiness: `ready for renewed GAREL planning`
+- Current readiness: `ready for GADISP planning`
 
 The prior recut dispatched and completed successfully on
 `https://github.com/ViperJuice/Code-Index-MCP/actions/runs/24919438766`,
@@ -125,25 +130,24 @@ deprecation warning observed in the successful `Create GitHub Release` job.
 
 ## Next Scope
 
-The roadmap now records that existing downstream `ship GA` and `cut another RC`
-plans are both blocked by the unresolved artifact-download warning:
+The roadmap now records that the artifact-download warning is accepted as
+non-blocking for GA dispatch:
 
 - Roadmap artifact: `specs/phase-plans-v5.md`
 - Nearest downstream phase boundary: `GADISP`
-- Downstream disposition: `roadmap extension required before GADISP or GARECUT`
+- Downstream disposition: `GADISP planning/execution authorized`
 
-The next roadmap work must:
+The next phase must:
 
-- decide whether a future phase will remediate the workflow-artifact transport
-  path, explicitly accept the remaining `actions/download-artifact@v8`
-  `Buffer()` warning as non-blocking, or wait for an upstream GitHub fix,
+- record the remaining `actions/download-artifact@v8` `Buffer()` warning as an
+  accepted non-blocking risk in GA release evidence,
 - keep GitHub Latest and Docker `latest` stable-only until a deliberate GA
   release changes those channels, and
-- avoid reusing the current `GADISP` or `GARECUT` plans until the roadmap is
-  extended with that explicit warning-disposition owner.
+- dispatch and verify stable `v1.2.0` only through the dedicated GADISP
+  `phase_loop_mutation: release_dispatch` phase.
 
-Any older downstream `GADISP` or `GARECUT` plan that predates this roadmap
-amendment is stale and must not be treated as authoritative.
+Any older downstream `GADISP` plan that predates this accepted-risk disposition
+is stale and must not be treated as authoritative.
 
 ## Verification
 

@@ -62,7 +62,7 @@ def test_final_decision_exists_and_cites_all_ga_inputs():
         "## GARECUT Status",
         "## Next Scope",
         "## Verification",
-        "defer GA",
+        "ship GA",
         "docs/validation/ga-readiness-checklist.md",
         "docs/validation/ga-governance-evidence.md",
         "docs/validation/ga-e2e-evidence.md",
@@ -80,16 +80,17 @@ def test_final_decision_exists_and_cites_all_ga_inputs():
     ):
         assert expected in decision
 
-    assert "- Final decision: `ship GA`." not in decision
+    assert "- Final decision: `defer GA`." not in decision
     assert "- Final decision: `cut another RC`." not in decision
 
 
-def test_non_ship_decision_keeps_ga_release_evidence_absent_and_public_surfaces_pre_ga():
+def test_ship_decision_defers_release_evidence_to_gadisp_and_keeps_public_surfaces_pre_dispatch():
     decision = _read(GA_FINAL)
 
-    assert "- Final decision: `defer GA`." in decision
+    assert "- Final decision: `ship GA`." in decision
+    assert "Stable GA dispatch: `authorized for downstream GADISP`" in decision
     assert "ga-release-evidence.md`" in decision
-    assert "remains intentionally absent" in decision
+    assert "remains intentionally absent until downstream GADISP" in decision
     assert not GA_RELEASE.exists()
 
     combined = "\n".join(_read(path) for path in PUBLIC_SURFACES).lower()
@@ -114,7 +115,8 @@ def test_workflow_runtime_warning_is_remediated_before_any_future_ga_dispatch():
     assert "Current recut outcome: `recut succeeded`" in decision
     assert "actions/download-artifact@v8" in decision
     assert "Buffer()" in decision
-    assert "roadmap extension required before GADISP or GARECUT" in decision
+    assert "accepted as non-blocking for GA" in decision
+    assert "GADISP planning/execution authorized" in decision
     assert "### Phase 8 — GA Stable Dispatch And Release Evidence (GADISP)" in roadmap
-    assert "When GAREL records `defer GA`, this phase remains blocked" in roadmap.replace("\n", " ")
+    assert "accepted as non-blocking for GA dispatch" in roadmap.replace("\n", " ")
     assert "softprops/action-gh-release@v3" in roadmap

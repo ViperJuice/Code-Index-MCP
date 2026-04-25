@@ -498,20 +498,24 @@ plans GARECUT and then routes back through GAREL.
 - If GAREL remediates release-workflow runtime drift and concludes that another
   prerelease soak is required, plan `GARECUT` next and treat any older
   downstream GAREL assumptions as stale.
-- If GAREL selects `defer GA` because the latest `actions/download-artifact@v8`
-  line still emits the unresolved `Buffer()` warning and no accepted-risk
-  policy or repo-local remediation was chosen, stop the v5 execution path at
-  GAREL and extend the roadmap before reusing `GADISP` or `GARECUT`.
+- The `actions/download-artifact@v8` `Buffer()` warning observed in the
+  successful `v1.2.0-rc8` run is accepted as non-blocking for GA dispatch. The
+  action is GitHub-owned, the latest published `v8.0.1` line still emits the
+  warning, and the rc8 release proved digest-verified artifact transfer plus
+  successful GitHub Release, PyPI, and GHCR publication. Track the upstream
+  warning separately, but do not block `GADISP` on it.
 - After a successful GARECUT, route back through `codex-plan-phase
   specs/phase-plans-v5.md GAREL`; any older GAREL plan that predates the
   post-GARECUT or post-remediation release-workflow steering is stale.
 - GADISP is the only stable-GA phase that may carry
   `phase_loop_mutation: release_dispatch`.
 - Successful `v1.2.0-rc8` GARECUT evidence on run `24923402398` proved the
-  `softprops/action-gh-release@v3` path, but it also surfaced a new
+  `softprops/action-gh-release@v3` path and surfaced the
   `actions/download-artifact@v8` `Buffer()` deprecation warning inside the
-  successful `Create GitHub Release` job. Renewed GAREL must disposition that
-  warning before any `ship GA` decision or GA dispatch.
+  successful `Create GitHub Release` job. The operator disposition is
+  accepted-risk/non-blocking for GA because artifact download used
+  `digest-mismatch: error`, logged the expected SHA256 digest, and completed
+  before successful GitHub Release, PyPI, and GHCR publication.
 
 ## Verification
 
@@ -606,9 +610,11 @@ post-release evidence only after renewed GAREL selects `ship GA`.
 **Scope notes**
 
 This phase is the only stable-GA mutation phase. It must start from a clean,
-synced tree whose stable surface was already prepared by GAREL. When GAREL
-records `defer GA`, this phase remains blocked until a roadmap extension owns
-the remaining `actions/download-artifact@v8` warning disposition.
+synced tree whose stable surface was already prepared by GAREL. The remaining
+`actions/download-artifact@v8` `Buffer()` warning is accepted as non-blocking
+for GA dispatch based on the successful digest-verified `v1.2.0-rc8` release
+run; GADISP should still record that accepted-risk disposition in GA release
+evidence.
 
 **Non-goals**
 
@@ -652,10 +658,10 @@ any future GA ship decision is reconsidered.
 **Scope notes**
 
 This phase is a prerelease recut on the remediated workflow path. It does not
-authorize a stable release by itself. When GAREL records `defer GA` on the
-latest published `actions/download-artifact@v8` line, this phase is not the
-next step unless a roadmap extension first lands a new workflow-artifact
-transport change to soak.
+authorize a stable release by itself. Because the latest
+`actions/download-artifact@v8` `Buffer()` warning has been accepted as
+non-blocking based on successful digest-verified rc8 evidence, another recut is
+not required solely for that warning.
 
 **Non-goals**
 

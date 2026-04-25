@@ -66,17 +66,18 @@ def test_final_decision_stays_historical_and_routes_to_the_next_phase_explicitly
     assert decision.startswith("> **Historical artifact")
     for expected in (
         "# GA Final Decision",
-        "cut another RC",
+        "ship GA",
         "GAREL",
         "v1.2.0-rc8",
-        "ready for renewed GAREL planning",
+        "ready for GADISP planning",
         "recut succeeded",
         "actions/download-artifact@v8",
+        "accepted as non-blocking for GA",
         "softprops/action-gh-release@v3",
     ):
         assert expected in decision
 
-    assert "- Final decision: `ship GA`." not in decision
-    assert "roadmap extension required before GADISP or GARECUT" in decision
+    assert "- Final decision: `defer GA`." not in decision
+    assert "GADISP planning/execution authorized" in decision
     assert "### Phase 9 — Post-Remediation RC Recut (GARECUT)" in roadmap
     assert "softprops/action-gh-release@v3" in roadmap
