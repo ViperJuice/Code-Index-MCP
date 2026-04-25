@@ -8,6 +8,8 @@ REPO = Path(__file__).parent.parent.parent
 
 PUBLIC_ALPHA_VERSION = "1.2.0-rc6"
 PUBLIC_ALPHA_TAG = "v1.2.0-rc6"
+CURRENT_RECUT_VERSION = "1.2.0-rc7"
+CURRENT_RECUT_TAG = "v1.2.0-rc7"
 
 PUBLIC_SURFACES = [
     "README.md",
@@ -90,10 +92,15 @@ def test_release_surfaces_use_rc5_identifier():
     assert PUBLIC_ALPHA_TAG in _read(".github/workflows/release-automation.yml")
 
 
-def test_active_release_instructions_do_not_reference_rc4():
+def test_active_release_instructions_do_not_reference_rc4_or_stale_recut_target():
     for relative in ACTIVE_RC4_DRIFT_SURFACES:
         text = _read(relative)
-        assert PUBLIC_ALPHA_VERSION in text or PUBLIC_ALPHA_TAG in text, relative
+        assert (
+            PUBLIC_ALPHA_VERSION in text
+            or PUBLIC_ALPHA_TAG in text
+            or CURRENT_RECUT_VERSION in text
+            or CURRENT_RECUT_TAG in text
+        ), relative
         assert "1.2.0-rc4" not in text, relative
         assert "v1.2.0-rc4" not in text, relative
 

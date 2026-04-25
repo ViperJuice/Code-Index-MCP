@@ -124,7 +124,6 @@ def test_ga_rc_evidence_exists_and_records_blocked_or_observed_state():
         "## Verification",
         "plans/phase-plan-v5-garc.md",
         "v1.2.0-rc6",
-        "blocked before dispatch",
         "git status --short --branch",
         'gh workflow view "Release Automation"',
         "auto_merge=false",
@@ -132,6 +131,12 @@ def test_ga_rc_evidence_exists_and_records_blocked_or_observed_state():
         "Release Automation",
     ):
         assert expected in evidence
+
+    assert (
+        "blocked before dispatch" in evidence
+        or "follow-up RC soak succeeded" in evidence
+        or "workflow failed after dispatch" in evidence
+    )
 
     for forbidden in ("gho_", "Authorization: Bearer", '"password":'):
         assert forbidden not in evidence

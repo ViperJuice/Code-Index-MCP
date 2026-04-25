@@ -59,6 +59,7 @@ P8 SL-3 sweep — 2026-04-18. All 49 files in scope bannered; 0 deleted. All 16 
 | `docs/validation/comprehensive-test-report.md` | bannered | Subject active in mcp_server/benchmarks and scripts; historical test report snapshot | 2026-04-18 |
 | `docs/validation/document-processing-validation.md` | bannered | Subject (document processing) active in mcp_server/plugins; historical validation snapshot | 2026-04-18 |
 | `docs/validation/ga-e2e-evidence.md` | bannered | GAE2E evidence artifact; current end-to-end release readiness and live workflow state must be rechecked before GA or follow-up release decisions | 2026-04-18 |
+| `docs/validation/ga-final-decision.md` | bannered | GAREL decision artifact; current GA release posture and recut dispatch readiness must be rechecked before release decisions | 2026-04-24 |
 | `docs/validation/private-alpha-decision.md` | bannered | P26 redacted private-alpha decision artifact; current release gating pointer is maintained by P26 tests | 2026-04-18 |
 | `docs/validation/ga-closeout-decision.md` | bannered | GACLOSE decision artifact; current release, governance, readiness, and production-matrix evidence must be rechecked before GA or follow-up release decisions | 2026-04-18 |
 | `docs/validation/ga-governance-evidence.md` | bannered | GAGOV governance evidence artifact; current branch protection, ruleset, release-channel, and required-gate state must be rechecked from GitHub before GA or follow-up release decisions | 2026-04-18 |

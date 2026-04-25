@@ -399,6 +399,9 @@ decision is ship GA, execute the GA release.
 - [ ] If the decision is `ship GA`, Release Automation dispatches the GA version
       with governance-approved inputs and records tag, GitHub release, PyPI,
       GHCR, install, and rollback evidence.
+- [ ] Release workflow dependencies and automation runtime warnings discovered
+      during GARC are either remediated or explicitly dispositioned before a GA
+      dispatch is attempted.
 - [ ] Public docs, support matrix, changelog, runbooks, and installer flows
       match the final release channel and support-tier claims.
 - [ ] Post-release verification passes from a clean checkout and the final GA
@@ -408,7 +411,11 @@ decision is ship GA, execute the GA release.
 
 This phase is a guarded decision reducer plus release execution. It must stop
 before mutation if governance, support, E2E, operations, or RC soak evidence is
-missing.
+missing. GARC surfaced a GitHub Actions warning that
+`peter-evans/create-pull-request@v7` still runs on the deprecated Node 20
+runtime in the `Merge Release Branch` job, so GAREL must either upgrade or
+replace that action, or explicitly record why the warning is acceptable for the
+GA path before dispatching another release.
 
 **Non-goals**
 
@@ -447,7 +454,7 @@ GACLOSE
        ├─> GASUPPORT ─┼─> GAE2E ─┐
        │              │          ├─> GAOPS ─┐
        └──────────────┘          │          │
-                                 └──────────┴─> GARC -> GAREL
+                                 └──────────┴─> GARC -> GAREL -> GARECUT
 ```
 
 GAGOV and GASUPPORT can be planned after GABASE. GAE2E depends on the support
@@ -470,6 +477,9 @@ support, E2E, and operations. GAREL waits for the follow-up RC soak.
 - GARC is the first phase that may dispatch a release workflow.
 - GAREL must stop before any release mutation unless the final evidence selects
   `ship GA`.
+- If GAREL remediates release-workflow runtime drift and concludes that another
+  prerelease soak is required, plan `GARECUT` next and treat any older
+  downstream GAREL assumptions as stale.
 
 ## Verification
 
@@ -523,4 +533,55 @@ make release-smoke
 make release-smoke-container
 gh workflow run "Release Automation" -f version=<ga-version> -f release_type=stable -f auto_merge=<approved-policy>
 gh release view <ga-version>
+
+# GARECUT
+git status --short --branch
+uv run pytest tests/docs tests/smoke tests/test_release_metadata.py -v --no-cov
+gh workflow run "Release Automation" -f version=<next-rc-tag> -f release_type=custom -f auto_merge=false
+gh run view <run-id> --job <merge-release-job-id> --log
+gh release view <next-rc-tag>
 ```
+
+### Phase 8 — Post-Remediation RC Recut (GARECUT)
+
+**Objective**
+
+Soak the remediated release workflow on one more prerelease candidate before
+any future GA ship decision is reconsidered.
+
+**Exit criteria**
+- [ ] The release workflow no longer depends on the deprecated Node 20 action
+      path that GARC surfaced.
+- [ ] A new RC version after `v1.2.0-rc6` is frozen and dispatched through the
+      remediated workflow.
+- [ ] The recut workflow run completes with prerelease policy intact: GitHub
+      Latest remains excluded and Docker `latest` remains stable-only.
+- [ ] A fresh RC evidence artifact records the remediated workflow run, its log
+      disposition, and the resulting prerelease channel state.
+- [ ] The repo is ready for a renewed final GA decision only after that fresh
+      recut evidence exists.
+
+**Scope notes**
+
+This phase is a prerelease recut on the remediated workflow path. It does not
+authorize a stable release by itself.
+
+**Non-goals**
+
+- No GA dispatch.
+- No support-matrix expansion.
+- No topology broadening.
+
+**Key files**
+
+- `.github/workflows/release-automation.yml`
+- `docs/validation/ga-rc-evidence.md`
+- `docs/validation/ga-final-decision.md`
+- `tests/test_release_metadata.py`
+- `tests/docs/`
+
+**Depends on**
+- GAREL
+
+**Produces**
+- IF-0-GARECUT-1 — Post-remediation RC recut contract.
