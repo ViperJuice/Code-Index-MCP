@@ -51,7 +51,7 @@ def test_final_decision_exists_and_cites_all_ga_inputs():
     assert "enforced via branch protection" in governance
     assert "ready" in e2e
     assert "plans/phase-plan-v5-gaops.md" in ops
-    assert "follow-up RC soak succeeded" in rc
+    assert "recut succeeded" in rc
 
     for expected in (
         "# GA Final Decision",
@@ -71,9 +71,12 @@ def test_final_decision_exists_and_cites_all_ga_inputs():
         "v1.2.0-rc8",
         "peter-evans/create-pull-request@v8",
         "softprops/action-gh-release@v3",
+        "actions/download-artifact@v8",
+        "Buffer()",
         "Node 20",
         "specs/phase-plans-v5.md",
         "GARECUT",
+        "GAREL",
     ):
         assert expected in decision
 
@@ -105,7 +108,9 @@ def test_workflow_runtime_warning_is_remediated_before_any_future_ga_dispatch():
     assert "peter-evans/create-pull-request@v7" not in workflow
     assert "softprops/action-gh-release@v3" in workflow
     assert "softprops/action-gh-release@v2" not in workflow
-    assert "the immediate next step is rerunning GARECUT" in decision.replace("\n", " ")
-    assert "Current recut outcome: `blocked before dispatch`" in decision
+    assert "the immediate next step is renewed GAREL planning" in decision.replace("\n", " ")
+    assert "Current recut outcome: `recut succeeded`" in decision
+    assert "actions/download-artifact@v8" in decision
+    assert "Buffer()" in decision
     assert "### Phase 8 — Post-Remediation RC Recut (GARECUT)" in roadmap
     assert "softprops/action-gh-release@v3" in roadmap

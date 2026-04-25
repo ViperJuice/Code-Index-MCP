@@ -4,24 +4,28 @@
 
 ## Summary
 
-- Evidence captured: `2026-04-25T02:31:42Z`.
+- Evidence captured: `2026-04-25T05:34:39Z`.
 - Active phase plan: `plans/phase-plan-v5-garecut.md`.
 - Selected commit before dispatch evaluation:
-  `a3adcea5cd569571a2c4ce3d863317e9f14519bc`.
+  `d2560e95f1b4e7d52eacb025d592275e4b48a084`.
 - Active recut target: `v1.2.0-rc8`.
-- Conclusion: `blocked before dispatch`.
-- Dispatch attempted: `no`.
-- Blocker: release-affecting worktree remained dirty during the rc8 recut
-  attempt, so `gh workflow run` did not execute.
-- Channel posture preserved: no `v1.2.0-rc8` prerelease was published; GitHub
-  Latest remained excluded and Docker `latest` remained stable-only.
+- Conclusion: `recut succeeded`.
+- Dispatch attempted: `yes`.
+- Run URL: `https://github.com/ViperJuice/Code-Index-MCP/actions/runs/24923402398`
+  (`run ID 24923402398`).
+- Channel posture preserved: `v1.2.0-rc8` published as a prerelease only;
+  GitHub Latest remained excluded and Docker `latest` remained stable-only.
+- Follow-up warning: the `Create GitHub Release` job completed successfully on
+  `softprops/action-gh-release@v3`, but its `actions/download-artifact@v8`
+  step emitted a runtime `Buffer()` deprecation warning that renewed GAREL must
+  disposition before any GA ship path is reconsidered.
 
 ## Pre-dispatch Qualification
 
 | Check | Command | Result | Evidence |
 |---|---|---|---|
-| Release candidate worktree state | `git status --short --branch` | fail | `## main...origin/main` with release-affecting dirty files in `.github/workflows/release-automation.yml`, `pyproject.toml`, `mcp_server/__init__.py`, installer helpers, validation docs, and release-contract tests. |
-| Local versus remote branch sync | `git fetch origin main --tags --prune` then `git rev-parse HEAD origin/main` | pass | `HEAD=a3adcea5cd569571a2c4ce3d863317e9f14519bc`, `origin/main=a3adcea5cd569571a2c4ce3d863317e9f14519bc`. |
+| Release candidate worktree state | `git status --short --branch` | pass | `## main...origin/main` with no tracked-file dirt before dispatch. |
+| Local versus remote branch sync | `git fetch origin main --tags --prune` then `git rev-parse HEAD origin/main` | pass | `HEAD=d2560e95f1b4e7d52eacb025d592275e4b48a084`, `origin/main=d2560e95f1b4e7d52eacb025d592275e4b48a084`. |
 | Local tag reuse | `git tag -l v1.2.0-rc8` | pass | No local `v1.2.0-rc8` tag existed before dispatch evaluation. |
 | Remote tag reuse | `git ls-remote --tags origin refs/tags/v1.2.0-rc8` | pass | No remote `v1.2.0-rc8` tag existed before dispatch evaluation. |
 | Release workflow visibility | `gh workflow view "Release Automation"` | pass | Workflow visible as `Release Automation - release-automation.yml`, workflow id `167401116`. |
@@ -44,17 +48,36 @@ Frozen channel-policy inputs:
 
 ## Workflow Observation
 
-- Dispatch attempted: `no`
-- Run URL: `none - blocked before dispatch`
-- Run ID: `none - blocked before dispatch`
-- `headSha`: `a3adcea5cd569571a2c4ce3d863317e9f14519bc`
-- Workflow status / conclusion: `not started` / `blocked before dispatch`
-- Release branch / PR disposition: no `release/v1.2.0-rc8` branch or PR was
-  created because the recut stopped at the dirty-worktree gate.
-- GitHub release state: no `v1.2.0-rc8` release exists because dispatch did not
-  occur.
-- PyPI publication: none - blocked before dispatch.
-- GHCR image identity: none - blocked before dispatch.
+- Dispatch attempted: `yes`
+- Run URL: `https://github.com/ViperJuice/Code-Index-MCP/actions/runs/24923402398`
+- Run ID: `24923402398`
+- `headSha`: `d2560e95f1b4e7d52eacb025d592275e4b48a084`
+- Workflow status / conclusion: `completed` / `success`
+- Job conclusions:
+  - `Preflight Release Gates`: `success`
+  - `Prepare Release`: `success`
+  - `Run Release Tests`: `success`
+  - `Build Release Artifacts`: `success`
+  - `Create GitHub Release`: `success`
+  - `Merge Release Branch`: `success`
+  - `Post-Release Tasks`: `success`
+- `Create GitHub Release` log disposition: successful tag push, prerelease
+  creation, and PyPI publish on `softprops/action-gh-release@v3`; one
+  non-fatal `Buffer()` deprecation warning was emitted by
+  `actions/download-artifact@v8` before release creation.
+- Release branch / PR disposition: `release/v1.2.0-rc8` was created remotely at
+  `d2560e95f1b4e7d52eacb025d592275e4b48a084`; the merge job reported
+  `pull-request-operation = none`, so no new release PR was left open because
+  the branch no longer differed from `main`.
+- GitHub release state: prerelease `v1.2.0-rc8` published at
+  `2026-04-25T05:30:37Z`:
+  `https://github.com/ViperJuice/Code-Index-MCP/releases/tag/v1.2.0-rc8`
+- Tag target commit: `079338cb70f5078db381f088e93df1e9700b5d96`
+- PyPI publication: `index-it-mcp 1.2.0rc8` published at
+  `https://pypi.org/project/index-it-mcp/1.2.0rc8/`
+- GHCR image identity: `ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc8` index
+  digest `sha256:352bb88eec59e3f15a19077f2880bafa10241997f3ab2619ed221ac32c9eaa05`
+  with linux/amd64 and linux/arm64 manifests.
 
 ## Release-Channel Policy
 
@@ -63,21 +86,23 @@ Frozen channel-policy inputs:
 - `auto_merge=false` remains the required recut input.
 - GitHub Latest remained excluded from the RC policy source.
 - Docker `latest` remained stable-only.
-- No GA wording or stable-channel claims were introduced by the blocked recut.
+- No GA wording or stable-channel claims were introduced by the successful recut
+  itself.
 
 ## Rollback And Next-Step Disposition
 
-No rollback was required because no rc8 release mutation occurred.
+No rollback was required because the rc8 recut completed successfully and did
+not mutate the stable GA channel.
 
 Next-step disposition:
 
-- Rerun GARECUT after the release-affecting worktree is clean enough for
-  mutation and the intended rc8 surfaces are preserved.
-- A renewed GAREL decision is not yet ready; it still depends on fresh
-  `v1.2.0-rc8` prerelease evidence on the remediated
-  `softprops/action-gh-release@v3` workflow path.
-- Until that rerun succeeds, keep the work inside GARECUT rather than
-  reopening GA or treating older downstream GAREL plans as authoritative.
+- Route back through renewed GAREL planning on top of this fresh
+  `v1.2.0-rc8` prerelease evidence.
+- Carry forward the newly observed `actions/download-artifact@v8`
+  `Buffer()` deprecation warning from the `Create GitHub Release` job as a
+  required runtime-disposition item before any `ship GA` path is authorized.
+- Treat any older downstream GAREL plan as stale after the roadmap amendment
+  that incorporates this new warning.
 
 ## Historical GARC Baseline
 
@@ -108,4 +133,11 @@ git rev-parse HEAD origin/main
 git tag -l v1.2.0-rc8
 git ls-remote --tags origin refs/tags/v1.2.0-rc8
 gh workflow view "Release Automation"
+gh workflow run "Release Automation" -f version=v1.2.0-rc8 -f release_type=custom -f auto_merge=false
+gh run view 24923402398 --json url,headSha,status,conclusion,jobs
+gh run view 24923402398 --job 72989683995 --log
+gh release view v1.2.0-rc8 --repo ViperJuice/Code-Index-MCP --json tagName,isPrerelease,isDraft,publishedAt,targetCommitish,url,assets
+gh pr list --state all --search "release/v1.2.0-rc8" --json number,state,isDraft,mergedAt,url,headRefName,baseRefName,title
+curl -sSf https://pypi.org/pypi/index-it-mcp/1.2.0rc8/json
+docker buildx imagetools inspect ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc8
 ```

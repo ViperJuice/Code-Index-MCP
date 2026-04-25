@@ -31,7 +31,7 @@ Evidence summary:
   They support GA evaluation, but they do not independently authorize stable
   mutation.
 - `docs/validation/ga-rc-evidence.md` now records the `v1.2.0-rc8` GARECUT
-  attempt as `blocked before dispatch` while preserving the earlier successful
+  recut as `recut succeeded` while preserving the earlier successful
   `v1.2.0-rc7` recut as historical evidence.
 - This GAREL execution remediated the remaining `Create GitHub Release`
   Node 20 warning by upgrading `softprops/action-gh-release@v2` to
@@ -52,6 +52,14 @@ This GAREL execution remediated that remaining warning by updating
 That is the correct repair for the workflow runtime, but it means the release
 path that would own a stable GA dispatch has changed again and has not yet been
 soaked on a prerelease candidate.
+
+GARECUT has now provided that fresh prerelease soak through successful run
+`24923402398`, release `v1.2.0-rc8`, PyPI package `1.2.0rc8`, and the matching
+GHCR image. That clears the specific `softprops/action-gh-release@v3` soak
+requirement. However, the same successful `Create GitHub Release` job emitted a
+new non-fatal runtime warning from `actions/download-artifact@v8`:
+`Buffer()` deprecation. Renewed GAREL must disposition that warning before any
+future `ship GA` path is authorized.
 
 ## Final Decision
 
@@ -79,40 +87,45 @@ absent, and all stable-channel changes stay blocked.
 - Previous recut target: `v1.2.0-rc7`
 - Previous recut outcome: `recut succeeded`
 - Current recut target: `v1.2.0-rc8`
-- Current recut outcome: `blocked before dispatch`
-- Current readiness: `rerunning GARECUT after the release-affecting worktree is clean enough`
+- Current recut outcome: `recut succeeded`
+- Current readiness: `ready for renewed GAREL planning`
 
 The prior recut dispatched and completed successfully on
 `https://github.com/ViperJuice/Code-Index-MCP/actions/runs/24919438766`,
 published prerelease `v1.2.0-rc7`, pushed the multi-arch GHCR image, and
 published the `1.2.0rc7` wheel plus sdist to PyPI.
 
-The current rc8 recut did not dispatch because the release-affecting worktree
-is intentionally dirty in `.github/workflows/release-automation.yml`,
-`pyproject.toml`, `mcp_server/__init__.py`, installer helpers, validation docs,
-and release-contract tests even though `HEAD` still matches `origin/main`, the
-workflow is visible, and `v1.2.0-rc8` is unused locally and remotely.
+The current rc8 recut dispatched from clean pre-dispatch state on
+`d2560e95f1b4e7d52eacb025d592275e4b48a084`, completed successfully on run
+`24923402398`, published prerelease `v1.2.0-rc8`, uploaded
+`index_it_mcp-1.2.0rc8` wheel plus sdist to PyPI, and pushed the multi-arch
+GHCR image. The merge job left no new release PR open because the release
+branch no longer differed from `main`.
 
-That keeps the repository on the same historical `cut another RC` decision: the
-release path still needs a fresh prerelease soak on
-`softprops/action-gh-release@v3`, and the immediate next step is rerunning
-GARECUT once the release-affecting tree is clean enough for mutation.
+That advances the repository beyond the old rerun state: the
+`softprops/action-gh-release@v3` path is now soaked, so the immediate next step
+is renewed GAREL planning. The remaining release-runtime follow-up is the new
+`actions/download-artifact@v8` `Buffer()` deprecation warning observed in the
+successful `Create GitHub Release` job.
 
 ## Next Scope
 
 The roadmap now routes to the nearest downstream phase with amended steering:
 
 - Roadmap artifact: `specs/phase-plans-v5.md`
-- Phase 8: `Post-Remediation RC Recut (GARECUT)`
+- Phase 7: `GA Decision and Release (GAREL)` as a renewed downstream reducer on
+  top of successful `v1.2.0-rc8` evidence.
 
 That renewed phase must:
 
-- freeze the next prerelease target after `v1.2.0-rc7`,
-- soak the release workflow with `softprops/action-gh-release@v3`,
-- keep prerelease channel policy intact while proving the remediated release
-  path end-to-end, and
-- route back through a newly planned renewed GAREL only after that RC evidence
-  exists; until then, keep rerunning GARECUT rather than reopening GA.
+- reduce the refreshed `v1.2.0-rc8` prerelease evidence instead of reusing the
+  stale blocked-run assumption,
+- disposition the newly observed `actions/download-artifact@v8`
+  `Buffer()` deprecation warning before any `ship GA` path is allowed,
+- keep GitHub Latest and Docker `latest` stable-only until a deliberate GA
+  release changes those channels, and
+- either authorize GA with explicit release evidence or return to another RC /
+  defer-GA decision with the new runtime warning accounted for.
 
 Any older downstream GARECUT or GAREL plan that predates this roadmap
 amendment is stale and must not be treated as authoritative.
@@ -130,6 +143,9 @@ git rev-parse HEAD origin/main
 git tag -l v1.2.0-rc8
 git ls-remote --tags origin refs/tags/v1.2.0-rc8
 gh workflow view "Release Automation"
-gh run view 24919438766 --json url,headSha,status,conclusion,jobs
-gh release view v1.2.0-rc7 --repo ViperJuice/Code-Index-MCP --json tagName,isPrerelease,isDraft,publishedAt,targetCommitish,url,assets
+gh run view 24923402398 --json url,headSha,status,conclusion,jobs
+gh run view 24923402398 --job 72989683995 --log
+gh release view v1.2.0-rc8 --repo ViperJuice/Code-Index-MCP --json tagName,isPrerelease,isDraft,publishedAt,targetCommitish,url,assets
+curl -sSf https://pypi.org/pypi/index-it-mcp/1.2.0rc8/json
+docker buildx imagetools inspect ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc8
 ```
