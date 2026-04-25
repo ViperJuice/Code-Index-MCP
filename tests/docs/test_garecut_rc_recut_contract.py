@@ -77,6 +77,6 @@ def test_final_decision_stays_historical_and_routes_to_the_next_phase_explicitly
         assert expected in decision
 
     assert "- Final decision: `ship GA`." not in decision
-    assert "- Final decision: `defer GA`." not in decision
-    assert "### Phase 8 — Post-Remediation RC Recut (GARECUT)" in roadmap
+    assert "roadmap extension required before GADISP or GARECUT" in decision
+    assert "### Phase 9 — Post-Remediation RC Recut (GARECUT)" in roadmap
     assert "softprops/action-gh-release@v3" in roadmap
