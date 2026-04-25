@@ -57,7 +57,7 @@ def test_release_governance_policy_documented_in_operator_runbooks():
             "manual enforcement",
             "branch protection",
             "ruleset",
-            "v1.2.0-rc5",
+            "v1.2.0-rc8",
             "v2.15.0-alpha.1",
             "GitHub Latest",
             "auto_merge=false",

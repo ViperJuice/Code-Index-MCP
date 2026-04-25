@@ -1,9 +1,9 @@
-# Deployment Runbook (v1.2.0-rc5 public-alpha / beta baseline)
+# Deployment Runbook (v1.2.0-rc8 public-alpha / beta baseline)
 
 ## Overview
 
 This runbook is the operator playbook for the Code-Index-MCP
-`v1.2.0-rc5` public-alpha / beta baseline. It is not a GA launch document.
+`v1.2.0-rc8` public-alpha / beta baseline. It is not a GA launch document.
 The supported deployment surfaces remain local-first and operator-owned:
 
 - `uv sync --locked` plus the local checkout
@@ -39,7 +39,7 @@ tracked/default branch indexing only, and `index_unavailable` with
 The current RC/public-alpha baseline remains blocked on these required gates:
 the original P27-P33 production-readiness contract is still part of the
 pre-release checklist, and the current follow-up RC keeps the same release-gate
-shape while advancing the artifact identity to `v1.2.0-rc6`.
+shape while advancing the artifact identity to `v1.2.0-rc8`.
 
 | Required job | Operator decision | Command/workflow source | Block/fallback behavior |
 |---|---|---|---|
@@ -63,8 +63,8 @@ input evidence and should not be rewritten out of the record.
 |---|---|---|
 | Branch protection | `gh api repos/ViperJuice/Code-Index-MCP/branches/main` and `/protection` | `main` is protected and enforces the required GA gate contexts before merge. |
 | Repository ruleset | `gh api repos/ViperJuice/Code-Index-MCP/rulesets` | No repository rulesets are configured; branch protection is the active enforcement surface. |
-| Active RC contract | `docs/validation/rc5-release-evidence.md` and release `v1.2.0-rc5` | `v1.2.0-rc5` remains the active RC/public-alpha package contract. |
-| GACLOSE prerequisites | `docs/validation/release-governance-evidence.md`, `docs/validation/secondary-tool-readiness-evidence.md`, and `docs/validation/ga-closeout-decision.md` | Preserve the historical inputs before choosing `stay on RC/public-alpha`, `cut a follow-up RC`, or `start a GA hardening roadmap`. |
+| Active RC contract | `docs/validation/ga-rc-evidence.md` and release `v1.2.0-rc8` | `v1.2.0-rc8` remains the active RC/public-alpha package contract. |
+| GACLOSE prerequisites | `docs/validation/rc5-release-evidence.md`, `docs/validation/release-governance-evidence.md`, `docs/validation/secondary-tool-readiness-evidence.md`, and `docs/validation/ga-closeout-decision.md` | Preserve the historical inputs before choosing `stay on RC/public-alpha`, `cut a follow-up RC`, or `start a GA hardening roadmap`. |
 | GitHub Latest | `gh api repos/ViperJuice/Code-Index-MCP/releases/latest` | GitHub Latest still points at `v2.15.0-alpha.1`; it is excluded from the RC/GA policy source until a final GA release changes that state. |
 | Release automation | `.github/workflows/release-automation.yml` | Hyphenated versions are prereleases, prerelease dispatch requires `release_type=custom`, Docker latest is stable-only, and `auto_merge=false` is the RC default. |
 
@@ -93,7 +93,7 @@ The protection disposition recorded in
 - Enforce for administrators: `true`
 - Repository rulesets: `none`
 
-GitHub Latest still points at `v2.15.0-alpha.1`, while `v1.2.0-rc5` remains
+GitHub Latest still points at `v2.15.0-alpha.1`, while `v1.2.0-rc8` remains
 the active RC/public-alpha contract. That split is intentional until a final GA
 release changes the channel state. `auto_merge=false` remains the default RC
 workflow policy, and Docker latest remains stable-only.
@@ -108,7 +108,7 @@ the blocker through GAGOV/GAOPS before GARC dispatches another RC.
 Before GAGOV, GAE2E, GAOPS, GARC, or GAREL work begins, use
 `docs/validation/ga-readiness-checklist.md` as the canonical GABASE checklist.
 It freezes the release boundary, support tiers, required gates, evidence map,
-rollback expectations, and non-GA surfaces for the active `v1.2.0-rc5`
+rollback expectations, and non-GA surfaces for the active `v1.2.0-rc8`
 RC/public-alpha baseline.
 
 Refresh evidence ownership is:
@@ -120,13 +120,14 @@ Refresh evidence ownership is:
 - `docs/validation/ga-final-decision.md` -> `GAREL`
 - `docs/validation/ga-release-evidence.md` -> `GAREL`
 
-The follow-up RC version is frozen for GARC as `v1.2.0-rc6`.
+The active post-remediation RC version is `v1.2.0-rc8`, and the next recut
+target should advance beyond that version when GARECUT is replanned.
 
 ## GARC Follow-Up RC Procedure
 
 GARC is the first GA-hardening phase allowed to dispatch Release Automation.
-It may do so only after the repo-owned `rc6` contract surfaces, public docs,
-installer helpers, and operator procedure all agree on `v1.2.0-rc6`.
+It may do so only after the repo-owned `rc8` contract surfaces, public docs,
+installer helpers, and operator procedure all agree on `v1.2.0-rc8`.
 
 ### Pre-dispatch qualification
 
@@ -137,8 +138,8 @@ Before dispatch, the release operator must record all of the following in
 git status --short --branch
 git fetch origin main --tags --prune
 git rev-parse HEAD origin/main
-git tag -l v1.2.0-rc6
-git ls-remote --tags origin refs/tags/v1.2.0-rc6
+git tag -l v1.2.0-rc8
+git ls-remote --tags origin refs/tags/v1.2.0-rc8
 gh workflow view "Release Automation"
 ```
 
@@ -147,7 +148,7 @@ Qualification passes only when:
 1. `git status --short --branch` shows a clean expected release branch state.
 2. `git rev-parse HEAD origin/main` reports the same commit for local `HEAD`
    and `origin/main`.
-3. No local or remote `v1.2.0-rc6` tag already exists.
+3. No local or remote `v1.2.0-rc8` tag already exists.
 4. `docs/validation/ga-governance-evidence.md`,
    `docs/validation/ga-e2e-evidence.md`, and
    `docs/validation/ga-operations-evidence.md` are present as the current
@@ -164,7 +165,7 @@ Run the current clean-checkout release verification set before dispatch:
 ```bash
 uv run pytest tests/smoke tests/docs tests/test_release_metadata.py
 make release-smoke release-smoke-container
-git tag -l v1.2.0-rc6
+git tag -l v1.2.0-rc8
 ```
 
 Keep `tests/docs/test_p34_public_alpha_recut.py` in this gate set so the
@@ -175,11 +176,11 @@ follow-up RC continues to preserve the original public-alpha recut contract.
 When qualification passes, dispatch exactly:
 
 ```bash
-gh workflow run "Release Automation" -f version=v1.2.0-rc6 -f release_type=custom -f auto_merge=false
+gh workflow run "Release Automation" -f version=v1.2.0-rc8 -f release_type=custom -f auto_merge=false
 gh run list --workflow "Release Automation" --limit 10
 gh run watch <run-id> --exit-status
 gh run view <run-id> --json url,headSha,status,conclusion,jobs
-gh release view v1.2.0-rc6 --repo ViperJuice/Code-Index-MCP --json tagName,isPrerelease,isDraft,publishedAt,targetCommitish,url,assets
+gh release view v1.2.0-rc8 --repo ViperJuice/Code-Index-MCP --json tagName,isPrerelease,isDraft,publishedAt,targetCommitish,url,assets
 ```
 
 The operator must record run URL, run ID, `headSha`, per-job conclusions,
@@ -195,7 +196,7 @@ The follow-up RC remains a prerelease/public-alpha or beta channel operation:
   explicitly approves an exception.
 - GitHub Latest remains excluded from the RC policy source.
 - Docker `latest` remains stable-only.
-- No GA wording or stable-channel claims may be introduced by the `rc6` soak.
+- No GA wording or stable-channel claims may be introduced by the `rc8` soak.
 
 ## GAOPS Operator Procedure Contract
 

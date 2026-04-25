@@ -6,10 +6,10 @@ from pathlib import Path
 
 REPO = Path(__file__).parent.parent.parent
 
-PUBLIC_ALPHA_VERSION = "1.2.0-rc6"
-PUBLIC_ALPHA_TAG = "v1.2.0-rc6"
-CURRENT_RECUT_VERSION = "1.2.0-rc7"
-CURRENT_RECUT_TAG = "v1.2.0-rc7"
+PUBLIC_ALPHA_VERSION = "1.2.0-rc8"
+PUBLIC_ALPHA_TAG = "v1.2.0-rc8"
+CURRENT_RECUT_VERSION = "1.2.0-rc8"
+CURRENT_RECUT_TAG = "v1.2.0-rc8"
 
 PUBLIC_SURFACES = [
     "README.md",
@@ -74,7 +74,7 @@ def test_public_surfaces_share_v3_operating_model():
         assert missing == [], f"{relative} missing {missing}"
 
 
-def test_release_surfaces_use_rc5_identifier():
+def test_release_surfaces_use_current_rc_identifier():
     surfaces = [
         "README.md",
         "docs/GETTING_STARTED.md",
@@ -122,7 +122,7 @@ def test_public_alpha_checklist_names_required_p34_gates():
         "uv run pytest tests/smoke tests/docs tests/test_release_metadata.py",
         "make release-smoke release-smoke-container",
         "tests/docs/test_p34_public_alpha_recut.py",
-        "git tag -l v1.2.0-rc6",
+        "git tag -l v1.2.0-rc8",
     ):
         assert expected in text
 
