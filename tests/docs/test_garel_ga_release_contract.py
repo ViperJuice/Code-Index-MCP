@@ -59,9 +59,10 @@ def test_final_decision_exists_and_cites_all_ga_inputs():
         "## Decision Inputs",
         "## Workflow Runtime Disposition",
         "## Final Decision",
+        "## GARECUT Status",
         "## Next Scope",
         "## Verification",
-        "cut another RC",
+        "defer GA",
         "docs/validation/ga-readiness-checklist.md",
         "docs/validation/ga-governance-evidence.md",
         "docs/validation/ga-e2e-evidence.md",
@@ -69,11 +70,10 @@ def test_final_decision_exists_and_cites_all_ga_inputs():
         "docs/validation/ga-rc-evidence.md",
         "v1.2.0-rc7",
         "v1.2.0-rc8",
-        "peter-evans/create-pull-request@v8",
         "softprops/action-gh-release@v3",
         "actions/download-artifact@v8",
+        "v8.0.1",
         "Buffer()",
-        "Node 20",
         "specs/phase-plans-v5.md",
         "GARECUT",
         "GAREL",
@@ -81,12 +81,13 @@ def test_final_decision_exists_and_cites_all_ga_inputs():
         assert expected in decision
 
     assert "- Final decision: `ship GA`." not in decision
-    assert "- Final decision: `defer GA`." not in decision
+    assert "- Final decision: `cut another RC`." not in decision
 
 
 def test_non_ship_decision_keeps_ga_release_evidence_absent_and_public_surfaces_pre_ga():
     decision = _read(GA_FINAL)
 
+    assert "- Final decision: `defer GA`." in decision
     assert "ga-release-evidence.md`" in decision
     assert "remains intentionally absent" in decision
     assert not GA_RELEASE.exists()
@@ -108,9 +109,12 @@ def test_workflow_runtime_warning_is_remediated_before_any_future_ga_dispatch():
     assert "peter-evans/create-pull-request@v7" not in workflow
     assert "softprops/action-gh-release@v3" in workflow
     assert "softprops/action-gh-release@v2" not in workflow
-    assert "the immediate next step is renewed GAREL planning" in decision.replace("\n", " ")
+    assert "GitHub's latest published release is still" in decision
+    assert "`v8.0.1`" in decision
     assert "Current recut outcome: `recut succeeded`" in decision
     assert "actions/download-artifact@v8" in decision
     assert "Buffer()" in decision
-    assert "### Phase 8 — Post-Remediation RC Recut (GARECUT)" in roadmap
+    assert "roadmap extension required before GADISP or GARECUT" in decision
+    assert "### Phase 8 — GA Stable Dispatch And Release Evidence (GADISP)" in roadmap
+    assert "When GAREL records `defer GA`, this phase remains blocked" in roadmap.replace("\n", " ")
     assert "softprops/action-gh-release@v3" in roadmap
