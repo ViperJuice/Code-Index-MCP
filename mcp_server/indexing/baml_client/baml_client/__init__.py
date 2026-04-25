@@ -10,7 +10,7 @@
 # BAML files and re-generate this code using: baml-cli generate
 # baml-cli is available with the baml package.
 
-__version__ = "0.220.0"
+__version__ = "1.2.0-rc8"
 
 try:
     from baml_py.safe_import import EnsureBamlPyImport
