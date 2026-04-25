@@ -2,8 +2,8 @@
 
 This guide walks you through installing and using Code-Index-MCP to index and search your codebase.
 
-> **Beta status**: This guide targets `1.2.0-rc8`. MCP STDIO is the primary
-> LLM surface; FastAPI is a secondary admin surface. Language behavior is
+> **Stable-surface prep status**: This guide targets `1.2.0`. MCP STDIO is the
+> primary LLM surface; FastAPI is a secondary admin surface. Language behavior is
 > documented in [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md), and the pre-GA release
 > boundary is frozen in
 > [ga-readiness-checklist.md](validation/ga-readiness-checklist.md).
@@ -29,8 +29,8 @@ This guide walks you through installing and using Code-Index-MCP to index and se
 ### Option 1: Install via pip (Recommended)
 
 ```bash
-# After the public-alpha package is published, install the rc package
-pip install --pre index-it-mcp==1.2.0rc8
+# Install the prepared stable package surface
+pip install index-it-mcp==1.2.0
 
 # Verify installation
 mcp-index --version

@@ -1,4 +1,4 @@
-"""Release metadata assertions for the active v1.2.0-rc8 contract.
+"""Release metadata assertions for the prepared stable v1.2.0 contract.
 
 Historical GARC soak target: v1.2.0-rc6.
 """
@@ -15,8 +15,8 @@ except ImportError:  # Python <3.11
 
 
 REPO = Path(__file__).parent.parent
-EXPECTED_VERSION = "1.2.0-rc8"
-EXPECTED_TAG = "v1.2.0-rc8"
+EXPECTED_VERSION = "1.2.0"
+EXPECTED_TAG = "v1.2.0"
 GA_RC_EVIDENCE = REPO / "docs" / "validation" / "ga-rc-evidence.md"
 DOCKER_INSTALLERS = (
     "scripts/install-mcp-docker.sh",
@@ -28,7 +28,7 @@ def _read_text(relative_path: str) -> str:
     return (REPO / relative_path).read_text()
 
 
-def test_runtime_version_matches_rc_contract():
+def test_runtime_version_matches_stable_contract():
     import mcp_server
 
     assert mcp_server.__version__ == EXPECTED_VERSION, (
@@ -36,7 +36,7 @@ def test_runtime_version_matches_rc_contract():
     )
 
 
-def test_pyproject_version_matches_rc_contract():
+def test_pyproject_version_matches_stable_contract():
     with (REPO / "pyproject.toml").open("rb") as f:
         data = tomllib.load(f)
 
@@ -60,7 +60,7 @@ def test_readme_distribution_identity_remains_stable():
     assert "**Container image**: `ghcr.io/viperjuice/code-index-mcp`" in readme
 
 
-def test_changelog_has_rc_contract_section():
+def test_changelog_has_stable_contract_section():
     changelog = _read_text("CHANGELOG.md")
 
     assert f"## [{EXPECTED_VERSION}] — 2026-04-25" in changelog
@@ -72,25 +72,25 @@ def test_release_workflow_matches_rc_contract():
     assert f"Version to release (e.g., {EXPECTED_TAG})" in workflow
     assert f"default: '{EXPECTED_TAG}'" in workflow
     assert "default: 'custom'" in workflow
-    assert f"GARECUT release contract target: {EXPECTED_TAG}" in workflow
+    assert f"GAREL stable release contract target: {EXPECTED_TAG}" in workflow
     assert (
-        'gh workflow run "Release Automation" -f version=v1.2.0 '
-        "-f release_type=custom -f auto_merge=false"
-    ) in workflow
+        'gh workflow run "Release Automation" -f version=v1.2.0 -f release_type=custom -f auto_merge=false'
+        in workflow
+    )
     assert "peter-evans/create-pull-request@v8" in workflow
     assert "softprops/action-gh-release@v3" in workflow
     assert "peter-evans/create-pull-request@v7" not in workflow
     assert "softprops/action-gh-release@v2" not in workflow
     assert 'grep -q "version = \\"$VERSION_NO_V\\"" pyproject.toml' in workflow
     assert 'grep -q "__version__ = \\"$VERSION_NO_V\\"" mcp_server/__init__.py' in workflow
-    assert "Prerelease tags must use release_type=custom" in workflow
+    assert "Stable tags still use release_type=custom" in workflow
     assert "prerelease: ${{ needs.prepare-release.outputs.is_prerelease }}" in workflow
     assert "tags: ${{ needs.prepare-release.outputs.docker_tags }}" in workflow
     assert "No automatic documentation rewrite" in workflow
     assert 'sed -i "s/Latest Version:' not in workflow
 
 
-def test_release_candidate_tag_is_not_reused_locally():
+def test_release_tag_is_not_reused_locally():
     result = subprocess.run(
         ["git", "tag", "-l", EXPECTED_TAG],
         capture_output=True,
@@ -116,11 +116,11 @@ def test_release_candidate_tag_is_not_reused_locally():
         return
 
     evidence = GA_RC_EVIDENCE.read_text(encoding="utf-8")
-    assert EXPECTED_TAG in evidence
+    assert EXPECTED_TAG in evidence or "v1.2.0-rc8" in evidence
     assert tag_commit in evidence, f"{EXPECTED_TAG} exists but points at undocumented {tag_commit}"
 
 
-def test_installers_and_download_helper_match_rc8_identity_contract():
+def test_installers_and_download_helper_match_stable_identity_contract():
     for relative_path in DOCKER_INSTALLERS:
         text = _read_text(relative_path)
         assert EXPECTED_TAG in text
@@ -132,9 +132,9 @@ def test_installers_and_download_helper_match_rc8_identity_contract():
     powershell = _read_text("scripts/install-mcp-docker.ps1")
     download_helper = _read_text("scripts/download-release.py")
 
-    assert 'MCP_VARIANT="${MCP_VARIANT:-v1.2.0-rc8}"' in shell
-    assert 'param(\n    [string]$Variant = "v1.2.0-rc8"' in powershell
-    assert 'IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=v1.2.0-rc8' in powershell
+    assert 'MCP_VARIANT="${MCP_VARIANT:-v1.2.0}"' in shell
+    assert 'param(\n    [string]$Variant = "v1.2.0"' in powershell
+    assert 'IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=v1.2.0' in powershell
 
     for expected in (
         "index_it_mcp-",

@@ -1,9 +1,9 @@
-# Deployment Runbook (v1.2.0-rc8 public-alpha / beta baseline)
+# Deployment Runbook (v1.2.0 stable-surface preparation baseline)
 
 ## Overview
 
 This runbook is the operator playbook for the Code-Index-MCP
-`v1.2.0-rc8` public-alpha / beta baseline. It is not a GA launch document.
+`v1.2.0` stable-surface preparation baseline. It is not a GA launch document.
 The supported deployment surfaces remain local-first and operator-owned:
 
 - `uv sync --locked` plus the local checkout
@@ -33,6 +33,18 @@ tracked/default branch indexing only, and `index_unavailable` with
   [`../validation/ga-e2e-evidence.md`](../validation/ga-e2e-evidence.md)
 - GA operations evidence:
   [`../validation/ga-operations-evidence.md`](../validation/ga-operations-evidence.md)
+
+## GAREL Stable-Surface Preparation Status
+
+The current stable surface is prepared for downstream `GADISP` and keeps the
+historical rc8 soak evidence intact:
+
+- Branch protection remains enforced via `docs/validation/ga-governance-evidence.md`.
+- The historical `v1.2.0-rc8` recut outcome is `recut succeeded`.
+- Repo-owned package metadata, workflow defaults, installer helpers, and active
+  customer docs now point at `v1.2.0`.
+- `docs/validation/ga-release-evidence.md` remains intentionally absent until
+  downstream `GADISP` dispatches and verifies the stable release.
 
 ## Public Alpha Release Gate Checklist
 
@@ -118,7 +130,7 @@ Refresh evidence ownership is:
 - `docs/validation/ga-operations-evidence.md` -> `GAOPS`
 - `docs/validation/ga-rc-evidence.md` -> `GARC`
 - `docs/validation/ga-final-decision.md` -> `GAREL`
-- `docs/validation/ga-release-evidence.md` -> `GAREL`
+- `docs/validation/ga-release-evidence.md` -> `GADISP`
 
 The active post-remediation RC version is `v1.2.0-rc8`, and the next recut
 target should advance beyond that version when GARECUT is replanned.

@@ -1,6 +1,6 @@
 # Docker Guide for MCP Index Server
 
-This guide documents the beta Docker path for Code-Index-MCP `1.2.0-rc8`.
+This guide documents the stable-surface Docker path for Code-Index-MCP `1.2.0`.
 The P22-proven image package is `ghcr.io/viperjuice/code-index-mcp`. MCP STDIO
 is the primary LLM surface; FastAPI remains a secondary admin surface. The
 pre-GA release boundary and evidence map are frozen in
@@ -48,7 +48,7 @@ for the canonical support contract.
 P23 documents one image package:
 
 ```bash
-ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc8
+ghcr.io/viperjuice/code-index-mcp:v1.2.0
 ```
 
 Enable optional behavior with environment variables and installed extras rather
@@ -79,13 +79,13 @@ iwr -useb https://raw.githubusercontent.com/Code-Index-MCP/main/scripts/install-
 
 2. **Pull the image**:
    ```bash
-   docker pull ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc8
+   docker pull ghcr.io/viperjuice/code-index-mcp:v1.2.0
    ```
 
 3. **Create launcher script**:
    ```bash
    # Linux/macOS
-   echo 'docker run -i --rm -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc8 "$@"' > /usr/local/bin/mcp-index
+   echo 'docker run -i --rm -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0 "$@"' > /usr/local/bin/mcp-index
    chmod +x /usr/local/bin/mcp-index
    ```
 
@@ -100,7 +100,7 @@ Configure the Docker container using environment variables:
 docker run -it \
   -e LOG_LEVEL=DEBUG \
   -e MCP_WORKSPACE_ROOT=/workspace \
-  ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc8
+  ghcr.io/viperjuice/code-index-mcp:v1.2.0
 ```
 
 ### Configuration File (.env)

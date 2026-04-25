@@ -103,7 +103,17 @@ for downstream GADISP from a clean synced tree. This phase performed no stable
 release mutation, and `docs/validation/ga-release-evidence.md` remains
 intentionally absent until GADISP records the actual stable-release evidence.
 
-## GARECUT Status
+## Stable Surface Preparation
+
+- Stable surface status: `prepared for downstream GADISP`
+- Prepared package version: `1.2.0`
+- Prepared release tag: `v1.2.0`
+- Prepared installer default: `ghcr.io/viperjuice/code-index-mcp:v1.2.0`
+- Active repo-owned docs and installer helpers now point at the stable `1.2.0`
+  package and container surface while keeping rc8 release proof as historical
+  evidence only.
+
+## Historical RC Evidence
 
 - Previous recut target: `v1.2.0-rc7`
 - Previous recut outcome: `recut succeeded`

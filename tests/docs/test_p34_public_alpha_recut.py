@@ -6,6 +6,8 @@ from pathlib import Path
 
 REPO = Path(__file__).parent.parent.parent
 
+PREPARED_STABLE_VERSION = "1.2.0"
+PREPARED_STABLE_TAG = "v1.2.0"
 PUBLIC_ALPHA_VERSION = "1.2.0-rc8"
 PUBLIC_ALPHA_TAG = "v1.2.0-rc8"
 CURRENT_RECUT_VERSION = "1.2.0-rc8"
@@ -74,7 +76,7 @@ def test_public_surfaces_share_v3_operating_model():
         assert missing == [], f"{relative} missing {missing}"
 
 
-def test_release_surfaces_use_current_rc_identifier():
+def test_release_surfaces_use_prepared_stable_identifier_and_preserve_rc_history():
     surfaces = [
         "README.md",
         "docs/GETTING_STARTED.md",
@@ -86,17 +88,20 @@ def test_release_surfaces_use_current_rc_identifier():
     ]
     for relative in surfaces:
         text = _read(relative)
-        assert PUBLIC_ALPHA_VERSION in text, relative
+        assert PREPARED_STABLE_VERSION in text, relative
         if relative != "CHANGELOG.md":
             assert "1.2.0-rc4" not in text, relative
-    assert PUBLIC_ALPHA_TAG in _read(".github/workflows/release-automation.yml")
+    assert PUBLIC_ALPHA_VERSION in _read("CHANGELOG.md")
+    assert PREPARED_STABLE_TAG in _read(".github/workflows/release-automation.yml")
 
 
 def test_active_release_instructions_do_not_reference_rc4_or_stale_recut_target():
     for relative in ACTIVE_RC4_DRIFT_SURFACES:
         text = _read(relative)
         assert (
-            PUBLIC_ALPHA_VERSION in text
+            PREPARED_STABLE_VERSION in text
+            or PREPARED_STABLE_TAG in text
+            or PUBLIC_ALPHA_VERSION in text
             or PUBLIC_ALPHA_TAG in text
             or CURRENT_RECUT_VERSION in text
             or CURRENT_RECUT_TAG in text

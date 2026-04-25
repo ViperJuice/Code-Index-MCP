@@ -11,6 +11,15 @@ ACTIVE_DOCS = [
     REPO_ROOT / "docs" / "DOCKER_GUIDE.md",
     REPO_ROOT / "docs" / "MCP_CONFIGURATION.md",
     REPO_ROOT / "docs" / "operations" / "deployment-runbook.md",
+]
+RELEASE_SURFACE_DOCS = [
+    REPO_ROOT / "README.md",
+    REPO_ROOT / "docs" / "GETTING_STARTED.md",
+    REPO_ROOT / "docs" / "DOCKER_GUIDE.md",
+    REPO_ROOT / "docs" / "MCP_CONFIGURATION.md",
+    REPO_ROOT / "docs" / "operations" / "deployment-runbook.md",
+]
+SUPPORTING_ACTIVE_DOCS = [
     REPO_ROOT / "docs" / "security" / "attestation.md",
     REPO_ROOT / "docs" / "security" / "path-guard.md",
     REPO_ROOT / "docs" / "security" / "sandbox.md",
@@ -106,13 +115,13 @@ def test_docker_docs_use_current_image_package_only():
         assert "ghcr.io/viperjuice/code-index-mcp" in _read(path)
 
 
-def test_active_release_docs_name_rc8_and_alpha_or_beta_status():
-    for path in ACTIVE_DOCS:
+def test_active_release_docs_name_stable_surface_and_support_status():
+    for path in RELEASE_SURFACE_DOCS:
         text = _read(path).lower()
-        assert "1.2.0-rc8" in text, f"{path.relative_to(REPO_ROOT)} missing 1.2.0-rc8"
-        assert ("alpha" in text) or (
-            "beta" in text
-        ), f"{path.relative_to(REPO_ROOT)} missing alpha/beta status language"
+        assert "1.2.0" in text, f"{path.relative_to(REPO_ROOT)} missing 1.2.0"
+        assert ("stable" in text) or (
+            "ga" in text
+        ), f"{path.relative_to(REPO_ROOT)} missing stable/ga status language"
 
 
 def test_active_docs_link_to_support_matrix_for_language_claims():

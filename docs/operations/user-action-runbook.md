@@ -473,6 +473,38 @@ No operator actions required. P12 is fully codebase-internal.
   did not happen or the workflow failed, state that explicitly and keep GA
   release work blocked until GARC is rerun successfully.
 
+### 3.12 Phase GAREL / GADISP - Stable Surface Prep And Dispatch
+
+#### Before GAREL
+
+- [ ] **Confirm the historical soak result remains usable.** The active
+  historical prerelease proof is `v1.2.0-rc8`, and the canonical outcome in
+  `docs/validation/ga-rc-evidence.md` is `recut succeeded`.
+- [ ] **Keep branch protection live.** Treat
+  `docs/validation/ga-governance-evidence.md` as the source of truth that
+  `main` remains enforced via branch protection before any stable dispatch work
+  is planned.
+
+#### During GAREL
+
+- [ ] **Prepare only the repo-owned stable surface.** Update package metadata,
+  runtime version, active install docs, Docker install defaults, and release
+  workflow defaults to `v1.2.0` / `1.2.0` without dispatching the release.
+- [ ] **Route release evidence to the downstream owner.** Keep
+  `docs/validation/ga-release-evidence.md` absent during GAREL and reserve it
+  for `GADISP`.
+- [ ] **Record downstream readiness explicitly.** The GAREL closeout must state
+  that the stable surface is `prepared for downstream GADISP`.
+
+#### After GAREL
+
+- [ ] **Plan or execute only `GADISP` next.** Stable release mutation,
+  GitHub Latest verification, Docker `latest` verification, and final stable
+  release evidence belong only to `GADISP`.
+- [ ] **Treat older downstream dispatch plans as stale.** If a `GADISP` plan
+  predates the accepted `actions/download-artifact@v8` warning disposition or
+  the prepared `v1.2.0` surface, re-plan it before execution.
+
 ---
 
 ## 4. Ongoing operations
