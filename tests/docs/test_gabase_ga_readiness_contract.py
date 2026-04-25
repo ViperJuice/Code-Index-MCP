@@ -82,6 +82,7 @@ def test_checklist_exists_with_required_sections_and_baseline():
     for expected in (
         "v1.2.0-rc5",
         "v1.2.0-rc8",
+        "v1.2.0",
         "canonical GABASE checklist",
     ):
         assert expected in text
@@ -117,20 +118,14 @@ def test_public_docs_remain_pre_ga_and_route_to_canonical_artifacts():
         text = _read(path)
         lowered = text.lower()
 
-        if "1.2.0-rc8" not in text:
-            failures.append(f"{path.relative_to(REPO)} missing rc8 baseline")
-        if ("public-alpha" not in lowered) and ("beta" not in lowered):
-            failures.append(f"{path.relative_to(REPO)} missing public-alpha/beta language")
+        if "1.2.0" not in text:
+            failures.append(f"{path.relative_to(REPO)} missing stable baseline")
+        if "stable" not in lowered:
+            failures.append(f"{path.relative_to(REPO)} missing stable language")
         if "ga-readiness-checklist" not in text:
             failures.append(f"{path.relative_to(REPO)} missing checklist reference")
         if "SUPPORT_MATRIX.md" not in text:
             failures.append(f"{path.relative_to(REPO)} missing support matrix reference")
-        for phrase in FORBIDDEN_PUBLIC_LAUNCH_PHRASES:
-            if phrase in text:
-                failures.append(
-                    f"{path.relative_to(REPO)} contains forbidden launch phrase {phrase!r}"
-                )
-
     assert failures == []
 
 
@@ -153,7 +148,8 @@ def test_runbooks_point_future_ga_work_to_checklist_and_refresh_artifacts():
             "GAOPS",
             "GARC",
             "GAREL",
-            "v1.2.0-rc8",
-            "manual enforcement",
+            "GADISP",
+            "v1.2.0",
+            "branch protection",
         ):
             assert expected in text, f"{path.relative_to(REPO)} missing {expected!r}"

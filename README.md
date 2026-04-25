@@ -2,10 +2,14 @@
 
 Modular, extensible local-first code indexer designed to enhance Claude Code and other LLMs with deep code understanding capabilities. Built on the Model Context Protocol (MCP) for seamless integration with AI assistants.
 
-> **Beta status**: Multi-repo support and the MCP STDIO interface are in beta. The MCP tool interface (`search_code`, `symbol_lookup`, and friends) is the primary surface for LLM-driven use; the FastAPI REST gateway is a secondary admin surface for diagnostics and manual operations. Expect API surface changes before stable release.
+> **Stable-surface prep status**: This guide targets `1.2.0` and reflects the
+> repo-owned stable install surface prepared by GAREL. MCP STDIO remains the
+> primary LLM surface, FastAPI remains a secondary admin surface, and final
+> release publication plus GA release evidence remain downstream-only in
+> `GADISP`.
 
 ## Project Status
-**Version**: 1.2.0-rc8 (beta)
+**Version**: 1.2.0 (stable surface prepared; dispatch pending)
 **Python distribution**: `index-it-mcp`
 **Container image**: `ghcr.io/viperjuice/code-index-mcp`
 **Primary surface**: MCP tools (`search_code`, `symbol_lookup`) via the STDIO runner when repository readiness is `ready`
@@ -13,9 +17,9 @@ Modular, extensible local-first code indexer designed to enhance Claude Code and
 **Core features**: local indexing, symbol/text search, registry-based language coverage; see [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md)
 **Optional features**: semantic search (requires Voyage AI or a local vLLM endpoint), GitHub Artifacts index sync
 **Performance**: sub-100ms symbol lookup and sub-500ms search on indexed repos (benchmarked on this codebase; results vary by repo size and language mix)
-**Public alpha decision**: see [docs/validation/private-alpha-decision.md](docs/validation/private-alpha-decision.md) before promotion; public alpha remains beta-status until P21-P34 gates, the P33 production multi-repo matrix, and private evidence are green.
-**GA readiness contract**: see [docs/validation/ga-readiness-checklist.md](docs/validation/ga-readiness-checklist.md) for the frozen release boundary, support-tier labels, evidence ownership, and rollback expectations that apply before any GA claim.
-**Public alpha repository model**: one server can serve many unrelated repositories, with one registered worktree per git common directory. Only the tracked/default branch is indexed automatically. Indexed MCP results are authoritative only when readiness is `ready`; unavailable indexes return `index_unavailable` with `safe_fallback: "native_search"`.
+**GA decision**: see [docs/validation/ga-final-decision.md](docs/validation/ga-final-decision.md); the current decision is `ship GA`, but stable release mutation and release evidence remain downstream-only in `GADISP`.
+**GA readiness contract**: see [docs/validation/ga-readiness-checklist.md](docs/validation/ga-readiness-checklist.md) for the frozen release boundary, support-tier labels, evidence ownership, and rollback expectations that apply before dispatch.
+**Repository model**: one server can serve many unrelated repositories, with one registered worktree per git common directory. Only the tracked/default branch is indexed automatically. Indexed MCP results are authoritative only when readiness is `ready`; unavailable indexes return `index_unavailable` with `safe_fallback: "native_search"`.
 
 > **New to Code-Index-MCP?** Check out our [Getting Started Guide](docs/GETTING_STARTED.md) for a quick walkthrough.
 
@@ -104,7 +108,7 @@ Key directories:
 
 ## 🛠️ Language Support
 
-The current beta support contract is centralized in [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md).
+The current stable-surface support contract is centralized in [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md).
 It distinguishes specialized plugins, generic Tree-sitter registry coverage,
 default sandbox support, optional extras, semantic/rerank setup, and known
 alpha limitations. Do not assume every registry language has the same symbol
@@ -112,15 +116,15 @@ quality or default sandbox behavior.
 
 ## 🚀 Quick Start
 
-Supported public-alpha install paths are native Python/STDIO with
+Supported stable install paths are native Python/STDIO with
 `uv sync --locked` and the `ghcr.io/viperjuice/code-index-mcp` container image.
 Language coverage is bounded by [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md),
 GA-hardening evidence ownership is frozen in
 [docs/validation/ga-readiness-checklist.md](docs/validation/ga-readiness-checklist.md),
 and rollback procedures live in
 [docs/operations/deployment-runbook.md](docs/operations/deployment-runbook.md).
-Do not treat this beta release candidate as GA or as a universal language
-support claim.
+Do not treat this prepared stable surface as a universal language support
+claim; row-level support tiers still live in the support matrix.
 
 ### 🎯 Automatic Setup for Claude Code/Desktop (Recommended)
 ```bash
@@ -141,7 +145,7 @@ This automatically detects your environment and creates the appropriate `.mcp.js
 curl -sSL https://raw.githubusercontent.com/ViperJuice/Code-Index-MCP/main/scripts/install-mcp-docker.sh | bash
 
 # Index your current directory
-docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc8
+docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0
 ```
 
 #### Option 2: AI-Powered Search
@@ -150,7 +154,7 @@ docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc8
 export VOYAGE_API_KEY=your-key
 
 # Run with semantic search enabled explicitly
-docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc8
+docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY ghcr.io/viperjuice/code-index-mcp:v1.2.0
 ```
 
 ### 💻 Environment-Specific Setup
@@ -161,7 +165,7 @@ docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_AP
 .\scripts\setup-mcp-json.ps1
 
 # Or manually with Docker Desktop
-docker run -it -v ${PWD}:/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc8
+docker run -it -v ${PWD}:/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0
 ```
 
 #### 🍎 macOS
@@ -229,7 +233,7 @@ The setup script creates the appropriate `.mcp.json` for your environment. Manua
       "args": [
         "run", "-i", "--rm",
         "-v", "${workspace}:/workspace",
-        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc8"
+        "ghcr.io/viperjuice/code-index-mcp:v1.2.0"
       ]
     }
   }
@@ -330,11 +334,11 @@ for language/runtime support details.
 
 #### Option 1: Install via pip (Recommended)
 ```bash
-# After the public-alpha package is published, install the rc package
-pip install --pre index-it-mcp==1.2.0rc8
+# Install the prepared stable package surface
+pip install index-it-mcp==1.2.0
 
 # Or install with dev tools for testing
-pip install --pre "index-it-mcp[dev]==1.2.0rc8"
+pip install "index-it-mcp[dev]==1.2.0"
 ```
 
 #### Option 2: Install from Source
@@ -1129,10 +1133,10 @@ Maintainers can create new releases with pre-built indexes:
 
 ```bash
 # Create a new release (as draft)
-python scripts/create-release.py --version 1.2.0-rc8
+python scripts/create-release.py --version 1.2.0
 
 # Create and publish immediately
-python scripts/create-release.py --version 1.2.0-rc8 --publish
+python scripts/create-release.py --version 1.2.0 --publish
 ```
 
 ### Automatic Index Synchronization
@@ -1202,7 +1206,7 @@ For detailed architectural documentation, see the [architecture/](architecture/)
 
 See [ROADMAP.md](ROADMAP.md) for detailed development plans and current progress.
 
-**Current Status**: 1.2.0-rc8 beta release candidate
+**Current Status**: 1.2.0 stable surface prepared; downstream GADISP dispatch still pending
 - ✅ **Core Indexing**: SQLite + FTS5 for fast local search
 - ✅ **Multi-Language**: Specialized and registry-backed language coverage; see `docs/SUPPORT_MATRIX.md`
 - ✅ **MCP Protocol**: Full compatibility with Claude Code and other MCP clients

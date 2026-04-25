@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [Unreleased]: # placeholder for post-rc5 work
 
+## [1.2.0] — 2026-04-25
+
+### Changed (GAREL — stable surface preparation)
+- Prepared the stable `1.2.0` / `v1.2.0` repo-owned release surface across
+  package metadata, runtime metadata, release automation defaults, active
+  install docs, support docs, and Docker installer helpers.
+- Preserved `v1.2.0-rc8` as historical prerelease soak evidence only while
+  routing the actual stable dispatch and GA release evidence to downstream
+  `GADISP`.
+
+### Known limitations
+- This phase did not dispatch the stable release; GitHub Latest and Docker
+  `latest` remain stable-only outputs that are still verified in `GADISP`.
+- Beta, experimental, unsupported, and disabled-by-default support-tier limits
+  remain governed by `docs/SUPPORT_MATRIX.md`; stable surface prep does not
+  broaden product topology or runtime claims.
+
 ## [1.2.0-rc8] — 2026-04-25
 
 ### Changed (GARECUT — post-remediation RC recut freeze)

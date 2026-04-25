@@ -45,12 +45,12 @@ def _read(path: Path) -> str:
 
 
 def test_rc8_contract_surfaces_are_frozen():
-    for path in SURFACES:
+    for path in (GA_RC, CHANGELOG, REPO / "docs" / "validation" / "ga-final-decision.md"):
         text = _read(path)
         assert "1.2.0-rc8" in text or "v1.2.0-rc8" in text, path
 
     workflow = _read(RELEASE_WORKFLOW)
-    assert "default: 'v1.2.0-rc8'" in workflow
+    assert "default: 'v1.2.0'" in workflow
     assert "release_type=custom" in "\n".join(
         [workflow, _read(DEPLOYMENT_RUNBOOK), _read(USER_ACTION_RUNBOOK)]
     )
@@ -75,7 +75,7 @@ def test_public_surfaces_preserve_rc_only_channel_posture():
     for expected in ("public-alpha", "beta", "docker `latest`", "github latest"):
         assert expected in combined
 
-    for forbidden in ("ship ga", "generally available"):
+    for forbidden in ("active stable surface", "v1.2.0 is the active public version"):
         assert forbidden not in combined
 
 
@@ -94,7 +94,7 @@ def test_runbooks_freeze_pre_dispatch_and_observation_commands():
         "gh run watch <run-id> --exit-status",
         "gh run view <run-id> --json url,headSha,status,conclusion,jobs",
         "gh release view v1.2.0-rc8 --repo ViperJuice/Code-Index-MCP --json tagName,isPrerelease,isDraft,publishedAt,targetCommitish,url,assets",
-        "blocked before dispatch",
+        "recut succeeded",
         "ga-rc-evidence.md",
     ):
         assert expected in combined

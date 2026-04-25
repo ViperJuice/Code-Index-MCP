@@ -51,25 +51,25 @@ def test_readme_no_stale_claims():
 # ---------------------------------------------------------------------------
 
 
-def test_readme_beta_admonition_near_top():
+def test_readme_status_admonition_near_top():
     text = _readme_text()
     head = "\n".join(text.splitlines()[:80])
     assert (
-        "> **Beta status**:" in head
-    ), "README missing '> **Beta status**:' blockquote within first 80 lines"
+        "> **Stable-surface prep status**:" in head
+    ), "README missing stable-surface status blockquote within first 80 lines"
     # Body must name MCP as primary and FastAPI/REST as secondary admin surface.
     # Search the full admonition block (contiguous blockquote lines).
     admonition_blocks = re.findall(r"(?:^>.*\n)+", text, re.MULTILINE)
-    beta_blocks = [b for b in admonition_blocks if "Beta status" in b]
-    assert len(beta_blocks) >= 1, "No 'Beta status' admonition block found"
-    beta_body = "\n".join(beta_blocks)
-    assert "MCP" in beta_body, "Beta admonition does not name MCP as primary surface"
-    assert ("FastAPI" in beta_body) or (
-        "REST" in beta_body
-    ), "Beta admonition does not name FastAPI/REST as secondary admin surface"
-    assert ("secondary" in beta_body.lower()) or (
-        "admin" in beta_body.lower()
-    ), "Beta admonition does not mark FastAPI/REST as secondary/admin"
+    status_blocks = [b for b in admonition_blocks if "Stable-surface prep status" in b]
+    assert len(status_blocks) >= 1, "No stable-surface status admonition block found"
+    status_body = "\n".join(status_blocks)
+    assert "MCP" in status_body, "Status admonition does not name MCP as primary surface"
+    assert ("FastAPI" in status_body) or (
+        "REST" in status_body
+    ), "Status admonition does not name FastAPI/REST as secondary admin surface"
+    assert ("secondary" in status_body.lower()) or (
+        "admin" in status_body.lower()
+    ), "Status admonition does not mark FastAPI/REST as secondary/admin"
 
 
 # ---------------------------------------------------------------------------

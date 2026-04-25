@@ -59,7 +59,8 @@ def test_final_decision_exists_and_cites_all_ga_inputs():
         "## Decision Inputs",
         "## Workflow Runtime Disposition",
         "## Final Decision",
-        "## GARECUT Status",
+        "## Stable Surface Preparation",
+        "## Historical RC Evidence",
         "## Next Scope",
         "## Verification",
         "ship GA",
@@ -68,7 +69,7 @@ def test_final_decision_exists_and_cites_all_ga_inputs():
         "docs/validation/ga-e2e-evidence.md",
         "docs/validation/ga-operations-evidence.md",
         "docs/validation/ga-rc-evidence.md",
-        "v1.2.0-rc7",
+        "v1.2.0",
         "v1.2.0-rc8",
         "softprops/action-gh-release@v3",
         "actions/download-artifact@v8",
@@ -94,11 +95,11 @@ def test_ship_decision_defers_release_evidence_to_gadisp_and_keeps_public_surfac
     assert not GA_RELEASE.exists()
 
     combined = "\n".join(_read(path) for path in PUBLIC_SURFACES).lower()
-    for expected in ("public-alpha", "beta", "github latest", "docker `latest`"):
+    for expected in ("stable", "github latest", "docker `latest`"):
         assert expected in combined
-
-    for forbidden in ("ship ga", "generally available"):
-        assert forbidden not in combined
+    for path in (README, GETTING_STARTED, MCP_CONFIGURATION, DOCKER_GUIDE, SUPPORT_MATRIX):
+        text = _read(path)
+        assert "1.2.0" in text, f"{path.relative_to(REPO)} missing stable surface version"
 
 
 def test_workflow_runtime_warning_is_remediated_before_any_future_ga_dispatch():
@@ -112,7 +113,7 @@ def test_workflow_runtime_warning_is_remediated_before_any_future_ga_dispatch():
     assert "softprops/action-gh-release@v2" not in workflow
     assert "GitHub's latest published release is still" in decision
     assert "`v8.0.1`" in decision
-    assert "Current recut outcome: `recut succeeded`" in decision
+    assert "Stable surface status: `prepared for downstream GADISP`" in decision
     assert "actions/download-artifact@v8" in decision
     assert "Buffer()" in decision
     assert "accepted as non-blocking for GA" in decision

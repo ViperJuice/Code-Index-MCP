@@ -21,12 +21,16 @@ def _read(path: Path) -> str:
 def test_rc8_contract_surfaces_and_workflow_path_are_frozen():
     workflow = _read(WORKFLOW)
     release_metadata = _read(RELEASE_METADATA)
+    evidence = _read(GA_RC)
 
-    for expected in ("v1.2.0-rc8", "1.2.0-rc8", "softprops/action-gh-release@v3"):
+    for expected in ("v1.2.0", "1.2.0", "softprops/action-gh-release@v3"):
         assert expected in workflow
 
-    for expected in ("v1.2.0-rc8", "1.2.0-rc8", "release_type=custom"):
+    for expected in ("v1.2.0", "1.2.0", "release_type=custom"):
         assert expected in release_metadata
+
+    for expected in ("v1.2.0-rc8", "1.2.0-rc8", "recut succeeded"):
+        assert expected in evidence
 
     assert "softprops/action-gh-release@v2" not in workflow
     assert "latest" in workflow
@@ -68,9 +72,10 @@ def test_final_decision_stays_historical_and_routes_to_the_next_phase_explicitly
         "# GA Final Decision",
         "ship GA",
         "GAREL",
+        "v1.2.0",
         "v1.2.0-rc8",
         "ready for GADISP planning",
-        "recut succeeded",
+        "authorized for downstream GADISP",
         "actions/download-artifact@v8",
         "accepted as non-blocking for GA",
         "softprops/action-gh-release@v3",

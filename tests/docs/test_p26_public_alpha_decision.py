@@ -92,18 +92,19 @@ def test_runbooks_document_private_alpha_go_no_go_procedure():
         assert category in surfaces
 
 
-def test_public_alpha_release_surfaces_include_required_truth_fields():
-    surfaces = {
-        "README.md": _read("README.md"),
-        "CHANGELOG.md": _read("CHANGELOG.md"),
-    }
+def test_public_alpha_history_and_current_release_surfaces_include_required_truth_fields():
+    readme = _read("README.md")
+    changelog = _read("CHANGELOG.md")
 
-    for relative_path, text in surfaces.items():
-        lower = text.lower()
-        assert "docs/validation/private-alpha-decision.md" in text
-        assert "docs/SUPPORT_MATRIX.md" in text
-        assert "public alpha" in lower
-        assert "beta" in lower
-        assert "rollback" in lower
-        assert "release-smoke" in lower or "docker" in lower
-        assert "uv sync --locked" in text or "ghcr.io/viperjuice/code-index-mcp" in text
+    assert "docs/SUPPORT_MATRIX.md" in readme
+    assert "stable surface prepared" in readme.lower()
+    assert "GADISP" in readme
+    assert "rollback" in _read("docs/operations/deployment-runbook.md").lower()
+    assert "uv sync --locked" in readme
+    assert "ghcr.io/viperjuice/code-index-mcp" in readme
+
+    lower_changelog = changelog.lower()
+    assert "docs/validation/private-alpha-decision.md" in changelog
+    assert "public alpha" in lower_changelog
+    assert "beta" in lower_changelog
+    assert "release-smoke" in lower_changelog or "docker" in lower_changelog

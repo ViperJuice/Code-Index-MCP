@@ -1,10 +1,9 @@
 # Code-Index-MCP Support Matrix
 
-This matrix is the canonical GASUPPORT support statement for version
-`1.2.0-rc8`. The product release posture is still RC/public-alpha and beta:
-MCP STDIO is the primary LLM surface, FastAPI is a secondary admin surface,
-and the GA-hardening roadmap is reducing claims rather than widening the
-product.
+This matrix is the canonical GASUPPORT support statement for the prepared
+stable surface `1.2.0`. MCP STDIO is the primary LLM surface, FastAPI is a
+secondary admin surface, and the GA-hardening roadmap remains responsible for
+separating stable release prep from the downstream `GADISP` dispatch evidence.
 
 Repository-topology support is separate from language/runtime support. The v3
 public-alpha model supports many unrelated repositories on one machine, with one
@@ -22,9 +21,9 @@ evidence checklist is `docs/validation/ga-readiness-checklist.md`.
 
 ## Claim tiers
 
-- **Public-alpha**: `v1.2.0-rc8` is the active RC/public-alpha package
-  contract. It is suitable for outside-developer validation of the documented
-  STDIO, readiness, repository-topology, and Docker package surfaces.
+- **Stable prep**: `v1.2.0` is the prepared stable package and container
+  contract. It is the repo-owned surface that downstream `GADISP` dispatches
+  and verifies.
 - **Beta**: Multi-repo support, STDIO, and secondary tool readiness remain beta
   surfaces. Passing TOOLRDY evidence is readiness evidence, not a GA support
   claim or a support-matrix expansion.
@@ -116,8 +115,8 @@ topology, or install-surface support expansion.
 | STDIO mutation and summarization tools (`reindex`, `write_summaries`, `summarize_sample`) | beta | Secondary tool surfaces behind readiness gates | `tool_handlers.py`, TOOLRDY evidence, readiness-refusal tests | Non-ready repos fail closed; the artifact is readiness evidence, not support expansion |
 | FastAPI admin and diagnostics surface | beta | Secondary/admin surface | `README.md`, `docs/GETTING_STARTED.md`, `docs/MCP_CONFIGURATION.md` | Do not treat FastAPI as the primary LLM interface |
 | Native source install via `uv sync --locked` | beta | Canonical local development and operator path | `pyproject.toml`, `uv.lock`, install docs | This is the preferred local install path while the release remains pre-GA |
-| Pre-release package install (`index-it-mcp==1.2.0rc8`) | beta | Opt-in release artifact path | package naming and install docs | Keep tied to the RC/public-alpha release boundary until later GA evidence exists |
-| Docker image `ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc8` | beta | Supported container path | Docker guide, release evidence, image naming tests | Container docs must keep the same topology and readiness limits as native docs |
+| Package install (`index-it-mcp==1.2.0`) | beta | Prepared stable artifact path | package naming and install docs | Stable surface prep does not by itself prove downstream release publication |
+| Docker image `ghcr.io/viperjuice/code-index-mcp:v1.2.0` | beta | Supported container path | Docker guide, release evidence, image naming tests | Container docs must keep the same topology and readiness limits as native docs |
 | Semantic search (`uv sync --locked --extra semantic` plus provider config) | experimental | Optional extra and provider-dependent | extras docs, config env vars, support-fact notes | Requires provider credentials or a compatible local endpoint; not unconditional support |
 | Reranking (`uv sync --locked --extra rerank` plus provider/model config) | experimental | Optional extra and provider-dependent | extras docs and support-fact notes | Treat as opt-in ranking improvement, not baseline query behavior |
 | Default sandboxed plugin execution | beta | Default security posture | `sandbox_supported`, `activation_mode`, sandbox docs | Coverage varies by language and is authoritative through `plugin_availability` |
