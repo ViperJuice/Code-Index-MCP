@@ -6,9 +6,9 @@ on:
     # Historical GARC default: 'v1.2.0-rc6'
     inputs:
       version:
-        description: 'Version to release (e.g., v1.2.0-rc7)'
+        description: 'Version to release (e.g., v1.2.0-rc8)'
         required: true
-        default: 'v1.2.0-rc7'
+        default: 'v1.2.0-rc8'
         type: string
       release_type:
         description: 'Release type'
@@ -74,7 +74,9 @@ jobs:
               exit 1
               ;;
           esac
-          grep -q "default: 'v1.2.0-rc7'" .github/workflows/release-automation.yml
+          grep -q "default: 'v1.2.0-rc8'" .github/workflows/release-automation.yml
+          # Stable GA dispatch stays on the existing workflow contract:
+          # gh workflow run "Release Automation" -f version=v1.2.0 -f release_type=custom -f auto_merge=false
           if [ "$RELEASE_TYPE" = "custom" ]; then
             grep -q "version = \"$VERSION_NO_V\"" pyproject.toml
             grep -q "__version__ = \"$VERSION_NO_V\"" mcp_server/__init__.py
@@ -334,7 +336,7 @@ jobs:
           git push origin "$VERSION"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.prepare-release.outputs.version }}
           name: Release ${{ needs.prepare-release.outputs.version }}
@@ -374,7 +376,7 @@ jobs:
           body: |
             ## Release ${{ needs.prepare-release.outputs.version }}
 
-            GARECUT release contract target: v1.2.0-rc7
+            GARECUT release contract target: v1.2.0-rc8
 
             This PR contains all changes for release ${{ needs.prepare-release.outputs.version }}.
 

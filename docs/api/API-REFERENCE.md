@@ -1,5 +1,8 @@
 # Code-Index-MCP API Reference
 
+> **Beta status**: This API reference describes the `1.2.0-rc8` beta release
+> surface and should not be read as a GA guarantee.
+
 ## Overview
 
 Code-Index-MCP provides a comprehensive FastAPI-based REST API for code indexing, searching, and management across multiple programming languages. The API features authentication, monitoring, caching, and a plugin-based architecture for language-specific functionality.

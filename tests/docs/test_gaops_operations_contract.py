@@ -72,7 +72,7 @@ def test_gaops_runbooks_define_operator_sections_and_canonical_sources():
             "index rebuild",
             "incident response",
             "support triage",
-            "v1.2.0-rc6",
+            "v1.2.0-rc8",
         ):
             assert expected in text, f"{path.relative_to(REPO)} missing {expected!r}"
 

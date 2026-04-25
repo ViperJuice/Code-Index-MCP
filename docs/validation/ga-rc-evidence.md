@@ -1,29 +1,29 @@
-> **Historical artifact — as-of 2026-04-24, may not reflect current behavior**
+> **Historical artifact — as-of 2026-04-25, may not reflect current behavior**
 
 # GA RC Evidence
 
 ## Summary
 
-- Evidence captured: `2026-04-24T23:17:04Z`.
+- Evidence captured: `2026-04-25T02:31:42Z`.
 - Active phase plan: `plans/phase-plan-v5-garecut.md`.
 - Selected commit before dispatch evaluation:
-  `3d5a3aa14af5950dc3e6c20bc66d3f0c81998c28`.
-- Active recut target: `v1.2.0-rc7`.
+  `a3adcea5cd569571a2c4ce3d863317e9f14519bc`.
+- Active recut target: `v1.2.0-rc8`.
 - Conclusion: `blocked before dispatch`.
 - Dispatch attempted: `no`.
-- Blocker: release-affecting worktree was dirty during the rc7 recut attempt, so
-  `gh workflow run` did not execute.
-- Channel posture preserved: no `v1.2.0-rc7` prerelease was published; GitHub
+- Blocker: release-affecting worktree remained dirty during the rc8 recut
+  attempt, so `gh workflow run` did not execute.
+- Channel posture preserved: no `v1.2.0-rc8` prerelease was published; GitHub
   Latest remained excluded and Docker `latest` remained stable-only.
 
 ## Pre-dispatch Qualification
 
 | Check | Command | Result | Evidence |
 |---|---|---|---|
-| Release candidate worktree state | `git status --short --branch` | fail | `## main...origin/main` with tracked and untracked release-affecting changes in `.github/workflows/release-automation.yml`, `pyproject.toml`, `mcp_server/__init__.py`, `CHANGELOG.md`, installer helpers, tests, and validation docs. |
-| Local versus remote branch sync | `git fetch origin main --tags --prune` then `git rev-parse HEAD origin/main` | pass | `HEAD=3d5a3aa14af5950dc3e6c20bc66d3f0c81998c28`, `origin/main=3d5a3aa14af5950dc3e6c20bc66d3f0c81998c28`. |
-| Local tag reuse | `git tag -l v1.2.0-rc7` | pass | No local `v1.2.0-rc7` tag existed before dispatch evaluation. |
-| Remote tag reuse | `git ls-remote --tags origin refs/tags/v1.2.0-rc7` | pass | No remote `v1.2.0-rc7` tag existed before dispatch evaluation. |
+| Release candidate worktree state | `git status --short --branch` | fail | `## main...origin/main` with release-affecting dirty files in `.github/workflows/release-automation.yml`, `pyproject.toml`, `mcp_server/__init__.py`, installer helpers, validation docs, and release-contract tests. |
+| Local versus remote branch sync | `git fetch origin main --tags --prune` then `git rev-parse HEAD origin/main` | pass | `HEAD=a3adcea5cd569571a2c4ce3d863317e9f14519bc`, `origin/main=a3adcea5cd569571a2c4ce3d863317e9f14519bc`. |
+| Local tag reuse | `git tag -l v1.2.0-rc8` | pass | No local `v1.2.0-rc8` tag existed before dispatch evaluation. |
+| Remote tag reuse | `git ls-remote --tags origin refs/tags/v1.2.0-rc8` | pass | No remote `v1.2.0-rc8` tag existed before dispatch evaluation. |
 | Release workflow visibility | `gh workflow view "Release Automation"` | pass | Workflow visible as `Release Automation - release-automation.yml`, workflow id `167401116`. |
 
 ## Intended Dispatch Inputs
@@ -31,33 +31,34 @@
 GARECUT would dispatch exactly:
 
 ```bash
-gh workflow run "Release Automation" -f version=v1.2.0-rc7 -f release_type=custom -f auto_merge=false
+gh workflow run "Release Automation" -f version=v1.2.0-rc8 -f release_type=custom -f auto_merge=false
 ```
 
 Frozen channel-policy inputs:
 
-- Version: `v1.2.0-rc7`
+- Version: `v1.2.0-rc8`
 - Release type: `custom`
 - Auto-merge policy: `false`
 - Channel posture: prerelease `public-alpha` / `beta`
+- Workflow path under test: `softprops/action-gh-release@v3`
 
 ## Workflow Observation
 
 - Dispatch attempted: `no`
 - Run URL: `none - blocked before dispatch`
 - Run ID: `none - blocked before dispatch`
-- `headSha`: `3d5a3aa14af5950dc3e6c20bc66d3f0c81998c28`
+- `headSha`: `a3adcea5cd569571a2c4ce3d863317e9f14519bc`
 - Workflow status / conclusion: `not started` / `blocked before dispatch`
-- Release branch / PR disposition: no `release/v1.2.0-rc7` branch or PR was
+- Release branch / PR disposition: no `release/v1.2.0-rc8` branch or PR was
   created because the recut stopped at the dirty-worktree gate.
-- GitHub release state: no `v1.2.0-rc7` release exists because dispatch did not
+- GitHub release state: no `v1.2.0-rc8` release exists because dispatch did not
   occur.
 - PyPI publication: none - blocked before dispatch.
 - GHCR image identity: none - blocked before dispatch.
 
 ## Release-Channel Policy
 
-- `v1.2.0-rc7` remains the frozen prerelease/public-alpha or beta recut target.
+- `v1.2.0-rc8` remains the frozen prerelease/public-alpha or beta recut target.
 - `release_type=custom` remains required for the hyphenated RC version.
 - `auto_merge=false` remains the required recut input.
 - GitHub Latest remained excluded from the RC policy source.
@@ -66,16 +67,17 @@ Frozen channel-policy inputs:
 
 ## Rollback And Next-Step Disposition
 
-No rollback was required because no rc7 release mutation occurred.
+No rollback was required because no rc8 release mutation occurred.
 
 Next-step disposition:
 
-- Remediate the dirty release-affecting worktree or preserve and commit the
-  intended rc7 surfaces before rerunning GARECUT.
-- A renewed GAREL decision is not yet ready; it depends on successful fresh
-  `v1.2.0-rc7` prerelease evidence on the remediated workflow path.
-- If a later GARECUT run succeeds, route the next downstream work back through
-  a renewed GAREL reduction. Until then, keep the work inside GARECUT.
+- Rerun GARECUT after the release-affecting worktree is clean enough for
+  mutation and the intended rc8 surfaces are preserved.
+- A renewed GAREL decision is not yet ready; it still depends on fresh
+  `v1.2.0-rc8` prerelease evidence on the remediated
+  `softprops/action-gh-release@v3` workflow path.
+- Until that rerun succeeds, keep the work inside GARECUT rather than
+  reopening GA or treating older downstream GAREL plans as authoritative.
 
 ## Historical GARC Baseline
 
@@ -94,7 +96,7 @@ recut result:
 
 ## Verification
 
-Planned or completed validation sources for this artifact:
+Completed validation sources for this artifact:
 
 ```bash
 uv run pytest tests/docs/test_garecut_rc_recut_contract.py -v --no-cov
@@ -103,8 +105,7 @@ uv run pytest tests/test_release_metadata.py tests/docs/test_garecut_rc_recut_co
 git status --short --branch
 git fetch origin main --tags --prune
 git rev-parse HEAD origin/main
-git tag -l v1.2.0-rc7
-git ls-remote --tags origin refs/tags/v1.2.0-rc7
+git tag -l v1.2.0-rc8
+git ls-remote --tags origin refs/tags/v1.2.0-rc8
 gh workflow view "Release Automation"
-gh workflow run "Release Automation" -f version=v1.2.0-rc7 -f release_type=custom -f auto_merge=false
 ```

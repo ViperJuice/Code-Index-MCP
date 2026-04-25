@@ -1,5 +1,8 @@
 # Dynamic Plugin Loading System
 
+> **Beta status**: Current release-surface examples should assume the
+> `1.2.0-rc8` prerelease channel unless a section is explicitly historical.
+
 ## Overview
 
 The MCP Server now features a comprehensive dynamic plugin loading system that automatically discovers, loads, and manages plugins at runtime. This system replaces the previous hardcoded plugin initialization, providing greater flexibility and extensibility.

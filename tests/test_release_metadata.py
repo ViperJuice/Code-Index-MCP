@@ -1,4 +1,4 @@
-"""Release metadata assertions for the active v1.2.0-rc7 contract.
+"""Release metadata assertions for the active v1.2.0-rc8 contract.
 
 Historical GARC soak target: v1.2.0-rc6.
 """
@@ -15,8 +15,8 @@ except ImportError:  # Python <3.11
 
 
 REPO = Path(__file__).parent.parent
-EXPECTED_VERSION = "1.2.0-rc7"
-EXPECTED_TAG = "v1.2.0-rc7"
+EXPECTED_VERSION = "1.2.0-rc8"
+EXPECTED_TAG = "v1.2.0-rc8"
 GA_RC_EVIDENCE = REPO / "docs" / "validation" / "ga-rc-evidence.md"
 DOCKER_INSTALLERS = (
     "scripts/install-mcp-docker.sh",
@@ -63,7 +63,7 @@ def test_readme_distribution_identity_remains_stable():
 def test_changelog_has_rc_contract_section():
     changelog = _read_text("CHANGELOG.md")
 
-    assert f"## [{EXPECTED_VERSION}] — 2026-04-24" in changelog
+    assert f"## [{EXPECTED_VERSION}] — 2026-04-25" in changelog
 
 
 def test_release_workflow_matches_rc_contract():
@@ -73,8 +73,14 @@ def test_release_workflow_matches_rc_contract():
     assert f"default: '{EXPECTED_TAG}'" in workflow
     assert "default: 'custom'" in workflow
     assert f"GARECUT release contract target: {EXPECTED_TAG}" in workflow
+    assert (
+        'gh workflow run "Release Automation" -f version=v1.2.0 '
+        "-f release_type=custom -f auto_merge=false"
+    ) in workflow
     assert "peter-evans/create-pull-request@v8" in workflow
+    assert "softprops/action-gh-release@v3" in workflow
     assert "peter-evans/create-pull-request@v7" not in workflow
+    assert "softprops/action-gh-release@v2" not in workflow
     assert 'grep -q "version = \\"$VERSION_NO_V\\"" pyproject.toml' in workflow
     assert 'grep -q "__version__ = \\"$VERSION_NO_V\\"" mcp_server/__init__.py' in workflow
     assert "Prerelease tags must use release_type=custom" in workflow
@@ -114,7 +120,7 @@ def test_release_candidate_tag_is_not_reused_locally():
     assert tag_commit in evidence, f"{EXPECTED_TAG} exists but points at undocumented {tag_commit}"
 
 
-def test_installers_and_download_helper_match_rc7_identity_contract():
+def test_installers_and_download_helper_match_rc8_identity_contract():
     for relative_path in DOCKER_INSTALLERS:
         text = _read_text(relative_path)
         assert EXPECTED_TAG in text
@@ -126,9 +132,9 @@ def test_installers_and_download_helper_match_rc7_identity_contract():
     powershell = _read_text("scripts/install-mcp-docker.ps1")
     download_helper = _read_text("scripts/download-release.py")
 
-    assert 'MCP_VARIANT="${MCP_VARIANT:-v1.2.0-rc7}"' in shell
-    assert 'param(\n    [string]$Variant = "v1.2.0-rc7"' in powershell
-    assert 'IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=v1.2.0-rc7' in powershell
+    assert 'MCP_VARIANT="${MCP_VARIANT:-v1.2.0-rc8}"' in shell
+    assert 'param(\n    [string]$Variant = "v1.2.0-rc8"' in powershell
+    assert 'IF "%MCP_VARIANT%"=="" SET MCP_VARIANT=v1.2.0-rc8' in powershell
 
     for expected in (
         "index_it_mcp-",

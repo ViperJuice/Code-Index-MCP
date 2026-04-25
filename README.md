@@ -5,7 +5,7 @@ Modular, extensible local-first code indexer designed to enhance Claude Code and
 > **Beta status**: Multi-repo support and the MCP STDIO interface are in beta. The MCP tool interface (`search_code`, `symbol_lookup`, and friends) is the primary surface for LLM-driven use; the FastAPI REST gateway is a secondary admin surface for diagnostics and manual operations. Expect API surface changes before stable release.
 
 ## Project Status
-**Version**: 1.2.0-rc6 (beta)
+**Version**: 1.2.0-rc8 (beta)
 **Python distribution**: `index-it-mcp`
 **Container image**: `ghcr.io/viperjuice/code-index-mcp`
 **Primary surface**: MCP tools (`search_code`, `symbol_lookup`) via the STDIO runner when repository readiness is `ready`
@@ -141,7 +141,7 @@ This automatically detects your environment and creates the appropriate `.mcp.js
 curl -sSL https://raw.githubusercontent.com/ViperJuice/Code-Index-MCP/main/scripts/install-mcp-docker.sh | bash
 
 # Index your current directory
-docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc6
+docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc8
 ```
 
 #### Option 2: AI-Powered Search
@@ -150,7 +150,7 @@ docker run -it -v $(pwd):/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc6
 export VOYAGE_API_KEY=your-key
 
 # Run with semantic search enabled explicitly
-docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc6
+docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_API_KEY ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc8
 ```
 
 ### 💻 Environment-Specific Setup
@@ -161,7 +161,7 @@ docker run -it -v $(pwd):/workspace -e SEMANTIC_SEARCH_ENABLED=true -e VOYAGE_AP
 .\scripts\setup-mcp-json.ps1
 
 # Or manually with Docker Desktop
-docker run -it -v ${PWD}:/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc6
+docker run -it -v ${PWD}:/workspace ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc8
 ```
 
 #### 🍎 macOS
@@ -229,7 +229,7 @@ The setup script creates the appropriate `.mcp.json` for your environment. Manua
       "args": [
         "run", "-i", "--rm",
         "-v", "${workspace}:/workspace",
-        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc6"
+        "ghcr.io/viperjuice/code-index-mcp:v1.2.0-rc8"
       ]
     }
   }
@@ -331,10 +331,10 @@ for language/runtime support details.
 #### Option 1: Install via pip (Recommended)
 ```bash
 # After the public-alpha package is published, install the rc package
-pip install --pre index-it-mcp==1.2.0rc5
+pip install --pre index-it-mcp==1.2.0rc8
 
 # Or install with dev tools for testing
-pip install --pre "index-it-mcp[dev]==1.2.0rc5"
+pip install --pre "index-it-mcp[dev]==1.2.0rc8"
 ```
 
 #### Option 2: Install from Source
@@ -1129,10 +1129,10 @@ Maintainers can create new releases with pre-built indexes:
 
 ```bash
 # Create a new release (as draft)
-python scripts/create-release.py --version 1.2.0-rc6
+python scripts/create-release.py --version 1.2.0-rc8
 
 # Create and publish immediately
-python scripts/create-release.py --version 1.2.0-rc6 --publish
+python scripts/create-release.py --version 1.2.0-rc8 --publish
 ```
 
 ### Automatic Index Synchronization
@@ -1202,7 +1202,7 @@ For detailed architectural documentation, see the [architecture/](architecture/)
 
 See [ROADMAP.md](ROADMAP.md) for detailed development plans and current progress.
 
-**Current Status**: 1.2.0-rc6 beta release candidate
+**Current Status**: 1.2.0-rc8 beta release candidate
 - ✅ **Core Indexing**: SQLite + FTS5 for fast local search
 - ✅ **Multi-Language**: Specialized and registry-backed language coverage; see `docs/SUPPORT_MATRIX.md`
 - ✅ **MCP Protocol**: Full compatibility with Claude Code and other MCP clients

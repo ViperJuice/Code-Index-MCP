@@ -67,8 +67,10 @@ def test_final_decision_exists_and_cites_all_ga_inputs():
         "docs/validation/ga-e2e-evidence.md",
         "docs/validation/ga-operations-evidence.md",
         "docs/validation/ga-rc-evidence.md",
-        "v1.2.0-rc6",
+        "v1.2.0-rc7",
+        "v1.2.0-rc8",
         "peter-evans/create-pull-request@v8",
+        "softprops/action-gh-release@v3",
         "Node 20",
         "specs/phase-plans-v5.md",
         "GARECUT",
@@ -101,7 +103,9 @@ def test_workflow_runtime_warning_is_remediated_before_any_future_ga_dispatch():
 
     assert "peter-evans/create-pull-request@v8" in workflow
     assert "peter-evans/create-pull-request@v7" not in workflow
-    assert "Node.js 20 actions are deprecated" in decision
-    assert "updated release workflow requires" in decision
-    assert "another prerelease soak" in decision
+    assert "softprops/action-gh-release@v3" in workflow
+    assert "softprops/action-gh-release@v2" not in workflow
+    assert "the immediate next step is rerunning GARECUT" in decision.replace("\n", " ")
+    assert "Current recut outcome: `blocked before dispatch`" in decision
     assert "### Phase 8 — Post-Remediation RC Recut (GARECUT)" in roadmap
+    assert "softprops/action-gh-release@v3" in roadmap

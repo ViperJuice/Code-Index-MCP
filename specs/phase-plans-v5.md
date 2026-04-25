@@ -356,7 +356,7 @@ Cut and observe a post-hardening RC before making any GA release decision.
 **Scope notes**
 
 This phase is operational release execution. GABASE freezes the follow-up RC
-version as `v1.2.0-rc6` before planning this phase.
+version as `v1.2.0-rc7` before planning this phase.
 
 **Non-goals**
 
@@ -413,9 +413,13 @@ This phase is a guarded decision reducer plus release execution. It must stop
 before mutation if governance, support, E2E, operations, or RC soak evidence is
 missing. GARC surfaced a GitHub Actions warning that
 `peter-evans/create-pull-request@v7` still runs on the deprecated Node 20
-runtime in the `Merge Release Branch` job, so GAREL must either upgrade or
-replace that action, or explicitly record why the warning is acceptable for the
-GA path before dispatching another release.
+runtime in the `Merge Release Branch` job, and GARECUT later proved that path
+was remediated on `peter-evans/create-pull-request@v8` during successful run
+`24919438766`. That same GARECUT run also emitted a new Node 20 deprecation
+annotation for `softprops/action-gh-release@v2` in `Create GitHub Release`.
+GAREL has since remediated that path to `softprops/action-gh-release@v3`, so
+the next downstream work is another prerelease soak on the newly remediated
+release path before any stable GA dispatch is reconsidered.
 
 **Non-goals**
 
@@ -480,6 +484,9 @@ support, E2E, and operations. GAREL waits for the follow-up RC soak.
 - If GAREL remediates release-workflow runtime drift and concludes that another
   prerelease soak is required, plan `GARECUT` next and treat any older
   downstream GAREL assumptions as stale.
+- After a successful GARECUT, route back through `codex-plan-phase
+  specs/phase-plans-v5.md GAREL`; any older GAREL plan that predates the
+  post-GARECUT or post-remediation release-workflow steering is stale.
 
 ## Verification
 
@@ -531,7 +538,7 @@ uv run pytest tests/docs tests/smoke tests/test_release_metadata.py tests/test_r
 make alpha-production-matrix
 make release-smoke
 make release-smoke-container
-gh workflow run "Release Automation" -f version=<ga-version> -f release_type=stable -f auto_merge=<approved-policy>
+gh workflow run "Release Automation" -f version=<ga-version> -f release_type=custom -f auto_merge=false
 gh release view <ga-version>
 
 # GARECUT
@@ -552,7 +559,7 @@ any future GA ship decision is reconsidered.
 **Exit criteria**
 - [ ] The release workflow no longer depends on the deprecated Node 20 action
       path that GARC surfaced.
-- [ ] A new RC version after `v1.2.0-rc6` is frozen and dispatched through the
+- [ ] A new RC version after `v1.2.0-rc7` is frozen and dispatched through the
       remediated workflow.
 - [ ] The recut workflow run completes with prerelease policy intact: GitHub
       Latest remains excluded and Docker `latest` remains stable-only.

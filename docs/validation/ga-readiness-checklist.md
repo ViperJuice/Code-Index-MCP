@@ -5,16 +5,17 @@
 This is the canonical GABASE checklist for the v5 GA-hardening roadmap. It
 freezes the release boundary, support tiers, required gates, evidence map,
 rollback expectations, and non-GA surfaces for the current
-`v1.2.0-rc5` RC/public-alpha baseline before any GA claim or stable release
+`v1.2.0-rc8` RC/public-alpha baseline before any GA claim or stable release
 mutation.
 
 ## Release boundary
 
-- Active baseline: `v1.2.0-rc5` remains the current RC/public-alpha package
+- Active baseline: `v1.2.0-rc8` remains the current RC/public-alpha package
   contract across `README.md`, install docs, the support matrix, and operator
   runbooks.
-- Follow-up RC target: `v1.2.0-rc6` is the frozen follow-up RC version for
-  `GARC`.
+- Historical carried-forward inputs still include `v1.2.0-rc5` and
+  `v1.2.0-rc6`, but the currently documented prerelease surface is
+  `v1.2.0-rc8`.
 - Current release surfaces stay pre-GA: native Python/STDIO via
   `uv sync --locked`, the `index-it-mcp` package, and the
   `ghcr.io/viperjuice/code-index-mcp` container image remain the documented
@@ -86,7 +87,7 @@ must be regenerated before any later artifact can conclude `ship GA`.
 ## Rollback expectations
 
 - If a downstream hardening phase fails, fall back to the documented
-  `v1.2.0-rc5` RC/public-alpha contract rather than publishing GA wording.
+  `v1.2.0-rc8` RC/public-alpha contract rather than publishing GA wording.
 - Rollback instructions continue to live in
   `docs/operations/deployment-runbook.md` until `GAOPS` replaces or tightens
   them with fresh evidence.

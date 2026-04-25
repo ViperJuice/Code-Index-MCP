@@ -18,17 +18,17 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_rc7_contract_surfaces_and_workflow_path_are_frozen():
+def test_rc8_contract_surfaces_and_workflow_path_are_frozen():
     workflow = _read(WORKFLOW)
     release_metadata = _read(RELEASE_METADATA)
 
-    for expected in ("v1.2.0-rc7", "1.2.0-rc7", "peter-evans/create-pull-request@v8"):
+    for expected in ("v1.2.0-rc8", "1.2.0-rc8", "softprops/action-gh-release@v3"):
         assert expected in workflow
 
-    for expected in ("v1.2.0-rc7", "1.2.0-rc7", "release_type=custom"):
+    for expected in ("v1.2.0-rc8", "1.2.0-rc8", "release_type=custom"):
         assert expected in release_metadata
 
-    assert "peter-evans/create-pull-request@v7" not in workflow
+    assert "softprops/action-gh-release@v2" not in workflow
     assert "latest" in workflow
 
 
@@ -42,12 +42,13 @@ def test_ga_rc_evidence_is_the_canonical_recut_artifact():
     for expected in (
         "# GA RC Evidence",
         "plans/phase-plan-v5-garecut.md",
-        "v1.2.0-rc7",
+        "v1.2.0-rc8",
         "Release Automation",
         "PyPI",
         "GHCR",
         "prerelease",
         "latest",
+        "softprops/action-gh-release@v3",
     ):
         assert expected in evidence
 
@@ -67,12 +68,14 @@ def test_final_decision_stays_historical_and_routes_to_the_next_phase_explicitly
         "# GA Final Decision",
         "cut another RC",
         "GARECUT",
-        "v1.2.0-rc7",
-        "renewed GAREL",
+        "v1.2.0-rc8",
+        "rerunning GARECUT",
         "blocked before dispatch",
+        "softprops/action-gh-release@v3",
     ):
         assert expected in decision
 
     assert "- Final decision: `ship GA`." not in decision
     assert "- Final decision: `defer GA`." not in decision
     assert "### Phase 8 — Post-Remediation RC Recut (GARECUT)" in roadmap
+    assert "softprops/action-gh-release@v3" in roadmap

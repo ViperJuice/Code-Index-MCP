@@ -106,10 +106,10 @@ def test_docker_docs_use_current_image_package_only():
         assert "ghcr.io/viperjuice/code-index-mcp" in _read(path)
 
 
-def test_active_release_docs_name_rc6_and_alpha_or_beta_status():
+def test_active_release_docs_name_rc8_and_alpha_or_beta_status():
     for path in ACTIVE_DOCS:
         text = _read(path).lower()
-        assert "1.2.0-rc6" in text, f"{path.relative_to(REPO_ROOT)} missing 1.2.0-rc6"
+        assert "1.2.0-rc8" in text, f"{path.relative_to(REPO_ROOT)} missing 1.2.0-rc8"
         assert ("alpha" in text) or (
             "beta" in text
         ), f"{path.relative_to(REPO_ROOT)} missing alpha/beta status language"

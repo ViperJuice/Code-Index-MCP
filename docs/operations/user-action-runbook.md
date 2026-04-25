@@ -383,7 +383,7 @@ No operator actions required. P12 is fully codebase-internal.
   `docs/validation/ga-final-decision.md` plus
   `docs/validation/ga-release-evidence.md` for `GAREL`.
 - [ ] **Freeze the follow-up RC target.** GARC should plan around
-  `v1.2.0-rc6` unless a later roadmap amendment changes that contract.
+  `v1.2.0-rc8` unless a later roadmap amendment changes that contract.
 - [ ] **Keep governance in manual enforcement posture.** GABASE does not change
   branch protection, rulesets, release dispatch, or GA claims.
 
@@ -429,10 +429,10 @@ No operator actions required. P12 is fully codebase-internal.
 
 #### Before GARC
 
-- [ ] **Freeze the `rc6` contract surfaces first.** `pyproject.toml`,
+- [ ] **Freeze the `rc8` contract surfaces first.** `pyproject.toml`,
   `mcp_server/__init__.py`, `.github/workflows/release-automation.yml`,
   `CHANGELOG.md`, customer docs, installer helpers, and
-  `tests/test_release_metadata.py` must all agree on `v1.2.0-rc6` before any
+  `tests/test_release_metadata.py` must all agree on `v1.2.0-rc8` before any
   release dispatch is attempted.
 - [ ] **Require a clean release candidate state.** Run
   `git status --short --branch`; if the worktree is dirty, stop and record
@@ -440,8 +440,8 @@ No operator actions required. P12 is fully codebase-internal.
 - [ ] **Verify branch and tag qualification.** Run
   `git fetch origin main --tags --prune`,
   `git rev-parse HEAD origin/main`,
-  `git tag -l v1.2.0-rc6`, and
-  `git ls-remote --tags origin refs/tags/v1.2.0-rc6`.
+  `git tag -l v1.2.0-rc8`, and
+  `git ls-remote --tags origin refs/tags/v1.2.0-rc8`.
 - [ ] **Require fresh upstream evidence.** Treat
   `docs/validation/ga-governance-evidence.md`,
   `docs/validation/ga-e2e-evidence.md`, and
@@ -452,13 +452,13 @@ No operator actions required. P12 is fully codebase-internal.
 - [ ] **Confirm release-workflow visibility before dispatch.** Run
   `gh workflow view "Release Automation"` and record only metadata.
 - [ ] **Dispatch with the frozen RC policy.** Use exactly
-  `gh workflow run "Release Automation" -f version=v1.2.0-rc6 -f release_type=custom -f auto_merge=false`.
+  `gh workflow run "Release Automation" -f version=v1.2.0-rc8 -f release_type=custom -f auto_merge=false`.
 - [ ] **Observe the workflow to completion.** Record
   `gh run list --workflow "Release Automation" --limit 10`,
   `gh run watch <run-id> --exit-status`,
   `gh run view <run-id> --json url,headSha,status,conclusion,jobs`, and
-  `gh release view v1.2.0-rc6 --repo ViperJuice/Code-Index-MCP --json tagName,isPrerelease,isDraft,publishedAt,targetCommitish,url,assets`.
-- [ ] **Keep the channel split explicit.** `v1.2.0-rc6` remains prerelease
+  `gh release view v1.2.0-rc8 --repo ViperJuice/Code-Index-MCP --json tagName,isPrerelease,isDraft,publishedAt,targetCommitish,url,assets`.
+- [ ] **Keep the channel split explicit.** `v1.2.0-rc8` remains prerelease
   public-alpha/beta posture, `auto_merge=false` stays the default, GitHub
   Latest remains excluded from the RC policy source, and Docker `latest`
   remains stable-only.
