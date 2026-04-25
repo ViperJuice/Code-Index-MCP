@@ -487,6 +487,11 @@ support, E2E, and operations. GAREL waits for the follow-up RC soak.
 - After a successful GARECUT, route back through `codex-plan-phase
   specs/phase-plans-v5.md GAREL`; any older GAREL plan that predates the
   post-GARECUT or post-remediation release-workflow steering is stale.
+- Successful `v1.2.0-rc8` GARECUT evidence on run `24923402398` proved the
+  `softprops/action-gh-release@v3` path, but it also surfaced a new
+  `actions/download-artifact@v8` `Buffer()` deprecation warning inside the
+  successful `Create GitHub Release` job. Renewed GAREL must disposition that
+  warning before any `ship GA` decision or GA dispatch.
 
 ## Verification
 

@@ -67,10 +67,11 @@ def test_final_decision_stays_historical_and_routes_to_the_next_phase_explicitly
     for expected in (
         "# GA Final Decision",
         "cut another RC",
-        "GARECUT",
+        "GAREL",
         "v1.2.0-rc8",
-        "rerunning GARECUT",
-        "blocked before dispatch",
+        "ready for renewed GAREL planning",
+        "recut succeeded",
+        "actions/download-artifact@v8",
         "softprops/action-gh-release@v3",
     ):
         assert expected in decision
