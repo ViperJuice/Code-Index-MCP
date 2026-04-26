@@ -10,315 +10,163 @@ release_base_ref: origin/main
 
 ## Context
 
-GADISP is the eighth phase in the v5 GA-hardening roadmap and the only stable
-GA mutation phase. The roadmap hash is
-`4b09568b3e451da4b9d1d154a073ede1d3903c8e7fc5cb8111dec3fbcec10fd1`, the
-checkout is on clean synced `main` at
-`fbac09c931236d97d4457d041fbf358654999274`, and `.codex/phase-loop/state.json`
-already marks `GADISP` as the current planned phase under this roadmap.
+GADISP is the v5 GA-hardening phase that dispatches the stable `v1.2.0`
+release from a clean synced tree and records the post-release evidence after
+the workflow reaches a terminal state. The GAREL stable surfaces are already
+committed on `main`; this plan intentionally does not add pre-dispatch tests,
+stable-surface edits, support-matrix updates, or customer-doc rewrites.
 
-Current repo state gathered during planning:
+The current roadmap hash is
+`4b09568b3e451da4b9d1d154a073ede1d3903c8e7fc5cb8111dec3fbcec10fd1`.
+The previous GADISP plan is stale for execution because it mixed contract-test
+and docs-alignment edits into a `phase_loop_mutation: release_dispatch` phase.
+This replacement keeps the phase dispatch-only until the workflow has a
+terminal outcome. The only repo-owned mutation in this phase is the
+dispatch-dependent evidence artifact.
 
-- `docs/validation/ga-final-decision.md` is already the renewed GAREL artifact.
-  It records `ship GA`, routes stable mutation only to downstream `GADISP`,
-  preserves `v1.2.0-rc8` as historical evidence, and carries the accepted
-  non-blocking `actions/download-artifact@v8` `Buffer()` warning disposition.
-- Repo-owned stable surfaces are already prepared for `v1.2.0` / `v1.2.0`:
-  `.github/workflows/release-automation.yml`, package metadata, installer
-  defaults, and active customer docs already point at the stable version.
-- `docs/validation/ga-release-evidence.md` does not exist yet. That absence is
-  still explicitly referenced by the current README, runbooks, checklist, and
-  GAREL-focused tests, so execution must update only the files that are
-  supposed to flip once stable dispatch actually happens.
-- Existing contract tests still freeze a pre-dispatch world in a few places:
-  `tests/docs/test_garel_ga_release_contract.py`,
-  `tests/docs/test_gabase_ga_readiness_contract.py`, and
-  `tests/test_release_metadata.py` still assume release evidence is deferred or
-  absent, and there is no dedicated `GADISP` contract test yet.
-- The accepted-risk disposition is part of the stable dispatch contract:
-  `actions/download-artifact@v8` is still GitHub's current published line, and
-  the successful `v1.2.0-rc8` run already showed the same non-fatal
-  `Buffer()` warning. GADISP must record that warning as accepted metadata in
-  stable release evidence rather than reopening stable-surface prep or cutting
-  another RC.
+The accepted-risk disposition remains unchanged: the
+`actions/download-artifact@v8` `Buffer()` warning observed on the successful
+digest-verified `v1.2.0-rc8` release run is non-blocking for stable dispatch and
+must be recorded as accepted release evidence metadata.
 
 ## Interface Freeze Gates
 
-- [ ] IF-0-GADISP-1 - Stable pre-dispatch qualification contract:
-      local execution requires a clean expected release branch, synchronized
-      `origin/main`, a live `ship GA` decision in
-      `docs/validation/ga-final-decision.md`, already-committed stable
-      `v1.2.0` surfaces, visible Release Automation workflow metadata, and no
-      reused local or remote `v1.2.0` tag before dispatch.
-- [ ] IF-0-GADISP-2 - Stable dispatch observation contract:
-      Release Automation is dispatched exactly with
-      `version=v1.2.0`, `release_type=custom`, and `auto_merge=false`; the run
-      is watched to completion; and the captured facts include run URL, run ID,
-      `headSha`, per-job conclusions, stable GitHub release state, GitHub
-      Latest posture, release branch or PR disposition, PyPI publication, GHCR
-      image identity, and the accepted
-      `actions/download-artifact@v8` `Buffer()` warning metadata.
-- [ ] IF-0-GADISP-3 - GA release evidence reducer contract:
-      `docs/validation/ga-release-evidence.md` becomes the canonical stable
-      release artifact, records only redacted metadata, and explicitly states
-      dispatch inputs, preflight qualification, workflow observation,
-      publication identities, install/container verification, and rollback or
-      no-rollback disposition for `v1.2.0`.
-- [ ] IF-0-GADISP-4 - Post-dispatch docs and regression contract:
-      the README, getting-started/support/runbook surfaces, readiness checklist,
-      and GADISP-adjacent tests no longer describe stable dispatch as pending or
-      `ga-release-evidence.md` as absent, but they also do not widen support
-      tiers, topology claims, or non-GA/runtime promises beyond what the
-      release evidence actually proves.
+- [ ] IF-0-GADISP-1 - Clean-tree release dispatch preflight:
+      execution starts from clean `main`, `HEAD` equals `origin/main`,
+      `docs/validation/ga-final-decision.md` still selects `ship GA`, stable
+      `v1.2.0` surfaces already exist in committed files, the Release
+      Automation workflow is visible, and no local or remote `v1.2.0` tag
+      exists before dispatch.
+- [ ] IF-0-GADISP-2 - Stable dispatch observation:
+      Release Automation is dispatched exactly with `version=v1.2.0`,
+      `release_type=custom`, and `auto_merge=false`; the selected run is
+      watched to terminal state; and the captured facts include run URL, run
+      ID, `headSha`, job conclusions, publication states, install/container
+      verification, and warning disposition.
+- [ ] IF-0-GADISP-3 - GA release evidence:
+      `docs/validation/ga-release-evidence.md` records one coherent stable
+      dispatch attempt using redacted metadata only, including blocked/failed
+      details if the workflow does not complete successfully.
 
 ## Lane Index & Dependencies
 
-- SL-0 - GADISP contract tests; Depends on: GAREL; Blocks: SL-1, SL-2, SL-3; Parallel-safe: no
-- SL-1 - Stable GA dispatch qualification and workflow observation; Depends on: SL-0; Blocks: SL-2, SL-3; Parallel-safe: no
-- SL-2 - GA release evidence reducer; Depends on: SL-0, SL-1; Blocks: SL-3; Parallel-safe: no
-- SL-3 - Post-release docs and regression alignment; Depends on: SL-0, SL-1, SL-2; Blocks: GADISP acceptance; Parallel-safe: no
+- SL-0 - Clean dispatch qualification; Depends on: GAREL; Blocks: SL-1; Parallel-safe: no
+- SL-1 - Stable GA workflow dispatch and observation; Depends on: SL-0; Blocks: SL-2; Parallel-safe: no
+- SL-2 - GA release evidence reducer; Depends on: SL-1; Blocks: GADISP acceptance; Parallel-safe: no
 
 ## Lanes
 
-### SL-0 - GADISP Contract Tests
+### SL-0 - Clean Dispatch Qualification
 
-- **Scope**: Freeze the post-dispatch contract before mutation so execution
-  changes only the stable release evidence and the small set of docs/tests that
-  must reflect a completed GA dispatch.
-- **Owned files**: `tests/docs/test_gadisp_ga_dispatch_contract.py`,
-  `tests/docs/test_garel_ga_release_contract.py`,
-  `tests/docs/test_gabase_ga_readiness_contract.py`,
-  `tests/test_release_metadata.py`
-- **Interfaces provided**: IF-0-GADISP-1, IF-0-GADISP-2, IF-0-GADISP-3,
-  IF-0-GADISP-4
+- **Scope**: Prove the repository and release target are safe to dispatch
+  without mutating repo files.
+- **Owned files**: none
+- **Interfaces provided**: IF-0-GADISP-1
 - **Interfaces consumed**: `docs/validation/ga-final-decision.md`,
-  `docs/validation/ga-readiness-checklist.md`,
-  `docs/validation/ga-rc-evidence.md`,
-  `.github/workflows/release-automation.yml`,
-  `README.md`,
-  `docs/GETTING_STARTED.md`,
-  `docs/SUPPORT_MATRIX.md`,
-  `docs/operations/deployment-runbook.md`,
-  `docs/operations/user-action-runbook.md`
+  `.github/workflows/release-automation.yml`, `pyproject.toml`,
+  `mcp_server/__init__.py`, `CHANGELOG.md`, `README.md`
 - **Parallel-safe**: no
 - **Tasks**:
-  - test: Add a dedicated `tests/docs/test_gadisp_ga_dispatch_contract.py`
-    that freezes the required `ga-release-evidence.md` sections, stable
-    dispatch inputs, workflow observation fields, GitHub Latest posture, PyPI
-    and GHCR identities, install/container verification, and rollback
-    disposition.
-  - test: Update `tests/docs/test_garel_ga_release_contract.py` so GAREL stays
-    a historical pre-dispatch artifact after GADISP instead of asserting that
-    `docs/validation/ga-release-evidence.md` must remain absent forever.
-  - test: Update `tests/docs/test_gabase_ga_readiness_contract.py` so the
-    checklist's evidence map routes `docs/validation/ga-release-evidence.md`
-    to `GADISP` rather than `GAREL` and still preserves the pre-ship boundary.
-  - test: Update `tests/test_release_metadata.py` so stable tag reuse and
-    release metadata assertions reference the stable GA evidence path once
-    `v1.2.0` exists, while still freezing `release_type=custom`,
-    `auto_merge=false`, and the prepared workflow defaults.
-  - impl: Keep this lane test-only; it defines the exact post-dispatch contract
-    for SL-1 through SL-3 and should not mutate docs or evidence directly.
-  - verify: `uv run pytest tests/docs/test_gadisp_ga_dispatch_contract.py tests/docs/test_garel_ga_release_contract.py tests/docs/test_gabase_ga_readiness_contract.py tests/test_release_metadata.py -v --no-cov`
-
-### SL-1 - Stable GA Dispatch Qualification And Workflow Observation
-
-- **Scope**: Qualify the current stable `v1.2.0` release contract on clean
-  synced `main`, dispatch Release Automation, and capture the live workflow and
-  publication facts to terminal state.
-- **Owned files**: `none`
-- **Interfaces provided**: IF-0-GADISP-1, IF-0-GADISP-2; observed release
-  facts consumed by SL-2 and SL-3
-- **Interfaces consumed**: SL-0 GADISP assertions;
-  `docs/validation/ga-final-decision.md`,
-  `.github/workflows/release-automation.yml`,
-  `pyproject.toml`,
-  `mcp_server/__init__.py`,
-  `CHANGELOG.md`
-- **Parallel-safe**: no
-- **Tasks**:
-  - test: Re-run the narrowed post-dispatch contract checks first so stable
-    mutation starts only from the already-prepared `v1.2.0` repo state.
-  - test: Run the required pre-dispatch probes immediately before mutation:
+  - verify: Run the dispatch gate probes immediately before mutation:
     `git status --short --branch`, `git fetch origin main --tags --prune`,
     `git rev-parse HEAD origin/main`, `git tag -l v1.2.0`,
     `git ls-remote --tags origin refs/tags/v1.2.0`, and
     `gh workflow view "Release Automation"`.
-  - impl: If the worktree is dirty, `HEAD` differs from `origin/main`, the
-    stable `ship GA` decision is no longer authoritative, the workflow is not
-    visible, or `v1.2.0` already exists locally or remotely, stop before
-    dispatch and carry the blocked state into SL-2 and SL-3.
-  - impl: Dispatch `gh workflow run "Release Automation" -f version=v1.2.0 -f release_type=custom -f auto_merge=false`, watch the run to completion, and capture the run URL, run ID, `headSha`, and per-job conclusions.
-  - impl: Record GitHub release state, GitHub Latest posture, release branch or
-    PR disposition, PyPI `index-it-mcp 1.2.0` publication, GHCR
-    `ghcr.io/viperjuice/code-index-mcp:v1.2.0` identity, and the accepted
-    `actions/download-artifact@v8` `Buffer()` warning disposition from the
-    `Create GitHub Release` job logs.
-  - impl: If any preflight or publish-stage job fails, stop before claiming
-    success and preserve the blocked or failed outcome for downstream evidence
-    reduction.
-  - verify: `uv run pytest tests/docs/test_gadisp_ga_dispatch_contract.py tests/docs/test_garel_ga_release_contract.py tests/test_release_metadata.py -v --no-cov`
-  - verify: `git status --short --branch`
-  - verify: `git fetch origin main --tags --prune`
-  - verify: `git rev-parse HEAD origin/main`
-  - verify: `git tag -l v1.2.0`
-  - verify: `git ls-remote --tags origin refs/tags/v1.2.0`
-  - verify: `gh workflow view "Release Automation"`
-  - verify: `gh workflow run "Release Automation" -f version=v1.2.0 -f release_type=custom -f auto_merge=false`
-  - verify: `gh run list --workflow "Release Automation" --limit 10`
-  - verify: `gh run watch <run-id> --exit-status`
-  - verify: `gh run view <run-id> --json url,headSha,status,conclusion,jobs`
-  - verify: `gh run view <run-id> --job <create-github-release-job-id> --log`
-  - verify: `gh release view v1.2.0 --repo ViperJuice/Code-Index-MCP --json tagName,isPrerelease,isDraft,publishedAt,targetCommitish,url,assets`
-  - verify: `gh api repos/ViperJuice/Code-Index-MCP/releases/latest --jq '{tag_name,prerelease,draft,html_url,target_commitish,published_at}'`
-  - verify: `gh pr list --state all --head release/v1.2.0 --json number,state,isDraft,mergedAt,url,headRefName,baseRefName,title`
-  - verify: `curl -sSf https://pypi.org/pypi/index-it-mcp/1.2.0/json`
-  - verify: `docker buildx imagetools inspect ghcr.io/viperjuice/code-index-mcp:v1.2.0`
+  - verify: Run the existing release-contract smoke without adding or editing
+    tests: `uv run pytest tests/docs/test_garel_ga_release_contract.py tests/docs/test_gabase_ga_readiness_contract.py tests/test_release_metadata.py -v --no-cov`.
+  - impl: Stop before dispatch if the worktree is dirty, `HEAD` differs from
+    `origin/main`, `v1.2.0` already exists locally or remotely,
+    `docs/validation/ga-final-decision.md` no longer selects `ship GA`, or the
+    Release Automation workflow is unavailable.
+
+### SL-1 - Stable GA Workflow Dispatch And Observation
+
+- **Scope**: Dispatch the stable GA release workflow once and watch it to
+  terminal state.
+- **Owned files**: none
+- **Interfaces provided**: IF-0-GADISP-2
+- **Interfaces consumed**: IF-0-GADISP-1,
+  `.github/workflows/release-automation.yml`
+- **Parallel-safe**: no
+- **Tasks**:
+  - verify: Dispatch
+    `gh workflow run "Release Automation" -f version=v1.2.0 -f release_type=custom -f auto_merge=false`.
+  - verify: Identify the new workflow run from `gh run list --workflow "Release Automation" --limit 10`, preferring the run whose `headSha` matches the qualified `HEAD`.
+  - verify: Watch the run to completion with `gh run watch <run-id> --exit-status`.
+  - verify: Capture terminal workflow facts with
+    `gh run view <run-id> --json url,headSha,status,conclusion,jobs`.
+  - verify: Capture GitHub release state with
+    `gh release view v1.2.0 --repo ViperJuice/Code-Index-MCP --json tagName,isPrerelease,isDraft,publishedAt,targetCommitish,url,assets`.
+  - verify: Capture GitHub Latest posture with
+    `gh api repos/ViperJuice/Code-Index-MCP/releases/latest --jq '{tag_name,prerelease,draft,html_url,target_commitish,published_at}'`.
+  - verify: Capture release-branch or PR disposition with
+    `gh pr list --state all --head release/v1.2.0 --json number,state,isDraft,mergedAt,url,headRefName,baseRefName,title`.
+  - verify: Capture PyPI and GHCR identity metadata with
+    `curl -sSf https://pypi.org/pypi/index-it-mcp/1.2.0/json` and
+    `docker buildx imagetools inspect ghcr.io/viperjuice/code-index-mcp:v1.2.0`.
+  - verify: Inspect the relevant workflow logs for the accepted
+    `actions/download-artifact@v8` `Buffer()` warning without copying raw
+    secret-bearing output into repo artifacts.
+  - impl: If the workflow fails, continue to SL-2 and record the failed
+    terminal state. Do not create another dispatch attempt in the same phase
+    unless an operator explicitly authorizes retry.
 
 ### SL-2 - GA Release Evidence Reducer
 
-- **Scope**: Reduce the stable pre-dispatch, dispatch, workflow, publication,
-  and install-verification facts into the canonical GA release evidence
-  artifact.
+- **Scope**: Create the canonical evidence artifact for the stable dispatch
+  attempt after SL-1 reaches terminal state.
 - **Owned files**: `docs/validation/ga-release-evidence.md`
-- **Interfaces provided**: IF-0-GADISP-3; release facts consumed by SL-3
-- **Interfaces consumed**: SL-0 GADISP assertions; SL-1 stable dispatch and
-  publication facts; `docs/validation/ga-final-decision.md`,
-  `docs/validation/ga-rc-evidence.md`
+- **Interfaces provided**: IF-0-GADISP-3
+- **Interfaces consumed**: IF-0-GADISP-1, IF-0-GADISP-2,
+  `docs/validation/ga-final-decision.md`, `docs/validation/ga-rc-evidence.md`
 - **Parallel-safe**: no
 - **Tasks**:
-  - test: Rewrite `docs/validation/ga-release-evidence.md` only after SL-1 has
-    a terminal outcome so the artifact reflects one coherent stable dispatch
-    attempt.
-  - impl: Record capture time, active phase plan, selected commit, dispatch
-    inputs, qualification results, run URL and ID, `headSha`, per-job
-    conclusions, GitHub stable release state, GitHub Latest posture, release
-    branch or PR disposition, PyPI publication, GHCR image identity,
-    install/container verification outcome, rollback or no-rollback
-    disposition, and the accepted
+  - impl: Write `docs/validation/ga-release-evidence.md` with capture time,
+    active plan, qualified commit, dispatch inputs, preflight results, run URL,
+    run ID, `headSha`, terminal workflow conclusion, job conclusions, GitHub
+    release state, GitHub Latest posture, release branch or PR disposition,
+    PyPI publication identity, GHCR image identity, install/container
+    verification outcome, rollback or no-rollback disposition, and the accepted
     `actions/download-artifact@v8` `Buffer()` warning metadata.
-  - impl: If dispatch is blocked before mutation or fails mid-run, keep the
-    artifact explicit about the blocked or failed state instead of implying a
-    successful GA launch.
-  - impl: Preserve metadata-only reporting. Do not print raw tokens, raw logs,
-    or secret-bearing output.
-  - verify: `uv run pytest tests/docs/test_gadisp_ga_dispatch_contract.py tests/docs/test_garel_ga_release_contract.py tests/test_release_metadata.py -v --no-cov`
-  - verify: `rg -n "v1\\.2\\.0|Release Automation|GitHub Latest|PyPI|GHCR|Buffer\\(\\)|rollback|no rollback|dispatch attempted|conclusion" docs/validation/ga-release-evidence.md`
-
-### SL-3 - Post-Release Docs And Regression Alignment
-
-- **Scope**: Update the current docs and checklist surfaces that still describe
-  stable dispatch as pending so they align with the completed release evidence
-  without reopening support or topology decisions.
-- **Owned files**: `README.md`,
-  `docs/GETTING_STARTED.md`,
-  `docs/SUPPORT_MATRIX.md`,
-  `docs/operations/deployment-runbook.md`,
-  `docs/operations/user-action-runbook.md`,
-  `docs/validation/ga-readiness-checklist.md`
-- **Interfaces provided**: IF-0-GADISP-4
-- **Interfaces consumed**: SL-0 GADISP assertions; SL-1 stable dispatch facts;
-  SL-2 `docs/validation/ga-release-evidence.md`;
-  `docs/validation/ga-final-decision.md`
-- **Parallel-safe**: no
-- **Tasks**:
-  - test: Use the refreshed GADISP, GAREL, GABASE, release-metadata, and GAOPS
-    checks to fail first on stale "prepared stable", "dispatch pending", or
-    "`ga-release-evidence.md` belongs to GAREL" wording.
-  - impl: Update README, getting-started, support-matrix, and operator-runbook
-    status language so the stable `v1.2.0` release points at
-    `docs/validation/ga-release-evidence.md` as the canonical post-dispatch
-    artifact instead of describing dispatch as still pending.
-  - impl: Update the readiness checklist evidence map so
-    `docs/validation/ga-release-evidence.md` is owned by `GADISP`, while
-    preserving the historical pre-ship boundary and the frozen topology/support
-    labels.
-  - impl: Keep GAREL historical. Do not rewrite `docs/validation/ga-final-decision.md`
-    into a post-release artifact; treat it as the authorizing decision that SL-2
-    completed.
-  - impl: Preserve the existing beta, experimental, unsupported, and
-    disabled-by-default support tiers, the one-worktree-per-git-common-dir
-    topology contract, and the accepted `GitHub Latest` / Docker `latest`
-    channel posture exactly as observed in SL-1 and recorded in SL-2.
-  - verify: `uv run pytest tests/docs/test_gadisp_ga_dispatch_contract.py tests/docs/test_garel_ga_release_contract.py tests/docs/test_gabase_ga_readiness_contract.py tests/docs/test_gaops_operations_contract.py tests/test_release_metadata.py -v --no-cov`
-  - verify: `rg -n "ga-release-evidence|GADISP|prepared stable|dispatch still pending|stable release mutation and release evidence remain downstream-only|GitHub Latest|docker `latest`|v1\\.2\\.0" README.md docs/GETTING_STARTED.md docs/SUPPORT_MATRIX.md docs/operations/deployment-runbook.md docs/operations/user-action-runbook.md docs/validation/ga-readiness-checklist.md`
+  - impl: If SL-1 blocked or failed, make the evidence explicit about that
+    blocked or failed state rather than implying a successful GA launch.
+  - impl: Preserve metadata-only reporting. Do not print raw tokens, raw
+    private logs, or secret-bearing output.
+  - verify: `rg -n "v1\\.2\\.0|Release Automation|GitHub Latest|PyPI|GHCR|Buffer\\(\\)|rollback|no rollback|dispatch|conclusion" docs/validation/ga-release-evidence.md`.
+  - verify: `git diff --check`.
 
 ## Verification
 
-Planning-only run: do not execute these during plan creation. Run them during
-`codex-execute-phase` or manual GADISP execution.
-
-Lane-specific contract checks:
+Run during execution only:
 
 ```bash
-uv run pytest tests/docs/test_gadisp_ga_dispatch_contract.py tests/docs/test_garel_ga_release_contract.py tests/docs/test_gabase_ga_readiness_contract.py tests/test_release_metadata.py -v --no-cov
 git status --short --branch
 git fetch origin main --tags --prune
 git rev-parse HEAD origin/main
 git tag -l v1.2.0
 git ls-remote --tags origin refs/tags/v1.2.0
 gh workflow view "Release Automation"
+uv run pytest tests/docs/test_garel_ga_release_contract.py tests/docs/test_gabase_ga_readiness_contract.py tests/test_release_metadata.py -v --no-cov
 gh workflow run "Release Automation" -f version=v1.2.0 -f release_type=custom -f auto_merge=false
 gh run list --workflow "Release Automation" --limit 10
 gh run watch <run-id> --exit-status
 gh run view <run-id> --json url,headSha,status,conclusion,jobs
-gh run view <run-id> --job <create-github-release-job-id> --log
 gh release view v1.2.0 --repo ViperJuice/Code-Index-MCP --json tagName,isPrerelease,isDraft,publishedAt,targetCommitish,url,assets
 gh api repos/ViperJuice/Code-Index-MCP/releases/latest --jq '{tag_name,prerelease,draft,html_url,target_commitish,published_at}'
 gh pr list --state all --head release/v1.2.0 --json number,state,isDraft,mergedAt,url,headRefName,baseRefName,title
 curl -sSf https://pypi.org/pypi/index-it-mcp/1.2.0/json
 docker buildx imagetools inspect ghcr.io/viperjuice/code-index-mcp:v1.2.0
-rg -n "v1\\.2\\.0|Release Automation|GitHub Latest|PyPI|GHCR|Buffer\\(\\)|rollback|dispatch attempted" docs/validation/ga-release-evidence.md
-```
-
-Whole-phase regression commands:
-
-```bash
-uv run pytest tests/docs tests/smoke tests/test_release_metadata.py tests/test_requirements_consolidation.py -v --no-cov
-make alpha-production-matrix
-make release-smoke
-make release-smoke-container
-git status --short --branch
-test -e docs/validation/ga-release-evidence.md
+rg -n "v1\\.2\\.0|Release Automation|GitHub Latest|PyPI|GHCR|Buffer\\(\\)|rollback|no rollback|dispatch|conclusion" docs/validation/ga-release-evidence.md
+git diff --check
 ```
 
 ## Acceptance Criteria
 
-- [ ] Local pre-dispatch checks confirm clean release state, expected branch,
-      synchronized `origin/main`, a live `ship GA` decision, and already
-      committed stable `v1.2.0` surfaces before mutation begins.
-- [ ] Release Automation dispatch uses stable `v1.2.0` with
-      `release_type=custom` and `auto_merge=false` from this dedicated
-      `phase_loop_mutation: release_dispatch` plan.
-- [ ] Preflight gates, release artifact build, GitHub release creation, PyPI
-      publish, GHCR publish, and release-smoke/container-smoke observation are
-      watched to completion or captured explicitly as blocked/failed.
-- [ ] `docs/validation/ga-release-evidence.md` records workflow URL, run ID,
-      `headSha`, stable tag and release state, GitHub Latest posture, PyPI and
-      GHCR identities, install/container verification, rollback disposition,
-      and the accepted `actions/download-artifact@v8` `Buffer()` warning using
-      metadata-only reporting.
-- [ ] Docs and tests that previously described stable dispatch as pending now
-      align to the completed release evidence without broadening support tiers,
-      topology claims, or non-GA/runtime promises.
-- [ ] No additional stable-surface preparation is mixed into the dispatch plan
-      beyond evidence and status updates that depend on the actual stable
-      release outcome.
-
-## Automation Handoff
-
-```yaml
-automation:
-  status: planned
-  next_skill: codex-execute-phase
-  next_command: codex-execute-phase plans/phase-plan-v5-gadisp.md
-  next_model_hint: execute
-  next_effort_hint: medium
-  human_required: false
-  blocker_class: none
-  blocker_summary: none
-  required_human_inputs: []
-  verification_status: not_run
-  artifact: /home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v5-gadisp.md
-  artifact_state: staged
-```
+- The stable release workflow is dispatched once from clean synced `main`, or
+  the evidence artifact clearly records the pre-dispatch blocker.
+- The workflow terminal state and publication identities are captured as
+  redacted metadata.
+- `docs/validation/ga-release-evidence.md` is the only repo-owned output from
+  this phase.
+- No customer docs, stable surfaces, support tiers, topology claims, or tests
+  are changed by this dispatch phase.
