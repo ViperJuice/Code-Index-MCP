@@ -92,7 +92,13 @@ def test_ship_decision_defers_release_evidence_to_gadisp_and_keeps_public_surfac
     assert "Stable GA dispatch: `authorized for downstream GADISP`" in decision
     assert "ga-release-evidence.md`" in decision
     assert "remains intentionally absent until downstream GADISP" in decision
-    assert not GA_RELEASE.exists()
+    if GA_RELEASE.exists():
+        release = _read(GA_RELEASE)
+        assert "GADISP" in release
+        assert "stable dispatch succeeded" in release
+        assert "v1.2.0" in release
+    else:
+        assert "remains intentionally absent until downstream GADISP" in decision
 
     combined = "\n".join(_read(path) for path in PUBLIC_SURFACES).lower()
     for expected in ("stable", "github latest", "docker `latest`"):
