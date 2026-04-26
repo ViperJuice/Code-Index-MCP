@@ -468,7 +468,7 @@ GACLOSE
        │              │          ├─> GAOPS ─┐
        └──────────────┘          │          │
                                  └──────────┴─> GARC -> GAREL ─┬─> GADISP
-                                                               └─> GARECUT
+                                                               └─> GARECUT (retired)
 ```
 
 GAGOV and GASUPPORT can be planned after GABASE. GAE2E depends on the support
@@ -476,8 +476,10 @@ contract because the E2E evidence must know which claims it is proving. GAOPS
 depends on governance and E2E evidence so operator procedures reference the
 actual enforced gates and validated runtime behavior. GARC waits for governance,
 support, E2E, and operations. GAREL waits for the follow-up RC soak. From
-renewed GAREL, the ship-GA branch plans GADISP while the another-RC branch
-plans GARECUT and then routes back through GAREL.
+renewed GAREL, the ship-GA branch planned GADISP while the another-RC branch
+would have planned GARECUT and then routed back through GAREL. GARECUT is now
+retired for the v5 roadmap because renewed GAREL selected `ship GA` and GADISP
+successfully published stable `v1.2.0` with release evidence.
 
 ## Execution Notes
 
@@ -495,18 +497,20 @@ plans GARECUT and then routes back through GAREL.
   stable-surface-preparation phase only.
 - If GAREL selects `ship GA`, plan `GADISP` next; any older stable-dispatch
   artifact that predates the current GAREL decision and prep state is stale.
+  After successful GADISP evidence exists, do not plan or execute GARECUT in
+  the v5 roadmap.
 - If GAREL remediates release-workflow runtime drift and concludes that another
-  prerelease soak is required, plan `GARECUT` next and treat any older
-  downstream GAREL assumptions as stale.
+  prerelease soak is required before stable dispatch, plan `GARECUT` next and
+  treat any older downstream GAREL assumptions as stale. That contingency is
+  superseded once GADISP stable release evidence exists.
 - The `actions/download-artifact@v8` `Buffer()` warning observed in the
   successful `v1.2.0-rc8` run is accepted as non-blocking for GA dispatch. The
   action is GitHub-owned, the latest published `v8.0.1` line still emits the
   warning, and the rc8 release proved digest-verified artifact transfer plus
   successful GitHub Release, PyPI, and GHCR publication. Track the upstream
   warning separately, but do not block `GADISP` on it.
-- After a successful GARECUT, route back through `codex-plan-phase
-  specs/phase-plans-v5.md GAREL`; any older GAREL plan that predates the
-  post-GARECUT or post-remediation release-workflow steering is stale.
+- The historical `plans/phase-plan-v5-garecut.md` artifact is retained only as
+  a retired contingency record after GADISP; it must not be executed for v5.
 - GADISP is the only stable-GA phase that may carry
   `phase_loop_mutation: release_dispatch`.
 - Successful `v1.2.0-rc8` GARECUT evidence on run `24923402398` proved the
@@ -575,12 +579,10 @@ gh workflow run "Release Automation" -f version=<ga-version> -f release_type=cus
 gh run watch <run-id> --exit-status
 gh release view <ga-version>
 
-# GARECUT
+# GARECUT (retired contingency; do not execute after successful GADISP)
 git status --short --branch
-uv run pytest tests/docs tests/smoke tests/test_release_metadata.py -v --no-cov
-gh workflow run "Release Automation" -f version=<next-rc-tag> -f release_type=custom -f auto_merge=false
-gh run view <run-id> --job <merge-release-job-id> --log
-gh release view <next-rc-tag>
+rg -n "GARECUT|retired|v1\\.2\\.0|ga-release-evidence" \
+  specs/phase-plans-v5.md docs/validation/ga-release-evidence.md
 ```
 
 ### Phase 8 — GA Stable Dispatch And Release Evidence (GADISP)
@@ -638,34 +640,40 @@ evidence.
 
 ### Phase 9 — Post-Remediation RC Recut (GARECUT)
 
+**Status**
+
+Retired / superseded by successful GADISP stable dispatch.
+
 **Objective**
 
-Soak the remediated release workflow on one more prerelease candidate before
-any future GA ship decision is reconsidered.
+Historical contingency for the branch where renewed GAREL required another
+prerelease soak before stable dispatch. It is no longer execution-ready in v5
+because GAREL selected `ship GA` and GADISP published stable `v1.2.0`.
 
 **Exit criteria**
-- [ ] The release workflow no longer depends on the deprecated Node 20 action
-      path that GARC surfaced.
-- [ ] A new RC version after `v1.2.0-rc7` is frozen and dispatched through the
-      remediated workflow.
-- [ ] The recut workflow run completes with prerelease policy intact: GitHub
-      Latest remains excluded and Docker `latest` remains stable-only.
-- [ ] A fresh RC evidence artifact records the remediated workflow run, its log
-      disposition, and the resulting prerelease channel state.
-- [ ] The repo is ready for a renewed final GA decision only after that fresh
-      recut evidence exists.
+- [x] The release workflow no longer depends on the deprecated
+      `softprops/action-gh-release@v2` path that GARC surfaced.
+- [x] The successful `v1.2.0-rc8` recut proved the remediated
+      `softprops/action-gh-release@v3` path with prerelease policy intact.
+- [x] GAREL selected `ship GA` after the rc8 evidence and accepted the
+      `actions/download-artifact@v8` `Buffer()` warning as non-blocking.
+- [x] GADISP dispatched stable `v1.2.0` and wrote
+      `docs/validation/ga-release-evidence.md`.
+- [x] No post-GADISP prerelease recut is required for the v5 roadmap.
 
 **Scope notes**
 
-This phase is a prerelease recut on the remediated workflow path. It does not
-authorize a stable release by itself. Because the latest
-`actions/download-artifact@v8` `Buffer()` warning has been accepted as
-non-blocking based on successful digest-verified rc8 evidence, another recut is
-not required solely for that warning.
+This phase was the prerelease-recut contingency on the remediated workflow
+path. It did not authorize a stable release by itself. Because the latest
+`actions/download-artifact@v8` `Buffer()` warning was accepted as non-blocking
+based on successful digest-verified rc8 evidence, and GADISP subsequently
+published stable `v1.2.0`, this phase must not be planned or executed after
+GADISP in v5.
 
 **Non-goals**
 
 - No GA dispatch.
+- No post-GADISP prerelease recut.
 - No support-matrix expansion.
 - No topology broadening.
 
@@ -681,4 +689,4 @@ not required solely for that warning.
 - GAREL
 
 **Produces**
-- IF-0-GARECUT-1 — Post-remediation RC recut contract.
+- IF-0-GARECUT-1 — Retired post-remediation RC recut contingency record.
