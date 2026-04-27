@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from mcp_server.core.repo_context import RepoContext
+from mcp_server.dispatcher.dispatcher_enhanced import IndexResult, IndexResultStatus
 from mcp_server.storage.git_index_manager import (
     ChangeSet,
     GitAwareIndexManager,
@@ -95,24 +96,49 @@ def _make_manager(registry_mock) -> GitAwareIndexManager:
 
 
 class CtxSignatureDispatcher:
-    def __init__(self, fail_index: set[Path] | None = None) -> None:
+    def __init__(
+        self,
+        fail_index: set[Path] | None = None,
+        index_results: dict[Path, IndexResultStatus] | None = None,
+        remove_results: dict[Path, IndexResultStatus] | None = None,
+        move_results: dict[tuple[Path, Path], IndexResultStatus] | None = None,
+    ) -> None:
         self.calls = []
         self.fail_index = fail_index or set()
+        self.index_results = index_results or {}
+        self.remove_results = remove_results or {}
+        self.move_results = move_results or {}
 
     def remove_file(self, ctx, path):
         assert isinstance(ctx, RepoContext)
-        self.calls.append(("remove", ctx, Path(path)))
+        path = Path(path)
+        self.calls.append(("remove", ctx, path))
+        status = self.remove_results.get(path, IndexResultStatus.DELETED)
+        return IndexResult(status=status, path=path, observed_hash=None, actual_hash=None)
 
     def move_file(self, ctx, old_path, new_path, content_hash=None):
         assert isinstance(ctx, RepoContext)
-        self.calls.append(("move", ctx, Path(old_path), Path(new_path), content_hash))
+        old_path = Path(old_path)
+        new_path = Path(new_path)
+        self.calls.append(("move", ctx, old_path, new_path, content_hash))
+        status = self.move_results.get((old_path, new_path), IndexResultStatus.MOVED)
+        return IndexResult(status=status, path=new_path, observed_hash=None, actual_hash=None)
 
     def index_file(self, ctx, path):
         assert isinstance(ctx, RepoContext)
         path = Path(path)
         if path in self.fail_index:
-            raise RuntimeError("boom")
+            return IndexResult(
+                status=IndexResultStatus.ERROR,
+                path=path,
+                observed_hash=None,
+                actual_hash=None,
+                error="boom",
+            )
         self.calls.append(("index", ctx, path))
+        status = self.index_results.get(path, IndexResultStatus.INDEXED)
+        error = "synthetic status" if status is not IndexResultStatus.INDEXED else None
+        return IndexResult(status=status, path=path, observed_hash=None, actual_hash=None, error=error)
 
     def index_directory(self, ctx, path, recursive=True):
         assert isinstance(ctx, RepoContext)
@@ -248,6 +274,115 @@ def test_incremental_update_uses_same_ctx_for_all_dispatcher_mutations(tmp_path)
     assert result.clean
     assert [call[0] for call in dispatcher.calls] == ["remove", "move", "index"]
     assert all(call[1] is ctx for call in dispatcher.calls)
+
+
+def test_incremental_update_skipped_required_index_is_not_clean(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    repo_info.index_path.touch()
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+    changed_file = repo / "hello.py"
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    dispatcher = CtxSignatureDispatcher(
+        index_results={changed_file: IndexResultStatus.SKIPPED_UNCHANGED}
+    )
+    manager = GitAwareIndexManager(registry, dispatcher)
+
+    result = manager._incremental_index_update(
+        repo_info.repository_id,
+        ctx,
+        ChangeSet(added=[], modified=["hello.py"], deleted=[], renamed=[]),
+    )
+
+    assert not result.clean
+    assert result.indexed == 0
+    assert result.skipped == 1
+    assert any("hello.py" in error for error in result.errors)
+
+
+def test_incremental_missing_rename_destination_is_clean_only_after_delete_success(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    repo_info.index_path.touch()
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    dispatcher = CtxSignatureDispatcher()
+    manager = GitAwareIndexManager(registry, dispatcher)
+
+    result = manager._incremental_index_update(
+        repo_info.repository_id,
+        ctx,
+        ChangeSet(added=[], modified=[], deleted=[], renamed=[("old.py", "new.py")]),
+    )
+
+    assert result.clean
+    assert result.deleted == 1
+    assert result.moved == 0
+
+
+def test_incremental_missing_rename_destination_not_clean_when_delete_not_found(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    repo_info.index_path.touch()
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+    old_full = repo / "old.py"
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    dispatcher = CtxSignatureDispatcher(
+        remove_results={old_full: IndexResultStatus.NOT_FOUND}
+    )
+    manager = GitAwareIndexManager(registry, dispatcher)
+
+    result = manager._incremental_index_update(
+        repo_info.repository_id,
+        ctx,
+        ChangeSet(added=[], modified=[], deleted=[], renamed=[("old.py", "new.py")]),
+    )
+
+    assert not result.clean
+    assert result.deleted == 0
+    assert result.failed == 1
+
+
+def test_skipped_required_incremental_result_does_not_advance_commit(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    old_commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, old_commit)
+    repo_info.index_path.touch()
+
+    changed_file = repo / "hello.py"
+    changed_file.write_text("print('updated')\n")
+    subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "update"], cwd=repo, check=True, capture_output=True)
+    new_commit = _get_head_commit(repo)
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    registry.update_git_state.return_value = {"commit": new_commit, "branch": "main"}
+
+    manager = GitAwareIndexManager(
+        registry,
+        CtxSignatureDispatcher(
+            index_results={changed_file: IndexResultStatus.SKIPPED_UNCHANGED}
+        ),
+    )
+    manager._get_changed_files = MagicMock(
+        return_value=ChangeSet(added=[], modified=["hello.py"], deleted=[], renamed=[])
+    )
+    manager._should_full_reindex = MagicMock(return_value=False)
+
+    result = manager.sync_repository_index(repo_info.repository_id)
+
+    assert result.action == "failed"
+    registry.update_indexed_commit.assert_not_called()
 
 
 def test_missing_index_does_not_incremental_dry_run_or_advance_commit(tmp_path):

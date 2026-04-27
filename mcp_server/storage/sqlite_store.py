@@ -2110,7 +2110,7 @@ class SQLiteStore:
             )
             logger.info(f"Marked file as deleted: {relative_path}")
 
-    def remove_file(self, relative_path: str, repository_id: int):
+    def remove_file(self, relative_path: str, repository_id: int) -> bool:
         """Remove file and all associated data (hard delete)."""
         with self._get_connection() as conn:
             # Get file ID first
@@ -2121,7 +2121,7 @@ class SQLiteStore:
             row = cursor.fetchone()
             if not row:
                 logger.warning(f"File not found for removal: {relative_path}")
-                return
+                return False
 
             file_id = row[0]
 
@@ -2149,17 +2149,23 @@ class SQLiteStore:
             conn.execute("DELETE FROM files WHERE id = ?", (file_id,))
 
             logger.info(f"Removed file and all associated data: {relative_path}")
+            return True
 
-    def move_file(self, old_path: str, new_path: str, repository_id: int, content_hash: str):
+    def move_file(
+        self, old_path: str, new_path: str, repository_id: int, content_hash: str
+    ) -> bool:
         """Record a file move operation."""
         with self._get_connection() as conn:
             # Update the file path
-            conn.execute(
+            cursor = conn.execute(
                 """UPDATE files 
                    SET relative_path = ?, path = ?
                    WHERE relative_path = ? AND repository_id = ?""",
                 (new_path, new_path, old_path, repository_id),
             )
+            if cursor.rowcount <= 0:
+                logger.warning("File not found for move: %s", old_path)
+                return False
 
             # Record the move
             conn.execute(
@@ -2170,6 +2176,7 @@ class SQLiteStore:
             )
 
             logger.info(f"Recorded file move: {old_path} -> {new_path}")
+            return True
 
     def cleanup_deleted_files(self, days_old: int = 30):
         """Clean up files marked as deleted for more than specified days."""

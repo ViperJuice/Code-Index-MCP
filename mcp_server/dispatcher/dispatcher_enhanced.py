@@ -56,8 +56,11 @@ logger = logging.getLogger(__name__)
 
 class IndexResultStatus(str, Enum):
     INDEXED = "indexed"
+    DELETED = "deleted"
+    MOVED = "moved"
     SKIPPED_UNCHANGED = "skipped_unchanged"
     SKIPPED_TOCTOU = "skipped_toctou"
+    NOT_FOUND = "not_found"
     ERROR = "error"
 
 
@@ -1769,15 +1772,22 @@ class EnhancedDispatcher:
                 record_handled_error(__name__, exc)
                 pass
 
-    def index_file(self, ctx: RepoContext, path: Path, do_semantic: bool = True) -> None:
+    def index_file(
+        self, ctx: RepoContext, path: Path, do_semantic: bool = True
+    ) -> IndexResult:
         """Index a single file if it has changed."""
+        path = path.resolve()
+
+        if not path.exists():
+            return IndexResult(
+                status=IndexResultStatus.NOT_FOUND,
+                path=path,
+                observed_hash=None,
+                actual_hash=None,
+                error="file not found",
+            )
+
         try:
-            # Ensure path is absolute to avoid relative/absolute path issues
-            path = path.resolve()
-
-            # Find the appropriate plugin
-            plugin = self._match_plugin(path)
-
             # Read file content
             try:
                 content = path.read_text(encoding="utf-8")
@@ -1787,12 +1797,26 @@ class EnhancedDispatcher:
                     content = path.read_text(encoding="latin-1")
                 except Exception as e:
                     logger.error(f"Failed to read {path}: {e}")
-                    return
+                    return IndexResult(
+                        status=IndexResultStatus.ERROR,
+                        path=path,
+                        observed_hash=None,
+                        actual_hash=None,
+                        error=str(e),
+                    )
 
             # Skip if file hasn't changed since last index
             if not self._should_reindex(path, content):
                 logger.debug(f"Skipping {path} (unchanged)")
-                return
+                return IndexResult(
+                    status=IndexResultStatus.SKIPPED_UNCHANGED,
+                    path=path,
+                    observed_hash=None,
+                    actual_hash=None,
+                )
+
+            # Find the appropriate plugin
+            plugin = self._match_plugin(path)
 
             # Index the file
             start_time = time.time()
@@ -1831,11 +1855,32 @@ class EnhancedDispatcher:
                 except Exception as e:
                     logger.warning(f"Semantic indexing failed for {path}: {e}")
 
+            return IndexResult(
+                status=IndexResultStatus.INDEXED,
+                path=path,
+                observed_hash=None,
+                actual_hash=None,
+            )
+
         except RuntimeError as e:
             # No plugin found for this file type
             logger.debug(f"No plugin for {path}: {e}")
+            return IndexResult(
+                status=IndexResultStatus.ERROR,
+                path=path,
+                observed_hash=None,
+                actual_hash=None,
+                error=str(e),
+            )
         except Exception as e:
             logger.error(f"Error indexing {path}: {e}", exc_info=True)
+            return IndexResult(
+                status=IndexResultStatus.ERROR,
+                path=path,
+                observed_hash=None,
+                actual_hash=None,
+                error=str(e),
+            )
 
     def index_file_guarded(self, ctx: RepoContext, path: Path, expected_hash: str) -> IndexResult:
         """TOCTOU-guarded index: re-hashes immediately before plugin write.
@@ -2243,7 +2288,7 @@ class EnhancedDispatcher:
 
         return health
 
-    def remove_file(self, ctx: RepoContext, path: Union[Path, str]) -> None:
+    def remove_file(self, ctx: RepoContext, path: Union[Path, str]) -> IndexResult:
         """Remove a file from all per-repo indexes."""
         path = Path(path).resolve()
         logger.info(f"Removing file from index: {path}")
@@ -2252,19 +2297,48 @@ class EnhancedDispatcher:
         with self._file_cache_lock:
             self._file_cache.pop(str(path), None)
 
+        primary_result = IndexResult(
+            status=IndexResultStatus.ERROR,
+            path=path,
+            observed_hash=None,
+            actual_hash=None,
+            error="sqlite store unavailable",
+        )
+
         try:
-            # Remove from SQLite if available
             if ctx.sqlite_store:
                 from ..core.path_resolver import PathResolver
 
                 path_resolver = PathResolver(repository_root=ctx.workspace_root)
                 try:
                     relative_path = path_resolver.normalize_path(path)
-                    ctx.sqlite_store.remove_file(
+                    removed = ctx.sqlite_store.remove_file(
                         relative_path, repository_id=self._sqlite_repository_id(ctx)
                     )
+                    if removed:
+                        primary_result = IndexResult(
+                            status=IndexResultStatus.DELETED,
+                            path=path,
+                            observed_hash=None,
+                            actual_hash=None,
+                        )
+                    else:
+                        primary_result = IndexResult(
+                            status=IndexResultStatus.NOT_FOUND,
+                            path=path,
+                            observed_hash=None,
+                            actual_hash=None,
+                            error="indexed file row not found",
+                        )
                 except Exception as e:
                     logger.error(f"Error removing from SQLite: {e}")
+                    primary_result = IndexResult(
+                        status=IndexResultStatus.ERROR,
+                        path=path,
+                        observed_hash=None,
+                        actual_hash=None,
+                        error=str(e),
+                    )
 
             # Remove from plugin fuzzy index if available
             try:
@@ -2284,10 +2358,19 @@ class EnhancedDispatcher:
                     logger.warning("Failed to remove %s from semantic index: %s", path, e)
 
             # Update statistics
-            self._operation_stats["deletions"] = self._operation_stats.get("deletions", 0) + 1
+            if primary_result.status == IndexResultStatus.DELETED:
+                self._operation_stats["deletions"] = self._operation_stats.get("deletions", 0) + 1
+            return primary_result
 
         except Exception as e:
             logger.error(f"Error removing file {path}: {e}", exc_info=True)
+            return IndexResult(
+                status=IndexResultStatus.ERROR,
+                path=path,
+                observed_hash=None,
+                actual_hash=None,
+                error=str(e),
+            )
 
     def move_file(
         self,
@@ -2295,7 +2378,7 @@ class EnhancedDispatcher:
         old_path: Union[Path, str],
         new_path: Union[Path, str],
         content_hash: Optional[str] = None,
-    ) -> None:
+    ) -> IndexResult:
         """Relocate a file in the per-repo index.
 
         SQLite path-update is the primary op; semantic re-embed is the shadow op, both
@@ -2312,7 +2395,13 @@ class EnhancedDispatcher:
         if not ctx.sqlite_store:
             # No SQLite — nothing to do
             self._operation_stats["moves"] = self._operation_stats.get("moves", 0) + 1
-            return
+            return IndexResult(
+                status=IndexResultStatus.ERROR,
+                path=new_path,
+                observed_hash=None,
+                actual_hash=None,
+                error="sqlite store unavailable",
+            )
 
         from ..core.path_resolver import PathResolver
 
@@ -2323,18 +2412,26 @@ class EnhancedDispatcher:
             new_relative = path_resolver.normalize_path(new_path)
         except Exception as e:
             logger.error(f"Error normalizing paths for move {old_path} -> {new_path}: {e}")
-            return
+            return IndexResult(
+                status=IndexResultStatus.ERROR,
+                path=new_path,
+                observed_hash=None,
+                actual_hash=None,
+                error=str(e),
+            )
 
         store = ctx.sqlite_store
         repository_id = self._sqlite_repository_id(ctx)
 
         def _sqlite_primary() -> Tuple[str, str]:
-            store.move_file(
+            moved = store.move_file(
                 old_relative,
                 new_relative,
                 repository_id=repository_id,
                 content_hash=content_hash,
             )
+            if not moved:
+                raise FileNotFoundError(old_relative)
             return old_relative, new_relative
 
         def _semantic_shadow(_result: Tuple[str, str]) -> None:
@@ -2365,13 +2462,33 @@ class EnhancedDispatcher:
                 rollback=_sqlite_rollback,
             )
             self._operation_stats["moves"] = self._operation_stats.get("moves", 0) + 1
+            return IndexResult(
+                status=IndexResultStatus.MOVED,
+                path=new_path,
+                observed_hash=None,
+                actual_hash=None,
+            )
+        except FileNotFoundError:
+            return IndexResult(
+                status=IndexResultStatus.NOT_FOUND,
+                path=old_path,
+                observed_hash=None,
+                actual_hash=None,
+                error="indexed source row not found",
+            )
         except TwoPhaseCommitError as exc:
             err = IndexingError(f"Atomic move failed {old_path} -> {new_path}: {exc}")
             record_handled_error(__name__, err)
             raise err from exc
         except Exception as e:
             logger.error(f"Error moving file {old_path} -> {new_path}: {e}", exc_info=True)
-            raise
+            return IndexResult(
+                status=IndexResultStatus.ERROR,
+                path=new_path,
+                observed_hash=None,
+                actual_hash=None,
+                error=str(e),
+            )
 
     async def cross_repo_symbol_search(
         self,

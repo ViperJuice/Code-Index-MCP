@@ -7,6 +7,7 @@ import pytest
 
 from mcp_server.core.errors import IndexingError
 from mcp_server.core.repo_context import RepoContext
+from mcp_server.dispatcher.dispatcher_enhanced import IndexResultStatus
 from mcp_server.storage.sqlite_store import SQLiteStore
 
 # ---------------------------------------------------------------------------
@@ -85,7 +86,8 @@ class TestRenameSingleRemoveSingleAdd:
         bar_abs.write_text("x = 1\n")
 
         # No semantic indexer — no plugin with _indexer
-        dispatcher.move_file(ctx, foo_abs, bar_abs, content_hash="abc123")
+        result = dispatcher.move_file(ctx, foo_abs, bar_abs, content_hash="abc123")
+        assert result.status == IndexResultStatus.MOVED
 
         with store._get_connection() as conn:
             rows = conn.execute(
@@ -149,6 +151,24 @@ class TestRenameRollbackOnSemanticFailure:
 
         paths = [r[0] for r in rows]
         assert paths == ["foo.py"], f"Expected rollback to foo.py but got {paths}"
+
+    def test_move_returns_not_found_when_primary_row_never_existed(self, tmp_path):
+        repo_root = tmp_path / "repo"
+        repo_root.mkdir()
+
+        store = _make_store(tmp_path)
+        store.create_repository(path=str(repo_root), name="testrepo")
+        ctx = _make_ctx(store, workspace_root=repo_root)
+        dispatcher = _make_dispatcher(store)
+
+        foo_abs = repo_root / "foo.py"
+        bar_abs = repo_root / "bar.py"
+        foo_abs.write_text("x = 1\n")
+        bar_abs.write_text("x = 1\n")
+
+        result = dispatcher.move_file(ctx, foo_abs, bar_abs, content_hash="abc123")
+
+        assert result.status == IndexResultStatus.NOT_FOUND
 
     def test_rename_rollback_increments_error_metric(self, tmp_path):
         """record_handled_error is called with module=dispatcher_enhanced and exception=IndexingError."""

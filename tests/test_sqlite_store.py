@@ -251,6 +251,39 @@ class TestFileOperations:
         assert file_info["size"] == 200
         assert file_info["hash"] == "hash2"
 
+    def test_remove_file_returns_true_only_when_row_deleted(self, sqlite_store):
+        repo_id = sqlite_store.create_repository("/repo", "test")
+        sqlite_store.store_file(repo_id, "/repo/file.py", "file.py")
+
+        removed = sqlite_store.remove_file("file.py", repo_id)
+        missing = sqlite_store.remove_file("file.py", repo_id)
+
+        assert removed is True
+        assert missing is False
+
+    def test_move_file_returns_true_when_primary_row_moves(self, sqlite_store):
+        repo_id = sqlite_store.create_repository("/repo", "test")
+        sqlite_store.store_file(repo_id, "/repo/old.py", "old.py")
+
+        moved = sqlite_store.move_file("old.py", "new.py", repo_id, "hash-123")
+
+        assert moved is True
+        assert sqlite_store.get_file_by_path("old.py", repo_id) is None
+        assert sqlite_store.get_file_by_path("new.py", repo_id) is not None
+
+    def test_move_file_returns_false_and_skips_audit_when_source_missing(self, sqlite_store):
+        repo_id = sqlite_store.create_repository("/repo", "test")
+
+        moved = sqlite_store.move_file("missing.py", "new.py", repo_id, "hash-123")
+
+        assert moved is False
+        with sqlite_store._get_connection() as conn:
+            move_rows = conn.execute(
+                "SELECT COUNT(*) FROM file_moves WHERE repository_id = ?",
+                (repo_id,),
+            ).fetchone()[0]
+        assert move_rows == 0
+
     def test_get_file_with_repository(self, sqlite_store):
         """Test getting file with specific repository."""
         repo1_id = sqlite_store.create_repository("/repo1", "repo1")
