@@ -291,6 +291,7 @@ def boot_test_server(
     tmp_path: Path,
     repos: list[Path],
     *,
+    seed_indexes: bool = True,
     enable_watchers: bool = False,
     poll_interval: float = 2.0,
     client_secret: str | None = None,
@@ -337,17 +338,18 @@ def boot_test_server(
             initialize_stateless_services(registry_path=registry_path)
         )
 
-        # Register and index each repo
+        # Register and optionally seed each repo
         for repo_path in repos:
             repo_id = repo_registry.register_repository(str(repo_path))
-            # SQLiteStore requires the parent directory to exist
             (repo_path / ".mcp-index").mkdir(exist_ok=True)
-            _index_repo_into_sqlite(store_registry, repo_id, repo_path)
-            repo_registry.update_indexed_commit(
-                repo_id,
-                git_head(repo_path),
-                branch=git_branch(repo_path),
-            )
+            repo_registry.update_git_state(repo_id)
+            if seed_indexes:
+                _index_repo_into_sqlite(store_registry, repo_id, repo_path)
+                repo_registry.update_indexed_commit(
+                    repo_id,
+                    git_head(repo_path),
+                    branch=git_branch(repo_path),
+                )
 
         # Build HandshakeGate (reads MCP_CLIENT_SECRET from env, already set above)
         gate = HandshakeGate()

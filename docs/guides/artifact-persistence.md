@@ -109,8 +109,14 @@ recommended model is local-first:
 - each repository keeps its own local runtime/index files
 - the shared registry tracks which repos are ready, stale, or missing local state
 - `mcp-index artifact workspace-status` reports readiness across registered repos
+- `mcp-index artifact publish-workspace` records per-repo prepared artifact
+  state plus metadata/validation fields
+- `mcp-index artifact fetch-workspace` hydrates registered repositories from
+  validated artifacts and reports commit, branch, checksum, schema_version,
+  semantic_profile_hash, and semantic_profiles
 - `mcp-index artifact reconcile-workspace` refreshes that readiness after restores or rebuilds
-- `mcp-index artifact publish-workspace` prepares local artifact payloads without requiring paid remote publication per repo
+- normal CI acceptance uses a deterministic local GitHub/CLI mock for this
+  workspace lifecycle instead of live publication
 
 Typical flow:
 
@@ -119,12 +125,33 @@ mcp-index repository register /path/to/repo-a
 mcp-index repository register /path/to/repo-b
 mcp-index repository list -v
 mcp-index artifact workspace-status
+mcp-index artifact publish-workspace
+mcp-index artifact fetch-workspace
 mcp-index artifact reconcile-workspace
 ```
 
 This avoids turning multi-repo usage into a GitHub-artifact-per-repo system,
 which helps keep the tool practical for open source developers who do not want
 ongoing infrastructure costs.
+
+## MRE2E Accepted Deployment Shape
+
+MRE2E freezes the supported acceptance shape for multi-repo hydration:
+
+- many unrelated repositories on one machine;
+- one registered worktree per git common directory;
+- tracked/default branch indexing only;
+- local-first workspace commands as the operator surface:
+  `workspace-status`, `publish-workspace`, `fetch-workspace`,
+  `reconcile-workspace`;
+- deterministic local GitHub/CLI mock coverage in CI for
+  `register -> index -> publish -> hydrate -> reconcile -> query`;
+- optional live-operator validation only when a human explicitly needs to prove
+  real GitHub artifact transport behavior.
+
+This phase is still beta. Normal CI does not require live GitHub publication,
+and rollout posture for broader production adoption remains deferred to
+`MRREADY`.
 
 ## Why Not Partial Remote Downloads?
 

@@ -1,9 +1,30 @@
+from datetime import datetime
 from pathlib import Path
 
 from click.testing import CliRunner
 
+from mcp_server.artifacts.multi_repo_artifact_coordinator import MultiRepoArtifactCoordinator
 from mcp_server.cli.artifact_commands import _run_incremental_reconcile, artifact
 from mcp_server.indexing.change_detector import FileChange
+from mcp_server.storage.multi_repo_manager import MultiRepositoryManager, RepositoryInfo
+
+
+def _repo_info(repo_id: str, path: Path) -> RepositoryInfo:
+    return RepositoryInfo(
+        repository_id=repo_id,
+        name=path.name,
+        path=path,
+        index_path=path / ".mcp-index" / "current.db",
+        language_stats={},
+        total_files=0,
+        total_symbols=0,
+        indexed_at=datetime.now(),
+        current_commit="current-commit",
+        tracked_branch="main",
+        current_branch="main",
+        artifact_enabled=True,
+        active=True,
+    )
 
 
 def test_artifact_pull_confirms_local_restore(monkeypatch, tmp_path):
@@ -193,3 +214,48 @@ def test_incremental_reconcile_uses_python_plugin_without_preindex(monkeypatch, 
 
     assert result is True
     assert calls == [False]
+
+
+def test_workspace_fetch_cli_prints_validation_truth(monkeypatch, tmp_path):
+    runner = CliRunner()
+    manager = MultiRepositoryManager(central_index_path=tmp_path / "registry.json")
+    repo_path = tmp_path / "repo"
+    repo_path.mkdir()
+    repo_info = _repo_info("repo-1", repo_path)
+    manager.registry.register(repo_info)
+
+    (repo_path / ".mcp-index").mkdir(exist_ok=True)
+    (repo_path / ".mcp-index" / "current.db").write_text("db", encoding="utf-8")
+    (repo_path / ".mcp-index" / "artifact-metadata.json").write_text(
+        '{"commit":"recover123","tracked_branch":"main","branch":"main","checksum":"checksum-123","schema_version":"2","semantic_profile_hash":"'
+        + ("a" * 64)
+        + '"}',
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        "mcp_server.cli.artifact_commands.MultiRepoArtifactCoordinator",
+        lambda: MultiRepoArtifactCoordinator(manager),
+    )
+    monkeypatch.setattr(
+        "mcp_server.artifacts.multi_repo_artifact_coordinator.IndexArtifactDownloader.download_latest",
+        lambda self, output_dir, backup=True, full_only=False, **kwargs: type(
+            "Result",
+            (),
+            {
+                "artifact": {"head_sha": "recover123", "id": 23, "name": "repo-artifact"},
+                "validation_reasons": [],
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        "mcp_server.artifacts.multi_repo_artifact_coordinator.IndexArtifactDownloader._detect_repository",
+        lambda self: "owner/repo",
+    )
+
+    result = runner.invoke(artifact, ["fetch-workspace", "--repository", "repo-1"])
+
+    assert result.exit_code == 0
+    assert "validation_status: passed" in result.output
+    assert "last_recovered_commit: recover123" in result.output
+    assert "schema_version" in result.output

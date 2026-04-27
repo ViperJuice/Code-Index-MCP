@@ -6,8 +6,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from mcp_server.artifacts.multi_repo_artifact_coordinator import MultiRepoArtifactCoordinator
 from mcp_server.artifacts.artifact_download import IndexArtifactDownloader
 from mcp_server.cli import tool_handlers
+from mcp_server.storage.multi_repo_manager import MultiRepositoryManager
 from mcp_server.watcher.ref_poller import RefPoller
 from tests.fixtures.multi_repo import (
     boot_test_server,
@@ -180,6 +182,44 @@ def test_unregistered_repository_refuses_secondary_tools(tmp_path: Path):
         for tool in ("reindex", "write_summaries", "summarize_sample"):
             payload = server.call_tool(tool, {"repository": str(unregistered_repo)})
             _assert_secondary_refusal(payload, "unregistered_repository", tool)
+
+
+def test_wrong_branch_workspace_lifecycle_refuses_mutation_and_preserves_tracked_repo_state(
+    monkeypatch,
+    tmp_path: Path,
+):
+    matrix = build_production_matrix(tmp_path)
+    registry_path = tmp_path / "registry.json"
+
+    with boot_test_server(tmp_path, matrix.repos) as server:
+        manager = MultiRepositoryManager(central_index_path=registry_path)
+        before_commit = manager.get_repository_info(matrix.beta.repo_id).last_recovered_commit
+
+        matrix.alpha.checkout_new_branch("mre2e-feature")
+        server.registry.update_git_state(matrix.alpha.repo_id)
+        manager = MultiRepositoryManager(central_index_path=registry_path)
+
+        monkeypatch.setattr(
+            "mcp_server.artifacts.multi_repo_artifact_coordinator.IndexArtifactUploader.compress_indexes",
+            lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("publish should refuse")),
+        )
+        monkeypatch.setattr(
+            "mcp_server.artifacts.multi_repo_artifact_coordinator.IndexArtifactDownloader.download_latest",
+            lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("fetch should refuse")),
+        )
+
+        coordinator = MultiRepoArtifactCoordinator(manager)
+        publish = coordinator.publish_workspace([matrix.alpha.repo_id])
+        fetch = coordinator.fetch_workspace([matrix.alpha.repo_id])
+
+        assert publish[0].success is False
+        assert publish[0].details["readiness"]["state"] == "wrong_branch"
+        assert fetch[0].success is False
+        assert fetch[0].details["readiness"]["state"] == "wrong_branch"
+
+        after_beta = manager.get_repository_info(matrix.beta.repo_id)
+        assert after_beta.last_recovered_commit == before_commit
+        assert after_beta.current_branch == "main"
 
 
 def test_summarize_sample_explicit_path_scope_matrix(tmp_path: Path):
