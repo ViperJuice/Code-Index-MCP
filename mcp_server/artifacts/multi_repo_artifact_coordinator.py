@@ -12,6 +12,7 @@ from mcp_server.artifacts.artifact_upload import IndexArtifactUploader
 from mcp_server.artifacts.manifest_v2 import WorkspaceArtifactManifest
 from mcp_server.artifacts.semantic_profiles import extract_semantic_profile_metadata
 from mcp_server.core.errors import record_handled_error
+from mcp_server.health.repository_readiness import ReadinessClassifier
 from mcp_server.storage.multi_repo_manager import MultiRepositoryManager, RepositoryInfo
 
 
@@ -90,25 +91,105 @@ class MultiRepoArtifactCoordinator:
             repositories=repositories,
         )
 
+    def _read_artifact_metadata(
+        self, repo: RepositoryInfo, index_location: Path | str | None = None
+    ) -> Dict[str, Any]:
+        base = (
+            Path(index_location)
+            if index_location is not None
+            else Path(repo.index_location or repo.index_path.parent)
+        )
+        metadata_path = base / "artifact-metadata.json"
+        if not metadata_path.exists():
+            return {}
+        try:
+            return json.loads(metadata_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            record_handled_error(__name__, exc)
+            return {}
+
+    def _build_validation_details(
+        self,
+        repo: RepositoryInfo,
+        *,
+        index_location: Path | str | None = None,
+        validation_reasons: Optional[List[str]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        metadata_payload = metadata or self._read_artifact_metadata(repo, index_location)
+        profiles = self._read_local_profiles(repo.path, index_location)
+        compatibility = (
+            metadata_payload.get("compatibility", {})
+            if isinstance(metadata_payload, dict)
+            else {}
+        )
+        schema_version = metadata_payload.get("schema_version") or compatibility.get("schema_version")
+
+        validation_status = "missing"
+        if metadata_payload:
+            validation_status = "override_required" if validation_reasons else "passed"
+
+        return {
+            "validation_status": validation_status,
+            "validation_reasons": validation_reasons or [],
+            "validation": {
+                "commit": metadata_payload.get("commit"),
+                "branch": metadata_payload.get("tracked_branch") or metadata_payload.get("branch"),
+                "checksum": metadata_payload.get("checksum"),
+                "schema_version": schema_version,
+                "semantic_profile_hash": metadata_payload.get("semantic_profile_hash"),
+                "semantic_profiles": profiles
+                or compatibility.get("available_semantic_profiles")
+                or [],
+            },
+        }
+
+    def _refuse_if_not_ready(
+        self,
+        repo: RepositoryInfo,
+        *,
+        action: str,
+        allowed_states: set[str],
+    ) -> RepoArtifactLifecycleResult | None:
+        readiness = ReadinessClassifier.classify_registered(repo)
+        if readiness.state.value in allowed_states:
+            return None
+        return RepoArtifactLifecycleResult(
+            repository_id=repo.repository_id,
+            repository_name=repo.name,
+            action=action,
+            success=False,
+            details={
+                "readiness": readiness.to_dict(),
+                "artifact_backend": repo.artifact_backend,
+                "artifact_health": repo.artifact_health,
+                "last_published_commit": repo.last_published_commit,
+                "last_recovered_commit": repo.last_recovered_commit,
+            },
+            error=readiness.remediation or readiness.state.value,
+        )
+
     def get_workspace_status(
         self, repository_ids: Optional[Iterable[str]] = None
     ) -> List[RepoArtifactLifecycleResult]:
         results = []
         for repo in self._iter_repositories(repository_ids):
+            details = {
+                "current_commit": repo.current_commit,
+                "last_published_commit": repo.last_published_commit,
+                "last_recovered_commit": repo.last_recovered_commit,
+                "artifact_backend": repo.artifact_backend,
+                "artifact_health": repo.artifact_health,
+                "available_semantic_profiles": repo.available_semantic_profiles or [],
+            }
+            details.update(self._build_validation_details(repo))
             results.append(
                 RepoArtifactLifecycleResult(
                     repository_id=repo.repository_id,
                     repository_name=repo.name,
                     action="status",
                     success=True,
-                    details={
-                        "current_commit": repo.current_commit,
-                        "last_published_commit": repo.last_published_commit,
-                        "last_recovered_commit": repo.last_recovered_commit,
-                        "artifact_backend": repo.artifact_backend,
-                        "artifact_health": repo.artifact_health,
-                        "available_semantic_profiles": repo.available_semantic_profiles or [],
-                    },
+                    details=details,
                 )
             )
         return results
@@ -119,6 +200,15 @@ class MultiRepoArtifactCoordinator:
         results = []
         for repo in self._iter_repositories(repository_ids):
             try:
+                refused = self._refuse_if_not_ready(
+                    repo,
+                    action="publish",
+                    allowed_states={"ready"},
+                )
+                if refused is not None:
+                    results.append(refused)
+                    continue
+
                 index_location = Path(repo.index_location or repo.index_path.parent)
                 archive_path = index_location / "index-archive.tar.gz"
                 uploader = IndexArtifactUploader()
@@ -156,6 +246,11 @@ class MultiRepoArtifactCoordinator:
                     artifact_health=health,
                     available_semantic_profiles=profiles,
                 )
+                validation_details = self._build_validation_details(
+                    repo,
+                    index_location=index_location,
+                    metadata=metadata,
+                )
                 results.append(
                     RepoArtifactLifecycleResult(
                         repository_id=repo.repository_id,
@@ -166,7 +261,11 @@ class MultiRepoArtifactCoordinator:
                             "profiles": profiles,
                             "published_commit": repo.current_commit,
                             "artifact_backend": "local_workspace",
+                            "artifact_health": health,
+                            "last_published_commit": repo.current_commit,
+                            "last_recovered_commit": repo.last_recovered_commit,
                             "prepared_archive": "index-archive.tar.gz",
+                            **validation_details,
                         },
                     )
                 )
@@ -189,6 +288,15 @@ class MultiRepoArtifactCoordinator:
         results = []
         for repo in self._iter_repositories(repository_ids):
             try:
+                refused = self._refuse_if_not_ready(
+                    repo,
+                    action="fetch",
+                    allowed_states={"ready", "missing_index", "stale_commit"},
+                )
+                if refused is not None:
+                    results.append(refused)
+                    continue
+
                 downloader = IndexArtifactDownloader()
                 index_location = Path(repo.index_location or repo.index_path.parent)
                 output_dir = index_location / "artifact_download"
@@ -223,6 +331,22 @@ class MultiRepoArtifactCoordinator:
                     artifact_health=health,
                     available_semantic_profiles=profiles,
                 )
+                recovered_commit = (
+                    artifact.get("workflow_run", {}).get("head_sha")
+                    or artifact.get("head_sha")
+                    or repo.current_commit
+                )
+                self.multi_repo_manager.registry.update_indexed_commit(
+                    repo.repository_id,
+                    recovered_commit,
+                    branch=repo.tracked_branch or repo.current_branch or "main",
+                )
+                validation_reasons = getattr(result, "validation_reasons", []) or []
+                validation_details = self._build_validation_details(
+                    repo,
+                    index_location=index_location,
+                    validation_reasons=validation_reasons,
+                )
                 results.append(
                     RepoArtifactLifecycleResult(
                         repository_id=repo.repository_id,
@@ -233,9 +357,12 @@ class MultiRepoArtifactCoordinator:
                             "profiles": profiles,
                             "artifact_name": artifact.get("name"),
                             "artifact_id": artifact.get("id"),
-                            "recovered_commit": artifact.get("workflow_run", {}).get("head_sha")
-                            or artifact.get("head_sha")
-                            or repo.current_commit,
+                            "artifact_backend": repo.artifact_backend or "github_actions",
+                            "artifact_health": health,
+                            "last_published_commit": repo.last_published_commit,
+                            "last_recovered_commit": recovered_commit,
+                            "recovered_commit": recovered_commit,
+                            **validation_details,
                         },
                     )
                 )
@@ -258,7 +385,13 @@ class MultiRepoArtifactCoordinator:
         results = []
         for repo in self._iter_repositories(repository_ids):
             has_local_index = Path(repo.index_path).exists()
-            health = "ready" if has_local_index else "missing"
+            readiness = ReadinessClassifier.classify_registered(repo)
+            if readiness.state.value == "wrong_branch":
+                health = "wrong_branch"
+            elif readiness.state.value == "stale_commit":
+                health = "stale_commit"
+            else:
+                health = "ready" if has_local_index else "missing"
             self.multi_repo_manager.registry.update_artifact_state(
                 repo.repository_id,
                 artifact_health=health,
@@ -266,22 +399,25 @@ class MultiRepoArtifactCoordinator:
                     repo.path, repo.index_location
                 ),
             )
+            details = {
+                "has_local_index": has_local_index,
+                "artifact_health": health,
+                "current_commit": repo.current_commit,
+                "last_published_commit": repo.last_published_commit,
+                "last_recovered_commit": repo.last_recovered_commit,
+                "available_semantic_profiles": self._read_local_profiles(
+                    repo.path, repo.index_location
+                ),
+                "readiness": readiness.to_dict(),
+            }
+            details.update(self._build_validation_details(repo))
             results.append(
                 RepoArtifactLifecycleResult(
                     repository_id=repo.repository_id,
                     repository_name=repo.name,
                     action="reconcile",
                     success=True,
-                    details={
-                        "has_local_index": has_local_index,
-                        "artifact_health": health,
-                        "current_commit": repo.current_commit,
-                        "last_published_commit": repo.last_published_commit,
-                        "last_recovered_commit": repo.last_recovered_commit,
-                        "available_semantic_profiles": self._read_local_profiles(
-                            repo.path, repo.index_location
-                        ),
-                    },
+                    details=details,
                 )
             )
         return results
