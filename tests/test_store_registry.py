@@ -103,6 +103,59 @@ class TestStoreRegistry:
         with pytest.raises(KeyError):
             sr.get("unknown_repo_id_xyz")
 
+    def test_get_creates_index_parent_directory(self, tmp_path):
+        registry_file = tmp_path / "registry.json"
+        registry = RepositoryRegistry(registry_file)
+        index_path = tmp_path / "repo" / ".mcp-index" / "current.db"
+        repo_id = "aabbccdd11223344"
+        repo_info = RepositoryInfo(
+            repository_id=repo_id,
+            name="test-repo",
+            path=tmp_path,
+            index_path=index_path,
+            language_stats={},
+            total_files=0,
+            total_symbols=0,
+            indexed_at=datetime.now(),
+            active=True,
+        )
+        registry.register(repo_info)
+
+        store = StoreRegistry.for_registry(registry).get(repo_id)
+
+        assert isinstance(store, SQLiteStore)
+        assert index_path.exists()
+
+    def test_create_repository_returns_existing_row_after_other_inserts(self, tmp_path):
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        repo_path = str(tmp_path / "repo")
+        first_id = store.create_repository(repo_path, "repo")
+        store.store_file(first_id, path=tmp_path / "file.py", relative_path="file.py")
+
+        second_id = store.create_repository(repo_path, "repo")
+
+        assert second_id == first_id
+
+    def test_store_file_returns_existing_row_after_other_inserts(self, tmp_path):
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        repo_id = store.create_repository(str(tmp_path / "repo"), "repo")
+        first_id = store.store_file(
+            repo_id,
+            path=tmp_path / "file.py",
+            relative_path="file.py",
+            language="python",
+        )
+        store.store_file(repo_id, path=tmp_path / "other.py", relative_path="other.py")
+
+        second_id = store.store_file(
+            repo_id,
+            path=tmp_path / "file.py",
+            relative_path="file.py",
+            language="python",
+        )
+
+        assert second_id == first_id
+
     # --- 6. concurrent get from 8 threads ---
     def test_concurrent_get_same_instance_no_lock_errors(self, tmp_path):
         registry, repo_id, _ = _make_registry_with_repo(tmp_path)

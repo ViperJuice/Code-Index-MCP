@@ -292,6 +292,15 @@ class GitAwareIndexManager:
                 error="; ".join(result.errors) or "Full index failed",
                 duration_seconds=(datetime.now() - start_time).total_seconds(),
             )
+        if not self._index_has_durable_rows(repo_info):
+            self.registry.update_staleness_reason(repo_id, "index_empty")
+            return IndexSyncResult(
+                action="failed",
+                commit=current_commit,
+                files_processed=result.files_processed,
+                error="Full index completed without durable SQLite file rows",
+                duration_seconds=(datetime.now() - start_time).total_seconds(),
+            )
         if self._index_exists(repo_info) and self.registry.update_indexed_commit(
             repo_id, current_commit, branch=current_branch
         ):
@@ -361,6 +370,27 @@ class GitAwareIndexManager:
         if index_location is None:
             return False
         return (Path(index_location) / "current.db").exists()
+
+    def _index_has_durable_rows(self, repo_info: Any) -> bool:
+        index_path = getattr(repo_info, "index_path", None)
+        if index_path is None:
+            return False
+        path = Path(index_path)
+        if not path.exists():
+            return False
+        try:
+            import sqlite3
+
+            conn = sqlite3.connect(str(path))
+            try:
+                cursor = conn.execute(
+                    "SELECT COUNT(*) FROM files WHERE is_deleted = 0 OR is_deleted IS NULL"
+                )
+                return int(cursor.fetchone()[0]) > 0
+            finally:
+                conn.close()
+        except Exception:
+            return False
 
     def _normalize_update_result(self, value: Any) -> UpdateResult:
         if isinstance(value, UpdateResult):

@@ -4,16 +4,13 @@ import subprocess
 from datetime import datetime
 from inspect import signature
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from mcp_server.core.repo_context import RepoContext
 from mcp_server.dispatcher.dispatcher_enhanced import IndexResult, IndexResultStatus
 from mcp_server.storage.git_index_manager import (
     ChangeSet,
     GitAwareIndexManager,
-    IndexSyncResult,
     UpdateResult,
     should_reindex_for_branch,
 )
@@ -246,7 +243,7 @@ def test_same_branch_advance_triggers_incremental(tmp_path):
     incremental_mock = MagicMock(return_value=UpdateResult(indexed=1))
     manager._incremental_index_update = incremental_mock
 
-    result = manager.sync_repository_index("test-repo-id")
+    manager.sync_repository_index("test-repo-id")
 
     assert (
         incremental_mock.call_count == 1
@@ -338,6 +335,31 @@ def test_sync_repository_index_persists_partial_index_failure(tmp_path):
     registry.update_staleness_reason.assert_called_once_with(
         "test-repo-id", "partial_index_failure"
     )
+
+
+def test_full_index_without_durable_rows_does_not_advance_commit(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    repo_info.last_indexed_commit = None
+    repo_info.index_path.touch()
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    registry.update_git_state.return_value = {"commit": commit, "branch": "main"}
+
+    manager = _make_manager(registry)
+    manager._resolve_ctx = MagicMock(
+        return_value=_make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+    )
+    manager._full_index = MagicMock(return_value=UpdateResult(indexed=1))
+
+    result = manager.sync_repository_index(repo_info.repository_id, force_full=True)
+
+    assert result.action == "failed"
+    assert result.error == "Full index completed without durable SQLite file rows"
+    registry.update_staleness_reason.assert_called_once_with(repo_info.repository_id, "index_empty")
+    registry.update_indexed_commit.assert_not_called()
 
 
 def test_incremental_missing_rename_destination_is_clean_only_after_delete_success(tmp_path):
@@ -494,7 +516,13 @@ def test_clean_full_rebuild_advances_commit_only_with_durable_index(tmp_path):
     registry.update_git_state.return_value = {"commit": old_commit, "branch": "main"}
     registry.update_indexed_commit.return_value = True
 
-    manager = GitAwareIndexManager(registry, CtxSignatureDispatcher())
+    class DurableFullIndexDispatcher(CtxSignatureDispatcher):
+        def index_directory(self, ctx, path, recursive=True):
+            row_id = ctx.sqlite_store.ensure_repository_row(path, name="test-repo")
+            ctx.sqlite_store.store_file(row_id, path=Path(path) / "hello.py", relative_path="hello.py")
+            return super().index_directory(ctx, path, recursive=recursive)
+
+    manager = GitAwareIndexManager(registry, DurableFullIndexDispatcher())
 
     result = manager.sync_repository_index(repo_info.repository_id, force_full=True)
 

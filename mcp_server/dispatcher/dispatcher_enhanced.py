@@ -1820,6 +1820,17 @@ class EnhancedDispatcher:
             start_time = time.time()
             logger.info(f"Indexing {path} with {plugin.lang} plugin")
             shard = plugin.indexFile(path, content)
+            try:
+                self._persist_index_shard(ctx, path, content, plugin.language, shard)
+            except Exception as e:
+                logger.error(f"Failed to persist index shard for {path}: {e}", exc_info=True)
+                return IndexResult(
+                    status=IndexResultStatus.ERROR,
+                    path=path,
+                    observed_hash=None,
+                    actual_hash=None,
+                    error=f"failed to persist index shard: {e}",
+                )
 
             # Update file cache after successful indexing
             try:
@@ -1956,7 +1967,17 @@ class EnhancedDispatcher:
         try:
             start_time = time.time()
             logger.info(f"Indexing {path} with {plugin.lang} plugin (guarded)")
-            plugin.indexFile(path, content)
+            shard = plugin.indexFile(path, content)
+            try:
+                self._persist_index_shard(ctx, path, content, plugin.language, shard)
+            except Exception as e:
+                return IndexResult(
+                    status=IndexResultStatus.ERROR,
+                    path=path,
+                    observed_hash=expected_hash,
+                    actual_hash=actual_hash,
+                    error=f"failed to persist index shard: {e}",
+                )
 
             try:
                 stat = path.stat()
@@ -1997,6 +2018,119 @@ class EnhancedDispatcher:
                 actual_hash=actual_hash,
                 error=str(e),
             )
+
+    def _persist_index_shard(
+        self,
+        ctx: RepoContext,
+        path: Path,
+        content: str,
+        language: str,
+        shard: Dict[str, Any],
+    ) -> None:
+        """Persist a plugin-returned shard into the host SQLite store.
+
+        Sandboxed plugins cannot receive SQLite capabilities, so the dispatcher
+        owns durable writes from their returned shard.
+        """
+        sqlite_store = ctx.sqlite_store
+        if not isinstance(sqlite_store, SQLiteStore):
+            return
+
+        repo_path = Path(getattr(ctx.registry_entry, "path", ctx.workspace_root) or ctx.workspace_root)
+        repo_name = getattr(ctx.registry_entry, "name", None) or repo_path.name
+        repository_row = sqlite_store.ensure_repository_row(repo_path, name=repo_name)
+        try:
+            relative_path = str(path.relative_to(Path(ctx.workspace_root))).replace("\\", "/")
+        except ValueError:
+            relative_path = sqlite_store.path_resolver.normalize_path(path)
+        content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+        file_id = sqlite_store.store_file(
+            repository_id=repository_row,
+            path=path,
+            relative_path=relative_path,
+            language=language,
+            size=len(content.encode("utf-8")),
+            hash=content_hash,
+            content_hash=content_hash,
+            metadata=shard.get("metadata") if isinstance(shard, dict) else None,
+        )
+        self._clear_file_index_rows(sqlite_store, file_id)
+
+        for symbol in shard.get("symbols", []) if isinstance(shard, dict) else []:
+            if not isinstance(symbol, dict):
+                continue
+            name = symbol.get("symbol") or symbol.get("name")
+            if not name:
+                continue
+            span = symbol.get("span") or ()
+            line_start = symbol.get("line_start") or symbol.get("line")
+            line_end = symbol.get("line_end")
+            if not line_start and isinstance(span, (list, tuple)) and span:
+                line_start = span[0]
+            if not line_end and isinstance(span, (list, tuple)) and len(span) > 1:
+                line_end = span[1]
+            line_start = int(line_start or 1)
+            line_end = int(line_end or line_start)
+            sqlite_store.store_symbol(
+                file_id=file_id,
+                name=str(name),
+                kind=str(symbol.get("kind") or "symbol"),
+                line_start=line_start,
+                line_end=line_end,
+                column_start=symbol.get("column_start") or symbol.get("column"),
+                column_end=symbol.get("column_end"),
+                signature=symbol.get("signature"),
+                documentation=symbol.get("documentation") or symbol.get("doc"),
+                metadata=symbol.get("metadata") or symbol,
+            )
+
+        for index, chunk in enumerate(shard.get("chunks", []) if isinstance(shard, dict) else []):
+            if not isinstance(chunk, dict):
+                continue
+            chunk_content = str(chunk.get("content") or "")
+            if not chunk_content:
+                continue
+            start = int(chunk.get("content_start") or chunk.get("byte_start") or 0)
+            end = int(chunk.get("content_end") or chunk.get("byte_end") or start + len(chunk_content))
+            line_start = int(chunk.get("line_start") or chunk.get("start_line") or 1)
+            line_end = int(chunk.get("line_end") or chunk.get("end_line") or line_start)
+            chunk_id = str(
+                chunk.get("chunk_id")
+                or hashlib.sha256(f"{relative_path}:{index}:{start}:{end}".encode("utf-8")).hexdigest()
+            )
+            sqlite_store.store_chunk(
+                file_id=file_id,
+                content=chunk_content,
+                content_start=start,
+                content_end=end,
+                line_start=line_start,
+                line_end=line_end,
+                chunk_id=chunk_id,
+                node_id=str(chunk.get("node_id") or chunk_id),
+                treesitter_file_id=str(chunk.get("file_id") or relative_path),
+                definition_id=chunk.get("definition_id"),
+                parent_chunk_id=chunk.get("parent_chunk_id"),
+                node_type=chunk.get("node_type"),
+                language=language,
+                chunk_index=int(chunk.get("chunk_index") or index),
+                metadata=chunk.get("metadata") or {},
+            )
+
+        with sqlite_store._get_connection() as conn:
+            conn.execute("DELETE FROM fts_code WHERE file_id = ?", (str(file_id),))
+            conn.execute("INSERT INTO fts_code (content, file_id) VALUES (?, ?)", (content, file_id))
+
+    def _clear_file_index_rows(self, sqlite_store: SQLiteStore, file_id: int) -> None:
+        with sqlite_store._get_connection() as conn:
+            conn.execute(
+                "DELETE FROM symbol_trigrams WHERE symbol_id IN "
+                "(SELECT id FROM symbols WHERE file_id = ?)",
+                (file_id,),
+            )
+            conn.execute("DELETE FROM symbols WHERE file_id = ?", (file_id,))
+            conn.execute("DELETE FROM code_chunks WHERE file_id = ?", (file_id,))
+            conn.execute("DELETE FROM fts_code WHERE file_id = ?", (str(file_id),))
 
     def get_statistics(self, ctx: RepoContext) -> Dict[str, Any]:
         """Get statistics about indexed files and languages."""
@@ -2101,18 +2235,32 @@ class EnhancedDispatcher:
                 # First try to match by extension
                 if path.suffix in supported_extensions:
                     # skip_semantic=True — we'll batch semantic embed after the loop
-                    self.index_file(ctx, path, do_semantic=False)
-                    stats["indexed_files"] += 1
-                    semantically_indexed_paths.append(path.resolve())
+                    mutation = self.index_file(ctx, path, do_semantic=False)
+                    if mutation.status == IndexResultStatus.INDEXED:
+                        stats["indexed_files"] += 1
+                        semantically_indexed_paths.append(path.resolve())
+                    elif self._is_non_indexable_result(mutation):
+                        stats["ignored_files"] += 1
+                    else:
+                        stats["failed_files"] += 1
+                        if mutation.error:
+                            stats.setdefault("errors", []).append(f"{path}: {mutation.error}")
                 # For files without recognized extensions, try each plugin's supports() method
                 # This allows plugins to match by filename patterns (e.g., .env, Dockerfile)
                 else:
                     matched = False
                     for plugin in self._plugin_set_registry.plugins_for(ctx.repo_id):
                         if plugin.supports(path):
-                            self.index_file(ctx, path, do_semantic=False)
-                            stats["indexed_files"] += 1
-                            semantically_indexed_paths.append(path.resolve())
+                            mutation = self.index_file(ctx, path, do_semantic=False)
+                            if mutation.status == IndexResultStatus.INDEXED:
+                                stats["indexed_files"] += 1
+                                semantically_indexed_paths.append(path.resolve())
+                            elif self._is_non_indexable_result(mutation):
+                                stats["ignored_files"] += 1
+                            else:
+                                stats["failed_files"] += 1
+                                if mutation.error:
+                                    stats.setdefault("errors", []).append(f"{path}: {mutation.error}")
                             matched = True
                             break
 
@@ -2163,6 +2311,16 @@ class EnhancedDispatcher:
         )
 
         return stats
+
+    def _is_non_indexable_result(self, mutation: IndexResult) -> bool:
+        if mutation.status in {
+            IndexResultStatus.SKIPPED_UNCHANGED,
+            IndexResultStatus.SKIPPED_TOCTOU,
+        }:
+            return True
+        return mutation.status == IndexResultStatus.ERROR and bool(
+            mutation.error and mutation.error.startswith("No plugin for ")
+        )
 
     def search_documentation(
         self,

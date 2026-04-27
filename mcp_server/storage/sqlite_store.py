@@ -636,13 +636,8 @@ class SQLiteStore:
                    updated_at=CURRENT_TIMESTAMP""",
                 (path, name, json.dumps(metadata or {})),
             )
-            if cursor.lastrowid:
-                return cursor.lastrowid
-            else:
-                # If lastrowid is None, it means we updated an existing row
-                # Get the id of the existing repository
-                cursor = conn.execute("SELECT id FROM repositories WHERE path = ?", (path,))
-                return cursor.fetchone()[0]
+            cursor = conn.execute("SELECT id FROM repositories WHERE path = ?", (path,))
+            return cursor.fetchone()[0]
 
     def get_repository(self, path: str) -> Optional[Dict]:
         """Get repository by path."""
@@ -780,15 +775,14 @@ class SQLiteStore:
                     deleted_at,
                 ),
             )
-            if cursor.lastrowid:
-                return cursor.lastrowid
-            else:
-                # Get the id of the existing file
-                cursor = conn.execute(
-                    "SELECT id FROM files WHERE repository_id = ? AND relative_path = ?",
-                    (repository_id, relative_path_str),
-                )
-                return cursor.fetchone()[0]
+            cursor = conn.execute(
+                "SELECT id FROM files WHERE repository_id = ? AND relative_path = ?",
+                (repository_id, relative_path_str),
+            )
+            row = cursor.fetchone()
+            if row is None:  # pragma: no cover - defensive
+                raise RuntimeError(f"Failed to resolve stored file row for {relative_path_str}")
+            return row[0]
 
     def get_file(
         self, file_path: Union[str, Path], repository_id: Optional[int] = None
