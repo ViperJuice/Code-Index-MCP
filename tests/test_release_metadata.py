@@ -146,3 +146,12 @@ def test_installers_and_download_helper_match_stable_identity_contract():
         "ViperJuice/Code-Index-MCP",
     ):
         assert expected in download_helper
+
+
+def test_index_management_workflow_uses_repo_scoped_indexes_for_ci_uploads():
+    workflow = _read_text(".github/workflows/index-management.yml")
+
+    assert ".mcp-index/current.db" in workflow
+    assert ".mcp-index/.index_metadata.json" in workflow
+    assert 'python scripts/index-artifact-upload.py --method direct' not in workflow
+    assert '[ -f "code_index.db" ] && [ -f ".index_metadata.json" ]' not in workflow

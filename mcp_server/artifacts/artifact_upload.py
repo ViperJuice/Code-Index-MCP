@@ -349,6 +349,44 @@ class IndexArtifactUploader:
             }
         return stats
 
+    def write_metadata_file(
+        self,
+        *,
+        checksum: str,
+        size: int,
+        output_path: Path | str = "artifact-metadata.json",
+        secure: bool = True,
+        artifact_type: str = "full",
+        delta_from: Optional[str] = None,
+        repo_id: Optional[str] = None,
+        tracked_branch: Optional[str] = None,
+        commit: Optional[str] = None,
+        schema_version: Optional[str] = None,
+        semantic_profile_hash: Optional[str] = None,
+        index_location: Path | str | None = None,
+        index_path: Path | str | None = None,
+        attestation: Optional[Attestation] = None,
+    ) -> Path:
+        metadata = self.create_metadata(
+            checksum,
+            size,
+            secure=secure,
+            artifact_type=artifact_type,
+            delta_from=delta_from,
+            attestation=attestation,
+            repo_id=repo_id,
+            tracked_branch=tracked_branch,
+            commit=commit,
+            schema_version=schema_version,
+            semantic_profile_hash=semantic_profile_hash,
+            index_location=index_location,
+            index_path=index_path,
+        )
+        destination = Path(output_path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+        return destination
+
     def trigger_workflow(self, archive_path: Path, metadata: Dict[str, Any]) -> None:
         # GitHub workflow_dispatch cannot upload local files; use release upload instead
         self.upload_direct(archive_path, metadata)
@@ -491,6 +529,26 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Disable secure export (include all files, even sensitive ones)",
     )
+    parser.add_argument(
+        "--metadata-only",
+        action="store_true",
+        help="Only materialize artifact-metadata.json using the packaged metadata contract.",
+    )
+    parser.add_argument("--checksum", help="Archive checksum for --metadata-only.")
+    parser.add_argument("--size", type=int, help="Archive size in bytes for --metadata-only.")
+    parser.add_argument(
+        "--index-location",
+        help="Index directory containing current.db and .index_metadata.json.",
+    )
+    parser.add_argument("--index-path", help="Explicit path to the SQLite index file.")
+    parser.add_argument(
+        "--metadata-output",
+        default="artifact-metadata.json",
+        help="Output path for --metadata-only.",
+    )
+    parser.add_argument("--tracked-branch", help="Override tracked branch in metadata.")
+    parser.add_argument("--commit", help="Override commit in metadata.")
+    parser.add_argument("--schema-version", help="Override schema version in metadata.")
     parser.add_argument("--artifact-type", choices=["full", "delta"], default="full")
     parser.add_argument("--delta-from", help="Base commit SHA for delta artifacts")
     return parser
@@ -498,12 +556,40 @@ def build_parser() -> argparse.ArgumentParser:
 
 def run_cli(args: argparse.Namespace) -> int:
     uploader = IndexArtifactUploader(repo=args.repo)
+    index_location = Path(args.index_location) if args.index_location else Path(".mcp-index")
+    index_path = Path(args.index_path) if args.index_path else index_location / "current.db"
+
+    if args.metadata_only:
+        if not args.checksum or args.size is None:
+            raise ValueError("--metadata-only requires --checksum and --size")
+        metadata_path = uploader.write_metadata_file(
+            checksum=args.checksum,
+            size=args.size,
+            output_path=args.metadata_output,
+            secure=not args.no_secure,
+            artifact_type=args.artifact_type,
+            delta_from=args.delta_from,
+            repo_id=args.repo,
+            tracked_branch=args.tracked_branch,
+            commit=args.commit,
+            schema_version=args.schema_version,
+            index_location=index_location,
+            index_path=index_path,
+        )
+        print(f"✅ Wrote metadata: {metadata_path}")
+        return 0
+
     if args.validate:
         print("🔍 Validating indexes...")
         print("✅ Validation passed")
 
     secure = not args.no_secure
-    archive_path, checksum, size = uploader.compress_indexes(Path(args.output), secure=secure)
+    archive_path, checksum, size = uploader.compress_indexes(
+        Path(args.output),
+        secure=secure,
+        index_location=index_location,
+        index_path=index_path,
+    )
 
     policy = DeltaPolicy()
     decision = policy.decide(
@@ -517,6 +603,8 @@ def run_cli(args: argparse.Namespace) -> int:
         secure=secure,
         artifact_type=decision.strategy,
         delta_from=decision.base_artifact_id,
+        index_location=index_location,
+        index_path=index_path,
     )
     if args.method == "workflow":
         uploader.trigger_workflow(archive_path, metadata)

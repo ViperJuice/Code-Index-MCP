@@ -65,11 +65,25 @@ semantic profile without rebuilding the whole repository.
   SHA-keyed release, uploads the archive plus `artifact-metadata.json`,
   checksum sidecar, and optional attestation sidecar, verifies those assets,
   then moves `index-latest`.
-- **GitHub Actions artifacts:** CI can still upload compatible snapshot assets.
-  Workflow parity remains a separate concern from the runtime direct-publish
-  path.
+- **GitHub Actions artifacts:** CI uploads a repo-scoped `.mcp-index/`
+  snapshot archive plus packaged `artifact-metadata.json` for validation and
+  recovery compatibility. This path mirrors the direct-publish metadata
+  contract, but it does not move release pointers.
 - **Local-only fallback:** when remote publication is unavailable, local
   `.mcp-index/` state remains the runtime source of truth.
+
+## Operator Path Selection
+
+- **Local-only build or repair:** use `mcp-index artifact push --validate`,
+  `pull`, `sync`, or `recover` against local `.mcp-index/` state when you are
+  reconciling a workstation or a fresh clone.
+- **CI snapshot upload:** use the GitHub Actions upload path for validation and
+  short-lived recovery artifacts. The supported manual dispatch surface is
+  validation of an existing uploaded artifact, not release promotion or cleanup
+  management.
+- **Runtime publish-on-reindex:** rely on the watcher/runtime direct-publish
+  path when you need the durable SHA-keyed release asset set and `index-latest`
+  pointer movement.
 
 ## Recommended Remote/Local Split
 

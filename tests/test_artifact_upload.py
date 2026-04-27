@@ -139,6 +139,49 @@ def test_build_release_asset_bundle_writes_metadata_checksum_and_attestation(tmp
     ]
 
 
+def test_write_metadata_file_matches_create_metadata_contract(tmp_path: Path):
+    index_location = tmp_path / ".mcp-index"
+    index_location.mkdir()
+    index_path = index_location / "current.db"
+    _sqlite_db(index_path)
+    (index_location / ".index_metadata.json").write_text(
+        json.dumps(
+            {
+                "semantic_profiles": {
+                    "oss_high": {"compatibility_fingerprint": "abc"},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    uploader = IndexArtifactUploader(repo="owner/repo")
+    metadata_path = uploader.write_metadata_file(
+        checksum="deadbeef",
+        size=123,
+        output_path=index_location / "artifact-metadata.json",
+        repo_id="repo-id",
+        tracked_branch="main",
+        commit="abcdef123456",
+        schema_version="2",
+        index_location=index_location,
+        index_path=index_path,
+    )
+
+    payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+    assert payload["repo_id"] == "repo-id"
+    assert payload["tracked_branch"] == "main"
+    assert payload["commit"] == "abcdef123456"
+    assert payload["schema_version"] == "2"
+    assert payload["checksum"] == "deadbeef"
+    assert payload["artifact_type"] == "full"
+    assert payload["compatibility"]["semantic_profiles"]["oss_high"][
+        "compatibility_fingerprint"
+    ] == "abc"
+    assert payload["manifest_v2"]["repo_id"] == "repo-id"
+    assert payload["manifest_v2"]["tracked_branch"] == "main"
+
+
 def test_upload_direct_uses_explicit_release_tag_and_clobber(tmp_path: Path):
     archive = tmp_path / "archive.tar.gz"
     archive.write_bytes(b"archive-bytes")

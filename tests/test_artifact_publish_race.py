@@ -290,11 +290,18 @@ class TestWorkflowYaml:
         content = workflow_path.read_text()
         assert "workflow_dispatch:" in content
 
-    def test_publish_on_reindex_input_added(self, workflow_path: Path):
+    def test_workflow_dispatch_action_surface_is_narrowed(self, workflow_path: Path):
         content = workflow_path.read_text()
-        assert (
-            "publish_on_reindex" in content
-        ), "workflow_dispatch must have a 'publish_on_reindex' input"
+        assert "- validate" in content
+        assert "- promote" not in content
+        assert "- cleanup" not in content
+        assert "- list" not in content
+        assert "publish_on_reindex" not in content
+
+    def test_reusable_upload_uses_packaged_metadata_helper(self, workflow_path: Path):
+        content = workflow_path.read_text()
+        assert "python scripts/index-artifact-upload.py --metadata-only" in content
+        assert "Path(\"artifact-metadata.json\").write_text" not in content
 
 
 # ---------------------------------------------------------------------------
