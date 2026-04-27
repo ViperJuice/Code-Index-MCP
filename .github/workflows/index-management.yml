@@ -174,7 +174,7 @@ jobs:
           
           # This would use the artifact management workflow
           # For now, check if indexes exist in the repository
-          if [ -f "code_index.db" ] && [ -f ".index_metadata.json" ]; then
+          if [ -f ".mcp-index/current.db" ] && [ -f ".mcp-index/.index_metadata.json" ]; then
             echo "found=true" >> $GITHUB_OUTPUT
             echo "✅ Found index artifacts to validate"
           else
@@ -192,11 +192,14 @@ jobs:
           from mcp_server.storage.sqlite_store import SQLiteStore
           
           print('🔍 Validating index artifacts...')
+          db_path = Path('.mcp-index/current.db')
+          metadata_path = Path('.mcp-index/.index_metadata.json')
+          vector_path = Path('.mcp-index/vector_index.qdrant')
           
           # Validate SQLite index
-          if Path('code_index.db').exists():
+          if db_path.exists():
               try:
-                  store = SQLiteStore('code_index.db')
+                  store = SQLiteStore(str(db_path))
                   with store._get_connection() as conn:
                       cursor = conn.execute('SELECT COUNT(*) FROM files')
                       file_count = cursor.fetchone()[0]
@@ -212,15 +215,15 @@ jobs:
               exit(1)
           
           # Validate metadata
-          if Path('.index_metadata.json').exists():
-              with open('.index_metadata.json', 'r') as f:
+          if metadata_path.exists():
+              with open(metadata_path, 'r') as f:
                   metadata = json.load(f)
               print(f'✅ Index metadata valid: {metadata.get(\"embedding_model\", \"unknown\")} model')
           else:
               print('⚠️  Index metadata missing')
           
           # Validate vector index (if exists)
-          if Path('vector_index.qdrant').exists():
+          if vector_path.exists():
               print('✅ Vector index found')
           else:
               print('ℹ️  Vector index not included (optional)')
@@ -228,14 +231,57 @@ jobs:
           print('\\n✅ All validations passed!')
           "
 
-      - name: Upload indexes as artifacts
+      - name: Prepare CI artifact labels
+        if: steps.check_artifacts.outputs.found == 'true' && github.event_name == 'push'
+        id: artifact_labels
+        run: |
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          COMMIT_SHORT=$(git rev-parse --short HEAD)
+          TRACKED_BRANCH="$(git branch --show-current | tr '/:' '__')"
+          REPO_ID="${GITHUB_REPOSITORY//\//_}"
+          ARTIFACT_NAME="mcp-index-${REPO_ID}-${TRACKED_BRANCH}-${COMMIT_SHORT}-${TIMESTAMP}"
+          echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+
+      - name: Package repo-scoped index snapshot
+        if: steps.check_artifacts.outputs.found == 'true' && github.event_name == 'push'
+        id: package_indexes
+        run: |
+          echo "📤 Packaging validated indexes for CI upload..."
+          cd .mcp-index
+          tar -czf index-archive.tar.gz \
+            --exclude='*.log' \
+            --exclude='*.tmp' \
+            current.db \
+            vector_index.qdrant \
+            .index_metadata.json 2>/dev/null || true
+          CHECKSUM=$(sha256sum index-archive.tar.gz | cut -d' ' -f1)
+          SIZE=$(stat -c%s index-archive.tar.gz 2>/dev/null || stat -f%z index-archive.tar.gz 2>/dev/null)
+          SIZE_MB=$((SIZE / 1024 / 1024))
+          echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
+          echo "size_bytes=$SIZE" >> $GITHUB_OUTPUT
+          echo "size=$SIZE_MB MB" >> $GITHUB_OUTPUT
+
+      - name: Generate packaged artifact metadata
         if: steps.check_artifacts.outputs.found == 'true' && github.event_name == 'push'
         run: |
-          # Trigger artifact upload workflow
-          echo "📤 Uploading validated indexes as artifacts..."
-          
-          # Use the artifact management script
-          python scripts/index-artifact-upload.py --method direct
+          python scripts/index-artifact-upload.py --metadata-only \
+            --repo "${GITHUB_REPOSITORY}" \
+            --index-location ".mcp-index" \
+            --index-path ".mcp-index/current.db" \
+            --metadata-output ".mcp-index/artifact-metadata.json" \
+            --checksum "${{ steps.package_indexes.outputs.checksum }}" \
+            --size "${{ steps.package_indexes.outputs.size_bytes }}"
+
+      - name: Upload indexes as CI artifacts
+        if: steps.check_artifacts.outputs.found == 'true' && github.event_name == 'push'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.artifact_labels.outputs.artifact_name }}
+          path: |
+            .mcp-index/index-archive.tar.gz
+            .mcp-index/artifact-metadata.json
+          retention-days: 7
+          compression-level: 0
 
       - name: Fallback - Build minimal index
         if: steps.check_artifacts.outputs.found == 'false'
@@ -246,13 +292,15 @@ jobs:
           
           # Create minimal index for compatibility
           python -c "
+          from pathlib import Path
           from mcp_server.storage.sqlite_store import SQLiteStore
-          store = SQLiteStore('code_index.db')
+          Path('.mcp-index').mkdir(exist_ok=True)
+          store = SQLiteStore('.mcp-index/current.db')
           print('Created minimal SQLite index')
           "
           
           # Create minimal metadata
-          echo '{"version": "minimal", "note": "Rebuild locally with full indexing"}' > .index_metadata.json
+          echo '{"version": "minimal", "note": "Rebuild locally with full indexing"}' > .mcp-index/.index_metadata.json
 
       - name: Summary
         if: always()
@@ -262,6 +310,11 @@ jobs:
           
           if [ "${{ steps.check_artifacts.outputs.found }}" == "true" ]; then
             echo "✅ Developer-provided indexes validated successfully" >> $GITHUB_STEP_SUMMARY
+            if [ "${{ github.event_name }}" == "push" ]; then
+              echo "- Uploaded CI snapshot: \`${{ steps.artifact_labels.outputs.artifact_name }}\`" >> $GITHUB_STEP_SUMMARY
+              echo "- Snapshot size: ${{ steps.package_indexes.outputs.size }}" >> $GITHUB_STEP_SUMMARY
+              echo "- Snapshot checksum: \`${{ steps.package_indexes.outputs.checksum }}\`" >> $GITHUB_STEP_SUMMARY
+            fi
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "Developers should build indexes locally to avoid GitHub compute usage:" >> $GITHUB_STEP_SUMMARY
             echo '```bash' >> $GITHUB_STEP_SUMMARY
@@ -276,7 +329,7 @@ jobs:
             echo '# Build indexes locally' >> $GITHUB_STEP_SUMMARY
             echo 'python mcp_cli.py index rebuild' >> $GITHUB_STEP_SUMMARY
             echo '# Include in commit' >> $GITHUB_STEP_SUMMARY
-            echo 'git add code_index.db .index_metadata.json' >> $GITHUB_STEP_SUMMARY
+            echo 'git add .mcp-index/current.db .mcp-index/.index_metadata.json' >> $GITHUB_STEP_SUMMARY
             echo 'git commit -m "chore: update indexes"' >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
           fi
@@ -304,11 +357,12 @@ jobs:
       - name: Test index functionality
         run: |
           python -c "
-          import os
+          from pathlib import Path
           from mcp_server.storage.sqlite_store import SQLiteStore
           
-          if os.path.exists('code_index.db'):
-              store = SQLiteStore('code_index.db')
+          db_path = Path('.mcp-index/current.db')
+          if db_path.exists():
+              store = SQLiteStore(str(db_path))
               print('✓ Can load existing SQLite index')
               
               # Test basic functionality
