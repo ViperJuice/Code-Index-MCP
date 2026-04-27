@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from mcp_server.artifacts.artifact_upload import IndexArtifactUploader
+from mcp_server.artifacts.artifact_upload import IndexArtifactUploader, ReleaseAssetBundle
 from mcp_server.artifacts.attestation import Attestation
 from mcp_server.artifacts.publisher import ArtifactError, ArtifactPublisher, ArtifactRef
 
@@ -74,6 +74,20 @@ def _make_uploader() -> IndexArtifactUploader:
             "checksum": "sha256stub",
             "attestation_url": "https://github.com/owner/repo/attestations/1",
         }
+    )
+    uploader.upload_direct = _MagicMock(  # type: ignore[method-assign]
+        return_value=ReleaseAssetBundle(
+            archive_path=_Path("/tmp/_publish_race_archive.tar.gz"),
+            metadata_path=_Path("/tmp/artifact-metadata.json"),
+            checksum_path=_Path("/tmp/_publish_race_archive.tar.gz.sha256"),
+            attestation_path=_Path("/tmp/_publish_race_archive.tar.gz.attestation.jsonl"),
+            asset_paths=(
+                _Path("/tmp/_publish_race_archive.tar.gz"),
+                _Path("/tmp/artifact-metadata.json"),
+                _Path("/tmp/_publish_race_archive.tar.gz.sha256"),
+                _Path("/tmp/_publish_race_archive.tar.gz.attestation.jsonl"),
+            ),
+        )
     )
     uploader._synthetic_attestation = _synthetic_attestation  # type: ignore[attr-defined]
     return uploader
@@ -339,6 +353,11 @@ class TestCallOrder:
 
         with patch("subprocess.run", side_effect=side_effect):
             publisher.publish_on_reindex("repo", COMMIT)
+
+        upload_call = uploader.upload_direct.call_args
+        assert upload_call is not None
+        assert upload_call.kwargs["release_tag"] == _canonical_tag("repo", COMMIT)
+        assert upload_call.kwargs["attestation"].bundle_url == _SYNTHETIC_ATTESTATION.bundle_url
 
         # SHA-keyed create must precede index-latest edit
         sha_create_idx = next(

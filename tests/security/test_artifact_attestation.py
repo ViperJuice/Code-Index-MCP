@@ -223,6 +223,7 @@ class TestPublishOnReindexAttestationUrl:
             "attestation_url": "https://github.com/owner/repo/attestations/1",
         }
         uploader.create_metadata = _MM(return_value=metadata_return)  # type: ignore[method-assign]
+        uploader.upload_direct = _MM()  # type: ignore[method-assign]
 
         publisher = ArtifactPublisher(uploader, gh_cmd="gh")
 

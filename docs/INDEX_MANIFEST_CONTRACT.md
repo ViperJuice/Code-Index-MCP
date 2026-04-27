@@ -23,7 +23,8 @@ Requests are provided via `IndexDiscovery.get_local_index_path(requested_schema_
 `IndexManager.write_index_manifest` automatically computes the SHA256 `content_hash` for the target SQLite database. Downstream tools may use this hash to confirm the manifest matches the on-disk file when loading cached artifacts.
 
 ## Artifact metadata contract (full and delta)
-Artifact payloads published via CI must include `artifact-metadata.json` with:
+Artifact payloads published via CI or runtime direct publish must include
+`artifact-metadata.json` with:
 - `repo_id`: stable v3 repository identity
 - `tracked_branch`: tracked/default branch represented by the artifact
 - `commit`: commit represented by artifact contents
@@ -35,6 +36,18 @@ Artifact payloads published via CI must include `artifact-metadata.json` with:
 - `checksum`: SHA256 of archive payload
 - `compatibility.schema_version` and `compatibility.embedding_model`
 - `manifest_v2`: canonical manifest payload carrying the same identity fields
+
+Runtime direct publish to GitHub Releases must persist a durable asset set on
+the SHA-keyed release:
+- the compressed archive payload (`*.tar.gz`)
+- `artifact-metadata.json`
+- a checksum sidecar (`*.sha256`) whose first token is the archive SHA256
+- an attestation sidecar (`*.attestation.jsonl`) when attestation material exists
+
+`index-latest` is only a pointer release. It may move only after the SHA-keyed
+release already contains the required durable assets and those assets satisfy
+the same metadata, checksum, schema, branch, commit, and semantic-profile
+checks as other restore flows.
 
 Delta artifacts must also include a `delta-manifest.json` containing:
 - `delta_schema_version`

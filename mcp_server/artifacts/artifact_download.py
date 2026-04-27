@@ -14,6 +14,7 @@ import sys
 import tarfile
 import tempfile
 import urllib.error
+import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -131,92 +132,162 @@ class IndexArtifactDownloader:
                     check=True,
                     stdout=zip_file,
                 )
-
-            import zipfile
-
-            with zipfile.ZipFile(temp_dir / "artifact.zip", "r") as zip_ref:
-                zip_ref.extractall(temp_dir)  # nosec B202 - temp dir, contents re-validated below
-
-            archive_path = None
-            metadata_path = None
-            checksum_path = None
-            for file in temp_dir.iterdir():
-                if file.name.endswith(".tar.gz"):
-                    archive_path = file
-                elif file.name == "artifact-metadata.json":
-                    metadata_path = file
-                elif file.name.endswith(".sha256"):
-                    checksum_path = file
-
-            if archive_path is None:
-                raise ValueError("No archive found in artifact")
-            if metadata_path is None:
-                raise ValueError("Artifact metadata file is required but missing")
-
-            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-            delta_base = metadata.get("delta_from")
-            if delta_base:
-                probe = subprocess.run(
-                    ["gh", "release", "view", delta_base, "--repo", self.repo],
-                    capture_output=True,
-                    text=True,
-                )
-                if probe.returncode != 0:
-                    logger.warning(
-                        "Delta base release %r not found in %s; treating artifact as full (delta_from cleared)",
-                        delta_base,
-                        self.repo,
-                    )
-                    metadata = dict(metadata)
-                    metadata["delta_from"] = None
-            gate_result = self._run_integrity_gate(metadata, archive_path, checksum_path)
-            if gate_result.manifest_v2_validated:
-                print("✅ Manifest v2 verified")
-
-            identity_reasons = self.validate_artifact_identity(
-                metadata,
+            self._extract_actions_artifact_zip(temp_dir)
+            return self._restore_downloaded_payload(
+                temp_dir,
+                output_dir,
                 repo_id=repo_id,
                 tracked_branch=tracked_branch,
                 target_commit=target_commit,
                 semantic_profile_hash=semantic_profile_hash,
+                allow_unsafe=allow_unsafe,
             )
-            if identity_reasons and not allow_unsafe:
-                raise ValueError(
-                    "Artifact identity validation failed: " + "; ".join(identity_reasons)
-                )
-            if identity_reasons:
-                logger.warning(
-                    "Unsafe artifact identity override accepted: %s",
-                    "; ".join(identity_reasons),
-                )
-
-            compatible, issues = self.check_compatibility(metadata)
-            if not compatible:
-                raise ValueError("Artifact compatibility validation failed: " + "; ".join(issues))
-
-            att_url = metadata.get("attestation_url")
-            if att_url:
-                sidecar_path = archive_path.with_suffix(archive_path.suffix + ".attestation.jsonl")
-                att = Attestation(
-                    bundle_url=att_url,
-                    bundle_path=sidecar_path,
-                    subject_digest="",
-                    signed_at=datetime.now(timezone.utc),
-                )
-                verify_attestation(archive_path, att, expected_repo=self.repo, gh_cmd="gh")
-
-            print("📦 Extracting index files...")
-            with tarfile.open(archive_path, "r:gz") as tar:
-                members = tar.getmembers()
-                for member in members:
-                    if not self._validate_tar_member(member, output_dir):
-                        raise ValueError(f"Unsafe archive member blocked: {member.name}")
-                tar.extractall(output_dir, members=members)  # nosec B202 - members validated above
-
-            shutil.copy2(metadata_path, output_dir / "artifact-metadata.json")
-            return output_dir
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
+
+    def _extract_actions_artifact_zip(self, temp_dir: Path) -> None:
+        with zipfile.ZipFile(temp_dir / "artifact.zip", "r") as zip_ref:
+            zip_ref.extractall(temp_dir)  # nosec B202 - temp dir, contents re-validated below
+
+    def download_release_artifact(
+        self,
+        release_tag: str,
+        output_dir: Path,
+        *,
+        repo_id: Optional[str] = None,
+        tracked_branch: Optional[str] = None,
+        target_commit: Optional[str] = None,
+        semantic_profile_hash: Optional[str] = None,
+        allow_unsafe: bool = False,
+    ) -> Path:
+        print(f"📥 Downloading release artifact {release_tag}...")
+        temp_dir = Path(tempfile.mkdtemp())
+        try:
+            subprocess.run(
+                [
+                    "gh",
+                    "release",
+                    "download",
+                    release_tag,
+                    "--repo",
+                    self.repo,
+                    "--dir",
+                    str(temp_dir),
+                    "--clobber",
+                ],
+                check=True,
+            )
+            return self._restore_downloaded_payload(
+                temp_dir,
+                output_dir,
+                repo_id=repo_id,
+                tracked_branch=tracked_branch,
+                target_commit=target_commit,
+                semantic_profile_hash=semantic_profile_hash,
+                allow_unsafe=allow_unsafe,
+            )
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+    def _locate_download_payload(
+        self, payload_dir: Path
+    ) -> Tuple[Path, Path, Optional[Path], Optional[Path]]:
+        archive_path: Optional[Path] = None
+        metadata_path: Optional[Path] = None
+        checksum_path: Optional[Path] = None
+        attestation_path: Optional[Path] = None
+        for file in payload_dir.iterdir():
+            if file.name.endswith(".tar.gz"):
+                archive_path = file
+            elif file.name == "artifact-metadata.json":
+                metadata_path = file
+            elif file.name.endswith(".sha256"):
+                checksum_path = file
+            elif file.name.endswith(".attestation.jsonl"):
+                attestation_path = file
+
+        if archive_path is None:
+            raise ValueError("No archive found in artifact")
+        if metadata_path is None:
+            raise ValueError("Artifact metadata file is required but missing")
+        return archive_path, metadata_path, checksum_path, attestation_path
+
+    def _restore_downloaded_payload(
+        self,
+        payload_dir: Path,
+        output_dir: Path,
+        *,
+        repo_id: Optional[str] = None,
+        tracked_branch: Optional[str] = None,
+        target_commit: Optional[str] = None,
+        semantic_profile_hash: Optional[str] = None,
+        allow_unsafe: bool = False,
+    ) -> Path:
+        archive_path, metadata_path, checksum_path, attestation_path = self._locate_download_payload(
+            payload_dir
+        )
+
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        delta_base = metadata.get("delta_from")
+        if delta_base:
+            probe = subprocess.run(
+                ["gh", "release", "view", delta_base, "--repo", self.repo],
+                capture_output=True,
+                text=True,
+            )
+            if probe.returncode != 0:
+                logger.warning(
+                    "Delta base release %r not found in %s; treating artifact as full (delta_from cleared)",
+                    delta_base,
+                    self.repo,
+                )
+                metadata = dict(metadata)
+                metadata["delta_from"] = None
+        gate_result = self._run_integrity_gate(metadata, archive_path, checksum_path)
+        if gate_result.manifest_v2_validated:
+            print("✅ Manifest v2 verified")
+
+        identity_reasons = self.validate_artifact_identity(
+            metadata,
+            repo_id=repo_id,
+            tracked_branch=tracked_branch,
+            target_commit=target_commit,
+            semantic_profile_hash=semantic_profile_hash,
+        )
+        if identity_reasons and not allow_unsafe:
+            raise ValueError("Artifact identity validation failed: " + "; ".join(identity_reasons))
+        if identity_reasons:
+            logger.warning(
+                "Unsafe artifact identity override accepted: %s",
+                "; ".join(identity_reasons),
+            )
+
+        compatible, issues = self.check_compatibility(metadata)
+        if not compatible:
+            raise ValueError("Artifact compatibility validation failed: " + "; ".join(issues))
+
+        att_url = metadata.get("attestation_url")
+        if att_url:
+            if attestation_path is None:
+                raise ValueError("Artifact attestation sidecar is required but missing")
+            att = Attestation(
+                bundle_url=att_url,
+                bundle_path=attestation_path,
+                subject_digest="",
+                signed_at=datetime.now(timezone.utc),
+            )
+            verify_attestation(archive_path, att, expected_repo=self.repo, gh_cmd="gh")
+
+        print("📦 Extracting index files...")
+        with tarfile.open(archive_path, "r:gz") as tar:
+            members = tar.getmembers()
+            for member in members:
+                if not self._validate_tar_member(member, output_dir):
+                    raise ValueError(f"Unsafe archive member blocked: {member.name}")
+            tar.extractall(output_dir, members=members)  # nosec B202 - members validated above
+
+        shutil.copy2(metadata_path, output_dir / "artifact-metadata.json")
+        return output_dir
 
     def _calculate_checksum(self, file_path: Path) -> str:
         sha256 = hashlib.sha256()

@@ -10,9 +10,10 @@ import sqlite3
 import subprocess
 import sys
 import tarfile
+import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, NamedTuple, Optional, Tuple
 
 from mcp_server.artifacts.attestation import Attestation
 from mcp_server.artifacts.delta_policy import DeltaPolicy
@@ -352,10 +353,7 @@ class IndexArtifactUploader:
         # GitHub workflow_dispatch cannot upload local files; use release upload instead
         self.upload_direct(archive_path, metadata)
 
-    def upload_direct(self, archive_path: Path, metadata: Dict[str, Any]) -> None:
-        metadata_path = Path("artifact-metadata.json")
-        metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
-
+    def _ensure_gh_cli(self) -> None:
         # Verify gh CLI is available
         try:
             subprocess.run(["gh", "--version"], capture_output=True, check=True)
@@ -364,8 +362,80 @@ class IndexArtifactUploader:
                 "gh CLI is required for artifact upload. " "Install from https://cli.github.com"
             ) from exc
 
-        tag = str(metadata.get("logical_artifact_id") or "index-latest")
-        commit = metadata.get("commit", "")[:8]
+    def _build_release_asset_bundle(
+        self,
+        archive_path: Path,
+        metadata: Dict[str, Any],
+        *,
+        attestation: Optional[Attestation] = None,
+        bundle_dir: Path | None = None,
+    ) -> "ReleaseAssetBundle":
+        checksum = str(metadata.get("checksum") or "").strip()
+        if not checksum:
+            raise ValueError("artifact metadata checksum is required for direct upload")
+
+        if bundle_dir is None:
+            bundle_dir = Path(tempfile.mkdtemp(prefix="mcp-artifact-release-"))
+        bundle_dir.mkdir(parents=True, exist_ok=True)
+
+        metadata_path = bundle_dir / "artifact-metadata.json"
+        metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+
+        checksum_path = bundle_dir / f"{archive_path.name}.sha256"
+        checksum_path.write_text(f"{checksum}  {archive_path.name}\n", encoding="utf-8")
+
+        attestation_path: Optional[Path] = None
+        if attestation is not None and attestation.bundle_path and attestation.bundle_path.exists():
+            attestation_path = bundle_dir / attestation.bundle_path.name
+            attestation_path.write_bytes(attestation.bundle_path.read_bytes())
+
+        assets = [archive_path, metadata_path, checksum_path]
+        if attestation_path is not None:
+            assets.append(attestation_path)
+
+        return ReleaseAssetBundle(
+            archive_path=archive_path,
+            metadata_path=metadata_path,
+            checksum_path=checksum_path,
+            attestation_path=attestation_path,
+            asset_paths=tuple(assets),
+        )
+
+    def _verify_release_assets(self, tag: str, expected_names: set[str]) -> None:
+        result = subprocess.run(
+            ["gh", "release", "view", tag, "--repo", self.repo, "--json", "assets"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        payload = json.loads(result.stdout or "{}")
+        assets = payload.get("assets")
+        if not isinstance(assets, list):
+            raise RuntimeError(f"Release {tag} returned malformed asset payload")
+        actual_names = {
+            str(item.get("name"))
+            for item in assets
+            if isinstance(item, dict) and item.get("name") is not None
+        }
+        missing = sorted(expected_names - actual_names)
+        if missing:
+            raise RuntimeError(
+                f"Release {tag} missing required assets after upload: {', '.join(missing)}"
+            )
+
+    def upload_direct(
+        self,
+        archive_path: Path,
+        metadata: Dict[str, Any],
+        *,
+        release_tag: Optional[str] = None,
+        attestation: Optional[Attestation] = None,
+    ) -> "ReleaseAssetBundle":
+        self._ensure_gh_cli()
+
+        tag = str(release_tag or metadata.get("logical_artifact_id") or "index-latest")
+        commit = str(metadata.get("commit", ""))[:8]
+        bundle = self._build_release_asset_bundle(archive_path, metadata, attestation=attestation)
 
         # Create the release if it doesn't exist (ignore failure if it already exists)
         subprocess.run(
@@ -394,17 +464,18 @@ class IndexArtifactUploader:
                 "--repo",
                 self.repo,
                 "--clobber",
-                str(archive_path),
-                str(metadata_path),
+                *[str(asset_path) for asset_path in bundle.asset_paths],
             ],
             check=True,
         )
+        self._verify_release_assets(tag, {asset_path.name for asset_path in bundle.asset_paths})
 
         size_mb = archive_path.stat().st_size / 1024 / 1024
         print(
             f"✅ Uploaded {archive_path.name} ({size_mb:.1f} MB) to "
             f"https://github.com/{self.repo}/releases/tag/{tag}"
         )
+        return bundle
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -473,12 +544,17 @@ if __name__ == "__main__":
 # ArtifactMetadata — lightweight named tuple for publisher helpers (SL-4)
 # ---------------------------------------------------------------------------
 
-from typing import NamedTuple  # noqa: E402 — appended after CLI guard
-
-
 class ArtifactMetadata(NamedTuple):
     archive_path: Path
     checksum: str
     size: int
     commit: str
     metadata: Dict[str, Any]
+
+
+class ReleaseAssetBundle(NamedTuple):
+    archive_path: Path
+    metadata_path: Path
+    checksum_path: Path
+    attestation_path: Optional[Path]
+    asset_paths: tuple[Path, ...]

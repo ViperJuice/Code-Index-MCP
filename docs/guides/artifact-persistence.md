@@ -7,7 +7,9 @@ drift without adding a complicated remote delta-download protocol.
 ## Lifecycle Overview
 
 1. Local index build creates lexical and semantic assets under `.mcp-index/` (`current.db`, `.index_metadata.json`, and `vector_index.qdrant`).
-2. `mcp-index artifact push` packages and uploads a full snapshot artifact.
+2. `mcp-index artifact push` packages a full snapshot artifact and publishes it
+   either through GitHub Actions artifacts or through a SHA-keyed GitHub
+   Release asset set.
 3. Teammates or fresh clones run `mcp-index preflight` first to see whether they are behind remote or missing local runtime state.
 4. `mcp-index artifact pull --latest` hydrates local indexes from the full snapshot when needed.
 5. MCP reads the restored local runtime files directly from disk (`.mcp-index/current.db`, `.mcp-index/.index_metadata.json`, `.mcp-index/vector_index.qdrant`).
@@ -41,8 +43,8 @@ mcp-index artifact recover --branch main --commit <sha> --unsafe-allow-mismatche
 - Artifact metadata (`artifact-metadata.json`, manifest payloads)
 
 These files are expected to exist locally for MCP runtime use, but they are
-distributed through GitHub artifacts rather than committed to normal git
-history.
+distributed through GitHub artifacts or GitHub Release assets rather than
+committed to normal git history.
 
 `.mcp-index/current.db` is canonical. Root-level `code_index.db` is accepted only
 as a legacy archive member after artifact metadata has validated successfully,
@@ -57,9 +59,22 @@ collections inside `vector_index.qdrant`:
 That lets teammates pull one artifact and choose either the proprietary or OSS
 semantic profile without rebuilding the whole repository.
 
+## Remote Publication Modes
+
+- **Runtime direct publish:** `publish_on_reindex()` creates or repairs a
+  SHA-keyed release, uploads the archive plus `artifact-metadata.json`,
+  checksum sidecar, and optional attestation sidecar, verifies those assets,
+  then moves `index-latest`.
+- **GitHub Actions artifacts:** CI can still upload compatible snapshot assets.
+  Workflow parity remains a separate concern from the runtime direct-publish
+  path.
+- **Local-only fallback:** when remote publication is unavailable, local
+  `.mcp-index/` state remains the runtime source of truth.
+
 ## Recommended Remote/Local Split
 
-- **Remote transport:** full GitHub artifact snapshot only.
+- **Remote transport:** GitHub Release assets for runtime direct publish, with
+  GitHub Actions artifacts still supported for CI and recovery compatibility.
 - **Canonical semantic storage:** file-backed `vector_index.qdrant` built in CI.
 - **Local efficiency:** incremental reindex after restore based on git diff and
   watcher-driven file changes.
@@ -144,7 +159,9 @@ branch switching cheap enough for normal development.
 
 ## Validation Checklist
 
-- Push succeeds and a GitHub artifact is visible remotely.
+- Push succeeds and the remote SHA-keyed release contains the archive,
+  `artifact-metadata.json`, checksum sidecar, and optional attestation sidecar.
+- `index-latest` points only at a fully populated SHA release.
 - Pull recreates local index and reports the restored artifact commit.
 - Sync reports whether local `HEAD` or working tree differs from the restored artifact.
 - Recover by commit restores historical state.

@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
+import tarfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -151,3 +152,75 @@ def test_download_selected_artifact_unsafe_override_reports_reasons(tmp_path: Pa
 
     assert result.installed_items == [".mcp-index/current.db"]
     assert result.validation_reasons == ["freshness verdict: stale_commit"]
+
+
+def test_download_release_artifact_restores_direct_publish_payload(tmp_path: Path):
+    payload_dir = tmp_path / "release-assets"
+    payload_dir.mkdir()
+    archive_path = payload_dir / "index-archive.tar.gz"
+    with tarfile.open(archive_path, "w:gz") as tar:
+        current_db = tmp_path / "current.db"
+        current_db.write_text("db", encoding="utf-8")
+        tar.add(current_db, arcname="current.db")
+    checksum = IndexArtifactDownloader(repo="owner/repo")._calculate_checksum(archive_path)
+    (payload_dir / "artifact-metadata.json").write_text(
+        json.dumps(
+            _metadata(
+                checksum=checksum,
+                semantic_profile_hash="a" * 64,
+                manifest_v2={
+                    "logical_artifact_id": "logical-id",
+                    "repo_id": "repo-id",
+                    "tracked_branch": "main",
+                    "branch": "main",
+                    "commit": "abcdef123456",
+                    "schema_version": "2",
+                    "semantic_profile_hash": "a" * 64,
+                    "checksum": checksum,
+                    "artifact_type": "full",
+                    "chunk_schema_version": "2",
+                    "chunk_identity_algorithm": "treesitter_chunk_id_v1",
+                    "units": [
+                        {
+                            "unit_type": "lexical",
+                            "unit_id": "lexical-abcdef12",
+                            "checksum": checksum,
+                            "size_bytes": archive_path.stat().st_size,
+                        }
+                    ],
+                },
+            )
+        ),
+        encoding="utf-8",
+    )
+    (payload_dir / "index-archive.tar.gz.sha256").write_text(
+        f"{checksum}  index-archive.tar.gz\n", encoding="utf-8"
+    )
+
+    downloader = IndexArtifactDownloader(repo="owner/repo")
+
+    def side_effect(args, **kwargs):
+        if args[:4] == ["gh", "release", "download", "index-sha-tag"]:
+            dest = Path(args[args.index("--dir") + 1])
+            for file in payload_dir.iterdir():
+                if file.is_file():
+                    (dest / file.name).write_bytes(file.read_bytes())
+            return MagicMock(returncode=0, stdout="", stderr="")
+        return MagicMock(returncode=0, stdout="", stderr="")
+
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+    with patch("subprocess.run", side_effect=side_effect), patch.object(
+        downloader, "check_compatibility", return_value=(True, [])
+    ):
+        restored = downloader.download_release_artifact(
+            "index-sha-tag",
+            output_dir,
+            repo_id="repo-id",
+            tracked_branch="main",
+            target_commit="abcdef123456",
+        )
+
+    assert restored == output_dir
+    assert (output_dir / "current.db").read_text(encoding="utf-8") == "db"
+    assert (output_dir / "artifact-metadata.json").exists()
