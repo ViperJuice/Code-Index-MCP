@@ -21,6 +21,7 @@ from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
 # ---------------------------------------------------------------------------
 # SL-1.1 imports (new Protocol-conformance tests)
 # ---------------------------------------------------------------------------
+from mcp_server.dispatcher.dispatcher_enhanced import IndexResultStatus
 from mcp_server.dispatcher.protocol import DispatcherProtocol
 from mcp_server.dispatcher.query_intent import QueryIntent, classify
 from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher
@@ -1025,8 +1026,8 @@ class TestEnhancedDispatcherProtocolConformance:
         d = Dispatcher([])
         f = tmp_path / "test.py"
         f.write_text("x = 1")
-        # No plugin matches, so RuntimeError is caught internally — should not propagate
-        d.index_file(ctx, f)
+        result = d.index_file(ctx, f)
+        assert result.status == IndexResultStatus.INDEXED
 
     def test_index_directory_accepts_ctx(self, tmp_path):
         """index_directory(ctx, path) must accept ctx and return a dict."""
@@ -1079,10 +1080,71 @@ class TestEnhancedDispatcherProtocolConformance:
             registry_entry=ctx.registry_entry,
         )
 
-        Dispatcher([]).remove_file(ctx, target_b)
+        result = Dispatcher([]).remove_file(ctx, target_b)
 
+        assert result.status == IndexResultStatus.DELETED
         assert store.get_file_by_path("same.py", row_a) is not None
         assert store.get_file_by_path("same.py", row_b) is None
+
+    def test_index_file_returns_not_found_for_missing_required_path(self, tmp_path):
+        ctx = _make_repo_ctx()
+        result = Dispatcher([]).index_file(ctx, tmp_path / "missing.py")
+
+        assert result.status == IndexResultStatus.NOT_FOUND
+        assert result.error == "file not found"
+
+    def test_index_file_returns_explicit_plugin_failure(self, tmp_path):
+        plugin = MagicMock(spec=IPlugin, lang="python")
+        plugin.supports.return_value = True
+        plugin.indexFile.side_effect = RuntimeError("plugin boom")
+        dispatcher = Dispatcher([plugin])
+        ctx = _make_repo_ctx()
+        target = tmp_path / "test.py"
+        target.write_text("x = 1\n")
+
+        result = dispatcher.index_file(ctx, target)
+
+        assert result.status == IndexResultStatus.ERROR
+        assert result.error == "plugin boom"
+
+    def test_index_file_returns_skipped_unchanged_when_cache_matches(self, tmp_path):
+        plugin = MagicMock(spec=IPlugin, lang="python")
+        plugin.supports.return_value = True
+        plugin.indexFile.return_value = {"symbols": []}
+        dispatcher = Dispatcher([plugin])
+        ctx = _make_repo_ctx()
+        target = tmp_path / "test.py"
+        target.write_text("x = 1\n")
+
+        first = dispatcher.index_file(ctx, target)
+        second = dispatcher.index_file(ctx, target)
+
+        assert first.status == IndexResultStatus.INDEXED
+        assert second.status == IndexResultStatus.SKIPPED_UNCHANGED
+
+    def test_remove_file_returns_not_found_when_repo_row_missing(self, tmp_path):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo_root = tmp_path / "repo"
+        repo_root.mkdir()
+        target = repo_root / "missing.py"
+        target.write_text("x = 1\n")
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        store.ensure_repository_row(repo_root, name="repo")
+        ctx = _make_repo_ctx(store)
+        ctx.registry_entry.path = repo_root
+        ctx.registry_entry.name = "repo"
+        ctx = RepoContext(
+            repo_id=ctx.repo_id,
+            sqlite_store=store,
+            workspace_root=repo_root,
+            tracked_branch=ctx.tracked_branch,
+            registry_entry=ctx.registry_entry,
+        )
+
+        result = Dispatcher([]).remove_file(ctx, target)
+
+        assert result.status == IndexResultStatus.NOT_FOUND
 
     def test_runtime_feature_status_registered_semantic_unavailable_without_fallback(self):
         ctx = _make_repo_ctx(MagicMock())

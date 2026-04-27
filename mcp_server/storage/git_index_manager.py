@@ -15,7 +15,11 @@ from ..artifacts.commit_artifacts import CommitArtifactManager
 from ..core.path_resolver import PathResolver
 from ..core.repo_context import RepoContext
 from ..core.repo_resolver import RepoResolver
-from ..dispatcher.dispatcher_enhanced import EnhancedDispatcher
+from ..dispatcher.dispatcher_enhanced import (
+    EnhancedDispatcher,
+    IndexResult,
+    IndexResultStatus,
+)
 from ..health.repository_readiness import RepositoryReadiness, RepositoryReadinessState
 from ..indexing.change_detector import ChangeDetector
 from .repository_registry import RepositoryRegistry
@@ -89,7 +93,7 @@ class UpdateResult:
 
     @property
     def clean(self) -> bool:
-        return self.failed == 0 and not self.errors
+        return self.failed == 0 and self.skipped == 0 and not self.errors
 
 
 class GitAwareIndexManager:
@@ -421,8 +425,17 @@ class GitAwareIndexManager:
             # Handle deletions first
             for path in changes.deleted:
                 try:
-                    self.dispatcher.remove_file(ctx, repo_path / path)
-                    result.deleted += 1
+                    mutation = self._coerce_index_result(
+                        self.dispatcher.remove_file(ctx, repo_path / path),
+                        path=repo_path / path,
+                    )
+                    self._record_required_mutation_result(
+                        result,
+                        mutation,
+                        success_status=IndexResultStatus.DELETED,
+                        success_counter="deleted",
+                        action_label=f"Failed to remove {path}",
+                    )
                 except Exception as e:
                     logger.error(f"Failed to remove {path}: {e}")
                     result.failed += 1
@@ -434,12 +447,30 @@ class GitAwareIndexManager:
                     old_full = repo_path / old_path
                     new_full = repo_path / new_path
                     if new_full.exists():
-                        self.dispatcher.move_file(ctx, old_full, new_full)
-                        result.moved += 1
+                        mutation = self._coerce_index_result(
+                            self.dispatcher.move_file(ctx, old_full, new_full),
+                            path=new_full,
+                        )
+                        self._record_required_mutation_result(
+                            result,
+                            mutation,
+                            success_status=IndexResultStatus.MOVED,
+                            success_counter="moved",
+                            action_label=f"Failed to move {old_path} -> {new_path}",
+                        )
                     else:
                         # New path doesn't exist, just remove old
-                        self.dispatcher.remove_file(ctx, old_full)
-                        result.deleted += 1
+                        mutation = self._coerce_index_result(
+                            self.dispatcher.remove_file(ctx, old_full),
+                            path=old_full,
+                        )
+                        self._record_required_mutation_result(
+                            result,
+                            mutation,
+                            success_status=IndexResultStatus.DELETED,
+                            success_counter="deleted",
+                            action_label=f"Failed to remove stale rename source {old_path}",
+                        )
                 except Exception as e:
                     logger.error(f"Failed to move {old_path} -> {new_path}: {e}")
                     result.failed += 1
@@ -450,10 +481,20 @@ class GitAwareIndexManager:
                 try:
                     full_path = repo_path / path
                     if full_path.exists() and full_path.is_file():
-                        self.dispatcher.index_file(ctx, full_path)
-                        result.indexed += 1
+                        mutation = self._coerce_index_result(
+                            self.dispatcher.index_file(ctx, full_path),
+                            path=full_path,
+                        )
+                        self._record_required_mutation_result(
+                            result,
+                            mutation,
+                            success_status=IndexResultStatus.INDEXED,
+                            success_counter="indexed",
+                            action_label=f"Failed to index {path}",
+                        )
                     else:
                         result.skipped += 1
+                        result.errors.append(f"Failed to index {path}: file missing at dispatch")
                 except Exception as e:
                     logger.error(f"Failed to index {path}: {e}")
                     result.failed += 1
@@ -464,6 +505,42 @@ class GitAwareIndexManager:
 
         result.duration_seconds = (datetime.now() - start_time).total_seconds()
         return result
+
+    def _coerce_index_result(self, value: object, *, path: Path) -> IndexResult:
+        if isinstance(value, IndexResult):
+            return value
+        return IndexResult(
+            status=IndexResultStatus.ERROR,
+            path=path,
+            observed_hash=None,
+            actual_hash=None,
+            error=f"Unexpected mutation result: {value!r}",
+        )
+
+    def _record_required_mutation_result(
+        self,
+        result: UpdateResult,
+        mutation: IndexResult,
+        *,
+        success_status: IndexResultStatus,
+        success_counter: str,
+        action_label: str,
+    ) -> None:
+        if mutation.status == success_status:
+            setattr(result, success_counter, getattr(result, success_counter) + 1)
+            return
+
+        detail = mutation.error or mutation.status.value
+        if mutation.status in {
+            IndexResultStatus.SKIPPED_UNCHANGED,
+            IndexResultStatus.SKIPPED_TOCTOU,
+        }:
+            result.skipped += 1
+            result.errors.append(f"{action_label}: skipped required mutation ({detail})")
+            return
+
+        result.failed += 1
+        result.errors.append(f"{action_label}: {detail}")
 
     def _should_full_reindex(self, repo_path: Path, changes: ChangeSet) -> bool:
         """Decide whether change volume warrants a full reindex."""
