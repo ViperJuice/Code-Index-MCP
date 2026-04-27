@@ -2,6 +2,7 @@
 
 import subprocess
 from datetime import datetime
+from inspect import signature
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -38,6 +39,11 @@ def test_should_reindex_no_current_branch():
 
 def test_should_reindex_no_tracked_branch():
     assert should_reindex_for_branch("main", None) is False
+
+
+def test_sync_all_repositories_signature_no_longer_advertises_parallel():
+    params = signature(GitAwareIndexManager.sync_all_repositories).parameters
+    assert "parallel" not in params
 
 
 # ---------------------------------------------------------------------------

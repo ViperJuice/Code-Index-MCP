@@ -667,15 +667,8 @@ class GitAwareIndexManager:
         """Trigger a guarded full rescan without bypassing the tracked-branch check."""
         return self.sync_repository_index(repo_id, force_full=True)
 
-    def sync_all_repositories(self, parallel: bool = True) -> Dict[str, IndexSyncResult]:
-        """Sync all repositories that need updates.
-
-        Args:
-            parallel: Whether to sync in parallel
-
-        Returns:
-            Dictionary of repo_id -> IndexSyncResult
-        """
+    def sync_all_repositories(self) -> Dict[str, IndexSyncResult]:
+        """Sync all repositories that need updates sequentially."""
         results = {}
 
         # Get repositories needing update
@@ -687,8 +680,6 @@ class GitAwareIndexManager:
 
         logger.info(f"Found {len(stale_repos)} repositories needing update")
 
-        # For now, process sequentially
-        # TODO: Add parallel processing support
         for repo_id, repo_info in stale_repos:
             if repo_info.auto_sync:
                 logger.info(f"Syncing {repo_info.name}...")

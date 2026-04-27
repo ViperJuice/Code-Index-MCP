@@ -19,7 +19,7 @@ from .artifacts.commit_artifacts import CommitArtifactManager
 from .core.ignore_patterns import build_walker_filter
 from .core.repo_context import RepoContext
 from .core.repo_resolver import RepoResolver
-from .dispatcher.dispatcher_enhanced import EnhancedDispatcher
+from .dispatcher.dispatcher_enhanced import EnhancedDispatcher, IndexResult, IndexResultStatus
 from .indexing.lock_registry import lock_registry
 from .storage.git_index_manager import GitAwareIndexManager, should_reindex_for_branch
 from .storage.repository_registry import RepositoryRegistry
@@ -141,6 +141,35 @@ class MultiRepositoryHandler(FileSystemEventHandler):
             pass
         return None
 
+    def _landed_mutation(
+        self,
+        result: object,
+        *,
+        success_status: IndexResultStatus,
+        path: Path,
+        action: str,
+    ) -> bool:
+        if not isinstance(result, IndexResult):
+            logger.warning(
+                "Unexpected %s mutation result for %s in repo %s: %r",
+                action,
+                path,
+                self.repo_id,
+                result,
+            )
+            return False
+        if result.status == success_status:
+            return True
+        if result.status == IndexResultStatus.ERROR:
+            logger.warning(
+                "%s mutation failed for %s in repo %s: %s",
+                action,
+                path,
+                self.repo_id,
+                result.error,
+            )
+        return False
+
     def _trigger_reindex_with_ctx(self, path: Path) -> bool:
         """Branch + gitignore guarded reindex via ctx-aware dispatcher."""
         current_branch = self._get_current_branch()
@@ -169,9 +198,26 @@ class MultiRepositoryHandler(FileSystemEventHandler):
             logger.warning("Could not read %s for hash; skipping reindex", path)
             return False
         with lock_registry.acquire(self.repo_id):
-            self.parent_watcher.dispatcher.remove_file(self.ctx, path)
-            self.parent_watcher.dispatcher.index_file_guarded(self.ctx, path, observed_hash)
-        return True
+            remove_result = self.parent_watcher.dispatcher.remove_file(self.ctx, path)
+            if isinstance(remove_result, IndexResult) and remove_result.status == IndexResultStatus.ERROR:
+                logger.warning(
+                    "Pre-index remove failed for %s in repo %s: %s",
+                    path,
+                    self.repo_id,
+                    remove_result.error,
+                )
+                return False
+            index_result = self.parent_watcher.dispatcher.index_file_guarded(
+                self.ctx,
+                path,
+                observed_hash,
+            )
+        return self._landed_mutation(
+            index_result,
+            success_status=IndexResultStatus.INDEXED,
+            path=path,
+            action="reindex",
+        )
 
     def _remove_with_ctx(self, path: Path) -> bool:
         """Branch + gitignore guarded remove via ctx-aware dispatcher."""
@@ -193,8 +239,13 @@ class MultiRepositoryHandler(FileSystemEventHandler):
 
         logger.info("Removing from index: %s (repo=%s)", path, self.repo_id)
         with lock_registry.acquire(self.repo_id):
-            self.parent_watcher.dispatcher.remove_file(self.ctx, path)
-        return True
+            result = self.parent_watcher.dispatcher.remove_file(self.ctx, path)
+        return self._landed_mutation(
+            result,
+            success_status=IndexResultStatus.DELETED,
+            path=path,
+            action="remove",
+        )
 
     def _move_with_ctx(self, old_path: Path, new_path: Path) -> bool:
         """Branch + gitignore guarded move via ctx-aware dispatcher."""
@@ -211,8 +262,21 @@ class MultiRepositoryHandler(FileSystemEventHandler):
 
         logger.info("Moving in index: %s -> %s (repo=%s)", old_path, new_path, self.repo_id)
         with lock_registry.acquire(self.repo_id):
-            self.parent_watcher.dispatcher.move_file(self.ctx, old_path, new_path)
-        return True
+            if new_path.exists():
+                result = self.parent_watcher.dispatcher.move_file(self.ctx, old_path, new_path)
+                return self._landed_mutation(
+                    result,
+                    success_status=IndexResultStatus.MOVED,
+                    path=new_path,
+                    action="move",
+                )
+            result = self.parent_watcher.dispatcher.remove_file(self.ctx, old_path)
+        return self._landed_mutation(
+            result,
+            success_status=IndexResultStatus.DELETED,
+            path=old_path,
+            action="remove_stale_source",
+        )
 
     def on_any_event(self, event):
         """Route watchdog events through branch + gitignore guards."""
@@ -538,7 +602,11 @@ class MultiRepositoryWatcher:
                     synced_commit = getattr(result, "commit", None) or commit
                     self._create_and_upload_artifact(repo_id, synced_commit)
 
-                if self._artifact_publisher is not None:
+                if (
+                    repo_info
+                    and repo_info.artifact_enabled
+                    and self._artifact_publisher is not None
+                ):
                     try:
                         self._artifact_publisher.publish_on_reindex(
                             repo_id,
@@ -546,6 +614,12 @@ class MultiRepositoryWatcher:
                             tracked_branch=getattr(repo_info, "tracked_branch", None) or "main",
                             index_location=getattr(repo_info, "index_location", None),
                         )
+                        if hasattr(self.registry, "update_artifact_state"):
+                            self.registry.update_artifact_state(
+                                repo_id,
+                                last_published_commit=synced_commit,
+                                artifact_health="published",
+                            )
                     except Exception as pub_exc:
                         logger.error(
                             "ArtifactPublisher.publish_on_reindex failed for %s: %s",
