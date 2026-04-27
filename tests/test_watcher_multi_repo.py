@@ -6,9 +6,11 @@ from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+from watchdog.events import FileCreatedEvent, FileDeletedEvent, FileMovedEvent
 from watchdog.observers import Observer
 
 from mcp_server.core.repo_context import RepoContext
+from mcp_server.dispatcher.dispatcher_enhanced import IndexResult, IndexResultStatus
 from mcp_server.watcher.sweeper import WatcherSweeper
 from mcp_server.watcher_multi_repo import MultiRepositoryHandler, MultiRepositoryWatcher
 
@@ -62,8 +64,22 @@ def _make_dispatcher():
             actual_hash="abc",
         )
     )
-    d.remove_file = Mock()
-    d.move_file = Mock()
+    d.remove_file = Mock(
+        return_value=IndexResult(
+            status=IndexResultStatus.DELETED,
+            path=Path("/mock"),
+            observed_hash=None,
+            actual_hash=None,
+        )
+    )
+    d.move_file = Mock(
+        return_value=IndexResult(
+            status=IndexResultStatus.MOVED,
+            path=Path("/mock"),
+            observed_hash=None,
+            actual_hash=None,
+        )
+    )
     d.evict_repository_state = Mock()
     return d
 
@@ -194,6 +210,98 @@ class TestHandlerGitignoreFilter:
         assert call_args[0] is ctx
         assert call_args[1] == allowed_file
         assert isinstance(call_args[2], str) and len(call_args[2]) == 64
+
+
+class TestWatcherMutationTruth:
+    def test_created_event_skipped_guarded_index_does_not_mark_repo_changed(self, tmp_path):
+        dispatcher = _make_dispatcher()
+        dispatcher.index_file_guarded.return_value = IndexResult(
+            status=IndexResultStatus.NOT_FOUND,
+            path=tmp_path / "test.py",
+            observed_hash="abc",
+            actual_hash=None,
+            error="skip",
+        )
+        parent = Mock(dispatcher=dispatcher, query_cache=None, path_resolver=None)
+        ctx = _make_repo_context(tmp_path, tracked_branch="main")
+
+        with patch(
+            "mcp_server.watcher_multi_repo.subprocess.run",
+            return_value=Mock(stdout="main\n", returncode=0),
+        ):
+            handler = MultiRepositoryHandler("repo-1", tmp_path, parent, ctx=ctx)
+            test_file = tmp_path / "test.py"
+            test_file.write_text("x = 1")
+            handler.on_any_event(FileCreatedEvent(str(test_file)))
+
+        parent.mark_repository_changed.assert_not_called()
+
+    def test_deleted_event_not_found_does_not_mark_repo_changed(self, tmp_path):
+        dispatcher = _make_dispatcher()
+        dispatcher.remove_file.return_value = IndexResult(
+            status=IndexResultStatus.NOT_FOUND,
+            path=tmp_path / "gone.py",
+            observed_hash=None,
+            actual_hash=None,
+            error="already absent",
+        )
+        parent = Mock(dispatcher=dispatcher, query_cache=None, path_resolver=None)
+        ctx = _make_repo_context(tmp_path, tracked_branch="main")
+
+        with patch(
+            "mcp_server.watcher_multi_repo.subprocess.run",
+            return_value=Mock(stdout="main\n", returncode=0),
+        ):
+            handler = MultiRepositoryHandler("repo-1", tmp_path, parent, ctx=ctx)
+            deleted_file = tmp_path / "gone.py"
+            handler.on_any_event(FileDeletedEvent(str(deleted_file)))
+
+        parent.mark_repository_changed.assert_not_called()
+
+    def test_move_with_missing_destination_uses_delete_recovery(self, tmp_path):
+        dispatcher = _make_dispatcher()
+        old_path = tmp_path / "old.py"
+        old_path.write_text("x = 1")
+        new_path = tmp_path / "new.py"
+        parent = Mock(dispatcher=dispatcher, query_cache=None, path_resolver=None)
+        ctx = _make_repo_context(tmp_path, tracked_branch="main")
+
+        with patch(
+            "mcp_server.watcher_multi_repo.subprocess.run",
+            return_value=Mock(stdout="main\n", returncode=0),
+        ):
+            handler = MultiRepositoryHandler("repo-1", tmp_path, parent, ctx=ctx)
+            handler.on_any_event(FileMovedEvent(str(old_path), str(new_path)))
+
+        dispatcher.move_file.assert_not_called()
+        dispatcher.remove_file.assert_called_once_with(ctx, old_path)
+        parent.mark_repository_changed.assert_called_once_with("repo-1")
+
+    def test_move_with_missing_destination_only_marks_changed_on_successful_delete(self, tmp_path):
+        dispatcher = _make_dispatcher()
+        dispatcher.remove_file.return_value = IndexResult(
+            status=IndexResultStatus.NOT_FOUND,
+            path=tmp_path / "old.py",
+            observed_hash=None,
+            actual_hash=None,
+            error="already absent",
+        )
+        old_path = tmp_path / "old.py"
+        old_path.write_text("x = 1")
+        new_path = tmp_path / "new.py"
+        parent = Mock(dispatcher=dispatcher, query_cache=None, path_resolver=None)
+        ctx = _make_repo_context(tmp_path, tracked_branch="main")
+
+        with patch(
+            "mcp_server.watcher_multi_repo.subprocess.run",
+            return_value=Mock(stdout="main\n", returncode=0),
+        ):
+            handler = MultiRepositoryHandler("repo-1", tmp_path, parent, ctx=ctx)
+            handler.on_any_event(FileMovedEvent(str(old_path), str(new_path)))
+
+        dispatcher.move_file.assert_not_called()
+        dispatcher.remove_file.assert_called_once_with(ctx, old_path)
+        parent.mark_repository_changed.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -343,7 +451,7 @@ class TestArtifactPublishTriggers:
         registry.update_artifact_state.assert_any_call(
             "repo-1",
             last_published_commit="synced123",
-            artifact_health="local_only",
+            artifact_health="published",
         )
 
     @pytest.mark.parametrize("action", ["wrong_branch", "up_to_date", "downloaded", "failed"])
@@ -363,6 +471,19 @@ class TestArtifactPublishTriggers:
 
         artifact_manager.create_commit_artifact.assert_called_once()
         registry.update_artifact_state.assert_any_call("repo-1", artifact_health="publish_failed")
+
+    def test_local_only_health_is_reserved_for_no_remote_publisher(self, tmp_path):
+        watcher, registry, artifact_manager = self._watcher_for_sync(tmp_path, "full_index")
+        watcher._artifact_publisher = None
+
+        watcher._sync_repository("repo-1", "callback123")
+
+        artifact_manager.create_commit_artifact.assert_called_once()
+        registry.update_artifact_state.assert_any_call(
+            "repo-1",
+            last_published_commit="synced123",
+            artifact_health="local_only",
+        )
 
     def test_add_repository_after_start_begins_watching(self, tmp_path):
         repo1 = tmp_path / "repo1"

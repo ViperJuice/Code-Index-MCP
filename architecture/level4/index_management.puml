@@ -144,6 +144,7 @@ package "Index Management System" <<Component>> {
         - Detects branch changes
         - Monitors uncommitted changes
         - Updates index metadata
+        - Scans stale repositories sequentially
         - Maintains sync status
         
         Successfully synced 13/15 repos
