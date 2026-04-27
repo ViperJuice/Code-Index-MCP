@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from mcp_server.artifacts.artifact_upload import IndexArtifactUploader
+from mcp_server.artifacts.artifact_upload import IndexArtifactUploader, ReleaseAssetBundle
 from mcp_server.artifacts.attestation import Attestation
 from mcp_server.artifacts.publisher import ArtifactError, ArtifactPublisher
 
@@ -47,6 +47,20 @@ def _make_uploader() -> IndexArtifactUploader:
             "delta_from": None,
             "checksum": "sha256stub",
         }
+    )
+    uploader.upload_direct = MagicMock(  # type: ignore[method-assign]
+        return_value=ReleaseAssetBundle(
+            archive_path=Path("/tmp/_rollback_archive.tar.gz"),
+            metadata_path=Path("/tmp/artifact-metadata.json"),
+            checksum_path=Path("/tmp/_rollback_archive.tar.gz.sha256"),
+            attestation_path=Path("/tmp/_rollback_archive.tar.gz.attestation.jsonl"),
+            asset_paths=(
+                Path("/tmp/_rollback_archive.tar.gz"),
+                Path("/tmp/artifact-metadata.json"),
+                Path("/tmp/_rollback_archive.tar.gz.sha256"),
+                Path("/tmp/_rollback_archive.tar.gz.attestation.jsonl"),
+            ),
+        )
     )
     return uploader
 
@@ -174,3 +188,27 @@ class TestPublishRollback:
         assert (
             not sha_deletes
         ), f"Should not delete SHA release we never created; got: {sha_deletes}"
+
+    def test_sha_release_deleted_on_asset_upload_failure(self):
+        """If release asset upload fails after SHA creation, rollback deletes the SHA release."""
+        uploader = _make_uploader()
+        uploader.upload_direct.side_effect = RuntimeError("upload failed")
+        publisher = ArtifactPublisher(uploader, gh_cmd="gh")
+        delete_calls: list[list[str]] = []
+
+        def side_effect(args, **kwargs):
+            subsubcmd = args[2] if len(args) > 2 else ""
+            if subsubcmd == "delete":
+                delete_calls.append(list(args))
+                return MagicMock(returncode=0, stdout="", stderr="")
+            if subsubcmd == "view" and "--json" in args:
+                return MagicMock(returncode=1, stdout="", stderr="not found")
+            if subsubcmd == "view":
+                return MagicMock(returncode=1, stdout="", stderr="not found")
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        with patch("subprocess.run", side_effect=side_effect):
+            with pytest.raises(ArtifactError):
+                publisher.publish_on_reindex("repo", COMMIT)
+
+        assert any(SHA_TAG in call_args for call_args in delete_calls)

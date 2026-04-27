@@ -84,7 +84,7 @@ class ArtifactPublisher:
                 compressed_size_bytes=size,
                 previous_artifact_id=previous_artifact_id,
             )
-            self._uploader.create_metadata(
+            metadata = self._uploader.create_metadata(
                 checksum,
                 size,
                 artifact_type=decision.strategy,
@@ -95,14 +95,21 @@ class ArtifactPublisher:
                 commit=commit,
                 index_location=index_location,
             )
-            self._ensure_sha_release(sha_tag, commit, repo)
+            created_sha_release = self._ensure_sha_release(sha_tag, commit, repo)
             try:
+                self._uploader.upload_direct(
+                    archive_path,
+                    metadata,
+                    release_tag=sha_tag,
+                    attestation=attestation,
+                )
                 self._move_latest_pointer(sha_tag, commit, repo)
             except Exception:
-                subprocess.run(
-                    [self._gh_cmd, "release", "delete", sha_tag, "--yes", "--repo", repo],
-                    capture_output=True,
-                )
+                if created_sha_release:
+                    subprocess.run(
+                        [self._gh_cmd, "release", "delete", sha_tag, "--yes", "--repo", repo],
+                        capture_output=True,
+                    )
                 raise
             is_latest = self._check_is_latest(commit, repo)
         except ArtifactError:
@@ -165,7 +172,7 @@ class ArtifactPublisher:
                 f"gh CLI returned non-zero exit {exc.returncode}: {exc.stderr}"
             ) from exc
 
-    def _ensure_sha_release(self, sha_tag: str, commit: str, repo: str) -> None:
+    def _ensure_sha_release(self, sha_tag: str, commit: str, repo: str) -> bool:
         """Create the SHA-keyed release if it doesn't already exist (idempotent)."""
         result = subprocess.run(
             [self._gh_cmd, "release", "view", sha_tag, "--repo", repo],
@@ -173,7 +180,7 @@ class ArtifactPublisher:
             text=True,
         )
         if result.returncode == 0:
-            return  # Already exists — idempotent short-circuit
+            return False  # Already exists — idempotent short-circuit
 
         # Create new SHA-keyed release
         self._run(
@@ -191,6 +198,7 @@ class ArtifactPublisher:
                 f"Auto-published index artifact for commit {commit}",
             ]
         )
+        return True
 
     def _move_latest_pointer(self, sha_tag: str, commit: str, repo: str) -> None:
         """Atomically move index-latest to point at commit via gh release edit (or create)."""
