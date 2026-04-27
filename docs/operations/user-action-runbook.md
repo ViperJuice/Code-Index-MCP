@@ -298,6 +298,25 @@ No operator actions required. P12 is fully codebase-internal.
 - [ ] **Keep raw/local evidence out of git.** Commit only redacted release
   decision artifacts and documentation updates.
 
+### MRREADY - Multi-Repo Rollout Readiness
+
+- [ ] **Use rollout-status surfaces before multi-repo deployment.** Run
+  `mcp-index repository list -v`, `mcp-index repository status`, and
+  `mcp-index artifact workspace-status` to inspect `ready`, `local_only`,
+  `publish_failed`, `wrong_branch`, `stale_commit`, `missing_index`, and
+  `partial_index_failure`.
+- [ ] **Keep query refusal separate from status.** If the repo is not query
+  ready, MCP tools must still return `index_unavailable` with
+  `safe_fallback: "native_search"` instead of treating rollout status as a
+  successful query result.
+- [ ] **Recover by posture, not by log scraping.** Use reindex for
+  `stale_commit` or `missing_index`, switch branches for `wrong_branch`, repair
+  publish/fetch flows for `publish_failed` or `local_only`, and force a full
+  rebuild or hydrate/reconcile cycle for `partial_index_failure`.
+- [ ] **Preserve the beta boundary.** Even with `ready` rollout rows, the
+  current operator verdict remains `controlled rollout only` while multi-repo
+  and STDIO are beta.
+
 #### After P34
 
 - [ ] **Approve public alpha only with explicit evidence.** Docs truth,

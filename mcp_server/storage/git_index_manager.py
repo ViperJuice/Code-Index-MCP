@@ -20,6 +20,7 @@ from ..dispatcher.dispatcher_enhanced import (
     IndexResult,
     IndexResultStatus,
 )
+from ..health.repo_status import build_health_row
 from ..health.repository_readiness import RepositoryReadiness, RepositoryReadinessState
 from ..indexing.change_detector import ChangeDetector
 from .repository_registry import RepositoryRegistry
@@ -260,6 +261,9 @@ class GitAwareIndexManager:
                         # Incremental update - only reindex changed files
                         result = self._incremental_index_update(repo_id, ctx, changed_files)
                         if not result.clean:
+                            self.registry.update_staleness_reason(
+                                repo_id, "partial_index_failure"
+                            )
                             return IndexSyncResult(
                                 action="failed",
                                 commit=current_commit,
@@ -712,6 +716,8 @@ class GitAwareIndexManager:
             "needs_update": repo_info.needs_update(),
             "auto_sync": repo_info.auto_sync,
             "artifact_enabled": repo_info.artifact_enabled,
+            "artifact_backend": repo_info.artifact_backend,
+            "artifact_health": repo_info.artifact_health,
         }
 
         # Check index file
@@ -722,5 +728,7 @@ class GitAwareIndexManager:
         else:
             status["index_exists"] = False
             status["index_size_mb"] = 0
+
+        status.update(build_health_row(repo_info))
 
         return status

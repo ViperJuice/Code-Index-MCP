@@ -12,6 +12,7 @@ from mcp_server.artifacts.artifact_upload import IndexArtifactUploader
 from mcp_server.artifacts.manifest_v2 import WorkspaceArtifactManifest
 from mcp_server.artifacts.semantic_profiles import extract_semantic_profile_metadata
 from mcp_server.core.errors import record_handled_error
+from mcp_server.health.repo_status import build_health_row
 from mcp_server.health.repository_readiness import ReadinessClassifier
 from mcp_server.storage.multi_repo_manager import MultiRepositoryManager, RepositoryInfo
 
@@ -174,6 +175,8 @@ class MultiRepoArtifactCoordinator:
     ) -> List[RepoArtifactLifecycleResult]:
         results = []
         for repo in self._iter_repositories(repository_ids):
+            readiness = ReadinessClassifier.classify_registered(repo)
+            health_row = build_health_row(repo, readiness=readiness)
             details = {
                 "current_commit": repo.current_commit,
                 "last_published_commit": repo.last_published_commit,
@@ -182,6 +185,7 @@ class MultiRepoArtifactCoordinator:
                 "artifact_health": repo.artifact_health,
                 "available_semantic_profiles": repo.available_semantic_profiles or [],
             }
+            details.update(health_row)
             details.update(self._build_validation_details(repo))
             results.append(
                 RepoArtifactLifecycleResult(

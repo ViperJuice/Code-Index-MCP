@@ -309,6 +309,35 @@ def test_incremental_update_skipped_required_index_is_not_clean(tmp_path):
     assert any("hello.py" in error for error in result.errors)
 
 
+def test_sync_repository_index_persists_partial_index_failure(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    old_commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, old_commit)
+    repo_info.index_path.touch()
+
+    (repo / "hello.py").write_text("print('updated')\n")
+    subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "update"], cwd=repo, check=True, capture_output=True)
+    new_commit = _get_head_commit(repo)
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    registry.update_git_state.return_value = {"commit": new_commit, "branch": "main"}
+
+    manager = _make_manager(registry)
+    manager._should_full_reindex = MagicMock(return_value=False)
+    manager._incremental_index_update = MagicMock(
+        return_value=UpdateResult(skipped=1, errors=["required mutation skipped"])
+    )
+
+    result = manager.sync_repository_index("test-repo-id")
+
+    assert result.action == "failed"
+    registry.update_staleness_reason.assert_called_once_with(
+        "test-repo-id", "partial_index_failure"
+    )
+
+
 def test_incremental_missing_rename_destination_is_clean_only_after_delete_success(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)

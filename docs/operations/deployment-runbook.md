@@ -21,6 +21,28 @@ repositories, one registered worktree per git common directory,
 tracked/default branch indexing only, and `index_unavailable` with
 `safe_fallback: "native_search"` until readiness is `ready`.
 
+## MRREADY Rollout Gate
+
+MRREADY adds one rollout-facing operator gate for multi-repo deployment. Use
+`mcp-index repository list -v`, `mcp-index repository status`, and
+`mcp-index artifact workspace-status` before trusting indexed results across a
+workspace.
+
+| Rollout status | Meaning | Operator action |
+|---|---|---|
+| `ready` | Local runtime state, readiness, and artifact state agree. | Queries may use indexed results. |
+| `local_only` | Local runtime state works, but durable rollout readiness is not yet proven. | Publish or fetch/reconcile workspace artifacts before broader rollout. |
+| `publish_failed` | Artifact publication failed. | Repair the publish path, then rerun publish/reconcile checks. |
+| `wrong_branch` | The checkout is not on the tracked/default branch. | Switch to the tracked branch or register the intended repo path. |
+| `stale_commit` | The index is behind `HEAD`. | Reindex or fetch the matching artifact, then reconcile workspace state. |
+| `missing_index` | No durable local index exists. | Reindex or fetch workspace state before querying. |
+| `partial_index_failure` | A required incremental mutation failed and persisted a fail-closed marker. | Run a full reindex or hydrate a known-good artifact, then reconcile workspace state. |
+
+Status surfaces are not query results. Query tools still return
+`index_unavailable` with `safe_fallback: "native_search"` for non-ready cases.
+Because multi-repo and STDIO remain beta, the current MRREADY verdict is
+`controlled rollout only`.
+
 **Related files**:
 
 - Preflight validation:

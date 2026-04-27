@@ -301,4 +301,6 @@ def test_workspace_status_cli_reports_registered_repositories(monkeypatch, tmp_p
     assert "commercial_high" in result.output
     assert "last_published_commit: abc123" in result.output
     assert "last_recovered_commit: def456" in result.output
+    assert "rollout_status: ready" in result.output
+    assert "query_status: ready" in result.output
     assert "validation_status: passed" in result.output

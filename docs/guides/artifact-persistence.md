@@ -153,6 +153,22 @@ This phase is still beta. Normal CI does not require live GitHub publication,
 and rollout posture for broader production adoption remains deferred to
 `MRREADY`.
 
+## MRREADY Rollout Gate
+
+MRREADY turns the multi-repo lifecycle into a rollout gate rather than another
+artifact feature:
+
+- `mcp-index repository list -v`, `mcp-index repository status`, and
+  `mcp-index artifact workspace-status` are the canonical operator views.
+- Those surfaces report rollout statuses such as `ready`, `local_only`,
+  `publish_failed`, `wrong_branch`, `stale_commit`, `missing_index`, and
+  `partial_index_failure`.
+- Query tools remain separate. A non-ready repository still returns
+  `index_unavailable` with `safe_fallback: "native_search"` until readiness is
+  back to `ready`.
+- The current verdict is `controlled rollout only`, not broad multi-repo
+  deployment, because the beta boundary still applies to multi-repo and STDIO.
+
 ## Why Not Partial Remote Downloads?
 
 The current compressed artifact for this repository is only a few dozen megabytes,

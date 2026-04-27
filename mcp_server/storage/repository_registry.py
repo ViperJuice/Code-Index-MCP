@@ -402,6 +402,18 @@ class RepositoryRegistry:
             self.save()
             return True
 
+    def update_staleness_reason(self, repository_id: str, reason: Optional[str]) -> bool:
+        """Persist a repo-local staleness marker for status/reporting surfaces."""
+        with self._lock:
+            repo = self._registry.get(repository_id)
+            if not repo:
+                logger.warning(f"Repository {repository_id} not found in registry")
+                return False
+
+            repo["staleness_reason"] = reason
+            self.save()
+            return True
+
     def get(self, repository_id: str) -> Optional[Any]:
         """
         Get repository information.
@@ -579,6 +591,7 @@ class RepositoryRegistry:
             if branch:
                 repo["last_indexed_branch"] = branch
             repo["last_indexed"] = datetime.now()
+            repo["staleness_reason"] = None
             self.save()
             return commit
 
