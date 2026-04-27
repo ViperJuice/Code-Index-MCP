@@ -908,7 +908,7 @@ class TestSymbolRouting:
         store.get_symbol.return_value = []
         store.search_bm25.return_value = []  # BM25 also returns nothing
         d, ctx = self._make_dispatcher_with_ctx(store)
-        results = list(d.search(ctx, "class SemanticIndexer", limit=5))
+        list(d.search(ctx, "class SemanticIndexer", limit=5))
         # BM25 was attempted as fallback
         store.search_bm25.assert_called()
 
@@ -928,7 +928,6 @@ class TestSymbolRouting:
 
 def _make_repo_ctx(sqlite_store=None) -> RepoContext:
     """Build a minimal RepoContext for tests."""
-    from datetime import datetime
     from pathlib import Path
     from unittest.mock import MagicMock
 
@@ -1036,6 +1035,16 @@ class TestEnhancedDispatcherProtocolConformance:
         result = d.index_directory(ctx, tmp_path)
         assert isinstance(result, dict)
 
+    def test_index_directory_treats_unsupported_plugin_files_as_ignored(self, tmp_path):
+        ctx = _make_repo_ctx()
+        target = tmp_path / "data.json"
+        target.write_text('{"ok": true}\n')
+
+        result = Dispatcher([]).index_directory(ctx, tmp_path)
+
+        assert result["failed_files"] == 0
+        assert result["ignored_files"] == 1
+
     def test_remove_file_accepts_ctx(self, tmp_path):
         """remove_file(ctx, path) must accept ctx as first positional arg."""
         ctx = _make_repo_ctx()
@@ -1106,6 +1115,50 @@ class TestEnhancedDispatcherProtocolConformance:
 
         assert result.status == IndexResultStatus.ERROR
         assert result.error == "plugin boom"
+
+    def test_index_file_persists_plugin_shard_to_ctx_sqlite_store(self, tmp_path):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo_root = tmp_path / "repo"
+        repo_root.mkdir()
+        target = repo_root / "sample.py"
+        target.write_text("def persisted():\n    return 1\n")
+        store = SQLiteStore(str(tmp_path / "index.db"))
+
+        plugin = MagicMock(spec=IPlugin, lang="python")
+        plugin.language = "python"
+        plugin.supports.return_value = True
+        plugin.indexFile.return_value = {
+            "file": str(target),
+            "language": "python",
+            "symbols": [
+                {
+                    "symbol": "persisted",
+                    "kind": "function",
+                    "line": 1,
+                    "span": [1, 2],
+                    "signature": "def persisted():",
+                }
+            ],
+        }
+        ctx = _make_repo_ctx(store)
+        ctx.registry_entry.path = repo_root
+        ctx.registry_entry.name = "repo"
+        ctx = RepoContext(
+            repo_id=ctx.repo_id,
+            sqlite_store=store,
+            workspace_root=repo_root,
+            tracked_branch=ctx.tracked_branch,
+            registry_entry=ctx.registry_entry,
+        )
+
+        result = Dispatcher([plugin]).index_file(ctx, target)
+
+        repo_row = store.ensure_repository_row(repo_root, name="repo")
+        file_row = store.get_file_by_path("sample.py", repo_row)
+        assert result.status == IndexResultStatus.INDEXED
+        assert file_row is not None
+        assert store.get_symbol("persisted")[0]["file_id"] == file_row["id"]
 
     def test_index_file_returns_skipped_unchanged_when_cache_matches(self, tmp_path):
         plugin = MagicMock(spec=IPlugin, lang="python")
@@ -1193,7 +1246,7 @@ class TestEnhancedDispatcherProtocolConformance:
 
         ctx_a = _make_repo_ctx(store_a)
         d = Dispatcher([])
-        results = list(d.search(ctx_a, "foo"))
+        list(d.search(ctx_a, "foo"))
         # store_b must never be touched
         store_b.search_bm25.assert_not_called()
 

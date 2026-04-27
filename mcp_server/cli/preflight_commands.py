@@ -17,6 +17,8 @@ from .artifact_commands import (
     _get_local_drift,
     _verify_local_index_restored,
 )
+from mcp_server.health.repository_readiness import ReadinessClassifier
+from mcp_server.storage.repository_registry import RepositoryRegistry
 
 
 @dataclass
@@ -135,6 +137,22 @@ def run_preflight() -> PreflightResult:
                 )
             )
 
+    try:
+        registry = RepositoryRegistry()
+        repo_info = registry.get_repository_by_path(Path.cwd())
+        if repo_info is not None:
+            readiness = ReadinessClassifier.classify_registered(repo_info, requested_path=Path.cwd())
+            if not readiness.ready:
+                checks.append(
+                    PreflightCheck(
+                        level="warning",
+                        message=f"Registered repository readiness is {readiness.state.value}.",
+                        command=readiness.remediation,
+                    )
+                )
+    except Exception:
+        pass
+
     status = "ready"
     if any(check.level == "warning" for check in checks):
         status = "warning"
@@ -164,7 +182,7 @@ def run_startup_preflight() -> PreflightResult:
 def preflight() -> None:
     """Check repository and artifact readiness before starting MCP."""
     for line in format_preflight_report(run_preflight()):
-        click.echo(line)
+        click.echo(line, file=sys.stdout)
 
 
 def _load_env_file(path: Path) -> dict:
