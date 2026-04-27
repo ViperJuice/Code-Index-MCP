@@ -301,7 +301,7 @@ class TestWorkflowYaml:
     def test_reusable_upload_uses_packaged_metadata_helper(self, workflow_path: Path):
         content = workflow_path.read_text()
         assert "python scripts/index-artifact-upload.py --metadata-only" in content
-        assert "Path(\"artifact-metadata.json\").write_text" not in content
+        assert 'Path("artifact-metadata.json").write_text' not in content
 
 
 # ---------------------------------------------------------------------------

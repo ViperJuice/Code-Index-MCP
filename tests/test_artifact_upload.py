@@ -8,8 +8,8 @@ import tarfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from mcp_server.artifacts.attestation import Attestation
 from mcp_server.artifacts.artifact_upload import IndexArtifactUploader
+from mcp_server.artifacts.attestation import Attestation
 from mcp_server.artifacts.manifest_v2 import LEXICAL_ONLY_SEMANTIC_PROFILE_HASH
 
 
@@ -175,9 +175,10 @@ def test_write_metadata_file_matches_create_metadata_contract(tmp_path: Path):
     assert payload["schema_version"] == "2"
     assert payload["checksum"] == "deadbeef"
     assert payload["artifact_type"] == "full"
-    assert payload["compatibility"]["semantic_profiles"]["oss_high"][
-        "compatibility_fingerprint"
-    ] == "abc"
+    assert (
+        payload["compatibility"]["semantic_profiles"]["oss_high"]["compatibility_fingerprint"]
+        == "abc"
+    )
     assert payload["manifest_v2"]["repo_id"] == "repo-id"
     assert payload["manifest_v2"]["tracked_branch"] == "main"
 

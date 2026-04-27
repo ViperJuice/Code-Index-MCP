@@ -210,8 +210,9 @@ def test_download_release_artifact_restores_direct_publish_payload(tmp_path: Pat
 
     output_dir = tmp_path / "out"
     output_dir.mkdir()
-    with patch("subprocess.run", side_effect=side_effect), patch.object(
-        downloader, "check_compatibility", return_value=(True, [])
+    with (
+        patch("subprocess.run", side_effect=side_effect),
+        patch.object(downloader, "check_compatibility", return_value=(True, [])),
     ):
         restored = downloader.download_release_artifact(
             "index-sha-tag",

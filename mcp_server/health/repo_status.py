@@ -36,7 +36,10 @@ def _classify_rollout_status(
 ) -> str:
     if staleness_reason == "partial_index_failure":
         return "partial_index_failure"
-    if readiness.state == RepositoryReadinessState.WRONG_BRANCH or artifact_health == "wrong_branch":
+    if (
+        readiness.state == RepositoryReadinessState.WRONG_BRANCH
+        or artifact_health == "wrong_branch"
+    ):
         return "wrong_branch"
     if artifact_health == "publish_failed":
         return "publish_failed"

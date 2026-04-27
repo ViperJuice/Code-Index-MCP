@@ -632,6 +632,7 @@ if __name__ == "__main__":
 # ArtifactMetadata — lightweight named tuple for publisher helpers (SL-4)
 # ---------------------------------------------------------------------------
 
+
 class ArtifactMetadata(NamedTuple):
     archive_path: Path
     checksum: str

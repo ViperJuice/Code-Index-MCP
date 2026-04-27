@@ -45,7 +45,9 @@ def test_multi_repo_workspace_hydration_restores_clean_state_and_query_truth(
                 encoding="utf-8",
             )
 
-        matrix.alpha.write_file("delete_me.py", "def mre2e_deleted_symbol():\n    return 'delete'\n")
+        matrix.alpha.write_file(
+            "delete_me.py", "def mre2e_deleted_symbol():\n    return 'delete'\n"
+        )
         matrix.alpha.commit_all("add delete target")
         server.seed_repo_index(matrix.alpha.repo_id, matrix.alpha.path)
 
@@ -117,12 +119,8 @@ def test_multi_repo_workspace_hydration_restores_clean_state_and_query_truth(
                 "compatibility": {
                     "schema_version": "2",
                     "semantic_profiles": {
-                        "commercial_high": {
-                            "compatibility_fingerprint": "commercial-fingerprint"
-                        },
-                        "oss_high": {
-                            "compatibility_fingerprint": "oss-fingerprint"
-                        },
+                        "commercial_high": {"compatibility_fingerprint": "commercial-fingerprint"},
+                        "oss_high": {"compatibility_fingerprint": "oss-fingerprint"},
                     },
                     "available_semantic_profiles": ["commercial_high", "oss_high"],
                 },
@@ -181,9 +179,7 @@ def test_multi_repo_workspace_hydration_restores_clean_state_and_query_truth(
                             "commercial_high": {
                                 "compatibility_fingerprint": "commercial-fingerprint"
                             },
-                            "oss_high": {
-                                "compatibility_fingerprint": "oss-fingerprint"
-                            },
+                            "oss_high": {"compatibility_fingerprint": "oss-fingerprint"},
                         },
                         "available_semantic_profiles": ["commercial_high", "oss_high"],
                     },
@@ -214,7 +210,9 @@ def test_multi_repo_workspace_hydration_restores_clean_state_and_query_truth(
 
         coordinator = MultiRepoArtifactCoordinator(manager)
         fetch_results = coordinator.fetch_workspace([matrix.alpha.repo_id, matrix.beta.repo_id])
-        reconcile_results = coordinator.reconcile_workspace([matrix.alpha.repo_id, matrix.beta.repo_id])
+        reconcile_results = coordinator.reconcile_workspace(
+            [matrix.alpha.repo_id, matrix.beta.repo_id]
+        )
 
         assert all(result.success for result in fetch_results)
         assert all(result.success for result in reconcile_results)

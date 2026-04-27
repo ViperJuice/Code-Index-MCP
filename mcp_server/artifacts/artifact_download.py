@@ -223,8 +223,8 @@ class IndexArtifactDownloader:
         semantic_profile_hash: Optional[str] = None,
         allow_unsafe: bool = False,
     ) -> Path:
-        archive_path, metadata_path, checksum_path, attestation_path = self._locate_download_payload(
-            payload_dir
+        archive_path, metadata_path, checksum_path, attestation_path = (
+            self._locate_download_payload(payload_dir)
         )
 
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))

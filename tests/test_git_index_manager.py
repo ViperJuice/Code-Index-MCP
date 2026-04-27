@@ -144,7 +144,9 @@ class CtxSignatureDispatcher:
         self.calls.append(("index", ctx, path))
         status = self.index_results.get(path, IndexResultStatus.INDEXED)
         error = "synthetic status" if status is not IndexResultStatus.INDEXED else None
-        return IndexResult(status=status, path=path, observed_hash=None, actual_hash=None, error=error)
+        return IndexResult(
+            status=status, path=path, observed_hash=None, actual_hash=None, error=error
+        )
 
     def index_directory(self, ctx, path, recursive=True):
         assert isinstance(ctx, RepoContext)
@@ -371,9 +373,7 @@ def test_incremental_missing_rename_destination_not_clean_when_delete_not_found(
 
     registry = MagicMock()
     registry.get_repository.return_value = repo_info
-    dispatcher = CtxSignatureDispatcher(
-        remove_results={old_full: IndexResultStatus.NOT_FOUND}
-    )
+    dispatcher = CtxSignatureDispatcher(remove_results={old_full: IndexResultStatus.NOT_FOUND})
     manager = GitAwareIndexManager(registry, dispatcher)
 
     result = manager._incremental_index_update(
@@ -405,9 +405,7 @@ def test_skipped_required_incremental_result_does_not_advance_commit(tmp_path):
 
     manager = GitAwareIndexManager(
         registry,
-        CtxSignatureDispatcher(
-            index_results={changed_file: IndexResultStatus.SKIPPED_UNCHANGED}
-        ),
+        CtxSignatureDispatcher(index_results={changed_file: IndexResultStatus.SKIPPED_UNCHANGED}),
     )
     manager._get_changed_files = MagicMock(
         return_value=ChangeSet(added=[], modified=["hello.py"], deleted=[], renamed=[])

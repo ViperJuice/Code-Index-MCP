@@ -199,7 +199,10 @@ class MultiRepositoryHandler(FileSystemEventHandler):
             return False
         with lock_registry.acquire(self.repo_id):
             remove_result = self.parent_watcher.dispatcher.remove_file(self.ctx, path)
-            if isinstance(remove_result, IndexResult) and remove_result.status == IndexResultStatus.ERROR:
+            if (
+                isinstance(remove_result, IndexResult)
+                and remove_result.status == IndexResultStatus.ERROR
+            ):
                 logger.warning(
                     "Pre-index remove failed for %s in repo %s: %s",
                     path,
