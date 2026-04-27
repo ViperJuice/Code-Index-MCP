@@ -157,6 +157,20 @@ These commands are readiness-aware quick references and are available in `.claud
 
 `RepositoryRegistry.register_repository()` (`mcp_server/storage/repository_registry.py`) infers the default branch from `origin/HEAD` or falls back to `main`. Non-default branches are NOT indexed automatically — `MultiRepositoryWatcher` (`mcp_server/watcher_multi_repo.py`) runs a `RefPoller` (`mcp_server/watcher/ref_poller.py`) per registered repo at a 30-second cadence that only tracks the recorded default branch.
 
+### MRREADY Rollout Gate
+
+Treat repository and workspace status surfaces as rollout guidance, not query
+results:
+
+- `mcp-index repository list -v`, `mcp-index repository status`, and
+  `mcp-index artifact workspace-status` surface rollout status values such as
+  `ready`, `local_only`, `publish_failed`, `wrong_branch`,
+  `partial_index_failure`, `stale_commit`, and `missing_index`.
+- Query tools stay fail-closed and separate. Non-ready query paths still return
+  `index_unavailable` with `safe_fallback: "native_search"`.
+- The current operator verdict is `controlled rollout only` because multi-repo
+  and STDIO remain beta even when a repository reports `ready`.
+
 ### Path Sandbox
 
 Set `MCP_ALLOWED_ROOTS=/path/a:/path/b` using the OS path separator (`:` on Unix, `;` on Windows) to restrict which paths the server may index or read. Tools `search_code`, `symbol_lookup`, `summarize_sample`, and `reindex` reject any path outside the allowlist with uniform error code `path_outside_allowed_roots`. Registered repo *names* (not paths) bypass the path check.

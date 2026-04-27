@@ -34,6 +34,19 @@ def repository():
     """Repository management commands."""
 
 
+def _print_rollout_surface(prefix: str, health_row: dict[str, Any]) -> None:
+    rollout = health_row["rollout_status"]
+    rollout_color = "green" if rollout == "ready" else "yellow"
+    click.echo(click.style(f"{prefix}Rollout status: {rollout}", fg=rollout_color))
+    if health_row.get("rollout_remediation"):
+        click.echo(f"{prefix}Rollout remediation: {health_row['rollout_remediation']}")
+    query_status = health_row["query_status"]
+    query_color = "green" if query_status == "ready" else "yellow"
+    click.echo(click.style(f"{prefix}Query surface: {query_status}", fg=query_color))
+    if health_row.get("query_remediation"):
+        click.echo(f"{prefix}Query remediation: {health_row['query_remediation']}")
+
+
 @repository.command()
 @click.argument("path", type=click.Path(exists=True))
 @click.option("--auto-sync/--no-auto-sync", default=True, help="Enable automatic synchronization")
@@ -144,15 +157,7 @@ def list(verbose: bool):
                 click.echo(click.style(f"  Readiness: {readiness}", fg=color))
                 if health_row["remediation"]:
                     click.echo(f"  Remediation: {health_row['remediation']}")
-                if readiness != "ready":
-                    click.echo(click.style(f"  Status: {readiness}", fg="yellow"))
-                else:
-                    if repo_info.artifact_health in {"ready", "prepared", "published"}:
-                        click.echo(click.style("  Status: Ready", fg="green"))
-                    else:
-                        click.echo(
-                            click.style("  Status: Missing local runtime state", fg="yellow")
-                        )
+                _print_rollout_surface("  ", health_row)
 
             click.echo()
 
@@ -377,11 +382,15 @@ def status(repo_id: Optional[str]):
         click.echo(
             f"  Indexed commit: {status['last_indexed_commit'][:8] if status['last_indexed_commit'] else 'Never'}"
         )
-
-        if status["needs_update"]:
-            click.echo(click.style("  Status: Index needs update", fg="yellow"))
-        else:
-            click.echo(click.style("  Status: Index is up to date", fg="green"))
+        click.echo(
+            click.style(
+                f"  Readiness: {status['readiness']}",
+                fg="green" if status["ready"] else "yellow",
+            )
+        )
+        if status["remediation"]:
+            click.echo(f"  Remediation: {status['remediation']}")
+        _print_rollout_surface("  ", status)
 
         # Index status
         click.echo("\nIndex Status:")
@@ -390,11 +399,15 @@ def status(repo_id: Optional[str]):
             click.echo(f"  Last indexed: {status['last_indexed'] or 'Unknown'}")
         else:
             click.echo(click.style("  No index found", fg="yellow"))
+        if status.get("staleness_reason"):
+            click.echo(f"  Staleness reason: {status['staleness_reason']}")
 
         # Settings
         click.echo("\nSettings:")
         click.echo(f"  Auto-sync: {'Yes' if status['auto_sync'] else 'No'}")
         click.echo(f"  Artifacts: {'Yes' if status['artifact_enabled'] else 'No'}")
+        click.echo(f"  Artifact backend: {status['artifact_backend'] or 'local_workspace'}")
+        click.echo(f"  Artifact health: {status['artifact_health'] or 'missing'}")
 
     except Exception as e:
         click.echo(click.style(f"✗ Error: {e}", fg="red"), err=True)

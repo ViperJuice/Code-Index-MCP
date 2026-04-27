@@ -82,6 +82,8 @@ def test_list_shows_artifact_readiness_fields(monkeypatch, tmp_path: Path):
     assert "Artifact health: ready" in result.output
     assert "Semantic profiles: commercial_high, oss_high" in result.output
     assert "Readiness: ready" in result.output
+    assert "Rollout status: ready" in result.output
+    assert "Query surface: ready" in result.output
 
 
 def test_register_surfaces_multiple_worktrees_error(monkeypatch, tmp_path: Path):
@@ -173,3 +175,64 @@ def test_sync_guidance_matches_local_first_workflow(monkeypatch, tmp_path: Path)
     assert result.exit_code == 0
     assert "Downloaded index from artifact" in result.output
     assert "artifact reconcile-workspace" in result.output
+
+
+def test_status_reports_rollout_and_query_surfaces(monkeypatch, tmp_path: Path):
+    runner = CliRunner()
+    repo_info = _repo_info(tmp_path)
+    repo_info.staleness_reason = "partial_index_failure"
+
+    class FakeRegistry:
+        def get_repository_by_path(self, path):
+            return repo_info
+
+    class FakeStoreRegistry:
+        @classmethod
+        def for_registry(cls, registry):
+            return object()
+
+    class FakeRepoResolver:
+        def __init__(self, registry, store_registry):
+            pass
+
+    class FakeIndexManager:
+        def __init__(self, registry, repo_resolver=None, store_registry=None):
+            pass
+
+        def get_repository_status(self, repo_id):
+            return {
+                "repo_id": repo_info.repository_id,
+                "name": repo_info.name,
+                "path": repo_info.path,
+                "current_commit": repo_info.current_commit,
+                "last_indexed_commit": repo_info.last_indexed_commit,
+                "last_indexed": repo_info.last_indexed,
+                "needs_update": True,
+                "auto_sync": repo_info.auto_sync,
+                "artifact_enabled": repo_info.artifact_enabled,
+                "artifact_backend": repo_info.artifact_backend,
+                "artifact_health": repo_info.artifact_health,
+                "index_exists": True,
+                "index_size_mb": 0.1,
+                "readiness": "stale_commit",
+                "ready": False,
+                "remediation": "Run reindex to update the repository index to the current commit.",
+                "rollout_status": "partial_index_failure",
+                "rollout_remediation": "A required incremental mutation failed.",
+                "query_status": "index_unavailable",
+                "query_remediation": 'Use native search or follow the readiness remediation; query tools stay fail-closed with safe_fallback: "native_search".',
+                "staleness_reason": "partial_index_failure",
+            }
+
+    monkeypatch.setattr("mcp_server.cli.repository_commands.RepositoryRegistry", FakeRegistry)
+    monkeypatch.setattr("mcp_server.cli.repository_commands.StoreRegistry", FakeStoreRegistry)
+    monkeypatch.setattr("mcp_server.cli.repository_commands.RepoResolver", FakeRepoResolver)
+    monkeypatch.setattr("mcp_server.cli.repository_commands.GitAwareIndexManager", FakeIndexManager)
+
+    result = runner.invoke(repository, ["status"])
+
+    assert result.exit_code == 0
+    assert "Rollout status: partial_index_failure" in result.output
+    assert "Query surface: index_unavailable" in result.output
+    assert "safe_fallback: \"native_search\"" in result.output
+    assert "Artifact health: ready" in result.output

@@ -6,6 +6,18 @@ This document provides operators with guidance on managing artifact retention an
 
 The retention janitor is a CLI tool that removes old or excess artifact revisions from GitHub releases. It is **operator-triggered** (not a daemon) and respects protected release markers to prevent data loss.
 
+MRREADY keeps retention subordinate to rollout safety:
+
+- inspect `mcp-index repository list -v` or
+  `mcp-index artifact workspace-status` before pruning artifacts that may be
+  needed for `local_only`, `publish_failed`, or `partial_index_failure`
+  recovery;
+- keep query semantics separate from retention decisions: non-ready repos still
+  fail closed with `index_unavailable` and `safe_fallback: "native_search"`;
+- the current multi-repo verdict remains `controlled rollout only`, so prefer
+  conservative retention while beta rollout recovery still depends on artifact
+  hydration.
+
 ### Protected Releases
 
 The janitor **never deletes**:

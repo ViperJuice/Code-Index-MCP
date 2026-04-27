@@ -344,3 +344,25 @@ class TestRegisterRepositoryUsesComputeRepoId:
 
         assert id_a != id_b
         assert set(registry.get_all_repositories()) == {id_a, id_b}
+
+
+def test_update_indexed_commit_clears_partial_index_failure(tmp_path):
+    from mcp_server.storage.repository_registry import RepositoryRegistry
+
+    repo_path = make_git_repo(tmp_path / "repo-stale")
+    registry = RepositoryRegistry(registry_path=tmp_path / "registry.json")
+    repo_id = registry.register_repository(str(repo_path))
+    assert registry.update_staleness_reason(repo_id, "partial_index_failure") is True
+
+    commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+    assert registry.update_indexed_commit(repo_id, commit, branch="main") == commit
+    repo = registry.get_repository(repo_id)
+    assert repo is not None
+    assert repo.staleness_reason is None

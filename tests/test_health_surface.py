@@ -17,11 +17,16 @@ EXPECTED_KEYS = {
     "index_path_exists",
     "git_dir_exists",
     "last_indexed_commit",
+    "artifact_health",
     "staleness_reason",
     "readiness",
     "ready",
     "readiness_code",
     "remediation",
+    "rollout_status",
+    "rollout_remediation",
+    "query_status",
+    "query_remediation",
     "features",
 }
 
@@ -47,6 +52,8 @@ class TestBuildHealthRow:
         assert row["staleness_reason"] is None
         assert row["readiness"] == "ready"
         assert row["ready"] is True
+        assert row["rollout_status"] == "local_only"
+        assert row["query_status"] == "ready"
         assert row["index_path_exists"] is True
         assert row["git_dir_exists"] is True
 
@@ -65,6 +72,8 @@ class TestBuildHealthRow:
         row = build_health_row(info)
         assert row["staleness_reason"] == "missing_index"
         assert row["readiness"] == "missing_index"
+        assert row["rollout_status"] == "missing_index"
+        assert row["query_status"] == "index_unavailable"
         assert row["index_path_exists"] is False
 
     def test_empty_index(self, tmp_path):
@@ -90,6 +99,21 @@ class TestBuildHealthRow:
         row = build_health_row(info)
         assert row["staleness_reason"] == "wrong_branch"
         assert row["readiness"] == "wrong_branch"
+        assert row["rollout_status"] == "wrong_branch"
+
+    def test_partial_index_failure_overrides_other_staleness(self, tmp_path):
+        from mcp_server.health.repo_status import build_health_row
+
+        info = make_repo_info(
+            tmp_path,
+            current_commit="bbbb",
+            last_indexed_commit="aaaa",
+        )
+        info.staleness_reason = "partial_index_failure"
+        row = build_health_row(info)
+        assert row["staleness_reason"] == "partial_index_failure"
+        assert row["rollout_status"] == "partial_index_failure"
+        assert row["readiness"] == "stale_commit"
 
     def test_index_building(self, tmp_path):
         from mcp_server.health.repo_status import build_health_row

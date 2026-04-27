@@ -477,6 +477,19 @@ mcp-index artifact reconcile-workspace
 mcp-index artifact publish-workspace
 ```
 
+MRREADY freezes the rollout-facing interpretation of those commands:
+
+- `mcp-index repository list -v`, `mcp-index repository status`, and
+  `mcp-index artifact workspace-status` now surface one rollout status per
+  repository: `ready`, `local_only`, `publish_failed`, `wrong_branch`,
+  `stale_commit`, `missing_index`, or `partial_index_failure`.
+- Query tools remain a separate fail-closed surface. If readiness is not
+  `ready`, MCP search returns `index_unavailable` with
+  `safe_fallback: "native_search"` instead of treating a status row as a query
+  success.
+- The current multi-repo verdict remains `controlled rollout only` while the
+  multi-repo and STDIO surfaces are still beta.
+
 ### 🔐 Privacy & GitHub Artifact Sync
 
 Control how your code index is shared:

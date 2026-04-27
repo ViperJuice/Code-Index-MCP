@@ -1,4 +1,4 @@
-"""Build per-repository health rows for the get_status surface (IF-0-P10-7)."""
+"""Build per-repository health rows for the get_status surface."""
 
 from pathlib import Path
 from typing import Optional
@@ -11,6 +11,77 @@ from mcp_server.health.repository_readiness import (
 from mcp_server.storage.multi_repo_manager import RepositoryInfo
 
 
+def _normalize_staleness_reason(
+    repo_info: RepositoryInfo,
+    readiness: RepositoryReadiness,
+    *,
+    index_path_exists: bool,
+    git_dir_exists: bool,
+) -> str | None:
+    if getattr(repo_info, "staleness_reason", None) == "partial_index_failure":
+        return "partial_index_failure"
+    if not git_dir_exists:
+        return "missing_git_dir"
+    if not index_path_exists:
+        return "missing_index"
+    if readiness.state != RepositoryReadinessState.READY:
+        return readiness.state.value
+    return None
+
+
+def _classify_rollout_status(
+    readiness: RepositoryReadiness,
+    artifact_health: str | None,
+    staleness_reason: str | None,
+) -> str:
+    if staleness_reason == "partial_index_failure":
+        return "partial_index_failure"
+    if readiness.state == RepositoryReadinessState.WRONG_BRANCH or artifact_health == "wrong_branch":
+        return "wrong_branch"
+    if artifact_health == "publish_failed":
+        return "publish_failed"
+    if readiness.state != RepositoryReadinessState.READY:
+        return readiness.state.value
+    if artifact_health in {"ready", "published"}:
+        return "ready"
+    if artifact_health == "stale_commit":
+        return "stale_commit"
+    return "local_only"
+
+
+def _rollout_remediation(
+    rollout_status: str,
+    readiness: RepositoryReadiness,
+) -> str | None:
+    if rollout_status == "ready":
+        return None
+    if rollout_status == "local_only":
+        return (
+            "Local runtime state is usable, but durable multi-repo rollout is not confirmed. "
+            "Publish artifacts or fetch/reconcile workspace state before treating this repo as rollout-ready."
+        )
+    if rollout_status == "publish_failed":
+        return (
+            "Artifact publication failed. Re-run the publish path after fixing release or workflow access, "
+            "then confirm workspace status reports ready."
+        )
+    if rollout_status == "partial_index_failure":
+        return (
+            "A required incremental mutation failed. Run a full reindex or hydrate a known-good artifact, "
+            "then reconcile workspace status before trusting indexed results."
+        )
+    if rollout_status == "missing_index":
+        return "Run reindex or fetch the latest artifact, then reconcile workspace status."
+    if rollout_status == "stale_commit":
+        return (
+            "The local index is behind HEAD. Run reindex or fetch the matching artifact, "
+            "then reconcile workspace status."
+        )
+    if rollout_status == "index_building":
+        return "Wait for indexing to finish, then re-check repository or workspace status."
+    return readiness.remediation
+
+
 def build_health_row(
     repo_info: RepositoryInfo,
     readiness: Optional[RepositoryReadiness] = None,
@@ -21,24 +92,36 @@ def build_health_row(
 
     index_path_exists = bool(repo_info.index_path) and Path(repo_info.index_path).exists()
     git_dir_exists = bool(repo_info.git_common_dir) and Path(repo_info.git_common_dir).exists()
-    staleness = None
-    if not git_dir_exists:
-        staleness = "missing_git_dir"
-    elif not index_path_exists:
-        staleness = "missing_index"
-    elif readiness.state != RepositoryReadinessState.READY:
-        staleness = readiness.state.value
+    artifact_health = getattr(repo_info, "artifact_health", None)
+    staleness = _normalize_staleness_reason(
+        repo_info,
+        readiness,
+        index_path_exists=index_path_exists,
+        git_dir_exists=git_dir_exists,
+    )
+    rollout_status = _classify_rollout_status(readiness, artifact_health, staleness)
+    rollout_remediation = _rollout_remediation(rollout_status, readiness)
+    query_status = "ready" if readiness.ready else "index_unavailable"
     return {
         "repo_id": repo_info.repository_id,
         "tracked_branch": repo_info.tracked_branch,
         "index_path_exists": index_path_exists,
         "git_dir_exists": git_dir_exists,
         "last_indexed_commit": repo_info.last_indexed_commit,
+        "artifact_health": artifact_health,
         "staleness_reason": staleness,
         "readiness": readiness.state.value,
         "ready": readiness.ready,
         "readiness_code": readiness.code,
         "remediation": readiness.remediation,
+        "rollout_status": rollout_status,
+        "rollout_remediation": rollout_remediation,
+        "query_status": query_status,
+        "query_remediation": (
+            None
+            if readiness.ready
+            else 'Use native search or follow the readiness remediation; query tools stay fail-closed with safe_fallback: "native_search".'
+        ),
         "features": features
         or {
             "lexical": {"status": "available" if readiness.ready else "unavailable"},
