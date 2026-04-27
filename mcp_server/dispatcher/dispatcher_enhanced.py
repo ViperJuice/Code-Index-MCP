@@ -1772,9 +1772,7 @@ class EnhancedDispatcher:
                 record_handled_error(__name__, exc)
                 pass
 
-    def index_file(
-        self, ctx: RepoContext, path: Path, do_semantic: bool = True
-    ) -> IndexResult:
+    def index_file(self, ctx: RepoContext, path: Path, do_semantic: bool = True) -> IndexResult:
         """Index a single file if it has changed."""
         path = path.resolve()
 

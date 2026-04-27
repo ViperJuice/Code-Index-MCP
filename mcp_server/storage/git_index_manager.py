@@ -261,9 +261,7 @@ class GitAwareIndexManager:
                         # Incremental update - only reindex changed files
                         result = self._incremental_index_update(repo_id, ctx, changed_files)
                         if not result.clean:
-                            self.registry.update_staleness_reason(
-                                repo_id, "partial_index_failure"
-                            )
+                            self.registry.update_staleness_reason(repo_id, "partial_index_failure")
                             return IndexSyncResult(
                                 action="failed",
                                 commit=current_commit,

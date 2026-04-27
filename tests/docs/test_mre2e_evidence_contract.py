@@ -106,4 +106,3 @@ def test_artifact_persistence_guide_names_mre2e_supported_shape_and_beta_boundar
     ):
         assert expected in text
     assert "Multi-Repo Rollout Readiness (MRREADY)" in roadmap
-

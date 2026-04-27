@@ -120,11 +120,11 @@ class MultiRepoArtifactCoordinator:
         metadata_payload = metadata or self._read_artifact_metadata(repo, index_location)
         profiles = self._read_local_profiles(repo.path, index_location)
         compatibility = (
-            metadata_payload.get("compatibility", {})
-            if isinstance(metadata_payload, dict)
-            else {}
+            metadata_payload.get("compatibility", {}) if isinstance(metadata_payload, dict) else {}
         )
-        schema_version = metadata_payload.get("schema_version") or compatibility.get("schema_version")
+        schema_version = metadata_payload.get("schema_version") or compatibility.get(
+            "schema_version"
+        )
 
         validation_status = "missing"
         if metadata_payload:

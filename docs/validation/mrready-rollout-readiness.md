@@ -1,4 +1,4 @@
-> **Historical artifact — as-of 2026-04-27, may not reflect current behavior**
+> **Historical artifact — as-of 2026-04-25, may not reflect current behavior**
 
 # MRREADY Rollout Readiness
 

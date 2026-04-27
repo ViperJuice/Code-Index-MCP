@@ -234,5 +234,5 @@ def test_status_reports_rollout_and_query_surfaces(monkeypatch, tmp_path: Path):
     assert result.exit_code == 0
     assert "Rollout status: partial_index_failure" in result.output
     assert "Query surface: index_unavailable" in result.output
-    assert "safe_fallback: \"native_search\"" in result.output
+    assert 'safe_fallback: "native_search"' in result.output
     assert "Artifact health: ready" in result.output

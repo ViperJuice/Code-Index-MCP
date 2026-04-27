@@ -153,5 +153,5 @@ def test_index_management_workflow_uses_repo_scoped_indexes_for_ci_uploads():
 
     assert ".mcp-index/current.db" in workflow
     assert ".mcp-index/.index_metadata.json" in workflow
-    assert 'python scripts/index-artifact-upload.py --method direct' not in workflow
+    assert "python scripts/index-artifact-upload.py --method direct" not in workflow
     assert '[ -f "code_index.db" ] && [ -f ".index_metadata.json" ]' not in workflow

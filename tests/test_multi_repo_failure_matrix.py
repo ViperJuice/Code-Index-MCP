@@ -6,8 +6,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from mcp_server.artifacts.multi_repo_artifact_coordinator import MultiRepoArtifactCoordinator
 from mcp_server.artifacts.artifact_download import IndexArtifactDownloader
+from mcp_server.artifacts.multi_repo_artifact_coordinator import MultiRepoArtifactCoordinator
 from mcp_server.cli import tool_handlers
 from mcp_server.storage.multi_repo_manager import MultiRepositoryManager
 from mcp_server.watcher.ref_poller import RefPoller
