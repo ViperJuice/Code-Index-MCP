@@ -12,6 +12,7 @@ from mcp_server.indexing.summarization import (
     FileBatchSummarizer,
     LazyChunkWriter,
 )
+from mcp_server.config.settings import get_settings
 from mcp_server.setup.semantic_preflight import EnrichmentModelResolution
 from mcp_server.storage.sqlite_store import SQLiteStore
 
@@ -287,3 +288,80 @@ async def test_file_batch_summarizer_falls_back_to_topological_per_chunk_path(tm
     assert topological_called["value"] is True
     assert calls == []
     assert result.summaries_written == 2
+
+
+@pytest.mark.asyncio
+async def test_file_batch_summarizer_preserves_authoritative_metadata_on_batch_runtime_fallback(
+    tmp_path, monkeypatch
+):
+    db_path = tmp_path / "summaries.db"
+    store, file_id = _seed_chunk_summary_tables(db_path, tmp_path)
+    profile_id = get_settings().get_semantic_default_profile()
+    summarizer = FileBatchSummarizer(
+        db_path=str(db_path),
+        qdrant_client=None,
+        summarization_config={
+            **get_settings().get_profile_summarization_config(profile_id),
+            "profile_id": profile_id,
+        },
+    )
+    summarizer._profile_model_resolution = EnrichmentModelResolution(
+        configured_model="chat",
+        effective_model="cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit",
+        resolution_strategy="single_served_model_for_chat_alias",
+        available_models=["cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"],
+        models_probe_verified=True,
+    )
+
+    async def _raise_runtime_mismatch(*_args, **_kwargs):
+        raise ImportError("generated client 0.220.0 is incompatible with baml-py 0.221.0")
+
+    async def _fake_profile_api(_system: str, _prompt: str) -> tuple[str, str]:
+        return "Recovered authoritative summary", "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
+
+    monkeypatch.setenv("OPENAI_API_KEY", "dummy-local-key")
+    summarizer._call_batch_api = _raise_runtime_mismatch  # type: ignore[method-assign]
+    summarizer._call_profile_api = _fake_profile_api  # type: ignore[method-assign]
+    result = await summarizer.summarize_file_chunks(
+        file_id=file_id,
+        file_path=str(tmp_path / "sample.py"),
+        file_content="def alpha():\n    return 1\n",
+        chunks=[
+            {
+                "chunk_id": "chunk-1",
+                "line_start": 1,
+                "line_end": 2,
+                "node_type": "function_definition",
+                "language": "python",
+                "symbol_id": None,
+            }
+        ],
+        symbol_map={},
+        persist=True,
+    )
+
+    stored = store.get_chunk_summary("chunk-1")
+    assert result.summaries_written == 1
+    assert result.authoritative_chunks == 1
+    assert result.missing_chunk_ids == []
+    assert stored is not None
+    assert stored["summary_text"] == "Recovered authoritative summary"
+    assert stored["is_authoritative"] is True
+    assert stored["provider_name"] == "openai_compatible"
+    assert stored["profile_id"] == profile_id
+    assert stored["audit_metadata"]["llm_model"] == "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
+    assert stored["audit_metadata"]["configured_model_name"] == "chat"
+    assert (
+        stored["audit_metadata"]["effective_model_name"]
+        == "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
+    )
+
+
+def test_default_oss_high_profile_exposes_direct_summarization_config():
+    settings = get_settings()
+    profile_id = settings.get_semantic_default_profile()
+    config = settings.get_profile_summarization_config(profile_id)
+
+    assert profile_id == "oss_high"
+    assert config["base_url"] == "http://ai:8002/v1"
+    assert config["model_name"] == "chat"

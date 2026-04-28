@@ -622,6 +622,59 @@ runtime and the semantic write path it unlocks.
 **Produces**
 - IF-0-SEMSUMFIX-1 — Default local summary-runtime and semantic-write recovery contract.
 
+### Phase 11 — Full Sync Summary Coverage Recovery (SEMSYNCFIX)
+
+**Objective**
+
+Repair the remaining full-sync semantic-stage blocker exposed by SEMSUMFIX so a
+clean `repository sync --force-full` drains repo-wide authoritative summaries
+and can advance vector writes for the active `oss_high` profile.
+
+**Exit criteria**
+- [ ] A clean force-full rebuild writes authoritative summaries beyond the
+      direct probe subset and increases `chunk_summaries` from the current
+      manual-probe-only baseline.
+- [ ] The same rebuild produces non-zero `semantic_points` linked to
+      `code_index__oss_high__v1`.
+- [ ] `uv run mcp-index repository status` reports semantic readiness `ready`
+      for the active profile after the rebuild.
+- [ ] Semantic dogfood queries for the fixed prompts return semantic-path code
+      results instead of `semantic_not_ready`.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` is refreshed with the repaired
+      full-sync/write-path outcome and final semantic-ready verdict.
+
+**Scope notes**
+
+This phase exists only because SEMSUMFIX proved the direct authoritative
+summary runtime can recover from the BAML client/runtime mismatch, but the real
+`repository sync --force-full` path still leaves the repo at
+`summaries_missing` with only probe-written summary rows. Keep the work
+narrowly on full-sync summary coverage, summary-stage scoping, and the strict
+semantic readiness accounting that gates vector writes.
+
+**Non-goals**
+
+- No semantic ranking redesign.
+- No multi-repo rollout expansion.
+- No unrelated profile/configuration changes unless they are required to make
+  the repaired summary path execute during full sync.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/indexing/summarization.py`
+- `docs/guides/semantic-onboarding.md`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/real_world/test_semantic_search.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMSUMFIX
+
+**Produces**
+- IF-0-SEMSYNCFIX-1 — Default local full-sync summary coverage and semantic-ready rebuild contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -635,6 +688,7 @@ SEMCONTRACT
   -> SEMREADYFIX
   -> SEMCOLLECT
   -> SEMSUMFIX
+  -> SEMSYNCFIX
 ```
 
 ## Execution Notes
@@ -662,6 +716,9 @@ SEMCONTRACT
 - SEMSUMFIX exists only if SEMCOLLECT proves the active collection gate is
   repaired but authoritative summary generation still cannot run for the live
   rebuild.
+- SEMSYNCFIX exists only if SEMSUMFIX proves the direct authoritative summary
+  runtime is repaired but the real full-sync path or readiness accounting still
+  leaves the repo at `summaries_missing`.
 
 ## Verification
 
@@ -712,4 +769,13 @@ env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
 sqlite3 .mcp-index/current.db 'select count(*) from chunk_summaries; select count(*) from semantic_points;'
 SEMANTIC_SEARCH_ENABLED=true CODE_INDEX_DOGFOOD_REPO=. uv run pytest tests/real_world/test_semantic_search.py -q --no-cov
+
+# SEMSYNCFIX
+env OPENAI_API_KEY=dummy-local-key uv run python - <<'PY'
+...
+PY
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sqlite3 .mcp-index/current.db 'select count(*) from chunk_summaries; select count(*) from semantic_points;'
+RUN_REAL_WORLD_TESTS=1 SEMANTIC_SEARCH_ENABLED=true CODE_INDEX_DOGFOOD_REPO=. OPENAI_API_KEY=dummy-local-key uv run --extra dev python -m pytest tests/real_world/test_semantic_search.py -q --no-cov -k repo_local_dogfood_queries_stay_on_semantic_path -rs
 ```

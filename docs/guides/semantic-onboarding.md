@@ -162,8 +162,10 @@ and vectors:
 - The current SEMREADYFIX evidence shows the enrichment compatibility repair can
   succeed while semantic dogfood still remains blocked on `collection_missing`;
   the SEMCOLLECT evidence then shows collection bootstrap can succeed while the
-  repo is still blocked downstream on summary generation. Use the report to
-  separate those states.
+  repo is still blocked downstream on summary generation; the SEMSUMFIX
+  evidence then shows the direct authoritative summary runtime can recover
+  while the real full-sync path is still blocked on repo-wide summary
+  coverage. Use the report to separate those states.
 
 ## Full Reindex Pipeline
 
@@ -232,8 +234,13 @@ dogfood rebuild evidence.
   - run `uv run mcp-index repository status` and confirm active-profile preflight is `ready`
   - probe `ComprehensiveChunkWriter.process_scope(...)` or the summary path directly
     if semantic readiness remains `summaries_missing`
-  - if the probe fails with a BAML generator/runtime mismatch, align the installed
-    `baml-py` version with the generated client before rerunning the rebuild
+  - if the batch runtime reports a BAML generator/runtime mismatch, confirm the
+    direct authoritative fallback still writes `is_authoritative=1` rows with
+    the expected configured model, effective model, and profile metadata
+  - if direct probes succeed but `repository sync --force-full` still leaves
+    semantic readiness at `summaries_missing`, treat that as a full-sync
+    summary coverage blocker rather than a preflight or collection bootstrap
+    blocker
 - Voyage provider failing
   - verify `VOYAGE_API_KEY`
 - Preflight output

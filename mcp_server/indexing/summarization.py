@@ -5,6 +5,7 @@ import os
 import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Sequence
 
 import mcp.types as types
@@ -366,6 +367,7 @@ class ChunkWriter:
         language: str = "unknown",
         parent_context: str = "",
         file_content: str = "",
+        is_authoritative: bool = False,
     ) -> Optional[str]:
         """Generate a summary for a code chunk and persist it to SQLite.
 
@@ -504,7 +506,7 @@ class ChunkWriter:
             symbol=symbol,
             summary_text=summary_text,
             model_name=model_name,
-            is_authoritative=False,
+            is_authoritative=is_authoritative,
         )
         logger.info("Stored summary for chunk '%s' via %s", symbol, model_name)
         return summary_text
@@ -571,8 +573,6 @@ class FileBatchSummarizer(ChunkWriter):
         symbol_map: Dict[int, str],
     ) -> List[Any]:
         """Per-chunk fallback: summarize in topological order (leaves first)."""
-        from mcp_server.indexing.baml_client.baml_client.types import ChunkSummary
-
         order = _topological_order(chunks)
         chunk_map = {c["chunk_id"]: c for c in chunks}
         stored_summaries: Dict[str, str] = {}
@@ -611,10 +611,11 @@ class FileBatchSummarizer(ChunkWriter):
                     language=c.get("language") or "unknown",
                     parent_context=parent_context,
                     file_content=file_content,
+                    is_authoritative=True,
                 )
                 if summary_text:
                     stored_summaries[chunk_id] = summary_text
-                    results.append(ChunkSummary(chunk_id=chunk_id, summary=summary_text))
+                    results.append(SimpleNamespace(chunk_id=chunk_id, summary=summary_text))
                 else:
                     missing_chunk_ids.append(chunk_id)
             except Exception as exc:
