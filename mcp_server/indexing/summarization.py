@@ -917,7 +917,11 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
         return rows
 
     async def process_scope(
-        self, *, limit: int = 500, target_paths: Optional[Sequence[Path]] = None
+        self,
+        *,
+        limit: int = 500,
+        target_paths: Optional[Sequence[Path]] = None,
+        max_batches: Optional[int] = None,
     ) -> SummaryGenerationResult:
         """Generate summaries for unsummarized chunks within an optional file scope."""
         if not self.can_summarize():
@@ -934,6 +938,7 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
         total_files_summarized = 0
         missing_chunk_ids: List[str] = []
 
+        batches_processed = 0
         while True:
             rows = self._fetch_unsummarized_rows(limit=limit, target_paths=target_paths)
             if not rows:
@@ -1018,6 +1023,9 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
                     "ComprehensiveChunkWriter: made no progress on %d remaining chunks",
                     len(rows),
                 )
+                break
+            batches_processed += 1
+            if max_batches is not None and batches_processed >= max_batches:
                 break
 
         logger.info(

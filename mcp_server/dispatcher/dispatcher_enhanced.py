@@ -2263,7 +2263,8 @@ class EnhancedDispatcher:
         )
         # Keep each summary pass bounded enough to make durable progress inside
         # the per-pass timeout instead of attempting the entire repo backlog at once.
-        summary_limit = min(4096, max(512, len(normalized_paths) * 4))
+        summary_limit = min(512, max(64, len(normalized_paths)))
+        min_summary_limit = 32
         remaining_missing = self._count_missing_summaries_for_paths(ctx, normalized_paths)
         summary_missing_ids: List[str] = []
         previous_missing = remaining_missing
@@ -2276,11 +2277,15 @@ class EnhancedDispatcher:
                         writer.process_scope(
                             limit=summary_limit,
                             target_paths=normalized_paths,
+                            max_batches=1,
                         ),
                         timeout=semantic_stage_timeout_seconds,
                     )
                 )
             except TimeoutError:
+                if summary_limit > min_summary_limit:
+                    summary_limit = max(min_summary_limit, summary_limit // 2)
+                    continue
                 stats["summary_missing_chunks"] = remaining_missing
                 stats["semantic_stage"] = "blocked_summary_timeout"
                 stats["semantic_blocked"] = len(normalized_paths)

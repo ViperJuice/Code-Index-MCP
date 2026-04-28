@@ -187,11 +187,13 @@ and vectors:
   blocker, restores indexed-commit freshness, and leaves the repo blocked
   downstream on semantic readiness `summaries_missing`. The current
   SEMCLOSEOUT evidence then shows the registered-context semantic stage now
-  persists authoritative summaries on the live repo-local index, but the phase
-  remains blocked while the remaining summary backlog drains and strict vector
-  linkage still reports `0` rows in `semantic_points`. If that later blocker
-  remains live, route the next execution step through `SEMCLOSEOUT` instead of
-  reusing an older downstream plan. Use the report to separate those states.
+  persists authoritative summaries on the live repo-local index and the
+  dispatcher uses bounded one-batch passes plus timeout backoff, but the phase
+  still remains blocked on repo-wide summary timeout before strict vector
+  linkage can start. That leaves the repo at `stale_commit` with non-zero
+  `chunk_summaries` and zero `semantic_points`. If that later blocker remains
+  live, route the next execution step through `SEMTIMEOUT` instead of reusing
+  the older SEMCLOSEOUT handoff. Use the report to separate those states.
 
 ## Full Reindex Pipeline
 

@@ -1148,6 +1148,59 @@ is no longer the blocker.
 **Produces**
 - IF-0-SEMCLOSEOUT-1 — Post-lexical semantic summary/vector closeout contract.
 
+### Phase 21 — Semantic Summary Timeout Recovery (SEMTIMEOUT)
+
+**Objective**
+
+Repair the remaining repo-wide summary-timeout blocker exposed by SEMCLOSEOUT
+so force-full rebuilds can finish authoritative summary drain on the active
+commit instead of failing with `Summary generation timed out before strict
+semantic indexing could start`.
+
+**Exit criteria**
+- [ ] A force-full rebuild on the active repo no longer exits with
+      `Summary generation timed out before strict semantic indexing could start`.
+- [ ] Dispatcher summary recovery uses bounded one-batch passes and timeout
+      backoff so repo-local semantic progress persists durably without relying
+      on one unbounded summary call to drain the whole backlog.
+- [ ] `uv run mcp-index repository status` shows the indexed commit can
+      advance to the current commit again after the repo-local semantic rerun,
+      or it records a narrower post-timeout downstream blocker than summary
+      timeout.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` is refreshed with the timeout
+      recovery evidence, current summary/vector counts, and the new exact
+      downstream blocker if semantic closeout is still incomplete.
+
+**Scope notes**
+
+This phase exists only because SEMCLOSEOUT proved partial live summary
+persistence (`chunk_summaries` increased) but the real repo-wide force-full
+rerun still timed out before strict semantic indexing could start. Keep this
+phase narrowly on repo-wide summary pass sizing, timeout recovery, and the
+exact live blocker surfaced after timeout is removed.
+
+**Non-goals**
+
+- No lexical timeout or Markdown bounded-path work.
+- No semantic ranking redesign.
+- No multi-repo rollout expansion beyond this repo-local dogfood recovery.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/indexing/summarization.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `docs/guides/semantic-onboarding.md`
+- `tests/test_dispatcher.py`
+- `tests/test_summarization.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMCLOSEOUT
+
+**Produces**
+- IF-0-SEMTIMEOUT-1 — Repo-wide semantic summary timeout recovery contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -1171,6 +1224,7 @@ SEMCONTRACT
   -> SEMAGENTS
   -> SEMREADME
   -> SEMCLOSEOUT
+  -> SEMTIMEOUT
 ```
 
 ## Execution Notes
@@ -1231,6 +1285,14 @@ SEMCONTRACT
   force-full rerun still times out on another bounded Markdown document such
   as `README.md`; it should repair that exact file path or preserve a still
   narrower downstream blocker.
+- SEMCLOSEOUT exists only if SEMREADME clears the final lexical timeout but
+  the live rerun still remains blocked on semantic closeout; it should repair
+  summary persistence, strict semantic vector linkage, or preserve the next
+  exact semantic-stage blocker instead of reopening lexical work.
+- SEMTIMEOUT exists only if SEMCLOSEOUT proves semantic summary persistence is
+  live but the repo-wide force-full rerun still fails on summary timeout
+  before strict vector linkage can start; it should tighten repo-wide summary
+  pass sizing/backoff and then preserve the next exact downstream blocker.
 
 ## Verification
 

@@ -54,24 +54,23 @@ def test_semdogfood_report_records_reset_boundary_counts_collection_and_verifica
         "SEMAGENTS",
         "SEMREADME",
         "SEMCLOSEOUT",
+        "SEMTIMEOUT",
         "SEMCHANGELOG",
         "SEMSTALLFIX",
         "SEMIOWAIT",
         "README.md",
-        "Summary-backed chunks: `191`",
-        "Chunks missing summaries: `32978`",
+        "Summary-backed chunks: `234`",
+        "Chunks missing summaries: `32996`",
         "Vector-linked chunks: `0`",
         "Lexical readiness",
         "Semantic readiness",
         "Indexed commit",
         "Current commit",
         "Active-profile preflight",
-        "uv run pytest tests/test_dispatcher.py -q --no-cov",
-        "uv run pytest tests/test_git_index_manager.py -q --no-cov",
+        "uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_summarization.py tests/test_profile_aware_semantic_indexer.py -q --no-cov",
         "uv run mcp-index index check-semantic",
         "uv run pytest tests/root_tests/test_markdown_production_scenarios.py -q --no-cov -k readme",
         "uv run --extra dev python -m pytest tests/real_world/test_semantic_search.py -q --no-cov -k repo_local_dogfood_queries_stay_on_semantic_path -rs",
-        "ComprehensiveChunkWriter.process_scope(limit=512",
     ):
         assert expected in text
 
@@ -89,10 +88,10 @@ def test_semdogfood_report_compares_query_modes_and_states_operator_verdict():
         "mcp_server/dispatcher/dispatcher_enhanced.py",
         "mcp_server/storage/git_index_manager.py",
         "mcp_server/utils/semantic_indexer.py",
-        "semantic_not_ready",
+        "stale_commit",
         "local multi-repo dogfooding",
-        "throughput and vector linkage",
-        "registered-context semantic stage",
+        "summary timeout",
+        "one-batch mode",
     ):
         assert expected in text
 
@@ -115,6 +114,7 @@ def test_semantic_onboarding_links_semdogfood_report_and_separate_readiness_surf
     assert "SEMAGENTS" in text
     assert "SEMREADME" in text
     assert "SEMCLOSEOUT" in text
+    assert "SEMTIMEOUT" in text
     assert "stale_commit" in text
     assert "blocked_file_timeout" in text
     assert "lexical/storage blocker" in text
