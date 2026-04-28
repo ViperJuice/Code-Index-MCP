@@ -1201,6 +1201,51 @@ exact live blocker surfaced after timeout is removed.
 **Produces**
 - IF-0-SEMTIMEOUT-1 — Repo-wide semantic summary timeout recovery contract.
 
+### Phase 22 — Single-Pass Summary Stall Recovery (SEMPASSSTALL)
+
+**Objective**
+
+Repair the remaining single-pass doc-heavy summary stall exposed by SEMTIMEOUT
+so force-full rebuilds can return the bounded continuation blocker promptly
+instead of hanging inside one summary pass.
+
+**Exit criteria**
+- [ ] A force-full rebuild on the active repo reaches the semantic-stage
+      bounded continuation verdict instead of stalling inside a single
+      doc-heavy summary pass.
+- [ ] Repo-wide doc-like summary batches are sized or checkpointed so one
+      batch cannot prevent the dispatcher from reporting continuation metadata.
+- [ ] `uv run mcp-index repository status` reports the current exact semantic
+      readiness state with summary/vector counts after the live rerun.
+
+**Scope notes**
+
+This phase exists only if SEMTIMEOUT clears the repo-wide handoff gap but the
+live force-full rerun still stalls inside a single doc-heavy summary pass before
+it can emit the bounded continuation blocker.
+
+**Non-goals**
+
+- No semantic ranking redesign.
+- No multi-repo rollout expansion beyond this repo-local dogfood recovery.
+- No artifact publishing or GitHub Actions release work.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/indexing/summarization.py`
+- `mcp_server/storage/git_index_manager.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_summarization.py`
+- `tests/test_git_index_manager.py`
+
+**Depends on**
+- SEMTIMEOUT
+
+**Produces**
+- IF-0-SEMPASSSTALL-1 — Repo-wide single-pass summary stall recovery contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -1225,6 +1270,7 @@ SEMCONTRACT
   -> SEMREADME
   -> SEMCLOSEOUT
   -> SEMTIMEOUT
+  -> SEMPASSSTALL
 ```
 
 ## Execution Notes
