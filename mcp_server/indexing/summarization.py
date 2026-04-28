@@ -37,6 +37,8 @@ _USER_PROMPT_TEMPLATE = (
 _MAX_FILE_CONTEXT_CHARS = 60_000
 _DOC_FILE_CONTEXT_CHARS = 8_000
 _DOC_CONTEXT_LANGUAGES = {"markdown", "plaintext", "text", "rst"}
+_DOC_PROCESS_SCOPE_CHUNK_LIMIT = 16
+_DOC_TOPOLOGICAL_RECOVERY_CHUNK_LIMIT = 4
 
 # Files larger than this (in characters) skip the single-batch API call and fall back
 # to the topological per-chunk path.
@@ -578,8 +580,21 @@ class FileBatchSummarizer(ChunkWriter):
                     profile_exc,
                 )
         return await self._summarize_topological(
-            file_id, file_path, file_content, chunks, symbol_map
+            file_id,
+            file_path,
+            file_content,
+            chunks,
+            symbol_map,
+            max_chunks=self._topological_recovery_chunk_limit(
+                (chunks[0].get("language") or "unknown") if chunks else "unknown"
+            ),
         )
+
+    def _topological_recovery_chunk_limit(self, language: str) -> Optional[int]:
+        normalized_language = (language or "").lower()
+        if normalized_language in _DOC_CONTEXT_LANGUAGES:
+            return _DOC_TOPOLOGICAL_RECOVERY_CHUNK_LIMIT
+        return None
 
     def _parse_profile_batch_response(self, response_text: str) -> List[SimpleNamespace]:
         text = response_text.strip()
@@ -720,9 +735,12 @@ class FileBatchSummarizer(ChunkWriter):
         file_content: str,
         chunks: List[Dict],
         symbol_map: Dict[int, str],
+        max_chunks: Optional[int] = None,
     ) -> List[Any]:
         """Per-chunk fallback: summarize in topological order (leaves first)."""
         order = _topological_order(chunks)
+        if max_chunks is not None:
+            order = order[:max_chunks]
         chunk_map = {c["chunk_id"]: c for c in chunks}
         stored_summaries: Dict[str, str] = {}
         results: List[Any] = []
@@ -772,7 +790,7 @@ class FileBatchSummarizer(ChunkWriter):
                 missing_chunk_ids.append(chunk_id)
 
         return SummaryGenerationResult(
-            chunks_attempted=len(chunks),
+            chunks_attempted=len(order),
             summaries_written=len(results),
             authoritative_chunks=len(results),
             missing_chunk_ids=missing_chunk_ids,
@@ -967,6 +985,12 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
             row = cursor.fetchone()
         return int(row[0]) if row else 0
 
+    def _process_scope_chunk_limit_for_language(self, language: str, limit: int) -> int:
+        normalized_language = (language or "").lower()
+        if normalized_language in _DOC_CONTEXT_LANGUAGES:
+            return min(limit, _DOC_PROCESS_SCOPE_CHUNK_LIMIT)
+        return limit
+
     async def process_scope(
         self,
         *,
@@ -1024,23 +1048,33 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
                     file_chunks[file_id] = []
                     file_symbol_maps[file_id] = {}
 
-                file_chunks[file_id].append(
-                    {
-                        "chunk_id": chunk_id,
-                        "file_id": file_id,
-                        "line_start": line_start,
-                        "line_end": line_end,
-                        "content": chunk_content,
-                        "node_type": node_type,
-                        "parent_chunk_id": parent_chunk_id,
-                        "language": language,
-                        "symbol_id": symbol_id,
-                    }
+                chunk_cap = self._process_scope_chunk_limit_for_language(
+                    language or "unknown",
+                    limit,
                 )
+                if len(file_chunks[file_id]) < chunk_cap:
+                    file_chunks[file_id].append(
+                        {
+                            "chunk_id": chunk_id,
+                            "file_id": file_id,
+                            "line_start": line_start,
+                            "line_end": line_end,
+                            "content": chunk_content,
+                            "node_type": node_type,
+                            "parent_chunk_id": parent_chunk_id,
+                            "language": language,
+                            "symbol_id": symbol_id,
+                        }
+                    )
                 if symbol_id and symbol:
                     file_symbol_maps[file_id][symbol_id] = symbol
 
-            total_attempted += len(rows)
+            selected_chunk_count = sum(len(chunks) for chunks in file_chunks.values())
+            if selected_chunk_count == 0:
+                remaining_chunks = self._count_unsummarized_rows(target_paths=target_paths)
+                break
+
+            total_attempted += selected_chunk_count
             total_files_attempted += len(file_meta)
             pass_summaries_written = 0
 

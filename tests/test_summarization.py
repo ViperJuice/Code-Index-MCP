@@ -1004,6 +1004,179 @@ async def test_process_scope_retries_large_file_profile_recovery_until_backlog_i
 
 
 @pytest.mark.asyncio
+async def test_process_scope_caps_doc_like_file_batches_and_resumes_progress(
+    tmp_path, monkeypatch
+):
+    db_path = tmp_path / "summaries.db"
+    store = SQLiteStore(str(db_path))
+    repo_id = store.ensure_repository_row(tmp_path)
+
+    target = tmp_path / "target.md"
+    target.write_text("doc\n" * 40, encoding="utf-8")
+    file_id = store.store_file(
+        repo_id,
+        path=target,
+        relative_path="target.md",
+        language="markdown",
+        size=target.stat().st_size,
+        content_hash="target-hash",
+    )
+    for idx in range(1, 21):
+        symbol_id = store.store_symbol(
+            file_id=file_id,
+            name=f"chunk_{idx}",
+            kind="paragraph",
+            line_start=idx,
+            line_end=idx,
+        )
+        store.store_chunk(
+            file_id=file_id,
+            content=f"paragraph {idx}",
+            content_start=0,
+            content_end=len(f"paragraph {idx}"),
+            line_start=idx,
+            line_end=idx,
+            chunk_id=f"chunk-{idx}",
+            node_id=f"node-chunk-{idx}",
+            treesitter_file_id=f"tree-chunk-{idx}",
+            symbol_id=symbol_id,
+            language="markdown",
+            node_type="paragraph",
+        )
+
+    writer = ComprehensiveChunkWriter(
+        db_path=str(db_path),
+        qdrant_client=None,
+        summarization_config={"base_url": "http://ai:8002/v1", "model_name": "chat"},
+    )
+    batch_order: list[list[str]] = []
+
+    async def _fake_summarize_file_chunks(**kwargs):
+        chunk_ids = [chunk["chunk_id"] for chunk in kwargs["chunks"]]
+        batch_order.append(chunk_ids)
+        for chunk_id in chunk_ids:
+            store.store_chunk_summary(
+                chunk_hash=chunk_id,
+                file_id=file_id,
+                chunk_start=1,
+                chunk_end=1,
+                summary_text=f"summary for {chunk_id}",
+                llm_model="chat",
+                is_authoritative=True,
+                symbol=None,
+                provider_name="openai_compatible",
+                profile_id="oss_high",
+                prompt_fingerprint="test-fingerprint",
+                audit_metadata={"provider_name": "openai_compatible"},
+            )
+        return SummaryGenerationResult(
+            chunks_attempted=len(chunk_ids),
+            summaries_written=len(chunk_ids),
+            authoritative_chunks=len(chunk_ids),
+            missing_chunk_ids=[],
+            files_attempted=1,
+            files_summarized=1,
+        )
+
+    monkeypatch.setattr(writer, "summarize_file_chunks", _fake_summarize_file_chunks)
+
+    result = await writer.process_scope(limit=64, target_paths=[target])
+
+    assert [len(batch) for batch in batch_order] == [16, 4]
+    assert batch_order[0][0] == "chunk-1"
+    assert batch_order[0][-1] == "chunk-16"
+    assert batch_order[1] == ["chunk-17", "chunk-18", "chunk-19", "chunk-20"]
+    assert result.summaries_written == 20
+    assert result.authoritative_chunks == 20
+    assert result.chunks_attempted == 20
+    assert result.batches_processed == 2
+    assert result.remaining_chunks == 0
+    assert result.scope_drained is True
+
+
+@pytest.mark.asyncio
+async def test_process_scope_bounds_doc_like_topological_recovery_after_batch_failure(
+    tmp_path, monkeypatch
+):
+    db_path = tmp_path / "summaries.db"
+    store = SQLiteStore(str(db_path))
+    repo_id = store.ensure_repository_row(tmp_path)
+
+    target = tmp_path / "target.md"
+    target.write_text("doc\n" * 20, encoding="utf-8")
+    file_id = store.store_file(
+        repo_id,
+        path=target,
+        relative_path="target.md",
+        language="markdown",
+        size=target.stat().st_size,
+        content_hash="target-hash",
+    )
+    for idx in range(1, 11):
+        symbol_id = store.store_symbol(
+            file_id=file_id,
+            name=f"chunk_{idx}",
+            kind="paragraph",
+            line_start=idx,
+            line_end=idx,
+        )
+        store.store_chunk(
+            file_id=file_id,
+            content=f"paragraph {idx}",
+            content_start=0,
+            content_end=len(f"paragraph {idx}"),
+            line_start=idx,
+            line_end=idx,
+            chunk_id=f"chunk-{idx}",
+            node_id=f"node-chunk-{idx}",
+            treesitter_file_id=f"tree-chunk-{idx}",
+            symbol_id=symbol_id,
+            language="markdown",
+            node_type="paragraph",
+        )
+
+    writer = ComprehensiveChunkWriter(
+        db_path=str(db_path),
+        qdrant_client=None,
+        summarization_config={"base_url": "http://ai:8002/v1", "model_name": "chat"},
+    )
+    summarized: list[str] = []
+
+    async def _raise_batch(*_args, **_kwargs):
+        raise RuntimeError("Request timed out.")
+
+    async def _fake_summarize_chunk(**kwargs):
+        chunk_id = kwargs["chunk_hash"]
+        summarized.append(chunk_id)
+        store.store_chunk_summary(
+            chunk_hash=chunk_id,
+            file_id=file_id,
+            chunk_start=kwargs["chunk_start"],
+            chunk_end=kwargs["chunk_end"],
+            summary_text=f"summary for {chunk_id}",
+            llm_model="chat",
+            is_authoritative=True,
+            symbol=kwargs["symbol"],
+            provider_name="openai_compatible",
+            profile_id="oss_high",
+            prompt_fingerprint="test-fingerprint",
+            audit_metadata={"provider_name": "openai_compatible"},
+        )
+        return f"summary for {chunk_id}"
+
+    monkeypatch.setattr(writer, "_call_profile_batch_api", _raise_batch)
+    monkeypatch.setattr(writer, "summarize_chunk", _fake_summarize_chunk)
+
+    result = await writer.process_scope(limit=16, target_paths=[target], max_batches=1)
+
+    assert summarized == ["chunk-1", "chunk-2", "chunk-3", "chunk-4"]
+    assert result.summaries_written == 4
+    assert result.chunks_attempted == 10
+    assert result.remaining_chunks == 6
+    assert result.scope_drained is False
+
+
+@pytest.mark.asyncio
 async def test_process_scope_max_batches_stops_after_one_batch(tmp_path, monkeypatch):
     db_path = tmp_path / "summaries.db"
     store = SQLiteStore(str(db_path))
