@@ -185,7 +185,11 @@ and vectors:
   `README.md` as the next exact lexical/storage blocker; and the SEMREADME
   evidence then shows the bounded README repair clears that final lexical
   blocker, restores indexed-commit freshness, and leaves the repo blocked
-  downstream on semantic readiness `summaries_missing`. If that later blocker
+  downstream on semantic readiness `summaries_missing`. The current
+  SEMCLOSEOUT evidence then shows the registered-context semantic stage now
+  persists authoritative summaries on the live repo-local index, but the phase
+  remains blocked while the remaining summary backlog drains and strict vector
+  linkage still reports `0` rows in `semantic_points`. If that later blocker
   remains live, route the next execution step through `SEMCLOSEOUT` instead of
   reusing an older downstream plan. Use the report to separate those states.
 

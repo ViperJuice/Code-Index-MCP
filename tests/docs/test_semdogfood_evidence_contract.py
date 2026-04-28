@@ -23,9 +23,10 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
 
     for expected in (
         "# Semantic Dogfood Rebuild",
-        "Phase plan: `plans/phase-plan-v7-SEMREADME.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMCLOSEOUT.md`",
         "## Reset Boundary",
         "## README Lexical Repair",
+        "## SEMCLOSEOUT Semantic Recovery",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -57,6 +58,9 @@ def test_semdogfood_report_records_reset_boundary_counts_collection_and_verifica
         "SEMSTALLFIX",
         "SEMIOWAIT",
         "README.md",
+        "Summary-backed chunks: `191`",
+        "Chunks missing summaries: `32978`",
+        "Vector-linked chunks: `0`",
         "Lexical readiness",
         "Semantic readiness",
         "Indexed commit",
@@ -67,6 +71,7 @@ def test_semdogfood_report_records_reset_boundary_counts_collection_and_verifica
         "uv run mcp-index index check-semantic",
         "uv run pytest tests/root_tests/test_markdown_production_scenarios.py -q --no-cov -k readme",
         "uv run --extra dev python -m pytest tests/real_world/test_semantic_search.py -q --no-cov -k repo_local_dogfood_queries_stay_on_semantic_path -rs",
+        "ComprehensiveChunkWriter.process_scope(limit=512",
     ):
         assert expected in text
 
@@ -86,6 +91,8 @@ def test_semdogfood_report_compares_query_modes_and_states_operator_verdict():
         "mcp_server/utils/semantic_indexer.py",
         "semantic_not_ready",
         "local multi-repo dogfooding",
+        "throughput and vector linkage",
+        "registered-context semantic stage",
     ):
         assert expected in text
 
@@ -112,3 +119,4 @@ def test_semantic_onboarding_links_semdogfood_report_and_separate_readiness_surf
     assert "blocked_file_timeout" in text
     assert "lexical/storage blocker" in text
     assert "storage diagnostics" in text
+    assert "semantic_points" in text

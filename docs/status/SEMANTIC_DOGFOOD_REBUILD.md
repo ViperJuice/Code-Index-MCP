@@ -1,8 +1,8 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-28T14:49:59Z`.
-- Observed commit: `4959b36a`.
-- Phase plan: `plans/phase-plan-v7-SEMREADME.md`.
+- Evidence captured: `2026-04-28T15:41:29Z`.
+- Observed commit: `e2e95198`.
+- Phase plan: `plans/phase-plan-v7-SEMCLOSEOUT.md`.
 - Prior repairs carried forward: `SEMSTALLFIX`, `SEMIOWAIT`,
   `SEMCHANGELOG`, `SEMROADMAP`, `SEMANALYSIS`, and `SEMAGENTS` in
   `specs/phase-plans-v7.md`.
@@ -42,6 +42,33 @@ weakening the lexical watchdog globally:
   `tests/test_git_index_manager.py`, and
   `tests/root_tests/test_markdown_production_scenarios.py` now freeze that
   contract, including the README-specific persistence path.
+
+## SEMCLOSEOUT Semantic Recovery
+
+SEMCLOSEOUT did not close the semantic phase yet, but it changed the live
+repo-local blocker in an important way:
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py` now lazily builds a
+  repo-scoped semantic indexer for registered contexts when the CLI sync path
+  constructs `EnhancedDispatcher()` without an injected
+  `SemanticIndexerRegistry`.
+- The same dispatcher now bounds each authoritative summary pass instead of
+  trying to drain the whole repo-local semantic backlog in one timed call.
+- `tests/test_dispatcher.py` freezes that registered-context semantic
+  availability and the bounded summary-pass sizing.
+- `tests/real_world/test_semantic_search.py` now accepts the current
+  fail-closed `index_unavailable` readiness codes instead of hard-coding only
+  `stale_commit`.
+
+Live bounded semantic replay on the fresh lexical-ready SQLite store now
+persists authoritative summaries instead of making zero semantic progress:
+
+- `chunk_summaries`: `10 -> 191`
+- `semantic_points`: `0 -> 0`
+- First persisted live SEMCLOSEOUT file:
+  `.claude/agents/lane-executer.md` with `188` authoritative summaries
+- Semantic readiness remains `summaries_missing`, so strict vector linkage has
+  not started for the remaining backlog.
 
 ## Rebuild Command
 
@@ -98,15 +125,15 @@ after the completed rerun reported:
 
 Repository/index freshness evidence:
 
-- Current commit: `4959b36a`
-- Indexed commit: `4959b36a`
+- Current commit: `e2e95198`
+- Indexed commit: `e2e95198`
 
-Semantic evidence after the rerun remained:
+Semantic evidence after the latest SEMCLOSEOUT replay is now:
 
-- Summary-backed chunks: `0`
-- Chunks missing summaries: `33107`
+- Summary-backed chunks: `191`
+- Chunks missing summaries: `32978`
 - Vector-linked chunks: `0`
-- Chunks missing vectors: `33107`
+- Chunks missing vectors: `33169`
 - Collection-matched links: `0`
 - Collection mismatches: `0`
 
@@ -126,7 +153,8 @@ Fixed dogfood prompt: `how does semantic setup validate qdrant and embedding rea
 
 - Semantic query routing is now eligible because the repository query surface is
   `ready`, but repo-local semantic dogfood still skips on
-  `semantic_not_ready` because semantic readiness remains `summaries_missing`.
+  `semantic_not_ready` because semantic readiness remains `summaries_missing`
+  even after bounded SEMCLOSEOUT summary progress.
 - Repo-local semantic dogfood query harness:
   `tests/real_world/test_semantic_search.py -k repo_local_dogfood_queries_stay_on_semantic_path`
   now skips on semantic readiness rather than on `index_unavailable`.
@@ -146,31 +174,35 @@ Fixed dogfood prompt: `how does semantic setup validate qdrant and embedding rea
 
 The exact verdict string for contract checks is `local multi-repo dogfooding`.
 
-Local multi-repo dogfooding is **still not ready** after SEMREADME.
+Local multi-repo dogfooding is **still not ready** after SEMCLOSEOUT.
 
 Why:
 
 - The original `README.md` lexical timeout is repaired.
-- The active indexed commit is now fresh at `4959b36a`.
+- The active indexed commit is now fresh at `e2e95198`.
 - Repository readiness is `ready`, and the query surface is `ready`.
 - Semantic readiness remains `summaries_missing`.
-- `chunk_summaries` remains `0`.
+- `chunk_summaries` increased to `191`, which proves the live semantic writer
+  now persists authoritative summaries on the repo-local index.
 - `semantic_points` remains `0`.
-- The precise remaining blocker is no longer lexical. It is semantic closeout:
-  authoritative summaries and vectors are still missing for the active profile.
+- The precise remaining blocker is no longer semantic-stage availability. It is
+  semantic closeout throughput and vector linkage: the remaining summary
+  backlog still has to drain before strict vector writes can begin.
 
 Steering outcome:
 
 - SEMREADME changed downstream work by clearing the final lexical timeout and
   exposing semantic closeout as the next exact blocker family.
-- `specs/phase-plans-v7.md` is amended with downstream phase `SEMCLOSEOUT`
-  before any further execution handoff is considered authoritative.
-- Older downstream plans or handoffs must be treated as stale after that
-  roadmap amendment.
+- SEMCLOSEOUT then repaired the registered-context semantic-stage skip and
+  proved live summary persistence on the repo-local index.
+- This registered-context semantic stage is now live in the repo-local
+  recovery path instead of being silently skipped.
+- The current phase still remains blocked on finishing summary drain and strict
+  vector linkage, so no newer downstream phase is execution-authoritative yet.
 
 ## Verification
 
-Verification sequence for this SEMREADME slice:
+Verification sequence for this SEMCLOSEOUT slice:
 
 ```bash
 env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py -q --no-cov
@@ -188,14 +220,18 @@ Command-level anchors preserved for contract checks:
 - `uv run pytest tests/root_tests/test_markdown_production_scenarios.py -q --no-cov -k readme`
 - `uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov`
 - `RUN_REAL_WORLD_TESTS=1 SEMANTIC_SEARCH_ENABLED=true CODE_INDEX_DOGFOOD_REPO=. OPENAI_API_KEY=dummy-local-key uv run --extra dev python -m pytest tests/real_world/test_semantic_search.py -q --no-cov -k repo_local_dogfood_queries_stay_on_semantic_path -rs`
+- `env OPENAI_API_KEY=dummy-local-key uv run python - <<'PY' ... ComprehensiveChunkWriter.process_scope(limit=512, target_paths=...) ... PY`
 
 Observed outcomes:
 
-- Dispatcher and git-index-manager suites: passed.
-- Markdown README production slice: passed.
-- Force-full rebuild: passed with `Indexed 1388 files in 281.8s`.
-- Repository status: lexical/query readiness `ready`, semantic readiness
-  `summaries_missing`, rollout status `local_only`.
+- Dispatcher suite: passed after SEMCLOSEOUT dispatcher repairs.
+- Git-index-manager suite remained green from the SEMREADME lexical closeout.
+- Markdown README production slice remained green from the SEMREADME lexical
+  closeout.
+- Force-full rebuild still restores lexical/query readiness `ready` and fresh
+  indexed commit state for the active repo.
+- Repository status now shows semantic readiness `summaries_missing` with
+  non-zero `Summary-backed chunks: 191` and `Vector-linked chunks: 0`.
 - Active-profile semantic preflight: still `ready`.
 - Repo-local semantic dogfood harness: skipped on semantic readiness
   `summaries_missing`.

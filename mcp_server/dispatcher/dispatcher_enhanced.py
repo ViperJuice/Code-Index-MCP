@@ -348,6 +348,8 @@ class EnhancedDispatcher:
         self._semantic_registry: Optional[SemanticIndexerRegistry] = semantic_indexer_registry
         # Fallback process-global semantic indexer for repos not tracked by the registry.
         self._semantic_indexer_fallback: Optional[SemanticIndexer] = None
+        self._registered_semantic_indexers: Dict[str, SemanticIndexer] = {}
+        self._registered_semantic_indexer_lock = threading.RLock()
         if self._semantic_enabled and semantic_indexer_registry is None:
             try:
                 settings = reload_settings()
@@ -1221,8 +1223,74 @@ class EnhancedDispatcher:
             except (KeyError, Exception):
                 return None
         if self._is_registered_context(ctx):
-            return None
+            return self._get_or_build_registered_semantic_indexer(ctx)
         return self._semantic_indexer_fallback
+
+    def _get_or_build_registered_semantic_indexer(
+        self, ctx: RepoContext
+    ) -> Optional[SemanticIndexer]:
+        """Lazily build a repo-scoped semantic indexer for registered contexts.
+
+        Some CLI paths construct ``EnhancedDispatcher`` without injecting a
+        ``SemanticIndexerRegistry``. Registered repositories should still be
+        able to execute strict semantic rebuilds in those flows.
+        """
+        cache_key = self._graph_key(ctx)
+        with self._registered_semantic_indexer_lock:
+            cached = self._registered_semantic_indexers.get(cache_key)
+            if cached is not None:
+                return cached
+
+        repo_info = getattr(ctx, "registry_entry", None)
+        repo_path = getattr(repo_info, "path", None)
+        index_location = getattr(repo_info, "index_location", None)
+        if not isinstance(repo_path, (str, Path)) or not isinstance(index_location, (str, Path)):
+            return None
+
+        try:
+            settings = reload_settings()
+            profile_registry = SemanticProfileRegistry.from_raw(
+                settings.get_semantic_profiles_config(),
+                settings.get_semantic_default_profile(),
+                tool_version=settings.app_version,
+            )
+            semantic_profile_id = settings.get_semantic_default_profile()
+            semantic_profile = profile_registry.get(semantic_profile_id)
+            if semantic_profile is None:
+                return None
+
+            repo_identifier = ctx.repo_id
+            branch = (
+                getattr(repo_info, "tracked_branch", None)
+                or getattr(repo_info, "current_branch", None)
+                or ctx.tracked_branch
+                or "unknown"
+            )
+            qdrant_path = Path(index_location) / "semantic_qdrant"
+            collection_name = _get_profile_collection_name(
+                semantic_profile,
+                settings.semantic_collection_name,
+            )
+            indexer = SemanticIndexer(
+                qdrant_path=str(qdrant_path),
+                profile_registry=profile_registry,
+                semantic_profile=semantic_profile_id,
+                repo_identifier=repo_identifier,
+                branch=branch,
+                commit=getattr(repo_info, "current_commit", None),
+                collection=collection_name,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Failed to initialize registered semantic indexer for %s: %s",
+                ctx.repo_id,
+                exc,
+            )
+            return None
+
+        with self._registered_semantic_indexer_lock:
+            self._registered_semantic_indexers.setdefault(cache_key, indexer)
+            return self._registered_semantic_indexers[cache_key]
 
     def _sqlite_repository_id(self, ctx: RepoContext) -> int:
         repo_info = ctx.registry_entry
@@ -1243,8 +1311,6 @@ class EnhancedDispatcher:
         semantic_available = False
         if not self._semantic_enabled:
             semantic_reason = "semantic_search_disabled"
-        elif self._semantic_registry is None and self._is_registered_context(ctx):
-            semantic_reason = "semantic_registry_unavailable"
         elif self._get_semantic_indexer(ctx) is None:
             semantic_reason = "semantic_indexer_unavailable"
         else:
@@ -2195,7 +2261,9 @@ class EnhancedDispatcher:
         semantic_stage_timeout_seconds = max(
             60, settings.semantic_preflight_timeout_seconds * 12
         )
-        summary_limit = max(10000, len(normalized_paths) * 64)
+        # Keep each summary pass bounded enough to make durable progress inside
+        # the per-pass timeout instead of attempting the entire repo backlog at once.
+        summary_limit = min(4096, max(512, len(normalized_paths) * 4))
         remaining_missing = self._count_missing_summaries_for_paths(ctx, normalized_paths)
         summary_missing_ids: List[str] = []
         previous_missing = remaining_missing

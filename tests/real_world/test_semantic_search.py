@@ -421,7 +421,12 @@ def parse_server_response(api_result):
             data = json.loads(result[0].text)
             if data.get("code") == "index_unavailable":
                 readiness = data["readiness"]
-                assert readiness["code"] == "stale_commit"
+                assert readiness["code"] in {
+                    "stale_commit",
+                    "missing_index",
+                    "index_empty",
+                    "index_unavailable",
+                }
                 evidence = (
                     repo_path / "docs" / "status" / "SEMANTIC_DOGFOOD_REBUILD.md"
                 ).read_text(encoding="utf-8")

@@ -1546,7 +1546,7 @@ class TestEnhancedDispatcherProtocolConformance:
         assert result["semantic_stage"] == "indexed"
         assert result["summaries_written"] == 2
         assert result["summary_chunks_attempted"] == 2
-        assert summary_limits == [10000, 10000]
+        assert summary_limits == [512, 512]
 
     def test_index_directory_blocks_when_summary_progress_plateaus(
         self, tmp_path, monkeypatch
@@ -1955,17 +1955,21 @@ class TestEnhancedDispatcherProtocolConformance:
 
         assert result.status == IndexResultStatus.NOT_FOUND
 
-    def test_runtime_feature_status_registered_semantic_unavailable_without_fallback(self):
+    def test_runtime_feature_status_registered_uses_lazy_semantic_indexer_when_registry_missing(
+        self,
+    ):
         ctx = _make_repo_ctx(MagicMock())
         ctx.registry_entry.path = ctx.workspace_root
         d = Dispatcher([])
         d._semantic_registry = None
-        d._semantic_indexer_fallback = object()
+        d._semantic_indexer_fallback = None
+        d._get_or_build_registered_semantic_indexer = MagicMock(return_value=object())
 
         status = d.get_runtime_feature_status(ctx)
 
-        assert status["semantic"]["status"] == "unavailable"
-        assert status["semantic"]["reason"] == "semantic_registry_unavailable"
+        assert status["semantic"]["status"] == "available"
+        assert status["semantic"]["reason"] is None
+        d._get_or_build_registered_semantic_indexer.assert_called_once_with(ctx)
 
     def test_plugins_takes_no_ctx(self):
         """plugins() is process-global; must accept no ctx arg."""
