@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 import re
 import tempfile
 from datetime import datetime
@@ -84,6 +85,10 @@ def mock_embedding_provider(monkeypatch):
 
 
 class TestSemanticIndexerRegistry:
+    def test_embedding_providers_module_imports_with_default_install_client_dependency(self):
+        module = importlib.import_module("mcp_server.utils.embedding_providers")
+        assert hasattr(module, "OpenAICompatibleEmbeddingProvider")
+
     def test_two_repos_distinct_collection_names(
         self, tmp_path, mock_qdrant, mock_embedding_provider
     ):

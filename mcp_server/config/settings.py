@@ -47,6 +47,26 @@ def _expand_env_vars(value: str) -> str:
     return re.sub(r"\$\{([^}]+)\}", _replace, value)
 
 
+def _resolve_semantic_base_url(
+    configured_value: Any,
+    *,
+    primary_env: str,
+    legacy_env: Optional[str] = None,
+    fallback: Optional[str] = None,
+) -> str:
+    """Resolve a semantic base URL with primary and legacy env-var shims."""
+    primary_value = os.environ.get(primary_env)
+    if primary_value:
+        return primary_value
+    if legacy_env:
+        legacy_value = os.environ.get(legacy_env)
+        if legacy_value:
+            return legacy_value
+    if configured_value not in (None, ""):
+        return _expand_env_vars(str(configured_value))
+    return str(fallback or "")
+
+
 class DatabaseSettings(BaseModel):
     """Database configuration settings."""
 
@@ -611,6 +631,14 @@ class Settings(BaseModel):
         """Check if Prometheus metrics are enabled."""
         return self.metrics.prometheus_enabled
 
+    def _load_profiles_yaml(self) -> Dict[str, Any]:
+        """Load semantic profile YAML payload when available."""
+        yaml_path = _find_profiles_yaml()
+        if not yaml_path:
+            return {}
+        with open(yaml_path, "r", encoding="utf-8") as handle:
+            return yaml.safe_load(handle) or {}
+
     def get_semantic_profiles_config(self) -> Dict[str, Dict[str, Any]]:
         """Get configured semantic profile definitions.
 
@@ -627,64 +655,79 @@ class Settings(BaseModel):
             return parsed
 
         chunker_version = self._detect_treesitter_chunker_version()
-        yaml_path = _find_profiles_yaml()
-        if yaml_path:
-            with open(yaml_path, "r", encoding="utf-8") as handle:
-                payload = yaml.safe_load(handle) or {}
+        payload = self._load_profiles_yaml()
+        profile_map = payload.get("profiles") or {}
+        if isinstance(profile_map, dict) and profile_map:
+            converted: Dict[str, Dict[str, Any]] = {}
+            for profile_id, config in profile_map.items():
+                model = config.get("model") or {}
+                auth = config.get("auth") or {}
+                serving = config.get("serving") or {}
+                vllm = serving.get("vllm") or {}
+                vector_store = config.get("vector_store") or {}
+                metadata = config.get("metadata") or {}
+                normalization = config.get("normalization") or {}
+                summarization = config.get("summarization") or {}
 
-            profile_map = payload.get("profiles") or {}
-            if isinstance(profile_map, dict) and profile_map:
-                converted: Dict[str, Dict[str, Any]] = {}
-                for profile_id, config in profile_map.items():
-                    model = config.get("model") or {}
-                    auth = config.get("auth") or {}
-                    serving = config.get("serving") or {}
-                    vllm = serving.get("vllm") or {}
-                    vector_store = config.get("vector_store") or {}
-                    metadata = config.get("metadata") or {}
-                    normalization = config.get("normalization") or {}
+                provider = str(config.get("provider", "voyage"))
+                embedding_base = _resolve_semantic_base_url(
+                    vllm.get("base_url") or self.openai_api_base,
+                    primary_env="SEMANTIC_EMBEDDING_BASE_URL",
+                    legacy_env="VLLM_EMBEDDING_BASE_URL",
+                    fallback=self.openai_api_base,
+                )
+                embedding_api_key_env = str(auth.get("api_key_env", "OPENAI_API_KEY"))
+                enrichment_base = _resolve_semantic_base_url(
+                    summarization.get("base_url"),
+                    primary_env="SEMANTIC_ENRICHMENT_BASE_URL",
+                    legacy_env="VLLM_SUMMARIZATION_BASE_URL",
+                    fallback="http://ai:8002/v1",
+                )
+                enrichment_api_key_env = str(
+                    summarization.get("api_key_env", embedding_api_key_env)
+                )
+                enrichment_model = _expand_env_vars(
+                    str(
+                        summarization.get(
+                            "model_name", os.environ.get("SEMANTIC_ENRICHMENT_MODEL", "chat")
+                        )
+                    )
+                )
+                embedding_model = str(model.get("name", self.semantic_embedding_model))
 
-                    provider = str(config.get("provider", "voyage"))
-                    _raw_base = vllm.get("base_url") or self.openai_api_base
-                    openai_base = _expand_env_vars(str(_raw_base)) if _raw_base else ""
-                    if provider in {
-                        "openai_compatible",
-                        "openai-compatible",
-                        "openai",
-                        "vllm",
-                        "qwen",
-                    }:
-                        openai_base = str(openai_base or self.openai_api_base)
+                converted[str(profile_id)] = {
+                    "provider": provider,
+                    "model_name": embedding_model,
+                    "model_version": str(
+                        model.get("version") or metadata.get("embed_schema_version") or "1"
+                    ),
+                    "vector_dimension": int(
+                        model.get("output_dimension") or vector_store.get("vector_size") or 1024
+                    ),
+                    "distance_metric": str(vector_store.get("distance", "cosine")),
+                    "normalization_policy": (
+                        "l2" if normalization.get("l2_normalize_vectors") else "provider-default"
+                    ),
+                    "chunk_schema_version": str(
+                        metadata.get("chunk_schema_version", self.index_schema_version)
+                    ),
+                    "chunker_version": chunker_version,
+                    "build_metadata": {
+                        "openai_api_base": embedding_base,
+                        "openai_api_key_env": embedding_api_key_env,
+                        "embedding_api_base": embedding_base,
+                        "embedding_model_name": embedding_model,
+                        "embedding_api_key_env": embedding_api_key_env,
+                        "enrichment_api_base": enrichment_base,
+                        "enrichment_model_name": enrichment_model,
+                        "enrichment_api_key_env": enrichment_api_key_env,
+                        "collection_name": str(
+                            vector_store.get("collection", self.semantic_collection_name)
+                        ),
+                    },
+                }
 
-                    converted[str(profile_id)] = {
-                        "provider": provider,
-                        "model_name": str(model.get("name", self.semantic_embedding_model)),
-                        "model_version": str(
-                            model.get("version") or metadata.get("embed_schema_version") or "1"
-                        ),
-                        "vector_dimension": int(
-                            model.get("output_dimension") or vector_store.get("vector_size") or 1024
-                        ),
-                        "distance_metric": str(vector_store.get("distance", "cosine")),
-                        "normalization_policy": (
-                            "l2"
-                            if normalization.get("l2_normalize_vectors")
-                            else "provider-default"
-                        ),
-                        "chunk_schema_version": str(
-                            metadata.get("chunk_schema_version", self.index_schema_version)
-                        ),
-                        "chunker_version": chunker_version,
-                        "build_metadata": {
-                            "openai_api_base": openai_base,
-                            "openai_api_key_env": str(auth.get("api_key_env", "OPENAI_API_KEY")),
-                            "collection_name": str(
-                                vector_store.get("collection", self.semantic_collection_name)
-                            ),
-                        },
-                    }
-
-                return converted
+            return converted
 
         return {
             "legacy-default": {
@@ -719,14 +762,18 @@ class Settings(BaseModel):
         included so ``ChunkWriter`` can use them without reading env vars directly.
         """
         profile_cfg: Dict[str, Any] = {}
-        yaml_path = _find_profiles_yaml()
-        if yaml_path:
-            with open(yaml_path, "r", encoding="utf-8") as fh:
-                payload = yaml.safe_load(fh) or {}
-            profile_map = payload.get("profiles") or {}
-            profile_cfg = dict((profile_map.get(profile_id) or {}).get("summarization") or {})
-            if "base_url" in profile_cfg:
-                profile_cfg["base_url"] = _expand_env_vars(str(profile_cfg["base_url"]))
+        payload = self._load_profiles_yaml()
+        profile_map = payload.get("profiles") or {}
+        profile_cfg = dict((profile_map.get(profile_id) or {}).get("summarization") or {})
+        if profile_cfg:
+            profile_cfg["base_url"] = _resolve_semantic_base_url(
+                profile_cfg.get("base_url"),
+                primary_env="SEMANTIC_ENRICHMENT_BASE_URL",
+                legacy_env="VLLM_SUMMARIZATION_BASE_URL",
+                fallback=profile_cfg.get("base_url") or "http://ai:8002/v1",
+            )
+            if "model_name" in profile_cfg:
+                profile_cfg["model_name"] = _expand_env_vars(str(profile_cfg["model_name"]))
 
         return {
             **profile_cfg,

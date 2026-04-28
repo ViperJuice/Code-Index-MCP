@@ -17,7 +17,21 @@ class _FakeReport:
             status=SimpleNamespace(value="ready"), message="ok", ok=overall_ready
         )
         self.warnings = [] if overall_ready else ["not ready"]
-        self.effective_config = {"selected_profile": "legacy-default"}
+        self.effective_config = {
+            "selected_profile": "oss_high",
+            "embedding": {
+                "base_url": "http://ai:8001/v1",
+                "model": "Qwen/Qwen3-Embedding-8B",
+                "api_key_env": "OPENAI_API_KEY",
+                "api_key_present": True,
+            },
+            "enrichment": {
+                "base_url": "http://ai:8002/v1",
+                "model": "chat",
+                "api_key_env": "OPENAI_API_KEY",
+                "api_key_present": True,
+            },
+        }
 
     def to_dict(self):
         return {
@@ -50,6 +64,8 @@ def test_setup_semantic_json_output(monkeypatch):
     result = runner.invoke(setup, ["semantic", "--json", "--dry-run"])
     assert result.exit_code == 0
     assert "overall_ready" in result.output
+    assert '"embedding"' in result.output
+    assert '"enrichment"' in result.output
 
 
 def test_setup_semantic_strict_failure(monkeypatch):

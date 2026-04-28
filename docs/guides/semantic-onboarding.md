@@ -22,7 +22,8 @@ readiness does not imply semantic readiness.
 This guide shows how to set up semantic search for Code-Index-MCP with:
 
 - local Qdrant (auto-started via Docker)
-- Voyage and/or OpenAI-compatible embedding endpoints (vLLM)
+- a profile-selected enrichment endpoint for chunk summaries
+- a profile-selected embedding endpoint for vectorization
 
 ## Quick Start
 
@@ -42,10 +43,9 @@ Configuration precedence:
 4. `SEMANTIC_PROFILES_JSON`
 5. Built-in defaults
 
-> **Tip**: For multi-profile setups, set `base_url` directly in
-> `code-index-mcp.profiles.yaml` rather than via `OPENAI_API_BASE`. The YAML value
-> takes precedence for profile URLs and avoids accidentally routing all profiles to the
-> same endpoint.
+> **Tip**: Keep profile-local endpoints in `code-index-mcp.profiles.yaml`. Global
+> `OPENAI_API_BASE` remains only a fallback for older flows and should not be the
+> primary way to steer `oss_high`.
 
 ## Key Environment Variables
 
@@ -55,7 +55,12 @@ Configuration precedence:
 - `SEMANTIC_PREFLIGHT_TIMEOUT_SECONDS=10`
 - `QDRANT_URL=http://localhost:6333`
 - `QDRANT_COMPOSE_FILE=docker-compose.qdrant.yml`
-- `OPENAI_API_BASE=http://localhost:8001/v1`  # fallback only; prefer profiles.yaml base_url
+- `SEMANTIC_ENRICHMENT_BASE_URL=http://ai:8002/v1`
+- `SEMANTIC_ENRICHMENT_MODEL=chat`
+- `SEMANTIC_EMBEDDING_BASE_URL=http://ai:8001/v1`
+- `VLLM_SUMMARIZATION_BASE_URL=http://ai:8002/v1`  # compatibility shim only
+- `VLLM_EMBEDDING_BASE_URL=http://ai:8001/v1`  # compatibility shim only
+- `OPENAI_API_BASE=http://localhost:8001/v1`  # legacy fallback only
 - `OPENAI_API_KEY=vllm-local`
 - `VOYAGE_API_KEY`
 
@@ -79,8 +84,21 @@ python scripts/cli/mcp_cli.py setup semantic --profile commercial_high
 
 ```bash
 curl http://localhost:6333/collections
-curl http://ai:8001/v1/models   # oss_high vLLM (adjust hostname to your setup)
+curl http://ai:8002/v1/models   # oss_high enrichment proxy
+curl http://ai:8001/v1/models   # oss_high embedding endpoint
 ```
+
+## Default `oss_high` Layout
+
+- Enrichment uses `${SEMANTIC_ENRICHMENT_BASE_URL:http://ai:8002/v1}` with
+  `${SEMANTIC_ENRICHMENT_MODEL:chat}`.
+- Embeddings use `${SEMANTIC_EMBEDDING_BASE_URL:http://ai:8001/v1}` with
+  `Qwen/Qwen3-Embedding-8B`.
+- Legacy `VLLM_SUMMARIZATION_BASE_URL` and `VLLM_EMBEDDING_BASE_URL` remain
+  accepted as compatibility shims when the newer `SEMANTIC_*` vars are unset.
+- `uv sync --locked` installs the default OpenAI-compatible client stack; no extra
+  semantic install is required just to reach the local enrichment or embedding
+  endpoints.
 
 ## Readiness Notes
 
@@ -97,7 +115,10 @@ curl http://ai:8001/v1/models   # oss_high vLLM (adjust hostname to your setup)
   - run `docker compose -f docker-compose.qdrant.yml up -d qdrant`
   - ensure port `6333` is free
 - OpenAI-compatible endpoint unreachable
-  - check vLLM process/container binding and host/port
-  - verify `OPENAI_API_BASE`
+  - check the selected profile's enrichment or embedding host/port
+  - verify `SEMANTIC_ENRICHMENT_BASE_URL` and `SEMANTIC_EMBEDDING_BASE_URL`
 - Voyage provider failing
   - verify `VOYAGE_API_KEY`
+- Preflight output
+  - `setup semantic --json` reports resolved enrichment and embedding endpoints separately
+  - API-key reporting is metadata-only: env-var name plus presence boolean, never the secret value

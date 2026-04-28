@@ -139,12 +139,13 @@ def check_voyage_key_present() -> CheckResult:
             name="embedding_voyage",
             status=ServiceStatus.READY,
             message="Voyage API key is configured",
-            details={"key_prefix": key[:8] + "..."},
+            details={"api_key_env": "VOYAGE_API_KEY", "api_key_present": True},
         )
     return CheckResult(
         name="embedding_voyage",
         status=ServiceStatus.MISCONFIGURED,
         message="Voyage API key is missing",
+        details={"api_key_env": "VOYAGE_API_KEY", "api_key_present": False},
         fixes=[
             "Set VOYAGE_API_KEY",
             "Use `op item get` to load the key from 1Password",
@@ -217,11 +218,29 @@ def run_semantic_preflight(
     selected_profile = profile or settings.get_semantic_default_profile()
     profile_payload = settings.get_semantic_profiles_config().get(selected_profile, {})
     provider = str(profile_payload.get("provider", "voyage")).lower()
+    build_metadata = profile_payload.get("build_metadata") or {}
+    embedding_base = str(
+        build_metadata.get("embedding_api_base")
+        or build_metadata.get("openai_api_base")
+        or settings.openai_api_base
+        or "http://localhost:8001/v1"
+    )
+    embedding_model = str(
+        build_metadata.get("embedding_model_name") or profile_payload.get("model_name") or ""
+    )
+    embedding_api_key_env = str(
+        build_metadata.get("embedding_api_key_env")
+        or build_metadata.get("openai_api_key_env")
+        or "OPENAI_API_KEY"
+    )
+    enrichment_base = str(build_metadata.get("enrichment_api_base") or "")
+    enrichment_model = str(build_metadata.get("enrichment_model_name") or "")
+    enrichment_api_key_env = str(
+        build_metadata.get("enrichment_api_key_env") or embedding_api_key_env
+    )
 
     if provider in {"openai_compatible", "openai-compatible", "openai", "qwen", "vllm"}:
-        metadata_base = (profile_payload.get("build_metadata") or {}).get("openai_api_base")
-        base_url = str(settings.openai_api_base or metadata_base or "http://localhost:8001/v1")
-        embedding_check = check_openai_compatible(base_url, timeout_s=timeout)
+        embedding_check = check_openai_compatible(embedding_base, timeout_s=timeout)
     else:
         embedding_check = check_voyage_key_present()
 
@@ -257,7 +276,18 @@ def run_semantic_preflight(
             "selected_profile": selected_profile,
             "provider": provider,
             "qdrant_url": qdrant_url,
-            "openai_api_base": settings.openai_api_base,
+            "embedding": {
+                "base_url": embedding_base,
+                "model": embedding_model,
+                "api_key_env": embedding_api_key_env,
+                "api_key_present": bool(os.getenv(embedding_api_key_env)),
+            },
+            "enrichment": {
+                "base_url": enrichment_base,
+                "model": enrichment_model,
+                "api_key_env": enrichment_api_key_env,
+                "api_key_present": bool(os.getenv(enrichment_api_key_env)),
+            },
             "autostart_qdrant": settings.semantic_autostart_qdrant,
             "strict_mode": strict,
             "timeout_seconds": timeout,

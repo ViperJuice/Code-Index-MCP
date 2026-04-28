@@ -40,6 +40,7 @@ dependencies = [
     "bcrypt>=4.0.0",
     "python-dotenv>=1.0.0",
     "httpx>=0.24.1",
+    "openai>=1.51.0",
     "pyyaml>=6.0.0",
     # Required for module imports (actual features need API keys)
     "voyageai>=0.2.0",
@@ -52,7 +53,6 @@ dependencies = [
 [project.optional-dependencies]
 semantic = [
     # Additional semantic search features (reranking, transformers)
-    "openai>=1.51.0",
     "sentence-transformers>=2.0.0",
     "cohere>=4.0.0",
     "anthropic>=0.18.0",

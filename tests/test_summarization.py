@@ -1,6 +1,7 @@
 """Tests for mcp_server/indexing/summarization.py — ChunkWriter and LazyChunkWriter."""
 
 import asyncio
+import importlib
 
 import pytest
 
@@ -8,6 +9,10 @@ from mcp_server.indexing.summarization import ChunkWriter, LazyChunkWriter
 
 
 class TestChunkWriterInit:
+    def test_module_imports_with_default_install_client_dependency(self):
+        module = importlib.import_module("mcp_server.indexing.summarization")
+        assert hasattr(module, "ChunkWriter")
+
     def test_defaults_to_empty_summarization_config(self):
         cw = ChunkWriter(db_path="/tmp/test.db", qdrant_client=None)
         assert cw.summarization_config == {}

@@ -1,5 +1,6 @@
 """Tests for semantic profile configuration loading in settings."""
 
+import json
 from pathlib import Path
 
 from mcp_server.config.settings import Settings, _expand_env_vars, _find_profiles_yaml
@@ -66,7 +67,189 @@ profiles:
     assert profiles["oss_high"]["vector_dimension"] == 4096
     assert profiles["oss_high"]["normalization_policy"] == "l2"
     assert profiles["oss_high"]["build_metadata"]["openai_api_base"] == "http://127.0.0.1:8000"
+    assert profiles["oss_high"]["build_metadata"]["embedding_api_base"] == "http://127.0.0.1:8000"
+    assert (
+        profiles["oss_high"]["build_metadata"]["embedding_model_name"] == "Qwen/Qwen3-Embedding-8B"
+    )
+    assert profiles["oss_high"]["build_metadata"]["enrichment_api_key_env"] == "OPENAI_API_KEY"
     assert profiles["oss_high"]["build_metadata"]["collection_name"] == "code_index__oss_high__v1"
+
+
+def test_oss_high_defaults_resolve_local_enrichment_and_embedding(monkeypatch):
+    """Repo defaults should point at the ai-hosted enrichment and embedding endpoints."""
+    monkeypatch.chdir(Path(__file__).resolve().parents[1])
+    monkeypatch.delenv("SEMANTIC_ENRICHMENT_BASE_URL", raising=False)
+    monkeypatch.delenv("SEMANTIC_EMBEDDING_BASE_URL", raising=False)
+    monkeypatch.delenv("VLLM_SUMMARIZATION_BASE_URL", raising=False)
+    monkeypatch.delenv("VLLM_EMBEDDING_BASE_URL", raising=False)
+    monkeypatch.setattr(
+        Settings,
+        "_detect_treesitter_chunker_version",
+        lambda self: "treesitter-chunker@test",
+    )
+
+    settings = Settings()
+    profiles = settings.get_semantic_profiles_config()
+    summary = settings.get_profile_summarization_config("oss_high")
+
+    assert profiles["oss_high"]["build_metadata"]["embedding_api_base"] == "http://ai:8001/v1"
+    assert (
+        profiles["oss_high"]["build_metadata"]["embedding_model_name"] == "Qwen/Qwen3-Embedding-8B"
+    )
+    assert profiles["oss_high"]["build_metadata"]["enrichment_api_base"] == "http://ai:8002/v1"
+    assert profiles["oss_high"]["build_metadata"]["enrichment_model_name"] == "chat"
+    assert summary["base_url"] == "http://ai:8002/v1"
+    assert summary["model_name"] == "chat"
+
+
+def test_legacy_base_url_shims_apply_when_new_semantic_vars_unset(monkeypatch, tmp_path: Path):
+    """Legacy VLLM env vars should still override profile endpoints when new vars are absent."""
+    yaml_content = """
+profiles:
+  oss_high:
+    provider: openai_compatible
+    model:
+      name: Qwen/Qwen3-Embedding-8B
+      output_dimension: 4096
+    serving:
+      vllm:
+        base_url: "${SEMANTIC_EMBEDDING_BASE_URL:http://ai:8001/v1}"
+    auth:
+      api_key_env: EMBEDDING_KEY
+    summarization:
+      model_name: "${SEMANTIC_ENRICHMENT_MODEL:chat}"
+      base_url: "${SEMANTIC_ENRICHMENT_BASE_URL:http://ai:8002/v1}"
+      api_key_env: ENRICHMENT_KEY
+    vector_store:
+      collection: code_index__oss_high__v1
+      vector_size: 4096
+      distance: dot
+""".strip()
+
+    (tmp_path / "code-index-mcp.profiles.yaml").write_text(yaml_content, encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("SEMANTIC_EMBEDDING_BASE_URL", raising=False)
+    monkeypatch.delenv("SEMANTIC_ENRICHMENT_BASE_URL", raising=False)
+    monkeypatch.setenv("VLLM_EMBEDDING_BASE_URL", "http://legacy-embed:8010/v1")
+    monkeypatch.setenv("VLLM_SUMMARIZATION_BASE_URL", "http://legacy-enrich:8020/v1")
+    monkeypatch.setattr(
+        Settings,
+        "_detect_treesitter_chunker_version",
+        lambda self: "treesitter-chunker@test",
+    )
+
+    settings = Settings()
+    profiles = settings.get_semantic_profiles_config()
+    summary = settings.get_profile_summarization_config("oss_high")
+
+    assert (
+        profiles["oss_high"]["build_metadata"]["embedding_api_base"]
+        == "http://legacy-embed:8010/v1"
+    )
+    assert (
+        profiles["oss_high"]["build_metadata"]["enrichment_api_base"]
+        == "http://legacy-enrich:8020/v1"
+    )
+    assert profiles["oss_high"]["build_metadata"]["embedding_api_key_env"] == "EMBEDDING_KEY"
+    assert profiles["oss_high"]["build_metadata"]["enrichment_api_key_env"] == "ENRICHMENT_KEY"
+    assert summary["base_url"] == "http://legacy-enrich:8020/v1"
+
+
+def test_new_semantic_base_url_vars_win_over_legacy_shims(monkeypatch, tmp_path: Path):
+    """Primary SEMANTIC_* vars must override legacy VLLM_* compatibility shims."""
+    yaml_content = """
+profiles:
+  oss_high:
+    provider: openai_compatible
+    model:
+      name: Qwen/Qwen3-Embedding-8B
+      output_dimension: 4096
+    serving:
+      vllm:
+        base_url: "${SEMANTIC_EMBEDDING_BASE_URL:http://ai:8001/v1}"
+    summarization:
+      model_name: "${SEMANTIC_ENRICHMENT_MODEL:chat}"
+      base_url: "${SEMANTIC_ENRICHMENT_BASE_URL:http://ai:8002/v1}"
+    vector_store:
+      collection: code_index__oss_high__v1
+      vector_size: 4096
+      distance: dot
+""".strip()
+
+    (tmp_path / "code-index-mcp.profiles.yaml").write_text(yaml_content, encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("SEMANTIC_EMBEDDING_BASE_URL", "http://primary-embed:8111/v1")
+    monkeypatch.setenv("SEMANTIC_ENRICHMENT_BASE_URL", "http://primary-enrich:8222/v1")
+    monkeypatch.setenv("VLLM_EMBEDDING_BASE_URL", "http://legacy-embed:8010/v1")
+    monkeypatch.setenv("VLLM_SUMMARIZATION_BASE_URL", "http://legacy-enrich:8020/v1")
+    monkeypatch.setattr(
+        Settings,
+        "_detect_treesitter_chunker_version",
+        lambda self: "treesitter-chunker@test",
+    )
+
+    settings = Settings()
+    profiles = settings.get_semantic_profiles_config()
+    summary = settings.get_profile_summarization_config("oss_high")
+
+    assert (
+        profiles["oss_high"]["build_metadata"]["embedding_api_base"]
+        == "http://primary-embed:8111/v1"
+    )
+    assert (
+        profiles["oss_high"]["build_metadata"]["enrichment_api_base"]
+        == "http://primary-enrich:8222/v1"
+    )
+    assert summary["base_url"] == "http://primary-enrich:8222/v1"
+
+
+def test_hydrated_profile_metadata_keeps_enrichment_and_embedding_surfaces_distinct(
+    monkeypatch, tmp_path: Path
+):
+    """Hydrated metadata should preserve separate endpoint, model, and env-var names."""
+    yaml_content = """
+profiles:
+  oss_high:
+    provider: openai_compatible
+    model:
+      name: Qwen/Qwen3-Embedding-8B
+      output_dimension: 4096
+    serving:
+      vllm:
+        base_url: "${SEMANTIC_EMBEDDING_BASE_URL:http://ai:8001/v1}"
+    auth:
+      api_key_env: EMBEDDING_KEY
+    summarization:
+      model_name: "${SEMANTIC_ENRICHMENT_MODEL:chat}"
+      base_url: "${SEMANTIC_ENRICHMENT_BASE_URL:http://ai:8002/v1}"
+      api_key_env: ENRICHMENT_KEY
+    vector_store:
+      collection: code_index__oss_high__v1
+      vector_size: 4096
+      distance: dot
+""".strip()
+
+    (tmp_path / "code-index-mcp.profiles.yaml").write_text(yaml_content, encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("SEMANTIC_ENRICHMENT_MODEL", "chat")
+    monkeypatch.setattr(
+        Settings,
+        "_detect_treesitter_chunker_version",
+        lambda self: "treesitter-chunker@test",
+    )
+
+    settings = Settings()
+    build_metadata = settings.get_semantic_profiles_config()["oss_high"]["build_metadata"]
+    build_metadata_json = json.dumps(build_metadata)
+
+    assert build_metadata["embedding_api_base"] == "http://ai:8001/v1"
+    assert build_metadata["embedding_model_name"] == "Qwen/Qwen3-Embedding-8B"
+    assert build_metadata["embedding_api_key_env"] == "EMBEDDING_KEY"
+    assert build_metadata["enrichment_api_base"] == "http://ai:8002/v1"
+    assert build_metadata["enrichment_model_name"] == "chat"
+    assert build_metadata["enrichment_api_key_env"] == "ENRICHMENT_KEY"
+    assert "win:8002" not in build_metadata_json
+    assert "Qwen2.5-Coder-14B-Instruct-AWQ" not in build_metadata_json
 
 
 def test_default_profile_resolves_first_yaml_profile_when_legacy_default(
