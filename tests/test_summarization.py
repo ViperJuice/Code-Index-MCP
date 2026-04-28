@@ -9,8 +9,10 @@ import pytest
 
 from mcp_server.indexing.summarization import (
     ChunkWriter,
+    ComprehensiveChunkWriter,
     FileBatchSummarizer,
     LazyChunkWriter,
+    SummaryGenerationResult,
 )
 from mcp_server.config.settings import get_settings
 from mcp_server.setup.semantic_preflight import EnrichmentModelResolution
@@ -31,6 +33,41 @@ def _seed_chunk_summary_tables(db_path: Path, tmp_path: Path) -> tuple[SQLiteSto
         content_hash="content-hash-1",
     )
     return store, file_id
+
+
+def _store_chunk(
+    store: SQLiteStore,
+    *,
+    file_id: int,
+    chunk_id: str,
+    content: str,
+    line_start: int,
+    line_end: int,
+    symbol: str | None = None,
+) -> None:
+    symbol_id = None
+    if symbol is not None:
+        symbol_id = store.store_symbol(
+            file_id=file_id,
+            name=symbol,
+            kind="function",
+            line_start=line_start,
+            line_end=line_end,
+        )
+    store.store_chunk(
+        file_id=file_id,
+        content=content,
+        content_start=0,
+        content_end=len(content),
+        line_start=line_start,
+        line_end=line_end,
+        chunk_id=chunk_id,
+        node_id=f"node-{chunk_id}",
+        treesitter_file_id=f"tree-{chunk_id}",
+        symbol_id=symbol_id,
+        language="python",
+        node_type="function_definition",
+    )
 
 
 class TestChunkWriterInit:
@@ -316,7 +353,7 @@ async def test_file_batch_summarizer_preserves_authoritative_metadata_on_batch_r
     async def _raise_runtime_mismatch(*_args, **_kwargs):
         raise ImportError("generated client 0.220.0 is incompatible with baml-py 0.221.0")
 
-    async def _fake_profile_api(_system: str, _prompt: str) -> tuple[str, str]:
+    async def _fake_profile_api(_system: str, _prompt: str, **_kwargs) -> tuple[str, str]:
         return "Recovered authoritative summary", "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
 
     monkeypatch.setenv("OPENAI_API_KEY", "dummy-local-key")
@@ -357,6 +394,78 @@ async def test_file_batch_summarizer_preserves_authoritative_metadata_on_batch_r
     )
 
 
+@pytest.mark.asyncio
+async def test_file_batch_summarizer_uses_profile_batch_fallback_before_per_chunk_recovery(
+    tmp_path, monkeypatch
+):
+    db_path = tmp_path / "summaries.db"
+    store, file_id = _seed_chunk_summary_tables(db_path, tmp_path)
+    summarizer = FileBatchSummarizer(
+        db_path=str(db_path),
+        qdrant_client=None,
+        summarization_config={
+            "base_url": "http://ai:8002/v1",
+            "model_name": "chat",
+            "profile_id": "oss_high",
+        },
+    )
+
+    async def _raise_runtime_mismatch(*_args, **_kwargs):
+        raise ImportError("generated client 0.220.0 is incompatible with baml-py 0.221.0")
+
+    async def _fake_profile_api(_system: str, _prompt: str, **_kwargs) -> tuple[str, str]:
+        return (
+            '{"summaries":['
+            '{"chunk_id":"chunk-1","summary":"Summary one. Still concise."},'
+            '{"chunk_id":"chunk-2","summary":"Summary two. Still concise."}'
+            ']}',
+            "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit",
+        )
+
+    async def _should_not_run(*_args, **_kwargs):
+        raise AssertionError("per-chunk fallback should not run when profile batch fallback succeeds")
+
+    monkeypatch.setenv("OPENAI_API_KEY", "dummy-local-key")
+    summarizer._call_batch_api = _raise_runtime_mismatch  # type: ignore[method-assign]
+    summarizer._call_profile_api = _fake_profile_api  # type: ignore[method-assign]
+    summarizer._summarize_topological = _should_not_run  # type: ignore[method-assign]
+
+    result = await summarizer.summarize_file_chunks(
+        file_id=file_id,
+        file_path=str(tmp_path / "sample.py"),
+        file_content="def alpha():\n    return 1\n\ndef beta():\n    return 2\n",
+        chunks=[
+            {
+                "chunk_id": "chunk-1",
+                "line_start": 1,
+                "line_end": 2,
+                "node_type": "function_definition",
+                "language": "python",
+                "symbol_id": None,
+            },
+            {
+                "chunk_id": "chunk-2",
+                "line_start": 4,
+                "line_end": 5,
+                "node_type": "function_definition",
+                "language": "python",
+                "symbol_id": None,
+            },
+        ],
+        symbol_map={},
+        persist=True,
+    )
+
+    stored_one = store.get_chunk_summary("chunk-1")
+    stored_two = store.get_chunk_summary("chunk-2")
+    assert result.summaries_written == 2
+    assert result.missing_chunk_ids == []
+    assert stored_one is not None
+    assert stored_two is not None
+    assert stored_one["summary_text"] == "Summary one. Still concise."
+    assert stored_two["summary_text"] == "Summary two. Still concise."
+
+
 def test_default_oss_high_profile_exposes_direct_summarization_config():
     settings = get_settings()
     profile_id = settings.get_semantic_default_profile()
@@ -365,3 +474,143 @@ def test_default_oss_high_profile_exposes_direct_summarization_config():
     assert profile_id == "oss_high"
     assert config["base_url"] == "http://ai:8002/v1"
     assert config["model_name"] == "chat"
+
+
+def test_fetch_unsummarized_rows_filters_scope_before_limit(tmp_path):
+    db_path = tmp_path / "summaries.db"
+    store = SQLiteStore(str(db_path))
+    repo_id = store.ensure_repository_row(tmp_path)
+
+    off_scope = tmp_path / "off_scope.py"
+    off_scope.write_text("def off_scope():\n    return 0\n", encoding="utf-8")
+    off_scope_file_id = store.store_file(
+        repo_id,
+        path=off_scope,
+        relative_path="off_scope.py",
+        language="python",
+        size=off_scope.stat().st_size,
+        content_hash="off-scope-hash",
+    )
+    _store_chunk(
+        store,
+        file_id=off_scope_file_id,
+        chunk_id="chunk-off-scope",
+        content="def off_scope():\n    return 0\n",
+        line_start=1,
+        line_end=2,
+        symbol="off_scope",
+    )
+
+    in_scope = tmp_path / "in_scope.py"
+    in_scope.write_text("def in_scope():\n    return 1\n", encoding="utf-8")
+    in_scope_file_id = store.store_file(
+        repo_id,
+        path=in_scope,
+        relative_path="in_scope.py",
+        language="python",
+        size=in_scope.stat().st_size,
+        content_hash="in-scope-hash",
+    )
+    _store_chunk(
+        store,
+        file_id=in_scope_file_id,
+        chunk_id="chunk-in-scope",
+        content="def in_scope():\n    return 1\n",
+        line_start=1,
+        line_end=2,
+        symbol="in_scope",
+    )
+
+    writer = ComprehensiveChunkWriter(
+        db_path=str(db_path),
+        qdrant_client=None,
+        summarization_config={"base_url": "http://ai:8002/v1", "model_name": "chat"},
+    )
+    rows = writer._fetch_unsummarized_rows(limit=1, target_paths=[in_scope])
+
+    assert len(rows) == 1
+    assert rows[0][0] == "chunk-in-scope"
+    assert rows[0][9] == str(in_scope)
+
+
+@pytest.mark.asyncio
+async def test_process_scope_drains_multiple_batches_for_target_scope(tmp_path, monkeypatch):
+    db_path = tmp_path / "summaries.db"
+    store = SQLiteStore(str(db_path))
+    repo_id = store.ensure_repository_row(tmp_path)
+
+    target = tmp_path / "target.py"
+    target.write_text(
+        "def alpha():\n    return 1\n\ndef beta():\n    return 2\n",
+        encoding="utf-8",
+    )
+    file_id = store.store_file(
+        repo_id,
+        path=target,
+        relative_path="target.py",
+        language="python",
+        size=target.stat().st_size,
+        content_hash="target-hash",
+    )
+    _store_chunk(
+        store,
+        file_id=file_id,
+        chunk_id="chunk-1",
+        content="def alpha():\n    return 1\n",
+        line_start=1,
+        line_end=2,
+        symbol="alpha",
+    )
+    _store_chunk(
+        store,
+        file_id=file_id,
+        chunk_id="chunk-2",
+        content="def beta():\n    return 2\n",
+        line_start=4,
+        line_end=5,
+        symbol="beta",
+    )
+
+    writer = ComprehensiveChunkWriter(
+        db_path=str(db_path),
+        qdrant_client=None,
+        summarization_config={"base_url": "http://ai:8002/v1", "model_name": "chat"},
+    )
+    batch_order: list[list[str]] = []
+
+    async def _fake_summarize_file_chunks(**kwargs):
+        chunk_ids = [chunk["chunk_id"] for chunk in kwargs["chunks"]]
+        batch_order.append(chunk_ids)
+        for chunk_id in chunk_ids:
+            store.store_chunk_summary(
+                chunk_hash=chunk_id,
+                file_id=file_id,
+                chunk_start=1,
+                chunk_end=2,
+                summary_text=f"summary for {chunk_id}",
+                llm_model="chat",
+                is_authoritative=True,
+                symbol=None,
+                provider_name="openai_compatible",
+                profile_id="oss_high",
+                prompt_fingerprint="test-fingerprint",
+                audit_metadata={"provider_name": "openai_compatible"},
+            )
+        return SummaryGenerationResult(
+            chunks_attempted=len(chunk_ids),
+            summaries_written=len(chunk_ids),
+            authoritative_chunks=len(chunk_ids),
+            missing_chunk_ids=[],
+            files_attempted=1,
+            files_summarized=1,
+        )
+
+    monkeypatch.setattr(writer, "summarize_file_chunks", _fake_summarize_file_chunks)
+
+    result = await writer.process_scope(limit=1, target_paths=[target])
+
+    assert batch_order == [["chunk-1"], ["chunk-2"]]
+    assert result.summaries_written == 2
+    assert result.authoritative_chunks == 2
+    assert result.chunks_attempted == 2
+    assert result.missing_chunk_ids == []

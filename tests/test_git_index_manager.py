@@ -568,6 +568,46 @@ def test_full_index_preserves_additive_semantic_stats_without_failing_lexical_su
     assert result.semantic["semantic_stage"] == "blocked_missing_summaries"
 
 
+def test_full_index_preserves_semantic_ready_stats_when_force_full_rebuild_succeeds(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+
+    dispatcher = MagicMock()
+    dispatcher.index_directory.return_value = {
+        "indexed_files": 2,
+        "failed_files": 0,
+        "errors": [],
+        "summaries_written": 8,
+        "summary_chunks_attempted": 8,
+        "summary_missing_chunks": 0,
+        "semantic_indexed": 2,
+        "semantic_failed": 0,
+        "semantic_skipped": 0,
+        "semantic_blocked": 0,
+        "semantic_stage": "indexed",
+        "semantic_error": None,
+    }
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=dispatcher)
+    result = manager._full_index(repo_info.repository_id, ctx)
+
+    assert result.indexed == 2
+    assert result.failed == 0
+    assert result.clean
+    assert result.semantic is not None
+    assert result.semantic["summaries_written"] == 8
+    assert result.semantic["summary_chunks_attempted"] == 8
+    assert result.semantic["summary_missing_chunks"] == 0
+    assert result.semantic["semantic_indexed"] == 2
+    assert result.semantic["semantic_blocked"] == 0
+    assert result.semantic["semantic_stage"] == "indexed"
+
+
 def test_incremental_update_aggregates_semantic_mutation_stats(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)

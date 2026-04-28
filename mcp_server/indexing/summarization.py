@@ -1,7 +1,9 @@
 import asyncio
 import hashlib
+import json
 import logging
 import os
+import re
 import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -37,6 +39,7 @@ _MAX_FILE_CONTEXT_CHARS = 60_000
 # Files larger than this (in characters) skip the single-batch API call and fall back
 # to the topological per-chunk path.
 _BATCH_FILE_SIZE_THRESHOLD = 400_000
+_PROFILE_BATCH_CHUNK_COUNT = 64
 
 
 class FileTooLargeError(Exception):
@@ -300,7 +303,9 @@ class ChunkWriter:
         )
         return response.choices[0].message.content
 
-    async def _call_profile_api(self, system: str, prompt: str) -> tuple[str, str]:
+    async def _call_profile_api(
+        self, system: str, prompt: str, *, max_tokens: int = 150
+    ) -> tuple[str, str]:
         """Call the profile-configured OpenAI-compatible endpoint."""
         from openai import AsyncOpenAI
 
@@ -317,7 +322,7 @@ class ChunkWriter:
         client = AsyncOpenAI(api_key=api_key, base_url=base_url)
         response = await client.chat.completions.create(
             model=model,
-            max_tokens=150,
+            max_tokens=max_tokens,
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": prompt},
@@ -521,6 +526,95 @@ class FileBatchSummarizer(ChunkWriter):
     ``Dict`` rows rather than raw SQL tuples).
     """
 
+    def _parse_profile_batch_response(self, response_text: str) -> List[SimpleNamespace]:
+        text = response_text.strip()
+        if text.startswith("```"):
+            lines = text.splitlines()
+            if len(lines) >= 3:
+                text = "\n".join(lines[1:-1]).strip()
+
+        try:
+            payload = json.loads(text)
+            summaries = payload.get("summaries")
+            if not isinstance(summaries, list):
+                raise ValueError("Profile batch response did not include a summaries list")
+        except Exception:
+            pair_pattern = re.compile(
+                r'"chunk_id"\s*:\s*"(?P<chunk_id>[^"]+)"\s*,\s*"summary"\s*:\s*"(?P<summary>(?:[^"\\]|\\.)*)"',
+                re.DOTALL,
+            )
+            parsed = []
+            for match in pair_pattern.finditer(text):
+                summary = json.loads(f'"{match.group("summary")}"')
+                parsed.append(
+                    SimpleNamespace(
+                        chunk_id=match.group("chunk_id"),
+                        summary=summary.strip(),
+                    )
+                )
+            if parsed:
+                return parsed
+            raise
+
+        parsed: List[SimpleNamespace] = []
+        for item in summaries:
+            if not isinstance(item, dict):
+                continue
+            chunk_id = item.get("chunk_id")
+            summary = item.get("summary")
+            if isinstance(chunk_id, str) and isinstance(summary, str):
+                parsed.append(SimpleNamespace(chunk_id=chunk_id, summary=summary.strip()))
+        return parsed
+
+    async def _call_profile_batch_api(
+        self,
+        file_id: int,
+        file_path: str,
+        file_content: str,
+        chunks: List[Dict],
+        symbol_map: Dict[int, str],
+    ) -> List[Any]:
+        del file_id, file_content
+        language = (chunks[0].get("language") or "unknown") if chunks else "unknown"
+        summaries: List[SimpleNamespace] = []
+
+        for offset in range(0, len(chunks), _PROFILE_BATCH_CHUNK_COUNT):
+            batch = chunks[offset : offset + _PROFILE_BATCH_CHUNK_COUNT]
+            chunk_blocks = []
+            for chunk in batch:
+                symbol = symbol_map.get(chunk.get("symbol_id")) or chunk.get("node_type") or "unknown"
+                chunk_blocks.append(
+                    "\n".join(
+                        [
+                            f"chunk_id: {chunk['chunk_id']}",
+                            f"symbol: {symbol}",
+                            f"lines: {chunk.get('line_start') or 1}-{chunk.get('line_end') or 1}",
+                            f"content:\n```{language}\n{chunk.get('content') or ''}\n```",
+                        ]
+                    )
+                )
+
+            system = (
+                "You summarize code/document chunks. "
+                "Return strict JSON with shape "
+                '{"summaries":[{"chunk_id":"...","summary":"..."}]}. '
+                "Every summary must be exactly 2 concise sentences."
+            )
+            prompt = (
+                f"File: {file_path}\n"
+                f"Language: {language}\n"
+                f"Summarize each chunk below and include every chunk_id exactly once.\n\n"
+                + "\n\n".join(chunk_blocks)
+            )
+            response_text, _model_name = await self._call_profile_api(
+                system,
+                prompt,
+                max_tokens=min(8000, max(600, len(batch) * 80)),
+            )
+            summaries.extend(self._parse_profile_batch_response(response_text))
+
+        return summaries
+
     async def _call_batch_api(
         self,
         file_id: int,
@@ -689,10 +783,27 @@ class FileBatchSummarizer(ChunkWriter):
                 file_path,
                 exc,
             )
-            result = await self._summarize_topological(
-                file_id, file_path, file_content, to_summarize, symbol_map
-            )
-            return result
+            if self.summarization_config.get("base_url"):
+                try:
+                    summaries = await self._call_profile_batch_api(
+                        file_id, file_path, file_content, to_summarize, symbol_map
+                    )
+                    missing_chunk_ids = []
+                except Exception as profile_exc:
+                    logger.warning(
+                        "Profile batch fallback failed for %s (%s), falling back to per-chunk path",
+                        file_path,
+                        profile_exc,
+                    )
+                    result = await self._summarize_topological(
+                        file_id, file_path, file_content, to_summarize, symbol_map
+                    )
+                    return result
+            else:
+                result = await self._summarize_topological(
+                    file_id, file_path, file_content, to_summarize, symbol_map
+                )
+                return result
 
         if persist and summaries:
             model_name = self._get_model_name()
@@ -752,26 +863,29 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
             Path(path).resolve(strict=False).as_posix() for path in (target_paths or []) if path
         }
         with sqlite3.connect(self.db_path) as conn:
+            where_clauses = ["cs.chunk_hash IS NULL"]
+            params: list[Any] = []
+            if normalized_paths:
+                placeholders = ", ".join("?" for _ in normalized_paths)
+                where_clauses.append(f"f.path IN ({placeholders})")
+                params.extend(sorted(normalized_paths))
+            params.append(limit)
             cursor = conn.execute(
-                """SELECT c.chunk_id, c.file_id, c.line_start, c.line_end,
-                          c.content, c.node_type, c.parent_chunk_id,
-                          c.language, s.name AS symbol, f.path AS file_path,
-                          c.symbol_id
-                   FROM code_chunks c
-                   JOIN files f ON c.file_id = f.id
-                   LEFT JOIN symbols s ON c.symbol_id = s.id
-                   LEFT JOIN chunk_summaries cs ON c.chunk_id = cs.chunk_hash
-                   WHERE cs.chunk_hash IS NULL
-                   LIMIT ?""",
-                (limit,),
+                f"""SELECT c.chunk_id, c.file_id, c.line_start, c.line_end,
+                           c.content, c.node_type, c.parent_chunk_id,
+                           c.language, s.name AS symbol, f.path AS file_path,
+                           c.symbol_id
+                    FROM code_chunks c
+                    JOIN files f ON c.file_id = f.id
+                    LEFT JOIN symbols s ON c.symbol_id = s.id
+                    LEFT JOIN chunk_summaries cs ON c.chunk_id = cs.chunk_hash
+                    WHERE {" AND ".join(where_clauses)}
+                    ORDER BY f.path, c.line_start, c.line_end, c.chunk_id
+                    LIMIT ?""",
+                tuple(params),
             )
             rows = cursor.fetchall()
-
-        if not normalized_paths:
-            return rows
-        return [
-            row for row in rows if Path(row[9]).resolve(strict=False).as_posix() in normalized_paths
-        ]
+        return rows
 
     async def process_scope(
         self, *, limit: int = 500, target_paths: Optional[Sequence[Path]] = None
@@ -784,95 +898,112 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
             )
             return SummaryGenerationResult()
 
-        rows = self._fetch_unsummarized_rows(limit=limit, target_paths=target_paths)
+        total_attempted = 0
+        total_summaries_written = 0
+        total_authoritative_chunks = 0
+        total_files_attempted = 0
+        total_files_summarized = 0
+        missing_chunk_ids: List[str] = []
 
-        if not rows:
-            logger.info("ComprehensiveChunkWriter: no unsummarized chunks found")
-            return SummaryGenerationResult()
+        while True:
+            rows = self._fetch_unsummarized_rows(limit=limit, target_paths=target_paths)
+            if not rows:
+                if total_attempted == 0:
+                    logger.info("ComprehensiveChunkWriter: no unsummarized chunks found")
+                break
 
-        # Group chunks and symbol names by file_id.
-        file_meta: Dict[int, tuple] = {}  # file_id -> (file_path, language)
-        file_chunks: Dict[int, List[Dict]] = {}
-        file_symbol_maps: Dict[int, Dict[int, str]] = {}
+            # Group chunks and symbol names by file_id.
+            file_meta: Dict[int, tuple] = {}  # file_id -> (file_path, language)
+            file_chunks: Dict[int, List[Dict]] = {}
+            file_symbol_maps: Dict[int, Dict[int, str]] = {}
 
-        for row in rows:
-            (
-                chunk_id,
-                file_id,
-                line_start,
-                line_end,
-                chunk_content,
-                node_type,
-                parent_chunk_id,
-                language,
-                symbol,
-                file_path,
-                symbol_id,
-            ) = row
+            for row in rows:
+                (
+                    chunk_id,
+                    file_id,
+                    line_start,
+                    line_end,
+                    chunk_content,
+                    node_type,
+                    parent_chunk_id,
+                    language,
+                    symbol,
+                    file_path,
+                    symbol_id,
+                ) = row
 
-            if file_id not in file_meta:
-                file_meta[file_id] = (file_path, language or "unknown")
-                file_chunks[file_id] = []
-                file_symbol_maps[file_id] = {}
+                if file_id not in file_meta:
+                    file_meta[file_id] = (file_path, language or "unknown")
+                    file_chunks[file_id] = []
+                    file_symbol_maps[file_id] = {}
 
-            file_chunks[file_id].append(
-                {
-                    "chunk_id": chunk_id,
-                    "file_id": file_id,
-                    "line_start": line_start,
-                    "line_end": line_end,
-                    "content": chunk_content,
-                    "node_type": node_type,
-                    "parent_chunk_id": parent_chunk_id,
-                    "language": language,
-                    "symbol_id": symbol_id,
-                }
-            )
-            if symbol_id and symbol:
-                file_symbol_maps[file_id][symbol_id] = symbol
-
-        result = SummaryGenerationResult(
-            chunks_attempted=len(rows),
-            files_attempted=len(file_meta),
-        )
-        for file_id, (file_path, _) in file_meta.items():
-            try:
-                with open(file_path, encoding="utf-8", errors="replace") as fh:
-                    file_content = fh.read()
-            except Exception:
-                file_content = ""
-
-            try:
-                file_result = await self.summarize_file_chunks(
-                    file_id=file_id,
-                    file_path=file_path,
-                    file_content=file_content,
-                    chunks=file_chunks[file_id],
-                    symbol_map=file_symbol_maps[file_id],
-                    persist=True,
+                file_chunks[file_id].append(
+                    {
+                        "chunk_id": chunk_id,
+                        "file_id": file_id,
+                        "line_start": line_start,
+                        "line_end": line_end,
+                        "content": chunk_content,
+                        "node_type": node_type,
+                        "parent_chunk_id": parent_chunk_id,
+                        "language": language,
+                        "symbol_id": symbol_id,
+                    }
                 )
-                result = SummaryGenerationResult(
-                    chunks_attempted=result.chunks_attempted,
-                    summaries_written=result.summaries_written + file_result.summaries_written,
-                    authoritative_chunks=(
-                        result.authoritative_chunks + file_result.authoritative_chunks
-                    ),
-                    missing_chunk_ids=result.missing_chunk_ids + file_result.missing_chunk_ids,
-                    files_attempted=result.files_attempted,
-                    files_summarized=result.files_summarized + file_result.files_summarized,
+                if symbol_id and symbol:
+                    file_symbol_maps[file_id][symbol_id] = symbol
+
+            total_attempted += len(rows)
+            total_files_attempted += len(file_meta)
+            pass_summaries_written = 0
+
+            for file_id, (file_path, _) in file_meta.items():
+                try:
+                    with open(file_path, encoding="utf-8", errors="replace") as fh:
+                        file_content = fh.read()
+                except Exception:
+                    file_content = ""
+
+                try:
+                    file_result = await self.summarize_file_chunks(
+                        file_id=file_id,
+                        file_path=file_path,
+                        file_content=file_content,
+                        chunks=file_chunks[file_id],
+                        symbol_map=file_symbol_maps[file_id],
+                        persist=True,
+                    )
+                    pass_summaries_written += file_result.summaries_written
+                    total_summaries_written += file_result.summaries_written
+                    total_authoritative_chunks += file_result.authoritative_chunks
+                    total_files_summarized += file_result.files_summarized
+                    missing_chunk_ids.extend(file_result.missing_chunk_ids)
+                except Exception as exc:
+                    logger.error("Failed to summarize file %s: %s", file_path, exc)
+                    missing_chunk_ids.extend(
+                        [chunk["chunk_id"] for chunk in file_chunks.get(file_id, [])]
+                    )
+
+            if pass_summaries_written == 0:
+                logger.info(
+                    "ComprehensiveChunkWriter: made no progress on %d remaining chunks",
+                    len(rows),
                 )
-            except Exception as exc:
-                logger.error("Failed to summarize file %s: %s", file_path, exc)
-                result.missing_chunk_ids.extend(
-                    [chunk["chunk_id"] for chunk in file_chunks.get(file_id, [])]
-                )
+                break
 
         logger.info(
             "ComprehensiveChunkWriter: stored %d/%d summaries",
-            result.summaries_written,
-            len(rows),
+            total_summaries_written,
+            total_attempted,
         )
-        return result
+        return SummaryGenerationResult(
+            chunks_attempted=total_attempted,
+            summaries_written=total_summaries_written,
+            authoritative_chunks=total_authoritative_chunks,
+            missing_chunk_ids=missing_chunk_ids,
+            files_attempted=total_files_attempted,
+            files_summarized=total_files_summarized,
+        )
 
     async def process_all(self, limit: int = 500) -> int:
         """Generate summaries for every unsummarized chunk, grouped by file."""

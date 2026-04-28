@@ -1147,6 +1147,8 @@ class TestEnhancedDispatcherProtocolConformance:
                 events.append(("semantic", [str(path) for path in paths], kwargs))
                 return {"files_indexed": 1, "files_failed": 0, "files_skipped": 0}
 
+        remaining_counts = [1, 0]
+
         monkeypatch.setattr(
             "mcp_server.indexing.summarization.ComprehensiveChunkWriter",
             FakeWriter,
@@ -1161,6 +1163,11 @@ class TestEnhancedDispatcherProtocolConformance:
             Dispatcher,
             "_get_semantic_indexer",
             lambda self, _ctx: FakeSemanticIndexer(),
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "_count_missing_summaries_for_paths",
+            lambda self, _ctx, _paths: 0 if events and events[-1][0] == "summary" else 1,
         )
 
         def _fake_index_file(self, _ctx, path, do_semantic=False):
@@ -1224,6 +1231,11 @@ class TestEnhancedDispatcherProtocolConformance:
         )
         monkeypatch.setattr(
             Dispatcher,
+            "_count_missing_summaries_for_paths",
+            lambda self, _ctx, _paths: 1,
+        )
+        monkeypatch.setattr(
+            Dispatcher,
             "index_file",
             lambda self, _ctx, path, do_semantic=False: IndexResult(
                 status=IndexResultStatus.INDEXED,
@@ -1238,6 +1250,90 @@ class TestEnhancedDispatcherProtocolConformance:
         assert semantic_called["value"] is False
         assert result["semantic_stage"] == "blocked_missing_summaries"
         assert result["semantic_blocked"] == 1
+
+    def test_index_directory_retries_summary_generation_until_scope_is_drained(
+        self, tmp_path, monkeypatch
+    ):
+        summary_limits = []
+        ctx = _make_repo_ctx(sqlite_store=MagicMock(db_path=str(tmp_path / "index.db")))
+        target = tmp_path / "sample.py"
+        target.write_text("x = 1\n")
+
+        class FakeWriter:
+            call_count = 0
+
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def process_scope(self, **kwargs):
+                FakeWriter.call_count += 1
+                summary_limits.append(kwargs["limit"])
+                if FakeWriter.call_count == 1:
+                    return SimpleNamespace(
+                        summaries_written=1,
+                        chunks_attempted=1,
+                        authoritative_chunks=1,
+                        missing_chunk_ids=[],
+                        files_attempted=1,
+                        files_summarized=1,
+                    )
+                return SimpleNamespace(
+                    summaries_written=1,
+                    chunks_attempted=1,
+                    authoritative_chunks=1,
+                    missing_chunk_ids=[],
+                    files_attempted=1,
+                    files_summarized=1,
+                )
+
+        class FakeSemanticIndexer:
+            def index_files_batch(self, paths, **kwargs):
+                return {"files_indexed": 1, "files_failed": 0, "files_skipped": 0}
+
+        unresolved = [{"remaining": 1}, {"remaining": 1}, {"remaining": 0}]
+
+        monkeypatch.setattr(
+            "mcp_server.indexing.summarization.ComprehensiveChunkWriter",
+            FakeWriter,
+        )
+        monkeypatch.setattr(
+            "mcp_server.setup.semantic_preflight.run_semantic_preflight",
+            lambda **_kwargs: SimpleNamespace(
+                to_dict=lambda: {"can_write_semantic_vectors": True, "blocker": None}
+            ),
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "_get_semantic_indexer",
+            lambda self, _ctx: FakeSemanticIndexer(),
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "_count_missing_summaries_for_paths",
+            lambda self, _ctx, _paths: remaining_counts.pop(0),
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "index_file",
+            lambda self, _ctx, path, do_semantic=False: IndexResult(
+                status=IndexResultStatus.INDEXED,
+                path=path,
+                observed_hash=None,
+                actual_hash=None,
+            ),
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "_count_missing_summaries_for_paths",
+            lambda self, _ctx, _paths: unresolved.pop(0)["remaining"],
+        )
+
+        result = Dispatcher([]).index_directory(ctx, tmp_path)
+
+        assert result["semantic_stage"] == "indexed"
+        assert result["summaries_written"] == 2
+        assert result["summary_chunks_attempted"] == 2
+        assert summary_limits == [10000, 10000]
 
     def test_index_directory_bootstraps_missing_collection_before_semantic_writes(
         self, tmp_path, monkeypatch
@@ -1323,6 +1419,11 @@ class TestEnhancedDispatcherProtocolConformance:
             Dispatcher,
             "_get_semantic_indexer",
             lambda self, _ctx: FakeSemanticIndexer(),
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "_count_missing_summaries_for_paths",
+            lambda self, _ctx, _paths: 0 if preflight_calls["count"] > 0 else 1,
         )
         monkeypatch.setattr(
             Dispatcher,

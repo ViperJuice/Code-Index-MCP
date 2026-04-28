@@ -163,9 +163,12 @@ and vectors:
   succeed while semantic dogfood still remains blocked on `collection_missing`;
   the SEMCOLLECT evidence then shows collection bootstrap can succeed while the
   repo is still blocked downstream on summary generation; the SEMSUMFIX
-  evidence then shows the direct authoritative summary runtime can recover
-  while the real full-sync path is still blocked on repo-wide summary
-  coverage. Use the report to separate those states.
+  evidence then shows the direct authoritative summary runtime can recover;
+  the SEMSYNCFIX evidence then shows the full-sync path can recover its scoped
+  summary selection and retry behavior while still remaining blocked on
+  summary throughput; and `SEMTHROUGHPUT` is the downstream roadmap follow-up
+  for clearing the remaining repo-wide summary backlog. Use the report to
+  separate those states.
 
 ## Full Reindex Pipeline
 
@@ -239,8 +242,8 @@ dogfood rebuild evidence.
     the expected configured model, effective model, and profile metadata
   - if direct probes succeed but `repository sync --force-full` still leaves
     semantic readiness at `summaries_missing`, treat that as a full-sync
-    summary coverage blocker rather than a preflight or collection bootstrap
-    blocker
+    summary throughput blocker rather than a preflight or collection bootstrap
+    blocker; the current roadmap follow-up for that state is `SEMTHROUGHPUT`
 - Voyage provider failing
   - verify `VOYAGE_API_KEY`
 - Preflight output

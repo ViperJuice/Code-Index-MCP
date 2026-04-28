@@ -675,6 +675,61 @@ semantic readiness accounting that gates vector writes.
 **Produces**
 - IF-0-SEMSYNCFIX-1 — Default local full-sync summary coverage and semantic-ready rebuild contract.
 
+### Phase 12 — Summary Throughput Recovery (SEMTHROUGHPUT)
+
+**Objective**
+
+Repair the remaining summary-throughput bottleneck exposed by SEMSYNCFIX so the
+real `repository sync --force-full` path can finish repo-wide authoritative
+summary generation within one rebuild and finally advance semantic vector
+writes.
+
+**Exit criteria**
+- [ ] The full-sync summary path no longer stalls on large markdown/plaintext
+      files after the BAML runtime mismatch fallback is triggered.
+- [ ] A clean force-full rebuild clears the repo-wide `summaries_missing`
+      blocker and produces non-zero `semantic_points` for
+      `code_index__oss_high__v1`.
+- [ ] `uv run mcp-index repository status` reports semantic readiness `ready`
+      for the active profile after the repaired rebuild.
+- [ ] Repo-local semantic dogfood queries return semantic-path results instead
+      of `semantic_not_ready`.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the throughput repair
+      evidence and final semantic-ready or exact still-blocked verdict.
+
+**Scope notes**
+
+This phase exists only because SEMSYNCFIX repaired the scoped full-sync summary
+selection and strict stage retry contract, but the live dogfood rebuild still
+left semantic readiness at `summaries_missing` after summary coverage advanced
+only partway through large documentation/spec files. Keep the work narrowly on
+summary batching/recovery throughput and the proof needed to show the same
+force-full rebuild now clears the summary gate.
+
+**Non-goals**
+
+- No semantic ranking redesign.
+- No multi-repo rollout expansion.
+- No unrelated profile/configuration changes outside the summary throughput
+  recovery path.
+
+**Key files**
+
+- `mcp_server/indexing/summarization.py`
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `docs/guides/semantic-onboarding.md`
+- `tests/test_summarization.py`
+- `tests/test_dispatcher.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+- `tests/real_world/test_semantic_search.py`
+
+**Depends on**
+- SEMSYNCFIX
+
+**Produces**
+- IF-0-SEMTHROUGHPUT-1 — Default local full-sync summary throughput and semantic-ready rebuild contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -689,6 +744,7 @@ SEMCONTRACT
   -> SEMCOLLECT
   -> SEMSUMFIX
   -> SEMSYNCFIX
+  -> SEMTHROUGHPUT
 ```
 
 ## Execution Notes
@@ -719,6 +775,9 @@ SEMCONTRACT
 - SEMSYNCFIX exists only if SEMSUMFIX proves the direct authoritative summary
   runtime is repaired but the real full-sync path or readiness accounting still
   leaves the repo at `summaries_missing`.
+- SEMTHROUGHPUT exists only if SEMSYNCFIX proves the scoped full-sync summary
+  drain is repaired but the live rebuild still cannot clear repo-wide summary
+  coverage fast enough to reach semantic vector writes in one force-full pass.
 
 ## Verification
 

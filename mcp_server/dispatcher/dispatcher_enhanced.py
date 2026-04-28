@@ -5,6 +5,7 @@ import hashlib
 import logging
 import os
 import re
+import sqlite3
 import threading
 import time
 from dataclasses import dataclass
@@ -2160,21 +2161,33 @@ class EnhancedDispatcher:
             qdrant_client=None,
             summarization_config=summarization_config,
         )
-        summary_result = _run_coro_blocking(
-            writer.process_scope(
-                limit=max(10000, len(normalized_paths) * 64),
-                target_paths=normalized_paths,
+        summary_limit = max(10000, len(normalized_paths) * 64)
+        remaining_missing = self._count_missing_summaries_for_paths(ctx, normalized_paths)
+        summary_missing_ids: List[str] = []
+
+        while remaining_missing > 0:
+            summary_result = _run_coro_blocking(
+                writer.process_scope(
+                    limit=summary_limit,
+                    target_paths=normalized_paths,
+                )
             )
-        )
-        stats["summaries_written"] = summary_result.summaries_written
-        stats["summary_chunks_attempted"] = summary_result.chunks_attempted
-        stats["summary_missing_chunks"] = len(summary_result.missing_chunk_ids)
-        if summary_result.missing_chunk_ids:
+            stats["summaries_written"] += summary_result.summaries_written
+            stats["summary_chunks_attempted"] += summary_result.chunks_attempted
+            summary_missing_ids.extend(summary_result.missing_chunk_ids)
+            remaining_missing = self._count_missing_summaries_for_paths(ctx, normalized_paths)
+            if summary_result.summaries_written == 0:
+                break
+
+        stats["summary_missing_chunks"] = remaining_missing
+        if remaining_missing > 0:
             stats["semantic_stage"] = "blocked_missing_summaries"
             stats["semantic_blocked"] = len(normalized_paths)
             stats["semantic_error"] = (
                 "Missing authoritative summaries blocked strict semantic indexing"
             )
+            if summary_missing_ids:
+                stats["summary_missing_chunk_ids"] = summary_missing_ids
             return stats
 
         semantic_preflight = run_semantic_preflight(
@@ -2230,6 +2243,25 @@ class EnhancedDispatcher:
         else:
             stats["semantic_stage"] = "skipped"
         return stats
+
+    def _count_missing_summaries_for_paths(self, ctx: RepoContext, paths: List[Path]) -> int:
+        active_store = getattr(ctx, "sqlite_store", None)
+        if active_store is None or not paths:
+            return 0
+
+        normalized_paths = sorted(Path(path).resolve(strict=False).as_posix() for path in paths)
+        placeholders = ", ".join("?" for _ in normalized_paths)
+        with sqlite3.connect(active_store.db_path) as conn:
+            row = conn.execute(
+                f"""SELECT COUNT(*)
+                    FROM code_chunks c
+                    JOIN files f ON c.file_id = f.id
+                    LEFT JOIN chunk_summaries cs ON c.chunk_id = cs.chunk_hash
+                    WHERE cs.chunk_hash IS NULL
+                      AND f.path IN ({placeholders})""",
+                tuple(normalized_paths),
+            ).fetchone()
+        return int(row[0]) if row else 0
 
     def _persist_index_shard(
         self,
