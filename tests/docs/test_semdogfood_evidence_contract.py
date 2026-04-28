@@ -23,9 +23,9 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
 
     for expected in (
         "# Semantic Dogfood Rebuild",
-        "Phase plan: `plans/phase-plan-v7-SEMANALYSIS.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMAGENTS.md`",
         "## Reset Boundary",
-        "## Final-Analysis Lexical Repair",
+        "## AGENTS Lexical Repair",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -51,11 +51,12 @@ def test_semdogfood_report_records_reset_boundary_counts_collection_and_verifica
         "SEMROADMAP",
         "SEMANALYSIS",
         "SEMAGENTS",
+        "SEMREADME",
         "SEMCHANGELOG",
         "SEMSTALLFIX",
         "SEMIOWAIT",
-        "FINAL_COMPREHENSIVE_MCP_ANALYSIS.md",
         "AGENTS.md",
+        "README.md",
         "blocked_file_timeout",
         "lexical_stage",
         "last_progress_path",
@@ -71,6 +72,7 @@ def test_semdogfood_report_records_reset_boundary_counts_collection_and_verifica
         "uv run pytest tests/test_git_index_manager.py -q --no-cov",
         "uv run pytest tests/test_sqlite_store.py -q --no-cov",
         "uv run mcp-index index check-semantic",
+        "uv run pytest tests/root_tests/test_markdown_production_scenarios.py -q --no-cov -k agents",
         "uv run --extra dev python -m pytest tests/real_world/test_semantic_search.py -q --no-cov -k repo_local_dogfood_queries_stay_on_semantic_path -rs",
     ):
         assert expected in text
@@ -111,6 +113,7 @@ def test_semantic_onboarding_links_semdogfood_report_and_separate_readiness_surf
     assert "SEMROADMAP" in text
     assert "SEMANALYSIS" in text
     assert "SEMAGENTS" in text
+    assert "SEMREADME" in text
     assert "stale_commit" in text
     assert "blocked_file_timeout" in text
     assert "lexical/storage blocker" in text

@@ -178,11 +178,13 @@ and vectors:
   exact lexical/storage blocker; the SEMROADMAP evidence then shows the
   bounded roadmap repair clears that exact file path while exposing
   `FINAL_COMPREHENSIVE_MCP_ANALYSIS.md` as the next exact lexical/storage
-  blocker; and the SEMANALYSIS evidence then shows the bounded final-analysis
+  blocker; the SEMANALYSIS evidence then shows the bounded final-analysis
   repair clears that exact file path while exposing `AGENTS.md` as the next
-  exact lexical/storage blocker. If that later blocker remains live, route the
-  next execution step through `SEMAGENTS` instead of reusing an older
-  downstream plan. Use the report to separate those states.
+  exact lexical/storage blocker; and the SEMAGENTS evidence then shows the
+  bounded AGENTS repair clears that exact file path while exposing
+  `README.md` as the next exact lexical/storage blocker. If that later blocker
+  remains live, route the next execution step through `SEMREADME` instead of
+  reusing an older downstream plan. Use the report to separate those states.
 
 ## Full Reindex Pipeline
 
@@ -300,8 +302,8 @@ dogfood rebuild evidence.
     SEMDOGFOOD report before assuming the semantic stage is at fault
   - if storage posture might be involved, inspect `journal_mode`,
     `busy_timeout_ms`, and `wal_checkpoint` from the same report
-  - the current SEMANALYSIS evidence shows `blocked_file_timeout` on
-    `AGENTS.md` rather than an unbounded lower-level hang
+  - the current SEMAGENTS evidence shows `blocked_file_timeout` on
+    `README.md` rather than an unbounded lower-level hang
 - Voyage provider failing
   - verify `VOYAGE_API_KEY`
 - Preflight output

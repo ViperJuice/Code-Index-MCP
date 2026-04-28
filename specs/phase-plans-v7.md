@@ -1043,6 +1043,58 @@ exclusion-policy fixes over weakening the timeout globally.
 **Produces**
 - IF-0-SEMAGENTS-1 — AGENTS lexical timeout repair and rerun evidence contract.
 
+### Phase 19 — README Lexical Timeout Repair (SEMREADME)
+
+**Objective**
+
+Repair the next exact repo-local force-full blocker where lexical indexing now
+times out while processing `README.md`, so the dogfood rebuild can move past
+that bounded repository guide and either reach semantic closeout or surface the
+next narrower downstream blocker.
+
+**Exit criteria**
+- [ ] `README.md` no longer exceeds the lexical timeout during
+      `repository sync --force-full`.
+- [ ] The lexical timeout watchdog remains active and still fails closed for
+      true path-level stalls.
+- [ ] The live force-full rerun either completes through indexed-commit
+      freshness or exits with a new exact blocker that is narrower than
+      `README.md` lexical processing.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the README repair,
+      the rerun outcome, current-versus-indexed commit evidence, and the
+      final ready or still-blocked verdict.
+
+**Scope notes**
+
+Keep this phase narrowly focused on why `README.md` is now slow enough to trip
+the lexical watchdog after SEMAGENTS cleared `AGENTS.md`. Prefer bounded
+parsing, chunking, or exclusion-policy fixes over weakening the timeout
+globally.
+
+**Non-goals**
+
+- No semantic ranking redesign.
+- No broad document-processing rewrite.
+- No global timeout increase that hides path-level stalls.
+- No unrelated cleanup of dogfood runtime artifacts.
+
+**Key files**
+
+- `mcp_server/plugins/markdown_plugin/plugin.py`
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `docs/guides/semantic-onboarding.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMAGENTS
+
+**Produces**
+- IF-0-SEMREADME-1 — README lexical timeout repair and rerun evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -1064,6 +1116,7 @@ SEMCONTRACT
   -> SEMROADMAP
   -> SEMANALYSIS
   -> SEMAGENTS
+  -> SEMREADME
 ```
 
 ## Execution Notes
@@ -1119,6 +1172,10 @@ SEMCONTRACT
   `FINAL_COMPREHENSIVE_MCP_ANALYSIS.md` but the live force-full rerun still
   times out on another bounded Markdown or policy document such as
   `AGENTS.md`; it should repair that exact file path or preserve a still
+  narrower downstream blocker.
+- SEMREADME exists only if SEMAGENTS clears `AGENTS.md` but the live
+  force-full rerun still times out on another bounded Markdown document such
+  as `README.md`; it should repair that exact file path or preserve a still
   narrower downstream blocker.
 
 ## Verification

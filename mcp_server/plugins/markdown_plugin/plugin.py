@@ -37,6 +37,7 @@ _ANALYSIS_REPORT_MARKDOWN_NAME_RE = re.compile(
     r"^(?:final[-_ ]?comprehensive[-_ ]?mcp[-_ ]?analysis|.+[-_ ]analysis|.+[-_ ]report)$",
     re.IGNORECASE,
 )
+_AGENT_INSTRUCTIONS_MARKDOWN_NAME_RE = re.compile(r"^(?:agents)$", re.IGNORECASE)
 
 
 class MarkdownPlugin(BaseDocumentPlugin):
@@ -80,6 +81,9 @@ class MarkdownPlugin(BaseDocumentPlugin):
 
         if _ANALYSIS_REPORT_MARKDOWN_NAME_RE.match(path.stem):
             return "analysis_report_path"
+
+        if _AGENT_INSTRUCTIONS_MARKDOWN_NAME_RE.match(path.stem):
+            return "agent_instructions_path"
 
         return None
 

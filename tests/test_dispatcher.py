@@ -1233,6 +1233,32 @@ class TestEnhancedDispatcherProtocolConformance:
         assert result["lexical_stage"] == "completed"
         assert result["last_progress_path"] == str(analysis_report.resolve())
 
+    def test_index_directory_uses_bounded_markdown_path_for_agents(
+        self, tmp_path, monkeypatch
+    ):
+        ctx = _make_repo_ctx()
+        agents = tmp_path / "AGENTS.md"
+        agents.write_text(
+            "# MCP Server Agent Configuration\n\n## Current State\n\n### Search Strategy\n- Preserve AGENTS heading discoverability\n",
+            encoding="utf-8",
+        )
+
+        from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
+
+        def _unexpected(*_args, **_kwargs):
+            raise AssertionError("heavy Markdown path should not run for AGENTS.md")
+
+        monkeypatch.setattr(MarkdownPlugin, "extract_structure", _unexpected)
+        monkeypatch.setattr(MarkdownPlugin, "chunk_document", _unexpected)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, tmp_path)
+
+        assert result["indexed_files"] == 1
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] == str(agents.resolve())
+
     def test_index_directory_runs_lexical_then_summaries_then_semantic(self, tmp_path, monkeypatch):
         events = []
         ctx = _make_repo_ctx(sqlite_store=MagicMock(db_path=str(tmp_path / "index.db")))

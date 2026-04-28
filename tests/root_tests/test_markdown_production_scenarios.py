@@ -643,6 +643,36 @@ All notable changes to this project will be documented in this file.
         assert "Recommendations" in symbol_names
         assert "Next Step" in symbol_names
 
+    def test_agents_bounded_index_preserves_document_and_heading_symbols(
+        self, markdown_plugin
+    ):
+        """AGENTS.md should stay lexically discoverable on the bounded path."""
+        content = """
+# MCP Server Agent Configuration
+
+## Current State
+
+### MCP Search Strategy
+- Prefer readiness-aware indexed search
+
+## Development Priorities
+
+### Immediate
+- Repair AGENTS lexical timeout handling
+"""
+
+        result = markdown_plugin.indexFile("AGENTS.md", content)
+
+        assert result["metadata"]["lightweight_index"] is True
+        assert result["metadata"]["lightweight_reason"] == "agent_instructions_path"
+        assert result["chunks"] == []
+        symbol_names = [symbol["symbol"] for symbol in result["symbols"]]
+        assert "MCP Server Agent Configuration" in symbol_names
+        assert "Current State" in symbol_names
+        assert "MCP Search Strategy" in symbol_names
+        assert "Development Priorities" in symbol_names
+        assert "Immediate" in symbol_names
+
     def test_large_documentation_site(self, markdown_plugin, sqlite_store):
         """Test handling of large documentation site structure."""
         # Simulate multiple interconnected docs

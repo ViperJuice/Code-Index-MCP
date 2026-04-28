@@ -425,8 +425,8 @@ def parse_server_response(api_result):
                 evidence = (
                     repo_path / "docs" / "status" / "SEMANTIC_DOGFOOD_REBUILD.md"
                 ).read_text(encoding="utf-8")
-                assert "SEMANALYSIS" in evidence
-                assert "AGENTS.md" in evidence
+                assert "SEMAGENTS" in evidence
+                assert "README.md" in evidence
                 pytest.skip(
                     "Dogfood repo indexed semantic query is unavailable: "
                     f"{readiness['state']} ({readiness['code']})"
