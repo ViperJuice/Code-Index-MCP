@@ -430,6 +430,7 @@ def parse_server_response(api_result):
                 readiness = data["semantic_readiness"]
                 assert readiness["code"] in {
                     "summaries_missing",
+                    "blocked_missing_summaries",
                     "blocked_summary_plateau",
                     "blocked_semantic_batch",
                 }

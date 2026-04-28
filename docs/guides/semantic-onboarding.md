@@ -170,10 +170,14 @@ and vectors:
   profile batching can increase summary coverage while the live force-full
   rebuild still stalls short of a fresh indexed commit; the SEMSTALLFIX
   evidence then shows bounded semantic-stage blocker vocabulary and fail-closed
-  full-index closeout without fully clearing the live repo-local stall; and
-  the SEMIOWAIT evidence then narrows that residual state to a lexical/storage
+  full-index closeout without fully clearing the live repo-local stall; the
+  SEMIOWAIT evidence then narrows that residual state to a lexical/storage
   blocker, `blocked_file_timeout` on `CHANGELOG.md`, with storage diagnostics
-  attached. Use the report to separate those states.
+  attached; and the SEMCHANGELOG evidence then shows the bounded changelog
+  repair clears that exact file path while exposing `ROADMAP.md` as the next
+  exact lexical/storage blocker. If that later blocker remains live, route the
+  next execution step through `SEMROADMAP` instead of reusing an older
+  downstream plan. Use the report to separate those states.
 
 ## Full Reindex Pipeline
 

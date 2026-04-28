@@ -887,6 +887,58 @@ chunking, or exclusion-policy fixes over weakening the timeout globally.
 **Produces**
 - IF-0-SEMCHANGELOG-1 — Changelog lexical timeout repair and rerun evidence contract.
 
+### Phase 16 — Roadmap Lexical Timeout Repair (SEMROADMAP)
+
+**Objective**
+
+Repair the next exact repo-local force-full blocker where lexical indexing now
+times out while processing `ROADMAP.md`, so the dogfood rebuild can move past
+that large Markdown document and either reach semantic closeout or surface the
+next bounded downstream blocker.
+
+**Exit criteria**
+- [ ] `ROADMAP.md` no longer exceeds the lexical timeout during
+      `repository sync --force-full`.
+- [ ] The lexical timeout watchdog remains active and still fails closed for
+      true path-level stalls.
+- [ ] The live force-full rerun either completes through indexed-commit
+      freshness or exits with a new exact blocker that is narrower than
+      `ROADMAP.md` lexical processing.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the roadmap repair,
+      the rerun outcome, current-versus-indexed commit evidence, and the final
+      ready or still-blocked verdict.
+
+**Scope notes**
+
+Keep this phase narrowly focused on why `ROADMAP.md` is now slow enough to trip
+the lexical watchdog after SEMCHANGELOG cleared `CHANGELOG.md`. Prefer bounded
+parsing, chunking, or exclusion-policy fixes over weakening the timeout
+globally.
+
+**Non-goals**
+
+- No semantic ranking redesign.
+- No broad document-processing rewrite.
+- No global timeout increase that hides path-level stalls.
+- No unrelated cleanup of dogfood runtime artifacts.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/plugin_system/`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `docs/guides/semantic-onboarding.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMCHANGELOG
+
+**Produces**
+- IF-0-SEMROADMAP-1 — Roadmap lexical timeout repair and rerun evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -905,6 +957,7 @@ SEMCONTRACT
   -> SEMSTALLFIX
   -> SEMIOWAIT
   -> SEMCHANGELOG
+  -> SEMROADMAP
 ```
 
 ## Execution Notes
@@ -948,6 +1001,10 @@ SEMCONTRACT
 - SEMCHANGELOG exists only if SEMIOWAIT narrows the opaque low-level stall to a
   deterministic `CHANGELOG.md` lexical timeout; it should repair that exact file
   path or preserve a narrower downstream blocker.
+- SEMROADMAP exists only if SEMCHANGELOG clears `CHANGELOG.md` but the live
+  force-full rerun still times out on another bounded Markdown document such
+  as `ROADMAP.md`; it should repair that exact file path or preserve a still
+  narrower downstream blocker.
 
 ## Verification
 

@@ -27,6 +27,9 @@ from .section_extractor import SectionExtractor
 logger = logging.getLogger(__name__)
 
 _LIGHTWEIGHT_MARKDOWN_BYTES = 250_000
+_BOUNDED_MARKDOWN_NAME_RE = re.compile(
+    r"^(?:changelog|release[-_ ]?notes?)$", re.IGNORECASE
+)
 
 
 class MarkdownPlugin(BaseDocumentPlugin):
@@ -53,6 +56,117 @@ class MarkdownPlugin(BaseDocumentPlugin):
     def _get_supported_extensions(self) -> List[str]:
         """Get list of supported file extensions."""
         return [".md", ".markdown", ".mdown", ".mkd", ".mdx"]
+
+    def _resolve_lightweight_reason(self, path: Path, content: str) -> Optional[str]:
+        """Return the bounded indexing reason when Markdown should skip the heavy path."""
+        if os.getenv("MCP_LIGHTWEIGHT_DOC_INDEX", "false").lower() == "true":
+            return "forced_env"
+
+        if len(content.encode("utf-8", errors="ignore")) > _LIGHTWEIGHT_MARKDOWN_BYTES:
+            return "large_document"
+
+        if _BOUNDED_MARKDOWN_NAME_RE.match(path.stem):
+            return "changelog_path"
+
+        return None
+
+    def _extract_lightweight_title(self, content: str, path: Path) -> str:
+        """Extract a document title without invoking the full Markdown AST path."""
+        frontmatter, content_without_frontmatter = self.frontmatter_parser.parse(content)
+        title = frontmatter.get("title")
+        if isinstance(title, str) and title.strip():
+            return title.strip()
+
+        for line in content_without_frontmatter.splitlines():
+            match = re.match(r"^\s{0,3}#{1,6}\s+(.+?)\s*$", line)
+            if match:
+                return match.group(1).strip()
+
+        return path.stem
+
+    def _extract_lightweight_heading_symbols(
+        self, content: str, path: Path
+    ) -> List[Dict[str, Any]]:
+        """Extract heading/document symbols with a bounded line-based scan."""
+        symbols: List[Dict[str, Any]] = []
+        lines = content.splitlines()
+        frontmatter_open = False
+        frontmatter_closed = False
+        parent_by_level: Dict[int, str] = {}
+
+        for line_number, line in enumerate(lines, start=1):
+            stripped = line.strip()
+            if line_number == 1 and stripped == "---":
+                frontmatter_open = True
+                continue
+            if frontmatter_open and not frontmatter_closed:
+                if stripped == "---":
+                    frontmatter_closed = True
+                continue
+
+            match = re.match(r"^\s{0,3}(#{1,6})\s+(.+?)\s*$", line)
+            if not match:
+                continue
+
+            level = len(match.group(1))
+            heading_text = match.group(2).strip()
+            parent = None
+            for parent_level in range(level - 1, 0, -1):
+                parent = parent_by_level.get(parent_level)
+                if parent:
+                    break
+
+            symbols.append(
+                {
+                    "symbol": heading_text,
+                    "kind": "heading",
+                    "line": line_number,
+                    "span": [line_number, line_number],
+                    "metadata": {"level": level, "parent": parent},
+                }
+            )
+            parent_by_level[level] = heading_text
+            for stale_level in tuple(parent_by_level):
+                if stale_level > level:
+                    del parent_by_level[stale_level]
+
+        return symbols
+
+    def _build_lightweight_index_shard(
+        self, path: Path, content: str, reason: str
+    ) -> IndexShard:
+        """Return a bounded lexical shard that preserves document discoverability."""
+        title = self._extract_lightweight_title(content, path)
+        metadata = {
+            "title": title,
+            "author": None,
+            "created_date": None,
+            "modified_date": None,
+            "document_type": "markdown",
+            "language": "en",
+            "tags": [],
+            "custom": {},
+            "lightweight_index": True,
+            "lightweight_reason": reason,
+        }
+        symbols = [
+            {
+                "symbol": title,
+                "kind": "document",
+                "signature": f"Document: {title or path.name}",
+                "line": 1,
+                "span": [1, max(len(content.splitlines()), 1)],
+                "metadata": metadata,
+            }
+        ]
+        symbols.extend(self._extract_lightweight_heading_symbols(content, path))
+        return {
+            "file": str(path),
+            "symbols": symbols,
+            "language": self.lang,
+            "chunks": [],
+            "metadata": metadata,
+        }
 
     def chunk_document(self, content: str, file_path: Path) -> List[DocumentChunk]:
         """Override to use Markdown-specific chunking."""
@@ -84,33 +198,9 @@ class MarkdownPlugin(BaseDocumentPlugin):
         if content is None:
             content = path.read_text(encoding="utf-8", errors="replace")
 
-        lightweight_mode = (
-            os.getenv("MCP_LIGHTWEIGHT_DOC_INDEX", "false").lower() == "true"
-            or len(content.encode("utf-8", errors="ignore")) > _LIGHTWEIGHT_MARKDOWN_BYTES
-        )
-
-        if lightweight_mode:
-            metadata = self.extract_metadata(content, path)
-            symbols = [
-                {
-                    "symbol": metadata.title or path.stem,
-                    "kind": "document",
-                    "signature": f"Document: {metadata.title or path.name}",
-                    "line": 1,
-                    "span": [1, len(content.splitlines())],
-                    "metadata": {
-                        **metadata.__dict__,
-                        "lightweight_index": True,
-                    },
-                }
-            ]
-            return {
-                "file": str(path),
-                "symbols": symbols,
-                "language": self.lang,
-                "chunks": [],
-                "metadata": metadata.__dict__,
-            }
+        lightweight_reason = self._resolve_lightweight_reason(path, content)
+        if lightweight_reason is not None:
+            return self._build_lightweight_index_shard(path, content, lightweight_reason)
 
         # Extract metadata
         metadata = self.extract_metadata(content, path)

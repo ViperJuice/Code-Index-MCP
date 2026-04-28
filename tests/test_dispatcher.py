@@ -1153,6 +1153,32 @@ class TestEnhancedDispatcherProtocolConformance:
         assert result["storage_diagnostics"]["journal_mode"] == "WAL"
         store.health_check.assert_called_once()
 
+    def test_index_directory_uses_bounded_markdown_path_for_changelog(
+        self, tmp_path, monkeypatch
+    ):
+        ctx = _make_repo_ctx()
+        changelog = tmp_path / "CHANGELOG.md"
+        changelog.write_text(
+            "# Changelog\n\n## [Unreleased]\n\n### Added\n- Bounded lexical repair\n",
+            encoding="utf-8",
+        )
+
+        from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
+
+        def _unexpected(*_args, **_kwargs):
+            raise AssertionError("heavy Markdown path should not run for CHANGELOG.md")
+
+        monkeypatch.setattr(MarkdownPlugin, "extract_structure", _unexpected)
+        monkeypatch.setattr(MarkdownPlugin, "chunk_document", _unexpected)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, tmp_path)
+
+        assert result["indexed_files"] == 1
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] == str(changelog.resolve())
+
     def test_index_directory_runs_lexical_then_summaries_then_semantic(self, tmp_path, monkeypatch):
         events = []
         ctx = _make_repo_ctx(sqlite_store=MagicMock(db_path=str(tmp_path / "index.db")))

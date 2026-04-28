@@ -543,16 +543,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.1.0]: https://github.com/ex/pro/releases/tag/v1.1.0
 """
 
-        result = markdown_plugin.extract_symbols(content, "CHANGELOG.md")
+        result = markdown_plugin.indexFile("CHANGELOG.md", content)
+        symbol_names = [symbol["symbol"] for symbol in result["symbols"]]
 
         # Check version extraction
-        versions = [s for s in result.symbols if "[1." in s.name or "[Unreleased]" in s.name]
+        versions = [name for name in symbol_names if "[1." in name or "[Unreleased]" in name]
         assert len(versions) >= 3
 
         # Check change type sections
         change_types = ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"]
         for change_type in change_types:
-            assert any(change_type in s.name for s in result.symbols)
+            assert any(change_type in name for name in symbol_names)
+
+    def test_changelog_bounded_index_preserves_document_and_heading_symbols(self, markdown_plugin):
+        """CHANGELOG.md should stay lexically discoverable on the bounded path."""
+        content = """
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+## [Unreleased]
+
+### Added
+- New semantic staging diagnostics
+
+## [1.2.0] - 2026-04-28
+
+### Fixed
+- Repair changelog lexical timeout handling
+"""
+
+        result = markdown_plugin.indexFile("CHANGELOG.md", content)
+
+        assert result["metadata"]["lightweight_index"] is True
+        assert result["metadata"]["lightweight_reason"] == "changelog_path"
+        assert result["chunks"] == []
+        symbol_names = [symbol["symbol"] for symbol in result["symbols"]]
+        assert "Changelog" in symbol_names
+        assert "[Unreleased]" in symbol_names
+        assert "[1.2.0] - 2026-04-28" in symbol_names
+        assert "Added" in symbol_names
+        assert "Fixed" in symbol_names
 
     def test_large_documentation_site(self, markdown_plugin, sqlite_store):
         """Test handling of large documentation site structure."""
