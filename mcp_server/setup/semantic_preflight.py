@@ -6,10 +6,11 @@ import json
 import os
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from urllib import error, request
 
-from mcp_server.artifacts.semantic_profiles import SemanticProfileRegistry
+from mcp_server.artifacts.semantic_namespace import SemanticNamespaceResolver
+from mcp_server.artifacts.semantic_profiles import SemanticProfile, SemanticProfileRegistry
 from mcp_server.config.settings import Settings
 
 
@@ -39,6 +40,26 @@ class CheckResult:
 
 
 @dataclass(frozen=True)
+class SemanticWriteBlocker:
+    """Structured fail-closed blocker for semantic vector writes."""
+
+    code: str
+    message: str
+    failing_checks: List[Dict[str, Any]]
+    remediation: List[str] = field(default_factory=list)
+    can_write_semantic_vectors: bool = False
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "code": self.code,
+            "message": self.message,
+            "failing_checks": list(self.failing_checks),
+            "remediation": list(self.remediation),
+            "can_write_semantic_vectors": self.can_write_semantic_vectors,
+        }
+
+
+@dataclass(frozen=True)
 class SemanticPreflightReport:
     """Full readiness report for semantic stack usage."""
 
@@ -47,6 +68,10 @@ class SemanticPreflightReport:
     qdrant: CheckResult
     embedding: CheckResult
     profiles: CheckResult
+    enrichment: CheckResult
+    collection: CheckResult
+    can_write_semantic_vectors: bool
+    blocker: Optional[SemanticWriteBlocker] = None
     warnings: List[str] = field(default_factory=list)
     effective_config: Dict[str, Any] = field(default_factory=dict)
 
@@ -68,16 +93,122 @@ class SemanticPreflightReport:
             "qdrant": _check_to_dict(self.qdrant),
             "embedding": _check_to_dict(self.embedding),
             "profiles": _check_to_dict(self.profiles),
+            "enrichment": _check_to_dict(self.enrichment),
+            "collection": _check_to_dict(self.collection),
+            "can_write_semantic_vectors": self.can_write_semantic_vectors,
+            "blocker": None if self.blocker is None else self.blocker.to_dict(),
             "warnings": list(self.warnings),
             "effective_config": dict(self.effective_config),
         }
 
 
-def _http_get_json(url: str, timeout_s: float) -> Dict[str, Any]:
-    req = request.Request(url, method="GET")
+def _http_request_json(
+    url: str,
+    *,
+    timeout_s: float,
+    method: str = "GET",
+    payload: Optional[Dict[str, Any]] = None,
+    headers: Optional[Dict[str, str]] = None,
+) -> Dict[str, Any]:
+    body = None
+    merged_headers = dict(headers or {})
+    if payload is not None:
+        body = json.dumps(payload).encode("utf-8")
+        merged_headers.setdefault("Content-Type", "application/json")
+    req = request.Request(url, data=body, headers=merged_headers, method=method)
     with request.urlopen(req, timeout=timeout_s) as response:
         content = response.read().decode("utf-8")
-    return json.loads(content)
+    return json.loads(content) if content else {}
+
+
+def _http_get_json(url: str, timeout_s: float) -> Dict[str, Any]:
+    return _http_request_json(url, timeout_s=timeout_s, method="GET")
+
+
+def _http_post_json(
+    url: str,
+    payload: Dict[str, Any],
+    *,
+    timeout_s: float,
+    headers: Optional[Dict[str, str]] = None,
+) -> Dict[str, Any]:
+    return _http_request_json(
+        url,
+        timeout_s=timeout_s,
+        method="POST",
+        payload=payload,
+        headers=headers,
+    )
+
+
+def _read_http_error(exc: error.HTTPError) -> Tuple[int, str]:
+    try:
+        body = exc.read().decode("utf-8", errors="replace")
+    except Exception:
+        body = str(exc)
+    return exc.code, body
+
+
+def _redacted_auth_headers(api_key_env: str) -> Dict[str, str]:
+    api_key = os.getenv(api_key_env)
+    if not api_key:
+        return {}
+    return {"Authorization": f"Bearer {api_key}"}
+
+
+def _missing_api_key_result(
+    *,
+    name: str,
+    base_url: str,
+    model: str,
+    api_key_env: str,
+    label: str,
+) -> CheckResult:
+    return CheckResult(
+        name=name,
+        status=ServiceStatus.MISCONFIGURED,
+        message=f"{label} API key env var is missing",
+        details={
+            "base_url": base_url,
+            "model": model,
+            "api_key_env": api_key_env,
+            "api_key_present": False,
+            "failure_class": "missing_api_key_env",
+        },
+        fixes=[
+            f"Set {api_key_env} before running semantic preflight",
+            f"Re-run preflight after exporting the {label.lower()} API key env var",
+        ],
+    )
+
+
+def _build_unavailable_result(
+    *,
+    name: str,
+    message: str,
+    failure_class: str,
+    details: Optional[Dict[str, Any]] = None,
+    fixes: Optional[List[str]] = None,
+) -> CheckResult:
+    return CheckResult(
+        name=name,
+        status=ServiceStatus.MISCONFIGURED,
+        message=message,
+        details={"failure_class": failure_class, **(details or {})},
+        fixes=list(fixes or []),
+    )
+
+
+def _detect_model_failure(body: str) -> Optional[str]:
+    lowered = body.lower()
+    if "model" in lowered and (
+        "not found" in lowered
+        or "does not exist" in lowered
+        or "unsupported" in lowered
+        or "unknown" in lowered
+    ):
+        return "wrong_chat_model"
+    return None
 
 
 def check_qdrant(qdrant_url: str, timeout_s: float = 5.0) -> CheckResult:
@@ -90,14 +221,35 @@ def check_qdrant(qdrant_url: str, timeout_s: float = 5.0) -> CheckResult:
             name="qdrant",
             status=ServiceStatus.READY,
             message="Qdrant is reachable",
-            details={"url": qdrant_url, "collections": len(collections)},
+            details={
+                "url": qdrant_url,
+                "collections": len(collections),
+                "failure_class": None,
+            },
         )
-    except (error.URLError, error.HTTPError, TimeoutError, ValueError, OSError) as exc:
+    except error.HTTPError as exc:
+        status_code, body = _read_http_error(exc)
+        return CheckResult(
+            name="qdrant",
+            status=ServiceStatus.UNREACHABLE,
+            message=f"Qdrant probe failed at {qdrant_url} with HTTP {status_code}",
+            details={
+                "url": qdrant_url,
+                "http_status": status_code,
+                "error": body,
+                "failure_class": "qdrant_unreachable",
+            },
+            fixes=[
+                "Check the Qdrant server health and route",
+                "Or set QDRANT_URL to a reachable server endpoint",
+            ],
+        )
+    except (error.URLError, TimeoutError, ValueError, OSError) as exc:
         return CheckResult(
             name="qdrant",
             status=ServiceStatus.UNREACHABLE,
             message=f"Qdrant is not reachable at {qdrant_url}: {exc}",
-            details={"url": qdrant_url, "error": str(exc)},
+            details={"url": qdrant_url, "error": str(exc), "failure_class": "qdrant_unreachable"},
             fixes=[
                 "Run setup semantic to auto-start local Qdrant via Docker",
                 "Or set QDRANT_URL to a reachable server endpoint",
@@ -116,14 +268,35 @@ def check_openai_compatible(base_url: str, timeout_s: float = 5.0) -> CheckResul
             name="embedding_openai_compatible",
             status=ServiceStatus.READY,
             message="OpenAI-compatible embedding endpoint is reachable",
-            details={"base_url": base_url, "models": model_ids[:5]},
+            details={"base_url": base_url, "models": model_ids[:5], "failure_class": None},
         )
-    except (error.URLError, error.HTTPError, TimeoutError, ValueError, OSError) as exc:
+    except error.HTTPError as exc:
+        status_code, body = _read_http_error(exc)
+        return CheckResult(
+            name="embedding_openai_compatible",
+            status=ServiceStatus.UNREACHABLE,
+            message=f"OpenAI-compatible endpoint probe failed with HTTP {status_code}",
+            details={
+                "base_url": base_url,
+                "http_status": status_code,
+                "error": body,
+                "failure_class": "embedding_endpoint_unreachable",
+            },
+            fixes=[
+                "Verify the embedding endpoint route and auth configuration",
+                "Or point OPENAI_API_BASE to a reachable OpenAI-compatible server",
+            ],
+        )
+    except (error.URLError, TimeoutError, ValueError, OSError) as exc:
         return CheckResult(
             name="embedding_openai_compatible",
             status=ServiceStatus.UNREACHABLE,
             message=f"OpenAI-compatible endpoint is not reachable at {base_url}: {exc}",
-            details={"base_url": base_url, "error": str(exc)},
+            details={
+                "base_url": base_url,
+                "error": str(exc),
+                "failure_class": "embedding_endpoint_unreachable",
+            },
             fixes=[
                 "Start vLLM or another OpenAI-compatible embeddings server",
                 "Or set OPENAI_API_BASE to a reachable endpoint",
@@ -139,13 +312,21 @@ def check_voyage_key_present() -> CheckResult:
             name="embedding_voyage",
             status=ServiceStatus.READY,
             message="Voyage API key is configured",
-            details={"api_key_env": "VOYAGE_API_KEY", "api_key_present": True},
+            details={
+                "api_key_env": "VOYAGE_API_KEY",
+                "api_key_present": True,
+                "failure_class": None,
+            },
         )
     return CheckResult(
         name="embedding_voyage",
         status=ServiceStatus.MISCONFIGURED,
         message="Voyage API key is missing",
-        details={"api_key_env": "VOYAGE_API_KEY", "api_key_present": False},
+        details={
+            "api_key_env": "VOYAGE_API_KEY",
+            "api_key_present": False,
+            "failure_class": "missing_api_key_env",
+        },
         fixes=[
             "Set VOYAGE_API_KEY",
             "Use `op item get` to load the key from 1Password",
@@ -169,6 +350,7 @@ def check_profile_registry(settings: Settings) -> CheckResult:
             details={
                 "default_profile": registry.default_profile,
                 "profiles": profile_ids,
+                "failure_class": None,
             },
         )
     except Exception as exc:
@@ -176,12 +358,455 @@ def check_profile_registry(settings: Settings) -> CheckResult:
             name="semantic_profiles",
             status=ServiceStatus.MISCONFIGURED,
             message=f"Semantic profile configuration is invalid: {exc}",
-            details={"error": str(exc)},
+            details={"error": str(exc), "failure_class": "profile_registry_invalid"},
             fixes=[
                 "Validate code-index-mcp.profiles.yaml syntax and profile IDs",
                 "Validate SEMANTIC_PROFILES_JSON and SEMANTIC_DEFAULT_PROFILE",
             ],
         )
+
+
+def resolve_profile_registry(
+    settings: Settings,
+    profile: Optional[str] = None,
+) -> Tuple[CheckResult, Optional[SemanticProfileRegistry], Optional[SemanticProfile]]:
+    """Return profile validation plus selected semantic profile when possible."""
+    profile_check = check_profile_registry(settings)
+    if not profile_check.ok:
+        return profile_check, None, None
+
+    registry = SemanticProfileRegistry.from_raw(
+        settings.get_semantic_profiles_config(),
+        settings.get_semantic_default_profile(),
+        tool_version=settings.app_version,
+    )
+    selected_profile = registry.get(profile or settings.get_semantic_default_profile())
+    return profile_check, registry, selected_profile
+
+
+def check_enrichment_chat(
+    *,
+    base_url: str,
+    model: str,
+    api_key_env: str,
+    timeout_s: float,
+) -> CheckResult:
+    """Send a minimal chat smoke to the enrichment endpoint."""
+    if not os.getenv(api_key_env):
+        return _missing_api_key_result(
+            name="enrichment_chat",
+            base_url=base_url,
+            model=model,
+            api_key_env=api_key_env,
+            label="Enrichment",
+        )
+
+    try:
+        payload = _http_post_json(
+            base_url.rstrip("/") + "/chat/completions",
+            {
+                "model": model,
+                "messages": [{"role": "user", "content": "semantic preflight smoke"}],
+                "max_tokens": 1,
+            },
+            timeout_s=timeout_s,
+            headers=_redacted_auth_headers(api_key_env),
+        )
+        choices = payload.get("choices") or []
+        if not isinstance(choices, list) or not choices:
+            return _build_unavailable_result(
+                name="enrichment_chat",
+                message="Enrichment endpoint returned no chat choices",
+                failure_class="chat_response_invalid",
+                details={
+                    "base_url": base_url,
+                    "model": model,
+                    "api_key_env": api_key_env,
+                    "api_key_present": True,
+                },
+                fixes=[
+                    "Verify the enrichment proxy implements OpenAI-compatible chat responses",
+                ],
+            )
+        return CheckResult(
+            name="enrichment_chat",
+            status=ServiceStatus.READY,
+            message="Enrichment chat smoke succeeded",
+            details={
+                "base_url": base_url,
+                "model": model,
+                "api_key_env": api_key_env,
+                "api_key_present": True,
+                "response_model": payload.get("model"),
+                "failure_class": None,
+            },
+        )
+    except error.HTTPError as exc:
+        status_code, body = _read_http_error(exc)
+        failure_class = _detect_model_failure(body) or "enrichment_request_rejected"
+        message = (
+            "Enrichment endpoint rejected the configured chat model"
+            if failure_class == "wrong_chat_model"
+            else f"Enrichment endpoint rejected the chat smoke with HTTP {status_code}"
+        )
+        return CheckResult(
+            name="enrichment_chat",
+            status=ServiceStatus.MISCONFIGURED,
+            message=message,
+            details={
+                "base_url": base_url,
+                "model": model,
+                "api_key_env": api_key_env,
+                "api_key_present": True,
+                "http_status": status_code,
+                "error": body,
+                "failure_class": failure_class,
+            },
+            fixes=[
+                "Verify the configured enrichment model exists on the target endpoint",
+                "Or update SEMANTIC_ENRICHMENT_MODEL / profile metadata to a supported chat model",
+            ],
+        )
+    except (error.URLError, TimeoutError, ValueError, OSError) as exc:
+        return CheckResult(
+            name="enrichment_chat",
+            status=ServiceStatus.UNREACHABLE,
+            message=f"Enrichment endpoint is not reachable at {base_url}: {exc}",
+            details={
+                "base_url": base_url,
+                "model": model,
+                "api_key_env": api_key_env,
+                "api_key_present": True,
+                "error": str(exc),
+                "failure_class": "enrichment_endpoint_unreachable",
+            },
+            fixes=[
+                "Start the enrichment proxy or repair its route",
+                "Verify SEMANTIC_ENRICHMENT_BASE_URL points at the active OpenAI-compatible chat endpoint",
+            ],
+        )
+
+
+def check_embedding_smoke(
+    *,
+    base_url: str,
+    model: str,
+    api_key_env: str,
+    expected_dimension: int,
+    timeout_s: float,
+) -> CheckResult:
+    """Send an embedding smoke and verify vector length."""
+    if not os.getenv(api_key_env):
+        return _missing_api_key_result(
+            name="embedding_vector",
+            base_url=base_url,
+            model=model,
+            api_key_env=api_key_env,
+            label="Embedding",
+        )
+
+    try:
+        payload = _http_post_json(
+            base_url.rstrip("/") + "/embeddings",
+            {
+                "model": model,
+                "input": ["semantic preflight smoke"],
+            },
+            timeout_s=timeout_s,
+            headers=_redacted_auth_headers(api_key_env),
+        )
+        data = payload.get("data") or []
+        if not isinstance(data, list) or not data:
+            return _build_unavailable_result(
+                name="embedding_vector",
+                message="Embedding endpoint returned no vectors",
+                failure_class="embedding_response_invalid",
+                details={
+                    "base_url": base_url,
+                    "model": model,
+                    "api_key_env": api_key_env,
+                    "api_key_present": True,
+                    "expected_dimension": expected_dimension,
+                },
+                fixes=[
+                    "Verify the embedding endpoint implements OpenAI-compatible embeddings responses",
+                ],
+            )
+        embedding = data[0].get("embedding") if isinstance(data[0], dict) else None
+        actual_dimension = len(embedding) if isinstance(embedding, list) else None
+        if actual_dimension != expected_dimension:
+            return CheckResult(
+                name="embedding_vector",
+                status=ServiceStatus.MISCONFIGURED,
+                message=(
+                    "Embedding dimension mismatch: "
+                    f"expected {expected_dimension}, got {actual_dimension}"
+                ),
+                details={
+                    "base_url": base_url,
+                    "model": model,
+                    "api_key_env": api_key_env,
+                    "api_key_present": True,
+                    "expected_dimension": expected_dimension,
+                    "actual_dimension": actual_dimension,
+                    "failure_class": "embedding_dimension_mismatch",
+                },
+                fixes=[
+                    "Point the profile at an embedding model with the expected vector dimension",
+                    "Or update the semantic profile vector_dimension to match the model you intend to use",
+                ],
+            )
+        return CheckResult(
+            name="embedding_vector",
+            status=ServiceStatus.READY,
+            message="Embedding smoke succeeded",
+            details={
+                "base_url": base_url,
+                "model": model,
+                "api_key_env": api_key_env,
+                "api_key_present": True,
+                "expected_dimension": expected_dimension,
+                "actual_dimension": actual_dimension,
+                "failure_class": None,
+            },
+        )
+    except error.HTTPError as exc:
+        status_code, body = _read_http_error(exc)
+        return CheckResult(
+            name="embedding_vector",
+            status=ServiceStatus.MISCONFIGURED,
+            message=f"Embedding endpoint rejected the smoke request with HTTP {status_code}",
+            details={
+                "base_url": base_url,
+                "model": model,
+                "api_key_env": api_key_env,
+                "api_key_present": True,
+                "expected_dimension": expected_dimension,
+                "http_status": status_code,
+                "error": body,
+                "failure_class": "embedding_request_rejected",
+            },
+            fixes=[
+                "Verify the configured embedding model and endpoint route",
+                "Confirm the endpoint accepts OpenAI-compatible embedding requests",
+            ],
+        )
+    except (error.URLError, TimeoutError, ValueError, OSError) as exc:
+        return CheckResult(
+            name="embedding_vector",
+            status=ServiceStatus.UNREACHABLE,
+            message=f"Embedding endpoint is not reachable at {base_url}: {exc}",
+            details={
+                "base_url": base_url,
+                "model": model,
+                "api_key_env": api_key_env,
+                "api_key_present": True,
+                "expected_dimension": expected_dimension,
+                "error": str(exc),
+                "failure_class": "embedding_endpoint_unreachable",
+            },
+            fixes=[
+                "Start the embedding endpoint or repair its route",
+                "Verify SEMANTIC_EMBEDDING_BASE_URL points at the active embeddings endpoint",
+            ],
+        )
+
+
+def check_qdrant_collection(
+    *,
+    qdrant_url: str,
+    collection_name: str,
+    expected_dimension: int,
+    expected_distance: str,
+    timeout_s: float,
+    namespace_resolver: Optional[SemanticNamespaceResolver] = None,
+) -> CheckResult:
+    """Validate Qdrant collection identity and vector shape without mutating it."""
+    resolver = namespace_resolver or SemanticNamespaceResolver()
+    normalized_collection = resolver.normalize_collection_name(collection_name)
+    try:
+        payload = _http_get_json(
+            qdrant_url.rstrip("/") + f"/collections/{collection_name}",
+            timeout_s=timeout_s,
+        )
+        result = payload.get("result") or {}
+        vectors = (((result.get("config") or {}).get("params") or {}).get("vectors")) or {}
+        if isinstance(vectors, dict) and "size" not in vectors and len(vectors) == 1:
+            vectors = next(iter(vectors.values()))
+
+        actual_dimension = vectors.get("size") if isinstance(vectors, dict) else None
+        actual_distance = (
+            resolver.normalize_distance_metric(vectors.get("distance"))
+            if isinstance(vectors, dict)
+            else None
+        )
+        if actual_dimension != expected_dimension or actual_distance != resolver.normalize_distance_metric(
+            expected_distance
+        ):
+            return CheckResult(
+                name="qdrant_collection",
+                status=ServiceStatus.MISCONFIGURED,
+                message="Qdrant collection shape does not match the active profile",
+                details={
+                    "qdrant_url": qdrant_url,
+                    "collection_name": collection_name,
+                    "normalized_collection_name": normalized_collection,
+                    "expected_dimension": expected_dimension,
+                    "actual_dimension": actual_dimension,
+                    "expected_distance_metric": resolver.normalize_distance_metric(
+                        expected_distance
+                    ),
+                    "actual_distance_metric": actual_distance,
+                    "failure_class": "collection_shape_mismatch",
+                },
+                fixes=[
+                    "Rebuild or recreate the semantic collection with the active profile settings",
+                    "Confirm the selected profile targets the intended collection namespace",
+                ],
+            )
+        return CheckResult(
+            name="qdrant_collection",
+            status=ServiceStatus.READY,
+            message="Qdrant collection matches the active profile",
+            details={
+                "qdrant_url": qdrant_url,
+                "collection_name": collection_name,
+                "normalized_collection_name": normalized_collection,
+                "expected_dimension": expected_dimension,
+                "actual_dimension": actual_dimension,
+                "expected_distance_metric": resolver.normalize_distance_metric(expected_distance),
+                "actual_distance_metric": actual_distance,
+                "failure_class": None,
+            },
+        )
+    except error.HTTPError as exc:
+        status_code, body = _read_http_error(exc)
+        if status_code == 404:
+            return CheckResult(
+                name="qdrant_collection",
+                status=ServiceStatus.MISCONFIGURED,
+                message="Qdrant collection is missing for the active semantic profile",
+                details={
+                    "qdrant_url": qdrant_url,
+                    "collection_name": collection_name,
+                    "normalized_collection_name": normalized_collection,
+                    "expected_dimension": expected_dimension,
+                    "expected_distance_metric": resolver.normalize_distance_metric(
+                        expected_distance
+                    ),
+                    "http_status": status_code,
+                    "error": body,
+                    "failure_class": "collection_missing",
+                },
+                fixes=[
+                    "Create or hydrate the expected semantic collection before vector writes",
+                    "Confirm the selected profile namespace resolves to the intended collection",
+                ],
+            )
+        return CheckResult(
+            name="qdrant_collection",
+            status=ServiceStatus.UNREACHABLE,
+            message=f"Qdrant collection probe failed with HTTP {status_code}",
+            details={
+                "qdrant_url": qdrant_url,
+                "collection_name": collection_name,
+                "normalized_collection_name": normalized_collection,
+                "http_status": status_code,
+                "error": body,
+                "failure_class": "qdrant_unreachable",
+            },
+            fixes=[
+                "Check Qdrant server health and permissions",
+                "Retry once the Qdrant API is reachable",
+            ],
+        )
+    except (error.URLError, TimeoutError, ValueError, OSError) as exc:
+        return CheckResult(
+            name="qdrant_collection",
+            status=ServiceStatus.UNREACHABLE,
+            message=f"Qdrant collection is not reachable at {qdrant_url}: {exc}",
+            details={
+                "qdrant_url": qdrant_url,
+                "collection_name": collection_name,
+                "normalized_collection_name": normalized_collection,
+                "error": str(exc),
+                "failure_class": "qdrant_unreachable",
+            },
+            fixes=[
+                "Run setup semantic to auto-start local Qdrant via Docker",
+                "Or set QDRANT_URL to a reachable server endpoint",
+            ],
+        )
+
+
+def _disabled_report(strict: bool) -> SemanticPreflightReport:
+    disabled = CheckResult(
+        name="semantic",
+        status=ServiceStatus.DISABLED,
+        message="Semantic search is disabled (SEMANTIC_SEARCH_ENABLED=false)",
+    )
+    blocker = SemanticWriteBlocker(
+        code="semantic_disabled",
+        message="Semantic vector writes are disabled until semantic search is enabled.",
+        failing_checks=[
+            {
+                "name": "semantic",
+                "status": disabled.status.value,
+                "message": disabled.message,
+                "failure_class": "semantic_disabled",
+            }
+        ],
+        remediation=["Enable SEMANTIC_SEARCH_ENABLED=true to initialize semantic search"],
+        can_write_semantic_vectors=False,
+    )
+    return SemanticPreflightReport(
+        overall_ready=False,
+        strict_mode=strict,
+        qdrant=disabled,
+        embedding=disabled,
+        profiles=disabled,
+        enrichment=disabled,
+        collection=disabled,
+        can_write_semantic_vectors=False,
+        blocker=blocker,
+        warnings=["Enable SEMANTIC_SEARCH_ENABLED=true to initialize semantic search"],
+        effective_config={
+            "semantic_enabled": False,
+            "strict_mode": strict,
+        },
+    )
+
+
+def _build_semantic_write_blocker(checks: List[CheckResult]) -> Optional[SemanticWriteBlocker]:
+    failing_checks = [check for check in checks if not check.ok]
+    if not failing_checks:
+        return None
+
+    primary = failing_checks[0]
+    failing_payload = [
+        {
+            "name": check.name,
+            "status": check.status.value,
+            "message": check.message,
+            "failure_class": check.details.get("failure_class"),
+        }
+        for check in failing_checks
+    ]
+    remediation: List[str] = []
+    seen = set()
+    for check in failing_checks:
+        for fix in check.fixes:
+            if fix not in seen:
+                remediation.append(fix)
+                seen.add(fix)
+    blocker_code = str(primary.details.get("failure_class") or primary.status.value)
+    return SemanticWriteBlocker(
+        code=blocker_code,
+        message=primary.message,
+        failing_checks=failing_payload,
+        remediation=remediation,
+        can_write_semantic_vectors=False,
+    )
 
 
 def run_semantic_preflight(
@@ -195,62 +820,121 @@ def run_semantic_preflight(
         timeout_s if timeout_s is not None else settings.semantic_preflight_timeout_seconds
     )
     if not settings.semantic_search_enabled:
-        disabled = CheckResult(
-            name="semantic",
-            status=ServiceStatus.DISABLED,
-            message="Semantic search is disabled (SEMANTIC_SEARCH_ENABLED=false)",
+        return _disabled_report(strict)
+
+    profile_check, _, selected_profile = resolve_profile_registry(settings, profile=profile)
+    namespace_resolver = SemanticNamespaceResolver()
+
+    selected_profile_id = profile or settings.get_semantic_default_profile()
+    provider = ""
+    embedding_base = ""
+    embedding_model = ""
+    embedding_api_key_env = "OPENAI_API_KEY"
+    enrichment_base = ""
+    enrichment_model = ""
+    enrichment_api_key_env = "OPENAI_API_KEY"
+    collection_name = settings.semantic_collection_name
+    vector_dimension = None
+    distance_metric = None
+
+    if selected_profile is not None:
+        provider = str(selected_profile.provider).lower()
+        build_metadata = selected_profile.build_metadata or {}
+        embedding_base = str(
+            build_metadata.get("embedding_api_base")
+            or build_metadata.get("openai_api_base")
+            or settings.openai_api_base
+            or "http://localhost:8001/v1"
         )
-        return SemanticPreflightReport(
-            overall_ready=False,
-            strict_mode=strict,
-            qdrant=disabled,
-            embedding=disabled,
-            profiles=disabled,
-            warnings=["Enable SEMANTIC_SEARCH_ENABLED=true to initialize semantic search"],
-            effective_config={
-                "semantic_enabled": False,
-                "strict_mode": strict,
-            },
+        embedding_model = str(build_metadata.get("embedding_model_name") or selected_profile.model_name)
+        embedding_api_key_env = str(
+            build_metadata.get("embedding_api_key_env")
+            or build_metadata.get("openai_api_key_env")
+            or "OPENAI_API_KEY"
         )
+        enrichment_base = str(build_metadata.get("enrichment_api_base") or "")
+        enrichment_model = str(build_metadata.get("enrichment_model_name") or "")
+        enrichment_api_key_env = str(
+            build_metadata.get("enrichment_api_key_env") or embedding_api_key_env
+        )
+        collection_name = str(build_metadata.get("collection_name") or settings.semantic_collection_name)
+        vector_dimension = int(selected_profile.vector_dimension)
+        distance_metric = str(selected_profile.distance_metric)
 
-    profile_check = check_profile_registry(settings)
-
-    selected_profile = profile or settings.get_semantic_default_profile()
-    profile_payload = settings.get_semantic_profiles_config().get(selected_profile, {})
-    provider = str(profile_payload.get("provider", "voyage")).lower()
-    build_metadata = profile_payload.get("build_metadata") or {}
-    embedding_base = str(
-        build_metadata.get("embedding_api_base")
-        or build_metadata.get("openai_api_base")
-        or settings.openai_api_base
-        or "http://localhost:8001/v1"
-    )
-    embedding_model = str(
-        build_metadata.get("embedding_model_name") or profile_payload.get("model_name") or ""
-    )
-    embedding_api_key_env = str(
-        build_metadata.get("embedding_api_key_env")
-        or build_metadata.get("openai_api_key_env")
-        or "OPENAI_API_KEY"
-    )
-    enrichment_base = str(build_metadata.get("enrichment_api_base") or "")
-    enrichment_model = str(build_metadata.get("enrichment_model_name") or "")
-    enrichment_api_key_env = str(
-        build_metadata.get("enrichment_api_key_env") or embedding_api_key_env
-    )
-
-    if provider in {"openai_compatible", "openai-compatible", "openai", "qwen", "vllm"}:
-        embedding_check = check_openai_compatible(embedding_base, timeout_s=timeout)
+    if not profile_check.ok or selected_profile is None:
+        enrichment_check = _build_unavailable_result(
+            name="enrichment_chat",
+            message="Enrichment chat smoke is unavailable until semantic profiles validate",
+            failure_class="profile_registry_invalid",
+            fixes=["Repair semantic profile configuration before re-running preflight"],
+        )
+        embedding_check = _build_unavailable_result(
+            name="embedding_vector",
+            message="Embedding smoke is unavailable until semantic profiles validate",
+            failure_class="profile_registry_invalid",
+            fixes=["Repair semantic profile configuration before re-running preflight"],
+        )
+        qdrant_url = os.getenv(
+            "QDRANT_URL", f"http://{settings.qdrant_host}:{settings.qdrant_port}"
+        )
+        qdrant_check = check_qdrant(qdrant_url, timeout_s=timeout)
+        collection_check = _build_unavailable_result(
+            name="qdrant_collection",
+            message="Qdrant collection validation is unavailable until semantic profiles validate",
+            failure_class="profile_registry_invalid",
+            fixes=["Repair semantic profile configuration before re-running preflight"],
+        )
     else:
-        embedding_check = check_voyage_key_present()
+        if provider in {"openai_compatible", "openai-compatible", "openai", "qwen", "vllm"}:
+            embedding_check = check_embedding_smoke(
+                base_url=embedding_base,
+                model=embedding_model,
+                api_key_env=embedding_api_key_env,
+                expected_dimension=int(vector_dimension or 0),
+                timeout_s=timeout,
+            )
+        else:
+            embedding_check = check_voyage_key_present()
 
-    qdrant_url = os.getenv("QDRANT_URL", f"http://{settings.qdrant_host}:{settings.qdrant_port}")
-    qdrant_check = check_qdrant(qdrant_url, timeout_s=timeout)
+        enrichment_check = check_enrichment_chat(
+            base_url=enrichment_base,
+            model=enrichment_model,
+            api_key_env=enrichment_api_key_env,
+            timeout_s=timeout,
+        )
+        qdrant_url = os.getenv(
+            "QDRANT_URL", f"http://{settings.qdrant_host}:{settings.qdrant_port}"
+        )
+        qdrant_check = check_qdrant(qdrant_url, timeout_s=timeout)
+        if qdrant_check.ok:
+            collection_check = check_qdrant_collection(
+                qdrant_url=qdrant_url,
+                collection_name=collection_name,
+                expected_dimension=int(vector_dimension or 0),
+                expected_distance=str(distance_metric or "cosine"),
+                timeout_s=timeout,
+                namespace_resolver=namespace_resolver,
+            )
+        else:
+            collection_check = CheckResult(
+                name="qdrant_collection",
+                status=ServiceStatus.UNREACHABLE,
+                message="Qdrant collection validation skipped because Qdrant is unreachable",
+                details={
+                    "qdrant_url": qdrant_url,
+                    "collection_name": collection_name,
+                    "normalized_collection_name": namespace_resolver.normalize_collection_name(
+                        collection_name
+                    ),
+                    "failure_class": "qdrant_unreachable",
+                },
+                fixes=list(qdrant_check.fixes),
+            )
 
-    warnings: List[str] = []
-    for check in [profile_check, embedding_check, qdrant_check]:
-        if not check.ok:
-            warnings.append(check.message)
+    checks = [profile_check, enrichment_check, embedding_check, qdrant_check, collection_check]
+    blocker = _build_semantic_write_blocker(checks)
+    can_write_semantic_vectors = blocker is None
+    warnings: List[str] = [check.message for check in checks if not check.ok]
 
     try:
         import flashrank  # noqa: F401
@@ -260,22 +944,31 @@ def run_semantic_preflight(
             "Install with: pip install flashrank  (or pip install -r requirements-semantic.txt)"
         )
 
-    overall_ready = all(check.ok for check in [profile_check, embedding_check, qdrant_check])
-    if strict and not overall_ready:
-        warnings.append("Strict semantic mode enabled: startup/setup should fail until checks pass")
+    if strict and not can_write_semantic_vectors:
+        warnings.append("Strict semantic mode enabled: semantic vector writes remain fail-closed")
 
     return SemanticPreflightReport(
-        overall_ready=overall_ready,
+        overall_ready=all(check.ok for check in checks),
         strict_mode=strict,
         qdrant=qdrant_check,
         embedding=embedding_check,
         profiles=profile_check,
+        enrichment=enrichment_check,
+        collection=collection_check,
+        can_write_semantic_vectors=can_write_semantic_vectors,
+        blocker=blocker,
         warnings=warnings,
         effective_config={
             "semantic_enabled": settings.semantic_search_enabled,
-            "selected_profile": selected_profile,
+            "selected_profile": selected_profile_id,
             "provider": provider,
             "qdrant_url": qdrant_url,
+            "vector_dimension": vector_dimension,
+            "distance_metric": namespace_resolver.normalize_distance_metric(distance_metric),
+            "collection_name": collection_name,
+            "normalized_collection_name": namespace_resolver.normalize_collection_name(
+                collection_name
+            ),
             "embedding": {
                 "base_url": embedding_base,
                 "model": embedding_model,

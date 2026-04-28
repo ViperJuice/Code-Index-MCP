@@ -23,11 +23,13 @@
 
 1. Validates semantic profile configuration.
 2. Resolves the selected/default profile's embedding and enrichment metadata.
-3. Checks embedding provider readiness for the selected/default profile.
+3. Sends an enrichment chat smoke using the configured chat model.
+4. Sends an embedding smoke and checks vector dimension against the active profile.
+5. Validates Qdrant collection existence, namespace identity, vector dimension, and distance metric.
 4. Reports redacted API-key env-var names and presence for both enrichment and embedding.
-5. Checks Qdrant reachability.
-6. If Qdrant is down and autostart is enabled, starts Qdrant via Docker Compose.
-7. Prints actionable status and next steps.
+6. Checks Qdrant reachability.
+7. If Qdrant is down and autostart is enabled, starts Qdrant via Docker Compose.
+8. Prints actionable status, a structured blocker when semantic vector writes are blocked, and next steps.
 
 For the default `oss_high` profile, the docs contract is:
 
@@ -40,4 +42,17 @@ For the default `oss_high` profile, the docs contract is:
 ### Exit Semantics
 
 - Non-strict mode: command can succeed with warnings.
-- Strict mode: command fails when preflight is not fully ready.
+- Strict mode: command fails when the structured blocker says semantic vector writes are not allowed.
+
+## `mcp-index index check-semantic`
+
+`mcp-index index check-semantic`
+
+This command renders the same active-profile semantic preflight contract as
+`setup semantic` without running a full index. It reports:
+
+- enrichment chat smoke status
+- embedding vector dimension validation
+- Qdrant collection validation
+- metadata-only API-key presence
+- the structured blocker and whether the active profile can write semantic vectors

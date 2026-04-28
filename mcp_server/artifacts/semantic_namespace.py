@@ -62,6 +62,26 @@ class SemanticNamespaceResolver:
         normalized = collection_name.strip().lower()
         return normalized or None
 
+    def normalize_distance_metric(self, metric: Optional[object]) -> Optional[str]:
+        """Normalize distance metric identifiers for deterministic comparisons."""
+        if metric is None:
+            return None
+        value = getattr(metric, "value", metric)
+        if not isinstance(value, str):
+            value = str(value)
+        normalized = value.strip().lower()
+        if not normalized:
+            return None
+        aliases = {
+            "cosine": "cosine",
+            "dot": "dot",
+            "dotproduct": "dot",
+            "euclid": "euclidean",
+            "euclidean": "euclidean",
+            "manhattan": "manhattan",
+        }
+        return aliases.get(normalized, normalized)
+
     def normalize_endpoint_identity(self, endpoint: Optional[str]) -> Optional[str]:
         """Normalize endpoint identity without probing network state."""
         if not isinstance(endpoint, str):

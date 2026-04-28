@@ -92,6 +92,7 @@ def build_health_row(
     readiness: Optional[RepositoryReadiness] = None,
     features: Optional[dict] = None,
     semantic_readiness: Optional[SemanticReadiness] = None,
+    semantic_preflight: Optional[dict] = None,
 ) -> dict:
     if readiness is None:
         readiness = ReadinessClassifier.classify_registered(repo_info)
@@ -130,6 +131,20 @@ def build_health_row(
             "runtime_status": runtime_status,
             "runtime_reason": runtime_reason,
             "readiness": semantic_readiness.to_dict(),
+            "preflight": semantic_preflight
+            or {
+                "overall_ready": False,
+                "can_write_semantic_vectors": False,
+                "blocker": {
+                    "code": "runtime_preflight_unavailable",
+                    "message": "Active-profile semantic preflight has not been computed for this status surface.",
+                    "failing_checks": [],
+                    "remediation": [
+                        "Run `setup semantic` or `mcp-index index check-semantic` for the active profile.",
+                    ],
+                    "can_write_semantic_vectors": False,
+                },
+            },
         }
     )
     base_features["semantic"] = semantic_feature

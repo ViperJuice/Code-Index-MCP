@@ -159,6 +159,28 @@ class TestBuildHealthRow:
         row = build_health_row(info)
         assert row["last_indexed_commit"] is None
 
+    def test_semantic_preflight_is_additive_runtime_metadata(self, tmp_path):
+        from mcp_server.health.repo_status import build_health_row
+
+        info = make_repo_info(tmp_path)
+        row = build_health_row(
+            info,
+            semantic_preflight={
+                "overall_ready": False,
+                "can_write_semantic_vectors": False,
+                "blocker": {
+                    "code": "collection_missing",
+                    "message": "Qdrant collection is missing for the active semantic profile",
+                    "failing_checks": [],
+                    "remediation": ["Create the expected collection"],
+                    "can_write_semantic_vectors": False,
+                },
+            },
+        )
+        semantic_feature = row["features"]["semantic"]
+        assert semantic_feature["preflight"]["overall_ready"] is False
+        assert semantic_feature["preflight"]["blocker"]["code"] == "collection_missing"
+
 
 # ---------------------------------------------------------------------------
 # stdio handle_get_status includes repositories

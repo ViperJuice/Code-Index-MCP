@@ -32,6 +32,9 @@ python scripts/cli/mcp_cli.py setup semantic
 ```
 
 The command performs preflight checks and, by default, starts local Qdrant if it is not reachable.
+For the active profile, the preflight is fail-closed: it can block semantic
+vector writes before `SEMPIPE` if chat reachability, embedding dimension, or
+collection shape do not match the configured contract.
 
 ## Where Settings Live
 
@@ -88,6 +91,25 @@ curl http://ai:8002/v1/models   # oss_high enrichment proxy
 curl http://ai:8001/v1/models   # oss_high embedding endpoint
 ```
 
+## What Preflight Proves
+
+`setup semantic` and `mcp-index index check-semantic` now perform a semantic
+preflight for the active profile that stays read-only with respect to summaries
+and vectors:
+
+- an enrichment chat smoke sends a redacted OpenAI-compatible chat request to
+  the selected enrichment endpoint using the configured chat model
+- an embedding smoke verifies the returned vector dimension matches the active
+  profile
+- a Qdrant collection check verifies collection existence, namespace identity,
+  vector dimension, and distance metric without creating or mutating the
+  collection
+- API-key reporting remains metadata-only: env-var name plus presence boolean,
+  never the secret value
+- when any check fails, the command emits a structured blocker, semantic vector
+  writes remain fail-closed until remediation is complete, and the phase stays
+  read-only with respect to summaries and vectors
+
 ## Default `oss_high` Layout
 
 - Enrichment uses `${SEMANTIC_ENRICHMENT_BASE_URL:http://ai:8002/v1}` with
@@ -117,8 +139,12 @@ curl http://ai:8001/v1/models   # oss_high embedding endpoint
 - OpenAI-compatible endpoint unreachable
   - check the selected profile's enrichment or embedding host/port
   - verify `SEMANTIC_ENRICHMENT_BASE_URL` and `SEMANTIC_EMBEDDING_BASE_URL`
+- Wrong chat model or blocked semantic writes
+  - verify `SEMANTIC_ENRICHMENT_MODEL` matches a model served by the enrichment endpoint
+  - rerun `setup semantic --json` to inspect the structured blocker and remediation
 - Voyage provider failing
   - verify `VOYAGE_API_KEY`
 - Preflight output
   - `setup semantic --json` reports resolved enrichment and embedding endpoints separately
+  - preflight reports collection validation, vector dimension checks, and whether it can write semantic vectors
   - API-key reporting is metadata-only: env-var name plus presence boolean, never the secret value

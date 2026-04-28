@@ -16,9 +16,11 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from mcp_server.artifacts.commit_artifacts import CommitArtifactManager  # noqa: E402
+from mcp_server.config.settings import reload_settings  # noqa: E402
 from mcp_server.core.repo_resolver import RepoResolver  # noqa: E402
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher  # noqa: E402
 from mcp_server.health.repo_status import build_health_row  # noqa: E402
+from mcp_server.setup.semantic_preflight import run_semantic_preflight  # noqa: E402
 from mcp_server.storage.git_index_manager import GitAwareIndexManager  # noqa: E402
 from mcp_server.storage.repository_registry import (  # noqa: E402
     MultipleWorktreesUnsupportedError,
@@ -368,6 +370,14 @@ def status(repo_id: Optional[str]):
             click.echo(click.style(f"✗ {status['error']}", fg="red"), err=True)
             sys.exit(1)
 
+        settings = reload_settings()
+        semantic_preflight = run_semantic_preflight(
+            settings=settings,
+            profile=settings.get_semantic_default_profile(),
+            strict=settings.semantic_strict_mode,
+        ).to_dict()
+        status["features"]["semantic"]["preflight"] = semantic_preflight
+
         # Display status
         click.echo(f"Repository: {status['name']}")
         click.echo(f"Path: {status['path']}")
@@ -401,6 +411,22 @@ def status(repo_id: Optional[str]):
             click.echo(click.style("  No index found", fg="yellow"))
         if status.get("staleness_reason"):
             click.echo(f"  Staleness reason: {status['staleness_reason']}")
+
+        semantic_preflight = status["features"]["semantic"].get("preflight") or {}
+        blocker = semantic_preflight.get("blocker") or {}
+        click.echo("\nSemantic Preflight:")
+        click.echo(
+            "  Active-profile preflight: "
+            + ("ready" if semantic_preflight.get("overall_ready") else "blocked")
+        )
+        click.echo(
+            "  Can write semantic vectors: "
+            + ("yes" if semantic_preflight.get("can_write_semantic_vectors") else "no")
+        )
+        if blocker:
+            click.echo(f"  Blocker: {blocker.get('code')} - {blocker.get('message')}")
+            for fix in blocker.get("remediation") or []:
+                click.echo(f"  Remediation: {fix}")
 
         # Settings
         click.echo("\nSettings:")

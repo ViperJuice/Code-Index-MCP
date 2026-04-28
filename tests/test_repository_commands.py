@@ -1,6 +1,7 @@
 import sqlite3
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 from click.testing import CliRunner
 
@@ -222,12 +223,46 @@ def test_status_reports_rollout_and_query_surfaces(monkeypatch, tmp_path: Path):
                 "query_status": "index_unavailable",
                 "query_remediation": 'Use native search or follow the readiness remediation; query tools stay fail-closed with safe_fallback: "native_search".',
                 "staleness_reason": "partial_index_failure",
+                "features": {
+                    "semantic": {
+                        "preflight": {
+                            "overall_ready": False,
+                            "can_write_semantic_vectors": False,
+                            "blocker": {
+                                "code": "collection_missing",
+                                "message": "Qdrant collection is missing for the active semantic profile",
+                                "remediation": ["Create the expected collection"],
+                            },
+                        }
+                    }
+                },
             }
 
     monkeypatch.setattr("mcp_server.cli.repository_commands.RepositoryRegistry", FakeRegistry)
     monkeypatch.setattr("mcp_server.cli.repository_commands.StoreRegistry", FakeStoreRegistry)
     monkeypatch.setattr("mcp_server.cli.repository_commands.RepoResolver", FakeRepoResolver)
     monkeypatch.setattr("mcp_server.cli.repository_commands.GitAwareIndexManager", FakeIndexManager)
+    monkeypatch.setattr(
+        "mcp_server.cli.repository_commands.reload_settings",
+        lambda: SimpleNamespace(
+            get_semantic_default_profile=lambda: "oss_high",
+            semantic_strict_mode=False,
+        ),
+    )
+    monkeypatch.setattr(
+        "mcp_server.cli.repository_commands.run_semantic_preflight",
+        lambda **kwargs: SimpleNamespace(
+            to_dict=lambda: {
+                "overall_ready": False,
+                "can_write_semantic_vectors": False,
+                "blocker": {
+                    "code": "collection_missing",
+                    "message": "Qdrant collection is missing for the active semantic profile",
+                    "remediation": ["Create the expected collection"],
+                },
+            }
+        ),
+    )
 
     result = runner.invoke(repository, ["status"])
 
@@ -236,3 +271,6 @@ def test_status_reports_rollout_and_query_surfaces(monkeypatch, tmp_path: Path):
     assert "Query surface: index_unavailable" in result.output
     assert 'safe_fallback: "native_search"' in result.output
     assert "Artifact health: ready" in result.output
+    assert "Semantic Preflight:" in result.output
+    assert "Can write semantic vectors: no" in result.output
+    assert "collection_missing" in result.output

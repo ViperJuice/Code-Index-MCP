@@ -625,17 +625,35 @@ def check_semantic():
     click.echo("Semantic Search Configuration Check")
     click.echo("=" * 40)
     click.echo(f"Overall ready: {'✅' if report.overall_ready else '❌'}")
+    click.echo(
+        "Can write semantic vectors: "
+        + ("✅" if report.can_write_semantic_vectors else "❌")
+    )
     click.echo(f"Profiles: {report.profiles.status.value} - {report.profiles.message}")
+    click.echo(f"Enrichment: {report.enrichment.status.value} - {report.enrichment.message}")
     click.echo(f"Embedding: {report.embedding.status.value} - {report.embedding.message}")
     click.echo(f"Qdrant: {report.qdrant.status.value} - {report.qdrant.message}")
+    click.echo(f"Collection: {report.collection.status.value} - {report.collection.message}")
 
     if report.warnings:
         click.echo("\nWarnings:")
         for warning in report.warnings:
             click.echo(f"- {warning}")
 
+    if report.blocker is not None:
+        click.echo("\nSemantic write blocker:")
+        click.echo(f"  Code: {report.blocker.code}")
+        click.echo(f"  Reason: {report.blocker.message}")
+        if report.blocker.remediation:
+            click.echo("  Remediation:")
+            for fix in report.blocker.remediation:
+                click.echo(f"  - {fix}")
+
     click.echo("\nEffective config:")
-    click.echo(json.dumps(report.effective_config, indent=2))
+    click.echo(json.dumps(report.to_dict()["effective_config"], indent=2))
+
+    if report.strict_mode and not report.can_write_semantic_vectors:
+        raise click.ClickException("Strict semantic preflight failed")
 
 
 if __name__ == "__main__":

@@ -111,10 +111,20 @@ def setup_semantic(
         click.echo("Semantic Setup Report")
         click.echo("=" * 22)
         click.echo(f"Overall ready: {'yes' if report.overall_ready else 'no'}")
+        click.echo(
+            "Can write semantic vectors: "
+            + ("yes" if report.can_write_semantic_vectors else "no")
+        )
         click.echo(f"Strict mode: {'on' if report.strict_mode else 'off'}")
         click.echo(f"Profile check: {report.profiles.status.value} ({report.profiles.message})")
+        click.echo(
+            f"Enrichment smoke: {report.enrichment.status.value} ({report.enrichment.message})"
+        )
         click.echo(f"Embedding check: {report.embedding.status.value} ({report.embedding.message})")
         click.echo(f"Qdrant check: {report.qdrant.status.value} ({report.qdrant.message})")
+        click.echo(
+            f"Collection check: {report.collection.status.value} ({report.collection.message})"
+        )
 
         if qdrant_start is not None:
             click.echo(f"Qdrant autostart: {qdrant_start.message}")
@@ -124,10 +134,23 @@ def setup_semantic(
             for warning in report.warnings:
                 click.echo(f"- {warning}")
 
-        if not report.overall_ready:
-            click.echo("Next steps:")
-            click.echo("- Verify OPENAI_API_BASE or VOYAGE_API_KEY for the selected profile")
-            click.echo("- Ensure QDRANT_URL is reachable or rerun setup with autostart enabled")
+        if report.blocker is not None:
+            click.echo("Semantic write blocker:")
+            click.echo(f"- Code: {report.blocker.code}")
+            click.echo(f"- Reason: {report.blocker.message}")
+            if report.blocker.remediation:
+                click.echo("- Remediation:")
+                for item in report.blocker.remediation:
+                    click.echo(f"  - {item}")
 
-    if strict and not report.overall_ready:
+        if not report.can_write_semantic_vectors:
+            click.echo("Next steps:")
+            click.echo(
+                "- Verify the selected profile's enrichment and embedding endpoints, models, and API-key env vars"
+            )
+            click.echo(
+                "- Ensure QDRANT_URL is reachable and the expected collection shape matches the active profile"
+            )
+
+    if strict and not report.can_write_semantic_vectors:
         raise click.ClickException("Strict semantic setup failed")
