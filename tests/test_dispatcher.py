@@ -1239,6 +1239,108 @@ class TestEnhancedDispatcherProtocolConformance:
         assert result["semantic_stage"] == "blocked_missing_summaries"
         assert result["semantic_blocked"] == 1
 
+    def test_index_directory_bootstraps_missing_collection_before_semantic_writes(
+        self, tmp_path, monkeypatch
+    ):
+        events = []
+        ctx = _make_repo_ctx(sqlite_store=MagicMock(db_path=str(tmp_path / "index.db")))
+        target = tmp_path / "sample.py"
+        target.write_text("x = 1\n")
+
+        class FakeWriter:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def process_scope(self, **kwargs):
+                return SimpleNamespace(
+                    summaries_written=1,
+                    chunks_attempted=1,
+                    authoritative_chunks=1,
+                    missing_chunk_ids=[],
+                    files_attempted=1,
+                    files_summarized=1,
+                )
+
+        preflight_calls = {"count": 0}
+
+        def _fake_preflight(**_kwargs):
+            preflight_calls["count"] += 1
+            if preflight_calls["count"] == 1:
+                payload = {
+                    "overall_ready": False,
+                    "can_write_semantic_vectors": False,
+                    "blocker": {
+                        "code": "collection_missing",
+                        "message": "Qdrant collection is missing for the active semantic profile",
+                    },
+                    "effective_config": {
+                        "selected_profile": "oss_high",
+                        "collection_name": "code_index__oss_high__v1",
+                        "normalized_collection_name": "code_index__oss_high__v1",
+                        "qdrant_url": "http://localhost:6333",
+                        "vector_dimension": 4096,
+                        "distance_metric": "cosine",
+                    },
+                }
+            else:
+                payload = {
+                    "overall_ready": True,
+                    "can_write_semantic_vectors": True,
+                    "blocker": None,
+                    "effective_config": {
+                        "selected_profile": "oss_high",
+                        "collection_name": "code_index__oss_high__v1",
+                        "normalized_collection_name": "code_index__oss_high__v1",
+                        "qdrant_url": "http://localhost:6333",
+                        "vector_dimension": 4096,
+                        "distance_metric": "cosine",
+                    },
+                }
+            return SimpleNamespace(to_dict=lambda: payload)
+
+        class FakeSemanticIndexer:
+            def index_files_batch(self, paths, **kwargs):
+                events.append(("semantic", [str(path) for path in paths], kwargs))
+                return {"files_indexed": 1, "files_failed": 0, "files_skipped": 0}
+
+        monkeypatch.setattr(
+            "mcp_server.indexing.summarization.ComprehensiveChunkWriter",
+            FakeWriter,
+        )
+        monkeypatch.setattr(
+            "mcp_server.setup.semantic_preflight.run_semantic_preflight",
+            _fake_preflight,
+        )
+        monkeypatch.setattr(
+            "mcp_server.setup.semantic_preflight.bootstrap_active_profile_collection",
+            lambda **_kwargs: SimpleNamespace(
+                to_dict=lambda: {"status": "created", "message": "created"},
+                status="created",
+                message="created",
+            ),
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "_get_semantic_indexer",
+            lambda self, _ctx: FakeSemanticIndexer(),
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "index_file",
+            lambda self, _ctx, path, do_semantic=False: IndexResult(
+                status=IndexResultStatus.INDEXED,
+                path=path,
+                observed_hash=None,
+                actual_hash=None,
+            ),
+        )
+
+        result = Dispatcher([]).index_directory(ctx, tmp_path)
+
+        assert preflight_calls["count"] == 2
+        assert result["semantic_stage"] == "indexed"
+        assert result["semantic_collection_bootstrap"]["status"] == "created"
+
     def test_remove_file_accepts_ctx(self, tmp_path):
         """remove_file(ctx, path) must accept ctx as first positional arg."""
         ctx = _make_repo_ctx()

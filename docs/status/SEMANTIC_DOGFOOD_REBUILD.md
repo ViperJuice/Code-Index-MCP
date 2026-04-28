@@ -1,27 +1,44 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: 2026-04-28T08:54:31Z.
-- Observed commit: `c4e78776e5727d73b9168e8bf198e54803a791d0`.
-- Phase plan: `plans/phase-plan-v7-SEMREADYFIX.md`.
-- Roadmap follow-up added during execution: `SEMCOLLECT` in `specs/phase-plans-v7.md`.
+- Evidence captured: 2026-04-28T09:35:36Z.
+- Observed commit: `64fa813165c63703c62799a7f06ca44263b68263`.
+- Phase plan: `plans/phase-plan-v7-SEMCOLLECT.md`.
+- Roadmap follow-up added during execution: `SEMSUMFIX` in `specs/phase-plans-v7.md`.
 
 ## Reset Boundary
 
-This run used a repo-local reset boundary before the rebuild. Existing repo-local
-runtime artifacts were moved aside into `.codex-tmp-reset/20260428T082620Z/`:
+This SEMCOLLECT run reused the repo-local reset boundary that already existed
+in this worktree:
 
-- `.mcp-index`
-- `.indexes`
+- `.mcp-index/current.db` remained the active SQLite store.
+- `qdrant_storage/` was preserved.
+- No unrelated Qdrant collections were deleted.
 
-Shared live service state was preserved:
-
-- `qdrant_storage/` was left intact.
-- No shared Qdrant collections were deleted.
-
-The rebuild also logged one oversized-file skip during indexing:
+The rebuild still skipped one oversized file during lexical indexing:
 
 - `analysis_archive/semantic_vs_sql_comparison_1750926162.json` at `32983030`
   bytes.
+
+## Collection Bootstrap
+
+`env OPENAI_API_KEY=dummy-local-key uv run mcp-index setup semantic --json --dry-run`
+reported the exact pre-bootstrap blocker:
+
+- Active-profile preflight: `blocked`.
+- Preflight blocker: `collection_missing`.
+- Collection bootstrap: `dry_run`.
+- Active profile: `oss_high`.
+- Active collection: `code_index__oss_high__v1`.
+
+`env OPENAI_API_KEY=dummy-local-key uv run mcp-index setup semantic --json`
+then repaired the collection gate:
+
+- Active-profile preflight: `ready`.
+- Collection check: `ready`.
+- Collection bootstrap: `created`.
+- Collection bootstrap message: `Created the active semantic collection for the selected profile`.
+- Collection distance metric: `dot`.
+- Collection vector dimension: `4096`.
 
 ## Rebuild Command
 
@@ -37,21 +54,20 @@ The rebuild also logged one oversized-file skip during indexing:
 ## Rebuild Evidence
 
 - Exit status: `0`.
-- CLI result: `Indexed 1377 files in 1331.5s`.
-- Wall time: `22:15.19`.
+- CLI result: `Indexed 1378 files in 1375.4s`.
+- Wall time: `22:59.17`.
 - Normalized field name for contract checks: `wall time`.
-- User time: `234.73s`.
-- System time: `71.72s`.
-- CPU: `22%`.
-- Max RSS: `407188 KB`.
+- User time: `246.52s`.
+- System time: `85.46s`.
+- CPU: `24%`.
+- Max RSS: `408260 KB`.
 - Normalized field name for contract checks: `max rss`.
-- File system outputs: `26961024` blocks.
+- File system outputs: `31593376` blocks.
 
 SQLite counts from `.mcp-index/current.db` after the rebuild:
 
-- Files: `1365`.
-- Symbols: `23985`.
-- Chunks: `66694`.
+- Files: `1366`.
+- `code_chunks`: `66923`.
 - `chunk_summaries`: `0`.
 - `semantic_points`: `0`.
 - `code_index__oss_high__v1` collection-linked semantic chunks: `0`.
@@ -59,45 +75,47 @@ SQLite counts from `.mcp-index/current.db` after the rebuild:
 ## Repository Status
 
 `env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status` after
-the clean rebuild reported:
+the rebuild reported:
+
+- The lexical readiness remained `ready`.
+- The semantic readiness remained `summaries_missing`.
 
 - Lexical readiness: `ready`.
 - Semantic readiness: `summaries_missing`.
-- Active-profile preflight: `blocked`.
-- Preflight blocker: `collection_missing`.
-- Preflight message: `Qdrant collection is missing for the active semantic profile`.
+- Active-profile preflight: `ready`.
+- Can write semantic vectors: `yes`.
+- Active profile: `oss_high`.
+- Active collection: `code_index__oss_high__v1`.
+- Collection bootstrap state: `reused`.
 - Semantic remediation: `Run semantic summary/vector generation for the current profile before semantic queries.`
-- Indexed commit: `c4e78776`.
-- Index size: `177.5 MB`.
+- Indexed commit: `64fa8131`.
+- Index size: `198.6 MB`.
 - Artifact backend: `local_workspace`.
 - Artifact health: `missing`.
 
+Semantic evidence from the rebuilt status surface:
+
+- Summary-backed chunks: `0`.
+- Chunks missing summaries: `66923`.
+- Vector-linked chunks: `0`.
+- Chunks missing vectors: `66923`.
+- Active collection: `code_index__oss_high__v1`.
+- Collection-matched links: `0`.
+- Collection mismatches: `0`.
+
 `env OPENAI_API_KEY=dummy-local-key uv run mcp-index index check-semantic`
-proved that the enrichment compatibility repair itself is active:
+confirmed the repaired active-profile contract:
+
+- The configured enrichment model remained `chat`.
+- The effective enrichment model remained `cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit`.
 
 - Configured enrichment model: `chat`.
 - Effective enrichment model: `cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit`.
 - Resolution strategy: `single_served_model_for_chat_alias`.
 - Enrichment chat smoke: `ready`.
 - Embedding smoke: `ready`.
-- Remaining preflight blocker: `collection_missing`.
-
-Semantic evidence from the rebuilt status surface:
-
-- Summary-backed chunks: `0`.
-- Chunks missing summaries: `66694`.
-- Vector-linked chunks: `0`.
-- Chunks missing vectors: `66694`.
-- Active collection: `code_index__oss_high__v1`.
-- Collection-matched links: `0`.
-- Collection mismatches: `0`.
-
-`env OPENAI_API_KEY=dummy-local-key uv run mcp-index preflight` still reported
-working-tree drift after the rebuild because the phase implementation files are
-not committed in this worktree:
-
-- Branch is ahead of `origin/main` by `7` commits.
-- Local runtime index has drift relative to the working tree (`7 change(s)`).
+- Collection check: `ready`.
+- Remaining preflight blocker: none.
 
 ## Query Comparison
 
@@ -105,86 +123,88 @@ Fixed dogfood prompt: `how does semantic setup validate qdrant and embedding rea
 
 - Lexical query:
   top result was `docs/guides/semantic-onboarding.md`.
-  Follow-on hits were `tests/test_benchmark_query_regressions.py` and
-  `plans/phase-plan-v7-SEMPREFLIGHT.md`.
 - Fuzzy query:
-  This is the `fuzzy` comparison lane for the fixed dogfood prompt.
-  top result was `plans/phase-plan-v7-SEMCONTRACT.md`.
-  Follow-on hits were `architecture/document_processing_architecture.md` and
-  `scripts/create_semantic_embeddings.py`.
+  the fuzzy path still preferred phrase-heavy planning and documentation hits
+  over implementation files for this prompt.
 - Semantic query:
   returned `code: "semantic_not_ready"` with `semantic_source: "semantic"`,
   `semantic_collection_name: "code_index__oss_high__v1"`, and readiness state
   `summaries_missing`.
 - Symbol query:
-  `symbol_lookup("run_semantic_preflight")` resolved the implementation symbol
-  in `mcp_server/setup/semantic_preflight.py`.
+  `symbol_lookup("run_semantic_preflight")` still resolves the implementation
+  symbol in `mcp_server/setup/semantic_preflight.py`.
 
 Fixed operator prompt: `where does repository status print semantic readiness evidence`
 
-- Lexical query still preferred `docs/guides/semantic-onboarding.md` over the
-  implementation file, which is expected for a phrase-driven lexical search.
-- The benchmark regression fixture added in this phase keeps
-  `mcp_server/cli/repository_commands.py` as the preferred implementation path
-  when semantic reranking is available.
+- Repository status still points operators at `mcp_server/cli/repository_commands.py`.
+- The remaining runtime blocker probe points at
+  `mcp_server/indexing/summarization.py`.
 
 ## Dogfood Verdict
 
 The exact verdict string for contract checks is `local multi-repo dogfooding`.
 
-Local multi-repo dogfooding is **still not ready** under the default `oss_high`
-setup after `SEMREADYFIX`.
+Local multi-repo dogfooding is **still not ready** after SEMCOLLECT.
 
 Why:
 
-- `SEMREADYFIX` repaired the default enrichment compatibility path:
-  preflight now resolves configured `chat` to served
-  `cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit`.
+- SEMCOLLECT repaired the active collection gate:
+  `setup semantic` created `code_index__oss_high__v1`, and active-profile
+  preflight is now `ready`.
 - A clean force-full rebuild still produced `0` `chunk_summaries`.
 - The same rebuild still produced `0` `semantic_points`.
-- Active-profile preflight moved forward but is now blocked on
-  `collection_missing`.
+- A direct authoritative summary probe against the rebuilt store failed inside
+  the summary runtime with a `baml-py` generator/runtime mismatch:
+  generated client `0.220.0` vs installed `baml-py 0.221.0`.
 - Semantic queries therefore still stay fail-closed with
   `semantic_not_ready` instead of returning semantic-path implementation
   results.
 
 Steering outcome:
 
-- `SEMREADYFIX` completed the enrichment-compatibility repair slice, but it did
-  not restore semantic-write readiness.
-- The roadmap now needs a downstream `SEMCOLLECT` phase to provision or hydrate
-  the active `code_index__oss_high__v1` collection and reconnect the strict
-  summary/vector pipeline before rerunning semantic dogfood acceptance.
+- SEMCOLLECT completed the active collection bootstrap recovery slice.
+- The remaining blocker has moved downstream into authoritative summary
+  execution, so the roadmap now needs `SEMSUMFIX` to repair the summary
+  runtime before semantic vectors and dogfood queries can pass.
 
 ## Verification
 
 Executed in this phase:
 
 ```bash
-env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_semantic_profile_settings.py tests/test_semantic_preflight.py tests/test_summarization.py -q --no-cov
-curl -s http://ai:8002/v1/models
+uv run pytest tests/test_semantic_preflight.py tests/test_setup_cli.py tests/test_profile_aware_semantic_indexer.py tests/test_dispatcher.py tests/test_repository_commands.py -q --no-cov
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index setup semantic --json --dry-run
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index setup semantic --json
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index index check-semantic
 /usr/bin/time -v env SEMANTIC_SEARCH_ENABLED=true SEMANTIC_DEFAULT_PROFILE=oss_high OPENAI_API_KEY=dummy-local-key QDRANT_URL=http://localhost:6333 uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
-env OPENAI_API_KEY=dummy-local-key uv run mcp-index preflight
 sqlite3 .mcp-index/current.db 'select count(*) from chunk_summaries; select count(*) from semantic_points;'
-env SEMANTIC_SEARCH_ENABLED=true CODE_INDEX_DOGFOOD_REPO=. OPENAI_API_KEY=dummy-local-key uv run python - <<'PY'
+env OPENAI_API_KEY=dummy-local-key uv run python - <<'PY'
+...
+PY
+env MCP_ALLOWED_ROOTS=/home/viperjuice/code OPENAI_API_KEY=dummy-local-key uv run python - <<'PY'
 ...
 PY
 ```
 
-Observed test outcomes:
+Observed outcomes:
 
-- `tests/test_semantic_profile_settings.py`: passed.
-- `tests/test_semantic_preflight.py`: passed.
-- `tests/test_summarization.py`: passed.
-- Semantic query harness: lexical and symbol paths resolved, while semantic
-  queries still returned `semantic_not_ready` with readiness state
+- Phase-owned unit slice: passed (`130 passed`).
+- Setup dry run: reported `collection_missing` plus `collection bootstrap: dry_run`.
+- Setup live run: reported `collection bootstrap: created` and fully ready preflight.
+- Full rebuild: completed successfully but left `chunk_summaries=0` and
+  `semantic_points=0`.
+- Semantic query probe: returned `semantic_not_ready` with readiness state
   `summaries_missing`.
+- Summary probe: failed in `mcp_server/indexing/summarization.py` with the
+  `baml-py` version mismatch noted above.
 
-Pending verification tied to this report artifact:
+Pending verification for the next phase:
 
 ```bash
 uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
-rg -n "SEMANTIC_DOGFOOD_REBUILD|configured enrichment model|effective enrichment model|collection_missing|lexical readiness|semantic readiness|active-profile preflight|code_index__oss_high__v1|semantic_points|chunk_summaries" docs/status/SEMANTIC_DOGFOOD_REBUILD.md docs/guides/semantic-onboarding.md tests/docs/test_semdogfood_evidence_contract.py
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_summarization.py -q --no-cov
+env OPENAI_API_KEY=dummy-local-key uv run python - <<'PY'
+...
+PY
 ```

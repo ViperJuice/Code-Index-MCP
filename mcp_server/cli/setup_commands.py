@@ -9,7 +9,11 @@ import click
 
 from mcp_server.config.settings import reload_settings
 from mcp_server.setup.qdrant_autostart import ensure_qdrant_running
-from mcp_server.setup.semantic_preflight import run_semantic_preflight
+from mcp_server.setup.semantic_preflight import (
+    bootstrap_active_profile_collection,
+    run_semantic_preflight,
+    summarize_collection_bootstrap,
+)
 
 
 @click.group()
@@ -101,9 +105,31 @@ def setup_semantic(
             timeout_s=timeout,
         )
 
+    collection_bootstrap = summarize_collection_bootstrap(report.to_dict(), dry_run=dry_run)
+    if (
+        not dry_run
+        and collection_bootstrap.status == "blocked"
+        and report.blocker is not None
+        and report.blocker.code == "collection_missing"
+    ):
+        collection_bootstrap = bootstrap_active_profile_collection(
+            settings=settings,
+            profile=profile,
+            timeout_s=timeout,
+        )
+        report = run_semantic_preflight(
+            settings=settings,
+            profile=profile,
+            strict=bool(strict),
+            timeout_s=timeout,
+        )
+        if collection_bootstrap.status == "reused" and report.can_write_semantic_vectors:
+            collection_bootstrap = summarize_collection_bootstrap(report.to_dict(), dry_run=False)
+
     output_payload = report.to_dict()
     if qdrant_start is not None:
         output_payload["qdrant_autostart"] = qdrant_start.to_dict()
+    output_payload["collection_bootstrap"] = collection_bootstrap.to_dict()
 
     if json_output:
         click.echo(json.dumps(output_payload, indent=2))
@@ -124,6 +150,10 @@ def setup_semantic(
         click.echo(f"Qdrant check: {report.qdrant.status.value} ({report.qdrant.message})")
         click.echo(
             f"Collection check: {report.collection.status.value} ({report.collection.message})"
+        )
+        click.echo(
+            "Collection bootstrap: "
+            f"{collection_bootstrap.status} ({collection_bootstrap.message})"
         )
 
         if qdrant_start is not None:

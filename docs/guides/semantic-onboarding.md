@@ -35,6 +35,9 @@ The command performs preflight checks and, by default, starts local Qdrant if it
 For the active profile, the preflight is fail-closed: it can block semantic
 vector writes before `SEMPIPE` if chat reachability, embedding dimension, or
 collection shape do not match the configured contract.
+When the only blocker is `collection_missing`, the non-dry-run setup path now
+reports a `collection bootstrap` outcome and creates the active profile
+collection before re-running semantic preflight.
 
 ## Where Settings Live
 
@@ -113,6 +116,8 @@ and vectors:
   model identifier from the effective served model actually used for the chat
   smoke; this is how a configured `chat` alias can resolve to a concrete local
   Gemma model without hiding the operator-facing contract
+- `setup semantic` also reports a `collection bootstrap` state. Typical values
+  are `dry_run`, `created`, `reused`, or `blocked`.
 
 ## Default `oss_high` Layout
 
@@ -134,8 +139,9 @@ and vectors:
 - `get_status` exposes lexical readiness separately from semantic readiness.
 - `uv run mcp-index repository status` is the operator-facing status surface:
   it now prints lexical readiness, semantic readiness, and active-profile
-  preflight separately, plus durable semantic evidence counts for summaries,
-  vectors, and collection linkage.
+  preflight separately, plus the active profile, active collection, collection
+  bootstrap state, and durable semantic evidence counts for summaries, vectors,
+  and collection linkage.
 - `search_code(semantic=true)` refuses with semantic readiness metadata when
   summaries, vectors, or profile compatibility are missing.
 - For a semantically ready registered repository, `search_code(semantic=true)`
@@ -155,7 +161,9 @@ and vectors:
   output when you need to confirm semantic readiness after a clean rebuild.
 - The current SEMREADYFIX evidence shows the enrichment compatibility repair can
   succeed while semantic dogfood still remains blocked on `collection_missing`;
-  use the report to separate those two states.
+  the SEMCOLLECT evidence then shows collection bootstrap can succeed while the
+  repo is still blocked downstream on summary generation. Use the report to
+  separate those states.
 
 ## Full Reindex Pipeline
 
@@ -220,9 +228,15 @@ dogfood rebuild evidence.
   - rerun `setup semantic --json` to inspect the structured blocker and remediation
   - if the configured `chat` alias resolves to a concrete served model, confirm
     the report shows both the configured model and the effective model
+- Collection bootstrap succeeded but summaries are still zero
+  - run `uv run mcp-index repository status` and confirm active-profile preflight is `ready`
+  - probe `ComprehensiveChunkWriter.process_scope(...)` or the summary path directly
+    if semantic readiness remains `summaries_missing`
+  - if the probe fails with a BAML generator/runtime mismatch, align the installed
+    `baml-py` version with the generated client before rerunning the rebuild
 - Voyage provider failing
   - verify `VOYAGE_API_KEY`
 - Preflight output
   - `setup semantic --json` reports resolved enrichment and embedding endpoints separately
-  - preflight reports collection validation, vector dimension checks, and whether it can write semantic vectors
+  - preflight reports collection validation, vector dimension checks, whether it can write semantic vectors, and the collection bootstrap outcome
   - API-key reporting is metadata-only: env-var name plus presence boolean, never the secret value

@@ -2144,7 +2144,11 @@ class EnhancedDispatcher:
             return stats
 
         from ..indexing.summarization import ComprehensiveChunkWriter
-        from ..setup.semantic_preflight import run_semantic_preflight
+        from ..setup.semantic_preflight import (
+            bootstrap_active_profile_collection,
+            run_semantic_preflight,
+            summarize_collection_bootstrap,
+        )
 
         settings = reload_settings()
         summarization_config = settings.get_profile_summarization_config(
@@ -2177,6 +2181,24 @@ class EnhancedDispatcher:
             settings=settings,
             strict=False,
         ).to_dict()
+        collection_bootstrap = summarize_collection_bootstrap(semantic_preflight)
+        if not semantic_preflight.get("can_write_semantic_vectors", True):
+            blocker = semantic_preflight.get("blocker") or {}
+            if blocker.get("code") == "collection_missing":
+                collection_bootstrap = bootstrap_active_profile_collection(
+                    settings=settings,
+                    profile=settings.semantic_default_profile,
+                ).to_dict()
+                stats["semantic_collection_bootstrap"] = collection_bootstrap
+                semantic_preflight = run_semantic_preflight(
+                    settings=settings,
+                    strict=False,
+                ).to_dict()
+            else:
+                stats["semantic_collection_bootstrap"] = collection_bootstrap.to_dict()
+        else:
+            stats["semantic_collection_bootstrap"] = collection_bootstrap.to_dict()
+
         if not semantic_preflight.get("can_write_semantic_vectors", True):
             stats["semantic_stage"] = "blocked_preflight"
             stats["semantic_blocked"] = len(normalized_paths)

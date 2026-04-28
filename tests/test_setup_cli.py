@@ -100,6 +100,7 @@ def test_setup_semantic_json_output(monkeypatch):
     assert '"embedding"' in result.output
     assert '"enrichment"' in result.output
     assert '"collection"' in result.output
+    assert '"collection_bootstrap"' in result.output
 
 
 def test_setup_semantic_strict_failure(monkeypatch):
@@ -126,5 +127,34 @@ def test_setup_semantic_text_output_names_blocker_and_collection(monkeypatch):
     result = runner.invoke(setup, ["semantic", "--dry-run"])
     assert result.exit_code == 0
     assert "Collection check: misconfigured" in result.output
+    assert "Collection bootstrap: dry_run" in result.output
     assert "Semantic write blocker:" in result.output
     assert "collection_missing" in result.output
+
+
+def test_setup_semantic_bootstraps_missing_collection_when_not_dry_run(monkeypatch):
+    runner = CliRunner()
+    calls = {"count": 0}
+
+    def _fake_preflight(**kwargs):
+        calls["count"] += 1
+        return _FakeReport(overall_ready=calls["count"] > 1)
+
+    monkeypatch.setattr("mcp_server.cli.setup_commands.run_semantic_preflight", _fake_preflight)
+    monkeypatch.setattr(
+        "mcp_server.cli.setup_commands.bootstrap_active_profile_collection",
+        lambda **kwargs: SimpleNamespace(
+            to_dict=lambda: {
+                "status": "created",
+                "message": "Created the active semantic collection for the selected profile",
+            },
+            status="created",
+            message="Created the active semantic collection for the selected profile",
+        ),
+    )
+
+    result = runner.invoke(setup, ["semantic"])
+
+    assert result.exit_code == 0
+    assert calls["count"] == 2
+    assert "Collection bootstrap: created" in result.output

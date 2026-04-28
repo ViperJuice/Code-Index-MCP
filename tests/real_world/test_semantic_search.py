@@ -420,8 +420,10 @@ def parse_server_response(api_result):
             )
             data = json.loads(result[0].text)
             if data.get("code") == "semantic_not_ready":
+                readiness = data["semantic_readiness"]
                 pytest.skip(
-                    f"Dogfood repo semantic readiness is blocked: {data['semantic_readiness']['state']}"
+                    "Dogfood repo semantic readiness is blocked: "
+                    f"{readiness['state']} ({readiness['code']})"
                 )
             assert data["semantic_requested"] is True
             assert data["semantic_source"] == "semantic"

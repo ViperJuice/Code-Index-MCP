@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 from mcp_server.artifacts.semantic_profiles import SemanticProfileRegistry
 from mcp_server.utils import semantic_indexer as semantic_indexer_module
-from mcp_server.utils.semantic_indexer import SemanticIndexer
+from mcp_server.utils.semantic_indexer import SemanticIndexer, ensure_qdrant_collection
 
 
 class _FakeEmbeddingProvider:
@@ -29,9 +29,28 @@ class _FakeEmbeddingProvider:
 class _FakeQdrantClient:
     def __init__(self) -> None:
         self.upserts = []
+        self.collections = {}
 
     def upsert(self, *, collection_name, points):
         self.upserts.append((collection_name, list(points)))
+
+    def get_collections(self):
+        return SimpleNamespace(
+            collections=[SimpleNamespace(name=name) for name in self.collections.keys()]
+        )
+
+    def get_collection(self, collection_name):
+        size, distance = self.collections[collection_name]
+        return SimpleNamespace(
+            config=SimpleNamespace(
+                params=SimpleNamespace(
+                    vectors=SimpleNamespace(size=size, distance=distance)
+                )
+            )
+        )
+
+    def recreate_collection(self, *, collection_name, vectors_config):
+        self.collections[collection_name] = (vectors_config.size, vectors_config.distance)
 
 
 def _sample_profiles() -> dict[str, dict[str, object]]:
@@ -300,9 +319,12 @@ def test_successful_strict_batch_indexing_persists_chunk_point_links(monkeypatch
     result = indexer.index_files_batch([source], require_summaries=True)
 
     assert result["files_indexed"] == 1
-    assert len(sqlite_store.semantic_points) == 1
-    assert sqlite_store.semantic_points[0]["chunk_id"] == "chunk-link"
-    assert sqlite_store.semantic_points[0]["profile_id"] == "oss-high"
+    assert {point["chunk_id"] for point in sqlite_store.semantic_points} == {
+        "chunk-link:part:1:1",
+        "sample.py:file-summary",
+        "chunk-link",
+    }
+    assert all(point["profile_id"] == "oss-high" for point in sqlite_store.semantic_points)
 
 
 def test_preflight_blocker_prevents_any_qdrant_upsert(monkeypatch, tmp_path):
@@ -332,3 +354,35 @@ def test_preflight_blocker_prevents_any_qdrant_upsert(monkeypatch, tmp_path):
 
     assert result["files_blocked"] == 1
     assert indexer.qdrant.upserts == []
+
+
+def test_ensure_qdrant_collection_creates_missing_collection():
+    client = _FakeQdrantClient()
+
+    result = ensure_qdrant_collection(
+        client,
+        collection_name="semantic-oss-high",
+        expected_dimension=4096,
+        distance_metric="cosine",
+        allow_recreate=False,
+    )
+
+    assert result.status == "created"
+    assert "semantic-oss-high" in client.collections
+
+
+def test_ensure_qdrant_collection_blocks_shape_mismatch_when_recreate_disallowed():
+    client = _FakeQdrantClient()
+    distance = SemanticIndexer.resolve_qdrant_distance("dot")
+    client.collections["semantic-oss-high"] = (1024, distance)
+
+    result = ensure_qdrant_collection(
+        client,
+        collection_name="semantic-oss-high",
+        expected_dimension=4096,
+        distance_metric="cosine",
+        allow_recreate=False,
+    )
+
+    assert result.status == "blocked"
+    assert result.actual_dimension == 1024

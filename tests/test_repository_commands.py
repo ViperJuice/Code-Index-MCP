@@ -280,6 +280,10 @@ def test_status_reports_rollout_and_query_surfaces(monkeypatch, tmp_path: Path):
                     "message": "Qdrant collection is missing for the active semantic profile",
                     "remediation": ["Create the expected collection"],
                 },
+                "effective_config": {
+                    "selected_profile": "oss_high",
+                    "collection_name": "code_index__oss_high__v1",
+                },
             }
         ),
     )
@@ -296,6 +300,9 @@ def test_status_reports_rollout_and_query_surfaces(monkeypatch, tmp_path: Path):
     assert "Semantic Preflight:" in result.output
     assert "Can write semantic vectors: no" in result.output
     assert "collection_missing" in result.output
+    assert "Active profile: oss_high" in result.output
+    assert "Active collection: code_index__oss_high__v1" in result.output
+    assert "Collection bootstrap state: blocked" in result.output
     assert "Semantic Evidence:" in result.output
     assert "Summary-backed chunks: 11" in result.output
     assert "Chunks missing summaries: 1" in result.output

@@ -569,6 +569,59 @@ and the strict semantic stage that depends on it.
 **Produces**
 - IF-0-SEMCOLLECT-1 — Default local semantic collection bootstrap and semantic-stage recovery contract.
 
+### Phase 10 — Summary Runtime Recovery (SEMSUMFIX)
+
+**Objective**
+
+Repair the newly exposed summary-generation runtime blocker now that
+SEMCOLLECT has restored active-profile collection bootstrap and semantic
+preflight readiness for `oss_high`.
+
+**Exit criteria**
+- [ ] A direct authoritative summary write probe no longer fails on the current
+      BAML generator/runtime mismatch, or the summary path is intentionally
+      rerouted through a supported local provider path with equivalent audit
+      metadata.
+- [ ] A clean force-full rebuild produces non-zero `chunk_summaries` for the
+      default local `oss_high` path.
+- [ ] The same rebuild produces non-zero `semantic_points` linked to
+      `code_index__oss_high__v1`.
+- [ ] Semantic dogfood queries for the fixed prompts return semantic-path code
+      results instead of `semantic_not_ready`.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` is refreshed with the repaired
+      summary-runtime outcome and final semantic-ready verdict.
+
+**Scope notes**
+
+This phase exists only because SEMCOLLECT cleared the active collection gate,
+but the repo-local rebuild still produced zero summaries and zero vectors due
+to summary-runtime failure. Keep the work narrowly on the authoritative summary
+runtime and the semantic write path it unlocks.
+
+**Non-goals**
+
+- No semantic ranking redesign.
+- No multi-repo rollout expansion.
+- No unrelated collection-namespace changes after SEMCOLLECT.
+
+**Key files**
+
+- `mcp_server/indexing/summarization.py`
+- `mcp_server/config/settings.py`
+- `pyproject.toml`
+- `uv.lock`
+- `docs/guides/semantic-onboarding.md`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_summarization.py`
+- `tests/real_world/test_semantic_search.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMCOLLECT
+
+**Produces**
+- IF-0-SEMSUMFIX-1 — Default local summary-runtime and semantic-write recovery contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -581,6 +634,7 @@ SEMCONTRACT
   -> SEMDOGFOOD
   -> SEMREADYFIX
   -> SEMCOLLECT
+  -> SEMSUMFIX
 ```
 
 ## Execution Notes
@@ -605,6 +659,9 @@ SEMCONTRACT
 - SEMCOLLECT exists only if SEMREADYFIX proves enrichment compatibility is
   repaired but semantic writes still cannot advance because the active
   collection/bootstrap path is missing or disconnected from the rebuild.
+- SEMSUMFIX exists only if SEMCOLLECT proves the active collection gate is
+  repaired but authoritative summary generation still cannot run for the live
+  rebuild.
 
 ## Verification
 
@@ -643,6 +700,16 @@ SEMANTIC_SEARCH_ENABLED=true CODE_INDEX_DOGFOOD_REPO=. uv run pytest tests/real_
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index index check-semantic
+sqlite3 .mcp-index/current.db 'select count(*) from chunk_summaries; select count(*) from semantic_points;'
+SEMANTIC_SEARCH_ENABLED=true CODE_INDEX_DOGFOOD_REPO=. uv run pytest tests/real_world/test_semantic_search.py -q --no-cov
+
+# SEMSUMFIX
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_summarization.py -q --no-cov
+env OPENAI_API_KEY=dummy-local-key uv run python - <<'PY'
+...
+PY
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
 sqlite3 .mcp-index/current.db 'select count(*) from chunk_summaries; select count(*) from semantic_points;'
 SEMANTIC_SEARCH_ENABLED=true CODE_INDEX_DOGFOOD_REPO=. uv run pytest tests/real_world/test_semantic_search.py -q --no-cov
 ```

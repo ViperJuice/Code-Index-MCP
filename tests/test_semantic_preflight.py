@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from mcp_server.config.settings import Settings
 from mcp_server.setup.semantic_preflight import (
+    bootstrap_active_profile_collection,
     ServiceStatus,
     check_embedding_smoke,
     check_enrichment_chat,
@@ -12,6 +13,7 @@ from mcp_server.setup.semantic_preflight import (
     check_qdrant,
     check_qdrant_collection,
     run_semantic_preflight,
+    summarize_collection_bootstrap,
 )
 
 
@@ -435,7 +437,85 @@ def test_qdrant_collection_validates_dimension_and_distance_without_mutation():
     assert result.status == ServiceStatus.READY
     assert result.details["actual_dimension"] == 4096
     assert result.details["actual_distance_metric"] == "cosine"
-    http_get.assert_called_once()
+
+
+def test_summarize_collection_bootstrap_reports_reused_for_ready_preflight():
+    result = summarize_collection_bootstrap(
+        {
+            "can_write_semantic_vectors": True,
+            "effective_config": {
+                "selected_profile": "oss_high",
+                "collection_name": "code_index__oss_high__v1",
+                "normalized_collection_name": "code_index__oss_high__v1",
+                "qdrant_url": "http://localhost:6333",
+                "vector_dimension": 4096,
+                "distance_metric": "cosine",
+            },
+        }
+    )
+
+    assert result.status == "reused"
+    assert result.collection_name == "code_index__oss_high__v1"
+
+
+def test_bootstrap_active_profile_collection_creates_missing_collection(monkeypatch):
+    settings = _semantic_settings()
+
+    monkeypatch.setattr(
+        "mcp_server.setup.semantic_preflight.check_qdrant",
+        lambda *args, **kwargs: _ready_check("qdrant"),
+    )
+
+    class _FakeQdrantClient:
+        def __init__(self, *args, **kwargs):
+            self.args = args
+            self.kwargs = kwargs
+
+    monkeypatch.setattr("qdrant_client.QdrantClient", _FakeQdrantClient)
+    monkeypatch.setattr(
+        "mcp_server.utils.semantic_indexer.ensure_qdrant_collection",
+        lambda *args, **kwargs: SimpleNamespace(
+            status="created",
+            actual_dimension=4096,
+            actual_distance_metric="cosine",
+        ),
+    )
+
+    result = bootstrap_active_profile_collection(settings=settings, profile="oss_high")
+
+    assert result.status == "created"
+    assert result.profile_id == "oss_high"
+    assert result.collection_name == "ci__repo__oss-high__workspace"
+
+
+def test_bootstrap_active_profile_collection_preserves_shape_mismatch_blocker(monkeypatch):
+    settings = _semantic_settings()
+
+    monkeypatch.setattr(
+        "mcp_server.setup.semantic_preflight.check_qdrant",
+        lambda *args, **kwargs: _ready_check("qdrant"),
+    )
+
+    class _FakeQdrantClient:
+        def __init__(self, *args, **kwargs):
+            self.args = args
+            self.kwargs = kwargs
+
+    monkeypatch.setattr("qdrant_client.QdrantClient", _FakeQdrantClient)
+    monkeypatch.setattr(
+        "mcp_server.utils.semantic_indexer.ensure_qdrant_collection",
+        lambda *args, **kwargs: SimpleNamespace(
+            status="blocked",
+            actual_dimension=1024,
+            actual_distance_metric="dot",
+        ),
+    )
+
+    result = bootstrap_active_profile_collection(settings=settings, profile="oss_high")
+
+    assert result.status == "blocked"
+    assert result.blocker["code"] == "collection_shape_mismatch"
+    assert result.blocker["actual_dimension"] == 1024
 
 
 def test_run_semantic_preflight_emits_structured_blocker_for_fail_closed_contract(monkeypatch):

@@ -453,6 +453,7 @@ def status(repo_id: Optional[str]):
 
         semantic_preflight = status["features"]["semantic"].get("preflight") or {}
         blocker = semantic_preflight.get("blocker") or {}
+        effective_config = semantic_preflight.get("effective_config") or {}
         click.echo("\nSemantic Preflight:")
         click.echo(
             "  Active-profile preflight: "
@@ -466,6 +467,15 @@ def status(repo_id: Optional[str]):
             click.echo(f"  Blocker: {blocker.get('code')} - {blocker.get('message')}")
             for fix in blocker.get("remediation") or []:
                 click.echo(f"  Remediation: {fix}")
+        if effective_config:
+            click.echo(f"  Active profile: {effective_config.get('selected_profile')}")
+            click.echo(f"  Active collection: {effective_config.get('collection_name')}")
+            bootstrap_state = (
+                "reused"
+                if semantic_preflight.get("can_write_semantic_vectors")
+                else "blocked"
+            )
+            click.echo(f"  Collection bootstrap state: {bootstrap_state}")
         semantic_evidence = (
             status.get("features", {}).get("semantic", {}).get("readiness", {}).get("evidence") or {}
         )

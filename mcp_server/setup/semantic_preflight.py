@@ -119,6 +119,34 @@ class SemanticPreflightReport:
         }
 
 
+@dataclass(frozen=True)
+class CollectionBootstrapResult:
+    """Outcome of active-profile collection bootstrap evaluation."""
+
+    status: str
+    message: str
+    profile_id: Optional[str]
+    collection_name: Optional[str]
+    normalized_collection_name: Optional[str]
+    qdrant_url: Optional[str]
+    expected_dimension: Optional[int]
+    expected_distance_metric: Optional[str]
+    blocker: Optional[Dict[str, Any]] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "status": self.status,
+            "message": self.message,
+            "profile_id": self.profile_id,
+            "collection_name": self.collection_name,
+            "normalized_collection_name": self.normalized_collection_name,
+            "qdrant_url": self.qdrant_url,
+            "expected_dimension": self.expected_dimension,
+            "expected_distance_metric": self.expected_distance_metric,
+            "blocker": self.blocker,
+        }
+
+
 def _http_request_json(
     url: str,
     *,
@@ -937,6 +965,180 @@ def _build_semantic_write_blocker(checks: List[CheckResult]) -> Optional[Semanti
         failing_checks=failing_payload,
         remediation=remediation,
         can_write_semantic_vectors=False,
+    )
+
+
+def summarize_collection_bootstrap(
+    preflight: Dict[str, Any],
+    *,
+    dry_run: bool = False,
+) -> CollectionBootstrapResult:
+    """Derive operator-facing collection bootstrap state from preflight."""
+    effective = preflight.get("effective_config") or {}
+    collection_name = effective.get("collection_name")
+    normalized_collection_name = effective.get("normalized_collection_name")
+    profile_id = effective.get("selected_profile")
+    qdrant_url = effective.get("qdrant_url")
+    expected_dimension = effective.get("vector_dimension")
+    expected_distance_metric = effective.get("distance_metric")
+    blocker = preflight.get("blocker") or {}
+
+    if preflight.get("can_write_semantic_vectors"):
+        return CollectionBootstrapResult(
+            status="reused",
+            message="Active semantic collection already matches the selected profile",
+            profile_id=profile_id,
+            collection_name=collection_name,
+            normalized_collection_name=normalized_collection_name,
+            qdrant_url=qdrant_url,
+            expected_dimension=expected_dimension,
+            expected_distance_metric=expected_distance_metric,
+            blocker=None,
+        )
+
+    if blocker.get("code") == "collection_missing":
+        return CollectionBootstrapResult(
+            status="dry_run" if dry_run else "blocked",
+            message=(
+                "Dry run: active semantic collection would be created before vector writes"
+                if dry_run
+                else "Active semantic collection is missing and semantic writes remain blocked"
+            ),
+            profile_id=profile_id,
+            collection_name=collection_name,
+            normalized_collection_name=normalized_collection_name,
+            qdrant_url=qdrant_url,
+            expected_dimension=expected_dimension,
+            expected_distance_metric=expected_distance_metric,
+            blocker=dict(blocker),
+        )
+
+    return CollectionBootstrapResult(
+        status="blocked",
+        message="Collection bootstrap is not available for the current semantic blocker",
+        profile_id=profile_id,
+        collection_name=collection_name,
+        normalized_collection_name=normalized_collection_name,
+        qdrant_url=qdrant_url,
+        expected_dimension=expected_dimension,
+        expected_distance_metric=expected_distance_metric,
+        blocker=dict(blocker) if blocker else None,
+    )
+
+
+def bootstrap_active_profile_collection(
+    *,
+    settings: Settings,
+    profile: Optional[str] = None,
+    timeout_s: Optional[float] = None,
+) -> CollectionBootstrapResult:
+    """Create the active-profile collection when the only blocker is missing collection."""
+    timeout = float(
+        timeout_s if timeout_s is not None else settings.semantic_preflight_timeout_seconds
+    )
+    namespace_resolver = SemanticNamespaceResolver()
+    profile_check, _, selected_profile = resolve_profile_registry(settings, profile=profile)
+    selected_profile_id = profile or settings.get_semantic_default_profile()
+    qdrant_url = os.getenv("QDRANT_URL", f"http://{settings.qdrant_host}:{settings.qdrant_port}")
+
+    if not profile_check.ok or selected_profile is None:
+        blocker = _build_semantic_write_blocker([profile_check])
+        return CollectionBootstrapResult(
+            status="blocked",
+            message="Semantic profile configuration must validate before collection bootstrap",
+            profile_id=selected_profile_id,
+            collection_name=None,
+            normalized_collection_name=None,
+            qdrant_url=qdrant_url,
+            expected_dimension=None,
+            expected_distance_metric=None,
+            blocker=None if blocker is None else blocker.to_dict(),
+        )
+
+    collection_name = str(
+        (selected_profile.build_metadata or {}).get("collection_name")
+        or settings.semantic_collection_name
+    )
+    normalized_collection_name = namespace_resolver.normalize_collection_name(collection_name)
+    vector_dimension = int(selected_profile.vector_dimension)
+    distance_metric = namespace_resolver.normalize_distance_metric(selected_profile.distance_metric)
+
+    qdrant_check = check_qdrant(qdrant_url, timeout_s=timeout)
+    if not qdrant_check.ok:
+        blocker = _build_semantic_write_blocker([qdrant_check])
+        return CollectionBootstrapResult(
+            status="blocked",
+            message="Qdrant must be reachable before collection bootstrap can run",
+            profile_id=selected_profile.profile_id,
+            collection_name=collection_name,
+            normalized_collection_name=normalized_collection_name,
+            qdrant_url=qdrant_url,
+            expected_dimension=vector_dimension,
+            expected_distance_metric=distance_metric,
+            blocker=None if blocker is None else blocker.to_dict(),
+        )
+
+    from qdrant_client import QdrantClient
+
+    from mcp_server.utils.semantic_indexer import ensure_qdrant_collection
+
+    try:
+        client = QdrantClient(url=qdrant_url, timeout=timeout)
+        ensure_result = ensure_qdrant_collection(
+            client,
+            collection_name=collection_name,
+            expected_dimension=vector_dimension,
+            distance_metric=distance_metric,
+            allow_recreate=False,
+        )
+    except Exception as exc:
+        return CollectionBootstrapResult(
+            status="blocked",
+            message=f"Failed to bootstrap the active semantic collection: {exc}",
+            profile_id=selected_profile.profile_id,
+            collection_name=collection_name,
+            normalized_collection_name=normalized_collection_name,
+            qdrant_url=qdrant_url,
+            expected_dimension=vector_dimension,
+            expected_distance_metric=distance_metric,
+            blocker={
+                "code": "collection_bootstrap_failed",
+                "message": f"Failed to bootstrap the active semantic collection: {exc}",
+            },
+        )
+
+    if ensure_result.status == "blocked":
+        return CollectionBootstrapResult(
+            status="blocked",
+            message="Qdrant collection shape does not match the active semantic profile",
+            profile_id=selected_profile.profile_id,
+            collection_name=collection_name,
+            normalized_collection_name=normalized_collection_name,
+            qdrant_url=qdrant_url,
+            expected_dimension=vector_dimension,
+            expected_distance_metric=distance_metric,
+            blocker={
+                "code": "collection_shape_mismatch",
+                "message": "Qdrant collection shape does not match the active semantic profile",
+                "actual_dimension": ensure_result.actual_dimension,
+                "actual_distance_metric": ensure_result.actual_distance_metric,
+            },
+        )
+
+    return CollectionBootstrapResult(
+        status=ensure_result.status,
+        message=(
+            "Created the active semantic collection for the selected profile"
+            if ensure_result.status == "created"
+            else "Reused the existing active semantic collection for the selected profile"
+        ),
+        profile_id=selected_profile.profile_id,
+        collection_name=collection_name,
+        normalized_collection_name=normalized_collection_name,
+        qdrant_url=qdrant_url,
+        expected_dimension=vector_dimension,
+        expected_distance_metric=distance_metric,
+        blocker=None,
     )
 
 

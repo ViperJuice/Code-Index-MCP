@@ -23,8 +23,9 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
 
     for expected in (
         "# Semantic Dogfood Rebuild",
-        "Phase plan: `plans/phase-plan-v7-SEMREADYFIX.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMCOLLECT.md`",
         "## Reset Boundary",
+        "## Collection Bootstrap",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -46,13 +47,14 @@ def test_semdogfood_report_records_reset_boundary_counts_collection_and_verifica
         "semantic_points",
         "configured enrichment model",
         "effective enrichment model",
-        "collection_missing",
+        "collection bootstrap",
+        "baml-py",
         "max rss",
         "wall time",
         "lexical readiness",
         "semantic readiness",
         "active-profile preflight",
-        "uv run pytest tests/test_semantic_profile_settings.py tests/test_semantic_preflight.py tests/test_summarization.py -q --no-cov",
+        "uv run pytest tests/test_semantic_preflight.py tests/test_setup_cli.py tests/test_profile_aware_semantic_indexer.py tests/test_dispatcher.py tests/test_repository_commands.py -q --no-cov",
         "uv run mcp-index index check-semantic",
         "uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov",
     ):
@@ -70,6 +72,7 @@ def test_semdogfood_report_compares_query_modes_and_states_operator_verdict():
         "semantic_source",
         "semantic_collection_name",
         "mcp_server/setup/semantic_preflight.py",
+        "mcp_server/indexing/summarization.py",
         "mcp_server/cli/repository_commands.py",
         "semantic_not_ready",
         "local multi-repo dogfooding",
@@ -86,3 +89,5 @@ def test_semantic_onboarding_links_semdogfood_report_and_separate_readiness_surf
     assert "active-profile preflight" in text
     assert "configured model" in text
     assert "effective model" in text
+    assert "collection bootstrap" in text
+    assert "baml" in text

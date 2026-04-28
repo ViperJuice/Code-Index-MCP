@@ -89,6 +89,102 @@ class DocumentSection:
             self.subsections = []
 
 
+@dataclass(frozen=True)
+class CollectionEnsureResult:
+    """Outcome of verifying or creating a Qdrant collection."""
+
+    status: str
+    collection_name: str
+    expected_dimension: int
+    expected_distance_metric: str
+    actual_dimension: Optional[int] = None
+    actual_distance_metric: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "status": self.status,
+            "collection_name": self.collection_name,
+            "expected_dimension": self.expected_dimension,
+            "expected_distance_metric": self.expected_distance_metric,
+            "actual_dimension": self.actual_dimension,
+            "actual_distance_metric": self.actual_distance_metric,
+        }
+
+
+def ensure_qdrant_collection(
+    client: Any,
+    *,
+    collection_name: str,
+    expected_dimension: int,
+    distance_metric: str,
+    allow_recreate: bool = True,
+) -> CollectionEnsureResult:
+    """Verify the target collection and create it when the contract allows."""
+    expected_distance = SemanticIndexer.resolve_qdrant_distance(distance_metric)
+    collections = client.get_collections()
+    exists = any(c.name == collection_name for c in collections.collections)
+
+    if not exists:
+        client.recreate_collection(
+            collection_name=collection_name,
+            vectors_config=models.VectorParams(
+                size=expected_dimension,
+                distance=expected_distance,
+            ),
+        )
+        return CollectionEnsureResult(
+            status="created",
+            collection_name=collection_name,
+            expected_dimension=expected_dimension,
+            expected_distance_metric=expected_distance.value,
+            actual_dimension=expected_dimension,
+            actual_distance_metric=expected_distance.value,
+        )
+
+    collection_info = client.get_collection(collection_name)
+    vectors_config = collection_info.config.params.vectors
+    actual_dimension = getattr(vectors_config, "size", None)
+    actual_distance = getattr(vectors_config, "distance", None)
+    mismatch = actual_dimension not in (None, expected_dimension) or actual_distance not in (
+        None,
+        expected_distance,
+    )
+    if mismatch:
+        if not allow_recreate:
+            return CollectionEnsureResult(
+                status="blocked",
+                collection_name=collection_name,
+                expected_dimension=expected_dimension,
+                expected_distance_metric=expected_distance.value,
+                actual_dimension=actual_dimension,
+                actual_distance_metric=getattr(actual_distance, "value", None),
+            )
+        client.recreate_collection(
+            collection_name=collection_name,
+            vectors_config=models.VectorParams(
+                size=expected_dimension,
+                distance=expected_distance,
+            ),
+        )
+        return CollectionEnsureResult(
+            status="recreated",
+            collection_name=collection_name,
+            expected_dimension=expected_dimension,
+            expected_distance_metric=expected_distance.value,
+            actual_dimension=expected_dimension,
+            actual_distance_metric=expected_distance.value,
+        )
+
+    return CollectionEnsureResult(
+        status="reused",
+        collection_name=collection_name,
+        expected_dimension=expected_dimension,
+        expected_distance_metric=expected_distance.value,
+        actual_dimension=actual_dimension,
+        actual_distance_metric=getattr(actual_distance, "value", None),
+    )
+
+
 class SemanticIndexer:
     """Index code using semantic profile embeddings stored in Qdrant."""
 
@@ -907,52 +1003,22 @@ class SemanticIndexer:
             raise RuntimeError("Qdrant is not available - cannot ensure collection")
 
         try:
-            collections = self.qdrant.get_collections()
-            exists = any(c.name == self.collection for c in collections.collections)
-            should_recreate = False
-
-            if not exists:
-                logger.info(f"Creating Qdrant collection: {self.collection}")
-            else:
-                try:
-                    collection_info = self.qdrant.get_collection(self.collection)
-                    vectors_config = collection_info.config.params.vectors
-                    expected_distance = self._resolve_qdrant_distance(self.distance_metric)
-                    current_size = getattr(vectors_config, "size", None)
-                    current_distance = getattr(vectors_config, "distance", None)
-                    should_recreate = current_size not in (
-                        None,
-                        self.embedding_dimension,
-                    ) or current_distance not in (None, expected_distance)
-                    if should_recreate:
-                        logger.warning(
-                            "Recreating Qdrant collection %s due to config mismatch "
-                            "(size=%s, distance=%s, expected_size=%s, expected_distance=%s)",
-                            self.collection,
-                            current_size,
-                            current_distance,
-                            self.embedding_dimension,
-                            expected_distance,
-                        )
-                    else:
-                        logger.debug(f"Collection already exists: {self.collection}")
-                except Exception as info_error:
-                    logger.warning(
-                        "Failed to inspect collection %s; recreating. Error: %s",
-                        self.collection,
-                        info_error,
-                    )
-                    should_recreate = True
-
-            if not exists or should_recreate:
-                self.qdrant.recreate_collection(
-                    collection_name=self.collection,
-                    vectors_config=models.VectorParams(
-                        size=self.embedding_dimension,
-                        distance=self._resolve_qdrant_distance(self.distance_metric),
-                    ),
+            result = ensure_qdrant_collection(
+                self.qdrant,
+                collection_name=self.collection,
+                expected_dimension=self.embedding_dimension,
+                distance_metric=self.distance_metric,
+                allow_recreate=True,
+            )
+            if result.status == "created":
+                logger.info("Successfully created collection: %s", self.collection)
+            elif result.status == "recreated":
+                logger.warning(
+                    "Recreated Qdrant collection %s due to config mismatch",
+                    self.collection,
                 )
-                logger.info(f"Successfully created collection: {self.collection}")
+            else:
+                logger.debug("Collection already exists: %s", self.collection)
         except Exception as e:
             logger.error(
                 f"Failed to ensure collection '{self.collection}': {type(e).__name__}: {e}"
@@ -963,7 +1029,8 @@ class SemanticIndexer:
             )
 
     # ------------------------------------------------------------------
-    def _resolve_qdrant_distance(self, metric: str) -> models.Distance:
+    @staticmethod
+    def resolve_qdrant_distance(metric: str) -> models.Distance:
         """Map profile distance metric to Qdrant enum."""
         metric_value = (metric or "").strip().lower()
         mapping = {
@@ -979,6 +1046,10 @@ class SemanticIndexer:
             logger.warning("Unknown distance metric '%s', defaulting to cosine", metric)
             return models.Distance.COSINE
         return resolved
+
+    def _resolve_qdrant_distance(self, metric: str) -> models.Distance:
+        """Backward-compatible instance wrapper for distance resolution."""
+        return self.resolve_qdrant_distance(metric)
 
     # ------------------------------------------------------------------
     def _build_metadata(self) -> Dict[str, Any]:
