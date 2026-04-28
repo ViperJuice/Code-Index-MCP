@@ -33,6 +33,10 @@ _BOUNDED_MARKDOWN_NAME_RE = re.compile(
 _ROADMAP_MARKDOWN_NAME_RE = re.compile(
     r"^(?:roadmap|phase[-_ ]?plan(?:s)?(?:[-_ ].+)?)$", re.IGNORECASE
 )
+_ANALYSIS_REPORT_MARKDOWN_NAME_RE = re.compile(
+    r"^(?:final[-_ ]?comprehensive[-_ ]?mcp[-_ ]?analysis|.+[-_ ]analysis|.+[-_ ]report)$",
+    re.IGNORECASE,
+)
 
 
 class MarkdownPlugin(BaseDocumentPlugin):
@@ -73,6 +77,9 @@ class MarkdownPlugin(BaseDocumentPlugin):
 
         if _ROADMAP_MARKDOWN_NAME_RE.match(path.stem):
             return "roadmap_path"
+
+        if _ANALYSIS_REPORT_MARKDOWN_NAME_RE.match(path.stem):
+            return "analysis_report_path"
 
         return None
 

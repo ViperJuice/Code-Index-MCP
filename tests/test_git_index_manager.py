@@ -772,6 +772,47 @@ def test_full_index_carries_forward_downstream_blocker_after_roadmap_repair(tmp_
     assert result.errors == ["Missing authoritative summaries blocked strict semantic indexing"]
 
 
+def test_full_index_carries_forward_downstream_blocker_after_final_analysis_repair(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+
+    dispatcher = MagicMock()
+    dispatcher.index_directory.return_value = {
+        "indexed_files": 2,
+        "failed_files": 0,
+        "errors": [],
+        "lexical_stage": "completed",
+        "lexical_files_attempted": 2,
+        "lexical_files_completed": 2,
+        "last_progress_path": str(repo / "FINAL_COMPREHENSIVE_MCP_ANALYSIS.md"),
+        "in_flight_path": None,
+        "summaries_written": 0,
+        "summary_chunks_attempted": 2,
+        "summary_missing_chunks": 2,
+        "semantic_indexed": 0,
+        "semantic_failed": 0,
+        "semantic_skipped": 0,
+        "semantic_blocked": 1,
+        "semantic_stage": "blocked_missing_summaries",
+        "semantic_error": "Missing authoritative summaries blocked strict semantic indexing",
+    }
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=dispatcher)
+    result = manager._full_index(repo_info.repository_id, ctx)
+
+    assert result.indexed == 2
+    assert not result.clean
+    assert result.low_level is None
+    assert result.semantic is not None
+    assert result.semantic["semantic_stage"] == "blocked_missing_summaries"
+    assert result.errors == ["Missing authoritative summaries blocked strict semantic indexing"]
+
+
 def test_force_full_sync_does_not_advance_commit_when_semantic_stage_is_blocked(tmp_path):
     repo = _make_git_repo(tmp_path)
     old_commit = _get_head_commit(repo)

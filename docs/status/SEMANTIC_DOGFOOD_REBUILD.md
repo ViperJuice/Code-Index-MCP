@@ -1,14 +1,14 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-28T13:55:06Z`.
-- Observed commit: `019e31d6`.
-- Phase plan: `plans/phase-plan-v7-SEMROADMAP.md`.
+- Evidence captured: `2026-04-28T14:08:05Z`.
+- Observed commit: `269e32a2`.
+- Phase plan: `plans/phase-plan-v7-SEMANALYSIS.md`.
 - Prior repairs carried forward: `SEMSTALLFIX`, `SEMIOWAIT`, and
   `SEMCHANGELOG` in `specs/phase-plans-v7.md`.
 
 ## Reset Boundary
 
-This SEMROADMAP run preserved the same repo-local reset boundary and
+This SEMANALYSIS run preserved the same repo-local reset boundary and
 repo-local dogfood boundary:
 
 - `.mcp-index/current.db` remained the active SQLite store.
@@ -22,17 +22,17 @@ partially rebuilt local index:
 - `chunk_summaries`: `0`
 - `semantic_points`: `0`
 
-## Roadmap Lexical Repair
+## Final-Analysis Lexical Repair
 
-SEMCHANGELOG already narrowed the residual live stall to an exact lexical
-blocker on `ROADMAP.md`. SEMROADMAP repaired that file-path-specific timeout
-without weakening the watchdog globally:
+SEMROADMAP already narrowed the residual live stall to an exact lexical
+blocker on `FINAL_COMPREHENSIVE_MCP_ANALYSIS.md`. SEMANALYSIS repaired that
+file-path-specific timeout without weakening the watchdog globally:
 
 - `mcp_server/plugins/markdown_plugin/plugin.py` now uses a bounded lexical
-  path for roadmap and phase-plan Markdown filenames.
+  path for final-analysis and report-shaped Markdown filenames.
 - The bounded path preserves durable lexical search input plus document and
-  heading symbols for `ROADMAP.md` instead of silently dropping the file from
-  the index.
+  heading symbols for `FINAL_COMPREHENSIVE_MCP_ANALYSIS.md` instead of
+  silently dropping the file from the index.
 - The heavyweight Markdown AST/section/chunk path is still available for other
   Markdown documents, and the lexical watchdog still fails closed for genuine
   path-level stalls.
@@ -49,26 +49,25 @@ env OPENAI_API_KEY=dummy-local-key MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5 uv run mc
 
 ## Rebuild Evidence
 
-Live SEMROADMAP rerun evidence:
+Live SEMANALYSIS rerun evidence:
 
-- The rerun no longer failed on `ROADMAP.md`.
+- The rerun no longer failed on `FINAL_COMPREHENSIVE_MCP_ANALYSIS.md`.
 - The command now fails fast with:
-  `Lexical indexing timed out while processing FINAL_COMPREHENSIVE_MCP_ANALYSIS.md`.
+  `Lexical indexing timed out while processing AGENTS.md`.
 - The dispatcher-side lexical blocker classification remains
   `lexical_stage=blocked_file_timeout`.
-- `last_progress_path` advanced past `ROADMAP.md`.
-- `in_flight_path` now points at `FINAL_COMPREHENSIVE_MCP_ANALYSIS.md` when
-  the watchdog fires.
-- The bounded downstream blocker moved from `ROADMAP.md` to
-  `FINAL_COMPREHENSIVE_MCP_ANALYSIS.md`.
+- `last_progress_path` advanced past `FINAL_COMPREHENSIVE_MCP_ANALYSIS.md`.
+- `in_flight_path` now points at `AGENTS.md` when the watchdog fires.
+- The bounded downstream blocker moved from
+  `FINAL_COMPREHENSIVE_MCP_ANALYSIS.md` to `AGENTS.md`.
 - The indexed commit did not advance after the failed rerun.
 
 Residual blocker shape:
 
-- `ROADMAP.md`: `1010` lines, `45009` bytes, cleared by the bounded lexical
-  Markdown path.
-- `FINAL_COMPREHENSIVE_MCP_ANALYSIS.md`: `206` lines, `7356` bytes, now the
-  next exact file-path timeout under the same five-second watchdog.
+- `FINAL_COMPREHENSIVE_MCP_ANALYSIS.md`: `206` lines, `7356` bytes, cleared by
+  the bounded lexical Markdown path.
+- `AGENTS.md`: `433` lines, `21166` bytes, now the next exact file-path
+  timeout under the same five-second watchdog.
 
 Low-level diagnostic evidence from `SQLiteStore.health_check()` remains part of
 the fail-closed contract:
@@ -148,31 +147,31 @@ Fixed dogfood prompt: `how does semantic setup validate qdrant and embedding rea
 
 The exact verdict string for contract checks is `local multi-repo dogfooding`.
 
-Local multi-repo dogfooding is **still not ready** after SEMROADMAP.
+Local multi-repo dogfooding is **still not ready** after SEMANALYSIS.
 
 Why:
 
-- The original `ROADMAP.md` lexical timeout is repaired.
+- The original `FINAL_COMPREHENSIVE_MCP_ANALYSIS.md` lexical timeout is repaired.
 - The active indexed commit remains stale at `93f00d29` while `HEAD` is
-  `019e31d6`.
+  `269e32a2`.
 - Semantic readiness remains `summaries_missing`.
 - `semantic_points` remains `0`.
 - The precise remaining blocker is now a new exact lexical/storage blocker:
-  `blocked_file_timeout` on `FINAL_COMPREHENSIVE_MCP_ANALYSIS.md`.
+  `blocked_file_timeout` on `AGENTS.md`.
 
 Steering outcome:
 
-- SEMROADMAP changed downstream work by clearing the `ROADMAP.md` blocker and
-  exposing `FINAL_COMPREHENSIVE_MCP_ANALYSIS.md` as the next exact file-path
-  timeout.
-- `specs/phase-plans-v7.md` is amended with downstream phase `SEMANALYSIS`
+- SEMANALYSIS changed downstream work by clearing the
+  `FINAL_COMPREHENSIVE_MCP_ANALYSIS.md` blocker and exposing `AGENTS.md` as
+  the next exact file-path timeout.
+- `specs/phase-plans-v7.md` is amended with downstream phase `SEMAGENTS`
   before any further execution handoff is considered authoritative.
 - Older downstream plans must be treated as stale after that roadmap
   amendment.
 
 ## Verification
 
-Verification sequence for this SEMROADMAP slice:
+Verification sequence for this SEMANALYSIS slice:
 
 ```bash
 env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py -q --no-cov
@@ -188,7 +187,7 @@ Command-level anchors preserved for contract checks:
 - `env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py -q --no-cov`
 - `env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py -q --no-cov`
 - `env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_sqlite_store.py -q --no-cov`
-- `uv run pytest tests/root_tests/test_markdown_production_scenarios.py -q --no-cov -k roadmap`
+- `uv run pytest tests/root_tests/test_markdown_production_scenarios.py -q --no-cov -k analysis`
 - `RUN_REAL_WORLD_TESTS=1 SEMANTIC_SEARCH_ENABLED=true CODE_INDEX_DOGFOOD_REPO=. OPENAI_API_KEY=dummy-local-key uv run --extra dev python -m pytest tests/real_world/test_semantic_search.py -q --no-cov -k repo_local_dogfood_queries_stay_on_semantic_path -rs`
 
 Observed outcomes:
@@ -196,8 +195,7 @@ Observed outcomes:
 - Dispatcher and git-index-manager suites: passed.
 - Markdown roadmap production slice: passed.
 - Force-full rebuild:
-  failed fast with
-  `Lexical indexing timed out while processing FINAL_COMPREHENSIVE_MCP_ANALYSIS.md`.
+  failed fast with `Lexical indexing timed out while processing AGENTS.md`.
 - Repository status:
   still `stale_commit` plus semantic readiness `summaries_missing`.
 - Active-profile semantic preflight:

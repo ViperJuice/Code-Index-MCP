@@ -991,6 +991,58 @@ chunking, or exclusion-policy fixes over weakening the timeout globally.
 **Produces**
 - IF-0-SEMANALYSIS-1 — Final-analysis lexical timeout repair and rerun evidence contract.
 
+### Phase 18 — AGENTS Lexical Timeout Repair (SEMAGENTS)
+
+**Objective**
+
+Repair the next exact repo-local force-full blocker where lexical indexing now
+times out while processing `AGENTS.md`, so the dogfood rebuild can move past
+that bounded policy document and either reach semantic closeout or surface the
+next narrower downstream blocker.
+
+**Exit criteria**
+- [ ] `AGENTS.md` no longer exceeds the lexical timeout during
+      `repository sync --force-full`.
+- [ ] The lexical timeout watchdog remains active and still fails closed for
+      true path-level stalls.
+- [ ] The live force-full rerun either completes through indexed-commit
+      freshness or exits with a new exact blocker that is narrower than
+      `AGENTS.md` lexical processing.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the AGENTS repair,
+      the rerun outcome, current-versus-indexed commit evidence, and the
+      final ready or still-blocked verdict.
+
+**Scope notes**
+
+Keep this phase narrowly focused on why `AGENTS.md` is now slow enough to trip
+the lexical watchdog after SEMANALYSIS cleared
+`FINAL_COMPREHENSIVE_MCP_ANALYSIS.md`. Prefer bounded parsing, chunking, or
+exclusion-policy fixes over weakening the timeout globally.
+
+**Non-goals**
+
+- No semantic ranking redesign.
+- No broad document-processing rewrite.
+- No global timeout increase that hides path-level stalls.
+- No unrelated cleanup of dogfood runtime artifacts.
+
+**Key files**
+
+- `mcp_server/plugins/markdown_plugin/plugin.py`
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `docs/guides/semantic-onboarding.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMANALYSIS
+
+**Produces**
+- IF-0-SEMAGENTS-1 — AGENTS lexical timeout repair and rerun evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -1011,6 +1063,7 @@ SEMCONTRACT
   -> SEMCHANGELOG
   -> SEMROADMAP
   -> SEMANALYSIS
+  -> SEMAGENTS
 ```
 
 ## Execution Notes
@@ -1062,6 +1115,11 @@ SEMCONTRACT
   force-full rerun still times out on another bounded Markdown document such
   as `FINAL_COMPREHENSIVE_MCP_ANALYSIS.md`; it should repair that exact file
   path or preserve a still narrower downstream blocker.
+- SEMAGENTS exists only if SEMANALYSIS clears
+  `FINAL_COMPREHENSIVE_MCP_ANALYSIS.md` but the live force-full rerun still
+  times out on another bounded Markdown or policy document such as
+  `AGENTS.md`; it should repair that exact file path or preserve a still
+  narrower downstream blocker.
 
 ## Verification
 

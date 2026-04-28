@@ -613,6 +613,36 @@ All notable changes to this project will be documented in this file.
         assert "Next Phase" in symbol_names
         assert "SEMEVIDENCE" in symbol_names
 
+    def test_final_analysis_bounded_index_preserves_document_and_heading_symbols(
+        self, markdown_plugin
+    ):
+        """Final analysis reports should stay lexically discoverable on the bounded path."""
+        content = """
+# Final Comprehensive MCP Analysis
+
+## Executive Summary
+
+### Timeout Evidence
+- Preserve lexical watchdog coverage for analysis reports
+
+## Recommendations
+
+### Next Step
+- Carry forward the next exact downstream blocker
+"""
+
+        result = markdown_plugin.indexFile("FINAL_COMPREHENSIVE_MCP_ANALYSIS.md", content)
+
+        assert result["metadata"]["lightweight_index"] is True
+        assert result["metadata"]["lightweight_reason"] == "analysis_report_path"
+        assert result["chunks"] == []
+        symbol_names = [symbol["symbol"] for symbol in result["symbols"]]
+        assert "Final Comprehensive MCP Analysis" in symbol_names
+        assert "Executive Summary" in symbol_names
+        assert "Timeout Evidence" in symbol_names
+        assert "Recommendations" in symbol_names
+        assert "Next Step" in symbol_names
+
     def test_large_documentation_site(self, markdown_plugin, sqlite_store):
         """Test handling of large documentation site structure."""
         # Simulate multiple interconnected docs
