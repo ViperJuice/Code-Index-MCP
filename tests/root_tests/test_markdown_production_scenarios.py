@@ -585,6 +585,34 @@ All notable changes to this project will be documented in this file.
         assert "Added" in symbol_names
         assert "Fixed" in symbol_names
 
+    def test_roadmap_bounded_index_preserves_document_and_heading_symbols(self, markdown_plugin):
+        """ROADMAP.md should stay lexically discoverable on the bounded path."""
+        content = """
+# Semantic Hardening Roadmap
+
+## Current Phase
+
+### SEMROADMAP
+- Repair roadmap lexical timeout handling
+
+## Next Phase
+
+### SEMEVIDENCE
+- Refresh semantic dogfood evidence after the rerun
+"""
+
+        result = markdown_plugin.indexFile("ROADMAP.md", content)
+
+        assert result["metadata"]["lightweight_index"] is True
+        assert result["metadata"]["lightweight_reason"] == "roadmap_path"
+        assert result["chunks"] == []
+        symbol_names = [symbol["symbol"] for symbol in result["symbols"]]
+        assert "Semantic Hardening Roadmap" in symbol_names
+        assert "Current Phase" in symbol_names
+        assert "SEMROADMAP" in symbol_names
+        assert "Next Phase" in symbol_names
+        assert "SEMEVIDENCE" in symbol_names
+
     def test_large_documentation_site(self, markdown_plugin, sqlite_store):
         """Test handling of large documentation site structure."""
         # Simulate multiple interconnected docs

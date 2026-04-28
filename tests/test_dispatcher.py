@@ -1179,6 +1179,32 @@ class TestEnhancedDispatcherProtocolConformance:
         assert result["lexical_stage"] == "completed"
         assert result["last_progress_path"] == str(changelog.resolve())
 
+    def test_index_directory_uses_bounded_markdown_path_for_roadmap(
+        self, tmp_path, monkeypatch
+    ):
+        ctx = _make_repo_ctx()
+        roadmap = tmp_path / "ROADMAP.md"
+        roadmap.write_text(
+            "# Roadmap\n\n## Current Phase\n\n### Next Up\n- Repair roadmap lexical timeout\n",
+            encoding="utf-8",
+        )
+
+        from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
+
+        def _unexpected(*_args, **_kwargs):
+            raise AssertionError("heavy Markdown path should not run for ROADMAP.md")
+
+        monkeypatch.setattr(MarkdownPlugin, "extract_structure", _unexpected)
+        monkeypatch.setattr(MarkdownPlugin, "chunk_document", _unexpected)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, tmp_path)
+
+        assert result["indexed_files"] == 1
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] == str(roadmap.resolve())
+
     def test_index_directory_runs_lexical_then_summaries_then_semantic(self, tmp_path, monkeypatch):
         events = []
         ctx = _make_repo_ctx(sqlite_store=MagicMock(db_path=str(tmp_path / "index.db")))

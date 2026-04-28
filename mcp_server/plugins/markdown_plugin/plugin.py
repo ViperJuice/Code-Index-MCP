@@ -30,6 +30,9 @@ _LIGHTWEIGHT_MARKDOWN_BYTES = 250_000
 _BOUNDED_MARKDOWN_NAME_RE = re.compile(
     r"^(?:changelog|release[-_ ]?notes?)$", re.IGNORECASE
 )
+_ROADMAP_MARKDOWN_NAME_RE = re.compile(
+    r"^(?:roadmap|phase[-_ ]?plan(?:s)?(?:[-_ ].+)?)$", re.IGNORECASE
+)
 
 
 class MarkdownPlugin(BaseDocumentPlugin):
@@ -67,6 +70,9 @@ class MarkdownPlugin(BaseDocumentPlugin):
 
         if _BOUNDED_MARKDOWN_NAME_RE.match(path.stem):
             return "changelog_path"
+
+        if _ROADMAP_MARKDOWN_NAME_RE.match(path.stem):
+            return "roadmap_path"
 
         return None
 

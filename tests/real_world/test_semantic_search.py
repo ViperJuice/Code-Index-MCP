@@ -422,6 +422,11 @@ def parse_server_response(api_result):
             if data.get("code") == "index_unavailable":
                 readiness = data["readiness"]
                 assert readiness["code"] == "stale_commit"
+                evidence = (
+                    repo_path / "docs" / "status" / "SEMANTIC_DOGFOOD_REBUILD.md"
+                ).read_text(encoding="utf-8")
+                assert "SEMROADMAP" in evidence
+                assert "FINAL_COMPREHENSIVE_MCP_ANALYSIS.md" in evidence
                 pytest.skip(
                     "Dogfood repo indexed semantic query is unavailable: "
                     f"{readiness['state']} ({readiness['code']})"

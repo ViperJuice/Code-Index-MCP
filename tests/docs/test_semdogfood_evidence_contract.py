@@ -23,9 +23,9 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
 
     for expected in (
         "# Semantic Dogfood Rebuild",
-        "Phase plan: `plans/phase-plan-v7-SEMCHANGELOG.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMROADMAP.md`",
         "## Reset Boundary",
-        "## Changelog Lexical Repair",
+        "## Roadmap Lexical Repair",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -48,11 +48,13 @@ def test_semdogfood_report_records_reset_boundary_counts_collection_and_verifica
         "Configured enrichment model",
         "Effective enrichment model",
         "Collection bootstrap state",
+        "SEMROADMAP",
+        "SEMANALYSIS",
         "SEMCHANGELOG",
         "SEMSTALLFIX",
         "SEMIOWAIT",
-        "CHANGELOG.md",
         "ROADMAP.md",
+        "FINAL_COMPREHENSIVE_MCP_ANALYSIS.md",
         "blocked_file_timeout",
         "lexical_stage",
         "last_progress_path",
@@ -106,6 +108,7 @@ def test_semantic_onboarding_links_semdogfood_report_and_separate_readiness_surf
     assert "SEMSTALLFIX" in text
     assert "SEMIOWAIT" in text
     assert "SEMROADMAP" in text
+    assert "SEMANALYSIS" in text
     assert "stale_commit" in text
     assert "blocked_file_timeout" in text
     assert "lexical/storage blocker" in text
