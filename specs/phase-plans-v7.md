@@ -1095,6 +1095,59 @@ globally.
 **Produces**
 - IF-0-SEMREADME-1 — README lexical timeout repair and rerun evidence contract.
 
+### Phase 20 — Post-Lexical Semantic Closeout (SEMCLOSEOUT)
+
+**Objective**
+
+Repair the remaining semantic-stage closeout gap exposed by SEMREADME so a
+clean `repository sync --force-full` rebuild that now clears every lexical
+timeout also produces authoritative summaries, semantic vectors, and semantic
+readiness `ready` for the active `oss_high` profile.
+
+**Exit criteria**
+- [ ] A clean force-full rebuild still ends with `Indexed commit` equal to the
+      current commit and repository readiness `ready`.
+- [ ] The same rebuild produces non-zero `chunk_summaries` and non-zero
+      `semantic_points` linked to `code_index__oss_high__v1`.
+- [ ] `uv run mcp-index repository status` reports semantic readiness `ready`
+      instead of `summaries_missing` for the active profile.
+- [ ] Repo-local semantic dogfood queries return semantic-path code results
+      instead of skipping on `semantic_not_ready`.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` is refreshed with the semantic
+      closeout evidence and final semantic-ready or exact still-blocked verdict.
+
+**Scope notes**
+
+This phase exists only because SEMREADME cleared the final lexical timeout and
+restored indexed-commit freshness on the current commit, but the live rebuild
+still ends with semantic readiness `summaries_missing` and zero summaries or
+vectors. Keep the work narrowly on authoritative summary generation, semantic
+vector writes, and the strict semantic closeout path now that lexical indexing
+is no longer the blocker.
+
+**Non-goals**
+
+- No lexical timeout or Markdown bounded-path work.
+- No semantic ranking redesign.
+- No multi-repo rollout expansion beyond this repo-local dogfood closeout.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/indexing/summarization.py`
+- `mcp_server/utils/semantic_indexer.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `docs/guides/semantic-onboarding.md`
+- `tests/real_world/test_semantic_search.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMREADME
+
+**Produces**
+- IF-0-SEMCLOSEOUT-1 — Post-lexical semantic summary/vector closeout contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -1117,6 +1170,7 @@ SEMCONTRACT
   -> SEMANALYSIS
   -> SEMAGENTS
   -> SEMREADME
+  -> SEMCLOSEOUT
 ```
 
 ## Execution Notes

@@ -23,9 +23,9 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
 
     for expected in (
         "# Semantic Dogfood Rebuild",
-        "Phase plan: `plans/phase-plan-v7-SEMAGENTS.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMREADME.md`",
         "## Reset Boundary",
-        "## AGENTS Lexical Repair",
+        "## README Lexical Repair",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -52,17 +52,11 @@ def test_semdogfood_report_records_reset_boundary_counts_collection_and_verifica
         "SEMANALYSIS",
         "SEMAGENTS",
         "SEMREADME",
+        "SEMCLOSEOUT",
         "SEMCHANGELOG",
         "SEMSTALLFIX",
         "SEMIOWAIT",
-        "AGENTS.md",
         "README.md",
-        "blocked_file_timeout",
-        "lexical_stage",
-        "last_progress_path",
-        "in_flight_path",
-        "journal_mode",
-        "busy_timeout_ms",
         "Lexical readiness",
         "Semantic readiness",
         "Indexed commit",
@@ -70,9 +64,8 @@ def test_semdogfood_report_records_reset_boundary_counts_collection_and_verifica
         "Active-profile preflight",
         "uv run pytest tests/test_dispatcher.py -q --no-cov",
         "uv run pytest tests/test_git_index_manager.py -q --no-cov",
-        "uv run pytest tests/test_sqlite_store.py -q --no-cov",
         "uv run mcp-index index check-semantic",
-        "uv run pytest tests/root_tests/test_markdown_production_scenarios.py -q --no-cov -k agents",
+        "uv run pytest tests/root_tests/test_markdown_production_scenarios.py -q --no-cov -k readme",
         "uv run --extra dev python -m pytest tests/real_world/test_semantic_search.py -q --no-cov -k repo_local_dogfood_queries_stay_on_semantic_path -rs",
     ):
         assert expected in text
@@ -90,8 +83,8 @@ def test_semdogfood_report_compares_query_modes_and_states_operator_verdict():
         "mcp_server/cli/repository_commands.py",
         "mcp_server/dispatcher/dispatcher_enhanced.py",
         "mcp_server/storage/git_index_manager.py",
-        "mcp_server/storage/sqlite_store.py",
-        "index_unavailable",
+        "mcp_server/utils/semantic_indexer.py",
+        "semantic_not_ready",
         "local multi-repo dogfooding",
     ):
         assert expected in text
@@ -114,6 +107,7 @@ def test_semantic_onboarding_links_semdogfood_report_and_separate_readiness_surf
     assert "SEMANALYSIS" in text
     assert "SEMAGENTS" in text
     assert "SEMREADME" in text
+    assert "SEMCLOSEOUT" in text
     assert "stale_commit" in text
     assert "blocked_file_timeout" in text
     assert "lexical/storage blocker" in text

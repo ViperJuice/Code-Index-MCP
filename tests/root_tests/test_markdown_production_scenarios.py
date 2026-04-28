@@ -673,6 +673,36 @@ All notable changes to this project will be documented in this file.
         assert "Development Priorities" in symbol_names
         assert "Immediate" in symbol_names
 
+    def test_readme_bounded_index_preserves_document_and_heading_symbols(
+        self, markdown_plugin
+    ):
+        """README.md should stay lexically discoverable on the bounded path."""
+        content = """
+# Code-Index-MCP
+
+## Overview
+
+### Search Strategy
+- Preserve README heading discoverability
+
+## Installation
+
+### Local setup
+- Use uv sync --locked
+"""
+
+        result = markdown_plugin.indexFile("README.md", content)
+
+        assert result["metadata"]["lightweight_index"] is True
+        assert result["metadata"]["lightweight_reason"] == "readme_path"
+        assert result["chunks"] == []
+        symbol_names = [symbol["symbol"] for symbol in result["symbols"]]
+        assert "Code-Index-MCP" in symbol_names
+        assert "Overview" in symbol_names
+        assert "Search Strategy" in symbol_names
+        assert "Installation" in symbol_names
+        assert "Local setup" in symbol_names
+
     def test_large_documentation_site(self, markdown_plugin, sqlite_store):
         """Test handling of large documentation site structure."""
         # Simulate multiple interconnected docs

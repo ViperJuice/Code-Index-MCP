@@ -182,8 +182,11 @@ and vectors:
   repair clears that exact file path while exposing `AGENTS.md` as the next
   exact lexical/storage blocker; and the SEMAGENTS evidence then shows the
   bounded AGENTS repair clears that exact file path while exposing
-  `README.md` as the next exact lexical/storage blocker. If that later blocker
-  remains live, route the next execution step through `SEMREADME` instead of
+  `README.md` as the next exact lexical/storage blocker; and the SEMREADME
+  evidence then shows the bounded README repair clears that final lexical
+  blocker, restores indexed-commit freshness, and leaves the repo blocked
+  downstream on semantic readiness `summaries_missing`. If that later blocker
+  remains live, route the next execution step through `SEMCLOSEOUT` instead of
   reusing an older downstream plan. Use the report to separate those states.
 
 ## Full Reindex Pipeline
@@ -302,8 +305,9 @@ dogfood rebuild evidence.
     SEMDOGFOOD report before assuming the semantic stage is at fault
   - if storage posture might be involved, inspect `journal_mode`,
     `busy_timeout_ms`, and `wal_checkpoint` from the same report
-  - the current SEMAGENTS evidence shows `blocked_file_timeout` on
-    `README.md` rather than an unbounded lower-level hang
+  - the current SEMREADME evidence shows lexical readiness `ready` with
+    semantic readiness `summaries_missing`, so the remaining blocker is in
+    semantic closeout rather than a lower-level README timeout
 - Voyage provider failing
   - verify `VOYAGE_API_KEY`
 - Preflight output

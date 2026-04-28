@@ -1259,6 +1259,77 @@ class TestEnhancedDispatcherProtocolConformance:
         assert result["lexical_stage"] == "completed"
         assert result["last_progress_path"] == str(agents.resolve())
 
+    def test_index_directory_uses_bounded_markdown_path_for_readme(
+        self, tmp_path, monkeypatch
+    ):
+        ctx = _make_repo_ctx()
+        readme = tmp_path / "README.md"
+        readme.write_text(
+            "# Code Index MCP\n\n## Overview\n\n### Local-first search\n- Preserve README heading discoverability\n",
+            encoding="utf-8",
+        )
+
+        from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
+
+        def _unexpected(*_args, **_kwargs):
+            raise AssertionError("heavy Markdown path should not run for README.md")
+
+        monkeypatch.setattr(MarkdownPlugin, "extract_structure", _unexpected)
+        monkeypatch.setattr(MarkdownPlugin, "chunk_document", _unexpected)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, tmp_path)
+
+        assert result["indexed_files"] == 1
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] == str(readme.resolve())
+
+    def test_index_directory_persists_bounded_readme_without_per_symbol_store_calls(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        readme = repo / "README.md"
+        readme.write_text(
+            "# Code-Index-MCP\n\n## Overview\n\n### Search Strategy\n- Preserve README heading discoverability\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        monkeypatch.setattr(
+            SQLiteStore,
+            "store_symbol",
+            lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("README bounded persistence should not call store_symbol")
+            ),
+        )
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 1
+        with store._get_connection() as conn:
+            symbol_count = conn.execute(
+                "SELECT COUNT(*) FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'README.md')"
+            ).fetchone()[0]
+        store.close()
+        assert symbol_count >= 3
+
     def test_index_directory_runs_lexical_then_summaries_then_semantic(self, tmp_path, monkeypatch):
         events = []
         ctx = _make_repo_ctx(sqlite_store=MagicMock(db_path=str(tmp_path / "index.db")))

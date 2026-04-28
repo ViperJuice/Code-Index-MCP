@@ -38,6 +38,7 @@ _ANALYSIS_REPORT_MARKDOWN_NAME_RE = re.compile(
     re.IGNORECASE,
 )
 _AGENT_INSTRUCTIONS_MARKDOWN_NAME_RE = re.compile(r"^(?:agents)$", re.IGNORECASE)
+_README_MARKDOWN_NAME_RE = re.compile(r"^(?:readme)$", re.IGNORECASE)
 
 
 class MarkdownPlugin(BaseDocumentPlugin):
@@ -84,6 +85,9 @@ class MarkdownPlugin(BaseDocumentPlugin):
 
         if _AGENT_INSTRUCTIONS_MARKDOWN_NAME_RE.match(path.stem):
             return "agent_instructions_path"
+
+        if _README_MARKDOWN_NAME_RE.match(path.stem):
+            return "readme_path"
 
         return None
 

@@ -2,6 +2,7 @@
 
 import asyncio
 import hashlib
+import json
 import logging
 import os
 import re
@@ -2380,82 +2381,139 @@ class EnhancedDispatcher:
             content_hash=content_hash,
             metadata=shard.get("metadata") if isinstance(shard, dict) else None,
         )
-        self._clear_file_index_rows(sqlite_store, file_id)
-
-        for symbol in shard.get("symbols", []) if isinstance(shard, dict) else []:
-            if not isinstance(symbol, dict):
-                continue
-            name = symbol.get("symbol") or symbol.get("name")
-            if not name:
-                continue
-            span = symbol.get("span") or ()
-            line_start = symbol.get("line_start") or symbol.get("line")
-            line_end = symbol.get("line_end")
-            if not line_start and isinstance(span, (list, tuple)) and span:
-                line_start = span[0]
-            if not line_end and isinstance(span, (list, tuple)) and len(span) > 1:
-                line_end = span[1]
-            line_start = int(line_start or 1)
-            line_end = int(line_end or line_start)
-            sqlite_store.store_symbol(
-                file_id=file_id,
-                name=str(name),
-                kind=str(symbol.get("kind") or "symbol"),
-                line_start=line_start,
-                line_end=line_end,
-                column_start=symbol.get("column_start") or symbol.get("column"),
-                column_end=symbol.get("column_end"),
-                signature=symbol.get("signature"),
-                documentation=symbol.get("documentation") or symbol.get("doc"),
-                metadata=symbol.get("metadata") or symbol,
-            )
-
-        for index, chunk in enumerate(shard.get("chunks", []) if isinstance(shard, dict) else []):
-            if not isinstance(chunk, dict):
-                continue
-            chunk_content = str(chunk.get("content") or "")
-            if not chunk_content:
-                continue
-            start = int(chunk.get("content_start") or chunk.get("byte_start") or 0)
-            end = int(chunk.get("content_end") or chunk.get("byte_end") or start + len(chunk_content))
-            line_start = int(chunk.get("line_start") or chunk.get("start_line") or 1)
-            line_end = int(chunk.get("line_end") or chunk.get("end_line") or line_start)
-            chunk_id = str(
-                chunk.get("chunk_id")
-                or hashlib.sha256(f"{relative_path}:{index}:{start}:{end}".encode("utf-8")).hexdigest()
-            )
-            sqlite_store.store_chunk(
-                file_id=file_id,
-                content=chunk_content,
-                content_start=start,
-                content_end=end,
-                line_start=line_start,
-                line_end=line_end,
-                chunk_id=chunk_id,
-                node_id=str(chunk.get("node_id") or chunk_id),
-                treesitter_file_id=str(chunk.get("file_id") or relative_path),
-                definition_id=chunk.get("definition_id"),
-                parent_chunk_id=chunk.get("parent_chunk_id"),
-                node_type=chunk.get("node_type"),
-                language=language,
-                chunk_index=int(chunk.get("chunk_index") or index),
-                metadata=chunk.get("metadata") or {},
-            )
-
         with sqlite_store._get_connection() as conn:
+            self._clear_file_index_rows(sqlite_store, file_id, conn=conn)
+
+            for symbol in shard.get("symbols", []) if isinstance(shard, dict) else []:
+                if not isinstance(symbol, dict):
+                    continue
+                name = symbol.get("symbol") or symbol.get("name")
+                if not name:
+                    continue
+                span = symbol.get("span") or ()
+                line_start = symbol.get("line_start") or symbol.get("line")
+                line_end = symbol.get("line_end")
+                if not line_start and isinstance(span, (list, tuple)) and span:
+                    line_start = span[0]
+                if not line_end and isinstance(span, (list, tuple)) and len(span) > 1:
+                    line_end = span[1]
+                line_start = int(line_start or 1)
+                line_end = int(line_end or line_start)
+                cursor = conn.execute(
+                    """INSERT INTO symbols
+                       (file_id, name, kind, line_start, line_end, column_start,
+                        column_end, signature, documentation, metadata, token_count, token_model)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        file_id,
+                        str(name),
+                        str(symbol.get("kind") or "symbol"),
+                        line_start,
+                        line_end,
+                        symbol.get("column_start") or symbol.get("column"),
+                        symbol.get("column_end"),
+                        symbol.get("signature"),
+                        symbol.get("documentation") or symbol.get("doc"),
+                        json.dumps(symbol.get("metadata") or symbol),
+                        None,
+                        None,
+                    ),
+                )
+                sqlite_store._store_trigrams(conn, cursor.lastrowid, str(name))
+
+            for index, chunk in enumerate(shard.get("chunks", []) if isinstance(shard, dict) else []):
+                if not isinstance(chunk, dict):
+                    continue
+                chunk_content = str(chunk.get("content") or "")
+                if not chunk_content:
+                    continue
+                start = int(chunk.get("content_start") or chunk.get("byte_start") or 0)
+                end = int(
+                    chunk.get("content_end") or chunk.get("byte_end") or start + len(chunk_content)
+                )
+                line_start = int(chunk.get("line_start") or chunk.get("start_line") or 1)
+                line_end = int(chunk.get("line_end") or chunk.get("end_line") or line_start)
+                chunk_id = str(
+                    chunk.get("chunk_id")
+                    or hashlib.sha256(
+                        f"{relative_path}:{index}:{start}:{end}".encode("utf-8")
+                    ).hexdigest()
+                )
+                conn.execute(
+                    """INSERT INTO code_chunks
+                       (file_id, symbol_id, content, content_start, content_end,
+                        line_start, line_end, chunk_id, node_id, treesitter_file_id,
+                        symbol_hash, definition_id, token_count, token_model,
+                        chunk_type, language, node_type, parent_chunk_id, depth,
+                        chunk_index, metadata)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                       ON CONFLICT(file_id, chunk_id) DO UPDATE SET
+                       symbol_id=excluded.symbol_id,
+                       content=excluded.content,
+                       content_start=excluded.content_start,
+                       content_end=excluded.content_end,
+                       line_start=excluded.line_start,
+                       line_end=excluded.line_end,
+                       node_id=excluded.node_id,
+                       treesitter_file_id=excluded.treesitter_file_id,
+                       symbol_hash=excluded.symbol_hash,
+                       definition_id=excluded.definition_id,
+                       token_count=excluded.token_count,
+                       token_model=excluded.token_model,
+                       chunk_type=excluded.chunk_type,
+                       language=excluded.language,
+                       node_type=excluded.node_type,
+                       parent_chunk_id=excluded.parent_chunk_id,
+                       depth=excluded.depth,
+                       chunk_index=excluded.chunk_index,
+                       metadata=excluded.metadata,
+                       updated_at=CURRENT_TIMESTAMP""",
+                    (
+                        file_id,
+                        chunk.get("symbol_id"),
+                        chunk_content,
+                        start,
+                        end,
+                        line_start,
+                        line_end,
+                        chunk_id,
+                        str(chunk.get("node_id") or chunk_id),
+                        str(chunk.get("file_id") or relative_path),
+                        chunk.get("symbol_hash"),
+                        chunk.get("definition_id"),
+                        chunk.get("token_count"),
+                        chunk.get("token_model"),
+                        chunk.get("chunk_type") or "code",
+                        language,
+                        chunk.get("node_type"),
+                        chunk.get("parent_chunk_id"),
+                        int(chunk.get("depth") or 0),
+                        int(chunk.get("chunk_index") or index),
+                        json.dumps(chunk.get("metadata") or {}),
+                    ),
+                )
+
             conn.execute("DELETE FROM fts_code WHERE file_id = ?", (str(file_id),))
             conn.execute("INSERT INTO fts_code (content, file_id) VALUES (?, ?)", (content, file_id))
 
-    def _clear_file_index_rows(self, sqlite_store: SQLiteStore, file_id: int) -> None:
-        with sqlite_store._get_connection() as conn:
-            conn.execute(
-                "DELETE FROM symbol_trigrams WHERE symbol_id IN "
-                "(SELECT id FROM symbols WHERE file_id = ?)",
-                (file_id,),
-            )
-            conn.execute("DELETE FROM symbols WHERE file_id = ?", (file_id,))
-            conn.execute("DELETE FROM code_chunks WHERE file_id = ?", (file_id,))
-            conn.execute("DELETE FROM fts_code WHERE file_id = ?", (str(file_id),))
+    def _clear_file_index_rows(
+        self,
+        sqlite_store: SQLiteStore,
+        file_id: int,
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> None:
+        if conn is None:
+            with sqlite_store._get_connection() as owned_conn:
+                self._clear_file_index_rows(sqlite_store, file_id, conn=owned_conn)
+                return
+        conn.execute(
+            "DELETE FROM symbol_trigrams WHERE symbol_id IN "
+            "(SELECT id FROM symbols WHERE file_id = ?)",
+            (file_id,),
+        )
+        conn.execute("DELETE FROM symbols WHERE file_id = ?", (file_id,))
+        conn.execute("DELETE FROM code_chunks WHERE file_id = ?", (file_id,))
+        conn.execute("DELETE FROM fts_code WHERE file_id = ?", (str(file_id),))
 
     def get_statistics(self, ctx: RepoContext) -> Dict[str, Any]:
         """Get statistics about indexed files and languages."""
