@@ -141,6 +141,9 @@ class SessionManager:
             results = list(semantic_indexer.query(query, limit=5))
 
             assert len(results) > 0, f"Should find semantic matches for '{query}'"
+            assert all(
+                result.get("semantic_source") == "semantic" for result in results
+            ), f"Semantic path metadata should be preserved for '{query}'"
 
             # Check that results have reasonable scores
             best_score = max(r.get("score", 0) for r in results)

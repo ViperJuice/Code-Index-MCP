@@ -55,6 +55,21 @@ from .result_aggregator import (
 logger = logging.getLogger(__name__)
 
 
+class SemanticSearchFailure(RuntimeError):
+    """Raised when a semantic-only query cannot safely produce semantic output."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        profile_id: Optional[str] = None,
+        collection_name: Optional[str] = None,
+    ) -> None:
+        super().__init__(message)
+        self.profile_id = profile_id
+        self.collection_name = collection_name
+
+
 class IndexResultStatus(str, Enum):
     INDEXED = "indexed"
     DELETED = "deleted"
@@ -1273,6 +1288,7 @@ class EnhancedDispatcher:
         start_time = time.time()
         sqlite_store = ctx.sqlite_store
         _semantic_indexer = self._get_semantic_indexer(ctx)
+        strict_semantic_route = semantic and self._is_registered_context(ctx)
         repo_plugins = self._plugin_set_registry.plugins_for(ctx.repo_id)
 
         try:
@@ -1317,7 +1333,7 @@ class EnhancedDispatcher:
 
             # Prefer direct SQLite lexical search for non-semantic queries so the
             # server remains useful even when plugin in-memory indexes are cold.
-            if sqlite_store and (not semantic or _semantic_indexer is None):
+            if sqlite_store and (not semantic or (_semantic_indexer is None and not strict_semantic_route)):
                 # Symbol routing: bypass BM25 for explicit symbol-pattern queries.
                 intent, sym_name, kind_hint = classify_query_intent(query)
                 if intent == QueryIntent.SYMBOL:
@@ -1421,6 +1437,11 @@ class EnhancedDispatcher:
 
             # Semantic queries go directly to the vector index — plugins explicitly
             # return [] for semantic=True, so bypassing them is correct.
+            if strict_semantic_route and _semantic_indexer is None:
+                raise SemanticSearchFailure(
+                    "Semantic search requested for a registered repository, but the semantic indexer is unavailable."
+                )
+
             if semantic and _semantic_indexer:
                 logger.info(f"Using semantic indexer for query: {query}")
                 try:
@@ -1453,6 +1474,11 @@ class EnhancedDispatcher:
                                 "snippet": snippet,
                                 "score": raw_score,
                                 "language": result.get("metadata", {}).get("language", "unknown"),
+                                "semantic_source": result.get("semantic_source", "semantic"),
+                                "semantic_profile_id": result.get("semantic_profile_id"),
+                                "semantic_collection_name": result.get(
+                                    "semantic_collection_name"
+                                ),
                             }
                         )
                     # Re-sort by adjusted score so penalties take effect before reranking.
@@ -1466,6 +1492,12 @@ class EnhancedDispatcher:
                     self._operation_stats["total_time"] += time.time() - start_time
                     return
                 except Exception as e:
+                    if strict_semantic_route:
+                        raise SemanticSearchFailure(
+                            f"Semantic search failed for registered repository: {e}",
+                            profile_id=getattr(_semantic_indexer.semantic_profile, "profile_id", None),
+                            collection_name=getattr(_semantic_indexer, "collection", None),
+                        ) from e
                     logger.warning(f"Semantic indexer search failed, falling back to plugins: {e}")
 
             # For search, we may need to search across all languages
@@ -1500,11 +1532,24 @@ class EnhancedDispatcher:
                                 "snippet": snippet,
                                 "score": result.get("score", 0.0),
                                 "language": result.get("metadata", {}).get("language", "unknown"),
+                                "semantic_source": result.get("semantic_source", "semantic"),
+                                "semantic_profile_id": result.get("semantic_profile_id"),
+                                "semantic_collection_name": result.get(
+                                    "semantic_collection_name"
+                                ),
                             }
                         self._operation_stats["searches"] += 1
                         self._operation_stats["total_time"] += time.time() - start_time
                         return
                     except Exception as e:
+                        if strict_semantic_route:
+                            raise SemanticSearchFailure(
+                                f"Semantic search failed for registered repository: {e}",
+                                profile_id=getattr(
+                                    _semantic_indexer.semantic_profile, "profile_id", None
+                                ),
+                                collection_name=getattr(_semantic_indexer, "collection", None),
+                            ) from e
                         logger.error(f"Error in semantic search: {e}")
                         # Fall back to BM25
 
@@ -1785,6 +1830,8 @@ class EnhancedDispatcher:
                 self._operation_stats["searches"] += 1
                 self._operation_stats["total_time"] += time.time() - start_time
 
+        except SemanticSearchFailure:
+            raise
         except Exception as e:
             logger.error(f"Error in search for {query}: {e}", exc_info=True)
         finally:

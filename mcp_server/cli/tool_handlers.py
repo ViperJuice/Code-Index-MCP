@@ -19,6 +19,7 @@ import mcp.types as types
 from mcp_server.cli.bootstrap import _allowed_roots, _path_within_allowed, validate_index
 from mcp_server.core.repo_context import RepoContext
 from mcp_server.core.repo_resolver import RepoResolver
+from mcp_server.dispatcher.dispatcher_enhanced import SemanticSearchFailure
 from mcp_server.dispatcher.protocol import DispatcherProtocol
 from mcp_server.health.repository_readiness import (
     ReadinessClassifier,
@@ -194,9 +195,42 @@ def _semantic_not_ready_response(
         "results": [],
         "code": "semantic_not_ready",
         "query": query,
+        "semantic_requested": True,
+        "semantic_source": "semantic",
+        "semantic_profile_id": semantic_readiness.profile_id,
+        "semantic_collection_name": semantic_readiness.collection_name,
+        "semantic_fallback_status": "refused_not_ready",
         "semantic_readiness": semantic_readiness.to_dict(),
         "message": "Semantic search requested, but enriched semantic vectors are not ready.",
         "remediation": semantic_readiness.remediation,
+    }
+    return [types.TextContent(type="text", text=_ensure_response(response))]
+
+
+def _semantic_failure_response(
+    *,
+    query: str,
+    semantic_readiness: Any | None,
+    error: Exception,
+) -> list[types.TextContent]:
+    profile_id = getattr(semantic_readiness, "profile_id", None)
+    collection_name = getattr(semantic_readiness, "collection_name", None)
+    if isinstance(error, SemanticSearchFailure):
+        profile_id = error.profile_id or profile_id
+        collection_name = error.collection_name or collection_name
+
+    response = {
+        "results": [],
+        "code": "semantic_search_failed",
+        "query": query,
+        "semantic_requested": True,
+        "semantic_source": "semantic",
+        "semantic_profile_id": profile_id,
+        "semantic_collection_name": collection_name,
+        "semantic_fallback_status": "failed_runtime",
+        "semantic_readiness": semantic_readiness.to_dict() if semantic_readiness else None,
+        "message": "Semantic search failed at runtime; lexical fallback was not used.",
+        "details": str(error),
     }
     return [types.TextContent(type="text", text=_ensure_response(response))]
 
@@ -393,6 +427,7 @@ async def handle_search_code(
 
     # Resolve ctx via RepoResolver (replaces old multi-repo bypass)
     ctx = _resolve_ctx(repo_resolver, repository)
+    semantic_readiness = None
     if semantic and ctx is not None:
         semantic_readiness = ReadinessClassifier.classify_semantic_registered(
             ctx.registry_entry,
@@ -436,6 +471,12 @@ async def handle_search_code(
         ]
     except Exception as e:
         logger.error(f"Search failed: {e}")
+        if semantic:
+            return _semantic_failure_response(
+                query=query,
+                semantic_readiness=semantic_readiness,
+                error=e,
+            )
         return [
             types.TextContent(
                 type="text",
@@ -474,6 +515,22 @@ async def handle_search_code(
                     else getattr(r, "last_modified", None)
                 ),
             }
+            if semantic:
+                result_item["semantic_source"] = (
+                    r.get("semantic_source")
+                    if isinstance(r, dict)
+                    else getattr(r, "semantic_source", None)
+                )
+                result_item["semantic_profile_id"] = (
+                    r.get("semantic_profile_id")
+                    if isinstance(r, dict)
+                    else getattr(r, "semantic_profile_id", None)
+                )
+                result_item["semantic_collection_name"] = (
+                    r.get("semantic_collection_name")
+                    if isinstance(r, dict)
+                    else getattr(r, "semantic_collection_name", None)
+                )
             if line and file_path:
                 offset = line - 1
                 result_item["_usage_hint"] = (
@@ -491,7 +548,26 @@ async def handle_search_code(
                     if chunk_info:
                         lazy_summarizer.enqueue(chunk_info)
 
-        if _indexing_active:
+        if semantic:
+            search_response = {
+                "results": results_data,
+                "query": query,
+                "semantic_requested": True,
+                "semantic_source": "semantic",
+                "semantic_profile_id": (
+                    semantic_readiness.profile_id if semantic_readiness is not None else None
+                ),
+                "semantic_collection_name": (
+                    semantic_readiness.collection_name if semantic_readiness is not None else None
+                ),
+                "semantic_fallback_status": "not_attempted",
+            }
+            if _indexing_active:
+                search_response["indexing_in_progress"] = True
+                search_response["note"] = (
+                    "Initial index is still building — results may be incomplete"
+                )
+        elif _indexing_active:
             search_response = {
                 "results": results_data,
                 "indexing_in_progress": True,
@@ -510,6 +586,16 @@ async def handle_search_code(
                 else "No results found in index"
             ),
         }
+        if semantic:
+            response_data["semantic_requested"] = True
+            response_data["semantic_source"] = "semantic"
+            response_data["semantic_profile_id"] = (
+                semantic_readiness.profile_id if semantic_readiness is not None else None
+            )
+            response_data["semantic_collection_name"] = (
+                semantic_readiness.collection_name if semantic_readiness is not None else None
+            )
+            response_data["semantic_fallback_status"] = "not_attempted"
         if readiness is not None:
             response_data["readiness"] = readiness.to_dict()
         if _indexing_active:

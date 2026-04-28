@@ -615,6 +615,86 @@ def test_semantic_query_symbol_precise_demotes_tests():
     assert reranked[0]["relative_path"] == "mcp_server/utils/semantic_indexer.py"
 
 
+def test_semantic_query_symbol_precise_prefers_impl_over_plans_docs_and_benchmarks():
+    indexer = object.__new__(SemanticIndexer)
+
+    results = [
+        {
+            "relative_path": "plans/phase-plan-v7-SEMQUERY.md",
+            "symbol": "SemanticIndexer",
+            "semantic_text": "phase plan for SemanticIndexer query routing",
+            "score": 0.98,
+        },
+        {
+            "relative_path": "docs/guides/semantic-onboarding.md",
+            "symbol": "SemanticIndexer",
+            "doc_type": "markdown",
+            "semantic_text": "SemanticIndexer documentation",
+            "score": 0.96,
+        },
+        {
+            "relative_path": "docs/benchmarks/semantic-search-report.md",
+            "symbol": "SemanticIndexer",
+            "doc_type": "markdown",
+            "semantic_text": "benchmark fixture mentions SemanticIndexer",
+            "score": 0.95,
+        },
+        {
+            "relative_path": "tests/test_profile_aware_semantic_indexer.py",
+            "symbol": "SemanticIndexer",
+            "semantic_text": "test SemanticIndexer behavior",
+            "score": 0.94,
+        },
+        {
+            "relative_path": "mcp_server/utils/semantic_indexer.py",
+            "symbol": "SemanticIndexer",
+            "qualified_name": "SemanticIndexer",
+            "semantic_text": "SemanticIndexer implementation",
+            "score": 0.84,
+        },
+    ]
+
+    reranked = SemanticIndexer._rerank_query_results(
+        indexer,
+        "class SemanticIndexer",
+        results,
+        limit=5,
+    )
+
+    assert reranked[0]["relative_path"] == "mcp_server/utils/semantic_indexer.py"
+    assert reranked[-1]["relative_path"] == "plans/phase-plan-v7-SEMQUERY.md"
+
+
+def test_semantic_query_results_include_stable_metadata():
+    indexer = object.__new__(SemanticIndexer)
+    indexer._qdrant_available = True
+    indexer.collection = "code_index__oss_high__v1"
+    indexer.semantic_profile = cast(Any, SimpleNamespace(profile_id="oss_high"))
+    indexer._embed_texts = lambda texts, input_type="query": [[0.1, 0.2, 0.3] for _ in texts]
+
+    class _Point:
+        def __init__(self):
+            self.payload = {
+                "relative_path": "mcp_server/utils/semantic_indexer.py",
+                "line": 42,
+                "semantic_text": "SemanticIndexer implementation",
+            }
+            self.score = 0.91
+
+    class _QdrantStub:
+        def search(self, collection_name, query_vector, limit):
+            return [_Point()]
+
+    indexer.qdrant = cast(Any, _QdrantStub())
+
+    results = list(SemanticIndexer.query(indexer, "class SemanticIndexer", limit=1))
+
+    assert results[0]["source"] == "semantic"
+    assert results[0]["semantic_source"] == "semantic"
+    assert results[0]["semantic_profile_id"] == "oss_high"
+    assert results[0]["semantic_collection_name"] == "code_index__oss_high__v1"
+
+
 def test_hybrid_post_process_prefers_impl_paths_for_code_intent(temp_db_path):
     store = SQLiteStore(str(temp_db_path))
     hybrid = HybridSearch(storage=store, config=HybridSearchConfig())

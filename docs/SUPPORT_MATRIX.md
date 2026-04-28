@@ -12,7 +12,7 @@ indexed automatically. Same-repo sibling worktrees and non-default branch
 queries return `index_unavailable` with `safe_fallback: "native_search"` until
 readiness remediation completes; indexed MCP results are authoritative only when
 readiness is `ready`. Lexical repository readiness does not imply semantic
-readiness: `semantic=true` queries additionally require summaries, vector
+readiness: `semantic: true` queries additionally require summaries, vector
 linkage, and profile-compatible semantic metadata.
 
 Runtime facts are grounded in `mcp_server/plugins/language_registry.py`,
@@ -119,7 +119,7 @@ topology, or install-surface support expansion.
 | Native source install via `uv sync --locked` | beta | Canonical local development and operator path | `pyproject.toml`, `uv.lock`, install docs | This is the preferred local install path while the release remains pre-GA |
 | Package install (`index-it-mcp==1.2.0`) | beta | Prepared stable artifact path | package naming and install docs | Stable surface prep does not by itself prove downstream release publication |
 | Docker image `ghcr.io/viperjuice/code-index-mcp:v1.2.0` | beta | Supported container path | Docker guide, release evidence, image naming tests | Container docs must keep the same topology and readiness limits as native docs |
-| Semantic search (`uv sync --locked --extra semantic` plus provider config) | experimental | Optional extra and provider-dependent | extras docs, config env vars, support-fact notes | Requires semantic readiness `ready` for the active profile; `summaries_missing`, `vectors_missing`, `profile_mismatch`, or `semantic_stale` mean semantic queries are not ready |
+| Semantic search (`uv sync --locked --extra semantic` plus provider config) | experimental | Optional extra and provider-dependent | extras docs, config env vars, support-fact notes | Requires semantic readiness `ready` for the active profile; ready `semantic: true` responses expose semantic source/profile/collection metadata, while `summaries_missing`, `vectors_missing`, `profile_mismatch`, or `semantic_stale` return explicit semantic refusal or failure instead of lexical fallback |
 | Reranking (`uv sync --locked --extra rerank` plus provider/model config) | experimental | Optional extra and provider-dependent | extras docs and support-fact notes | Treat as opt-in ranking improvement, not baseline query behavior |
 | Default sandboxed plugin execution | beta | Default security posture | `sandbox_supported`, `activation_mode`, sandbox docs | Coverage varies by language and is authoritative through `plugin_availability` |
 | Unsandboxed or sandbox-disabled plugin path | disabled-by-default | Explicit operator opt-in only | `activation_mode=disabled_by_default`, sandbox docs | Enabling unsandboxed fallback does not widen documented default support |

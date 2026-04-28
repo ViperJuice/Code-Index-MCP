@@ -1147,6 +1147,7 @@ class SemanticIndexer:
 
         is_impl = normalized.startswith(("mcp_server/", "src/"))
         is_script = normalized.startswith("scripts/")
+        is_plan = normalized.startswith("plans/") or "/plans/" in normalized
         is_test = normalized.startswith("tests/") or "/tests/" in normalized
         is_doc = normalized.startswith(
             ("docs/", "ai_docs/", "architecture/")
@@ -1162,6 +1163,8 @@ class SemanticIndexer:
             multiplier *= 1.15
         elif is_script:
             multiplier *= 1.05
+        elif is_plan:
+            multiplier *= 0.45
         elif is_test:
             multiplier *= 0.75
         elif is_doc or doc_type_normalized in {
@@ -1180,6 +1183,8 @@ class SemanticIndexer:
                 multiplier *= 1.25
             elif is_script:
                 multiplier *= 1.1
+            if is_plan:
+                multiplier *= 0.2
             if is_test:
                 multiplier *= 0.55
             if is_doc or doc_type_normalized in {
@@ -1376,6 +1381,7 @@ class SemanticIndexer:
     ) -> List[dict[str, Any]]:
         """Apply lightweight query-aware reranking to semantic results."""
         code_intent = self._looks_like_code_intent(query)
+        symbol_precise = self._looks_like_symbol_precise_query(query)
         reranked: List[dict[str, Any]] = []
 
         for result in results:
@@ -1396,17 +1402,42 @@ class SemanticIndexer:
             normalized_path = path.replace("\\", "/").lower().lstrip("./")
             is_test = normalized_path.startswith("tests/") or "/tests/" in normalized_path
             is_impl = normalized_path.startswith(("mcp_server/", "src/"))
-            if self._looks_like_symbol_precise_query(query):
+            is_plan = normalized_path.startswith("plans/") or "/plans/" in normalized_path
+            is_doc = normalized_path.startswith(
+                ("docs/", "ai_docs/", "architecture/")
+            ) or normalized_path.endswith(("readme.md", "readme.rst", "readme.txt"))
+            is_benchmark_artifact = (
+                "/benchmarks/" in normalized_path
+                or normalized_path.startswith("benchmarks/")
+                or normalized_path.endswith("run_e2e_retrieval_validation.py")
+                or normalized_path.endswith("test_benchmark_query_regressions.py")
+            )
+            if symbol_precise:
                 if is_test:
-                    score *= 0.45
+                    score *= 0.35
+                elif is_plan:
+                    score *= 0.12
+                elif is_doc:
+                    score *= 0.2
+                elif is_benchmark_artifact:
+                    score *= 0.18
                 elif is_impl:
-                    score *= 1.1
+                    score *= 1.18
 
             adjusted["score"] = score
             reranked.append(adjusted)
 
         reranked.sort(key=lambda item: float(item.get("score", 0.0)), reverse=True)
         return self._prefer_unique_files(reranked, limit)
+
+    def _semantic_result_metadata(self) -> dict[str, Any]:
+        """Return stable metadata for semantic-path query results."""
+        return {
+            "source": "semantic",
+            "semantic_source": "semantic",
+            "semantic_profile_id": self.semantic_profile.profile_id,
+            "semantic_collection_name": self.collection,
+        }
 
     def _build_chunk_embedding_text(
         self,
@@ -1743,7 +1774,8 @@ class SemanticIndexer:
         source_chunk_links: Dict[str, int] = {}
         try:
             self._upsert_points_batched(path, points)
-            if self.sqlite_store is not None:
+            sqlite_store = getattr(self, "sqlite_store", None)
+            if sqlite_store is not None:
                 effective_profile_id = self.semantic_profile.profile_id
                 for point in points:
                     payload = point.payload or {}
@@ -1754,14 +1786,14 @@ class SemanticIndexer:
                     if source_chunk_id:
                         source_chunk_links[str(source_chunk_id)] = int(point.id)
                 for chunk_id, point_id in point_links:
-                    self.sqlite_store.upsert_semantic_point(
+                    sqlite_store.upsert_semantic_point(
                         profile_id=effective_profile_id,
                         chunk_id=chunk_id,
                         point_id=point_id,
                         collection=self.collection,
                     )
                 for source_chunk_id, point_id in source_chunk_links.items():
-                    self.sqlite_store.upsert_semantic_point(
+                    sqlite_store.upsert_semantic_point(
                         profile_id=effective_profile_id,
                         chunk_id=source_chunk_id,
                         point_id=point_id,
@@ -2024,8 +2056,9 @@ class SemanticIndexer:
 
             rerank_input: List[dict[str, Any]] = []
             for res in results:
-                payload = res.payload or {}
+                payload = dict(res.payload or {})
                 payload["score"] = res.score
+                payload.update(self._semantic_result_metadata())
                 rerank_input.append(payload)
 
             yield from self._rerank_query_results(text, rerank_input, limit)

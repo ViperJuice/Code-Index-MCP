@@ -127,6 +127,13 @@ and vectors:
 - `get_status` exposes lexical readiness separately from semantic readiness.
 - `search_code(semantic=true)` refuses with semantic readiness metadata when
   summaries, vectors, or profile compatibility are missing.
+- For a semantically ready registered repository, `search_code(semantic=true)`
+  stays on the semantic path end to end. Ready responses expose
+  `semantic_source`, `semantic_profile_id`, and `semantic_collection_name`.
+- Semantic runtime failures are explicit: `semantic=true` returns
+  `code="semantic_search_failed"` with `semantic_fallback_status=failed_runtime`
+  instead of silently degrading to lexical or plugin results.
+- Explicit lexical queries keep the existing lexical response shape.
 - Semantic search remains experimental and provider-aware; do not treat a
   lexically ready repository as semantically query-ready unless the semantic
   readiness surface reports `ready`.

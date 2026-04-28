@@ -22,7 +22,11 @@ from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
 # ---------------------------------------------------------------------------
 # SL-1.1 imports (new Protocol-conformance tests)
 # ---------------------------------------------------------------------------
-from mcp_server.dispatcher.dispatcher_enhanced import IndexResult, IndexResultStatus
+from mcp_server.dispatcher.dispatcher_enhanced import (
+    IndexResult,
+    IndexResultStatus,
+    SemanticSearchFailure,
+)
 from mcp_server.dispatcher.protocol import DispatcherProtocol
 from mcp_server.dispatcher.query_intent import QueryIntent, classify
 from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher
@@ -251,6 +255,75 @@ class TestSearch:
         list(dispatcher.search(ctx, "test", semantic=True, limit=10))
 
         mock_plugin.search.assert_called_once_with("test", {"semantic": True, "limit": 10})
+
+    def test_search_registered_semantic_returns_semantic_metadata(self):
+        store = MagicMock()
+        ctx = _make_repo_ctx(store)
+        semantic_indexer = MagicMock()
+        semantic_indexer.search.return_value = [
+            {
+                "relative_path": "mcp_server/utils/semantic_indexer.py",
+                "line": 42,
+                "snippet": "class SemanticIndexer:",
+                "score": 0.84,
+                "semantic_source": "semantic",
+                "semantic_profile_id": "oss_high",
+                "semantic_collection_name": "code_index__oss_high__v1",
+            }
+        ]
+
+        dispatcher = Dispatcher([])
+        dispatcher._semantic_registry = MagicMock(get=MagicMock(return_value=semantic_indexer))
+
+        results = list(dispatcher.search(ctx, "class SemanticIndexer", semantic=True, limit=5))
+
+        assert results[0]["file"] == "mcp_server/utils/semantic_indexer.py"
+        assert results[0]["semantic_source"] == "semantic"
+        assert results[0]["semantic_profile_id"] == "oss_high"
+        assert results[0]["semantic_collection_name"] == "code_index__oss_high__v1"
+        store.search_bm25.assert_not_called()
+
+    def test_search_registered_semantic_failure_does_not_fall_back_to_bm25(self):
+        store = MagicMock()
+        store.search_bm25.return_value = [
+            {"filepath": "docs/guides/semantic-onboarding.md", "score": -1.0, "snippet": "docs"}
+        ]
+        ctx = _make_repo_ctx(store)
+        semantic_indexer = MagicMock()
+        semantic_indexer.search.side_effect = RuntimeError("qdrant offline")
+        semantic_indexer.semantic_profile = SimpleNamespace(profile_id="oss_high")
+        semantic_indexer.collection = "code_index__oss_high__v1"
+
+        dispatcher = Dispatcher([])
+        dispatcher._semantic_registry = MagicMock(get=MagicMock(return_value=semantic_indexer))
+
+        with pytest.raises(SemanticSearchFailure, match="Semantic search failed"):
+            list(dispatcher.search(ctx, "class SemanticIndexer", semantic=True, limit=5))
+
+        store.search_bm25.assert_not_called()
+
+    def test_search_lexical_false_path_remains_unchanged_when_semantic_available(self):
+        store = MagicMock()
+        store.search_bm25.return_value = [
+            {
+                "filepath": "mcp_server/utils/semantic_indexer.py",
+                "score": -2.0,
+                "snippet": "class SemanticIndexer",
+                "language": "python",
+            }
+        ]
+        store.find_best_chunk_for_file.return_value = None
+        ctx = _make_repo_ctx(store)
+        semantic_indexer = MagicMock()
+
+        dispatcher = Dispatcher([])
+        dispatcher._semantic_registry = MagicMock(get=MagicMock(return_value=semantic_indexer))
+
+        results = list(dispatcher.search(ctx, "semantic preflight validation", semantic=False, limit=5))
+
+        assert results[0]["file"] == "mcp_server/utils/semantic_indexer.py"
+        semantic_indexer.search.assert_not_called()
+        store.search_bm25.assert_called()
 
     def test_search_multiple_plugins(self):
         """Test search results from multiple plugins are combined (first-hit plugin path)."""
@@ -940,6 +1013,7 @@ def _make_repo_ctx(sqlite_store=None) -> RepoContext:
 
     registry_entry = MagicMock(spec=RepositoryInfo)
     registry_entry.tracked_branch = "main"
+    registry_entry.path = Path("/tmp/test-repo")
 
     return RepoContext(
         repo_id="test-repo-id-0001",
