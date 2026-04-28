@@ -609,6 +609,57 @@ def test_full_index_returns_exact_semantic_blocker_when_summary_progress_plateau
     )
 
 
+def test_full_index_preserves_bounded_summary_continuation_details(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+
+    dispatcher = MagicMock()
+    dispatcher.index_directory.return_value = {
+        "indexed_files": 2,
+        "failed_files": 0,
+        "errors": [],
+        "summaries_written": 8,
+        "summary_chunks_attempted": 8,
+        "summary_missing_chunks": 17,
+        "summary_passes": 8,
+        "summary_remaining_chunks": 17,
+        "summary_scope_drained": False,
+        "summary_continuation_required": True,
+        "semantic_indexed": 0,
+        "semantic_failed": 0,
+        "semantic_skipped": 0,
+        "semantic_blocked": 2,
+        "semantic_stage": "blocked_missing_summaries",
+        "semantic_error": (
+            "Missing authoritative summaries blocked strict semantic indexing "
+            "after 8 bounded summary passes; 17 chunks still require summaries"
+        ),
+    }
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=dispatcher)
+    result = manager._full_index(repo_info.repository_id, ctx)
+
+    assert result.indexed == 2
+    assert not result.clean
+    assert result.semantic is not None
+    assert result.semantic["summary_passes"] == 8
+    assert result.semantic["summary_remaining_chunks"] == 17
+    assert result.semantic["summary_scope_drained"] is False
+    assert result.semantic["summary_continuation_required"] is True
+    assert (
+        result.errors
+        == [
+            "Missing authoritative summaries blocked strict semantic indexing after "
+            "8 bounded summary passes; 17 chunks still require summaries"
+        ]
+    )
+
+
 def test_full_index_returns_exact_low_level_blocker_when_lexical_stage_times_out(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)

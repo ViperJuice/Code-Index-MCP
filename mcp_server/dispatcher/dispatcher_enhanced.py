@@ -117,6 +117,8 @@ _INDEX_EXCLUDED_FILENAMES = {
     "test_queries.json",
 }
 
+_REPO_SCOPE_SUMMARY_PASS_BUDGET = 8
+
 
 def _get_profile_collection_name(profile: Any, fallback: str) -> str:
     """Return the configured collection name for a semantic profile."""
@@ -2223,6 +2225,9 @@ class EnhancedDispatcher:
             "summary_chunks_attempted": 0,
             "summary_missing_chunks": 0,
             "summary_passes": 0,
+            "summary_remaining_chunks": 0,
+            "summary_scope_drained": True,
+            "summary_continuation_required": False,
             "semantic_indexed": 0,
             "semantic_failed": 0,
             "semantic_skipped": 0,
@@ -2265,6 +2270,9 @@ class EnhancedDispatcher:
         # the per-pass timeout instead of attempting the entire repo backlog at once.
         summary_limit = min(512, max(64, len(normalized_paths)))
         min_summary_limit = 1
+        max_summary_passes = (
+            _REPO_SCOPE_SUMMARY_PASS_BUDGET if len(normalized_paths) > 1 else None
+        )
         remaining_missing = self._count_missing_summaries_for_paths(ctx, normalized_paths)
         summary_missing_ids: List[str] = []
         previous_missing = remaining_missing
@@ -2310,6 +2318,8 @@ class EnhancedDispatcher:
                 remaining_missing = reported_remaining
             else:
                 remaining_missing = self._count_missing_summaries_for_paths(ctx, normalized_paths)
+            stats["summary_remaining_chunks"] = remaining_missing
+            stats["summary_scope_drained"] = remaining_missing == 0
             if summary_result.summaries_written > 0 and remaining_missing > 0:
                 if remaining_missing < previous_missing:
                     plateau_passes = 0
@@ -2325,6 +2335,19 @@ class EnhancedDispatcher:
                         if summary_missing_ids:
                             stats["summary_missing_chunk_ids"] = sorted(set(summary_missing_ids))
                         return stats
+                if max_summary_passes is not None and stats["summary_passes"] >= max_summary_passes:
+                    stats["summary_missing_chunks"] = remaining_missing
+                    stats["summary_continuation_required"] = True
+                    stats["semantic_stage"] = "blocked_missing_summaries"
+                    stats["semantic_blocked"] = len(normalized_paths)
+                    stats["semantic_error"] = (
+                        "Missing authoritative summaries blocked strict semantic indexing "
+                        f"after {stats['summary_passes']} bounded summary passes; "
+                        f"{remaining_missing} chunks still require summaries"
+                    )
+                    if summary_missing_ids:
+                        stats["summary_missing_chunk_ids"] = sorted(set(summary_missing_ids))
+                    return stats
             if summary_result.summaries_written == 0:
                 if remaining_missing >= missing_before_pass and summary_limit > min_summary_limit:
                     summary_limit = max(min_summary_limit, summary_limit // 2)
@@ -2333,6 +2356,8 @@ class EnhancedDispatcher:
             previous_missing = remaining_missing
 
         stats["summary_missing_chunks"] = remaining_missing
+        stats["summary_remaining_chunks"] = remaining_missing
+        stats["summary_scope_drained"] = remaining_missing == 0
         if remaining_missing > 0:
             stats["semantic_stage"] = "blocked_missing_summaries"
             stats["semantic_blocked"] = len(normalized_paths)

@@ -726,6 +726,11 @@ class GitAwareIndexManager:
                 "summary_chunks_attempted": stats.get("summary_chunks_attempted", 0),
                 "summary_missing_chunks": stats.get("summary_missing_chunks", 0),
                 "summary_passes": stats.get("summary_passes", 0),
+                "summary_remaining_chunks": stats.get("summary_remaining_chunks", 0),
+                "summary_scope_drained": stats.get("summary_scope_drained", True),
+                "summary_continuation_required": stats.get(
+                    "summary_continuation_required", False
+                ),
                 "semantic_indexed": stats.get("semantic_indexed", 0),
                 "semantic_failed": stats.get("semantic_failed", 0),
                 "semantic_skipped": stats.get("semantic_skipped", 0),

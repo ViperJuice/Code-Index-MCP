@@ -1293,6 +1293,11 @@ SEMCONTRACT
   live but the repo-wide force-full rerun still fails on summary timeout
   before strict vector linkage can start; it should tighten repo-wide summary
   pass sizing/backoff and then preserve the next exact downstream blocker.
+- SEMPASSSTALL exists only if SEMTIMEOUT clears the repo-wide handoff gap but
+  the live force-full rerun still stalls inside a single doc-heavy summary
+  pass before it can emit the bounded continuation blocker; it should tighten
+  per-pass doc-style chunk sizing or emit intra-pass progress so the current
+  semantic-stage blocker returns promptly.
 
 ## Verification
 
@@ -1352,4 +1357,10 @@ env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
 sqlite3 .mcp-index/current.db 'select count(*) from chunk_summaries; select count(*) from semantic_points;'
 RUN_REAL_WORLD_TESTS=1 SEMANTIC_SEARCH_ENABLED=true CODE_INDEX_DOGFOOD_REPO=. OPENAI_API_KEY=dummy-local-key uv run --extra dev python -m pytest tests/real_world/test_semantic_search.py -q --no-cov -k repo_local_dogfood_queries_stay_on_semantic_path -rs
+
+# SEMPASSSTALL
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_summarization.py tests/test_dispatcher.py tests/test_git_index_manager.py -q --no-cov
+env OPENAI_API_KEY=dummy-local-key MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5 uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sqlite3 .mcp-index/current.db 'select count(*) from chunk_summaries; select count(*) from semantic_points;'
 ```

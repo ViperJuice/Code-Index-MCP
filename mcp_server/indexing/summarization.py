@@ -38,6 +38,7 @@ _MAX_FILE_CONTEXT_CHARS = 60_000
 _DOC_FILE_CONTEXT_CHARS = 8_000
 _DOC_CONTEXT_LANGUAGES = {"markdown", "plaintext", "text", "rst"}
 _DOC_PROCESS_SCOPE_CHUNK_LIMIT = 16
+_REPO_SCOPE_DOC_PROCESS_SCOPE_CHUNK_LIMIT = 4
 _DOC_TOPOLOGICAL_RECOVERY_CHUNK_LIMIT = 4
 
 # Files larger than this (in characters) skip the single-batch API call and fall back
@@ -985,9 +986,13 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
             row = cursor.fetchone()
         return int(row[0]) if row else 0
 
-    def _process_scope_chunk_limit_for_language(self, language: str, limit: int) -> int:
+    def _process_scope_chunk_limit_for_language(
+        self, language: str, limit: int, *, repo_scope: bool = False
+    ) -> int:
         normalized_language = (language or "").lower()
         if normalized_language in _DOC_CONTEXT_LANGUAGES:
+            if repo_scope:
+                return min(limit, _REPO_SCOPE_DOC_PROCESS_SCOPE_CHUNK_LIMIT)
             return min(limit, _DOC_PROCESS_SCOPE_CHUNK_LIMIT)
         return limit
 
@@ -1015,6 +1020,7 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
         remaining_chunks = 0
 
         batches_processed = 0
+        repo_scope = len(target_paths or []) > 1
         while True:
             rows = self._fetch_unsummarized_rows(limit=limit, target_paths=target_paths)
             if not rows:
@@ -1051,6 +1057,7 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
                 chunk_cap = self._process_scope_chunk_limit_for_language(
                     language or "unknown",
                     limit,
+                    repo_scope=repo_scope,
                 )
                 if len(file_chunks[file_id]) < chunk_cap:
                     file_chunks[file_id].append(
