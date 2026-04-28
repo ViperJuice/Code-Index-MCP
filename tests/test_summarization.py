@@ -2,6 +2,8 @@
 
 import asyncio
 import importlib
+import json
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -277,7 +279,162 @@ async def test_file_batch_summarizer_reports_missing_chunks_without_claiming_suc
 
 
 @pytest.mark.asyncio
-async def test_file_batch_summarizer_falls_back_to_topological_per_chunk_path(tmp_path):
+async def test_file_batch_summarizer_uses_profile_batch_recovery_before_topological_fallback_for_large_files(
+    tmp_path, monkeypatch
+):
+    db_path = tmp_path / "summaries.db"
+    store, file_id = _seed_chunk_summary_tables(db_path, tmp_path)
+    summarizer = FileBatchSummarizer(
+        db_path=str(db_path),
+        qdrant_client=None,
+        summarization_config={"base_url": "http://ai:8002/v1", "model_name": "chat"},
+    )
+    topological_called = {"value": False}
+    profile_batches: list[list[str]] = []
+
+    async def _raise_large(*_args, **_kwargs):
+        raise importlib.import_module("mcp_server.indexing.summarization").FileTooLargeError("big")
+
+    async def _fake_profile_batch(file_id, file_path, file_content, chunks, symbol_map):
+        del file_id, file_path, file_content, symbol_map
+        profile_batches.append([chunk["chunk_id"] for chunk in chunks])
+        return [
+            SimpleNamespace(chunk_id=chunk["chunk_id"], summary=f"summary for {chunk['chunk_id']}")
+            for chunk in chunks
+        ]
+
+    async def _should_not_run(*_args, **_kwargs):
+        topological_called["value"] = True
+        raise AssertionError("topological fallback should not run when bounded profile recovery succeeds")
+
+    monkeypatch.setenv("OPENAI_API_KEY", "dummy-local-key")
+    summarizer._call_batch_api = _raise_large  # type: ignore[method-assign]
+    summarizer._call_profile_batch_api = _fake_profile_batch  # type: ignore[method-assign]
+    summarizer._summarize_topological = _should_not_run  # type: ignore[method-assign]
+    result = await summarizer.summarize_file_chunks(
+        file_id=file_id,
+        file_path=str(tmp_path / "sample.py"),
+        file_content="x" * (
+            importlib.import_module("mcp_server.indexing.summarization")._BATCH_FILE_SIZE_THRESHOLD
+            + 1
+        ),
+        chunks=[
+            {
+                "chunk_id": f"chunk-{idx}",
+                "line_start": idx,
+                "line_end": idx,
+                "node_type": "function",
+                "language": "markdown",
+            }
+            for idx in range(1, 67)
+        ],
+        symbol_map={},
+        persist=True,
+    )
+
+    assert topological_called["value"] is False
+    assert profile_batches == [[f"chunk-{idx}" for idx in range(1, 67)]]
+    assert result.summaries_written == 66
+    assert result.missing_chunk_ids == []
+    stored = store.get_chunk_summary("chunk-1")
+    assert stored is not None
+    assert stored["is_authoritative"] is True
+    assert stored["provider_name"] == "openai_compatible"
+
+
+@pytest.mark.asyncio
+async def test_file_batch_summarizer_tracks_missing_chunks_after_large_file_profile_batch_recovery(
+    tmp_path, monkeypatch
+):
+    db_path = tmp_path / "summaries.db"
+    store, file_id = _seed_chunk_summary_tables(db_path, tmp_path)
+    summarizer = FileBatchSummarizer(
+        db_path=str(db_path),
+        qdrant_client=None,
+        summarization_config={
+            "base_url": "http://ai:8002/v1",
+            "model_name": "chat",
+            "profile_id": "oss_high",
+        },
+    )
+    summarizer._profile_model_resolution = EnrichmentModelResolution(
+        configured_model="chat",
+        effective_model="cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit",
+        resolution_strategy="single_served_model_for_chat_alias",
+        available_models=["cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"],
+        models_probe_verified=True,
+    )
+
+    async def _raise_large(*_args, **_kwargs):
+        raise importlib.import_module("mcp_server.indexing.summarization").FileTooLargeError("big")
+
+    profile_api_calls: list[list[str]] = []
+    chunk_ids = [f"chunk-{idx}" for idx in range(1, 66 + 1)]
+
+    async def _fake_profile_api(_system: str, prompt: str, **_kwargs) -> tuple[str, str]:
+        prompt_chunk_ids = re.findall(r"chunk_id: ([^\n]+)", prompt)
+        profile_api_calls.append(prompt_chunk_ids)
+        if len(profile_api_calls) == 1:
+            returned_ids = prompt_chunk_ids[:64]
+        else:
+            returned_ids = prompt_chunk_ids[:1]
+        payload = {
+            "summaries": [
+                {"chunk_id": chunk_id, "summary": f"Summary for {chunk_id}. Still concise."}
+                for chunk_id in returned_ids
+            ]
+        }
+        return json.dumps(payload), "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
+
+    async def _should_not_run(*_args, **_kwargs):
+        raise AssertionError("topological fallback should not run when large-file profile batches succeed")
+
+    monkeypatch.setenv("OPENAI_API_KEY", "dummy-local-key")
+    summarizer._call_batch_api = _raise_large  # type: ignore[method-assign]
+    summarizer._call_profile_api = _fake_profile_api  # type: ignore[method-assign]
+    summarizer._summarize_topological = _should_not_run  # type: ignore[method-assign]
+    result = await summarizer.summarize_file_chunks(
+        file_id=file_id,
+        file_path=str(tmp_path / "sample.md"),
+        file_content="x"
+        * (
+            importlib.import_module("mcp_server.indexing.summarization")._BATCH_FILE_SIZE_THRESHOLD
+            + 1
+        ),
+        chunks=[
+            {
+                "chunk_id": chunk_id,
+                "line_start": idx,
+                "line_end": idx,
+                "node_type": "paragraph",
+                "language": "markdown",
+            }
+            for idx, chunk_id in enumerate(chunk_ids, start=1)
+        ],
+        symbol_map={},
+        persist=True,
+    )
+
+    assert profile_api_calls[0] == chunk_ids[:64]
+    assert profile_api_calls[1] == chunk_ids[64:]
+    assert result.summaries_written == 65
+    assert result.missing_chunk_ids == ["chunk-66"]
+    stored = store.get_chunk_summary("chunk-1")
+    assert stored is not None
+    assert stored["is_authoritative"] is True
+    assert stored["provider_name"] == "openai_compatible"
+    assert stored["profile_id"] == "oss_high"
+    assert stored["audit_metadata"]["configured_model_name"] == "chat"
+    assert (
+        stored["audit_metadata"]["effective_model_name"]
+        == "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
+    )
+
+
+@pytest.mark.asyncio
+async def test_file_batch_summarizer_falls_back_to_topological_path_when_large_file_profile_recovery_fails(
+    tmp_path, monkeypatch
+):
     db_path = tmp_path / "summaries.db"
     _, file_id = _seed_chunk_summary_tables(db_path, tmp_path)
     summarizer = FileBatchSummarizer(
@@ -285,15 +442,13 @@ async def test_file_batch_summarizer_falls_back_to_topological_per_chunk_path(tm
         qdrant_client=None,
         summarization_config={"base_url": "http://ai:8002/v1", "model_name": "chat"},
     )
-    calls = []
     topological_called = {"value": False}
 
     async def _raise_large(*_args, **_kwargs):
         raise importlib.import_module("mcp_server.indexing.summarization").FileTooLargeError("big")
 
-    async def _fake_chunk_summary(**kwargs):
-        calls.append(kwargs["chunk_hash"])
-        return f"summary for {kwargs['chunk_hash']}"
+    async def _raise_profile(*_args, **_kwargs):
+        raise RuntimeError("profile batch failed")
 
     async def _fake_topological(*args, **kwargs):
         del args, kwargs
@@ -307,13 +462,17 @@ async def test_file_batch_summarizer_falls_back_to_topological_per_chunk_path(tm
             files_summarized=1,
         )
 
+    monkeypatch.setenv("OPENAI_API_KEY", "dummy-local-key")
     summarizer._call_batch_api = _raise_large  # type: ignore[method-assign]
-    summarizer.summarize_chunk = _fake_chunk_summary  # type: ignore[method-assign]
+    summarizer._call_profile_batch_api = _raise_profile  # type: ignore[method-assign]
     summarizer._summarize_topological = _fake_topological  # type: ignore[method-assign]
     result = await summarizer.summarize_file_chunks(
         file_id=file_id,
         file_path=str(tmp_path / "sample.py"),
-        file_content="def alpha():\n    return 1\n",
+        file_content="x" * (
+            importlib.import_module("mcp_server.indexing.summarization")._BATCH_FILE_SIZE_THRESHOLD
+            + 1
+        ),
         chunks=[
             {"chunk_id": "chunk-1", "line_start": 1, "line_end": 2, "node_type": "function"},
             {"chunk_id": "chunk-2", "line_start": 3, "line_end": 4, "node_type": "function"},
@@ -323,7 +482,6 @@ async def test_file_batch_summarizer_falls_back_to_topological_per_chunk_path(tm
     )
 
     assert topological_called["value"] is True
-    assert calls == []
     assert result.summaries_written == 2
 
 
@@ -614,3 +772,89 @@ async def test_process_scope_drains_multiple_batches_for_target_scope(tmp_path, 
     assert result.authoritative_chunks == 2
     assert result.chunks_attempted == 2
     assert result.missing_chunk_ids == []
+
+
+@pytest.mark.asyncio
+async def test_process_scope_retries_large_file_profile_recovery_until_backlog_is_drained(
+    tmp_path, monkeypatch
+):
+    db_path = tmp_path / "summaries.db"
+    store = SQLiteStore(str(db_path))
+    repo_id = store.ensure_repository_row(tmp_path)
+
+    target = tmp_path / "target.md"
+    target.write_text("x" * 32, encoding="utf-8")
+    file_id = store.store_file(
+        repo_id,
+        path=target,
+        relative_path="target.md",
+        language="markdown",
+        size=target.stat().st_size,
+        content_hash="target-hash",
+    )
+    for idx in range(1, 4):
+        _store_chunk(
+            store,
+            file_id=file_id,
+            chunk_id=f"chunk-{idx}",
+            content=f"paragraph {idx}",
+            line_start=idx,
+            line_end=idx,
+            symbol=f"chunk_{idx}",
+        )
+
+    writer = ComprehensiveChunkWriter(
+        db_path=str(db_path),
+        qdrant_client=None,
+        summarization_config={
+            "base_url": "http://ai:8002/v1",
+            "model_name": "chat",
+            "profile_id": "oss_high",
+        },
+    )
+
+    async def _raise_large(*_args, **_kwargs):
+        raise importlib.import_module("mcp_server.indexing.summarization").FileTooLargeError("big")
+
+    call_index = {"value": 0}
+    seen_batches: list[list[str]] = []
+
+    async def _fake_profile_batch(file_id, file_path, file_content, chunks, symbol_map):
+        del file_path, file_content, symbol_map
+        call_index["value"] += 1
+        chunk_ids = [chunk["chunk_id"] for chunk in chunks]
+        seen_batches.append(chunk_ids)
+        if call_index["value"] == 1:
+            chunk_ids = chunk_ids[:1]
+        for chunk_id in chunk_ids:
+            store.store_chunk_summary(
+                chunk_hash=chunk_id,
+                file_id=file_id,
+                chunk_start=1,
+                chunk_end=1,
+                summary_text=f"summary for {chunk_id}",
+                llm_model="chat",
+                is_authoritative=True,
+                symbol=None,
+                provider_name="openai_compatible",
+                profile_id="oss_high",
+                prompt_fingerprint="test-fingerprint",
+                audit_metadata={"provider_name": "openai_compatible", "profile_id": "oss_high"},
+            )
+        return [SimpleNamespace(chunk_id=chunk_id, summary=f"summary for {chunk_id}") for chunk_id in chunk_ids]
+
+    async def _should_not_run(*_args, **_kwargs):
+        raise AssertionError("topological fallback should not run when large-file profile recovery keeps making progress")
+
+    monkeypatch.setenv("OPENAI_API_KEY", "dummy-local-key")
+    monkeypatch.setattr(writer, "_call_batch_api", _raise_large)
+    monkeypatch.setattr(writer, "_call_profile_batch_api", _fake_profile_batch)
+    monkeypatch.setattr(writer, "_summarize_topological", _should_not_run)
+
+    result = await writer.process_scope(limit=10, target_paths=[target])
+
+    assert seen_batches == [["chunk-1", "chunk-2", "chunk-3"], ["chunk-2", "chunk-3"]]
+    assert result.summaries_written == 3
+    assert result.authoritative_chunks == 3
+    assert result.chunks_attempted == 5
+    assert result.missing_chunk_ids == ["chunk-2", "chunk-3"]

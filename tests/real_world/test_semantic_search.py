@@ -419,6 +419,12 @@ def parse_server_response(api_result):
                 )
             )
             data = json.loads(result[0].text)
+            if data.get("code") == "index_unavailable":
+                readiness = data["readiness"]
+                pytest.skip(
+                    "Dogfood repo indexed semantic query is unavailable: "
+                    f"{readiness['state']} ({readiness['code']})"
+                )
             if data.get("code") == "semantic_not_ready":
                 readiness = data["semantic_readiness"]
                 pytest.skip(

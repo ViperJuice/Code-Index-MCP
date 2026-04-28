@@ -730,6 +730,58 @@ force-full rebuild now clears the summary gate.
 **Produces**
 - IF-0-SEMTHROUGHPUT-1 — Default local full-sync summary throughput and semantic-ready rebuild contract.
 
+### Phase 13 — Force-Full Semantic Stall Recovery (SEMSTALLFIX)
+
+**Objective**
+
+Repair the remaining force-full rebuild stall exposed by SEMTHROUGHPUT so one
+clean `repository sync --force-full` run can finish on the current commit,
+refresh the registered index, and either reach semantic readiness `ready` or
+emit an exact post-summary blocker without hanging mid-run.
+
+**Exit criteria**
+- [ ] The default force-full rebuild no longer plateaus for long periods after
+      summary counts stop moving on the large markdown/plaintext backlog.
+- [ ] A clean force-full rebuild updates the indexed commit to the current
+      commit instead of leaving repository readiness at `stale_commit`.
+- [ ] The rebuild either produces non-zero `semantic_points` with semantic
+      readiness `ready`, or it fails closed with an exact post-summary blocker
+      that is narrower than summary-throughput recovery.
+- [ ] Repo-local semantic dogfood queries either return semantic-path results
+      or surface the exact new blocker contract without ambiguous failures.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the stall evidence,
+      remediation, and final ready or still-blocked verdict.
+
+**Scope notes**
+
+This phase exists only if SEMTHROUGHPUT improves oversized-file summary
+recovery but the live force-full rebuild still does not complete cleanly on
+the active commit. Keep the work narrowly on force-full completion, commit
+freshness, and post-summary semantic-stage handoff.
+
+**Non-goals**
+
+- No semantic ranking redesign.
+- No multi-repo rollout expansion.
+- No unrelated profile/configuration changes outside the stuck force-full path.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/indexing/summarization.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `docs/guides/semantic-onboarding.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/real_world/test_semantic_search.py`
+
+**Depends on**
+- SEMTHROUGHPUT
+
+**Produces**
+- IF-0-SEMSTALLFIX-1 — Force-full rebuild completion and indexed-commit freshness contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -745,6 +797,7 @@ SEMCONTRACT
   -> SEMSUMFIX
   -> SEMSYNCFIX
   -> SEMTHROUGHPUT
+  -> SEMSTALLFIX
 ```
 
 ## Execution Notes
@@ -778,6 +831,10 @@ SEMCONTRACT
 - SEMTHROUGHPUT exists only if SEMSYNCFIX proves the scoped full-sync summary
   drain is repaired but the live rebuild still cannot clear repo-wide summary
   coverage fast enough to reach semantic vector writes in one force-full pass.
+- SEMSTALLFIX exists only if SEMTHROUGHPUT improves large-file summary
+  recovery but the live force-full rebuild still does not complete cleanly on
+  the active commit or still cannot hand off from summary completion into
+  semantic vector writes.
 
 ## Verification
 

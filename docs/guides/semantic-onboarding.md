@@ -166,9 +166,11 @@ and vectors:
   evidence then shows the direct authoritative summary runtime can recover;
   the SEMSYNCFIX evidence then shows the full-sync path can recover its scoped
   summary selection and retry behavior while still remaining blocked on
-  summary throughput; and `SEMTHROUGHPUT` is the downstream roadmap follow-up
-  for clearing the remaining repo-wide summary backlog. Use the report to
-  separate those states.
+  summary throughput; the SEMTHROUGHPUT evidence then shows oversized-file
+  profile batching can increase summary coverage while the live force-full
+  rebuild still stalls short of a fresh indexed commit; and `SEMSTALLFIX` is
+  the downstream roadmap follow-up for restoring force-full completion. Use
+  the report to separate those states.
 
 ## Full Reindex Pipeline
 
@@ -244,6 +246,15 @@ dogfood rebuild evidence.
     semantic readiness at `summaries_missing`, treat that as a full-sync
     summary throughput blocker rather than a preflight or collection bootstrap
     blocker; the current roadmap follow-up for that state is `SEMTHROUGHPUT`
+- Repository status stays `stale_commit` after a long force-full rebuild
+  - compare `Current commit` and `Indexed commit` in `uv run mcp-index repository status`
+  - if summary counts improved but the indexed commit did not refresh, treat
+    that as a force-full completion blocker rather than only a semantic query
+    blocker
+  - if `search_code(semantic=true)` returns `index_unavailable` with
+    `safe_fallback: "native_search"`, the indexed query surface is still
+    blocked before semantic-path acceptance can be re-checked
+  - the current roadmap follow-up for that state is `SEMSTALLFIX`
 - Voyage provider failing
   - verify `VOYAGE_API_KEY`
 - Preflight output

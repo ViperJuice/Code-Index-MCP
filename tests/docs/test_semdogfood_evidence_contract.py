@@ -23,7 +23,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
 
     for expected in (
         "# Semantic Dogfood Rebuild",
-        "Phase plan: `plans/phase-plan-v7-SEMSYNCFIX.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMTHROUGHPUT.md`",
         "## Reset Boundary",
         "## Full-Sync Recovery",
         "## Rebuild Command",
@@ -49,12 +49,15 @@ def test_semdogfood_report_records_reset_boundary_counts_collection_and_verifica
         "Effective enrichment model",
         "Collection bootstrap state",
         "baml-py",
-        "SEMSYNCFIX",
         "SEMTHROUGHPUT",
+        "SEMSTALLFIX",
         "Lexical readiness",
         "Semantic readiness",
+        "stale_commit",
         "Active-profile preflight",
-        "uv run pytest tests/test_summarization.py tests/test_dispatcher.py tests/test_git_index_manager.py -q --no-cov",
+        "uv run pytest tests/test_summarization.py -q --no-cov",
+        "uv run pytest tests/test_dispatcher.py -q --no-cov",
+        "uv run pytest tests/test_git_index_manager.py -q --no-cov",
         "uv run mcp-index index check-semantic",
         "uv run --extra dev python -m pytest tests/real_world/test_semantic_search.py -q --no-cov -k repo_local_dogfood_queries_stay_on_semantic_path -rs",
     ):
@@ -73,6 +76,7 @@ def test_semdogfood_report_compares_query_modes_and_states_operator_verdict():
         "mcp_server/indexing/summarization.py",
         "mcp_server/cli/repository_commands.py",
         "mcp_server/dispatcher/dispatcher_enhanced.py",
+        "index_unavailable",
         "semantic_not_ready",
         "local multi-repo dogfooding",
     ):
@@ -92,3 +96,5 @@ def test_semantic_onboarding_links_semdogfood_report_and_separate_readiness_surf
     assert "generator/runtime mismatch" in text
     assert "summary throughput blocker" in text
     assert "SEMTHROUGHPUT" in text
+    assert "SEMSTALLFIX" in text
+    assert "stale_commit" in text

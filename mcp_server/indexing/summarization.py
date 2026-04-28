@@ -521,10 +521,38 @@ class FileBatchSummarizer(ChunkWriter):
     """Summarizes all chunks of a file in a single BAML API call.
 
     For files that exceed ``_BATCH_FILE_SIZE_THRESHOLD`` characters the batch
-    call is skipped and a topological per-chunk fallback is used instead
-    (same Kahn's-sort logic as ``ComprehensiveChunkWriter``, but operating on
-    ``Dict`` rows rather than raw SQL tuples).
+    call first falls back to bounded profile-backed chunk windows when that
+    recovery path is configured, and only then to the topological per-chunk
+    path (same Kahn's-sort logic as ``ComprehensiveChunkWriter``, but
+    operating on ``Dict`` rows rather than raw SQL tuples).
     """
+
+    async def _recover_with_profile_or_topological(
+        self,
+        *,
+        file_id: int,
+        file_path: str,
+        file_content: str,
+        chunks: List[Dict],
+        symbol_map: Dict[int, str],
+        warning_prefix: str,
+        error: Exception,
+    ) -> SummaryGenerationResult | List[Any]:
+        logger.warning("%s for %s (%s), falling back to per-chunk path", warning_prefix, file_path, error)
+        if self.summarization_config.get("base_url"):
+            try:
+                return await self._call_profile_batch_api(
+                    file_id, file_path, file_content, chunks, symbol_map
+                )
+            except Exception as profile_exc:
+                logger.warning(
+                    "Profile batch fallback failed for %s (%s), falling back to per-chunk path",
+                    file_path,
+                    profile_exc,
+                )
+        return await self._summarize_topological(
+            file_id, file_path, file_content, chunks, symbol_map
+        )
 
     def _parse_profile_batch_response(self, response_text: str) -> List[SimpleNamespace]:
         text = response_text.strip()
@@ -737,8 +765,9 @@ class FileBatchSummarizer(ChunkWriter):
         """Summarize all chunks of a file, preferring the batch API path.
 
         Filters already-authoritative chunks, calls ``_call_batch_api``, and
-        handles ``FileTooLargeError`` by delegating to the topological
-        per-chunk path.  Persists to ``chunk_summaries`` with
+        handles ``FileTooLargeError`` by trying bounded profile-batch recovery
+        before delegating to the topological per-chunk path. Persists to
+        ``chunk_summaries`` with
         ``is_authoritative=1`` when *persist* is ``True``.
 
         Returns a list of ``ChunkSummary`` objects.
@@ -772,38 +801,33 @@ class FileBatchSummarizer(ChunkWriter):
             )
             missing_chunk_ids: List[str] = []
         except FileTooLargeError as exc:
-            logger.info("Large-file fallback for %s: %s", file_path, exc)
-            result = await self._summarize_topological(
-                file_id, file_path, file_content, to_summarize, symbol_map
+            recovery = await self._recover_with_profile_or_topological(
+                file_id=file_id,
+                file_path=file_path,
+                file_content=file_content,
+                chunks=to_summarize,
+                symbol_map=symbol_map,
+                warning_prefix="Large-file fallback",
+                error=exc,
             )
-            return result
+            if isinstance(recovery, SummaryGenerationResult):
+                return recovery
+            summaries = recovery
+            missing_chunk_ids = []
         except Exception as exc:
-            logger.warning(
-                "Batch API failed for %s (%s), falling back to per-chunk path",
-                file_path,
-                exc,
+            recovery = await self._recover_with_profile_or_topological(
+                file_id=file_id,
+                file_path=file_path,
+                file_content=file_content,
+                chunks=to_summarize,
+                symbol_map=symbol_map,
+                warning_prefix="Batch API failed",
+                error=exc,
             )
-            if self.summarization_config.get("base_url"):
-                try:
-                    summaries = await self._call_profile_batch_api(
-                        file_id, file_path, file_content, to_summarize, symbol_map
-                    )
-                    missing_chunk_ids = []
-                except Exception as profile_exc:
-                    logger.warning(
-                        "Profile batch fallback failed for %s (%s), falling back to per-chunk path",
-                        file_path,
-                        profile_exc,
-                    )
-                    result = await self._summarize_topological(
-                        file_id, file_path, file_content, to_summarize, symbol_map
-                    )
-                    return result
-            else:
-                result = await self._summarize_topological(
-                    file_id, file_path, file_content, to_summarize, symbol_map
-                )
-                return result
+            if isinstance(recovery, SummaryGenerationResult):
+                return recovery
+            summaries = recovery
+            missing_chunk_ids = []
 
         if persist and summaries:
             model_name = self._get_model_name()
