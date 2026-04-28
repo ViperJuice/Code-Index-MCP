@@ -899,6 +899,9 @@ class TestSQLiteStoreHealthCheck:
         assert health["wal"] is True
         assert health["version"] >= 1
         assert health["error"] is None
+        assert health["journal_mode"] == "WAL"
+        assert health["busy_timeout_ms"] == 5000
+        assert health["wal_checkpoint"]["status"] == "ok"
         # Check all required tables exist
         assert health["tables"]["file_moves"] is True
         assert health["tables"]["files"] is True
@@ -1005,6 +1008,18 @@ class TestSQLiteStoreHealthCheck:
 
         # WAL mode should be enabled by _init_database
         assert health["wal"] is True
+
+    def test_health_check_reports_busy_timeout_checkpoint_and_file_sizes(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        store = SQLiteStore(str(db_path))
+
+        health = store.health_check()
+
+        assert health["journal_mode"] == "WAL"
+        assert health["busy_timeout_ms"] == 5000
+        assert health["wal_checkpoint"]["status"] == "ok"
+        assert set(health["database_files"]) == {"main", "wal", "shm"}
+        assert health["database_files"]["main"]["path"].endswith("test.db")
 
     def test_health_check_schema_version(self, tmp_path):
         """Verify health check returns schema version."""

@@ -83,6 +83,7 @@ class UpdateResult:
     skipped: int = 0
     errors: List[str] = None
     semantic: Optional[Dict[str, Any]] = None
+    low_level: Optional[Dict[str, Any]] = None
     duration_seconds: float = 0.0
 
     def __post_init__(self) -> None:
@@ -659,6 +660,22 @@ class GitAwareIndexManager:
 
         return f"Semantic stage ended with {stage}"
 
+    def _low_level_stage_error(self, low_level: Optional[Dict[str, Any]]) -> Optional[str]:
+        """Return an exact lexical/storage blocker before semantic-stage accounting starts."""
+        if not low_level:
+            return None
+
+        blocker = low_level.get("low_level_blocker")
+        if isinstance(blocker, dict):
+            message = blocker.get("message")
+            if isinstance(message, str) and message.strip():
+                return message.strip()
+
+        stage = low_level.get("lexical_stage")
+        if stage in {None, "not_run", "completed"}:
+            return None
+        return f"Lexical stage ended with {stage}"
+
     def _full_index(self, repo_id: str, ctx: RepoContext) -> UpdateResult:
         """Perform full repository indexing.
 
@@ -716,7 +733,23 @@ class GitAwareIndexManager:
                 "semantic_stage": stats.get("semantic_stage"),
                 "semantic_error": stats.get("semantic_error"),
             }
+            if (
+                stats.get("low_level_blocker") is not None
+                or stats.get("lexical_stage") not in {None, "not_run", "completed"}
+            ):
+                result.low_level = {
+                    "lexical_stage": stats.get("lexical_stage"),
+                    "lexical_files_attempted": stats.get("lexical_files_attempted", 0),
+                    "lexical_files_completed": stats.get("lexical_files_completed", 0),
+                    "last_progress_path": stats.get("last_progress_path"),
+                    "in_flight_path": stats.get("in_flight_path"),
+                    "low_level_blocker": stats.get("low_level_blocker"),
+                    "storage_diagnostics": stats.get("storage_diagnostics"),
+                }
         result.errors.extend(str(error) for error in errors)
+        low_level_error = self._low_level_stage_error(result.low_level)
+        if low_level_error:
+            result.errors.append(low_level_error)
         semantic_error = self._semantic_stage_error(result.semantic)
         if semantic_error:
             result.errors.append(semantic_error)

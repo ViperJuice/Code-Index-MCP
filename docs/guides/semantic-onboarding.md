@@ -171,8 +171,9 @@ and vectors:
   rebuild still stalls short of a fresh indexed commit; the SEMSTALLFIX
   evidence then shows bounded semantic-stage blocker vocabulary and fail-closed
   full-index closeout without fully clearing the live repo-local stall; and
-  `SEMIOWAIT` is the downstream roadmap follow-up for isolating the residual
-  low-level force-full hang. Use the report to separate those states.
+  the SEMIOWAIT evidence then narrows that residual state to a lexical/storage
+  blocker, `blocked_file_timeout` on `CHANGELOG.md`, with storage diagnostics
+  attached. Use the report to separate those states.
 
 ## Full Reindex Pipeline
 
@@ -203,6 +204,23 @@ The bounded semantic-stage vocabulary now includes:
 
 If a live force-full rerun still hangs without surfacing one of those stages,
 the remaining blocker is below the semantic-stage accounting layer.
+
+Below-semantic lexical/storage blockers are now reported separately. Operators
+should look for:
+
+- `lexical_stage`
+- `lexical_files_attempted`
+- `lexical_files_completed`
+- `last_progress_path`
+- `in_flight_path`
+
+When the lower path blocks, storage diagnostics are also reported from
+`SQLiteStore.health_check()`:
+
+- `journal_mode`
+- `busy_timeout_ms`
+- `wal_checkpoint`
+- SQLite/WAL/SHM file sizes
 
 Manual summary tools stay separate from the full-sync contract:
 
@@ -268,10 +286,13 @@ dogfood rebuild evidence.
   - if `search_code(semantic=true)` returns `index_unavailable` with
     `safe_fallback: "native_search"`, the indexed query surface is still
     blocked before semantic-path acceptance can be re-checked
-  - if the bounded semantic-stage strings above never appear and the live
-    force-full process still hangs with unchanged counts, treat that as a
-    lower-level force-full stall rather than only a semantic-stage blocker
-  - the current roadmap follow-up for that residual state is `SEMIOWAIT`
+  - if the bounded semantic-stage strings above never appear, read
+    `lexical_stage`, `last_progress_path`, and `in_flight_path` from the
+    SEMDOGFOOD report before assuming the semantic stage is at fault
+  - if storage posture might be involved, inspect `journal_mode`,
+    `busy_timeout_ms`, and `wal_checkpoint` from the same report
+  - the current SEMIOWAIT evidence shows `blocked_file_timeout` on
+    `CHANGELOG.md` rather than an unbounded lower-level hang
 - Voyage provider failing
   - verify `VOYAGE_API_KEY`
 - Preflight output

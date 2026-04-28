@@ -1740,6 +1740,10 @@ class SQLiteStore:
             "fts5": False,
             "wal": False,
             "version": 0,
+            "journal_mode": None,
+            "busy_timeout_ms": 0,
+            "wal_checkpoint": {"status": "not_run"},
+            "database_files": {},
             "error": None,
         }
 
@@ -1779,7 +1783,30 @@ class SQLiteStore:
                 # Check WAL mode
                 cursor = conn.execute("PRAGMA journal_mode")
                 journal_mode = cursor.fetchone()[0].upper()
+                result["journal_mode"] = journal_mode
                 result["wal"] = journal_mode == "WAL"
+
+                cursor = conn.execute("PRAGMA busy_timeout")
+                busy_timeout_row = cursor.fetchone()
+                result["busy_timeout_ms"] = (
+                    int(busy_timeout_row[0]) if busy_timeout_row and busy_timeout_row[0] else 0
+                )
+
+                try:
+                    cursor = conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
+                    checkpoint_row = cursor.fetchone()
+                    if checkpoint_row is not None:
+                        result["wal_checkpoint"] = {
+                            "status": "ok",
+                            "busy": int(checkpoint_row[0]),
+                            "log_frames": int(checkpoint_row[1]),
+                            "checkpointed_frames": int(checkpoint_row[2]),
+                        }
+                except sqlite3.OperationalError as exc:
+                    result["wal_checkpoint"] = {
+                        "status": "error",
+                        "error": str(exc),
+                    }
 
                 # Get schema version
                 if result["tables"].get("schema_version", False):
@@ -1789,6 +1816,19 @@ class SQLiteStore:
                         result["version"] = version_row[0] if version_row and version_row[0] else 0
                     except sqlite3.OperationalError:
                         result["version"] = 0
+
+                db_path = Path(self.db_path)
+                for label, candidate in (
+                    ("main", db_path),
+                    ("wal", db_path.with_name(f"{db_path.name}-wal")),
+                    ("shm", db_path.with_name(f"{db_path.name}-shm")),
+                ):
+                    exists = candidate.exists()
+                    result["database_files"][label] = {
+                        "path": str(candidate),
+                        "exists": exists,
+                        "bytes": candidate.stat().st_size if exists else 0,
+                    }
 
                 # Determine health status
                 missing_tables = [table for table, exists in result["tables"].items() if not exists]
@@ -1807,6 +1847,9 @@ class SQLiteStore:
                 elif not result["wal"]:
                     result["status"] = "degraded"
                     result["error"] = "WAL mode not enabled - concurrency may be affected"
+                elif result["wal_checkpoint"].get("status") == "error":
+                    result["status"] = "degraded"
+                    result["error"] = "WAL checkpoint diagnostics failed"
 
         except Exception as e:
             result["status"] = "unhealthy"

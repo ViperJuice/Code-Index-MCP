@@ -130,6 +130,14 @@ _INDEX_EXCLUDED_SUFFIXES = {
     ".xml",
 }
 
+
+def _get_lexical_timeout_seconds() -> float:
+    raw = os.getenv("MCP_INDEX_LEXICAL_TIMEOUT_SECONDS", "20")
+    try:
+        return max(float(raw), 1.0)
+    except ValueError:
+        return 20.0
+
 # Path segment penalties for lexical (BM25/fuzzy) results.
 # FTS5 scores are negative; adding a positive penalty degrades rank.
 _PATH_PENALTY_RULES: List[Tuple[str, float]] = [
@@ -2495,6 +2503,13 @@ class EnhancedDispatcher:
             "semantic_skipped": 0,
             "semantic_blocked": 0,
             "semantic_stage": "not_run",
+            "lexical_stage": "not_run",
+            "lexical_files_attempted": 0,
+            "lexical_files_completed": 0,
+            "last_progress_path": None,
+            "in_flight_path": None,
+            "low_level_blocker": None,
+            "storage_diagnostics": None,
         }
 
         is_excluded = build_walker_filter(directory)
@@ -2559,8 +2574,7 @@ class EnhancedDispatcher:
             try:
                 # First try to match by extension
                 if path.suffix in supported_extensions:
-                    # skip_semantic=True — we'll batch semantic embed after the loop
-                    mutation = self.index_file(ctx, path, do_semantic=False)
+                    mutation = self._index_file_with_lexical_timeout(ctx, path, stats)
                     if mutation.status == IndexResultStatus.INDEXED:
                         stats["indexed_files"] += 1
                         semantically_indexed_paths.append(path.resolve())
@@ -2570,13 +2584,23 @@ class EnhancedDispatcher:
                         stats["failed_files"] += 1
                         if mutation.error:
                             stats.setdefault("errors", []).append(f"{path}: {mutation.error}")
+                        if self._is_storage_lock_error(mutation.error):
+                            self._record_low_level_blocker(
+                                ctx,
+                                stats,
+                                code="sqlite_runtime_failure",
+                                message=mutation.error,
+                                path=path,
+                                stage="blocked_storage_error",
+                            )
+                            break
                 # For files without recognized extensions, try each plugin's supports() method
                 # This allows plugins to match by filename patterns (e.g., .env, Dockerfile)
                 else:
                     matched = False
                     for plugin in self._plugin_set_registry.plugins_for(ctx.repo_id):
                         if plugin.supports(path):
-                            mutation = self.index_file(ctx, path, do_semantic=False)
+                            mutation = self._index_file_with_lexical_timeout(ctx, path, stats)
                             if mutation.status == IndexResultStatus.INDEXED:
                                 stats["indexed_files"] += 1
                                 semantically_indexed_paths.append(path.resolve())
@@ -2586,6 +2610,16 @@ class EnhancedDispatcher:
                                 stats["failed_files"] += 1
                                 if mutation.error:
                                     stats.setdefault("errors", []).append(f"{path}: {mutation.error}")
+                                if self._is_storage_lock_error(mutation.error):
+                                    self._record_low_level_blocker(
+                                        ctx,
+                                        stats,
+                                        code="sqlite_runtime_failure",
+                                        message=mutation.error,
+                                        path=path,
+                                        stage="blocked_storage_error",
+                                    )
+                                    break
                             matched = True
                             break
 
@@ -2600,15 +2634,48 @@ class EnhancedDispatcher:
                 if language:
                     stats["by_language"][language] = stats["by_language"].get(language, 0) + 1
 
+            except TimeoutError as exc:
+                logger.error("Lexical indexing timed out for %s: %s", path, exc)
+                stats["failed_files"] += 1
+                self._record_low_level_blocker(
+                    ctx,
+                    stats,
+                    code="lexical_file_timeout",
+                    message=(
+                        f"Lexical indexing timed out while processing {path.name}"
+                    ),
+                    path=path,
+                    stage="blocked_file_timeout",
+                )
+                break
+            except sqlite3.OperationalError as exc:
+                logger.error("SQLite operational error while indexing %s: %s", path, exc)
+                stats["failed_files"] += 1
+                self._record_low_level_blocker(
+                    ctx,
+                    stats,
+                    code="sqlite_runtime_failure",
+                    message=str(exc),
+                    path=path,
+                    stage="blocked_storage_error",
+                )
+                break
             except Exception as e:
                 logger.error(f"Failed to index {path}: {e}")
                 stats["failed_files"] += 1
+
+            if stats["low_level_blocker"] is not None:
+                break
+
+        if stats["low_level_blocker"] is None:
+            stats["lexical_stage"] = "completed"
+            stats["in_flight_path"] = None
 
         # Batch semantic embedding — O(n/1000) API calls instead of O(n)
         _sem = self._get_semantic_indexer(ctx)
         stats["semantic_paths_queued"] = len(semantically_indexed_paths)
         stats["semantic_indexer_present"] = _sem is not None
-        if _sem and semantically_indexed_paths:
+        if stats["low_level_blocker"] is None and _sem and semantically_indexed_paths:
             try:
                 stats.update(self.rebuild_semantic_for_paths(ctx, semantically_indexed_paths))
             except Exception as e:
@@ -2622,6 +2689,58 @@ class EnhancedDispatcher:
         )
 
         return stats
+
+    def _index_file_with_lexical_timeout(
+        self, ctx: RepoContext, path: Path, stats: Dict[str, Any]
+    ) -> IndexResult:
+        stats["lexical_stage"] = "walking"
+        stats["lexical_files_attempted"] += 1
+        stats["in_flight_path"] = str(path.resolve())
+        mutation = _run_blocking_with_timeout(
+            lambda: self.index_file(ctx, path, do_semantic=False),
+            timeout_seconds=_get_lexical_timeout_seconds(),
+        )
+        stats["lexical_files_completed"] += 1
+        stats["last_progress_path"] = str(path.resolve())
+        stats["in_flight_path"] = None
+        return mutation
+
+    def _record_low_level_blocker(
+        self,
+        ctx: RepoContext,
+        stats: Dict[str, Any],
+        *,
+        code: str,
+        message: str,
+        path: Path,
+        stage: str,
+    ) -> None:
+        stats["lexical_stage"] = stage
+        stats["in_flight_path"] = str(path.resolve())
+        stats["low_level_blocker"] = {
+            "code": code,
+            "message": message,
+            "path": str(path.resolve()),
+        }
+        stats["storage_diagnostics"] = self._collect_storage_diagnostics(ctx)
+
+    def _collect_storage_diagnostics(self, ctx: RepoContext) -> Optional[Dict[str, Any]]:
+        sqlite_store = getattr(ctx, "sqlite_store", None)
+        if sqlite_store is None or not hasattr(sqlite_store, "health_check"):
+            return None
+        try:
+            return sqlite_store.health_check()
+        except Exception as exc:
+            return {
+                "status": "unhealthy",
+                "error": f"Storage diagnostics failed: {exc}",
+            }
+
+    def _is_storage_lock_error(self, error: Optional[str]) -> bool:
+        if not error:
+            return False
+        lowered = error.lower()
+        return "database is locked" in lowered or "database table is locked" in lowered
 
     def _is_non_indexable_result(self, mutation: IndexResult) -> bool:
         if mutation.status in {

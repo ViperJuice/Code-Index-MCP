@@ -1121,6 +1121,38 @@ class TestEnhancedDispatcherProtocolConformance:
         assert result["failed_files"] == 0
         assert result["ignored_files"] == 1
 
+    def test_index_directory_records_low_level_lexical_timeout(self, tmp_path, monkeypatch):
+        store = MagicMock(db_path=str(tmp_path / "index.db"))
+        store.health_check.return_value = {
+            "status": "healthy",
+            "journal_mode": "WAL",
+            "busy_timeout_ms": 5000,
+        }
+        ctx = _make_repo_ctx(sqlite_store=store)
+        target = tmp_path / "sample.py"
+        target.write_text("x = 1\n")
+
+        def _timeout(self, _ctx, _path, _stats):
+            _stats["lexical_stage"] = "walking"
+            _stats["lexical_files_attempted"] += 1
+            _stats["in_flight_path"] = str(_path.resolve())
+            raise TimeoutError("Operation timed out after 20 seconds")
+
+        monkeypatch.setattr(Dispatcher, "_index_file_with_lexical_timeout", _timeout)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, tmp_path)
+
+        assert result["lexical_stage"] == "blocked_file_timeout"
+        assert result["lexical_files_attempted"] == 1
+        assert result["lexical_files_completed"] == 0
+        assert result["last_progress_path"] is None
+        assert result["in_flight_path"] == str(target.resolve())
+        assert result["semantic_stage"] == "not_run"
+        assert result["low_level_blocker"]["code"] == "lexical_file_timeout"
+        assert result["storage_diagnostics"]["journal_mode"] == "WAL"
+        store.health_check.assert_called_once()
+
     def test_index_directory_runs_lexical_then_summaries_then_semantic(self, tmp_path, monkeypatch):
         events = []
         ctx = _make_repo_ctx(sqlite_store=MagicMock(db_path=str(tmp_path / "index.db")))
@@ -1184,6 +1216,10 @@ class TestEnhancedDispatcherProtocolConformance:
         result = Dispatcher([]).index_directory(ctx, tmp_path)
 
         assert [event[0] for event in events] == ["lexical", "summary", "semantic"]
+        assert result["lexical_stage"] == "completed"
+        assert result["lexical_files_attempted"] == 1
+        assert result["lexical_files_completed"] == 1
+        assert result["last_progress_path"] == str(target.resolve())
         assert result["semantic_stage"] == "indexed"
 
     def test_index_directory_blocks_semantic_stage_when_summaries_missing(

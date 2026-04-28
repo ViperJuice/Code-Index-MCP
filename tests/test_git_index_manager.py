@@ -609,6 +609,47 @@ def test_full_index_returns_exact_semantic_blocker_when_summary_progress_plateau
     )
 
 
+def test_full_index_returns_exact_low_level_blocker_when_lexical_stage_times_out(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+
+    dispatcher = MagicMock()
+    dispatcher.index_directory.return_value = {
+        "indexed_files": 0,
+        "failed_files": 1,
+        "errors": [],
+        "lexical_stage": "blocked_file_timeout",
+        "lexical_files_attempted": 1,
+        "lexical_files_completed": 0,
+        "last_progress_path": None,
+        "in_flight_path": str(repo / "hello.py"),
+        "semantic_stage": "not_run",
+        "low_level_blocker": {
+            "code": "lexical_file_timeout",
+            "message": "Lexical indexing timed out while processing hello.py",
+        },
+        "storage_diagnostics": {
+            "journal_mode": "WAL",
+            "busy_timeout_ms": 5000,
+        },
+    }
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=dispatcher)
+    result = manager._full_index(repo_info.repository_id, ctx)
+
+    assert result.indexed == 0
+    assert not result.clean
+    assert result.low_level is not None
+    assert result.low_level["lexical_stage"] == "blocked_file_timeout"
+    assert result.low_level["low_level_blocker"]["code"] == "lexical_file_timeout"
+    assert result.errors == ["Lexical indexing timed out while processing hello.py"]
+
+
 def test_full_index_preserves_semantic_ready_stats_when_force_full_rebuild_succeeds(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)
@@ -690,6 +731,47 @@ def test_force_full_sync_does_not_advance_commit_when_semantic_stage_is_blocked(
         result.error
         == "Summary generation plateaued before strict semantic indexing could start"
     )
+    registry.update_indexed_commit.assert_not_called()
+
+
+def test_force_full_sync_does_not_advance_commit_when_low_level_blocker_fires(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    old_commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, old_commit)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    registry.update_git_state.return_value = {"commit": old_commit, "branch": "main"}
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    manager._resolve_ctx = MagicMock(return_value=ctx)
+    manager._index_exists = MagicMock(return_value=True)
+    manager._index_has_durable_rows = MagicMock(return_value=True)
+    manager._full_index = MagicMock(
+        return_value=UpdateResult(
+            indexed=0,
+            failed=1,
+            errors=["Lexical indexing timed out while processing hello.py"],
+            low_level={
+                "lexical_stage": "blocked_file_timeout",
+                "lexical_files_attempted": 1,
+                "lexical_files_completed": 0,
+                "last_progress_path": None,
+                "in_flight_path": str(repo / "hello.py"),
+                "low_level_blocker": {
+                    "code": "lexical_file_timeout",
+                    "message": "Lexical indexing timed out while processing hello.py",
+                },
+            },
+            semantic={"semantic_stage": "not_run"},
+        )
+    )
+
+    result = manager.sync_repository_index(repo_info.repository_id, force_full=True)
+
+    assert result.action == "failed"
+    assert result.error == "Lexical indexing timed out while processing hello.py"
     registry.update_indexed_commit.assert_not_called()
 
 
