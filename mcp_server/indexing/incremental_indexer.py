@@ -127,6 +127,97 @@ class IncrementalIndexer:
 
             return chunk_ids + derived_chunk_ids + file_summary_ids
 
+    def _semantic_summary_contract(self) -> Optional[Dict[str, Any]]:
+        if self.semantic_indexer is None:
+            return None
+        if self.dispatcher is not None:
+            try:
+                contract = self.dispatcher.get_semantic_summary_contract(self._dispatcher_ctx())
+                if contract is not None:
+                    return contract
+            except Exception:
+                logger.debug("Falling back to local semantic summary contract lookup", exc_info=True)
+
+        try:
+            from ..indexing.summarization import ComprehensiveChunkWriter
+            from ..config.settings import reload_settings
+
+            settings = reload_settings()
+            summarization_config = settings.get_profile_summarization_config(
+                settings.semantic_default_profile
+            )
+            summarization_config.setdefault("profile_id", settings.semantic_default_profile)
+            writer = ComprehensiveChunkWriter(
+                db_path=self.store.db_path,
+                qdrant_client=None,
+                summarization_config=summarization_config,
+            )
+            return {
+                "profile_id": summarization_config.get("profile_id"),
+                "prompt_fingerprint": writer._prompt_fingerprint(),
+            }
+        except Exception:
+            logger.debug("Unable to resolve semantic summary contract", exc_info=True)
+            return None
+
+    def _plan_semantic_invalidation(
+        self,
+        path: str,
+        *,
+        new_path: Optional[str] = None,
+        preserve_matching_summaries: bool = False,
+    ) -> Dict[str, Any]:
+        contract = self._semantic_summary_contract() or {}
+        return self.store.plan_semantic_invalidation(
+            path,
+            self._get_repository_id(),
+            profile_id=getattr(self.semantic_indexer.semantic_profile, "profile_id", None)
+            if self.semantic_indexer is not None
+            else None,
+            new_relative_path=new_path,
+            preserve_matching_summaries=preserve_matching_summaries,
+            expected_summary_profile_id=contract.get("profile_id"),
+            expected_prompt_fingerprint=contract.get("prompt_fingerprint"),
+        )
+
+    def _cleanup_semantic_invalidation(self, invalidation: Dict[str, Any]) -> Dict[str, Any]:
+        if self.semantic_indexer is None:
+            return {
+                "vectors_deleted": 0,
+                "mappings_deleted": 0,
+                "summaries_deleted": 0,
+                "summaries_preserved": len(invalidation.get("summary_chunk_ids_preserved", [])),
+                "requires_summary_regeneration": bool(
+                    invalidation.get("requires_summary_regeneration", False)
+                ),
+            }
+
+        profile_id = self.semantic_indexer.semantic_profile.profile_id
+        if hasattr(self.semantic_indexer, "cleanup_stale_semantic_artifacts"):
+            return self.semantic_indexer.cleanup_stale_semantic_artifacts(
+                profile_id=profile_id,
+                invalidation=invalidation,
+                sqlite_store=self.store,
+            )
+
+        deleted_vectors = self.semantic_indexer.delete_stale_vectors(
+            profile_id=profile_id,
+            chunk_ids=list(invalidation.get("vector_chunk_ids", [])),
+            sqlite_store=self.store,
+        )
+        deleted_summaries = self.store.delete_chunk_summaries(
+            list(invalidation.get("summary_chunk_ids_to_delete", []))
+        )
+        return {
+            "vectors_deleted": deleted_vectors,
+            "mappings_deleted": len(invalidation.get("vector_chunk_ids", [])),
+            "summaries_deleted": deleted_summaries,
+            "summaries_preserved": len(invalidation.get("summary_chunk_ids_preserved", [])),
+            "requires_summary_regeneration": bool(
+                invalidation.get("requires_summary_regeneration", False)
+            ),
+        }
+
     def _cleanup_stale_vectors(self, chunk_ids: List[str]) -> None:
         """Delete stale semantic vectors for existing chunk ids.
 
@@ -270,7 +361,7 @@ class IncrementalIndexer:
         chosen as primary because it is the authoritative record of file existence.
         """
         try:
-            chunk_ids = self._get_chunk_ids_for_path(path)
+            invalidation = self._plan_semantic_invalidation(path)
 
             if self.dispatcher:
                 full_path = self.repo_path / path
@@ -278,12 +369,12 @@ class IncrementalIndexer:
 
                 def primary_op():
                     self.dispatcher.remove_file(ctx, full_path)
-                    return chunk_ids
+                    return invalidation
 
-                def shadow_op(captured_chunk_ids):
-                    self._cleanup_stale_vectors(captured_chunk_ids)
+                def shadow_op(captured_invalidation):
+                    self._cleanup_semantic_invalidation(captured_invalidation)
 
-                def rollback(captured_chunk_ids):
+                def rollback(captured_invalidation):
                     logger.warning(
                         f"Cannot roll back SQLite remove for {path}; "
                         "Qdrant vectors may be inconsistent."
@@ -296,12 +387,12 @@ class IncrementalIndexer:
 
                 def primary_op():
                     self.store.remove_file(relative_path, repo_id)
-                    return chunk_ids
+                    return invalidation
 
-                def shadow_op(captured_chunk_ids):
-                    self._cleanup_stale_vectors(captured_chunk_ids)
+                def shadow_op(captured_invalidation):
+                    self._cleanup_semantic_invalidation(captured_invalidation)
 
-                def rollback(captured_chunk_ids):
+                def rollback(captured_invalidation):
                     logger.warning(
                         f"Cannot roll back SQLite remove for {path}; "
                         "Qdrant vectors may be inconsistent."
@@ -330,8 +421,11 @@ class IncrementalIndexer:
                 return self._remove_file(old_path)
 
             content_hash = self._compute_file_hash(new_full_path)
-            # Capture chunk IDs before primary op mutates the SQLite row.
-            chunk_ids = self._get_chunk_ids_for_path(old_path)
+            invalidation = self._plan_semantic_invalidation(
+                old_path,
+                new_path=new_path,
+                preserve_matching_summaries=True,
+            )
 
             if self.dispatcher:
                 old_full_path = self.repo_path / old_path
@@ -339,18 +433,19 @@ class IncrementalIndexer:
 
                 def primary_op():
                     self.dispatcher.move_file(ctx, old_full_path, new_full_path, content_hash)
-                    return chunk_ids
+                    return invalidation
 
-                def shadow_op(captured_chunk_ids):
-                    self._cleanup_stale_vectors(captured_chunk_ids)
+                def shadow_op(captured_invalidation):
+                    self._cleanup_semantic_invalidation(captured_invalidation)
 
-                def rollback(captured_chunk_ids):
+                def rollback(captured_invalidation):
                     try:
                         self.dispatcher.move_file(ctx, new_full_path, old_full_path, content_hash)
                     except Exception as rb_exc:
                         logger.warning(f"Rollback of dispatcher move {old_path} failed: {rb_exc}")
 
                 two_phase_commit(primary_op, shadow_op, rollback)
+                self.dispatcher.rebuild_semantic_for_paths(ctx, [new_full_path])
             else:
                 old_relative = self.path_resolver.normalize_path(self.repo_path / old_path)
                 new_relative = self.path_resolver.normalize_path(new_full_path)
@@ -358,12 +453,12 @@ class IncrementalIndexer:
 
                 def primary_op():
                     self.store.move_file(old_relative, new_relative, repo_id, content_hash)
-                    return chunk_ids
+                    return invalidation
 
-                def shadow_op(captured_chunk_ids):
-                    self._cleanup_stale_vectors(captured_chunk_ids)
+                def shadow_op(captured_invalidation):
+                    self._cleanup_semantic_invalidation(captured_invalidation)
 
-                def rollback(captured_chunk_ids):
+                def rollback(captured_invalidation):
                     try:
                         self.store.move_file(new_relative, old_relative, repo_id, content_hash)
                     except Exception as rb_exc:
@@ -399,16 +494,16 @@ class IncrementalIndexer:
                 return "skipped"
 
             # Check if file needs reindexing
-            if not self._needs_reindex(full_path):
-                logger.debug(f"File unchanged, skipping: {path}")
-                return "skipped"
-
-            self._cleanup_stale_vectors(self._get_chunk_ids_for_path(path))
-
             relative_path = self.path_resolver.normalize_path(full_path)
             repo_id = self._get_repository_id()
             stored_file = self.store.get_file_by_path(relative_path, repo_id)
+            if not self._needs_reindex(full_path, stored_file=stored_file):
+                logger.debug(f"File unchanged, skipping: {path}")
+                return "skipped"
+
             if stored_file is not None:
+                invalidation = self._plan_semantic_invalidation(path)
+                self._cleanup_semantic_invalidation(invalidation)
                 self.store.remove_file(relative_path, repo_id)
 
             if self.dispatcher:
@@ -456,7 +551,24 @@ class IncrementalIndexer:
                 return True
 
             # Compare hashes
-            return current_hash != stored_hash
+            if current_hash != stored_hash:
+                return True
+
+            if self.semantic_indexer is None:
+                return False
+
+            invalidation = self._plan_semantic_invalidation(
+                relative_path,
+                new_path=relative_path,
+                preserve_matching_summaries=True,
+            )
+            preserved = len(invalidation.get("summary_chunk_ids_preserved", []))
+            source_chunks = len(invalidation.get("source_chunk_ids", []))
+            return bool(
+                invalidation.get("summary_chunk_ids_to_delete")
+                or invalidation.get("requires_summary_regeneration", False)
+                or preserved != source_chunks
+            )
 
         except Exception as e:
             logger.error(f"Error checking if file needs reindex: {e}")

@@ -1209,6 +1209,20 @@ class SQLiteStore:
             )
             return cursor.rowcount
 
+    def delete_chunk_summaries(self, chunk_ids: List[str]) -> int:
+        """Delete authoritative summary rows for the supplied chunk ids."""
+        if not chunk_ids:
+            return 0
+
+        placeholders = ",".join(["?"] * len(chunk_ids))
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                f"""DELETE FROM chunk_summaries
+                    WHERE chunk_hash IN ({placeholders})""",
+                list(chunk_ids),
+            )
+            return cursor.rowcount
+
     def store_chunks_batch(self, chunks: List[Dict[str, Any]]) -> int:
         """
         Store multiple chunks in a batch operation for efficiency.
@@ -2318,6 +2332,115 @@ class SQLiteStore:
                     "updated_at": row[13],
                 }
             return None
+
+    def plan_semantic_invalidation(
+        self,
+        relative_path: str,
+        repository_id: int,
+        *,
+        profile_id: Optional[str] = None,
+        new_relative_path: Optional[str] = None,
+        preserve_matching_summaries: bool = False,
+        expected_summary_profile_id: Optional[str] = None,
+        expected_prompt_fingerprint: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Plan summary/vector invalidation for a file mutation without mutating state."""
+        result: Dict[str, Any] = {
+            "relative_path": relative_path,
+            "new_relative_path": new_relative_path,
+            "file_id": None,
+            "source_chunk_ids": [],
+            "vector_chunk_ids": [],
+            "summary_chunk_ids_to_delete": [],
+            "summary_chunk_ids_preserved": [],
+            "file_summary_chunk_id": f"{relative_path}:file-summary",
+            "new_file_summary_chunk_id": (
+                f"{new_relative_path}:file-summary" if new_relative_path else None
+            ),
+            "requires_file_summary_regeneration": bool(
+                new_relative_path and new_relative_path != relative_path
+            ),
+            "requires_summary_regeneration": False,
+        }
+
+        file_row = self.get_file_by_path(relative_path, repository_id)
+        if not file_row:
+            return result
+
+        file_id = int(file_row["id"])
+        result["file_id"] = file_id
+
+        chunks = self.get_chunks_for_file(file_id)
+        source_chunk_ids = [str(chunk["chunk_id"]) for chunk in chunks]
+        result["source_chunk_ids"] = source_chunk_ids
+
+        with self._get_connection() as conn:
+            summary_rows = conn.execute(
+                """SELECT chunk_hash, is_authoritative, profile_id, prompt_fingerprint
+                   FROM chunk_summaries
+                   WHERE file_id = ?""",
+                (file_id,),
+            ).fetchall()
+
+            vector_chunk_ids: List[str] = list(source_chunk_ids)
+            if profile_id:
+                if source_chunk_ids:
+                    like_clauses = " OR ".join(["chunk_id = ? OR chunk_id LIKE ?"] * len(source_chunk_ids))
+                    params: List[Any] = [profile_id]
+                    for chunk_id in source_chunk_ids:
+                        params.extend([chunk_id, f"{chunk_id}:part:%"])
+                    params.append(result["file_summary_chunk_id"])
+                    vector_rows = conn.execute(
+                        f"""SELECT chunk_id
+                            FROM semantic_points
+                            WHERE profile_id = ?
+                              AND (({like_clauses}) OR chunk_id = ?)""",
+                        params,
+                    ).fetchall()
+                else:
+                    vector_rows = conn.execute(
+                        """SELECT chunk_id
+                           FROM semantic_points
+                           WHERE profile_id = ?
+                             AND chunk_id = ?""",
+                        (profile_id, result["file_summary_chunk_id"]),
+                    ).fetchall()
+                vector_chunk_ids.extend(str(row[0]) for row in vector_rows)
+
+        preserved: List[str] = []
+        deleted: List[str] = []
+        for row in summary_rows:
+            chunk_hash = str(row[0])
+            is_authoritative = bool(row[1])
+            row_profile_id = row[2]
+            row_prompt_fingerprint = row[3]
+            matches_profile = (
+                expected_summary_profile_id is None
+                or row_profile_id == expected_summary_profile_id
+            )
+            matches_prompt = (
+                expected_prompt_fingerprint is None
+                or row_prompt_fingerprint == expected_prompt_fingerprint
+            )
+            can_preserve = (
+                preserve_matching_summaries
+                and is_authoritative
+                and matches_profile
+                and matches_prompt
+            )
+            if can_preserve:
+                preserved.append(chunk_hash)
+            else:
+                deleted.append(chunk_hash)
+
+        dedup_vector_chunk_ids = list(dict.fromkeys(vector_chunk_ids))
+        result["vector_chunk_ids"] = dedup_vector_chunk_ids
+        result["summary_chunk_ids_to_delete"] = deleted
+        result["summary_chunk_ids_preserved"] = preserved
+        result["requires_summary_regeneration"] = bool(
+            deleted or result["requires_file_summary_regeneration"]
+        )
+        return result
 
     def get_missing_summaries(self, limit: int = 100) -> List[Dict[str, Any]]:
         """Find chunks that don't have summaries yet."""

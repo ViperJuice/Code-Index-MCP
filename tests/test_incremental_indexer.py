@@ -15,6 +15,8 @@ class DummyDispatcher:
         self.indexed = []
         self.removed = []
         self.moved = []
+        self.semantic_rebuilds = []
+        self.summary_contract = {"profile_id": "test-profile", "prompt_fingerprint": "prompt-new"}
 
     def index_file(self, ctx: RepoContext, path: Path) -> None:
         self.ctx = ctx
@@ -29,6 +31,15 @@ class DummyDispatcher:
     ) -> None:
         self.ctx = ctx
         self.moved.append((Path(old_path), Path(new_path), content_hash))
+
+    def rebuild_semantic_for_paths(self, ctx: RepoContext, paths):
+        self.ctx = ctx
+        self.semantic_rebuilds.append([Path(path) for path in paths])
+        return {"semantic_stage": "indexed", "semantic_indexed": len(paths)}
+
+    def get_semantic_summary_contract(self, ctx: RepoContext):
+        self.ctx = ctx
+        return dict(self.summary_contract)
 
 
 class DummySemanticIndexer:
@@ -45,6 +56,33 @@ class DummySemanticIndexer:
             }
         )
         return len(chunk_ids)
+
+    def cleanup_stale_semantic_artifacts(self, profile_id: str, invalidation, sqlite_store=None):
+        self.cleanup_calls.append(
+            {
+                "profile_id": profile_id,
+                "chunk_ids": list(invalidation.get("vector_chunk_ids", [])),
+                "summary_chunk_ids_to_delete": list(
+                    invalidation.get("summary_chunk_ids_to_delete", [])
+                ),
+                "summary_chunk_ids_preserved": list(
+                    invalidation.get("summary_chunk_ids_preserved", [])
+                ),
+                "sqlite_store": sqlite_store,
+            }
+        )
+        if sqlite_store is not None:
+            sqlite_store.delete_semantic_point_mappings(
+                profile_id,
+                list(invalidation.get("vector_chunk_ids", [])),
+            )
+            sqlite_store.delete_chunk_summaries(
+                list(invalidation.get("summary_chunk_ids_to_delete", []))
+            )
+        return {
+            "vectors_deleted": len(invalidation.get("vector_chunk_ids", [])),
+            "summaries_deleted": len(invalidation.get("summary_chunk_ids_to_delete", [])),
+        }
 
 
 @pytest.fixture
@@ -237,3 +275,44 @@ def test_incremental_cleanup_includes_split_semantic_chunk_ids(incremental_index
         "chunk-split-1:part:2:3",
         "split.py:file-summary",
     ]
+
+
+def test_prompt_fingerprint_drift_forces_reindex_even_when_file_hash_is_unchanged(
+    incremental_indexer,
+):
+    repo_path, store, dispatcher, indexer, semantic_indexer, ctx = incremental_indexer
+    existing_file = repo_path / "prompt_drift.py"
+    existing_file.write_text("value = 1\n")
+
+    repo_id = indexer._get_repository_id()
+    file_id = store.store_file(repo_id, existing_file, language="python")
+    store.store_chunk(
+        file_id=file_id,
+        content="value = 1",
+        content_start=0,
+        content_end=9,
+        line_start=1,
+        line_end=1,
+        chunk_id="chunk-drift-1",
+        node_id="node-drift-1",
+        treesitter_file_id="ts-drift-1",
+    )
+    store.store_chunk_summary(
+        chunk_hash="chunk-drift-1",
+        file_id=file_id,
+        chunk_start=0,
+        chunk_end=9,
+        summary_text="stale summary",
+        llm_model="chat",
+        is_authoritative=True,
+        profile_id="test-profile",
+        prompt_fingerprint="prompt-old",
+        audit_metadata={"profile_id": "test-profile", "prompt_fingerprint": "prompt-old"},
+    )
+
+    stats = indexer.update_from_changes([FileChange("prompt_drift.py", "modified")])
+
+    assert stats.files_indexed == 1
+    assert stats.errors == 0
+    assert dispatcher.indexed[-1] == existing_file
+    assert semantic_indexer.cleanup_calls[-1]["summary_chunk_ids_to_delete"] == ["chunk-drift-1"]

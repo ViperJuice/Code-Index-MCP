@@ -284,6 +284,93 @@ class TestFileOperations:
             ).fetchone()[0]
         assert move_rows == 0
 
+    def test_plan_semantic_invalidation_deletes_summaries_on_prompt_drift(self, sqlite_store):
+        repo_id = sqlite_store.create_repository("/repo", "test")
+        file_id = sqlite_store.store_file(repo_id, "/repo/file.py", "file.py")
+        sqlite_store.store_chunk(
+            file_id=file_id,
+            content="value = 1",
+            content_start=0,
+            content_end=9,
+            line_start=1,
+            line_end=1,
+            chunk_id="chunk-1",
+            node_id="node-1",
+            treesitter_file_id="ts-1",
+        )
+        sqlite_store.store_chunk_summary(
+            chunk_hash="chunk-1",
+            file_id=file_id,
+            chunk_start=0,
+            chunk_end=9,
+            summary_text="old summary",
+            llm_model="chat",
+            is_authoritative=True,
+            profile_id="oss_high",
+            prompt_fingerprint="prompt-old",
+            audit_metadata={"profile_id": "oss_high", "prompt_fingerprint": "prompt-old"},
+        )
+
+        plan = sqlite_store.plan_semantic_invalidation(
+            "file.py",
+            repo_id,
+            profile_id="oss_high",
+            preserve_matching_summaries=True,
+            expected_summary_profile_id="oss_high",
+            expected_prompt_fingerprint="prompt-new",
+        )
+
+        assert plan["summary_chunk_ids_to_delete"] == ["chunk-1"]
+        assert plan["summary_chunk_ids_preserved"] == []
+        assert plan["requires_summary_regeneration"] is True
+
+    def test_plan_semantic_invalidation_preserves_matching_rename_and_rotates_file_summary(
+        self, sqlite_store
+    ):
+        repo_id = sqlite_store.create_repository("/repo", "test")
+        file_id = sqlite_store.store_file(repo_id, "/repo/old.py", "old.py")
+        sqlite_store.store_chunk(
+            file_id=file_id,
+            content="value = 1",
+            content_start=0,
+            content_end=9,
+            line_start=1,
+            line_end=1,
+            chunk_id="chunk-1",
+            node_id="node-1",
+            treesitter_file_id="ts-1",
+        )
+        sqlite_store.store_chunk_summary(
+            chunk_hash="chunk-1",
+            file_id=file_id,
+            chunk_start=0,
+            chunk_end=9,
+            summary_text="stable summary",
+            llm_model="chat",
+            is_authoritative=True,
+            profile_id="oss_high",
+            prompt_fingerprint="prompt-stable",
+            audit_metadata={"profile_id": "oss_high", "prompt_fingerprint": "prompt-stable"},
+        )
+        sqlite_store.upsert_semantic_point("oss_high", "chunk-1:part:1:1", 101, "code-index")
+        sqlite_store.upsert_semantic_point("oss_high", "old.py:file-summary", 202, "code-index")
+
+        plan = sqlite_store.plan_semantic_invalidation(
+            "old.py",
+            repo_id,
+            profile_id="oss_high",
+            new_relative_path="new.py",
+            preserve_matching_summaries=True,
+            expected_summary_profile_id="oss_high",
+            expected_prompt_fingerprint="prompt-stable",
+        )
+
+        assert plan["summary_chunk_ids_to_delete"] == []
+        assert plan["summary_chunk_ids_preserved"] == ["chunk-1"]
+        assert "chunk-1:part:1:1" in plan["vector_chunk_ids"]
+        assert "old.py:file-summary" in plan["vector_chunk_ids"]
+        assert plan["requires_file_summary_regeneration"] is True
+
     def test_get_file_with_repository(self, sqlite_store):
         """Test getting file with specific repository."""
         repo1_id = sqlite_store.create_repository("/repo1", "repo1")

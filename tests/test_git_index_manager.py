@@ -566,3 +566,48 @@ def test_full_index_preserves_additive_semantic_stats_without_failing_lexical_su
     assert result.semantic is not None
     assert result.semantic["semantic_blocked"] == 1
     assert result.semantic["semantic_stage"] == "blocked_missing_summaries"
+
+
+def test_incremental_update_aggregates_semantic_mutation_stats(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+
+    class SemanticDispatcher(CtxSignatureDispatcher):
+        def index_file(self, ctx, path):
+            result = super().index_file(ctx, path)
+            result.semantic = {
+                "summaries_written": 1,
+                "summary_chunks_attempted": 1,
+                "semantic_indexed": 1,
+                "semantic_stage": "indexed",
+            }
+            return result
+
+        def move_file(self, ctx, old_path, new_path, content_hash=None):
+            result = super().move_file(ctx, old_path, new_path, content_hash)
+            result.semantic = {
+                "vectors_deleted": 2,
+                "summaries_preserved": 1,
+                "semantic_stage": "indexed",
+            }
+            return result
+
+    dispatcher = SemanticDispatcher()
+    manager = GitAwareIndexManager(registry=MagicMock(get_repository=MagicMock(return_value=repo_info)), dispatcher=dispatcher)
+    changes = ChangeSet(
+        added=[],
+        modified=["hello.py"],
+        deleted=[],
+        renamed=[("old.py", "hello.py")],
+    )
+
+    result = manager._incremental_index_update(repo_info.repository_id, ctx, changes)
+
+    assert result.failed == 0
+    assert result.semantic is not None
+    assert result.semantic["summaries_written"] == 1
+    assert result.semantic["semantic_indexed"] == 1
+    assert result.semantic["vectors_deleted"] == 2
+    assert result.semantic["summaries_preserved"] == 1

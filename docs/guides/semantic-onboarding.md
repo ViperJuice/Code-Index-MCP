@@ -156,6 +156,31 @@ Manual summary tools stay separate from the full-sync contract:
 - `summarize_sample` is a diagnostic/sample tool for inspecting summary output
   and does not satisfy the full-sync semantic build contract by itself.
 
+## Incremental Mutation Contract
+
+Incremental mutation follows the same ordered semantic contract as full sync:
+
+1. lexical/chunk persistence
+2. authoritative summary generation or summary reuse when the stored semantic
+   fingerprint still matches
+3. strict semantic vector writes
+
+Changed chunks invalidate stale semantic evidence before re-embedding. That
+includes authoritative summaries when chunk content or the summary contract
+changes, plus vector linkages for stale chunk, subchunk, and file-summary
+entries.
+
+Deletes remove both authoritative summaries and semantic vectors for the
+affected file. Renames may preserve authoritative chunk summaries only when the
+stored profile and prompt fingerprints still match, but the file-summary vector
+is rotated through the same summary-first rebuild path so path-sensitive
+semantic context does not go stale.
+
+Watcher-triggered repair uses the same summary-first mutation contract as
+direct incremental sync. This phase is limited to mutation durability and
+watcher repair; it does not change semantic query routing and does not claim
+dogfood rebuild evidence.
+
 ## Troubleshooting
 
 - Qdrant unreachable

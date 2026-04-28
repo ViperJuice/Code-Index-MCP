@@ -1740,19 +1740,27 @@ class SemanticIndexer:
             )
 
         point_links: List[tuple[str, int]] = []
+        source_chunk_links: Dict[str, int] = {}
         try:
             self._upsert_points_batched(path, points)
             if self.sqlite_store is not None:
                 effective_profile_id = self.semantic_profile.profile_id
                 for point in points:
                     payload = point.payload or {}
-                    if payload.get("kind") == "file_summary":
-                        continue
+                    chunk_id = payload.get("chunk_id")
+                    if chunk_id:
+                        point_links.append((str(chunk_id), int(point.id)))
                     source_chunk_id = payload.get("source_chunk_id")
-                    if not source_chunk_id:
-                        continue
-                    point_links.append((str(source_chunk_id), int(point.id)))
-                for source_chunk_id, point_id in point_links:
+                    if source_chunk_id:
+                        source_chunk_links[str(source_chunk_id)] = int(point.id)
+                for chunk_id, point_id in point_links:
+                    self.sqlite_store.upsert_semantic_point(
+                        profile_id=effective_profile_id,
+                        chunk_id=chunk_id,
+                        point_id=point_id,
+                        collection=self.collection,
+                    )
+                for source_chunk_id, point_id in source_chunk_links.items():
                     self.sqlite_store.upsert_semantic_point(
                         profile_id=effective_profile_id,
                         chunk_id=source_chunk_id,
@@ -2143,7 +2151,7 @@ class SemanticIndexer:
         if sqlite_store is None or not chunk_ids:
             return 0
 
-        point_ids = sqlite_store.get_semantic_point_ids(profile_id, chunk_ids)
+        point_ids = list(dict.fromkeys(sqlite_store.get_semantic_point_ids(profile_id, chunk_ids)))
 
         if point_ids and self._qdrant_available:
             try:
@@ -2162,6 +2170,58 @@ class SemanticIndexer:
 
         sqlite_store.delete_semantic_point_mappings(profile_id, chunk_ids)
         return len(point_ids)
+
+    def cleanup_stale_semantic_artifacts(
+        self,
+        profile_id: str,
+        invalidation: Mapping[str, Any],
+        sqlite_store: Optional["SQLiteStore"] = None,
+    ) -> Dict[str, Any]:
+        """Delete stale vectors, mappings, and invalidated summaries for a file mutation."""
+        if sqlite_store is None:
+            return {
+                "vectors_deleted": 0,
+                "mappings_deleted": 0,
+                "summaries_deleted": 0,
+                "summaries_preserved": len(invalidation.get("summary_chunk_ids_preserved", [])),
+                "requires_summary_regeneration": bool(
+                    invalidation.get("requires_summary_regeneration", False)
+                ),
+            }
+
+        vector_chunk_ids = list(invalidation.get("vector_chunk_ids", []) or [])
+        point_ids = list(
+            dict.fromkeys(sqlite_store.get_semantic_point_ids(profile_id, vector_chunk_ids))
+        )
+
+        if point_ids and self._qdrant_available:
+            try:
+                self.qdrant.delete(
+                    collection_name=self.collection,
+                    points_selector=models.PointIdsList(points=point_ids),
+                )
+            except Exception as e:
+                logger.error(
+                    "Failed deleting stale semantic artifacts for profile '%s': %s",
+                    profile_id,
+                    e,
+                )
+                self._qdrant_available = False
+                raise RuntimeError(f"Failed to delete stale semantic artifacts from Qdrant: {e}")
+
+        deleted_mappings = sqlite_store.delete_semantic_point_mappings(profile_id, vector_chunk_ids)
+        deleted_summaries = sqlite_store.delete_chunk_summaries(
+            list(invalidation.get("summary_chunk_ids_to_delete", []) or [])
+        )
+        return {
+            "vectors_deleted": len(point_ids),
+            "mappings_deleted": deleted_mappings,
+            "summaries_deleted": deleted_summaries,
+            "summaries_preserved": len(invalidation.get("summary_chunk_ids_preserved", [])),
+            "requires_summary_regeneration": bool(
+                invalidation.get("requires_summary_regeneration", False)
+            ),
+        }
 
     # ------------------------------------------------------------------
     def search(self, query: str, limit: int = 20) -> list[dict[str, Any]]:

@@ -72,6 +72,7 @@ class IndexResult:
     observed_hash: str | None
     actual_hash: str | None
     error: str | None = None
+    semantic: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -1882,10 +1883,11 @@ class EnhancedDispatcher:
             )
 
             # Semantic indexing for incremental single-file updates
+            semantic_stats = None
             _sem = self._get_semantic_indexer(ctx)
             if do_semantic and _sem:
                 try:
-                    _sem.index_file(path)
+                    semantic_stats = self.rebuild_semantic_for_paths(ctx, [path])
                 except Exception as e:
                     logger.warning(f"Semantic indexing failed for {path}: {e}")
 
@@ -1894,6 +1896,7 @@ class EnhancedDispatcher:
                 path=path,
                 observed_hash=None,
                 actual_hash=None,
+                semantic=semantic_stats,
             )
 
         except RuntimeError as e:
@@ -2021,10 +2024,11 @@ class EnhancedDispatcher:
             self._operation_stats["indexings"] += 1
             self._operation_stats["total_time"] += time.time() - start_time
 
+            semantic_stats = None
             _sem = self._get_semantic_indexer(ctx)
             if _sem:
                 try:
-                    _sem.index_file(path)
+                    semantic_stats = self.rebuild_semantic_for_paths(ctx, [path])
                 except Exception as e:
                     logger.warning(f"Semantic indexing failed for {path}: {e}")
 
@@ -2033,6 +2037,7 @@ class EnhancedDispatcher:
                 path=path,
                 observed_hash=expected_hash,
                 actual_hash=actual_hash,
+                semantic=semantic_stats,
             )
         except Exception as e:
             logger.error(f"Error in guarded indexing of {path}: {e}", exc_info=True)
@@ -2043,6 +2048,119 @@ class EnhancedDispatcher:
                 actual_hash=actual_hash,
                 error=str(e),
             )
+
+    def get_semantic_summary_contract(self, ctx: RepoContext) -> Optional[Dict[str, Any]]:
+        """Return the active summary fingerprint contract for strict semantic rebuilds."""
+        active_store = getattr(ctx, "sqlite_store", None)
+        if active_store is None:
+            return None
+
+        from ..indexing.summarization import ComprehensiveChunkWriter
+
+        settings = reload_settings()
+        summarization_config = settings.get_profile_summarization_config(
+            settings.semantic_default_profile
+        )
+        summarization_config.setdefault("profile_id", settings.semantic_default_profile)
+        writer = ComprehensiveChunkWriter(
+            db_path=active_store.db_path,
+            qdrant_client=None,
+            summarization_config=summarization_config,
+        )
+        return {
+            "profile_id": summarization_config.get("profile_id"),
+            "prompt_fingerprint": writer._prompt_fingerprint(),
+        }
+
+    def rebuild_semantic_for_paths(self, ctx: RepoContext, paths: List[Path]) -> Dict[str, Any]:
+        """Run the summary-first strict semantic pipeline for selected files."""
+        stats = {
+            "summaries_written": 0,
+            "summary_chunks_attempted": 0,
+            "summary_missing_chunks": 0,
+            "semantic_indexed": 0,
+            "semantic_failed": 0,
+            "semantic_skipped": 0,
+            "semantic_blocked": 0,
+            "semantic_stage": "not_run",
+        }
+        normalized_paths = [Path(path).resolve() for path in paths if Path(path).exists()]
+        if not normalized_paths:
+            stats["semantic_stage"] = "skipped"
+            return stats
+
+        _sem = self._get_semantic_indexer(ctx)
+        active_store = getattr(ctx, "sqlite_store", None)
+        if _sem is None or active_store is None:
+            stats["semantic_stage"] = "skipped"
+            stats["semantic_skipped"] = len(normalized_paths)
+            return stats
+
+        from ..indexing.summarization import ComprehensiveChunkWriter
+        from ..setup.semantic_preflight import run_semantic_preflight
+
+        settings = reload_settings()
+        summarization_config = settings.get_profile_summarization_config(
+            settings.semantic_default_profile
+        )
+        summarization_config.setdefault("profile_id", settings.semantic_default_profile)
+        writer = ComprehensiveChunkWriter(
+            db_path=active_store.db_path,
+            qdrant_client=None,
+            summarization_config=summarization_config,
+        )
+        summary_result = _run_coro_blocking(
+            writer.process_scope(
+                limit=max(10000, len(normalized_paths) * 64),
+                target_paths=normalized_paths,
+            )
+        )
+        stats["summaries_written"] = summary_result.summaries_written
+        stats["summary_chunks_attempted"] = summary_result.chunks_attempted
+        stats["summary_missing_chunks"] = len(summary_result.missing_chunk_ids)
+        if summary_result.missing_chunk_ids:
+            stats["semantic_stage"] = "blocked_missing_summaries"
+            stats["semantic_blocked"] = len(normalized_paths)
+            stats["semantic_error"] = (
+                "Missing authoritative summaries blocked strict semantic indexing"
+            )
+            return stats
+
+        semantic_preflight = run_semantic_preflight(
+            settings=settings,
+            strict=False,
+        ).to_dict()
+        if not semantic_preflight.get("can_write_semantic_vectors", True):
+            stats["semantic_stage"] = "blocked_preflight"
+            stats["semantic_blocked"] = len(normalized_paths)
+            stats["semantic_blocker"] = semantic_preflight.get("blocker")
+            stats["semantic_error"] = (semantic_preflight.get("blocker") or {}).get("message")
+            return stats
+
+        sem_stats = _sem.index_files_batch(
+            normalized_paths,
+            embed_batch_size=1000,
+            require_summaries=True,
+            semantic_preflight=semantic_preflight,
+        )
+        stats["semantic_indexed"] = sem_stats.get("files_indexed", 0)
+        stats["semantic_failed"] = sem_stats.get("files_failed", 0)
+        stats["semantic_skipped"] = sem_stats.get("files_skipped", 0)
+        stats["semantic_blocked"] = sem_stats.get("files_blocked", 0)
+        stats["total_embedding_units"] = sem_stats.get("total_embedding_units", 0)
+        if sem_stats.get("semantic_blocker") is not None:
+            stats["semantic_blocker"] = sem_stats.get("semantic_blocker")
+        if sem_stats.get("semantic_error"):
+            stats["semantic_error"] = sem_stats.get("semantic_error")
+        if stats["semantic_indexed"] > 0:
+            stats["semantic_stage"] = "indexed"
+        elif stats["semantic_blocked"] > 0:
+            stats["semantic_stage"] = "blocked"
+        elif stats["semantic_failed"] > 0:
+            stats["semantic_stage"] = "failed"
+        else:
+            stats["semantic_stage"] = "skipped"
+        return stats
 
     def _persist_index_shard(
         self,
@@ -2317,88 +2435,11 @@ class EnhancedDispatcher:
         stats["semantic_paths_queued"] = len(semantically_indexed_paths)
         stats["semantic_indexer_present"] = _sem is not None
         if _sem and semantically_indexed_paths:
-            summary_result = None
-            semantic_preflight = None
-            active_store = getattr(ctx, "sqlite_store", None)
-            if active_store is not None:
-                from ..indexing.summarization import ComprehensiveChunkWriter
-                from ..setup.semantic_preflight import run_semantic_preflight
-
-                settings = reload_settings()
-                summarization_config = settings.get_profile_summarization_config(
-                    settings.semantic_default_profile
-                )
-                summarization_config.setdefault("profile_id", settings.semantic_default_profile)
-                writer = ComprehensiveChunkWriter(
-                    db_path=active_store.db_path,
-                    qdrant_client=None,
-                    summarization_config=summarization_config,
-                )
-                summary_result = _run_coro_blocking(
-                    writer.process_scope(
-                        limit=max(10000, len(semantically_indexed_paths) * 64),
-                        target_paths=semantically_indexed_paths,
-                    )
-                )
-                stats["summaries_written"] = summary_result.summaries_written
-                stats["summary_chunks_attempted"] = summary_result.chunks_attempted
-                stats["summary_missing_chunks"] = len(summary_result.missing_chunk_ids)
-                if summary_result.missing_chunk_ids:
-                    stats["semantic_stage"] = "blocked_missing_summaries"
-                    stats["semantic_error"] = (
-                        "Missing authoritative summaries blocked strict semantic indexing"
-                    )
-
-                semantic_preflight = run_semantic_preflight(
-                    settings=settings,
-                    strict=False,
-                ).to_dict()
-                if not semantic_preflight.get("can_write_semantic_vectors", True):
-                    stats["semantic_stage"] = "blocked_preflight"
-                    stats["semantic_blocker"] = semantic_preflight.get("blocker")
-                    stats["semantic_error"] = (
-                        semantic_preflight.get("blocker") or {}
-                    ).get("message")
-
-            if stats["semantic_stage"] in {"blocked_missing_summaries", "blocked_preflight"}:
-                stats["semantic_blocked"] = len(semantically_indexed_paths)
-                return stats
-
-            logger.info(
-                f"Batch semantic indexing {len(semantically_indexed_paths)} files "
-                f"(embed_batch_size=1000)"
-            )
             try:
-                sem_stats = _sem.index_files_batch(
-                    semantically_indexed_paths,
-                    embed_batch_size=1000,
-                    require_summaries=True,
-                    semantic_preflight=semantic_preflight,
-                )
-                stats["semantic_indexed"] = sem_stats.get("files_indexed", 0)
-                stats["semantic_failed"] = sem_stats.get("files_failed", 0)
-                stats["semantic_skipped"] = sem_stats.get("files_skipped", 0)
-                stats["semantic_blocked"] = sem_stats.get("files_blocked", 0)
-                stats["total_embedding_units"] = sem_stats.get("total_embedding_units", 0)
-                if sem_stats.get("semantic_blocker") is not None:
-                    stats["semantic_blocker"] = sem_stats.get("semantic_blocker")
-                if sem_stats.get("semantic_error"):
-                    stats["semantic_error"] = sem_stats.get("semantic_error")
-                if stats["semantic_indexed"] > 0:
-                    stats["semantic_stage"] = "indexed"
-                elif stats["semantic_blocked"] > 0 and stats["semantic_stage"] == "not_run":
-                    stats["semantic_stage"] = "blocked"
-                elif stats["semantic_failed"] > 0:
-                    stats["semantic_stage"] = "failed"
-                else:
-                    stats["semantic_stage"] = "skipped"
-                logger.info(
-                    f"Semantic batch complete: {sem_stats.get('files_indexed', 0)} indexed, "
-                    f"{sem_stats.get('files_skipped', 0)} skipped, "
-                    f"{sem_stats.get('total_embedding_units', 0)} embedding units"
-                )
+                stats.update(self.rebuild_semantic_for_paths(ctx, semantically_indexed_paths))
             except Exception as e:
                 logger.error(f"Batch semantic indexing failed: {e}", exc_info=True)
+                stats["semantic_stage"] = "failed"
                 stats["semantic_error"] = str(e)
 
         logger.info(
@@ -2558,12 +2599,21 @@ class EnhancedDispatcher:
         )
 
         try:
+            semantic_stats = None
+            _sem = self._get_semantic_indexer(ctx)
             if ctx.sqlite_store:
                 from ..core.path_resolver import PathResolver
 
                 path_resolver = PathResolver(repository_root=ctx.workspace_root)
                 try:
                     relative_path = path_resolver.normalize_path(path)
+                    invalidation = ctx.sqlite_store.plan_semantic_invalidation(
+                        relative_path,
+                        repository_id=self._sqlite_repository_id(ctx),
+                        profile_id=(
+                            _sem.semantic_profile.profile_id if _sem is not None else None
+                        ),
+                    )
                     removed = ctx.sqlite_store.remove_file(
                         relative_path, repository_id=self._sqlite_repository_id(ctx)
                     )
@@ -2581,6 +2631,12 @@ class EnhancedDispatcher:
                             observed_hash=None,
                             actual_hash=None,
                             error="indexed file row not found",
+                        )
+                    if _sem is not None:
+                        semantic_stats = _sem.cleanup_stale_semantic_artifacts(
+                            profile_id=_sem.semantic_profile.profile_id,
+                            invalidation=invalidation,
+                            sqlite_store=ctx.sqlite_store,
                         )
                 except Exception as e:
                     logger.error(f"Error removing from SQLite: {e}")
@@ -2600,18 +2656,10 @@ class EnhancedDispatcher:
             except Exception as e:
                 logger.warning(f"Error removing from plugin index: {e}")
 
-            # Remove from Qdrant semantic index if available
-            _sem = self._get_semantic_indexer(ctx)
-            if _sem is not None:
-                try:
-                    _sem.remove_file(path)
-                    logger.info("Removed %s from semantic index", path)
-                except Exception as e:
-                    logger.warning("Failed to remove %s from semantic index: %s", path, e)
-
             # Update statistics
             if primary_result.status == IndexResultStatus.DELETED:
                 self._operation_stats["deletions"] = self._operation_stats.get("deletions", 0) + 1
+            primary_result.semantic = semantic_stats
             return primary_result
 
         except Exception as e:
@@ -2674,6 +2722,17 @@ class EnhancedDispatcher:
 
         store = ctx.sqlite_store
         repository_id = self._sqlite_repository_id(ctx)
+        semantic_contract = self.get_semantic_summary_contract(ctx) or {}
+        _sem = self._get_semantic_indexer(ctx)
+        invalidation = store.plan_semantic_invalidation(
+            old_relative,
+            repository_id=repository_id,
+            profile_id=_sem.semantic_profile.profile_id if _sem is not None else None,
+            new_relative_path=new_relative,
+            preserve_matching_summaries=True,
+            expected_summary_profile_id=semantic_contract.get("profile_id"),
+            expected_prompt_fingerprint=semantic_contract.get("prompt_fingerprint"),
+        )
 
         def _sqlite_primary() -> Tuple[str, str]:
             moved = store.move_file(
@@ -2687,13 +2746,12 @@ class EnhancedDispatcher:
             return old_relative, new_relative
 
         def _semantic_shadow(_result: Tuple[str, str]) -> None:
-            try:
-                plugin = self._match_plugin(new_path)
-            except RuntimeError:
-                return  # No plugin — semantic move not applicable
-            if plugin and hasattr(plugin, "_indexer") and plugin._indexer:
-                plugin._indexer.move_file(old_path, new_path, content_hash)
-                logger.info(f"Moved in semantic index: {old_path} -> {new_path}")
+            if _sem is not None:
+                _sem.cleanup_stale_semantic_artifacts(
+                    profile_id=_sem.semantic_profile.profile_id,
+                    invalidation=invalidation,
+                    sqlite_store=store,
+                )
 
         def _sqlite_rollback(_result: Tuple[str, str]) -> None:
             try:
@@ -2713,12 +2771,16 @@ class EnhancedDispatcher:
                 shadow_op=_semantic_shadow,
                 rollback=_sqlite_rollback,
             )
+            semantic_stats = None
+            if _sem is not None:
+                semantic_stats = self.rebuild_semantic_for_paths(ctx, [new_path])
             self._operation_stats["moves"] = self._operation_stats.get("moves", 0) + 1
             return IndexResult(
                 status=IndexResultStatus.MOVED,
                 path=new_path,
                 observed_hash=None,
                 actual_hash=None,
+                semantic=semantic_stats,
             )
         except FileNotFoundError:
             return IndexResult(

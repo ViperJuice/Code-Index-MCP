@@ -112,3 +112,63 @@ def test_index_symbol_writes_mapping_for_chunk_metadata(tmp_path):
 
     assert qdrant.upserted
     assert store.get_semantic_point_ids("test-profile", ["chunk-1"]) == [expected_point_id]
+
+
+def test_cleanup_stale_semantic_artifacts_deletes_mappings_and_invalidated_summaries(tmp_path):
+    repo_path = tmp_path / "repo"
+    repo_path.mkdir()
+    store = SQLiteStore(str(tmp_path / "index.db"), path_resolver=PathResolver(repo_path))
+    qdrant = _FakeQdrantClient()
+    indexer = _build_indexer(repo_path, qdrant)
+
+    repo_id = store.create_repository(str(repo_path), "repo")
+    file_path = repo_path / "file.py"
+    file_path.write_text("value = 1\n")
+    file_id = store.store_file(repo_id, file_path, relative_path="file.py", language="python")
+    store.store_chunk(
+        file_id=file_id,
+        content="value = 1",
+        content_start=0,
+        content_end=9,
+        line_start=1,
+        line_end=1,
+        chunk_id="chunk-1",
+        node_id="node-1",
+        treesitter_file_id="ts-1",
+    )
+    store.store_chunk_summary(
+        chunk_hash="chunk-1",
+        file_id=file_id,
+        chunk_start=0,
+        chunk_end=9,
+        summary_text="stale summary",
+        llm_model="chat",
+        is_authoritative=True,
+        profile_id="test-profile",
+        prompt_fingerprint="prompt-old",
+        audit_metadata={"profile_id": "test-profile", "prompt_fingerprint": "prompt-old"},
+    )
+    store.upsert_semantic_point("test-profile", "chunk-1", 101, "code-index")
+    store.upsert_semantic_point("test-profile", "chunk-1:part:1:1", 102, "code-index")
+    store.upsert_semantic_point("test-profile", "file.py:file-summary", 103, "code-index")
+
+    cleanup = indexer.cleanup_stale_semantic_artifacts(
+        profile_id="test-profile",
+        invalidation={
+            "vector_chunk_ids": ["chunk-1", "chunk-1:part:1:1", "file.py:file-summary"],
+            "summary_chunk_ids_to_delete": ["chunk-1"],
+            "summary_chunk_ids_preserved": [],
+            "requires_summary_regeneration": True,
+        },
+        sqlite_store=store,
+    )
+
+    assert cleanup["vectors_deleted"] == 3
+    assert cleanup["mappings_deleted"] == 3
+    assert cleanup["summaries_deleted"] == 1
+    assert qdrant.deleted[0]["points"] == [101, 102, 103]
+    assert store.get_semantic_point_ids(
+        "test-profile",
+        ["chunk-1", "chunk-1:part:1:1", "file.py:file-summary"],
+    ) == []
+    assert store.get_chunk_summary("chunk-1") is None

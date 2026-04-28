@@ -559,6 +559,7 @@ class GitAwareIndexManager:
         success_counter: str,
         action_label: str,
     ) -> None:
+        self._merge_semantic_result(result, mutation.semantic)
         if mutation.status == success_status:
             setattr(result, success_counter, getattr(result, success_counter) + 1)
             return
@@ -574,6 +575,48 @@ class GitAwareIndexManager:
 
         result.failed += 1
         result.errors.append(f"{action_label}: {detail}")
+
+    def _merge_semantic_result(
+        self, result: UpdateResult, semantic: Optional[Dict[str, Any]]
+    ) -> None:
+        if not semantic:
+            return
+        if result.semantic is None:
+            result.semantic = {
+                "summaries_written": 0,
+                "summary_chunks_attempted": 0,
+                "summary_missing_chunks": 0,
+                "semantic_indexed": 0,
+                "semantic_failed": 0,
+                "semantic_skipped": 0,
+                "semantic_blocked": 0,
+                "vectors_deleted": 0,
+                "mappings_deleted": 0,
+                "summaries_deleted": 0,
+                "summaries_preserved": 0,
+                "semantic_stage": "not_run",
+                "semantic_error": None,
+            }
+        for key in [
+            "summaries_written",
+            "summary_chunks_attempted",
+            "summary_missing_chunks",
+            "semantic_indexed",
+            "semantic_failed",
+            "semantic_skipped",
+            "semantic_blocked",
+            "vectors_deleted",
+            "mappings_deleted",
+            "summaries_deleted",
+            "summaries_preserved",
+        ]:
+            result.semantic[key] = result.semantic.get(key, 0) + int(semantic.get(key, 0) or 0)
+
+        stage = semantic.get("semantic_stage")
+        if stage:
+            result.semantic["semantic_stage"] = stage
+        if semantic.get("semantic_error"):
+            result.semantic["semantic_error"] = semantic.get("semantic_error")
 
     def _should_full_reindex(self, repo_path: Path, changes: ChangeSet) -> bool:
         """Decide whether change volume warrants a full reindex."""
