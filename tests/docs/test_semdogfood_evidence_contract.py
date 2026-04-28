@@ -23,9 +23,9 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
 
     for expected in (
         "# Semantic Dogfood Rebuild",
-        "Phase plan: `plans/phase-plan-v7-SEMTHROUGHPUT.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMSTALLFIX.md`",
         "## Reset Boundary",
-        "## Full-Sync Recovery",
+        "## Force-Full Stall Remediation",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -49,11 +49,13 @@ def test_semdogfood_report_records_reset_boundary_counts_collection_and_verifica
         "Effective enrichment model",
         "Collection bootstrap state",
         "baml-py",
-        "SEMTHROUGHPUT",
         "SEMSTALLFIX",
+        "blocked_summary_plateau",
+        "blocked_semantic_batch",
         "Lexical readiness",
         "Semantic readiness",
-        "stale_commit",
+        "Indexed commit",
+        "Current commit",
         "Active-profile preflight",
         "uv run pytest tests/test_summarization.py -q --no-cov",
         "uv run pytest tests/test_dispatcher.py -q --no-cov",
@@ -76,6 +78,7 @@ def test_semdogfood_report_compares_query_modes_and_states_operator_verdict():
         "mcp_server/indexing/summarization.py",
         "mcp_server/cli/repository_commands.py",
         "mcp_server/dispatcher/dispatcher_enhanced.py",
+        "mcp_server/storage/git_index_manager.py",
         "index_unavailable",
         "semantic_not_ready",
         "local multi-repo dogfooding",
@@ -95,6 +98,7 @@ def test_semantic_onboarding_links_semdogfood_report_and_separate_readiness_surf
     assert "collection bootstrap" in text
     assert "generator/runtime mismatch" in text
     assert "summary throughput blocker" in text
-    assert "SEMTHROUGHPUT" in text
     assert "SEMSTALLFIX" in text
     assert "stale_commit" in text
+    assert "blocked_summary_plateau" in text
+    assert "blocked_semantic_batch" in text

@@ -421,12 +421,18 @@ def parse_server_response(api_result):
             data = json.loads(result[0].text)
             if data.get("code") == "index_unavailable":
                 readiness = data["readiness"]
+                assert readiness["code"] == "stale_commit"
                 pytest.skip(
                     "Dogfood repo indexed semantic query is unavailable: "
                     f"{readiness['state']} ({readiness['code']})"
                 )
             if data.get("code") == "semantic_not_ready":
                 readiness = data["semantic_readiness"]
+                assert readiness["code"] in {
+                    "summaries_missing",
+                    "blocked_summary_plateau",
+                    "blocked_semantic_batch",
+                }
                 pytest.skip(
                     "Dogfood repo semantic readiness is blocked: "
                     f"{readiness['state']} ({readiness['code']})"

@@ -782,6 +782,60 @@ freshness, and post-summary semantic-stage handoff.
 **Produces**
 - IF-0-SEMSTALLFIX-1 — Force-full rebuild completion and indexed-commit freshness contract.
 
+### Phase 14 — Low-Level Force-Full Stall Forensics (SEMIOWAIT)
+
+**Objective**
+
+Investigate and repair the remaining repo-local force-full stall that persists
+after SEMSTALLFIX’s dispatcher/git-index-manager bounds, so a clean
+`repository sync --force-full` run cannot remain stuck below the semantic-stage
+accounting path without surfacing a precise lexical/storage/runtime blocker.
+
+**Exit criteria**
+- [ ] A repo-local force-full rebuild either completes through lexical,
+      summary, and semantic closeout, or exits fail-closed with an exact
+      blocker narrower than SEMSTALLFIX’s dispatcher-stage contracts.
+- [ ] The live rebuild no longer remains stuck for minutes with unchanged
+      `chunk_summaries` / `semantic_points` counts while `mcp-index repository sync`
+      stays active.
+- [ ] If the residual stall is in SQLite, WAL/checkpoint, file-read, or other
+      lexical/storage work below dispatcher stage accounting, that layer now
+      exposes bounded diagnostics and a deterministic exit path.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the SEMSTALLFIX repair,
+      the residual low-level stall evidence, and the final ready or still-blocked
+      verdict after SEMIOWAIT.
+
+**Scope notes**
+
+This phase exists only if SEMSTALLFIX repairs semantic-stage accounting and
+force-full closeout semantics in tests, but the real repo-local rebuild still
+hangs below that layer during lexical/storage/runtime work. Keep the work
+narrowly on the live force-full execution path, storage/runtime forensics, and
+bounded blocker surfacing.
+
+**Non-goals**
+
+- No semantic ranking redesign.
+- No multi-repo rollout expansion.
+- No unrelated profile/configuration changes outside the live force-full stall path.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/storage/sqlite_store.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `docs/guides/semantic-onboarding.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMSTALLFIX
+
+**Produces**
+- IF-0-SEMIOWAIT-1 — Low-level force-full stall diagnostics and bounded exit contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -798,6 +852,7 @@ SEMCONTRACT
   -> SEMSYNCFIX
   -> SEMTHROUGHPUT
   -> SEMSTALLFIX
+  -> SEMIOWAIT
 ```
 
 ## Execution Notes
@@ -835,6 +890,9 @@ SEMCONTRACT
   recovery but the live force-full rebuild still does not complete cleanly on
   the active commit or still cannot hand off from summary completion into
   semantic vector writes.
+- SEMIOWAIT exists only if SEMSTALLFIX tightens dispatcher-stage and closeout
+  contracts in tests, but the real repo-local force-full rebuild still hangs
+  below that layer without surfacing a precise blocker.
 
 ## Verification
 

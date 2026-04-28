@@ -194,6 +194,27 @@ def _run_coro_blocking(coro: Any) -> Any:
     return result.get("value")
 
 
+def _run_blocking_with_timeout(func: Any, *, timeout_seconds: float) -> Any:
+    """Run a blocking callable on a daemon thread with a hard timeout."""
+    result: dict[str, Any] = {}
+    error: dict[str, BaseException] = {}
+
+    def _runner() -> None:
+        try:
+            result["value"] = func()
+        except BaseException as exc:  # pragma: no cover - propagated to caller
+            error["value"] = exc
+
+    thread = threading.Thread(target=_runner, daemon=True)
+    thread.start()
+    thread.join(timeout_seconds)
+    if thread.is_alive():
+        raise TimeoutError(f"Operation timed out after {timeout_seconds:.0f} seconds")
+    if "value" in error:
+        raise error["value"]
+    return result.get("value")
+
+
 class EnhancedDispatcher:
     """Enhanced dispatcher with dynamic plugin loading and advanced routing capabilities."""
 
@@ -2126,6 +2147,7 @@ class EnhancedDispatcher:
             "summaries_written": 0,
             "summary_chunks_attempted": 0,
             "summary_missing_chunks": 0,
+            "summary_passes": 0,
             "semantic_indexed": 0,
             "semantic_failed": 0,
             "semantic_skipped": 0,
@@ -2161,23 +2183,59 @@ class EnhancedDispatcher:
             qdrant_client=None,
             summarization_config=summarization_config,
         )
+        semantic_stage_timeout_seconds = max(
+            60, settings.semantic_preflight_timeout_seconds * 12
+        )
         summary_limit = max(10000, len(normalized_paths) * 64)
         remaining_missing = self._count_missing_summaries_for_paths(ctx, normalized_paths)
         summary_missing_ids: List[str] = []
+        previous_missing = remaining_missing
+        plateau_passes = 0
 
         while remaining_missing > 0:
-            summary_result = _run_coro_blocking(
-                writer.process_scope(
-                    limit=summary_limit,
-                    target_paths=normalized_paths,
+            try:
+                summary_result = _run_coro_blocking(
+                    asyncio.wait_for(
+                        writer.process_scope(
+                            limit=summary_limit,
+                            target_paths=normalized_paths,
+                        ),
+                        timeout=semantic_stage_timeout_seconds,
+                    )
                 )
-            )
+            except TimeoutError:
+                stats["summary_missing_chunks"] = remaining_missing
+                stats["semantic_stage"] = "blocked_summary_timeout"
+                stats["semantic_blocked"] = len(normalized_paths)
+                stats["semantic_error"] = (
+                    "Summary generation timed out before strict semantic indexing could start"
+                )
+                if summary_missing_ids:
+                    stats["summary_missing_chunk_ids"] = sorted(set(summary_missing_ids))
+                return stats
+            stats["summary_passes"] += 1
             stats["summaries_written"] += summary_result.summaries_written
             stats["summary_chunks_attempted"] += summary_result.chunks_attempted
             summary_missing_ids.extend(summary_result.missing_chunk_ids)
             remaining_missing = self._count_missing_summaries_for_paths(ctx, normalized_paths)
+            if summary_result.summaries_written > 0 and remaining_missing > 0:
+                if remaining_missing < previous_missing:
+                    plateau_passes = 0
+                else:
+                    plateau_passes += 1
+                    if plateau_passes >= 2:
+                        stats["summary_missing_chunks"] = remaining_missing
+                        stats["semantic_stage"] = "blocked_summary_plateau"
+                        stats["semantic_blocked"] = len(normalized_paths)
+                        stats["semantic_error"] = (
+                            "Summary generation plateaued before strict semantic indexing could start"
+                        )
+                        if summary_missing_ids:
+                            stats["summary_missing_chunk_ids"] = sorted(set(summary_missing_ids))
+                        return stats
             if summary_result.summaries_written == 0:
                 break
+            previous_missing = remaining_missing
 
         stats["summary_missing_chunks"] = remaining_missing
         if remaining_missing > 0:
@@ -2187,7 +2245,7 @@ class EnhancedDispatcher:
                 "Missing authoritative summaries blocked strict semantic indexing"
             )
             if summary_missing_ids:
-                stats["summary_missing_chunk_ids"] = summary_missing_ids
+                stats["summary_missing_chunk_ids"] = sorted(set(summary_missing_ids))
             return stats
 
         semantic_preflight = run_semantic_preflight(
@@ -2219,12 +2277,23 @@ class EnhancedDispatcher:
             stats["semantic_error"] = (semantic_preflight.get("blocker") or {}).get("message")
             return stats
 
-        sem_stats = _sem.index_files_batch(
-            normalized_paths,
-            embed_batch_size=1000,
-            require_summaries=True,
-            semantic_preflight=semantic_preflight,
-        )
+        try:
+            sem_stats = _run_blocking_with_timeout(
+                lambda: _sem.index_files_batch(
+                    normalized_paths,
+                    embed_batch_size=1000,
+                    require_summaries=True,
+                    semantic_preflight=semantic_preflight,
+                ),
+                timeout_seconds=semantic_stage_timeout_seconds,
+            )
+        except TimeoutError:
+            stats["semantic_stage"] = "blocked_semantic_batch_timeout"
+            stats["semantic_blocked"] = len(normalized_paths)
+            stats["semantic_error"] = (
+                "Semantic batch writes timed out after summaries were generated"
+            )
+            return stats
         stats["semantic_indexed"] = sem_stats.get("files_indexed", 0)
         stats["semantic_failed"] = sem_stats.get("files_failed", 0)
         stats["semantic_skipped"] = sem_stats.get("files_skipped", 0)
@@ -2237,9 +2306,13 @@ class EnhancedDispatcher:
         if stats["semantic_indexed"] > 0:
             stats["semantic_stage"] = "indexed"
         elif stats["semantic_blocked"] > 0:
-            stats["semantic_stage"] = "blocked"
+            stats["semantic_stage"] = "blocked_semantic_batch"
+            if "semantic_error" not in stats:
+                stats["semantic_error"] = (
+                    "Semantic batch writes were blocked after summaries were generated"
+                )
         elif stats["semantic_failed"] > 0:
-            stats["semantic_stage"] = "failed"
+            stats["semantic_stage"] = "failed_semantic_batch"
         else:
             stats["semantic_stage"] = "skipped"
         return stats

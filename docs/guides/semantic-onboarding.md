@@ -168,9 +168,11 @@ and vectors:
   summary selection and retry behavior while still remaining blocked on
   summary throughput; the SEMTHROUGHPUT evidence then shows oversized-file
   profile batching can increase summary coverage while the live force-full
-  rebuild still stalls short of a fresh indexed commit; and `SEMSTALLFIX` is
-  the downstream roadmap follow-up for restoring force-full completion. Use
-  the report to separate those states.
+  rebuild still stalls short of a fresh indexed commit; the SEMSTALLFIX
+  evidence then shows bounded semantic-stage blocker vocabulary and fail-closed
+  full-index closeout without fully clearing the live repo-local stall; and
+  `SEMIOWAIT` is the downstream roadmap follow-up for isolating the residual
+  low-level force-full hang. Use the report to separate those states.
 
 ## Full Reindex Pipeline
 
@@ -189,6 +191,18 @@ not-ready even when lexical indexing completed successfully.
 whether summaries were written, whether semantic vectors were written, and
 whether the semantic stage was blocked before any vector write or failed after
 lexical persistence.
+
+The bounded semantic-stage vocabulary now includes:
+
+- `blocked_missing_summaries`
+- `blocked_summary_plateau`
+- `blocked_summary_timeout`
+- `blocked_preflight`
+- `blocked_semantic_batch`
+- `blocked_semantic_batch_timeout`
+
+If a live force-full rerun still hangs without surfacing one of those stages,
+the remaining blocker is below the semantic-stage accounting layer.
 
 Manual summary tools stay separate from the full-sync contract:
 
@@ -254,7 +268,10 @@ dogfood rebuild evidence.
   - if `search_code(semantic=true)` returns `index_unavailable` with
     `safe_fallback: "native_search"`, the indexed query surface is still
     blocked before semantic-path acceptance can be re-checked
-  - the current roadmap follow-up for that state is `SEMSTALLFIX`
+  - if the bounded semantic-stage strings above never appear and the live
+    force-full process still hangs with unchanged counts, treat that as a
+    lower-level force-full stall rather than only a semantic-stage blocker
+  - the current roadmap follow-up for that residual state is `SEMIOWAIT`
 - Voyage provider failing
   - verify `VOYAGE_API_KEY`
 - Preflight output

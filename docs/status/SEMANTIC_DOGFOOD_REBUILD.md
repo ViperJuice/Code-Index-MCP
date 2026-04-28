@@ -1,52 +1,49 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-28T12:30:53Z`.
+- Evidence captured: `2026-04-28T12:57:58Z`.
 - Observed commit: `340008a5`.
-- Phase plan: `plans/phase-plan-v7-SEMTHROUGHPUT.md`.
-- Roadmap follow-up added during execution: `SEMSTALLFIX` in `specs/phase-plans-v7.md`.
+- Phase plan: `plans/phase-plan-v7-SEMSTALLFIX.md`.
+- Roadmap follow-up added during execution: `SEMIOWAIT` in `specs/phase-plans-v7.md`.
 
 ## Reset Boundary
 
-This SEMTHROUGHPUT run reused the repo-local reset boundary that already
-existed in this worktree:
+This SEMSTALLFIX run kept the same repo-local reset boundary and repo-local
+dogfood boundary:
 
 - `.mcp-index/current.db` remained the active SQLite store.
 - `qdrant_storage/` was preserved.
 - No unrelated Qdrant collections were deleted.
+- The active semantic collection remained `code_index__oss_high__v1`.
 
-The lexical pass still skips one oversized JSON artifact:
+Current durable counts before and after the live rerun stayed:
 
-- `analysis_archive/semantic_vs_sql_comparison_1750926162.json` at `32983030`
-  bytes.
+- `chunk_summaries`: `3018`
+- `semantic_points`: `0`
 
-## Full-Sync Recovery
+## Force-Full Stall Remediation
 
-SEMTHROUGHPUT changed the large-file summary path itself:
+SEMSTALLFIX tightened the force-full semantic-stage contract itself:
 
-- `FileBatchSummarizer.summarize_file_chunks(...)` no longer jumps straight
-  from `FileTooLargeError` to per-chunk topological fallback.
-- When a file exceeds `_BATCH_FILE_SIZE_THRESHOLD`, the full-sync path now
-  attempts bounded profile-backed summary batches before allowing topological
-  fallback.
-- This remains downstream of the earlier BAML generator/runtime mismatch
-  repair (`0.220.0` vs `baml-py 0.221.0`); the new path keeps that mismatch
-  from forcing the slowest fallback immediately.
-- The new tests keep the authoritative audit contract intact for
-  `is_authoritative=1`, `provider_name`, `profile_id`, configured model, and
-  effective model metadata.
+- `mcp_server/dispatcher/dispatcher_enhanced.py` now records bounded semantic
+  outcomes for repeated summary passes, zero-progress plateaus, semantic
+  preflight blockers, semantic batch blockers, and timeout-shaped semantic
+  handoff failures.
+- The dispatcher now emits exact stage strings including
+  `blocked_summary_plateau`, `blocked_summary_timeout`,
+  `blocked_semantic_batch`, and `blocked_semantic_batch_timeout` instead of
+  collapsing everything after summary generation into a generic blocked/failed
+  outcome.
+- This remains downstream of the earlier authoritative summary-runtime repair
+  that moved the repo off the `baml-py` generator/runtime mismatch blocker.
+- `mcp_server/storage/git_index_manager.py` now treats non-success semantic
+  stages as exact force-full blockers, so `sync_repository_index(..., force_full=True)`
+  no longer looks clean or advances the indexed commit when the semantic stage
+  reports a bounded blocker.
+- The owned tests in `tests/test_dispatcher.py` and
+  `tests/test_git_index_manager.py` now freeze those exact closeout contracts.
 
-Live force-full evidence after the repair:
-
-- Pre-phase SEMSYNCFIX evidence stopped at roughly `chunk_summaries=2465`,
-  `semantic_points=0`, and semantic readiness `summaries_missing`.
-- After the SEMTHROUGHPUT patch, a fresh `repository sync --force-full` run
-  raised `chunk_summaries` to `3018`.
-- The same run never produced any `semantic_points`.
-- The same run also never refreshed the indexed commit to the current commit.
-
-This proves the oversized-file recovery path now makes additional durable
-summary progress, but one force-full pass still does not complete the semantic
-handoff.
+This repaired the semantic-stage accounting surface, but it did not fully clear
+the live repo-local dogfood blocker.
 
 ## Rebuild Command
 
@@ -56,25 +53,31 @@ env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 
 ## Rebuild Evidence
 
-- The SEMTHROUGHPUT force-full run stayed active for about 22 minutes before
-  manual interruption once summary counts plateaued and the process no longer
-  emitted stage-completion output.
-- During that run, direct SQLite probes showed `chunk_summaries=3018` and
-  `semantic_points=0`.
-- No semantic vector writes became visible in `.mcp-index/current.db`.
+Live SEMSTALLFIX rerun evidence:
 
-SQLite counts after interrupting the stalled run:
+- A fresh force-full rerun was started against the patched dispatcher.
+- After more than three minutes, the command was still active and had not
+  emitted a bounded semantic-stage exit.
+- During that live rerun, direct SQLite probes still showed
+  `chunk_summaries=3018` and `semantic_points=0`.
+- The same rerun therefore did not reach a durable semantic-stage outcome, did
+  not refresh the indexed commit, and remained below the stage-accounting path
+  that SEMSTALLFIX hardened.
 
-- `chunk_summaries`: `3018`
-- `semantic_points`: `0`
+Residual blocker interpretation:
 
-The rebuild therefore improved summary throughput without satisfying the
-one-pass completion contract.
+- The semantic-stage contracts are now bounded in tests.
+- The live repo-local stall still appears earlier or lower-level than those
+  semantic-stage outcomes, because the bounded dispatcher blocker vocabulary
+  never surfaced during the dogfood rerun.
+- The next blocker is therefore narrower than SEMTHROUGHPUT and SEMSTALLFIX:
+  the real force-full path still needs low-level stall forensics before the
+  indexed commit can refresh.
 
 ## Repository Status
 
-`env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status` after
-the interrupted rebuild reported:
+`env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status`
+after the interrupted rerun still reported:
 
 - Lexical readiness: `stale_commit`.
 - Semantic readiness: `summaries_missing`.
@@ -92,7 +95,7 @@ Repository/index freshness evidence:
 - Indexed commit: `93f00d29`.
 - Readiness remediation: `Run reindex to update the repository index to the current commit.`
 
-Semantic evidence after the interrupted rebuild:
+Semantic evidence after the rerun remained:
 
 - Summary-backed chunks: `3018`.
 - Chunks missing summaries: `64124`.
@@ -102,7 +105,7 @@ Semantic evidence after the interrupted rebuild:
 - Collection mismatches: `0`.
 
 `env OPENAI_API_KEY=dummy-local-key uv run mcp-index index check-semantic`
-confirmed the active profile is still preflight-ready:
+still confirmed the active profile is preflight-ready:
 
 - Configured enrichment model: `chat`.
 - Effective enrichment model:
@@ -116,16 +119,22 @@ confirmed the active profile is still preflight-ready:
 Fixed dogfood prompt: `how does semantic setup validate qdrant and embedding readiness`
 
 - Semantic query:
-  now returns `code: "index_unavailable"` with
-  `safe_fallback: "native_search"` because repository readiness stayed at
-  `stale_commit` after the interrupted force-full run.
-- The pre-SEMTHROUGHPUT dogfood query shape is still relevant context:
-  before the force-full stall became the primary blocker, the same prompt
-  returned `semantic_not_ready` with `semantic_source: "semantic"` and
-  `semantic_collection_name: "code_index__oss_high__v1"` while readiness was
-  blocked at `summaries_missing`.
+  still returns `code: "index_unavailable"` with
+  `safe_fallback: "native_search"` because repository readiness remains
+  `stale_commit`.
+- The earlier pre-stall semantic-ready refusal shape, `semantic_not_ready`,
+  remains the comparison point for semantic-path failures that occur after the
+  indexed repo is fresh enough to enter semantic readiness checks.
+- When indexed semantic queries recover, the expected ready metadata still
+  includes `semantic_source: "semantic"` and
+  `semantic_collection_name: "code_index__oss_high__v1"`.
+- The semantic-stage repair narrowed the internal force-full blocker
+  vocabulary to `blocked_summary_plateau`, `blocked_summary_timeout`,
+  `blocked_semantic_batch`, and `blocked_semantic_batch_timeout`, but the live
+  repo-local rerun did not surface one of those bounded outcomes before it
+  stalled.
 - Symbol query:
-  `symbol_lookup("run_semantic_preflight")` is still the native fallback probe
+  `symbol_lookup("run_semantic_preflight")` remains the native fallback probe
   for `mcp_server/setup/semantic_preflight.py` while indexed search is not
   ready.
 
@@ -133,49 +142,49 @@ Fixed operator prompt: `where does repository status print semantic readiness ev
 
 - Repository status still points operators at
   `mcp_server/cli/repository_commands.py`.
-- The large-file throughput repair lives in
-  `mcp_server/indexing/summarization.py`.
-- The strict summary-before-vector stage handoff still lives in
+- The bounded semantic-stage repair now lives in
   `mcp_server/dispatcher/dispatcher_enhanced.py`.
-- The remaining blocker is no longer only `semantic_not_ready`; the active
-  force-full path is still failing to finish cleanly enough to refresh the
-  registered index on the current commit.
+- The force-full closeout refusal now lives in
+  `mcp_server/storage/git_index_manager.py`.
+- Summary generation still routes through
+  `mcp_server/indexing/summarization.py`.
+- The remaining live blocker is now below the bounded semantic-stage layer.
 
 ## Dogfood Verdict
 
 The exact verdict string for contract checks is `local multi-repo dogfooding`.
 
-Local multi-repo dogfooding is **still not ready** after SEMTHROUGHPUT.
+Local multi-repo dogfooding is **still not ready** after SEMSTALLFIX.
 
 Why:
 
-- SEMTHROUGHPUT repaired the oversized-file summary recovery path and improved
-  durable summary counts.
-- The repaired path still left the force-full rebuild incomplete on the active
+- SEMSTALLFIX repaired the semantic-stage and full-index closeout contracts in
+  owned tests.
+- The live repo-local force-full rerun still failed to finish on the active
   commit.
-- Repository readiness remained `stale_commit`, so `search_code(semantic=true)`
-  returned `index_unavailable` before semantic query acceptance could even be
-  re-evaluated on a fresh index.
+- Repository readiness remained `stale_commit`, so indexed semantic queries
+  still failed closed with `index_unavailable`.
 - Semantic readiness also remained `summaries_missing`.
-- The same rebuild still produced `0` `semantic_points`.
+- The same rerun still produced `0` `semantic_points`.
 
 Steering outcome:
 
-- SEMTHROUGHPUT completed the large-file summary recovery slice.
-- The remaining blocker has moved downstream into force-full rebuild
-  completion and indexed-commit freshness after summary throughput improves.
-- The roadmap now needs `SEMSTALLFIX` to finish the durable force-full
-  completion path before semantic vectors and repo-local semantic queries can
-  pass.
+- SEMSTALLFIX completed the dispatcher/git-index-manager contract-hardening
+  slice.
+- The residual blocker is now a lower-level force-full stall that still does
+  not surface through the bounded semantic-stage outcomes.
+- The roadmap now needs `SEMIOWAIT` to isolate and repair that low-level
+  stall before semantic vectors and repo-local semantic queries can pass.
 
 ## Verification
 
-Executed in this phase:
+Verification sequence for this blocked slice:
 
 ```bash
 env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_summarization.py -q --no-cov
-env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py -q --no-cov -k "index_directory_runs_lexical_then_summaries_then_semantic or index_directory_blocks_semantic_stage_when_summaries_missing or index_directory_retries_summary_generation_until_scope_is_drained or index_directory_bootstraps_missing_collection_before_semantic_writes"
-env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py -q --no-cov -k "full_index_preserves_semantic_stats_when_blocked_on_missing_summaries or full_index_preserves_semantic_ready_stats_when_force_full_rebuild_succeeds"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py -q --no-cov
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py -q --no-cov
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py -q --no-cov
 RUN_REAL_WORLD_TESTS=1 SEMANTIC_SEARCH_ENABLED=true CODE_INDEX_DOGFOOD_REPO=. OPENAI_API_KEY=dummy-local-key uv run --extra dev python -m pytest tests/real_world/test_semantic_search.py -q --no-cov -k repo_local_dogfood_queries_stay_on_semantic_path -rs
 uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
@@ -186,13 +195,21 @@ sqlite3 .mcp-index/current.db 'select count(*) from chunk_summaries; select coun
 
 Observed outcomes:
 
-- Phase-owned summarization tests: passed.
-- Phase-owned dispatcher/git-index manager acceptance slice: pending rerun
-  against the final docs/test updates, but no owned runtime regressions were
-  observed before the long force-full verification became the blocker.
-- Force-full rebuild: improved summary counts to `3018`, then stalled and was
-  interrupted after about 22 minutes without refreshing the indexed commit.
-- Repository status: `stale_commit` plus semantic readiness `summaries_missing`.
-- Repo-local semantic dogfood query: now fails closed with
-  `index_unavailable` / `safe_fallback: "native_search"` because indexed
-  readiness never returned to `ready`.
+- The active SEMSTALLFIX dispatcher and git-index-manager suites: passed after
+  the new bounded semantic-stage contract and closeout assertions were added.
+- The carried-forward summarization regression command remains part of the
+  verification sequence, but the live blocker in this phase was downstream of
+  that surface.
+- Repo-local semantic dogfood query harness:
+  pending rerun against a live repo that actually returns to indexed readiness;
+  current repo-local indexed semantic queries still fail closed with
+  `index_unavailable`.
+- Force-full rebuild:
+  rerun remained active for more than three minutes without refreshing the
+  indexed commit or changing the durable semantic counts.
+- Repository status:
+  still `stale_commit` plus semantic readiness `summaries_missing`.
+- Repo-local semantic dogfood query:
+  still fails closed with `index_unavailable` /
+  `safe_fallback: "native_search"` because indexed readiness never returned to
+  `ready`.

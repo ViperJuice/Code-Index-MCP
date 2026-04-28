@@ -638,6 +638,27 @@ class GitAwareIndexManager:
         except subprocess.CalledProcessError:
             return False
 
+    def _semantic_stage_error(self, semantic: Optional[Dict[str, Any]]) -> Optional[str]:
+        """Return an exact force-full blocker when the semantic stage did not finish cleanly."""
+        if not semantic:
+            return None
+
+        stage = semantic.get("semantic_stage")
+        if stage in {None, "not_run", "skipped", "indexed"}:
+            return None
+
+        error = semantic.get("semantic_error")
+        if isinstance(error, str) and error.strip():
+            return error.strip()
+
+        blocker = semantic.get("semantic_blocker")
+        if isinstance(blocker, dict):
+            message = blocker.get("message")
+            if isinstance(message, str) and message.strip():
+                return message.strip()
+
+        return f"Semantic stage ended with {stage}"
+
     def _full_index(self, repo_id: str, ctx: RepoContext) -> UpdateResult:
         """Perform full repository indexing.
 
@@ -687,6 +708,7 @@ class GitAwareIndexManager:
                 "summaries_written": stats.get("summaries_written", 0),
                 "summary_chunks_attempted": stats.get("summary_chunks_attempted", 0),
                 "summary_missing_chunks": stats.get("summary_missing_chunks", 0),
+                "summary_passes": stats.get("summary_passes", 0),
                 "semantic_indexed": stats.get("semantic_indexed", 0),
                 "semantic_failed": stats.get("semantic_failed", 0),
                 "semantic_skipped": stats.get("semantic_skipped", 0),
@@ -695,6 +717,9 @@ class GitAwareIndexManager:
                 "semantic_error": stats.get("semantic_error"),
             }
         result.errors.extend(str(error) for error in errors)
+        semantic_error = self._semantic_stage_error(result.semantic)
+        if semantic_error:
+            result.errors.append(semantic_error)
         result.duration_seconds = (datetime.now() - start_time).total_seconds()
         logger.info(f"Indexed {total_indexed} files in {repo_info.name}")
 

@@ -532,7 +532,7 @@ def test_clean_full_rebuild_advances_commit_only_with_durable_index(tmp_path):
     )
 
 
-def test_full_index_preserves_additive_semantic_stats_without_failing_lexical_success(tmp_path):
+def test_full_index_returns_exact_semantic_blocker_when_summaries_still_missing(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)
     repo_info = _make_repo_info(repo, commit)
@@ -562,10 +562,51 @@ def test_full_index_preserves_additive_semantic_stats_without_failing_lexical_su
 
     assert result.indexed == 1
     assert result.failed == 0
-    assert result.clean
+    assert not result.clean
     assert result.semantic is not None
     assert result.semantic["semantic_blocked"] == 1
     assert result.semantic["semantic_stage"] == "blocked_missing_summaries"
+    assert result.errors == ["Missing authoritative summaries blocked strict semantic indexing"]
+
+
+def test_full_index_returns_exact_semantic_blocker_when_summary_progress_plateaus(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+
+    dispatcher = MagicMock()
+    dispatcher.index_directory.return_value = {
+        "indexed_files": 1,
+        "failed_files": 0,
+        "errors": [],
+        "summaries_written": 12,
+        "summary_chunks_attempted": 12,
+        "summary_missing_chunks": 4,
+        "summary_passes": 3,
+        "semantic_indexed": 0,
+        "semantic_failed": 0,
+        "semantic_skipped": 0,
+        "semantic_blocked": 1,
+        "semantic_stage": "blocked_summary_plateau",
+        "semantic_error": "Summary generation plateaued before strict semantic indexing could start",
+    }
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=dispatcher)
+    result = manager._full_index(repo_info.repository_id, ctx)
+
+    assert result.indexed == 1
+    assert not result.clean
+    assert result.semantic is not None
+    assert result.semantic["summary_passes"] == 3
+    assert result.semantic["semantic_stage"] == "blocked_summary_plateau"
+    assert (
+        result.errors
+        == ["Summary generation plateaued before strict semantic indexing could start"]
+    )
 
 
 def test_full_index_preserves_semantic_ready_stats_when_force_full_rebuild_succeeds(tmp_path):
@@ -606,6 +647,50 @@ def test_full_index_preserves_semantic_ready_stats_when_force_full_rebuild_succe
     assert result.semantic["semantic_indexed"] == 2
     assert result.semantic["semantic_blocked"] == 0
     assert result.semantic["semantic_stage"] == "indexed"
+
+
+def test_force_full_sync_does_not_advance_commit_when_semantic_stage_is_blocked(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    old_commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, old_commit)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    registry.update_git_state.return_value = {"commit": old_commit, "branch": "main"}
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    manager._resolve_ctx = MagicMock(return_value=ctx)
+    manager._index_exists = MagicMock(return_value=True)
+    manager._index_has_durable_rows = MagicMock(return_value=True)
+    manager._full_index = MagicMock(
+        return_value=UpdateResult(
+            indexed=1,
+            failed=0,
+            errors=["Summary generation plateaued before strict semantic indexing could start"],
+            semantic={
+                "summary_passes": 3,
+                "summaries_written": 12,
+                "summary_chunks_attempted": 12,
+                "summary_missing_chunks": 4,
+                "semantic_indexed": 0,
+                "semantic_failed": 0,
+                "semantic_skipped": 0,
+                "semantic_blocked": 1,
+                "semantic_stage": "blocked_summary_plateau",
+                "semantic_error": "Summary generation plateaued before strict semantic indexing could start",
+            },
+        )
+    )
+
+    result = manager.sync_repository_index(repo_info.repository_id, force_full=True)
+
+    assert result.action == "failed"
+    assert (
+        result.error
+        == "Summary generation plateaued before strict semantic indexing could start"
+    )
+    registry.update_indexed_commit.assert_not_called()
 
 
 def test_incremental_update_aggregates_semantic_mutation_stats(tmp_path):

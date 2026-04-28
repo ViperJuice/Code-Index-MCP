@@ -1290,7 +1290,7 @@ class TestEnhancedDispatcherProtocolConformance:
             def index_files_batch(self, paths, **kwargs):
                 return {"files_indexed": 1, "files_failed": 0, "files_skipped": 0}
 
-        unresolved = [{"remaining": 1}, {"remaining": 1}, {"remaining": 0}]
+        unresolved = [{"remaining": 2}, {"remaining": 1}, {"remaining": 0}]
 
         monkeypatch.setattr(
             "mcp_server.indexing.summarization.ComprehensiveChunkWriter",
@@ -1334,6 +1334,75 @@ class TestEnhancedDispatcherProtocolConformance:
         assert result["summaries_written"] == 2
         assert result["summary_chunks_attempted"] == 2
         assert summary_limits == [10000, 10000]
+
+    def test_index_directory_blocks_when_summary_progress_plateaus(
+        self, tmp_path, monkeypatch
+    ):
+        ctx = _make_repo_ctx(sqlite_store=MagicMock(db_path=str(tmp_path / "index.db")))
+        target = tmp_path / "sample.py"
+        target.write_text("x = 1\n")
+
+        class FakeWriter:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def process_scope(self, **kwargs):
+                return SimpleNamespace(
+                    summaries_written=1,
+                    chunks_attempted=1,
+                    authoritative_chunks=1,
+                    missing_chunk_ids=["chunk-1"],
+                    files_attempted=1,
+                    files_summarized=1,
+                )
+
+        semantic_called = {"value": False}
+
+        class FakeSemanticIndexer:
+            def index_files_batch(self, paths, **kwargs):
+                semantic_called["value"] = True
+                return {"files_indexed": 1, "files_failed": 0, "files_skipped": 0}
+
+        unresolved = [{"remaining": 2}, {"remaining": 2}, {"remaining": 2}]
+
+        monkeypatch.setattr(
+            "mcp_server.indexing.summarization.ComprehensiveChunkWriter",
+            FakeWriter,
+        )
+        monkeypatch.setattr(
+            "mcp_server.setup.semantic_preflight.run_semantic_preflight",
+            lambda **_kwargs: SimpleNamespace(
+                to_dict=lambda: {"can_write_semantic_vectors": True, "blocker": None}
+            ),
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "_get_semantic_indexer",
+            lambda self, _ctx: FakeSemanticIndexer(),
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "_count_missing_summaries_for_paths",
+            lambda self, _ctx, _paths: unresolved.pop(0)["remaining"],
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "index_file",
+            lambda self, _ctx, path, do_semantic=False: IndexResult(
+                status=IndexResultStatus.INDEXED,
+                path=path,
+                observed_hash=None,
+                actual_hash=None,
+            ),
+        )
+
+        result = Dispatcher([]).index_directory(ctx, tmp_path)
+
+        assert semantic_called["value"] is False
+        assert result["semantic_stage"] == "blocked_summary_plateau"
+        assert result["semantic_blocked"] == 1
+        assert result["summary_missing_chunks"] == 2
+        assert result["summary_passes"] == 2
 
     def test_index_directory_bootstraps_missing_collection_before_semantic_writes(
         self, tmp_path, monkeypatch
@@ -1423,7 +1492,81 @@ class TestEnhancedDispatcherProtocolConformance:
         monkeypatch.setattr(
             Dispatcher,
             "_count_missing_summaries_for_paths",
-            lambda self, _ctx, _paths: 0 if preflight_calls["count"] > 0 else 1,
+            lambda self, _ctx, _paths: remaining.pop(0),
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "index_file",
+            lambda self, _ctx, path, do_semantic=False: IndexResult(
+                status=IndexResultStatus.INDEXED,
+                path=path,
+                observed_hash=None,
+                actual_hash=None,
+            ),
+        )
+
+        remaining = [1, 0]
+
+        result = Dispatcher([]).index_directory(ctx, tmp_path)
+
+        assert preflight_calls["count"] == 2
+        assert result["semantic_stage"] == "indexed"
+        assert result["semantic_collection_bootstrap"]["status"] == "created"
+
+    def test_index_directory_records_semantic_batch_blockers(
+        self, tmp_path, monkeypatch
+    ):
+        ctx = _make_repo_ctx(sqlite_store=MagicMock(db_path=str(tmp_path / "index.db")))
+        target = tmp_path / "sample.py"
+        target.write_text("x = 1\n")
+
+        class FakeWriter:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def process_scope(self, **kwargs):
+                return SimpleNamespace(
+                    summaries_written=1,
+                    chunks_attempted=1,
+                    authoritative_chunks=1,
+                    missing_chunk_ids=[],
+                    files_attempted=1,
+                    files_summarized=1,
+                )
+
+        class FakeSemanticIndexer:
+            def index_files_batch(self, paths, **kwargs):
+                return {
+                    "files_indexed": 0,
+                    "files_failed": 0,
+                    "files_skipped": 0,
+                    "files_blocked": 1,
+                    "semantic_blocker": {
+                        "code": "semantic_batch_blocked",
+                        "message": "Semantic batch writes were blocked after summaries were generated",
+                    },
+                    "semantic_error": "Semantic batch writes were blocked after summaries were generated",
+                }
+
+        monkeypatch.setattr(
+            "mcp_server.indexing.summarization.ComprehensiveChunkWriter",
+            FakeWriter,
+        )
+        monkeypatch.setattr(
+            "mcp_server.setup.semantic_preflight.run_semantic_preflight",
+            lambda **_kwargs: SimpleNamespace(
+                to_dict=lambda: {"can_write_semantic_vectors": True, "blocker": None}
+            ),
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "_get_semantic_indexer",
+            lambda self, _ctx: FakeSemanticIndexer(),
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "_count_missing_summaries_for_paths",
+            lambda self, _ctx, _paths: 0,
         )
         monkeypatch.setattr(
             Dispatcher,
@@ -1438,9 +1581,12 @@ class TestEnhancedDispatcherProtocolConformance:
 
         result = Dispatcher([]).index_directory(ctx, tmp_path)
 
-        assert preflight_calls["count"] == 2
-        assert result["semantic_stage"] == "indexed"
-        assert result["semantic_collection_bootstrap"]["status"] == "created"
+        assert result["semantic_stage"] == "blocked_semantic_batch"
+        assert result["semantic_blocked"] == 1
+        assert (
+            result["semantic_error"]
+            == "Semantic batch writes were blocked after summaries were generated"
+        )
 
     def test_remove_file_accepts_ctx(self, tmp_path):
         """remove_file(ctx, path) must accept ctx as first positional arg."""
