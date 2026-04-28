@@ -20,6 +20,7 @@ from mcp_server.config.settings import reload_settings  # noqa: E402
 from mcp_server.core.repo_resolver import RepoResolver  # noqa: E402
 from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher  # noqa: E402
 from mcp_server.health.repo_status import build_health_row  # noqa: E402
+from mcp_server.health.repository_readiness import ReadinessClassifier  # noqa: E402
 from mcp_server.setup.semantic_preflight import run_semantic_preflight  # noqa: E402
 from mcp_server.storage.git_index_manager import GitAwareIndexManager  # noqa: E402
 from mcp_server.storage.repository_registry import (  # noqa: E402
@@ -47,6 +48,21 @@ def _print_rollout_surface(prefix: str, health_row: dict[str, Any]) -> None:
     click.echo(click.style(f"{prefix}Query surface: {query_status}", fg=query_color))
     if health_row.get("query_remediation"):
         click.echo(f"{prefix}Query remediation: {health_row['query_remediation']}")
+
+
+def _print_semantic_evidence(prefix: str, evidence: dict[str, Any]) -> None:
+    click.echo(f"{prefix}Summary-backed chunks: {evidence.get('summary_count', 0)}")
+    click.echo(f"{prefix}Chunks missing summaries: {evidence.get('missing_summaries', 0)}")
+    click.echo(f"{prefix}Vector-linked chunks: {evidence.get('vector_link_count', 0)}")
+    click.echo(f"{prefix}Chunks missing vectors: {evidence.get('missing_vectors', 0)}")
+    if evidence.get("collection") is not None:
+        click.echo(f"{prefix}Active collection: {evidence.get('collection')}")
+        click.echo(
+            f"{prefix}Collection-matched links: {evidence.get('matching_collection_links', 0)}"
+        )
+        click.echo(
+            f"{prefix}Collection mismatches: {evidence.get('collection_mismatches', 0)}"
+        )
 
 
 @repository.command()
@@ -376,6 +392,21 @@ def status(repo_id: Optional[str]):
             profile=settings.get_semantic_default_profile(),
             strict=settings.semantic_strict_mode,
         ).to_dict()
+        repo_ctx = None
+        if hasattr(repo_resolver, "resolve"):
+            repo_ctx = repo_resolver.resolve(Path(status["path"]))
+        if repo_ctx is not None:
+            semantic_readiness = ReadinessClassifier.classify_semantic_registered(
+                repo_ctx.registry_entry,
+                repo_ctx.sqlite_store,
+            )
+            status["semantic_readiness"] = semantic_readiness.state.value
+            status["semantic_ready"] = semantic_readiness.ready
+            status["semantic_readiness_code"] = semantic_readiness.code
+            status["semantic_remediation"] = semantic_readiness.remediation
+            status.setdefault("features", {}).setdefault("semantic", {})[
+                "readiness"
+            ] = semantic_readiness.to_dict()
         status["features"]["semantic"]["preflight"] = semantic_preflight
 
         # Display status
@@ -400,6 +431,14 @@ def status(repo_id: Optional[str]):
         )
         if status["remediation"]:
             click.echo(f"  Remediation: {status['remediation']}")
+        click.echo(
+            click.style(
+                f"  Semantic readiness: {status['semantic_readiness']}",
+                fg="green" if status.get("semantic_ready") else "yellow",
+            )
+        )
+        if status.get("semantic_remediation"):
+            click.echo(f"  Semantic remediation: {status['semantic_remediation']}")
         _print_rollout_surface("  ", status)
 
         # Index status
@@ -427,6 +466,12 @@ def status(repo_id: Optional[str]):
             click.echo(f"  Blocker: {blocker.get('code')} - {blocker.get('message')}")
             for fix in blocker.get("remediation") or []:
                 click.echo(f"  Remediation: {fix}")
+        semantic_evidence = (
+            status.get("features", {}).get("semantic", {}).get("readiness", {}).get("evidence") or {}
+        )
+        if semantic_evidence:
+            click.echo("\nSemantic Evidence:")
+            _print_semantic_evidence("  ", semantic_evidence)
 
         # Settings
         click.echo("\nSettings:")

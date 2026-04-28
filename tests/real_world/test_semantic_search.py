@@ -5,6 +5,8 @@ Tests semantic search capabilities with real codebases to validate dormant featu
 Requires SEMANTIC_SEARCH_ENABLED=true and proper Voyage AI + Qdrant configuration.
 """
 
+import asyncio
+import json
 import os
 import tempfile
 from pathlib import Path
@@ -364,6 +366,71 @@ def parse_server_response(api_result):
                 assert (
                     best_score > 0.5
                 ), f"Domain query '{query}' should have reasonable semantic match"
+
+    def test_repo_local_dogfood_queries_stay_on_semantic_path(self, monkeypatch):
+        """Use the real semantic query path against the opt-in local dogfood repo."""
+        dogfood_repo = os.getenv("CODE_INDEX_DOGFOOD_REPO")
+        if not dogfood_repo:
+            pytest.skip("CODE_INDEX_DOGFOOD_REPO not set")
+
+        repo_path = Path(dogfood_repo).resolve()
+        if not repo_path.exists():
+            pytest.skip(f"Dogfood repo not found: {repo_path}")
+
+        monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(repo_path.parent))
+
+        from mcp_server.cli.tool_handlers import handle_search_code
+        from mcp_server.core.repo_resolver import RepoResolver
+        from mcp_server.dispatcher.dispatcher_enhanced import EnhancedDispatcher
+        from mcp_server.storage.repository_registry import RepositoryRegistry
+        from mcp_server.storage.store_registry import StoreRegistry
+
+        registry = RepositoryRegistry()
+        repo_info = registry.get_repository_by_path(str(repo_path))
+        if repo_info is None:
+            pytest.skip("Dogfood repo is not registered")
+
+        store_registry = StoreRegistry.for_registry(registry)
+        resolver = RepoResolver(registry, store_registry)
+        dispatcher = EnhancedDispatcher()
+
+        dogfood_cases = [
+            (
+                "how does semantic setup validate qdrant and embedding readiness",
+                {"mcp_server/setup/semantic_preflight.py", "mcp_server/cli/setup_commands.py"},
+            ),
+            (
+                "where does repository status print semantic readiness evidence",
+                {"mcp_server/cli/repository_commands.py"},
+            ),
+        ]
+
+        for query, expected_hits in dogfood_cases:
+            result = asyncio.run(
+                handle_search_code(
+                    arguments={
+                        "query": query,
+                        "repository": str(repo_path),
+                        "semantic": True,
+                        "limit": 5,
+                    },
+                    dispatcher=dispatcher,
+                    repo_resolver=resolver,
+                )
+            )
+            data = json.loads(result[0].text)
+            if data.get("code") == "semantic_not_ready":
+                pytest.skip(
+                    f"Dogfood repo semantic readiness is blocked: {data['semantic_readiness']['state']}"
+                )
+            assert data["semantic_requested"] is True
+            assert data["semantic_source"] == "semantic"
+            assert data["semantic_profile_id"] == "oss_high"
+            assert data["semantic_collection_name"] == "code_index__oss_high__v1"
+            assert data["results"], query
+            result_files = {item["file"] for item in data["results"]}
+            assert result_files & expected_hits, (query, result_files)
+            assert all(item.get("semantic_source") == "semantic" for item in data["results"])
 
     @pytest.mark.integration
     def test_semantic_indexer_integration_with_plugin_system(self, setup_semantic_indexer):

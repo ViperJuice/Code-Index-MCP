@@ -223,8 +223,28 @@ def test_status_reports_rollout_and_query_surfaces(monkeypatch, tmp_path: Path):
                 "query_status": "index_unavailable",
                 "query_remediation": 'Use native search or follow the readiness remediation; query tools stay fail-closed with safe_fallback: "native_search".',
                 "staleness_reason": "partial_index_failure",
+                "semantic_readiness": "vectors_missing",
+                "semantic_ready": False,
+                "semantic_remediation": "Run semantic summary/vector generation for the current profile before semantic queries.",
                 "features": {
                     "semantic": {
+                        "readiness": {
+                            "state": "vectors_missing",
+                            "ready": False,
+                            "code": "vectors_missing",
+                            "remediation": "Run semantic summary/vector generation for the current profile before semantic queries.",
+                            "evidence": {
+                                "profile_id": "oss_high",
+                                "collection": "code_index__oss_high__v1",
+                                "total_chunks": 12,
+                                "summary_count": 11,
+                                "missing_summaries": 1,
+                                "vector_link_count": 10,
+                                "missing_vectors": 2,
+                                "matching_collection_links": 9,
+                                "collection_mismatches": 1,
+                            },
+                        },
                         "preflight": {
                             "overall_ready": False,
                             "can_write_semantic_vectors": False,
@@ -271,6 +291,16 @@ def test_status_reports_rollout_and_query_surfaces(monkeypatch, tmp_path: Path):
     assert "Query surface: index_unavailable" in result.output
     assert 'safe_fallback: "native_search"' in result.output
     assert "Artifact health: ready" in result.output
+    assert "Semantic readiness: vectors_missing" in result.output
+    assert "Semantic remediation: Run semantic summary/vector generation for the current profile before semantic queries." in result.output
     assert "Semantic Preflight:" in result.output
     assert "Can write semantic vectors: no" in result.output
     assert "collection_missing" in result.output
+    assert "Semantic Evidence:" in result.output
+    assert "Summary-backed chunks: 11" in result.output
+    assert "Chunks missing summaries: 1" in result.output
+    assert "Vector-linked chunks: 10" in result.output
+    assert "Chunks missing vectors: 2" in result.output
+    assert "Active collection: code_index__oss_high__v1" in result.output
+    assert "Collection-matched links: 9" in result.output
+    assert "Collection mismatches: 1" in result.output

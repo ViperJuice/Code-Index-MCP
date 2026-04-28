@@ -125,6 +125,10 @@ and vectors:
 ## Readiness Notes
 
 - `get_status` exposes lexical readiness separately from semantic readiness.
+- `uv run mcp-index repository status` is the operator-facing status surface:
+  it now prints lexical readiness, semantic readiness, and active-profile
+  preflight separately, plus durable semantic evidence counts for summaries,
+  vectors, and collection linkage.
 - `search_code(semantic=true)` refuses with semantic readiness metadata when
   summaries, vectors, or profile compatibility are missing.
 - For a semantically ready registered repository, `search_code(semantic=true)`
@@ -137,6 +141,11 @@ and vectors:
 - Semantic search remains experimental and provider-aware; do not treat a
   lexically ready repository as semantically query-ready unless the semantic
   readiness surface reports `ready`.
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` is the stable rebuild artifact for
+- Normalized path reference for contract checks:
+  `docs/status/semantic_dogfood_rebuild.md`.
+  local dogfood evidence. Use it alongside `repository status` and preflight
+  output when you need to confirm semantic readiness after a clean rebuild.
 
 ## Full Reindex Pipeline
 

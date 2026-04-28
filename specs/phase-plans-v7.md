@@ -465,6 +465,57 @@ acceptance blocker is discovered.
 **Produces**
 - IF-0-SEMDOGFOOD-1 — Dogfood evidence contract.
 
+### Phase 8 — Default Enrichment Compatibility Recovery (SEMREADYFIX)
+
+**Objective**
+
+Repair the default `oss_high` enrichment compatibility path exposed by
+SEMDOGFOOD so a clean rebuild can actually generate summaries and vectors with
+the intended local-default setup, then rerun the semantic dogfood proof.
+
+**Exit criteria**
+- [ ] The default `oss_high` enrichment model and endpoint metadata match a
+      chat model that the configured local enrichment service actually serves.
+- [ ] Active-profile semantic preflight no longer fails with
+      `wrong_chat_model` for the default local dogfood configuration.
+- [ ] A clean force-full rebuild of this repository produces non-zero
+      `chunk_summaries` and non-zero `semantic_points` for `oss_high`.
+- [ ] The repo-local dogfood semantic query harness returns semantic-path
+      results for the fixed natural-language prompts instead of
+      `semantic_not_ready`.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` is refreshed or superseded by a
+      post-repair report that records the semantic-ready verdict.
+
+**Scope notes**
+
+This phase is a blocker-repair follow-up for the exact default-profile issue
+found in SEMDOGFOOD. It should stay on enrichment profile compatibility,
+preflight, rebuild validation, and refreshed dogfood evidence.
+
+**Non-goals**
+
+- No semantic ranking redesign.
+- No unrelated artifact rollout changes.
+- No new cloud-only fallback path outside the existing local/proxy posture.
+
+**Key files**
+
+- `code-index-mcp.profiles.yaml`
+- `mcp_server/config/settings.py`
+- `mcp_server/setup/semantic_preflight.py`
+- `mcp_server/indexing/summarization.py`
+- `docs/guides/semantic-onboarding.md`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_semantic_profile_settings.py`
+- `tests/test_semantic_preflight.py`
+- `tests/real_world/test_semantic_search.py`
+
+**Depends on**
+- SEMDOGFOOD
+
+**Produces**
+- IF-0-SEMREADYFIX-1 — Default local semantic dogfood recovery contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -475,6 +526,7 @@ SEMCONTRACT
   -> SEMINCR
   -> SEMQUERY
   -> SEMDOGFOOD
+  -> SEMREADYFIX
 ```
 
 ## Execution Notes
@@ -493,6 +545,9 @@ SEMCONTRACT
   semantic artifacts.
 - SEMDOGFOOD should be the only phase that performs the full clean rebuild and
   broad natural-language result-quality check.
+- SEMREADYFIX exists only if SEMDOGFOOD proves the default local dogfood path
+  is still blocked; it should repair that blocker and then rerun the dogfood
+  proof instead of widening into unrelated semantic work.
 
 ## Verification
 
@@ -521,4 +576,9 @@ uv run mcp-index repository sync --force-full
 uv run mcp-index repository status
 uv run mcp-index preflight
 sqlite3 .mcp-index/current.db 'select count(*) from chunk_summaries; select count(*) from semantic_points;'
+
+# SEMREADYFIX
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index index check-semantic
+SEMANTIC_SEARCH_ENABLED=true CODE_INDEX_DOGFOOD_REPO=. uv run pytest tests/real_world/test_semantic_search.py -q --no-cov
 ```

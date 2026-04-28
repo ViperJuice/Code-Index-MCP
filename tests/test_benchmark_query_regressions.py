@@ -665,6 +665,88 @@ def test_semantic_query_symbol_precise_prefers_impl_over_plans_docs_and_benchmar
     assert reranked[-1]["relative_path"] == "plans/phase-plan-v7-SEMQUERY.md"
 
 
+@pytest.mark.parametrize(
+    ("query", "results", "expected_top"),
+    [
+        (
+            "how does semantic setup validate qdrant and embedding readiness",
+            [
+                {
+                    "relative_path": "docs/guides/semantic-onboarding.md",
+                    "doc_type": "markdown",
+                    "semantic_text": "guide for semantic setup and readiness",
+                    "score": 0.94,
+                },
+                {
+                    "relative_path": "mcp_server/setup/semantic_preflight.py",
+                    "semantic_text": "validate qdrant collection and embedding dimension readiness",
+                    "score": 0.83,
+                },
+                {
+                    "relative_path": "mcp_server/cli/setup_commands.py",
+                    "semantic_text": "setup semantic CLI command runs semantic preflight",
+                    "score": 0.81,
+                },
+            ],
+            "mcp_server/cli/setup_commands.py",
+        ),
+        (
+            "where does repository status print semantic readiness evidence",
+            [
+                {
+                    "relative_path": "docs/status/SEMANTIC_DOGFOOD_REBUILD.md",
+                    "doc_type": "markdown",
+                    "semantic_text": "dogfood report for semantic readiness evidence",
+                    "score": 0.95,
+                },
+                {
+                    "relative_path": "mcp_server/cli/repository_commands.py",
+                    "semantic_text": "repository status command prints semantic readiness evidence",
+                    "score": 0.82,
+                },
+                {
+                    "relative_path": "tests/test_repository_commands.py",
+                    "semantic_text": "repository status CLI tests",
+                    "score": 0.8,
+                },
+            ],
+            "mcp_server/cli/repository_commands.py",
+        ),
+    ],
+)
+def test_semdogfood_queries_prefer_repo_implementation_paths(query, results, expected_top):
+    indexer = object.__new__(SemanticIndexer)
+
+    reranked = SemanticIndexer._rerank_query_results(indexer, query, results, limit=3)
+
+    assert reranked[0]["relative_path"] == expected_top
+
+
+def test_semdogfood_symbol_query_prefers_repository_status_implementation_over_docs():
+    indexer = object.__new__(SemanticIndexer)
+
+    results = [
+        {
+            "relative_path": "docs/status/SEMANTIC_DOGFOOD_REBUILD.md",
+            "symbol": "status",
+            "doc_type": "markdown",
+            "semantic_text": "dogfood report cites repository status output",
+            "score": 0.96,
+        },
+        {
+            "relative_path": "mcp_server/cli/repository_commands.py",
+            "symbol": "status",
+            "qualified_name": "status",
+            "semantic_text": "status command prints lexical and semantic readiness",
+            "score": 0.82,
+        },
+    ]
+
+    reranked = SemanticIndexer._rerank_query_results(indexer, "function status", results, limit=2)
+
+    assert reranked[0]["relative_path"] == "mcp_server/cli/repository_commands.py"
+
+
 def test_semantic_query_results_include_stable_metadata():
     indexer = object.__new__(SemanticIndexer)
     indexer._qdrant_available = True
