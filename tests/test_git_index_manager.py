@@ -530,3 +530,39 @@ def test_clean_full_rebuild_advances_commit_only_with_durable_index(tmp_path):
     registry.update_indexed_commit.assert_called_once_with(
         repo_info.repository_id, old_commit, branch="main"
     )
+
+
+def test_full_index_preserves_additive_semantic_stats_without_failing_lexical_success(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+
+    dispatcher = MagicMock()
+    dispatcher.index_directory.return_value = {
+        "indexed_files": 1,
+        "failed_files": 0,
+        "errors": [],
+        "summaries_written": 1,
+        "summary_chunks_attempted": 2,
+        "summary_missing_chunks": 1,
+        "semantic_indexed": 0,
+        "semantic_failed": 0,
+        "semantic_skipped": 0,
+        "semantic_blocked": 1,
+        "semantic_stage": "blocked_missing_summaries",
+        "semantic_error": "Missing authoritative summaries blocked strict semantic indexing",
+    }
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=dispatcher)
+    result = manager._full_index(repo_info.repository_id, ctx)
+
+    assert result.indexed == 1
+    assert result.failed == 0
+    assert result.clean
+    assert result.semantic is not None
+    assert result.semantic["semantic_blocked"] == 1
+    assert result.semantic["semantic_stage"] == "blocked_missing_summaries"

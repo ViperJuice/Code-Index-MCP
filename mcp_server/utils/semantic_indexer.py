@@ -1526,6 +1526,7 @@ class SemanticIndexer:
         normalized_chunks: List[Dict[str, Any]] = []
         embedding_inputs: List[str] = []
         file_embedding_text: Optional[str] = None
+        missing_summary_chunk_ids: List[str] = []
 
         if chunks:
             for chunk in chunks:
@@ -1548,6 +1549,8 @@ class SemanticIndexer:
                     summary = _sqlite_store.get_chunk_summary(source_chunk_id)
                     if summary:
                         summary_text = summary["summary_text"]
+                    else:
+                        missing_summary_chunk_ids.append(source_chunk_id)
 
                 units = self._expand_chunk_embedding_units(
                     relative_path=relative_path,
@@ -1618,6 +1621,23 @@ class SemanticIndexer:
             "relative_path": relative_path,
             "chunk_count": len(chunks),
             "used_fallback_chunks": used_fallback_chunks,
+            "missing_summary_chunk_ids": sorted(set(missing_summary_chunk_ids)),
+        }
+
+    def _preflight_blocker_details(
+        self, semantic_preflight: Optional[Mapping[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
+        if not semantic_preflight:
+            return None
+        if semantic_preflight.get("can_write_semantic_vectors", True):
+            return None
+        blocker = semantic_preflight.get("blocker")
+        if isinstance(blocker, Mapping):
+            return dict(blocker)
+        return {
+            "code": "semantic_preflight_blocked",
+            "message": "Semantic preflight blocked vector writes",
+            "can_write_semantic_vectors": False,
         }
 
     def _store_file_embeddings(
@@ -1719,8 +1739,26 @@ class SemanticIndexer:
                 )
             )
 
+        point_links: List[tuple[str, int]] = []
         try:
             self._upsert_points_batched(path, points)
+            if self.sqlite_store is not None:
+                effective_profile_id = self.semantic_profile.profile_id
+                for point in points:
+                    payload = point.payload or {}
+                    if payload.get("kind") == "file_summary":
+                        continue
+                    source_chunk_id = payload.get("source_chunk_id")
+                    if not source_chunk_id:
+                        continue
+                    point_links.append((str(source_chunk_id), int(point.id)))
+                for source_chunk_id, point_id in point_links:
+                    self.sqlite_store.upsert_semantic_point(
+                        profile_id=effective_profile_id,
+                        chunk_id=source_chunk_id,
+                        point_id=point_id,
+                        collection=self.collection,
+                    )
         except Exception as e:
             logger.error(
                 f"Failed to upsert {len(points)} points for file {path}: "
@@ -1737,10 +1775,30 @@ class SemanticIndexer:
             "embedding_unit_count": len(normalized_chunks),
             "file_summary_indexed": file_embed is not None,
             "used_fallback_chunks": prep["used_fallback_chunks"],
+            "semantic_points_linked": len(point_links),
         }
 
-    def index_file(self, path: Path) -> Dict[str, Any]:
+    def index_file(
+        self,
+        path: Path,
+        *,
+        require_summaries: bool = False,
+        semantic_preflight: Optional[Mapping[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """Index a single file and return the shard info."""
+        blocker = self._preflight_blocker_details(semantic_preflight)
+        if blocker is not None:
+            return {
+                "file": str(path),
+                "symbols": [],
+                "language": self._infer_chunk_language(path),
+                "chunk_count": 0,
+                "embedding_unit_count": 0,
+                "file_summary_indexed": False,
+                "used_fallback_chunks": False,
+                "blocked": True,
+                "semantic_blocker": blocker,
+            }
         prep = self._prepare_file_for_indexing(path)
         if prep is None:
             return {
@@ -1752,10 +1810,31 @@ class SemanticIndexer:
                 "file_summary_indexed": False,
                 "used_fallback_chunks": False,
             }
+        missing_summary_chunk_ids = prep.get("missing_summary_chunk_ids", [])
+        if require_summaries and missing_summary_chunk_ids:
+            return {
+                "file": str(path),
+                "symbols": prep["symbols"],
+                "language": prep["language"],
+                "chunk_count": prep["chunk_count"],
+                "embedding_unit_count": 0,
+                "file_summary_indexed": False,
+                "used_fallback_chunks": prep["used_fallback_chunks"],
+                "blocked": True,
+                "missing_summary_chunk_ids": missing_summary_chunk_ids,
+                "semantic_error": "Missing authoritative summaries for strict semantic indexing",
+            }
         embeds = self._embed_texts(prep["embedding_inputs"], input_type="document")
         return self._store_file_embeddings(path, prep, embeds)
 
-    def index_files_batch(self, paths: List[Path], embed_batch_size: int = 1000) -> Dict[str, Any]:
+    def index_files_batch(
+        self,
+        paths: List[Path],
+        embed_batch_size: int = 1000,
+        *,
+        require_summaries: bool = False,
+        semantic_preflight: Optional[Mapping[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """Index multiple files with batched embedding API calls.
 
         Collects all embedding texts from all files first, then submits them
@@ -1765,14 +1844,34 @@ class SemanticIndexer:
         if not self._qdrant_available:
             raise RuntimeError("Qdrant is not available — cannot batch-index files")
 
+        blocker = self._preflight_blocker_details(semantic_preflight)
+        if blocker is not None:
+            return {
+                "files_indexed": 0,
+                "files_failed": 0,
+                "files_skipped": 0,
+                "files_blocked": len(paths),
+                "blocked_files": [str(path) for path in paths],
+                "total_embedding_units": 0,
+                "semantic_blocker": blocker,
+                "semantic_error": blocker.get("message"),
+            }
+
         # Phase 1: prepare all files — chunking + build embedding texts, no API calls
         preparations: List[tuple] = []
         skipped = 0
+        blocked_files: List[str] = []
+        missing_summary_chunk_ids: List[str] = []
         for path in paths:
             try:
                 prep = self._prepare_file_for_indexing(path)
                 if prep:
-                    preparations.append((path, prep))
+                    prep_missing = prep.get("missing_summary_chunk_ids", [])
+                    if require_summaries and prep_missing:
+                        blocked_files.append(str(path))
+                        missing_summary_chunk_ids.extend(str(chunk_id) for chunk_id in prep_missing)
+                    else:
+                        preparations.append((path, prep))
                 else:
                     skipped += 1
             except Exception as exc:
@@ -1784,6 +1883,9 @@ class SemanticIndexer:
                 "files_indexed": 0,
                 "files_failed": 0,
                 "files_skipped": skipped,
+                "files_blocked": len(blocked_files),
+                "blocked_files": blocked_files,
+                "missing_summary_chunk_ids": sorted(set(missing_summary_chunk_ids)),
                 "total_embedding_units": 0,
             }
 
@@ -1861,6 +1963,9 @@ class SemanticIndexer:
             "files_indexed": indexed,
             "files_failed": failed,
             "files_skipped": skipped,
+            "files_blocked": len(blocked_files),
+            "blocked_files": blocked_files,
+            "missing_summary_chunk_ids": sorted(set(missing_summary_chunk_ids)),
             "total_embedding_units": len(all_texts),
         }
 

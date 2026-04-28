@@ -131,6 +131,31 @@ and vectors:
   lexically ready repository as semantically query-ready unless the semantic
   readiness surface reports `ready`.
 
+## Full Reindex Pipeline
+
+In semantic mode, a full `reindex` now runs the build in a fixed order:
+
+1. lexical/chunk persistence
+2. authoritative summary generation for the targeted chunks/files
+3. semantic vector writes
+
+The semantic vector stage is strict. If authoritative summaries are missing for
+targeted chunks, or if semantic preflight says the active profile cannot write
+vectors, semantic vector writes are skipped and semantic readiness stays
+not-ready even when lexical indexing completed successfully.
+
+`reindex` reports the semantic stage additively. Operators should expect to see
+whether summaries were written, whether semantic vectors were written, and
+whether the semantic stage was blocked before any vector write or failed after
+lexical persistence.
+
+Manual summary tools stay separate from the full-sync contract:
+
+- `write_summaries` is an explicit summary-only operation. It can populate
+  authoritative summaries, but it does not claim semantic vector success.
+- `summarize_sample` is a diagnostic/sample tool for inspecting summary output
+  and does not satisfy the full-sync semantic build contract by itself.
+
 ## Troubleshooting
 
 - Qdrant unreachable

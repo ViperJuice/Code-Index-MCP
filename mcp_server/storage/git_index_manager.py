@@ -82,6 +82,7 @@ class UpdateResult:
     failed: int = 0
     skipped: int = 0
     errors: List[str] = None
+    semantic: Optional[Dict[str, Any]] = None
     duration_seconds: float = 0.0
 
     def __post_init__(self) -> None:
@@ -638,6 +639,18 @@ class GitAwareIndexManager:
         errors = stats.get("errors", []) if isinstance(stats, dict) else []
         result.indexed = total_indexed
         result.failed = failed_files
+        if isinstance(stats, dict):
+            result.semantic = {
+                "summaries_written": stats.get("summaries_written", 0),
+                "summary_chunks_attempted": stats.get("summary_chunks_attempted", 0),
+                "summary_missing_chunks": stats.get("summary_missing_chunks", 0),
+                "semantic_indexed": stats.get("semantic_indexed", 0),
+                "semantic_failed": stats.get("semantic_failed", 0),
+                "semantic_skipped": stats.get("semantic_skipped", 0),
+                "semantic_blocked": stats.get("semantic_blocked", 0),
+                "semantic_stage": stats.get("semantic_stage"),
+                "semantic_error": stats.get("semantic_error"),
+            }
         result.errors.extend(str(error) for error in errors)
         result.duration_seconds = (datetime.now() - start_time).total_seconds()
         logger.info(f"Indexed {total_indexed} files in {repo_info.name}")

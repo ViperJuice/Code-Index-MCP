@@ -1,5 +1,6 @@
 """Enhanced dispatcher with dynamic plugin loading via PluginFactory."""
 
+import asyncio
 import hashlib
 import logging
 import os
@@ -150,6 +151,30 @@ def _filename_token_boost(query: str, file_path: str) -> float:
     stem_tokens = set(re.findall(r"[a-z0-9]+", stem))
     overlap = len(terms & stem_tokens)
     return -min(overlap, 3) * 0.6
+
+
+def _run_coro_blocking(coro: Any) -> Any:
+    """Run an async coroutine from sync code, even when an event loop is active."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+
+    result: dict[str, Any] = {}
+    error: dict[str, BaseException] = {}
+
+    def _runner() -> None:
+        try:
+            result["value"] = asyncio.run(coro)
+        except BaseException as exc:  # pragma: no cover - propagated to caller
+            error["value"] = exc
+
+    thread = threading.Thread(target=_runner, daemon=True)
+    thread.start()
+    thread.join()
+    if "value" in error:
+        raise error["value"]
+    return result.get("value")
 
 
 class EnhancedDispatcher:
@@ -2153,7 +2178,7 @@ class EnhancedDispatcher:
 
     def index_directory(
         self, ctx: RepoContext, directory: Path, recursive: bool = True
-    ) -> Dict[str, int]:
+    ) -> Dict[str, Any]:
         """Index all files in a directory, respecting ignore patterns."""
         logger.info(f"Indexing directory: {directory} (recursive={recursive})")
 
@@ -2170,6 +2195,14 @@ class EnhancedDispatcher:
             "ignored_files": 0,
             "failed_files": 0,
             "by_language": {},
+            "summaries_written": 0,
+            "summary_chunks_attempted": 0,
+            "summary_missing_chunks": 0,
+            "semantic_indexed": 0,
+            "semantic_failed": 0,
+            "semantic_skipped": 0,
+            "semantic_blocked": 0,
+            "semantic_stage": "not_run",
         }
 
         is_excluded = build_walker_filter(directory)
@@ -2284,18 +2317,81 @@ class EnhancedDispatcher:
         stats["semantic_paths_queued"] = len(semantically_indexed_paths)
         stats["semantic_indexer_present"] = _sem is not None
         if _sem and semantically_indexed_paths:
+            summary_result = None
+            semantic_preflight = None
+            active_store = getattr(ctx, "sqlite_store", None)
+            if active_store is not None:
+                from ..indexing.summarization import ComprehensiveChunkWriter
+                from ..setup.semantic_preflight import run_semantic_preflight
+
+                settings = reload_settings()
+                summarization_config = settings.get_profile_summarization_config(
+                    settings.semantic_default_profile
+                )
+                summarization_config.setdefault("profile_id", settings.semantic_default_profile)
+                writer = ComprehensiveChunkWriter(
+                    db_path=active_store.db_path,
+                    qdrant_client=None,
+                    summarization_config=summarization_config,
+                )
+                summary_result = _run_coro_blocking(
+                    writer.process_scope(
+                        limit=max(10000, len(semantically_indexed_paths) * 64),
+                        target_paths=semantically_indexed_paths,
+                    )
+                )
+                stats["summaries_written"] = summary_result.summaries_written
+                stats["summary_chunks_attempted"] = summary_result.chunks_attempted
+                stats["summary_missing_chunks"] = len(summary_result.missing_chunk_ids)
+                if summary_result.missing_chunk_ids:
+                    stats["semantic_stage"] = "blocked_missing_summaries"
+                    stats["semantic_error"] = (
+                        "Missing authoritative summaries blocked strict semantic indexing"
+                    )
+
+                semantic_preflight = run_semantic_preflight(
+                    settings=settings,
+                    strict=False,
+                ).to_dict()
+                if not semantic_preflight.get("can_write_semantic_vectors", True):
+                    stats["semantic_stage"] = "blocked_preflight"
+                    stats["semantic_blocker"] = semantic_preflight.get("blocker")
+                    stats["semantic_error"] = (
+                        semantic_preflight.get("blocker") or {}
+                    ).get("message")
+
+            if stats["semantic_stage"] in {"blocked_missing_summaries", "blocked_preflight"}:
+                stats["semantic_blocked"] = len(semantically_indexed_paths)
+                return stats
+
             logger.info(
                 f"Batch semantic indexing {len(semantically_indexed_paths)} files "
                 f"(embed_batch_size=1000)"
             )
             try:
                 sem_stats = _sem.index_files_batch(
-                    semantically_indexed_paths, embed_batch_size=1000
+                    semantically_indexed_paths,
+                    embed_batch_size=1000,
+                    require_summaries=True,
+                    semantic_preflight=semantic_preflight,
                 )
                 stats["semantic_indexed"] = sem_stats.get("files_indexed", 0)
                 stats["semantic_failed"] = sem_stats.get("files_failed", 0)
                 stats["semantic_skipped"] = sem_stats.get("files_skipped", 0)
+                stats["semantic_blocked"] = sem_stats.get("files_blocked", 0)
                 stats["total_embedding_units"] = sem_stats.get("total_embedding_units", 0)
+                if sem_stats.get("semantic_blocker") is not None:
+                    stats["semantic_blocker"] = sem_stats.get("semantic_blocker")
+                if sem_stats.get("semantic_error"):
+                    stats["semantic_error"] = sem_stats.get("semantic_error")
+                if stats["semantic_indexed"] > 0:
+                    stats["semantic_stage"] = "indexed"
+                elif stats["semantic_blocked"] > 0 and stats["semantic_stage"] == "not_run":
+                    stats["semantic_stage"] = "blocked"
+                elif stats["semantic_failed"] > 0:
+                    stats["semantic_stage"] = "failed"
+                else:
+                    stats["semantic_stage"] = "skipped"
                 logger.info(
                     f"Semantic batch complete: {sem_stats.get('files_indexed', 0)} indexed, "
                     f"{sem_stats.get('files_skipped', 0)} skipped, "

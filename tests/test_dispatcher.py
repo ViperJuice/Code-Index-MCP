@@ -11,6 +11,7 @@ Tests cover:
 
 import hashlib
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -21,7 +22,7 @@ from mcp_server.dispatcher import EnhancedDispatcher as Dispatcher
 # ---------------------------------------------------------------------------
 # SL-1.1 imports (new Protocol-conformance tests)
 # ---------------------------------------------------------------------------
-from mcp_server.dispatcher.dispatcher_enhanced import IndexResultStatus
+from mcp_server.dispatcher.dispatcher_enhanced import IndexResult, IndexResultStatus
 from mcp_server.dispatcher.protocol import DispatcherProtocol
 from mcp_server.dispatcher.query_intent import QueryIntent, classify
 from mcp_server.dispatcher.simple_dispatcher import SimpleDispatcher
@@ -246,6 +247,7 @@ class TestSearch:
         ctx = self._make_no_sqlite_ctx()
         psr = _make_psr_with_plugins(self._REPO_ID, [mock_plugin])
         dispatcher = Dispatcher([mock_plugin], plugin_set_registry=psr)
+        dispatcher._semantic_indexer_fallback = None
         list(dispatcher.search(ctx, "test", semantic=True, limit=10))
 
         mock_plugin.search.assert_called_once_with("test", {"semantic": True, "limit": 10})
@@ -1044,6 +1046,124 @@ class TestEnhancedDispatcherProtocolConformance:
 
         assert result["failed_files"] == 0
         assert result["ignored_files"] == 1
+
+    def test_index_directory_runs_lexical_then_summaries_then_semantic(self, tmp_path, monkeypatch):
+        events = []
+        ctx = _make_repo_ctx(sqlite_store=MagicMock(db_path=str(tmp_path / "index.db")))
+        target = tmp_path / "sample.py"
+        target.write_text("x = 1\n")
+
+        class FakeWriter:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def process_scope(self, **kwargs):
+                events.append(("summary", sorted(str(path) for path in kwargs["target_paths"])))
+                return SimpleNamespace(
+                    summaries_written=1,
+                    chunks_attempted=1,
+                    authoritative_chunks=1,
+                    missing_chunk_ids=[],
+                    files_attempted=1,
+                    files_summarized=1,
+                )
+
+        class FakeSemanticIndexer:
+            def index_files_batch(self, paths, **kwargs):
+                events.append(("semantic", [str(path) for path in paths], kwargs))
+                return {"files_indexed": 1, "files_failed": 0, "files_skipped": 0}
+
+        monkeypatch.setattr(
+            "mcp_server.indexing.summarization.ComprehensiveChunkWriter",
+            FakeWriter,
+        )
+        monkeypatch.setattr(
+            "mcp_server.setup.semantic_preflight.run_semantic_preflight",
+            lambda **_kwargs: SimpleNamespace(
+                to_dict=lambda: {"can_write_semantic_vectors": True, "blocker": None}
+            ),
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "_get_semantic_indexer",
+            lambda self, _ctx: FakeSemanticIndexer(),
+        )
+
+        def _fake_index_file(self, _ctx, path, do_semantic=False):
+            events.append(("lexical", str(path), do_semantic))
+            return IndexResult(
+                status=IndexResultStatus.INDEXED,
+                path=path,
+                observed_hash=None,
+                actual_hash=None,
+            )
+
+        monkeypatch.setattr(Dispatcher, "index_file", _fake_index_file)
+
+        result = Dispatcher([]).index_directory(ctx, tmp_path)
+
+        assert [event[0] for event in events] == ["lexical", "summary", "semantic"]
+        assert result["semantic_stage"] == "indexed"
+
+    def test_index_directory_blocks_semantic_stage_when_summaries_missing(
+        self, tmp_path, monkeypatch
+    ):
+        ctx = _make_repo_ctx(sqlite_store=MagicMock(db_path=str(tmp_path / "index.db")))
+        target = tmp_path / "sample.py"
+        target.write_text("x = 1\n")
+
+        class FakeWriter:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def process_scope(self, **kwargs):
+                return SimpleNamespace(
+                    summaries_written=0,
+                    chunks_attempted=1,
+                    authoritative_chunks=0,
+                    missing_chunk_ids=["chunk-1"],
+                    files_attempted=1,
+                    files_summarized=0,
+                )
+
+        semantic_called = {"value": False}
+
+        class FakeSemanticIndexer:
+            def index_files_batch(self, paths, **kwargs):
+                semantic_called["value"] = True
+                return {"files_indexed": 0, "files_failed": 0, "files_skipped": 0}
+
+        monkeypatch.setattr(
+            "mcp_server.indexing.summarization.ComprehensiveChunkWriter",
+            FakeWriter,
+        )
+        monkeypatch.setattr(
+            "mcp_server.setup.semantic_preflight.run_semantic_preflight",
+            lambda **_kwargs: SimpleNamespace(
+                to_dict=lambda: {"can_write_semantic_vectors": True, "blocker": None}
+            ),
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "_get_semantic_indexer",
+            lambda self, _ctx: FakeSemanticIndexer(),
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "index_file",
+            lambda self, _ctx, path, do_semantic=False: IndexResult(
+                status=IndexResultStatus.INDEXED,
+                path=path,
+                observed_hash=None,
+                actual_hash=None,
+            ),
+        )
+
+        result = Dispatcher([]).index_directory(ctx, tmp_path)
+
+        assert semantic_called["value"] is False
+        assert result["semantic_stage"] == "blocked_missing_summaries"
+        assert result["semantic_blocked"] == 1
 
     def test_remove_file_accepts_ctx(self, tmp_path):
         """remove_file(ctx, path) must accept ctx as first positional arg."""

@@ -56,3 +56,20 @@ This command renders the same active-profile semantic preflight contract as
 - Qdrant collection validation
 - metadata-only API-key presence
 - the structured blocker and whether the active profile can write semantic vectors
+
+## Reindex Semantic Build Notes
+
+When `reindex` runs with semantic indexing available, the build order is:
+
+1. lexical/chunk persistence
+2. authoritative summaries
+3. semantic vector writes
+
+If summaries are missing or preflight blocks the active profile, semantic
+vector writes are skipped while lexical indexing may still complete. The
+response reports additive semantic-stage metadata such as summaries written,
+semantic vectors written, semantic blocked state, and semantic failure details.
+
+`write_summaries` remains a summary-only tool and `summarize_sample` remains a
+diagnostic/manual sample tool. Neither one is a substitute for the strict
+full-sync semantic vector stage.

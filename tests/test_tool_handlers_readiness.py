@@ -227,3 +227,104 @@ def test_search_code_semantic_not_ready_returns_semantic_metadata(tmp_path, monk
     assert data["code"] == "semantic_not_ready"
     assert data["semantic_readiness"]["state"] == "summaries_missing"
     dispatcher.search.assert_not_called()
+
+
+def test_reindex_reports_additive_semantic_stage_metadata(tmp_path, monkeypatch):
+    from mcp_server.cli.tool_handlers import handle_reindex
+
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+    worktree = tmp_path / "repo"
+    worktree.mkdir()
+    dispatcher = MagicMock()
+    dispatcher.index_directory.return_value = {
+        "indexed_files": 1,
+        "ignored_files": 0,
+        "failed_files": 0,
+        "total_files": 1,
+        "by_language": {"python": 1},
+        "summaries_written": 1,
+        "summary_chunks_attempted": 2,
+        "summary_missing_chunks": 1,
+        "semantic_indexed": 0,
+        "semantic_failed": 0,
+        "semantic_skipped": 0,
+        "semantic_blocked": 1,
+        "semantic_stage": "blocked_missing_summaries",
+        "semantic_error": "Missing authoritative summaries blocked strict semantic indexing",
+    }
+    ctx = MagicMock()
+    ctx.workspace_root = worktree
+    ctx.sqlite_store = MagicMock()
+    ctx.sqlite_store.db_path = str(tmp_path / "index.db")
+    ctx.sqlite_store.rebuild_fts_code.return_value = 1
+    resolver = FakeResolver(
+        RepositoryReadiness(
+            state=RepositoryReadinessState.READY,
+            repository_id="repo-1",
+            repository_name="repo",
+            requested_path=str(worktree),
+        )
+    )
+    resolver.resolve = lambda _path: ctx
+
+    result = _run(
+        handle_reindex(
+            arguments={"path": str(worktree)},
+            dispatcher=dispatcher,
+            repo_resolver=resolver,
+        )
+    )
+
+    data = _parsed(result)
+    assert data["summaries_written"] == 1
+    assert data["summary_chunks_attempted"] == 2
+    assert data["summary_missing_chunks"] == 1
+    assert data["semantic_blocked"] == 1
+    assert data["semantic_stage"] == "blocked_missing_summaries"
+
+
+def test_write_summaries_remains_summary_only(tmp_path, monkeypatch):
+    from mcp_server.cli.tool_handlers import handle_write_summaries
+
+    monkeypatch.setenv("MCP_ALLOWED_ROOTS", str(tmp_path))
+    worktree = tmp_path / "repo"
+    worktree.mkdir()
+    ctx = MagicMock()
+    ctx.sqlite_store = MagicMock(db_path=str(tmp_path / "index.db"))
+    resolver = FakeResolver(
+        RepositoryReadiness(
+            state=RepositoryReadinessState.READY,
+            repository_id="repo-1",
+            repository_name="repo",
+            requested_path=str(worktree),
+        )
+    )
+    resolver.resolve = lambda _path: ctx
+
+    class FakeWriter:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def process_scope(self, limit=500):
+            del limit
+            return SimpleNamespace(summaries_written=3, chunks_attempted=4, missing_chunk_ids=["c4"])
+
+    monkeypatch.setattr("mcp_server.indexing.summarization.ComprehensiveChunkWriter", FakeWriter)
+    lazy_summarizer = MagicMock()
+    lazy_summarizer.can_summarize.return_value = True
+    lazy_summarizer._get_model_name.return_value = "chat"
+
+    result = _run(
+        handle_write_summaries(
+            arguments={"repository": str(worktree), "limit": 4},
+            dispatcher=MagicMock(),
+            repo_resolver=resolver,
+            lazy_summarizer=lazy_summarizer,
+            current_session=None,
+        )
+    )
+
+    data = _parsed(result)
+    assert data["chunks_summarized"] == 3
+    assert data["semantic_vectors_written"] is False
+    assert data["summary_missing_chunks"] == 1

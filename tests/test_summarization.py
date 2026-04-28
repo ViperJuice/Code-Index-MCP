@@ -2,10 +2,33 @@
 
 import asyncio
 import importlib
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-from mcp_server.indexing.summarization import ChunkWriter, LazyChunkWriter
+from mcp_server.indexing.summarization import (
+    ChunkWriter,
+    FileBatchSummarizer,
+    LazyChunkWriter,
+)
+from mcp_server.storage.sqlite_store import SQLiteStore
+
+
+def _seed_chunk_summary_tables(db_path: Path, tmp_path: Path) -> tuple[SQLiteStore, int]:
+    store = SQLiteStore(str(db_path))
+    repo_id = store.ensure_repository_row(tmp_path)
+    source_file = tmp_path / "sample.py"
+    source_file.write_text("def alpha():\n    return 1\n", encoding="utf-8")
+    file_id = store.store_file(
+        repo_id,
+        path=source_file,
+        relative_path="sample.py",
+        language="python",
+        size=source_file.stat().st_size,
+        content_hash="content-hash-1",
+    )
+    return store, file_id
 
 
 class TestChunkWriterInit:
@@ -123,3 +146,130 @@ class TestLazyChunkWriterInit:
             summarization_config={"base_url": "http://localhost:11434"},
         )
         assert lw._has_direct_api() is True
+
+
+@pytest.mark.asyncio
+async def test_file_batch_summarizer_persists_authoritative_audit_metadata(tmp_path):
+    db_path = tmp_path / "summaries.db"
+    store, file_id = _seed_chunk_summary_tables(db_path, tmp_path)
+    summarizer = FileBatchSummarizer(
+        db_path=str(db_path),
+        qdrant_client=None,
+        summarization_config={
+            "base_url": "http://ai:8002/v1",
+            "model_name": "chat",
+            "profile_id": "oss_high",
+        },
+    )
+
+    async def _fake_batch_api(*_args, **_kwargs):
+        return [SimpleNamespace(chunk_id="chunk-1", summary="Semantic summary")]
+
+    summarizer._call_batch_api = _fake_batch_api  # type: ignore[method-assign]
+    result = await summarizer.summarize_file_chunks(
+        file_id=file_id,
+        file_path=str(tmp_path / "sample.py"),
+        file_content="def alpha():\n    return 1\n",
+        chunks=[
+            {
+                "chunk_id": "chunk-1",
+                "line_start": 1,
+                "line_end": 2,
+                "node_type": "function_definition",
+                "symbol_id": None,
+            }
+        ],
+        symbol_map={},
+        persist=True,
+    )
+
+    stored = store.get_chunk_summary("chunk-1")
+    assert result.summaries_written == 1
+    assert result.missing_chunk_ids == []
+    assert stored is not None
+    assert stored["is_authoritative"] is True
+    assert stored["provider_name"] == "openai_compatible"
+    assert stored["profile_id"] == "oss_high"
+    assert stored["prompt_fingerprint"]
+    assert stored["audit_metadata"]["llm_model"] == "chat"
+
+
+@pytest.mark.asyncio
+async def test_file_batch_summarizer_reports_missing_chunks_without_claiming_success(tmp_path):
+    db_path = tmp_path / "summaries.db"
+    _, file_id = _seed_chunk_summary_tables(db_path, tmp_path)
+    summarizer = FileBatchSummarizer(
+        db_path=str(db_path),
+        qdrant_client=None,
+        summarization_config={"base_url": "http://ai:8002/v1", "model_name": "chat"},
+    )
+
+    async def _fake_batch_api(*_args, **_kwargs):
+        return [SimpleNamespace(chunk_id="chunk-1", summary="Only one summary")]
+
+    summarizer._call_batch_api = _fake_batch_api  # type: ignore[method-assign]
+    result = await summarizer.summarize_file_chunks(
+        file_id=file_id,
+        file_path=str(tmp_path / "sample.py"),
+        file_content="def alpha():\n    return 1\n\ndef beta():\n    return 2\n",
+        chunks=[
+            {"chunk_id": "chunk-1", "line_start": 1, "line_end": 2, "node_type": "function"},
+            {"chunk_id": "chunk-2", "line_start": 4, "line_end": 5, "node_type": "function"},
+        ],
+        symbol_map={},
+        persist=True,
+    )
+
+    assert result.summaries_written == 1
+    assert result.missing_chunk_ids == ["chunk-2"]
+
+
+@pytest.mark.asyncio
+async def test_file_batch_summarizer_falls_back_to_topological_per_chunk_path(tmp_path):
+    db_path = tmp_path / "summaries.db"
+    _, file_id = _seed_chunk_summary_tables(db_path, tmp_path)
+    summarizer = FileBatchSummarizer(
+        db_path=str(db_path),
+        qdrant_client=None,
+        summarization_config={"base_url": "http://ai:8002/v1", "model_name": "chat"},
+    )
+    calls = []
+    topological_called = {"value": False}
+
+    async def _raise_large(*_args, **_kwargs):
+        raise importlib.import_module("mcp_server.indexing.summarization").FileTooLargeError("big")
+
+    async def _fake_chunk_summary(**kwargs):
+        calls.append(kwargs["chunk_hash"])
+        return f"summary for {kwargs['chunk_hash']}"
+
+    async def _fake_topological(*args, **kwargs):
+        del args, kwargs
+        topological_called["value"] = True
+        return importlib.import_module("mcp_server.indexing.summarization").SummaryGenerationResult(
+            chunks_attempted=2,
+            summaries_written=2,
+            authoritative_chunks=2,
+            missing_chunk_ids=[],
+            files_attempted=1,
+            files_summarized=1,
+        )
+
+    summarizer._call_batch_api = _raise_large  # type: ignore[method-assign]
+    summarizer.summarize_chunk = _fake_chunk_summary  # type: ignore[method-assign]
+    summarizer._summarize_topological = _fake_topological  # type: ignore[method-assign]
+    result = await summarizer.summarize_file_chunks(
+        file_id=file_id,
+        file_path=str(tmp_path / "sample.py"),
+        file_content="def alpha():\n    return 1\n",
+        chunks=[
+            {"chunk_id": "chunk-1", "line_start": 1, "line_end": 2, "node_type": "function"},
+            {"chunk_id": "chunk-2", "line_start": 3, "line_end": 4, "node_type": "function"},
+        ],
+        symbol_map={},
+        persist=False,
+    )
+
+    assert topological_called["value"] is True
+    assert calls == []
+    assert result.summaries_written == 2

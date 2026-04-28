@@ -95,6 +95,7 @@ class SQLiteStore:
         self._init_database()
         self._run_migrations()
         self._ensure_semantic_points_table()
+        self._ensure_chunk_summary_audit_columns()
 
     def _require_writable(self) -> None:
         if self._readonly:
@@ -125,6 +126,25 @@ class SQLiteStore:
                 CREATE INDEX IF NOT EXISTS idx_semantic_points_collection
                     ON semantic_points(collection);
                 """)
+
+    def _ensure_chunk_summary_audit_columns(self) -> None:
+        """Ensure additive chunk summary audit columns exist."""
+        with self._get_connection() as conn:
+            for column, ddl in (
+                ("provider_name", "ALTER TABLE chunk_summaries ADD COLUMN provider_name TEXT"),
+                ("profile_id", "ALTER TABLE chunk_summaries ADD COLUMN profile_id TEXT"),
+                (
+                    "prompt_fingerprint",
+                    "ALTER TABLE chunk_summaries ADD COLUMN prompt_fingerprint TEXT",
+                ),
+                ("audit_metadata", "ALTER TABLE chunk_summaries ADD COLUMN audit_metadata TEXT"),
+            ):
+                if self._check_column_exists(conn, "chunk_summaries", column):
+                    continue
+                try:
+                    conn.execute(ddl)
+                except sqlite3.OperationalError:
+                    logger.debug("Could not add chunk_summaries.%s", column)
 
     def _init_database(self):
         """Initialize database and create schema if needed."""
@@ -454,6 +474,10 @@ class SQLiteStore:
                 summary_text TEXT NOT NULL,
                 is_authoritative BOOLEAN DEFAULT 0,
                 llm_model TEXT,
+                provider_name TEXT,
+                profile_id TEXT,
+                prompt_fingerprint TEXT,
+                audit_metadata TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(file_id) REFERENCES files(id) ON DELETE CASCADE
@@ -2209,6 +2233,10 @@ class SQLiteStore:
         llm_model: str,
         symbol: Optional[str] = None,
         is_authoritative: bool = False,
+        provider_name: Optional[str] = None,
+        profile_id: Optional[str] = None,
+        prompt_fingerprint: Optional[str] = None,
+        audit_metadata: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """Store or update a semantic chunk summary."""
         with self._get_connection() as conn:
@@ -2223,12 +2251,18 @@ class SQLiteStore:
 
             conn.execute(
                 """INSERT INTO chunk_summaries 
-                   (chunk_hash, file_id, chunk_start, chunk_end, symbol, summary_text, is_authoritative, llm_model, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                   (chunk_hash, file_id, chunk_start, chunk_end, symbol, summary_text,
+                    is_authoritative, llm_model, provider_name, profile_id,
+                    prompt_fingerprint, audit_metadata, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                    ON CONFLICT(chunk_hash) DO UPDATE SET
                    summary_text=excluded.summary_text,
                    is_authoritative=excluded.is_authoritative,
                    llm_model=excluded.llm_model,
+                   provider_name=excluded.provider_name,
+                   profile_id=excluded.profile_id,
+                   prompt_fingerprint=excluded.prompt_fingerprint,
+                   audit_metadata=excluded.audit_metadata,
                    updated_at=CURRENT_TIMESTAMP
                 """,
                 (
@@ -2240,6 +2274,10 @@ class SQLiteStore:
                     summary_text,
                     is_authoritative,
                     llm_model,
+                    provider_name,
+                    profile_id,
+                    prompt_fingerprint,
+                    json.dumps(audit_metadata) if audit_metadata is not None else None,
                 ),
             )
             return True
@@ -2249,12 +2287,20 @@ class SQLiteStore:
         with self._get_connection() as conn:
             cursor = conn.execute(
                 """SELECT chunk_hash, file_id, chunk_start, chunk_end, symbol, 
-                          summary_text, is_authoritative, llm_model, created_at, updated_at
+                          summary_text, is_authoritative, llm_model, provider_name,
+                          profile_id, prompt_fingerprint, audit_metadata,
+                          created_at, updated_at
                    FROM chunk_summaries WHERE chunk_hash = ?""",
                 (chunk_hash,),
             )
             row = cursor.fetchone()
             if row:
+                audit_metadata = None
+                if row[11]:
+                    try:
+                        audit_metadata = json.loads(row[11])
+                    except json.JSONDecodeError:
+                        audit_metadata = None
                 return {
                     "chunk_hash": row[0],
                     "file_id": row[1],
@@ -2264,8 +2310,12 @@ class SQLiteStore:
                     "summary_text": row[5],
                     "is_authoritative": bool(row[6]),
                     "llm_model": row[7],
-                    "created_at": row[8],
-                    "updated_at": row[9],
+                    "provider_name": row[8],
+                    "profile_id": row[9],
+                    "prompt_fingerprint": row[10],
+                    "audit_metadata": audit_metadata,
+                    "created_at": row[12],
+                    "updated_at": row[13],
                 }
             return None
 

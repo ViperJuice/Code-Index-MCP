@@ -875,8 +875,14 @@ async def handle_reindex(
             "semantic_indexed": stats.get("semantic_indexed"),
             "semantic_failed": stats.get("semantic_failed"),
             "semantic_skipped": stats.get("semantic_skipped"),
+            "semantic_blocked": stats.get("semantic_blocked"),
+            "semantic_stage": stats.get("semantic_stage"),
+            "summaries_written": stats.get("summaries_written"),
+            "summary_chunks_attempted": stats.get("summary_chunks_attempted"),
+            "summary_missing_chunks": stats.get("summary_missing_chunks"),
             "total_embedding_units": stats.get("total_embedding_units"),
             "semantic_error": stats.get("semantic_error"),
+            "semantic_blocker": stats.get("semantic_blocker"),
             "semantic_paths_queued": stats.get("semantic_paths_queued"),
             "semantic_indexer_present": stats.get("semantic_indexer_present"),
             "merge_note": (
@@ -962,21 +968,25 @@ async def handle_write_summaries(
         qdrant_client=None,
         session=current_session,
         client_name=client_name,
-        summarization_config=_settings.get_profile_summarization_config(
-            _settings.semantic_default_profile
-        ),
+        summarization_config={
+            **_settings.get_profile_summarization_config(_settings.semantic_default_profile),
+            "profile_id": _settings.semantic_default_profile,
+        },
     )
-    chunks_written = await writer.process_all(limit=limit_arg)
+    summary_result = await writer.process_scope(limit=limit_arg)
 
     return [
         types.TextContent(
             type="text",
             text=_ensure_response(
                 {
-                    "chunks_summarized": chunks_written,
+                    "chunks_summarized": summary_result.summaries_written,
                     "limit": limit_arg,
                     "model_used": model_used,
                     "persisted": True,
+                    "semantic_vectors_written": False,
+                    "summary_chunks_attempted": summary_result.chunks_attempted,
+                    "summary_missing_chunks": len(summary_result.missing_chunk_ids),
                 }
             ),
         )
