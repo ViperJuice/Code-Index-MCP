@@ -796,9 +796,14 @@ class FileBatchSummarizer(ChunkWriter):
             )
 
         try:
-            summaries = await self._call_batch_api(
-                file_id, file_path, file_content, to_summarize, symbol_map
-            )
+            if self.summarization_config.get("base_url"):
+                summaries = await self._call_profile_batch_api(
+                    file_id, file_path, file_content, to_summarize, symbol_map
+                )
+            else:
+                summaries = await self._call_batch_api(
+                    file_id, file_path, file_content, to_summarize, symbol_map
+                )
             missing_chunk_ids: List[str] = []
         except FileTooLargeError as exc:
             recovery = await self._recover_with_profile_or_topological(

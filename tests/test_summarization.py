@@ -261,7 +261,7 @@ async def test_file_batch_summarizer_reports_missing_chunks_without_claiming_suc
     async def _fake_batch_api(*_args, **_kwargs):
         return [SimpleNamespace(chunk_id="chunk-1", summary="Only one summary")]
 
-    summarizer._call_batch_api = _fake_batch_api  # type: ignore[method-assign]
+    summarizer._call_profile_batch_api = _fake_batch_api  # type: ignore[method-assign]
     result = await summarizer.summarize_file_chunks(
         file_id=file_id,
         file_path=str(tmp_path / "sample.py"),
@@ -550,6 +550,66 @@ async def test_file_batch_summarizer_preserves_authoritative_metadata_on_batch_r
         stored["audit_metadata"]["effective_model_name"]
         == "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
     )
+
+
+@pytest.mark.asyncio
+async def test_file_batch_summarizer_prefers_profile_batch_path_when_base_url_is_configured(
+    tmp_path, monkeypatch
+):
+    db_path = tmp_path / "summaries.db"
+    store, file_id = _seed_chunk_summary_tables(db_path, tmp_path)
+    profile_id = get_settings().get_semantic_default_profile()
+    summarizer = FileBatchSummarizer(
+        db_path=str(db_path),
+        qdrant_client=None,
+        summarization_config={
+            **get_settings().get_profile_summarization_config(profile_id),
+            "profile_id": profile_id,
+        },
+    )
+    summarizer._profile_model_resolution = EnrichmentModelResolution(
+        configured_model="chat",
+        effective_model="cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit",
+        resolution_strategy="single_served_model_for_chat_alias",
+        available_models=["cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"],
+        models_probe_verified=True,
+    )
+
+    async def _should_not_call_baml_batch(*_args, **_kwargs):
+        raise AssertionError("configured profile batch path should bypass the BAML batch path")
+
+    async def _fake_profile_batch(*_args, **_kwargs):
+        return [SimpleNamespace(chunk_id="chunk-1", summary="Recovered authoritative summary")]
+
+    monkeypatch.setenv("OPENAI_API_KEY", "dummy-local-key")
+    summarizer._call_batch_api = _should_not_call_baml_batch  # type: ignore[method-assign]
+    summarizer._call_profile_batch_api = _fake_profile_batch  # type: ignore[method-assign]
+    result = await summarizer.summarize_file_chunks(
+        file_id=file_id,
+        file_path=str(tmp_path / "sample.py"),
+        file_content="def alpha():\n    return 1\n",
+        chunks=[
+            {
+                "chunk_id": "chunk-1",
+                "line_start": 1,
+                "line_end": 2,
+                "node_type": "function_definition",
+                "language": "python",
+                "symbol_id": None,
+            }
+        ],
+        symbol_map={},
+        persist=True,
+    )
+
+    stored = store.get_chunk_summary("chunk-1")
+    assert result.summaries_written == 1
+    assert result.authoritative_chunks == 1
+    assert result.missing_chunk_ids == []
+    assert stored is not None
+    assert stored["summary_text"] == "Recovered authoritative summary"
+    assert stored["provider_name"] == "openai_compatible"
+    assert stored["profile_id"] == profile_id
 
 
 @pytest.mark.asyncio
