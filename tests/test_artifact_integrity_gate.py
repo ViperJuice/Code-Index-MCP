@@ -24,6 +24,12 @@ def _configured_profiles() -> dict:
             "normalization_policy": "l2",
             "chunk_schema_version": "1",
             "chunker_version": "treesitter-v2",
+            "build_metadata": {
+                "collection_name": "code_index__oss_high__v1",
+                "enrichment_model": "chat",
+                "enrichment_base_url": "http://ai:8002/v1",
+                "prompt_template": "Summarize this chunk.",
+            },
         },
         "commercial_high": {
             "provider": "voyage",
@@ -34,6 +40,12 @@ def _configured_profiles() -> dict:
             "normalization_policy": "provider-default",
             "chunk_schema_version": "1",
             "chunker_version": "treesitter-v2",
+            "build_metadata": {
+                "collection_name": "code_index__commercial_high__v1",
+                "enrichment_model": "gpt-5.4-mini",
+                "enrichment_base_url": "https://api.openai.com/v1",
+                "prompt_template": "Summarize this chunk.",
+            },
         },
     }
 

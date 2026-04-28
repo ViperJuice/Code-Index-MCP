@@ -23,6 +23,10 @@ EXPECTED_KEYS = {
     "ready",
     "readiness_code",
     "remediation",
+    "semantic_readiness",
+    "semantic_ready",
+    "semantic_readiness_code",
+    "semantic_remediation",
     "rollout_status",
     "rollout_remediation",
     "query_status",
@@ -52,6 +56,8 @@ class TestBuildHealthRow:
         assert row["staleness_reason"] is None
         assert row["readiness"] == "ready"
         assert row["ready"] is True
+        assert row["semantic_readiness"] == "enrichment_unavailable"
+        assert row["semantic_ready"] is False
         assert row["rollout_status"] == "local_only"
         assert row["query_status"] == "ready"
         assert row["index_path_exists"] is True

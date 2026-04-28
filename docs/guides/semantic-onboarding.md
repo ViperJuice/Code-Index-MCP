@@ -1,4 +1,23 @@
-# Semantic Onboarding (Docker-First)
+# Semantic Onboarding
+
+Semantic search readiness is stricter than ordinary indexed search readiness.
+A repository can be lexically ready for `search_code` and `symbol_lookup` while
+still being semantically not ready. Semantic readiness is fail-closed and is
+reported separately from lexical readiness.
+
+Semantic readiness requires all of the following durable local evidence for the
+active semantic profile:
+
+- `code_chunks` exist for the indexed repository.
+- `chunk_summaries` exist for those chunks.
+- `semantic_points` link those chunks to vectors for the active profile.
+- the stored vector metadata matches the current profile fingerprint, vector
+  dimension, and collection identity.
+
+When any of those checks fail, semantic readiness reports a specific not-ready
+state such as `summaries_missing`, `vectors_missing`,
+`vector_dimension_mismatch`, `profile_mismatch`, or `semantic_stale`. Lexical
+readiness does not imply semantic readiness.
 
 This guide shows how to set up semantic search for Code-Index-MCP with:
 
@@ -62,6 +81,15 @@ python scripts/cli/mcp_cli.py setup semantic --profile commercial_high
 curl http://localhost:6333/collections
 curl http://ai:8001/v1/models   # oss_high vLLM (adjust hostname to your setup)
 ```
+
+## Readiness Notes
+
+- `get_status` exposes lexical readiness separately from semantic readiness.
+- `search_code(semantic=true)` refuses with semantic readiness metadata when
+  summaries, vectors, or profile compatibility are missing.
+- Semantic search remains experimental and provider-aware; do not treat a
+  lexically ready repository as semantically query-ready unless the semantic
+  readiness surface reports `ready`.
 
 ## Troubleshooting
 

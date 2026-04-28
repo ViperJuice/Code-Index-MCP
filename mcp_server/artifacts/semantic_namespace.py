@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from urllib.parse import urlsplit
 from typing import Optional
 
 
@@ -53,3 +54,27 @@ class SemanticNamespaceResolver:
         profile_segment = self.sanitize_profile_id(profile_id)
         lineage_segment = self.sanitize_profile_id(lineage_id)
         return f"ci__{repo_hash}__{profile_segment}__{lineage_segment}"
+
+    def normalize_collection_name(self, collection_name: Optional[str]) -> Optional[str]:
+        """Normalize collection identity for deterministic comparisons."""
+        if not isinstance(collection_name, str):
+            return None
+        normalized = collection_name.strip().lower()
+        return normalized or None
+
+    def normalize_endpoint_identity(self, endpoint: Optional[str]) -> Optional[str]:
+        """Normalize endpoint identity without probing network state."""
+        if not isinstance(endpoint, str):
+            return None
+        raw = endpoint.strip()
+        if not raw:
+            return None
+        parsed = urlsplit(raw)
+        scheme = parsed.scheme.lower() if parsed.scheme else "http"
+        hostname = (parsed.hostname or "").lower()
+        if not hostname:
+            return raw.rstrip("/") or None
+        default_port = 443 if scheme == "https" else 80 if scheme == "http" else None
+        port = f":{parsed.port}" if parsed.port and parsed.port != default_port else ""
+        path = parsed.path.rstrip("/")
+        return f"{scheme}://{hostname}{port}{path}"

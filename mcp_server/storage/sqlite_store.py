@@ -2295,6 +2295,81 @@ class SQLiteStore:
                 for row in cursor.fetchall()
             ]
 
+    def get_semantic_readiness_evidence(
+        self,
+        profile_id: str,
+        *,
+        collection: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Summarize durable semantic evidence without mutating the store."""
+        with self._get_connection() as conn:
+            total_chunks = int(conn.execute("SELECT COUNT(*) FROM code_chunks").fetchone()[0])
+            summary_count = int(
+                conn.execute("SELECT COUNT(DISTINCT chunk_hash) FROM chunk_summaries").fetchone()[0]
+            )
+            missing_summaries = int(
+                conn.execute(
+                    """SELECT COUNT(*)
+                       FROM code_chunks c
+                       LEFT JOIN chunk_summaries cs ON c.chunk_id = cs.chunk_hash
+                       WHERE cs.chunk_hash IS NULL"""
+                ).fetchone()[0]
+            )
+
+            vector_link_count = int(
+                conn.execute(
+                    """SELECT COUNT(DISTINCT chunk_id)
+                       FROM semantic_points
+                       WHERE profile_id = ?""",
+                    (profile_id,),
+                ).fetchone()[0]
+            )
+            missing_vectors = int(
+                conn.execute(
+                    """SELECT COUNT(*)
+                       FROM code_chunks c
+                       LEFT JOIN semantic_points sp
+                         ON c.chunk_id = sp.chunk_id
+                        AND sp.profile_id = ?
+                       WHERE sp.chunk_id IS NULL""",
+                    (profile_id,),
+                ).fetchone()[0]
+            )
+
+            matching_collection_links = vector_link_count
+            collection_mismatches = 0
+            if collection is not None:
+                matching_collection_links = int(
+                    conn.execute(
+                        """SELECT COUNT(DISTINCT chunk_id)
+                           FROM semantic_points
+                           WHERE profile_id = ?
+                             AND collection = ?""",
+                        (profile_id, collection),
+                    ).fetchone()[0]
+                )
+                collection_mismatches = int(
+                    conn.execute(
+                        """SELECT COUNT(*)
+                           FROM semantic_points
+                           WHERE profile_id = ?
+                             AND collection != ?""",
+                        (profile_id, collection),
+                    ).fetchone()[0]
+                )
+
+            return {
+                "profile_id": profile_id,
+                "collection": collection,
+                "total_chunks": total_chunks,
+                "summary_count": summary_count,
+                "missing_summaries": missing_summaries,
+                "vector_link_count": vector_link_count,
+                "missing_vectors": missing_vectors,
+                "matching_collection_links": matching_collection_links,
+                "collection_mismatches": collection_mismatches,
+            }
+
     def find_chunk_at_line(self, file_path: str, line: int) -> Optional[Dict[str, Any]]:
         """Return the tightest code chunk that covers *line* in *file_path*.
 

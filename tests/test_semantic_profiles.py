@@ -14,6 +14,12 @@ def _sample_profiles():
             "normalization_policy": "provider-default",
             "chunk_schema_version": "2.0",
             "chunker_version": "treesitter-chunker@2.x",
+            "build_metadata": {
+                "collection_name": "Code_Index__Commercial_High__V1",
+                "enrichment_model": "gpt-5.4-mini",
+                "enrichment_base_url": "https://api.openai.com/v1/",
+                "prompt_template": "Summarize this chunk.",
+            },
         },
         "oss-high": {
             "provider": "sentence_transformers",
@@ -24,6 +30,12 @@ def _sample_profiles():
             "normalization_policy": "l2",
             "chunk_schema_version": "2.0",
             "chunker_version": "treesitter-chunker@2.x",
+            "build_metadata": {
+                "collection_name": "code_index__oss_high__v1",
+                "enrichment_model": "chat",
+                "enrichment_base_url": "http://ai:8002/v1",
+                "prompt_template": "Summarize this chunk.",
+            },
         },
     }
 
@@ -53,3 +65,31 @@ def test_missing_required_profile_field_raises_value_error():
         assert False, "Expected ValueError"
     except ValueError as exc:
         assert "missing required fields" in str(exc)
+
+
+def test_fingerprint_changes_when_semantic_contract_inputs_change():
+    profiles = _sample_profiles()
+    baseline = SemanticProfileRegistry.from_raw(profiles, "commercial-high")
+
+    profiles["commercial-high"]["build_metadata"]["enrichment_model"] = "gpt-5.4-nano"
+    changed = SemanticProfileRegistry.from_raw(profiles, "commercial-high")
+
+    assert (
+        baseline.get("commercial-high").compatibility_fingerprint
+        != changed.get("commercial-high").compatibility_fingerprint
+    )
+
+
+def test_collection_and_endpoint_identity_are_normalized_for_fingerprint_stability():
+    profiles = _sample_profiles()
+    registry_a = SemanticProfileRegistry.from_raw(profiles, "commercial-high")
+    profiles["commercial-high"]["build_metadata"]["collection_name"] = "code_index__commercial_high__v1"
+    profiles["commercial-high"]["build_metadata"]["enrichment_base_url"] = (
+        "https://api.openai.com:443/v1"
+    )
+    registry_b = SemanticProfileRegistry.from_raw(profiles, "commercial-high")
+
+    assert (
+        registry_a.get("commercial-high").compatibility_fingerprint
+        == registry_b.get("commercial-high").compatibility_fingerprint
+    )

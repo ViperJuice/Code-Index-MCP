@@ -7,6 +7,8 @@ from mcp_server.health.repository_readiness import (
     ReadinessClassifier,
     RepositoryReadiness,
     RepositoryReadinessState,
+    SemanticReadiness,
+    SemanticReadinessState,
 )
 from mcp_server.storage.multi_repo_manager import RepositoryInfo
 
@@ -89,9 +91,15 @@ def build_health_row(
     repo_info: RepositoryInfo,
     readiness: Optional[RepositoryReadiness] = None,
     features: Optional[dict] = None,
+    semantic_readiness: Optional[SemanticReadiness] = None,
 ) -> dict:
     if readiness is None:
         readiness = ReadinessClassifier.classify_registered(repo_info)
+    if semantic_readiness is None:
+        semantic_readiness = SemanticReadiness(
+            state=SemanticReadinessState.ENRICHMENT_UNAVAILABLE,
+            remediation="Semantic readiness is unavailable for this status surface.",
+        )
 
     index_path_exists = bool(repo_info.index_path) and Path(repo_info.index_path).exists()
     git_dir_exists = bool(repo_info.git_common_dir) and Path(repo_info.git_common_dir).exists()
@@ -105,6 +113,27 @@ def build_health_row(
     rollout_status = _classify_rollout_status(readiness, artifact_health, staleness)
     rollout_remediation = _rollout_remediation(rollout_status, readiness)
     query_status = "ready" if readiness.ready else "index_unavailable"
+    base_features = features or {
+        "lexical": {"status": "available" if readiness.ready else "unavailable"},
+        "semantic": {"status": "unavailable", "reason": "runtime_status_unavailable"},
+        "graph": {"status": "unavailable", "reason": "runtime_status_unavailable"},
+        "plugins": {"status": "unavailable", "reason": "runtime_status_unavailable"},
+        "cross_repo": {"status": "unavailable", "reason": "runtime_status_unavailable"},
+    }
+    semantic_feature = dict(base_features.get("semantic") or {})
+    runtime_status = semantic_feature.get("status")
+    runtime_reason = semantic_feature.get("reason")
+    semantic_feature.update(
+        {
+            "status": "available" if semantic_readiness.ready else "unavailable",
+            "reason": semantic_readiness.code or runtime_reason,
+            "runtime_status": runtime_status,
+            "runtime_reason": runtime_reason,
+            "readiness": semantic_readiness.to_dict(),
+        }
+    )
+    base_features["semantic"] = semantic_feature
+
     return {
         "repo_id": repo_info.repository_id,
         "tracked_branch": repo_info.tracked_branch,
@@ -117,6 +146,10 @@ def build_health_row(
         "ready": readiness.ready,
         "readiness_code": readiness.code,
         "remediation": readiness.remediation,
+        "semantic_readiness": semantic_readiness.state.value,
+        "semantic_ready": semantic_readiness.ready,
+        "semantic_readiness_code": semantic_readiness.code,
+        "semantic_remediation": semantic_readiness.remediation,
         "rollout_status": rollout_status,
         "rollout_remediation": rollout_remediation,
         "query_status": query_status,
@@ -125,12 +158,5 @@ def build_health_row(
             if readiness.ready
             else 'Use native search or follow the readiness remediation; query tools stay fail-closed with safe_fallback: "native_search".'
         ),
-        "features": features
-        or {
-            "lexical": {"status": "available" if readiness.ready else "unavailable"},
-            "semantic": {"status": "unavailable", "reason": "runtime_status_unavailable"},
-            "graph": {"status": "unavailable", "reason": "runtime_status_unavailable"},
-            "plugins": {"status": "unavailable", "reason": "runtime_status_unavailable"},
-            "cross_repo": {"status": "unavailable", "reason": "runtime_status_unavailable"},
-        },
+        "features": base_features,
     }

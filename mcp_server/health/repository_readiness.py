@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import subprocess
 from dataclasses import dataclass
@@ -21,6 +22,16 @@ class RepositoryReadinessState(str, Enum):
     WRONG_BRANCH = "wrong_branch"
     INDEX_BUILDING = "index_building"
     UNSUPPORTED_WORKTREE = "unsupported_worktree"
+
+
+class SemanticReadinessState(str, Enum):
+    READY = "ready"
+    ENRICHMENT_UNAVAILABLE = "enrichment_unavailable"
+    SUMMARIES_MISSING = "summaries_missing"
+    VECTORS_MISSING = "vectors_missing"
+    VECTOR_DIMENSION_MISMATCH = "vector_dimension_mismatch"
+    PROFILE_MISMATCH = "profile_mismatch"
+    SEMANTIC_STALE = "semantic_stale"
 
 
 @dataclass(frozen=True)
@@ -60,6 +71,44 @@ class RepositoryReadiness:
             "last_indexed_commit": self.last_indexed_commit,
             "index_path": self.index_path,
             "remediation": self.remediation,
+        }
+
+
+@dataclass(frozen=True)
+class SemanticReadiness:
+    state: SemanticReadinessState
+    profile_id: Optional[str] = None
+    compatibility_fingerprint: Optional[str] = None
+    discovered_fingerprint: Optional[str] = None
+    collection_name: Optional[str] = None
+    discovered_collection_name: Optional[str] = None
+    vector_dimension: Optional[int] = None
+    discovered_vector_dimension: Optional[int] = None
+    remediation: Optional[str] = None
+    evidence: Optional[dict[str, Any]] = None
+
+    @property
+    def ready(self) -> bool:
+        return self.state == SemanticReadinessState.READY
+
+    @property
+    def code(self) -> Optional[str]:
+        return None if self.ready else self.state.value
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "state": self.state.value,
+            "ready": self.ready,
+            "code": self.code,
+            "profile_id": self.profile_id,
+            "compatibility_fingerprint": self.compatibility_fingerprint,
+            "discovered_fingerprint": self.discovered_fingerprint,
+            "collection_name": self.collection_name,
+            "discovered_collection_name": self.discovered_collection_name,
+            "vector_dimension": self.vector_dimension,
+            "discovered_vector_dimension": self.discovered_vector_dimension,
+            "remediation": self.remediation,
+            "evidence": self.evidence,
         }
 
 
@@ -154,6 +203,123 @@ class ReadinessClassifier:
             repo_info,
             requested_path=requested_path,
             indexing_active=indexing_active,
+        )
+
+    @classmethod
+    def classify_semantic_registered(
+        cls,
+        repo_info: Any,
+        sqlite_store: Any,
+    ) -> SemanticReadiness:
+        profile = _current_semantic_profile()
+        if profile is None:
+            return SemanticReadiness(
+                state=SemanticReadinessState.ENRICHMENT_UNAVAILABLE,
+                remediation="Configure a semantic profile before treating semantic search as ready.",
+            )
+
+        metadata = _load_index_metadata(Path(repo_info.path))
+        expected_collection = _profile_collection_name(profile)
+        evidence = _semantic_evidence(sqlite_store, profile.profile_id, expected_collection)
+        metadata_profile = _current_profile_metadata(metadata, profile.profile_id)
+        discovered_fingerprint = _metadata_fingerprint(metadata_profile)
+        discovered_collection = _metadata_string(metadata_profile, "collection_name")
+        discovered_dimension = _metadata_int(metadata_profile, "model_dimension")
+        remediation = (
+            "Run semantic summary/vector generation for the current profile before semantic queries."
+        )
+
+        if evidence is None:
+            return SemanticReadiness(
+                state=SemanticReadinessState.ENRICHMENT_UNAVAILABLE,
+                profile_id=profile.profile_id,
+                compatibility_fingerprint=profile.compatibility_fingerprint,
+                collection_name=expected_collection,
+                vector_dimension=profile.vector_dimension,
+                remediation="Semantic evidence tables are unavailable; repair the local index store.",
+            )
+
+        if int(evidence["missing_summaries"]) > 0:
+            return SemanticReadiness(
+                state=SemanticReadinessState.SUMMARIES_MISSING,
+                profile_id=profile.profile_id,
+                compatibility_fingerprint=profile.compatibility_fingerprint,
+                collection_name=expected_collection,
+                vector_dimension=profile.vector_dimension,
+                remediation=remediation,
+                evidence=evidence,
+            )
+
+        if int(evidence["missing_vectors"]) > 0 or int(evidence["vector_link_count"]) == 0:
+            return SemanticReadiness(
+                state=SemanticReadinessState.VECTORS_MISSING,
+                profile_id=profile.profile_id,
+                compatibility_fingerprint=profile.compatibility_fingerprint,
+                collection_name=expected_collection,
+                vector_dimension=profile.vector_dimension,
+                remediation=remediation,
+                evidence=evidence,
+            )
+
+        if discovered_dimension is not None and discovered_dimension != profile.vector_dimension:
+            return SemanticReadiness(
+                state=SemanticReadinessState.VECTOR_DIMENSION_MISMATCH,
+                profile_id=profile.profile_id,
+                compatibility_fingerprint=profile.compatibility_fingerprint,
+                discovered_fingerprint=discovered_fingerprint,
+                collection_name=expected_collection,
+                discovered_collection_name=discovered_collection,
+                vector_dimension=profile.vector_dimension,
+                discovered_vector_dimension=discovered_dimension,
+                remediation="Rebuild semantic vectors with the current embedding dimension.",
+                evidence=evidence,
+            )
+
+        if (
+            expected_collection
+            and discovered_collection
+            and expected_collection != discovered_collection
+        ) or int(evidence["collection_mismatches"]) > 0:
+            return SemanticReadiness(
+                state=SemanticReadinessState.PROFILE_MISMATCH,
+                profile_id=profile.profile_id,
+                compatibility_fingerprint=profile.compatibility_fingerprint,
+                discovered_fingerprint=discovered_fingerprint,
+                collection_name=expected_collection,
+                discovered_collection_name=discovered_collection,
+                vector_dimension=profile.vector_dimension,
+                discovered_vector_dimension=discovered_dimension,
+                remediation="Rebuild semantic vectors so the current profile and collection agree.",
+                evidence=evidence,
+            )
+
+        if metadata_profile is None or (
+            discovered_fingerprint
+            and discovered_fingerprint != profile.compatibility_fingerprint
+        ):
+            return SemanticReadiness(
+                state=SemanticReadinessState.SEMANTIC_STALE,
+                profile_id=profile.profile_id,
+                compatibility_fingerprint=profile.compatibility_fingerprint,
+                discovered_fingerprint=discovered_fingerprint,
+                collection_name=expected_collection,
+                discovered_collection_name=discovered_collection,
+                vector_dimension=profile.vector_dimension,
+                discovered_vector_dimension=discovered_dimension,
+                remediation="Semantic summaries/vectors are stale for the current profile; rebuild them.",
+                evidence=evidence,
+            )
+
+        return SemanticReadiness(
+            state=SemanticReadinessState.READY,
+            profile_id=profile.profile_id,
+            compatibility_fingerprint=profile.compatibility_fingerprint,
+            discovered_fingerprint=discovered_fingerprint,
+            collection_name=expected_collection,
+            discovered_collection_name=discovered_collection,
+            vector_dimension=profile.vector_dimension,
+            discovered_vector_dimension=discovered_dimension,
+            evidence=evidence,
         )
 
     @classmethod
@@ -255,3 +421,97 @@ def _run_git(args: list[str], cwd: Path) -> Optional[str]:
         return value if value and value != "HEAD" else None
     except (FileNotFoundError, subprocess.CalledProcessError):
         return None
+
+
+def _current_semantic_profile() -> Any:
+    try:
+        from mcp_server.config.settings import get_settings
+        from mcp_server.artifacts.semantic_profiles import SemanticProfileRegistry
+
+        settings = get_settings()
+        if not settings.semantic_search_enabled:
+            return None
+
+        registry = SemanticProfileRegistry.from_raw(
+            settings.get_semantic_profiles_config(),
+            settings.get_semantic_default_profile(),
+            tool_version=settings.app_version,
+        )
+        return registry.get()
+    except Exception:
+        return None
+
+
+def _load_index_metadata(repo_root: Path) -> dict[str, Any]:
+    metadata_path = repo_root / ".index_metadata.json"
+    if not metadata_path.exists():
+        return {}
+    try:
+        return json.loads(metadata_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _semantic_evidence(
+    sqlite_store: Any,
+    profile_id: str,
+    expected_collection: Optional[str],
+) -> Optional[dict[str, Any]]:
+    getter = getattr(sqlite_store, "get_semantic_readiness_evidence", None)
+    if not callable(getter):
+        return None
+    try:
+        result = getter(profile_id, collection=expected_collection)
+        return result if isinstance(result, dict) else None
+    except Exception:
+        return None
+
+
+def _current_profile_metadata(metadata: dict[str, Any], profile_id: str) -> Optional[dict[str, Any]]:
+    try:
+        from mcp_server.artifacts.semantic_profiles import get_primary_semantic_profile_metadata
+    except Exception:
+        return None
+
+    discovered_profile_id, payload = get_primary_semantic_profile_metadata(metadata)
+    if payload is None:
+        return None
+    if discovered_profile_id == profile_id:
+        return payload
+
+    semantic_profiles = metadata.get("semantic_profiles")
+    if isinstance(semantic_profiles, dict):
+        candidate = semantic_profiles.get(profile_id)
+        if isinstance(candidate, dict):
+            return candidate
+    return None
+
+
+def _profile_collection_name(profile: Any) -> Optional[str]:
+    metadata = getattr(profile, "build_metadata", None) or {}
+    value = metadata.get("collection_name")
+    return str(value).strip() if isinstance(value, str) and value.strip() else None
+
+
+def _metadata_string(metadata: Optional[dict[str, Any]], key: str) -> Optional[str]:
+    if not metadata:
+        return None
+    value = metadata.get(key)
+    return str(value).strip() if isinstance(value, str) and value.strip() else None
+
+
+def _metadata_int(metadata: Optional[dict[str, Any]], key: str) -> Optional[int]:
+    if not metadata:
+        return None
+    value = metadata.get(key)
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _metadata_fingerprint(metadata: Optional[dict[str, Any]]) -> Optional[str]:
+    if not metadata:
+        return None
+    raw = metadata.get("compatibility_fingerprint") or metadata.get("compatibility_hash")
+    return str(raw).strip() if isinstance(raw, str) and raw.strip() else None

@@ -21,6 +21,7 @@ from mcp_server.core.repo_context import RepoContext
 from mcp_server.core.repo_resolver import RepoResolver
 from mcp_server.dispatcher.protocol import DispatcherProtocol
 from mcp_server.health.repository_readiness import (
+    ReadinessClassifier,
     RepositoryReadiness,
     RepositoryReadinessState,
 )
@@ -181,6 +182,22 @@ def _secondary_readiness_refusal_response(
         response["mutation_performed"] = False
     else:
         response["persisted"] = False
+    return [types.TextContent(type="text", text=_ensure_response(response))]
+
+
+def _semantic_not_ready_response(
+    semantic_readiness: Any,
+    *,
+    query: str,
+) -> list[types.TextContent]:
+    response = {
+        "results": [],
+        "code": "semantic_not_ready",
+        "query": query,
+        "semantic_readiness": semantic_readiness.to_dict(),
+        "message": "Semantic search requested, but enriched semantic vectors are not ready.",
+        "remediation": semantic_readiness.remediation,
+    }
     return [types.TextContent(type="text", text=_ensure_response(response))]
 
 
@@ -376,6 +393,13 @@ async def handle_search_code(
 
     # Resolve ctx via RepoResolver (replaces old multi-repo bypass)
     ctx = _resolve_ctx(repo_resolver, repository)
+    if semantic and ctx is not None:
+        semantic_readiness = ReadinessClassifier.classify_semantic_registered(
+            ctx.registry_entry,
+            ctx.sqlite_store,
+        )
+        if not semantic_readiness.ready:
+            return _semantic_not_ready_response(semantic_readiness, query=query)
 
     try:
         if ctx is not None:
@@ -509,14 +533,25 @@ def _build_repositories(repo_resolver: Any, dispatcher: Any = None) -> list:
     rows = []
     for info in all_repos.values():
         features = None
+        semantic_readiness = None
         if dispatcher is not None and hasattr(dispatcher, "get_runtime_feature_status"):
             try:
                 ctx = repo_resolver.resolve(info.path)
                 if ctx is not None:
                     features = dispatcher.get_runtime_feature_status(ctx)
+                    semantic_readiness = ReadinessClassifier.classify_semantic_registered(
+                        ctx.registry_entry,
+                        ctx.sqlite_store,
+                    )
             except Exception:
                 features = None
-        rows.append(build_health_row(info, features=features))
+        rows.append(
+            build_health_row(
+                info,
+                features=features,
+                semantic_readiness=semantic_readiness,
+            )
+        )
     return rows
 
 
