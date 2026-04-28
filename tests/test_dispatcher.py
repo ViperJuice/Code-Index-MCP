@@ -1847,6 +1847,85 @@ class TestEnhancedDispatcherProtocolConformance:
         assert result["summary_continuation_required"] is True
         assert "8 bounded summary passes" in result["semantic_error"]
 
+    def test_index_directory_prefers_writer_reported_remaining_for_repo_scope_continuation(
+        self, tmp_path, monkeypatch
+    ):
+        ctx = _make_repo_ctx(sqlite_store=MagicMock(db_path=str(tmp_path / "index.db")))
+        first = tmp_path / "sample_a.md"
+        second = tmp_path / "sample_b.md"
+        first.write_text("doc\n")
+        second.write_text("doc\n")
+
+        class FakeWriter:
+            call_count = 0
+
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def process_scope(self, **kwargs):
+                FakeWriter.call_count += 1
+                assert kwargs["max_batches"] == 1
+                return SimpleNamespace(
+                    summaries_written=1,
+                    chunks_attempted=1,
+                    authoritative_chunks=1,
+                    missing_chunk_ids=[f"chunk-{FakeWriter.call_count}"],
+                    files_attempted=1,
+                    files_summarized=1,
+                    remaining_chunks=9 - FakeWriter.call_count,
+                    scope_drained=False,
+                )
+
+        semantic_called = {"value": False}
+
+        class FakeSemanticIndexer:
+            def index_files_batch(self, paths, **kwargs):
+                semantic_called["value"] = True
+                return {"files_indexed": 2, "files_failed": 0, "files_skipped": 0}
+
+        fallback_counts = [99] * 8
+
+        monkeypatch.setattr(
+            "mcp_server.indexing.summarization.ComprehensiveChunkWriter",
+            FakeWriter,
+        )
+        monkeypatch.setattr(
+            "mcp_server.setup.semantic_preflight.run_semantic_preflight",
+            lambda **_kwargs: SimpleNamespace(
+                to_dict=lambda: {"can_write_semantic_vectors": True, "blocker": None}
+            ),
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "_get_semantic_indexer",
+            lambda self, _ctx: FakeSemanticIndexer(),
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "_count_missing_summaries_for_paths",
+            lambda self, _ctx, _paths: fallback_counts.pop(0),
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "index_file",
+            lambda self, _ctx, path, do_semantic=False: IndexResult(
+                status=IndexResultStatus.INDEXED,
+                path=path,
+                observed_hash=None,
+                actual_hash=None,
+            ),
+        )
+
+        result = Dispatcher([]).index_directory(ctx, tmp_path)
+
+        assert semantic_called["value"] is False
+        assert result["semantic_stage"] == "blocked_missing_summaries"
+        assert result["summary_passes"] == 8
+        assert result["summary_remaining_chunks"] == 1
+        assert result["summary_missing_chunks"] == 1
+        assert result["summary_scope_drained"] is False
+        assert result["summary_continuation_required"] is True
+
     def test_index_directory_bootstraps_missing_collection_before_semantic_writes(
         self, tmp_path, monkeypatch
     ):

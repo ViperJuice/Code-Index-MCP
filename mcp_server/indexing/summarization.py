@@ -39,6 +39,8 @@ _DOC_FILE_CONTEXT_CHARS = 8_000
 _DOC_CONTEXT_LANGUAGES = {"markdown", "plaintext", "text", "rst"}
 _DOC_PROCESS_SCOPE_CHUNK_LIMIT = 16
 _REPO_SCOPE_DOC_PROCESS_SCOPE_CHUNK_LIMIT = 4
+_REPO_SCOPE_DOC_FILE_CHUNK_WINDOW = 1
+_REPO_SCOPE_FILE_LIMIT = 1
 _DOC_TOPOLOGICAL_RECOVERY_CHUNK_LIMIT = 4
 
 # Files larger than this (in characters) skip the single-batch API call and fall back
@@ -807,6 +809,7 @@ class FileBatchSummarizer(ChunkWriter):
         chunks: List[Dict],
         symbol_map: Optional[Dict[int, str]] = None,
         persist: bool = True,
+        max_chunks: Optional[int] = None,
     ) -> SummaryGenerationResult:
         """Summarize all chunks of a file, preferring the batch API path.
 
@@ -840,15 +843,17 @@ class FileBatchSummarizer(ChunkWriter):
                 files_attempted=1,
                 files_summarized=0,
             )
+        active_chunks = to_summarize[:max_chunks] if max_chunks is not None else to_summarize
+        existing_authoritative = len(chunks) - len(to_summarize)
 
         try:
             if self.summarization_config.get("base_url"):
                 summaries = await self._call_profile_batch_api(
-                    file_id, file_path, file_content, to_summarize, symbol_map
+                    file_id, file_path, file_content, active_chunks, symbol_map
                 )
             else:
                 summaries = await self._call_batch_api(
-                    file_id, file_path, file_content, to_summarize, symbol_map
+                    file_id, file_path, file_content, active_chunks, symbol_map
                 )
             missing_chunk_ids: List[str] = []
         except FileTooLargeError as exc:
@@ -856,7 +861,7 @@ class FileBatchSummarizer(ChunkWriter):
                 file_id=file_id,
                 file_path=file_path,
                 file_content=file_content,
-                chunks=to_summarize,
+                chunks=active_chunks,
                 symbol_map=symbol_map,
                 warning_prefix="Large-file fallback",
                 error=exc,
@@ -871,7 +876,7 @@ class FileBatchSummarizer(ChunkWriter):
                 file_id=file_id,
                 file_path=file_path,
                 file_content=file_content,
-                chunks=to_summarize,
+                chunks=active_chunks,
                 symbol_map=symbol_map,
                 warning_prefix="Batch API failed",
                 error=exc,
@@ -884,7 +889,7 @@ class FileBatchSummarizer(ChunkWriter):
 
         if persist and summaries:
             model_name = self._get_model_name()
-            chunk_lookup = {c["chunk_id"]: c for c in to_summarize}
+            chunk_lookup = {c["chunk_id"]: c for c in active_chunks}
             for s in summaries:
                 c = chunk_lookup.get(s.chunk_id)
                 if c is None:
@@ -911,12 +916,14 @@ class FileBatchSummarizer(ChunkWriter):
             c["chunk_id"] for c in to_summarize if c["chunk_id"] not in summarized_chunk_ids
         ]
         return SummaryGenerationResult(
-            chunks_attempted=len(to_summarize),
+            chunks_attempted=len(active_chunks),
             summaries_written=len(summaries),
-            authoritative_chunks=len(summaries) + len(chunks) - len(to_summarize),
+            authoritative_chunks=existing_authoritative + len(summaries),
             missing_chunk_ids=missing_chunk_ids,
             files_attempted=1,
             files_summarized=1 if summaries else 0,
+            remaining_chunks=len(missing_chunk_ids),
+            scope_drained=len(missing_chunk_ids) == 0,
         )
 
 
@@ -996,6 +1003,14 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
             return min(limit, _DOC_PROCESS_SCOPE_CHUNK_LIMIT)
         return limit
 
+    def _file_chunk_window_for_language(
+        self, language: str, *, repo_scope: bool = False
+    ) -> Optional[int]:
+        normalized_language = (language or "").lower()
+        if repo_scope and normalized_language in _DOC_CONTEXT_LANGUAGES:
+            return _REPO_SCOPE_DOC_FILE_CHUNK_WINDOW
+        return None
+
     async def process_scope(
         self,
         *,
@@ -1033,6 +1048,7 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
             file_meta: Dict[int, tuple] = {}  # file_id -> (file_path, language)
             file_chunks: Dict[int, List[Dict]] = {}
             file_symbol_maps: Dict[int, Dict[int, str]] = {}
+            max_files = _REPO_SCOPE_FILE_LIMIT if repo_scope else None
 
             for row in rows:
                 (
@@ -1050,6 +1066,8 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
                 ) = row
 
                 if file_id not in file_meta:
+                    if max_files is not None and len(file_meta) >= max_files:
+                        continue
                     file_meta[file_id] = (file_path, language or "unknown")
                     file_chunks[file_id] = []
                     file_symbol_maps[file_id] = {}
@@ -1086,6 +1104,11 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
             pass_summaries_written = 0
 
             for file_id, (file_path, _) in file_meta.items():
+                file_language = (file_meta[file_id][1] or "unknown") if file_id in file_meta else "unknown"
+                file_chunk_window = self._file_chunk_window_for_language(
+                    file_language,
+                    repo_scope=repo_scope,
+                )
                 try:
                     with open(file_path, encoding="utf-8", errors="replace") as fh:
                         file_content = fh.read()
@@ -1100,6 +1123,7 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
                         chunks=file_chunks[file_id],
                         symbol_map=file_symbol_maps[file_id],
                         persist=True,
+                        max_chunks=file_chunk_window,
                     )
                     pass_summaries_written += file_result.summaries_written
                     total_summaries_written += file_result.summaries_written

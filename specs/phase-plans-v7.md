@@ -1246,6 +1246,57 @@ it can emit the bounded continuation blocker.
 **Produces**
 - IF-0-SEMPASSSTALL-1 — Repo-wide single-pass summary stall recovery contract.
 
+### Phase 23 — Single-Call Summary Timeout Recovery (SEMCALLTIME)
+
+**Objective**
+
+Repair the newly exposed single-call summary hang uncovered by SEMPASSSTALL so
+force-full rebuilds either persist at least one authoritative summary or fail
+closed with an exact timeout blocker instead of staying in flight inside the
+first summary invocation.
+
+**Exit criteria**
+- [ ] A force-full rebuild on the active repo no longer spends multiple minutes
+      inside the first repo-scope summary invocation with zero new
+      `chunk_summaries`.
+- [ ] Repo-scope summary execution applies a bounded per-call timeout or
+      equivalent cancellation path that returns an exact blocker when one
+      summary call does not complete promptly.
+- [ ] `uv run mcp-index repository status` and
+      `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` record the repaired per-call
+      behavior together with current summary/vector counts and the exact
+      follow-on blocker, if any.
+
+**Scope notes**
+
+This phase exists only if SEMPASSSTALL proves repo-scope passes are narrowed to
+one file / one doc-like chunk, but the live force-full rerun still remains in
+flight long enough that no authoritative summary is written and no bounded
+continuation verdict is returned.
+
+**Non-goals**
+
+- No semantic ranking redesign.
+- No multi-repo rollout expansion beyond this repo-local dogfood recovery.
+- No artifact publishing or GitHub Actions release work.
+
+**Key files**
+
+- `mcp_server/indexing/summarization.py`
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_summarization.py`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMPASSSTALL
+
+**Produces**
+- IF-0-SEMCALLTIME-1 — Repo-wide single-call summary timeout recovery contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -1271,6 +1322,7 @@ SEMCONTRACT
   -> SEMCLOSEOUT
   -> SEMTIMEOUT
   -> SEMPASSSTALL
+  -> SEMCALLTIME
 ```
 
 ## Execution Notes
@@ -1344,6 +1396,11 @@ SEMCONTRACT
   pass before it can emit the bounded continuation blocker; it should tighten
   per-pass doc-style chunk sizing or emit intra-pass progress so the current
   semantic-stage blocker returns promptly.
+- SEMCALLTIME exists only if SEMPASSSTALL narrows repo-scope work to one file
+  and one doc-like chunk but the live force-full rerun still remains in flight
+  inside that first summary call with zero new `chunk_summaries`; it should
+  add an exact per-call timeout/cancellation blocker instead of letting the
+  force-full sync appear hung.
 
 ## Verification
 
@@ -1406,6 +1463,12 @@ RUN_REAL_WORLD_TESTS=1 SEMANTIC_SEARCH_ENABLED=true CODE_INDEX_DOGFOOD_REPO=. OP
 
 # SEMPASSSTALL
 env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_summarization.py tests/test_dispatcher.py tests/test_git_index_manager.py -q --no-cov
+env OPENAI_API_KEY=dummy-local-key MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5 uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sqlite3 .mcp-index/current.db 'select count(*) from chunk_summaries; select count(*) from semantic_points;'
+
+# SEMCALLTIME
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_summarization.py tests/test_dispatcher.py tests/test_git_index_manager.py tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 env OPENAI_API_KEY=dummy-local-key MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5 uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
 sqlite3 .mcp-index/current.db 'select count(*) from chunk_summaries; select count(*) from semantic_points;'
