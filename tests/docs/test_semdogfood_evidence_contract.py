@@ -23,7 +23,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
 
     for expected in (
         "# Semantic Dogfood Rebuild",
-        "Phase plan: `plans/phase-plan-v7-SEMDOGFOOD.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMREADYFIX.md`",
         "## Reset Boundary",
         "## Rebuild Command",
         "## Rebuild Evidence",
@@ -44,14 +44,16 @@ def test_semdogfood_report_records_reset_boundary_counts_collection_and_verifica
         "code_index__oss_high__v1",
         "chunk_summaries",
         "semantic_points",
+        "configured enrichment model",
+        "effective enrichment model",
+        "collection_missing",
         "max rss",
         "wall time",
         "lexical readiness",
         "semantic readiness",
         "active-profile preflight",
-        "uv run pytest tests/test_repository_commands.py -q --no-cov",
-        "uv run pytest tests/test_benchmark_query_regressions.py -q --no-cov",
-        "SEMANTIC_SEARCH_ENABLED=true CODE_INDEX_DOGFOOD_REPO=. uv run pytest tests/real_world/test_semantic_search.py -q --no-cov",
+        "uv run pytest tests/test_semantic_profile_settings.py tests/test_semantic_preflight.py tests/test_summarization.py -q --no-cov",
+        "uv run mcp-index index check-semantic",
         "uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov",
     ):
         assert expected in text
@@ -69,6 +71,7 @@ def test_semdogfood_report_compares_query_modes_and_states_operator_verdict():
         "semantic_collection_name",
         "mcp_server/setup/semantic_preflight.py",
         "mcp_server/cli/repository_commands.py",
+        "semantic_not_ready",
         "local multi-repo dogfooding",
     ):
         assert expected in text
@@ -81,3 +84,5 @@ def test_semantic_onboarding_links_semdogfood_report_and_separate_readiness_surf
     assert "lexical readiness" in text
     assert "semantic readiness" in text
     assert "active-profile preflight" in text
+    assert "configured model" in text
+    assert "effective model" in text

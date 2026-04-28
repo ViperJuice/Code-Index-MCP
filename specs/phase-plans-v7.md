@@ -516,6 +516,59 @@ preflight, rebuild validation, and refreshed dogfood evidence.
 **Produces**
 - IF-0-SEMREADYFIX-1 — Default local semantic dogfood recovery contract.
 
+### Phase 9 — Collection Bootstrap and Semantic Stage Recovery (SEMCOLLECT)
+
+**Objective**
+
+Repair the remaining semantic-write bootstrap gap exposed by SEMREADYFIX so a
+clean rebuild can actually persist summaries, provision or hydrate the active
+Qdrant collection, and advance vectors for `oss_high`.
+
+**Exit criteria**
+- [ ] A clean force-full rebuild no longer stops with active-profile preflight
+      blocker `collection_missing` for the default local `oss_high` path.
+- [ ] `chunk_summaries` becomes non-zero after the rebuild and remains tied to
+      the repaired effective enrichment-model audit metadata.
+- [ ] `semantic_points` becomes non-zero and links to
+      `code_index__oss_high__v1`.
+- [ ] Semantic dogfood queries for the fixed prompts return semantic-path code
+      results instead of `semantic_not_ready`.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` is refreshed again with the
+      semantic-ready or exact still-blocked verdict after collection recovery.
+
+**Scope notes**
+
+This phase exists because SEMREADYFIX repaired enrichment compatibility but the
+full rebuild still stalled on collection bootstrap and produced zero summaries
+and zero vectors. Keep the work narrowly on collection provisioning/hydration
+and the strict semantic stage that depends on it.
+
+**Non-goals**
+
+- No semantic ranking redesign.
+- No multi-repo rollout expansion.
+- No unrelated inference-provider changes beyond the repaired `oss_high`
+  default path.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/utils/semantic_indexer.py`
+- `mcp_server/setup/semantic_preflight.py`
+- `mcp_server/cli/setup_commands.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `docs/guides/semantic-onboarding.md`
+- `tests/real_world/test_semantic_search.py`
+- `tests/test_repository_commands.py`
+- `tests/test_profile_aware_semantic_indexer.py`
+
+**Depends on**
+- SEMREADYFIX
+
+**Produces**
+- IF-0-SEMCOLLECT-1 — Default local semantic collection bootstrap and semantic-stage recovery contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -527,6 +580,7 @@ SEMCONTRACT
   -> SEMQUERY
   -> SEMDOGFOOD
   -> SEMREADYFIX
+  -> SEMCOLLECT
 ```
 
 ## Execution Notes
@@ -548,6 +602,9 @@ SEMCONTRACT
 - SEMREADYFIX exists only if SEMDOGFOOD proves the default local dogfood path
   is still blocked; it should repair that blocker and then rerun the dogfood
   proof instead of widening into unrelated semantic work.
+- SEMCOLLECT exists only if SEMREADYFIX proves enrichment compatibility is
+  repaired but semantic writes still cannot advance because the active
+  collection/bootstrap path is missing or disconnected from the rebuild.
 
 ## Verification
 
@@ -580,5 +637,12 @@ sqlite3 .mcp-index/current.db 'select count(*) from chunk_summaries; select coun
 # SEMREADYFIX
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index index check-semantic
+SEMANTIC_SEARCH_ENABLED=true CODE_INDEX_DOGFOOD_REPO=. uv run pytest tests/real_world/test_semantic_search.py -q --no-cov
+
+# SEMCOLLECT
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index index check-semantic
+sqlite3 .mcp-index/current.db 'select count(*) from chunk_summaries; select count(*) from semantic_points;'
 SEMANTIC_SEARCH_ENABLED=true CODE_INDEX_DOGFOOD_REPO=. uv run pytest tests/real_world/test_semantic_search.py -q --no-cov
 ```

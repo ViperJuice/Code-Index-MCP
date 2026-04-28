@@ -76,7 +76,7 @@ profiles:
 
 
 def test_oss_high_defaults_resolve_local_enrichment_and_embedding(monkeypatch):
-    """Repo defaults should point at the ai-hosted enrichment and embedding endpoints."""
+    """Repo defaults should keep configured local defaults separate from runtime resolution."""
     monkeypatch.chdir(Path(__file__).resolve().parents[1])
     monkeypatch.delenv("SEMANTIC_ENRICHMENT_BASE_URL", raising=False)
     monkeypatch.delenv("SEMANTIC_EMBEDDING_BASE_URL", raising=False)
@@ -98,6 +98,7 @@ def test_oss_high_defaults_resolve_local_enrichment_and_embedding(monkeypatch):
     )
     assert profiles["oss_high"]["build_metadata"]["enrichment_api_base"] == "http://ai:8002/v1"
     assert profiles["oss_high"]["build_metadata"]["enrichment_model_name"] == "chat"
+    assert "effective_model_name" not in profiles["oss_high"]["build_metadata"]
     assert summary["base_url"] == "http://ai:8002/v1"
     assert summary["model_name"] == "chat"
 

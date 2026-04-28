@@ -166,6 +166,52 @@ def test_run_semantic_preflight_reports_redacted_config_only(monkeypatch):
     assert "enrich-secret" not in payload
 
 
+def test_run_semantic_preflight_effective_config_reports_configured_and_effective_enrichment_model(
+    monkeypatch,
+):
+    monkeypatch.setenv("EMBEDDING_KEY", "embed-secret")
+    monkeypatch.setenv("ENRICHMENT_KEY", "enrich-secret")
+    settings = _semantic_settings()
+
+    with (
+        patch("mcp_server.setup.semantic_preflight.check_embedding_smoke") as check_embedding,
+        patch("mcp_server.setup.semantic_preflight.check_qdrant") as check_qdrant_probe,
+        patch("mcp_server.setup.semantic_preflight.check_qdrant_collection") as check_collection,
+        patch("mcp_server.setup.semantic_preflight.check_enrichment_chat") as check_enrichment,
+    ):
+        check_embedding.return_value = _ready_check("embedding_vector")
+        check_qdrant_probe.return_value = _ready_check("qdrant")
+        check_collection.return_value = _ready_check("qdrant_collection")
+        check_enrichment.return_value = SimpleNamespace(
+            ok=True,
+            name="enrichment_chat",
+            message="ok",
+            status=ServiceStatus.READY,
+            details={
+                "configured_model": "chat",
+                "effective_model": "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit",
+                "resolution_strategy": "single_served_model_for_chat_alias",
+                "considered_model_ids": ["cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"],
+                "models_probe_verified": True,
+                "failure_class": None,
+            },
+            fixes=[],
+        )
+
+        report = run_semantic_preflight(settings=settings, strict=False)
+
+    assert report.effective_config["enrichment"]["model"] == "chat"
+    assert report.effective_config["enrichment"]["configured_model"] == "chat"
+    assert (
+        report.effective_config["enrichment"]["effective_model"]
+        == "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
+    )
+    assert (
+        report.effective_config["enrichment"]["resolution_strategy"]
+        == "single_served_model_for_chat_alias"
+    )
+
+
 def test_enrichment_chat_reports_missing_api_key_env():
     result = check_enrichment_chat(
         base_url="http://profile-enrich:8002/v1",
@@ -227,6 +273,109 @@ def test_enrichment_chat_rejects_wrong_chat_model(monkeypatch):
         )
     assert result.status == ServiceStatus.MISCONFIGURED
     assert result.details["failure_class"] == "wrong_chat_model"
+
+
+def test_enrichment_chat_uses_configured_model_when_served(monkeypatch):
+    monkeypatch.setenv("ENRICHMENT_KEY", "present")
+    seen_payload = {}
+
+    def _fake_post(url, payload, *, timeout_s, headers=None):
+        del url, timeout_s, headers
+        seen_payload.update(payload)
+        return {"choices": [{"message": {"content": "ok"}}], "model": payload["model"]}
+
+    with (
+        patch(
+            "mcp_server.setup.semantic_preflight._http_request_json",
+            return_value={"data": [{"id": "chat"}]},
+        ),
+        patch("mcp_server.setup.semantic_preflight._http_post_json", side_effect=_fake_post),
+    ):
+        result = check_enrichment_chat(
+            base_url="http://profile-enrich:8002/v1",
+            model="chat",
+            api_key_env="ENRICHMENT_KEY",
+            timeout_s=0.1,
+        )
+
+    assert result.status == ServiceStatus.READY
+    assert seen_payload["model"] == "chat"
+    assert result.details["configured_model"] == "chat"
+    assert result.details["effective_model"] == "chat"
+    assert result.details["resolution_strategy"] == "configured_model_served"
+    assert result.details["considered_model_ids"] == ["chat"]
+
+
+def test_enrichment_chat_resolves_default_chat_alias_to_single_served_model(monkeypatch):
+    monkeypatch.setenv("ENRICHMENT_KEY", "present")
+    seen_payload = {}
+    served_model = "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
+
+    def _fake_post(url, payload, *, timeout_s, headers=None):
+        del url, timeout_s, headers
+        seen_payload.update(payload)
+        return {"choices": [{"message": {"content": "ok"}}], "model": payload["model"]}
+
+    with (
+        patch(
+            "mcp_server.setup.semantic_preflight._http_request_json",
+            return_value={"data": [{"id": served_model}]},
+        ),
+        patch("mcp_server.setup.semantic_preflight._http_post_json", side_effect=_fake_post),
+    ):
+        result = check_enrichment_chat(
+            base_url="http://profile-enrich:8002/v1",
+            model="chat",
+            api_key_env="ENRICHMENT_KEY",
+            timeout_s=0.1,
+        )
+
+    assert result.status == ServiceStatus.READY
+    assert seen_payload["model"] == served_model
+    assert result.details["configured_model"] == "chat"
+    assert result.details["effective_model"] == served_model
+    assert result.details["resolution_strategy"] == "single_served_model_for_chat_alias"
+    assert result.details["considered_model_ids"] == [served_model]
+
+
+def test_enrichment_chat_reports_wrong_model_after_compatibility_path_exhausted(monkeypatch):
+    monkeypatch.setenv("ENRICHMENT_KEY", "present")
+
+    from urllib import error as urllib_error
+
+    def _raise_http_error(*args, **kwargs):
+        raise urllib_error.HTTPError(
+            url="http://profile-enrich:8002/v1/chat/completions",
+            code=400,
+            msg="bad request",
+            hdrs=None,
+            fp=None,
+        )
+
+    with (
+        patch(
+            "mcp_server.setup.semantic_preflight._http_request_json",
+            return_value={"data": [{"id": "model-a"}, {"id": "model-b"}]},
+        ),
+        patch("mcp_server.setup.semantic_preflight._http_post_json", side_effect=_raise_http_error),
+        patch(
+            "mcp_server.setup.semantic_preflight._read_http_error",
+            return_value=(400, '{"error":{"message":"model not found"}}'),
+        ),
+    ):
+        result = check_enrichment_chat(
+            base_url="http://profile-enrich:8002/v1",
+            model="chat",
+            api_key_env="ENRICHMENT_KEY",
+            timeout_s=0.1,
+        )
+
+    assert result.status == ServiceStatus.MISCONFIGURED
+    assert result.details["failure_class"] == "wrong_chat_model"
+    assert result.details["configured_model"] == "chat"
+    assert result.details["effective_model"] == "chat"
+    assert result.details["resolution_strategy"] == "no_compatible_model_found"
+    assert result.details["considered_model_ids"] == ["model-a", "model-b"]
 
 
 def test_qdrant_collection_reports_missing_collection():

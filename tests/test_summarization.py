@@ -12,6 +12,7 @@ from mcp_server.indexing.summarization import (
     FileBatchSummarizer,
     LazyChunkWriter,
 )
+from mcp_server.setup.semantic_preflight import EnrichmentModelResolution
 from mcp_server.storage.sqlite_store import SQLiteStore
 
 
@@ -166,6 +167,13 @@ async def test_file_batch_summarizer_persists_authoritative_audit_metadata(tmp_p
         return [SimpleNamespace(chunk_id="chunk-1", summary="Semantic summary")]
 
     summarizer._call_batch_api = _fake_batch_api  # type: ignore[method-assign]
+    summarizer._profile_model_resolution = EnrichmentModelResolution(
+        configured_model="chat",
+        effective_model="cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit",
+        resolution_strategy="single_served_model_for_chat_alias",
+        available_models=["cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"],
+        models_probe_verified=True,
+    )
     result = await summarizer.summarize_file_chunks(
         file_id=file_id,
         file_path=str(tmp_path / "sample.py"),
@@ -191,7 +199,13 @@ async def test_file_batch_summarizer_persists_authoritative_audit_metadata(tmp_p
     assert stored["provider_name"] == "openai_compatible"
     assert stored["profile_id"] == "oss_high"
     assert stored["prompt_fingerprint"]
-    assert stored["audit_metadata"]["llm_model"] == "chat"
+    assert stored["audit_metadata"]["llm_model"] == "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
+    assert stored["audit_metadata"]["configured_model_name"] == "chat"
+    assert (
+        stored["audit_metadata"]["effective_model_name"]
+        == "cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit"
+    )
+    assert stored["audit_metadata"]["model_resolution_strategy"] == "single_served_model_for_chat_alias"
 
 
 @pytest.mark.asyncio

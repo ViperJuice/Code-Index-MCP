@@ -40,6 +40,23 @@ class CheckResult:
 
 
 @dataclass(frozen=True)
+class EnrichmentModelResolution:
+    """Resolved enrichment-model choice for a profile endpoint."""
+
+    configured_model: str
+    effective_model: str
+    resolution_strategy: str
+    available_models: List[str] = field(default_factory=list)
+    models_probe_verified: bool = False
+    probe_failure: Optional[str] = None
+
+    @property
+    def compatibility_considered(self) -> bool:
+        """Whether the endpoint model list was consulted."""
+        return self.models_probe_verified and bool(self.available_models)
+
+
+@dataclass(frozen=True)
 class SemanticWriteBlocker:
     """Structured fail-closed blocker for semantic vector writes."""
 
@@ -209,6 +226,88 @@ def _detect_model_failure(body: str) -> Optional[str]:
     ):
         return "wrong_chat_model"
     return None
+
+
+def _extract_model_ids(payload: Dict[str, Any]) -> List[str]:
+    data = payload.get("data")
+    if not isinstance(data, list):
+        return []
+    model_ids = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        model_id = item.get("id")
+        if isinstance(model_id, str) and model_id.strip():
+            model_ids.append(model_id.strip())
+    return model_ids
+
+
+def resolve_enrichment_model(
+    *,
+    base_url: str,
+    configured_model: str,
+    api_key_env: str,
+    timeout_s: float,
+) -> EnrichmentModelResolution:
+    """Resolve the effective enrichment model for the active endpoint.
+
+    The current compatibility path is intentionally narrow: when the configured
+    local default is the `chat` alias and the endpoint advertises exactly one
+    served model, use that single served model as the effective target.
+    """
+    probe_url = base_url.rstrip("/") + "/models"
+    try:
+        payload = _http_request_json(
+            probe_url,
+            timeout_s=timeout_s,
+            headers=_redacted_auth_headers(api_key_env),
+        )
+        model_ids = _extract_model_ids(payload)
+    except error.HTTPError as exc:
+        status_code, body = _read_http_error(exc)
+        return EnrichmentModelResolution(
+            configured_model=configured_model,
+            effective_model=configured_model,
+            resolution_strategy="models_probe_http_error",
+            available_models=[],
+            models_probe_verified=False,
+            probe_failure=f"http_{status_code}:{body}",
+        )
+    except (error.URLError, TimeoutError, ValueError, OSError) as exc:
+        return EnrichmentModelResolution(
+            configured_model=configured_model,
+            effective_model=configured_model,
+            resolution_strategy="models_probe_unavailable",
+            available_models=[],
+            models_probe_verified=False,
+            probe_failure=str(exc),
+        )
+
+    if configured_model in model_ids:
+        return EnrichmentModelResolution(
+            configured_model=configured_model,
+            effective_model=configured_model,
+            resolution_strategy="configured_model_served",
+            available_models=model_ids,
+            models_probe_verified=True,
+        )
+
+    if configured_model == "chat" and len(model_ids) == 1:
+        return EnrichmentModelResolution(
+            configured_model=configured_model,
+            effective_model=model_ids[0],
+            resolution_strategy="single_served_model_for_chat_alias",
+            available_models=model_ids,
+            models_probe_verified=True,
+        )
+
+    return EnrichmentModelResolution(
+        configured_model=configured_model,
+        effective_model=configured_model,
+        resolution_strategy="no_compatible_model_found",
+        available_models=model_ids,
+        models_probe_verified=True,
+    )
 
 
 def check_qdrant(qdrant_url: str, timeout_s: float = 5.0) -> CheckResult:
@@ -401,11 +500,19 @@ def check_enrichment_chat(
             label="Enrichment",
         )
 
+    resolution = resolve_enrichment_model(
+        base_url=base_url,
+        configured_model=model,
+        api_key_env=api_key_env,
+        timeout_s=timeout_s,
+    )
+    effective_model = resolution.effective_model
+
     try:
         payload = _http_post_json(
             base_url.rstrip("/") + "/chat/completions",
             {
-                "model": model,
+                "model": effective_model,
                 "messages": [{"role": "user", "content": "semantic preflight smoke"}],
                 "max_tokens": 1,
             },
@@ -418,14 +525,20 @@ def check_enrichment_chat(
                 name="enrichment_chat",
                 message="Enrichment endpoint returned no chat choices",
                 failure_class="chat_response_invalid",
-                details={
-                    "base_url": base_url,
-                    "model": model,
-                    "api_key_env": api_key_env,
-                    "api_key_present": True,
-                },
-                fixes=[
-                    "Verify the enrichment proxy implements OpenAI-compatible chat responses",
+            details={
+                "base_url": base_url,
+                "model": effective_model,
+                "configured_model": model,
+                "effective_model": effective_model,
+                "api_key_env": api_key_env,
+                "api_key_present": True,
+                "resolution_strategy": resolution.resolution_strategy,
+                "considered_model_ids": resolution.available_models,
+                "models_probe_verified": resolution.models_probe_verified,
+                "models_probe_failure": resolution.probe_failure,
+            },
+            fixes=[
+                "Verify the enrichment proxy implements OpenAI-compatible chat responses",
                 ],
             )
         return CheckResult(
@@ -434,10 +547,16 @@ def check_enrichment_chat(
             message="Enrichment chat smoke succeeded",
             details={
                 "base_url": base_url,
-                "model": model,
+                "model": effective_model,
+                "configured_model": model,
+                "effective_model": effective_model,
                 "api_key_env": api_key_env,
                 "api_key_present": True,
                 "response_model": payload.get("model"),
+                "resolution_strategy": resolution.resolution_strategy,
+                "considered_model_ids": resolution.available_models,
+                "models_probe_verified": resolution.models_probe_verified,
+                "models_probe_failure": resolution.probe_failure,
                 "failure_class": None,
             },
         )
@@ -455,11 +574,17 @@ def check_enrichment_chat(
             message=message,
             details={
                 "base_url": base_url,
-                "model": model,
+                "model": effective_model,
+                "configured_model": model,
+                "effective_model": effective_model,
                 "api_key_env": api_key_env,
                 "api_key_present": True,
                 "http_status": status_code,
                 "error": body,
+                "resolution_strategy": resolution.resolution_strategy,
+                "considered_model_ids": resolution.available_models,
+                "models_probe_verified": resolution.models_probe_verified,
+                "models_probe_failure": resolution.probe_failure,
                 "failure_class": failure_class,
             },
             fixes=[
@@ -474,10 +599,16 @@ def check_enrichment_chat(
             message=f"Enrichment endpoint is not reachable at {base_url}: {exc}",
             details={
                 "base_url": base_url,
-                "model": model,
+                "model": effective_model,
+                "configured_model": model,
+                "effective_model": effective_model,
                 "api_key_env": api_key_env,
                 "api_key_present": True,
                 "error": str(exc),
+                "resolution_strategy": resolution.resolution_strategy,
+                "considered_model_ids": resolution.available_models,
+                "models_probe_verified": resolution.models_probe_verified,
+                "models_probe_failure": resolution.probe_failure,
                 "failure_class": "enrichment_endpoint_unreachable",
             },
             fixes=[
@@ -977,7 +1108,18 @@ def run_semantic_preflight(
             },
             "enrichment": {
                 "base_url": enrichment_base,
-                "model": enrichment_model,
+                "model": enrichment_check.details.get("configured_model", enrichment_model),
+                "configured_model": enrichment_check.details.get(
+                    "configured_model", enrichment_model
+                ),
+                "effective_model": enrichment_check.details.get(
+                    "effective_model", enrichment_model
+                ),
+                "resolution_strategy": enrichment_check.details.get("resolution_strategy"),
+                "considered_model_ids": enrichment_check.details.get("considered_model_ids", []),
+                "models_probe_verified": enrichment_check.details.get(
+                    "models_probe_verified", False
+                ),
                 "api_key_env": enrichment_api_key_env,
                 "api_key_present": bool(os.getenv(enrichment_api_key_env)),
             },

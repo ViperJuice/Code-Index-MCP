@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Sequence
 
 import mcp.types as types
 
+from ..setup.semantic_preflight import EnrichmentModelResolution, resolve_enrichment_model
 from ..storage.sqlite_store import SQLiteStore
 
 logger = logging.getLogger(__name__)
@@ -122,6 +123,7 @@ class ChunkWriter:
         self.client_name = client_name
         self.summarization_config = summarization_config or {}
         self._sqlite_store: Optional[SQLiteStore] = None
+        self._profile_model_resolution: Optional[EnrichmentModelResolution] = None
 
     def _get_sqlite_store(self) -> SQLiteStore:
         if self._sqlite_store is None:
@@ -140,6 +142,19 @@ class ChunkWriter:
         )
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
+    def _resolve_effective_profile_model(self) -> Optional[EnrichmentModelResolution]:
+        if not self.summarization_config.get("base_url"):
+            return None
+        if self._profile_model_resolution is None:
+            cfg = self.summarization_config
+            self._profile_model_resolution = resolve_enrichment_model(
+                base_url=str(cfg["base_url"]),
+                configured_model=str(cfg.get("model_name", "gpt-4o-mini")),
+                api_key_env=str(cfg.get("api_key_env", "OPENAI_API_KEY")),
+                timeout_s=float(cfg.get("timeout_s", 10.0)),
+            )
+        return self._profile_model_resolution
+
     def _build_summary_audit_metadata(self, *, model_name: str) -> Dict[str, Any]:
         base_url = self.summarization_config.get("base_url")
         if base_url:
@@ -153,13 +168,20 @@ class ChunkWriter:
         else:
             provider_name = "mcp_sampling"
 
-        return {
+        audit_metadata = {
             "provider_name": provider_name,
             "llm_model": model_name,
             "profile_id": self.summarization_config.get("profile_id"),
             "base_url": base_url,
             "prompt_fingerprint": self._prompt_fingerprint(),
         }
+        resolution = self._resolve_effective_profile_model()
+        if resolution is not None:
+            audit_metadata["configured_model_name"] = resolution.configured_model
+            audit_metadata["effective_model_name"] = resolution.effective_model
+            audit_metadata["model_resolution_strategy"] = resolution.resolution_strategy
+            audit_metadata["considered_model_ids"] = list(resolution.available_models)
+        return audit_metadata
 
     def _persist_summary(
         self,
@@ -277,13 +299,18 @@ class ChunkWriter:
         )
         return response.choices[0].message.content
 
-    async def _call_profile_api(self, system: str, prompt: str) -> str:
+    async def _call_profile_api(self, system: str, prompt: str) -> tuple[str, str]:
         """Call the profile-configured OpenAI-compatible endpoint."""
         from openai import AsyncOpenAI
 
         cfg = self.summarization_config
         base_url = cfg["base_url"]
-        model = cfg.get("model_name", "gpt-4o-mini")
+        resolution = self._resolve_effective_profile_model()
+        model = (
+            resolution.effective_model
+            if resolution is not None
+            else cfg.get("model_name", "gpt-4o-mini")
+        )
         api_key_env = cfg.get("api_key_env", "OPENAI_API_KEY")
         api_key = os.environ.get(api_key_env) or "vllm-local"
         client = AsyncOpenAI(api_key=api_key, base_url=base_url)
@@ -295,9 +322,9 @@ class ChunkWriter:
                 {"role": "user", "content": prompt},
             ],
         )
-        return response.choices[0].message.content
+        return response.choices[0].message.content, model
 
-    async def _call_direct_api(self, system: str, prompt: str) -> Optional[str]:
+    async def _call_direct_api(self, system: str, prompt: str) -> tuple[Optional[str], Optional[str]]:
         """Try profile endpoint first, then Cerebras, Anthropic, OpenAI."""
         if self.summarization_config.get("base_url"):
             try:
@@ -309,15 +336,18 @@ class ChunkWriter:
                     exc,
                 )
         if os.environ.get("CEREBRAS_API_KEY"):
-            return await self._call_cerebras_api(system, prompt)
+            return await self._call_cerebras_api(system, prompt), None
         elif os.environ.get("ANTHROPIC_API_KEY"):
-            return await self._call_anthropic_api(system, prompt)
+            return await self._call_anthropic_api(system, prompt), None
         elif os.environ.get("OPENAI_API_KEY"):
-            return await self._call_openai_api(system, prompt)
-        return None
+            return await self._call_openai_api(system, prompt), None
+        return None, None
 
     def _get_model_name(self) -> str:
         if self.summarization_config.get("model_name"):
+            resolution = self._resolve_effective_profile_model()
+            if resolution is not None:
+                return resolution.effective_model
             return self.summarization_config["model_name"]
         if os.environ.get("CEREBRAS_API_KEY"):
             return self.summarization_config.get("cerebras_model", "llama3.1-8b")
@@ -456,8 +486,10 @@ class ChunkWriter:
         # Path 3: Direct API fallback (Anthropic / OpenAI raw call, or Cerebras raw)
         if summary_text is None and self._has_direct_api():
             try:
-                summary_text = await self._call_direct_api(_SYSTEM_PROMPT, api_prompt)
-                model_name = self._get_model_name()
+                summary_text, resolved_model_name = await self._call_direct_api(
+                    _SYSTEM_PROMPT, api_prompt
+                )
+                model_name = resolved_model_name or self._get_model_name()
             except Exception as exc:
                 logger.warning("Direct API summarization failed for '%s': %s", symbol, exc)
 

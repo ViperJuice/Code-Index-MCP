@@ -109,6 +109,10 @@ and vectors:
 - when any check fails, the command emits a structured blocker, semantic vector
   writes remain fail-closed until remediation is complete, and the phase stays
   read-only with respect to summaries and vectors
+- for `oss_high`, the preflight also distinguishes the configured enrichment
+  model identifier from the effective served model actually used for the chat
+  smoke; this is how a configured `chat` alias can resolve to a concrete local
+  Gemma model without hiding the operator-facing contract
 
 ## Default `oss_high` Layout
 
@@ -121,6 +125,9 @@ and vectors:
 - `uv sync --locked` installs the default OpenAI-compatible client stack; no extra
   semantic install is required just to reach the local enrichment or embedding
   endpoints.
+- When the enrichment endpoint does not literally serve `chat` but advertises a
+  single compatible local model, semantic preflight reports both the configured
+  model and the effective served model it used.
 
 ## Readiness Notes
 
@@ -146,6 +153,9 @@ and vectors:
   `docs/status/semantic_dogfood_rebuild.md`.
   local dogfood evidence. Use it alongside `repository status` and preflight
   output when you need to confirm semantic readiness after a clean rebuild.
+- The current SEMREADYFIX evidence shows the enrichment compatibility repair can
+  succeed while semantic dogfood still remains blocked on `collection_missing`;
+  use the report to separate those two states.
 
 ## Full Reindex Pipeline
 
@@ -208,6 +218,8 @@ dogfood rebuild evidence.
 - Wrong chat model or blocked semantic writes
   - verify `SEMANTIC_ENRICHMENT_MODEL` matches a model served by the enrichment endpoint
   - rerun `setup semantic --json` to inspect the structured blocker and remediation
+  - if the configured `chat` alias resolves to a concrete served model, confirm
+    the report shows both the configured model and the effective model
 - Voyage provider failing
   - verify `VOYAGE_API_KEY`
 - Preflight output
