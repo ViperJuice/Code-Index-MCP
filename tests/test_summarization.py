@@ -120,6 +120,82 @@ class TestChunkWriterInit:
         cw = ChunkWriter(db_path="/tmp/test.db", qdrant_client=None)
         assert cw._has_direct_api() is False
 
+    @pytest.mark.asyncio
+    async def test_profile_api_closes_async_openai_client(self, monkeypatch):
+        closed = {"value": False}
+
+        class FakeCompletions:
+            async def create(self, **_kwargs):
+                return SimpleNamespace(
+                    choices=[SimpleNamespace(message=SimpleNamespace(content="summary text"))]
+                )
+
+        class FakeChat:
+            def __init__(self):
+                self.completions = FakeCompletions()
+
+        class FakeAsyncOpenAI:
+            def __init__(self, **_kwargs):
+                self.chat = FakeChat()
+
+            async def close(self):
+                closed["value"] = True
+
+        monkeypatch.setenv("OPENAI_API_KEY", "dummy-local-key")
+        monkeypatch.setattr("openai.AsyncOpenAI", FakeAsyncOpenAI)
+
+        writer = ChunkWriter(
+            db_path="/tmp/test.db",
+            qdrant_client=None,
+            summarization_config={"base_url": "http://ai:8002/v1", "model_name": "chat"},
+        )
+        monkeypatch.setattr(
+            writer,
+            "_resolve_effective_profile_model",
+            lambda: EnrichmentModelResolution(
+                configured_model="chat",
+                effective_model="chat",
+                resolution_strategy="configured",
+            ),
+        )
+
+        summary_text, model_name = await writer._call_profile_api("system", "prompt")
+
+        assert summary_text == "summary text"
+        assert model_name == "chat"
+        assert closed["value"] is True
+
+    def test_build_api_file_context_uses_smaller_budget_for_doc_like_languages(self):
+        writer = ChunkWriter(db_path="/tmp/test.db", qdrant_client=None)
+        file_content = ("0123456789" * 900)[:9000]
+
+        markdown_context = writer._build_api_file_context(
+            language="markdown",
+            file_content=file_content,
+            chunk_content="small chunk",
+        )
+        python_context = writer._build_api_file_context(
+            language="python",
+            file_content=file_content,
+            chunk_content="small chunk",
+        )
+
+        assert "... [file truncated for context window]" in markdown_context
+        assert file_content[:8000] in markdown_context
+        assert len(markdown_context) < len(python_context)
+        assert "... [file truncated for context window]" not in python_context
+
+    def test_build_api_file_context_omits_full_file_when_chunk_is_already_large(self):
+        writer = ChunkWriter(db_path="/tmp/test.db", qdrant_client=None)
+
+        context = writer._build_api_file_context(
+            language="markdown",
+            file_content="a" * 9000,
+            chunk_content="b" * 5000,
+        )
+
+        assert context == ""
+
     def test_has_sampling_capability_false_when_session_is_none(self):
         cw = ChunkWriter(db_path="/tmp/test.db", qdrant_client=None)
         assert cw._has_sampling_capability() is False
@@ -290,6 +366,7 @@ async def test_file_batch_summarizer_uses_profile_batch_recovery_before_topologi
         summarization_config={"base_url": "http://ai:8002/v1", "model_name": "chat"},
     )
     topological_called = {"value": False}
+    profile_attempts = {"count": 0}
     profile_batches: list[list[str]] = []
 
     async def _raise_large(*_args, **_kwargs):
@@ -443,11 +520,13 @@ async def test_file_batch_summarizer_falls_back_to_topological_path_when_large_f
         summarization_config={"base_url": "http://ai:8002/v1", "model_name": "chat"},
     )
     topological_called = {"value": False}
+    profile_attempts = {"count": 0}
 
     async def _raise_large(*_args, **_kwargs):
         raise importlib.import_module("mcp_server.indexing.summarization").FileTooLargeError("big")
 
     async def _raise_profile(*_args, **_kwargs):
+        profile_attempts["count"] += 1
         raise RuntimeError("profile batch failed")
 
     async def _fake_topological(*args, **kwargs):
@@ -482,6 +561,7 @@ async def test_file_batch_summarizer_falls_back_to_topological_path_when_large_f
     )
 
     assert topological_called["value"] is True
+    assert profile_attempts["count"] == 1
     assert result.summaries_written == 2
 
 
@@ -831,6 +911,9 @@ async def test_process_scope_drains_multiple_batches_for_target_scope(tmp_path, 
     assert result.summaries_written == 2
     assert result.authoritative_chunks == 2
     assert result.chunks_attempted == 2
+    assert result.batches_processed == 2
+    assert result.remaining_chunks == 0
+    assert result.scope_drained is True
     assert result.missing_chunk_ids == []
 
 
@@ -1000,4 +1083,7 @@ async def test_process_scope_max_batches_stops_after_one_batch(tmp_path, monkeyp
     assert result.summaries_written == 1
     assert result.authoritative_chunks == 1
     assert result.chunks_attempted == 1
+    assert result.batches_processed == 1
+    assert result.remaining_chunks == 1
+    assert result.scope_drained is False
     assert result.missing_chunk_ids == []

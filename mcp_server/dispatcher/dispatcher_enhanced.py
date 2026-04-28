@@ -2264,13 +2264,14 @@ class EnhancedDispatcher:
         # Keep each summary pass bounded enough to make durable progress inside
         # the per-pass timeout instead of attempting the entire repo backlog at once.
         summary_limit = min(512, max(64, len(normalized_paths)))
-        min_summary_limit = 32
+        min_summary_limit = 1
         remaining_missing = self._count_missing_summaries_for_paths(ctx, normalized_paths)
         summary_missing_ids: List[str] = []
         previous_missing = remaining_missing
         plateau_passes = 0
 
         while remaining_missing > 0:
+            missing_before_pass = remaining_missing
             try:
                 summary_result = _run_coro_blocking(
                     asyncio.wait_for(
@@ -2283,6 +2284,11 @@ class EnhancedDispatcher:
                     )
                 )
             except TimeoutError:
+                refreshed_missing = self._count_missing_summaries_for_paths(ctx, normalized_paths)
+                if refreshed_missing < remaining_missing:
+                    remaining_missing = refreshed_missing
+                    previous_missing = refreshed_missing
+                    plateau_passes = 0
                 if summary_limit > min_summary_limit:
                     summary_limit = max(min_summary_limit, summary_limit // 2)
                     continue
@@ -2299,7 +2305,11 @@ class EnhancedDispatcher:
             stats["summaries_written"] += summary_result.summaries_written
             stats["summary_chunks_attempted"] += summary_result.chunks_attempted
             summary_missing_ids.extend(summary_result.missing_chunk_ids)
-            remaining_missing = self._count_missing_summaries_for_paths(ctx, normalized_paths)
+            reported_remaining = getattr(summary_result, "remaining_chunks", None)
+            if isinstance(reported_remaining, int):
+                remaining_missing = reported_remaining
+            else:
+                remaining_missing = self._count_missing_summaries_for_paths(ctx, normalized_paths)
             if summary_result.summaries_written > 0 and remaining_missing > 0:
                 if remaining_missing < previous_missing:
                     plateau_passes = 0
@@ -2316,6 +2326,9 @@ class EnhancedDispatcher:
                             stats["summary_missing_chunk_ids"] = sorted(set(summary_missing_ids))
                         return stats
             if summary_result.summaries_written == 0:
+                if remaining_missing >= missing_before_pass and summary_limit > min_summary_limit:
+                    summary_limit = max(min_summary_limit, summary_limit // 2)
+                    continue
                 break
             previous_missing = remaining_missing
 

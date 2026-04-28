@@ -23,10 +23,10 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
 
     for expected in (
         "# Semantic Dogfood Rebuild",
-        "Phase plan: `plans/phase-plan-v7-SEMCLOSEOUT.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMTIMEOUT.md`",
         "## Reset Boundary",
         "## README Lexical Repair",
-        "## SEMCLOSEOUT Semantic Recovery",
+        "## SEMTIMEOUT Semantic Recovery",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -59,8 +59,8 @@ def test_semdogfood_report_records_reset_boundary_counts_collection_and_verifica
         "SEMSTALLFIX",
         "SEMIOWAIT",
         "README.md",
-        "Summary-backed chunks: `234`",
-        "Chunks missing summaries: `32996`",
+        "Summary-backed chunks: `269`",
+        "Chunks missing summaries: `33126`",
         "Vector-linked chunks: `0`",
         "Lexical readiness",
         "Semantic readiness",
@@ -88,10 +88,11 @@ def test_semdogfood_report_compares_query_modes_and_states_operator_verdict():
         "mcp_server/dispatcher/dispatcher_enhanced.py",
         "mcp_server/storage/git_index_manager.py",
         "mcp_server/utils/semantic_indexer.py",
+        ".claude/agents/lane-executer.md",
         "stale_commit",
         "local multi-repo dogfooding",
         "summary timeout",
-        "one-batch mode",
+        "one-batch passes",
     ):
         assert expected in text
 

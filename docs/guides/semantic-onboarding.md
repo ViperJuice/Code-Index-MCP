@@ -185,15 +185,19 @@ and vectors:
   `README.md` as the next exact lexical/storage blocker; and the SEMREADME
   evidence then shows the bounded README repair clears that final lexical
   blocker, restores indexed-commit freshness, and leaves the repo blocked
-  downstream on semantic readiness `summaries_missing`. The current
-  SEMCLOSEOUT evidence then shows the registered-context semantic stage now
-  persists authoritative summaries on the live repo-local index and the
-  dispatcher uses bounded one-batch passes plus timeout backoff, but the phase
-  still remains blocked on repo-wide summary timeout before strict vector
-  linkage can start. That leaves the repo at `stale_commit` with non-zero
-  `chunk_summaries` and zero `semantic_points`. If that later blocker remains
-  live, route the next execution step through `SEMTIMEOUT` instead of reusing
-  the older SEMCLOSEOUT handoff. Use the report to separate those states.
+  downstream on semantic readiness `summaries_missing`. The SEMCLOSEOUT
+  evidence then shows the registered-context semantic stage starts persisting
+  authoritative summaries on the live repo-local index, and the current
+  SEMTIMEOUT evidence shows the dispatcher now uses bounded one-batch passes,
+  deeper timeout backoff, deterministic profile-client closure, and smaller
+  doc-style fallback prompts. Even with those repairs, the repo still remains
+  blocked on repo-wide summary drain before strict vector linkage can start.
+  That leaves the repo at `stale_commit` with non-zero `chunk_summaries`,
+  zero `semantic_points`, and a hot unsummarized backlog rooted in
+  `.claude/agents/lane-executer.md` plus related `.claude/commands/*.md`
+  documents. If that later blocker remains live, keep routing execution
+  through `SEMTIMEOUT` instead of reusing the older SEMCLOSEOUT handoff. Use
+  the report to separate those states.
 
 ## Full Reindex Pipeline
 

@@ -35,6 +35,8 @@ _USER_PROMPT_TEMPLATE = (
 # Max characters of the surrounding file to include as context (~100k tokens ≈ 400k chars,
 # but we keep it conservative to leave room for the chunk itself and the response.
 _MAX_FILE_CONTEXT_CHARS = 60_000
+_DOC_FILE_CONTEXT_CHARS = 8_000
+_DOC_CONTEXT_LANGUAGES = {"markdown", "plaintext", "text", "rst"}
 
 # Files larger than this (in characters) skip the single-batch API call and fall back
 # to the topological per-chunk path.
@@ -56,6 +58,9 @@ class SummaryGenerationResult:
     missing_chunk_ids: List[str] = field(default_factory=list)
     files_attempted: int = 0
     files_summarized: int = 0
+    batches_processed: int = 0
+    remaining_chunks: int = 0
+    scope_drained: bool = True
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -65,6 +70,9 @@ class SummaryGenerationResult:
             "missing_chunk_ids": list(self.missing_chunk_ids),
             "files_attempted": self.files_attempted,
             "files_summarized": self.files_summarized,
+            "batches_processed": self.batches_processed,
+            "remaining_chunks": self.remaining_chunks,
+            "scope_drained": self.scope_drained,
         }
 
 
@@ -319,16 +327,20 @@ class ChunkWriter:
         )
         api_key_env = cfg.get("api_key_env", "OPENAI_API_KEY")
         api_key = os.environ.get(api_key_env) or "vllm-local"
-        client = AsyncOpenAI(api_key=api_key, base_url=base_url)
-        response = await client.chat.completions.create(
-            model=model,
-            max_tokens=max_tokens,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": prompt},
-            ],
-        )
-        return response.choices[0].message.content, model
+        request_timeout = max(10.0, float(cfg.get("timeout_s", 10.0)) * 3)
+        client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=request_timeout)
+        try:
+            response = await client.chat.completions.create(
+                model=model,
+                max_tokens=max_tokens,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": prompt},
+                ],
+            )
+            return response.choices[0].message.content, model
+        finally:
+            await client.close()
 
     async def _call_direct_api(self, system: str, prompt: str) -> tuple[Optional[str], Optional[str]]:
         """Try profile endpoint first, then Cerebras, Anthropic, OpenAI."""
@@ -360,6 +372,24 @@ class ChunkWriter:
         if os.environ.get("ANTHROPIC_API_KEY"):
             return self.summarization_config.get("anthropic_model", "claude-haiku-4-5-20251001")
         return self.summarization_config.get("openai_model", "gpt-5.4-nano")
+
+    def _build_api_file_context(self, *, language: str, file_content: str, chunk_content: str) -> str:
+        if not file_content:
+            return ""
+        normalized_language = (language or "").lower()
+        max_chars = _MAX_FILE_CONTEXT_CHARS
+        if normalized_language in _DOC_CONTEXT_LANGUAGES:
+            max_chars = _DOC_FILE_CONTEXT_CHARS
+        if len(chunk_content) > max_chars // 2:
+            return ""
+
+        trimmed = file_content[:max_chars]
+        if len(file_content) > max_chars:
+            trimmed += "\n... [file truncated for context window]"
+        return (
+            f"Full source file ({language}):\n```{language}\n{trimmed}\n```\n\n"
+            f"Now summarize only the following chunk from that file:\n\n"
+        )
 
     async def summarize_chunk(
         self,
@@ -418,15 +448,11 @@ class ChunkWriter:
         )
 
         # File context injected for direct API calls (large context window).
-        api_file_context = ""
-        if file_content:
-            trimmed = file_content[:_MAX_FILE_CONTEXT_CHARS]
-            if len(file_content) > _MAX_FILE_CONTEXT_CHARS:
-                trimmed += "\n... [file truncated for context window]"
-            api_file_context = (
-                f"Full source file ({language}):\n```{language}\n{trimmed}\n```\n\n"
-                f"Now summarize only the following chunk from that file:\n\n"
-            )
+        api_file_context = self._build_api_file_context(
+            language=language,
+            file_content=file_content,
+            chunk_content=content,
+        )
 
         # Fallback manual prompt for non-BAML direct API paths.
         api_prompt = _USER_PROMPT_TEMPLATE.format(
@@ -537,9 +563,10 @@ class FileBatchSummarizer(ChunkWriter):
         symbol_map: Dict[int, str],
         warning_prefix: str,
         error: Exception,
+        retry_profile_batch: bool = True,
     ) -> SummaryGenerationResult | List[Any]:
         logger.warning("%s for %s (%s), falling back to per-chunk path", warning_prefix, file_path, error)
-        if self.summarization_config.get("base_url"):
+        if retry_profile_batch and self.summarization_config.get("base_url"):
             try:
                 return await self._call_profile_batch_api(
                     file_id, file_path, file_content, chunks, symbol_map
@@ -814,6 +841,7 @@ class FileBatchSummarizer(ChunkWriter):
                 symbol_map=symbol_map,
                 warning_prefix="Large-file fallback",
                 error=exc,
+                retry_profile_batch=True,
             )
             if isinstance(recovery, SummaryGenerationResult):
                 return recovery
@@ -828,6 +856,7 @@ class FileBatchSummarizer(ChunkWriter):
                 symbol_map=symbol_map,
                 warning_prefix="Batch API failed",
                 error=exc,
+                retry_profile_batch=not self.summarization_config.get("base_url"),
             )
             if isinstance(recovery, SummaryGenerationResult):
                 return recovery
@@ -916,6 +945,28 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
             rows = cursor.fetchall()
         return rows
 
+    def _count_unsummarized_rows(self, *, target_paths: Optional[Sequence[Path]] = None) -> int:
+        normalized_paths = {
+            Path(path).resolve(strict=False).as_posix() for path in (target_paths or []) if path
+        }
+        with sqlite3.connect(self.db_path) as conn:
+            where_clauses = ["cs.chunk_hash IS NULL"]
+            params: list[Any] = []
+            if normalized_paths:
+                placeholders = ", ".join("?" for _ in normalized_paths)
+                where_clauses.append(f"f.path IN ({placeholders})")
+                params.extend(sorted(normalized_paths))
+            cursor = conn.execute(
+                f"""SELECT COUNT(*)
+                    FROM code_chunks c
+                    JOIN files f ON c.file_id = f.id
+                    LEFT JOIN chunk_summaries cs ON c.chunk_id = cs.chunk_hash
+                    WHERE {" AND ".join(where_clauses)}""",
+                tuple(params),
+            )
+            row = cursor.fetchone()
+        return int(row[0]) if row else 0
+
     async def process_scope(
         self,
         *,
@@ -937,6 +988,7 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
         total_files_attempted = 0
         total_files_summarized = 0
         missing_chunk_ids: List[str] = []
+        remaining_chunks = 0
 
         batches_processed = 0
         while True:
@@ -944,6 +996,7 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
             if not rows:
                 if total_attempted == 0:
                     logger.info("ComprehensiveChunkWriter: no unsummarized chunks found")
+                remaining_chunks = 0
                 break
 
             # Group chunks and symbol names by file_id.
@@ -1019,12 +1072,14 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
                     )
 
             if pass_summaries_written == 0:
+                remaining_chunks = self._count_unsummarized_rows(target_paths=target_paths)
                 logger.info(
                     "ComprehensiveChunkWriter: made no progress on %d remaining chunks",
                     len(rows),
                 )
                 break
             batches_processed += 1
+            remaining_chunks = self._count_unsummarized_rows(target_paths=target_paths)
             if max_batches is not None and batches_processed >= max_batches:
                 break
 
@@ -1040,6 +1095,9 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
             missing_chunk_ids=missing_chunk_ids,
             files_attempted=total_files_attempted,
             files_summarized=total_files_summarized,
+            batches_processed=batches_processed,
+            remaining_chunks=remaining_chunks,
+            scope_drained=remaining_chunks == 0,
         )
 
     async def process_all(self, limit: int = 500) -> int:

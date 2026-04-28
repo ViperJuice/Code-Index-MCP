@@ -1,15 +1,15 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-28T16:30:00Z`.
-- Observed commit: `045ca439`.
-- Phase plan: `plans/phase-plan-v7-SEMCLOSEOUT.md`.
+- Evidence captured: `2026-04-28T17:19:00Z`.
+- Observed commit: `57bcec0d`.
+- Phase plan: `plans/phase-plan-v7-SEMTIMEOUT.md`.
 - Prior repairs carried forward: `SEMSTALLFIX`, `SEMIOWAIT`,
   `SEMCHANGELOG`, `SEMROADMAP`, `SEMANALYSIS`, `SEMAGENTS`, and
-  `SEMREADME` in `specs/phase-plans-v7.md`.
+  `SEMREADME` plus `SEMCLOSEOUT` in `specs/phase-plans-v7.md`.
 
 ## Reset Boundary
 
-This SEMCLOSEOUT run preserved the same repo-local reset boundary and repo-local
+This SEMTIMEOUT run preserved the same repo-local reset boundary and repo-local
 dogfood boundary:
 
 - `.mcp-index/current.db` remained the active SQLite store.
@@ -33,24 +33,33 @@ SEMREADME remains the lexical prerequisite this phase inherits:
 - The live SEMCLOSEOUT reruns in this turn did not reopen a lexical timeout on
   `README.md`; the remaining blocker stayed inside the semantic stage.
 
-## SEMCLOSEOUT Semantic Recovery
+## SEMTIMEOUT Semantic Recovery
 
-SEMCLOSEOUT is still incomplete, but this execution changed the live semantic
-recovery path in two important ways:
+SEMTIMEOUT is still incomplete, but this execution changed the live semantic
+recovery path in four important ways:
 
 - `mcp_server/indexing/summarization.py` now exposes `process_scope(..., max_batches=1)`
   so one dispatcher summary pass can stop after one durable batch instead of
   looping until the whole repo backlog drains.
 - `mcp_server/dispatcher/dispatcher_enhanced.py` now calls that one-batch mode
-  and backs off the repo-wide summary limit after a timeout (`64 -> 32`)
-  instead of failing immediately on the first oversized summary pass.
-- `tests/test_summarization.py` and `tests/test_dispatcher.py` now freeze the
-  one-batch bound plus timeout-backoff contract.
+  and now drives one-batch passes while halving the repo-wide summary limit all
+  the way down to single-chunk passes and preserving any progress made
+  underneath timeout cancellation.
+- Profile-backed summary clients now close deterministically, so the latest
+  SEMTIMEOUT reruns no longer reproduce the earlier
+  `httpx.AsyncClient.aclose()` / `RuntimeError: Event loop is closed` cleanup
+  failure after timeout recovery.
+- Profile-batch failures no longer retry the same doomed profile batch a second
+  time before falling back, and the direct per-chunk fallback now uses a much
+  smaller file-context budget for markdown/plaintext-style documents.
+- `tests/test_summarization.py`, `tests/test_dispatcher.py`, and
+  `tests/test_git_index_manager.py` now freeze the client-close,
+  continuation-aware backlog, and deeper timeout-backoff contract.
 
 Live bounded semantic replay on the repo-local SQLite store now persists
 authoritative summaries instead of making zero semantic progress:
 
-- `chunk_summaries`: `0 -> 234`
+- `chunk_summaries`: `0 -> 269`
 - `semantic_points`: `0 -> 0`
 - Semantic readiness remains `summaries_missing`, so strict vector linkage has
   still not started for the remaining backlog.
@@ -63,33 +72,34 @@ env OPENAI_API_KEY=dummy-local-key MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5 uv run mc
 
 ## Rebuild Evidence
 
-Live SEMCLOSEOUT rerun evidence from this turn:
+Live SEMTIMEOUT rerun evidence from this turn:
 
 - The rerun no longer stayed at zero semantic progress: authoritative summary
   rows were persisted into `chunk_summaries`.
 - One oversized archive artifact was still skipped during the same run:
   `analysis_archive/semantic_vs_sql_comparison_1750926162.json` (`32983030`
   bytes).
-- The force-full rerun still did not reach strict vector linkage. The exact
-  blocker remained:
-  `Summary generation timed out before strict semantic indexing could start`.
-- A later interrupted retry also emitted a runtime cleanup warning from
-  `httpx.AsyncClient.aclose()` with `RuntimeError: Event loop is closed`
-  while semantic summary retry work was still in progress.
+- The latest reruns no longer emitted the earlier event-loop cleanup warning,
+  but they still did not reach strict vector linkage before operator
+  interruption.
+- The remaining live blocker is still inside repo-wide summary drain. The first
+  unsummarized backlog slice after the latest repair remains dominated by
+  `.claude/*.md` command/agent documents, and semantic vector writes have not
+  started for that backlog yet.
 
 Residual blocker shape after the latest repaired rerun:
 
 - Lexical readiness: `stale_commit`
 - Query surface: `index_unavailable`
 - Semantic readiness: `summaries_missing`
-- `chunk_summaries`: `234`
+- `chunk_summaries`: `269`
 - `semantic_points`: `0`
-- Chunks missing summaries: `32996`
-- Chunks missing vectors: `33230`
+- Chunks missing summaries: `33126`
+- Chunks missing vectors: `33395`
 
 Current SQLite artifact size after the rerun:
 
-- `.mcp-index/current.db`: `148.7 MB`
+- `.mcp-index/current.db`: `159.4 MB`
 
 ## Repository Status
 
@@ -108,15 +118,15 @@ after the latest rerun attempt reported:
 
 Repository/index freshness evidence:
 
-- Current commit: `045ca439`
+- Current commit: `57bcec0d`
 - Indexed commit: `e2e95198`
 
 Semantic evidence after the latest SEMCLOSEOUT replay is now:
 
-- Summary-backed chunks: `234`
-- Chunks missing summaries: `32996`
+- Summary-backed chunks: `269`
+- Chunks missing summaries: `33126`
 - Vector-linked chunks: `0`
-- Chunks missing vectors: `33230`
+- Chunks missing vectors: `33395`
 - Collection-matched links: `0`
 - Collection mismatches: `0`
 
@@ -146,11 +156,13 @@ Fixed dogfood prompt: `how does semantic setup validate qdrant and embedding rea
 - `symbol` and lexical probes still point operators at
   `mcp_server/setup/semantic_preflight.py` and
   `mcp_server/cli/repository_commands.py`.
-- The remaining downstream work is now in the semantic timeout and linkage
+- The remaining downstream work is still in the semantic timeout and linkage
   path centered on `mcp_server/indexing/summarization.py`,
   `mcp_server/dispatcher/dispatcher_enhanced.py`,
   `mcp_server/storage/git_index_manager.py`, and
-  `mcp_server/utils/semantic_indexer.py`.
+  `mcp_server/utils/semantic_indexer.py`, with the current hot backlog rooted
+  in `.claude/agents/lane-executer.md` and related `.claude/commands/*.md`
+  documents.
 
 ## Dogfood Verdict
 
@@ -167,19 +179,22 @@ Why:
 - `semantic_points` remains `0`.
 - The repo has regressed back to `stale_commit` because the force-full rerun
   still does not complete cleanly on the active commit.
-- The precise remaining blocker is now narrower than the stale checked-in
-  report: repo-wide summary timeout still prevents strict vector linkage from
-  starting.
+- The precise remaining blocker is narrower than the stale checked-in report:
+  the cleanup leak is gone and repo-wide summary drain now reaches `269`
+  authoritative summaries, but the `.claude` document backlog still prevents
+  strict vector linkage from starting.
 
 Steering outcome:
 
 - SEMCLOSEOUT repaired the registered-context semantic-stage skip earlier and,
-  in this turn, repaired unbounded summary-pass behavior plus timeout backoff.
+  in this turn, SEMTIMEOUT repaired client cleanup, doc-heavy fallback size,
+  and deeper timeout backoff on top of the earlier one-batch summary pass
+  behavior.
 - Those repairs are enough to prove partial live summary persistence on the
   repo-local index.
 - They are not enough to close the phase: semantic summary timeout is still the
-  next exact blocker, so downstream work now belongs to `SEMTIMEOUT` rather
-  than to any older downstream handoff.
+  current blocker, so downstream work still belongs to `SEMTIMEOUT` rather
+  than to any older handoff.
 
 ## Verification
 
@@ -205,13 +220,13 @@ Command-level anchors preserved for contract checks:
 
 Observed outcomes:
 
-- Owned semantic regression suite: passed (`174 passed`).
+- Owned semantic regression suite: passed (`168 passed`).
 - Markdown README production slice remains green from the SEMREADME lexical
   closeout.
 - Force-full rebuild still persists non-zero summary progress but does not yet
   advance the indexed commit to the current commit.
 - Repository status now shows semantic readiness `summaries_missing` with
-  non-zero `Summary-backed chunks: 234` and `Vector-linked chunks: 0`.
+  non-zero `Summary-backed chunks: 269` and `Vector-linked chunks: 0`.
 - Active-profile semantic preflight: still `ready`.
-- Repo-local semantic dogfood harness: skipped on indexed-query unavailability
-  `stale_commit`.
+- Repo-local semantic dogfood harness: still blocked on indexed-query
+  unavailability `stale_commit`.
