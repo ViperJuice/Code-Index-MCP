@@ -2968,6 +2968,125 @@ class TestEnhancedDispatcherProtocolConformance:
         assert len(simulator_fts_rows) == 1
         assert "ClaudeCodeSimulator" in simulator_fts_rows[0][0]
 
+    def test_index_directory_uses_exact_bounded_python_pair_for_embed_consolidation_tail(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        embed_script = repo / "scripts" / "create_semantic_embeddings.py"
+        consolidation_script = repo / "scripts" / "consolidate_real_performance_data.py"
+        helper_script = repo / "scripts" / "helper.py"
+        embed_script.parent.mkdir(parents=True)
+        embed_script.write_text(
+            "def get_repository_info():\n"
+            "    return {}\n\n"
+            "def process_repository():\n"
+            "    return get_repository_info()\n",
+            encoding="utf-8",
+        )
+        consolidation_script.write_text(
+            "class ConsolidatedResult:\n"
+            "    pass\n\n"
+            "class PerformanceDataConsolidator:\n"
+            "    def consolidate(self):\n"
+            "        return ConsolidatedResult()\n",
+            encoding="utf-8",
+        )
+        helper_script.write_text(
+            "def helper():\n"
+            "    return 'helper'\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 3
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(embed_script.resolve()),
+            str(helper_script.resolve()),
+            str(consolidation_script.resolve()),
+        }
+        with store._get_connection() as conn:
+            embed_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/create_semantic_embeddings.py') ORDER BY id"
+                ).fetchall()
+            ]
+            consolidation_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/consolidate_real_performance_data.py') ORDER BY id"
+                ).fetchall()
+            ]
+            helper_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/helper.py') ORDER BY id"
+                ).fetchall()
+            ]
+            embed_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/create_semantic_embeddings.py')"
+            ).fetchone()[0]
+            consolidation_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/consolidate_real_performance_data.py')"
+            ).fetchone()[0]
+            embed_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/create_semantic_embeddings.py'"
+            ).fetchone()[0]
+            consolidation_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/consolidate_real_performance_data.py'"
+            ).fetchone()[0]
+            helper_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/helper.py'"
+            ).fetchone()[0]
+            embed_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/create_semantic_embeddings.py')"
+            ).fetchall()
+            consolidation_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/consolidate_real_performance_data.py')"
+            ).fetchall()
+        store.close()
+        assert embed_symbols == ["get_repository_info", "process_repository"]
+        assert consolidation_symbols == [
+            "ConsolidatedResult",
+            "PerformanceDataConsolidator",
+            "consolidate",
+        ]
+        assert helper_symbols == ["helper"]
+        assert embed_chunk_count == 0
+        assert consolidation_chunk_count == 0
+        assert "exact_create_semantic_embeddings_rebound" in embed_metadata
+        assert (
+            "exact_consolidate_real_performance_data_rebound" in consolidation_metadata
+        )
+        assert "exact_create_semantic_embeddings_rebound" not in helper_metadata
+        assert "exact_consolidate_real_performance_data_rebound" not in helper_metadata
+        assert len(embed_fts_rows) == 1
+        assert "get_repository_info" in embed_fts_rows[0][0]
+        assert "process_repository" in embed_fts_rows[0][0]
+        assert len(consolidation_fts_rows) == 1
+        assert "ConsolidatedResult" in consolidation_fts_rows[0][0]
+        assert "PerformanceDataConsolidator" in consolidation_fts_rows[0][0]
+
     def test_index_directory_uses_exact_bounded_python_path_for_quick_charts(
         self, tmp_path, monkeypatch
     ):
@@ -3978,6 +4097,8 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "scripts/quick_mcp_vs_native_validation.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert "scripts/verify_embeddings.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert "scripts/claude_code_behavior_simulator.py" in Plugin._BOUNDED_CHUNK_PATHS
+        assert "scripts/create_semantic_embeddings.py" in Plugin._BOUNDED_CHUNK_PATHS
+        assert "scripts/consolidate_real_performance_data.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert "scripts/rerun_failed_native_tests.py" not in Plugin._BOUNDED_CHUNK_PATHS
         assert "tests/test_artifact_publish_race.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert "tests/root_tests/run_reranking_tests.py" not in Plugin._BOUNDED_CHUNK_PATHS

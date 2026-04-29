@@ -34,6 +34,8 @@ class Plugin(IPlugin):
         "scripts/quick_mcp_vs_native_validation.py",
         "scripts/verify_embeddings.py",
         "scripts/claude_code_behavior_simulator.py",
+        "scripts/create_semantic_embeddings.py",
+        "scripts/consolidate_real_performance_data.py",
         "tests/test_artifact_publish_race.py",
         "mcp_server/visualization/quick_charts.py",
     }

@@ -3175,6 +3175,71 @@ lexical walking on
 - IF-0-SEMEMBEDCONSOL-1 — later Python-script lexical recovery and evidence
   contract.
 
+### Phase 57 — Docs-Test Tail Recovery (SEMDOCTESTTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later tests/docs tail exposed after
+SEMEMBEDCONSOL:
+`tests/docs/test_gaclose_evidence_closeout.py -> tests/docs/test_p8_deployment_security.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMEMBEDCONSOL
+      head either advances durably beyond
+      `tests/docs/test_gaclose_evidence_closeout.py ->
+      tests/docs/test_p8_deployment_security.py` or emits a truthful newer
+      blocker before the 120-second watchdog expires.
+- [ ] The chosen repair for the
+      `tests/docs/test_gaclose_evidence_closeout.py ->
+      tests/docs/test_p8_deployment_security.py` seam stays narrow, tested,
+      and does not reopen the repaired
+      `scripts/create_semantic_embeddings.py ->
+      scripts/consolidate_real_performance_data.py` boundary without direct
+      evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMEMBEDCONSOL rerun outcome and the final live verdict for the later
+      tests/docs blocker pair.
+
+**Scope notes**
+
+This phase exists only if SEMEMBEDCONSOL proves the later Python-script
+`scripts/create_semantic_embeddings.py ->
+scripts/consolidate_real_performance_data.py` seam is cleared, but the
+refreshed live rerun still terminalizes later in lexical walking on
+`tests/docs/test_gaclose_evidence_closeout.py ->
+tests/docs/test_p8_deployment_security.py`.
+
+**Non-goals**
+
+- No reopening of the repaired embed/consolidation script recovery once the
+  live rerun has advanced beyond that seam.
+- No broad reopening of earlier tests/docs or documentation-governance phases
+  such as
+  `tests/docs/test_mre2e_evidence_contract.py ->
+  tests/docs/test_gagov_governance_contract.py` unless the refreshed rerun
+  proves the active blocker requires it.
+- No repo-wide lexical timeout retune unless the refreshed rerun proves this
+  later tests/docs seam cannot be cleared with a narrower repair.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/plugins/python_plugin/plugin.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMEMBEDCONSOL
+
+**Produces**
+- IF-0-SEMDOCTESTTAIL-1 — later tests/docs lexical recovery and evidence
+  contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -3234,6 +3299,7 @@ SEMCONTRACT
   -> SEMPREUPGRADETAIL
   -> SEMVERIFYSIMTAIL
   -> SEMEMBEDCONSOL
+  -> SEMDOCTESTTAIL
 ```
 
 ## Execution Notes
@@ -3513,6 +3579,19 @@ SEMCONTRACT
   live rerun still terminalizes later in lexical walking on
   `scripts/create_semantic_embeddings.py ->
   scripts/consolidate_real_performance_data.py`.
+- SEMEMBEDCONSOL should amend the roadmap immediately if the refreshed live
+  rerun clears
+  `scripts/create_semantic_embeddings.py ->
+  scripts/consolidate_real_performance_data.py` but exposes a later exact
+  tests/docs blocker such as
+  `tests/docs/test_gaclose_evidence_closeout.py ->
+  tests/docs/test_p8_deployment_security.py`.
+- SEMDOCTESTTAIL exists only if SEMEMBEDCONSOL proves the
+  `scripts/create_semantic_embeddings.py ->
+  scripts/consolidate_real_performance_data.py` seam is cleared but the
+  refreshed live rerun still terminalizes later in lexical walking on
+  `tests/docs/test_gaclose_evidence_closeout.py ->
+  tests/docs/test_p8_deployment_security.py`.
 
 ## Verification
 

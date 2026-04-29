@@ -127,6 +127,10 @@ _EXACT_BOUNDED_PYTHON_PATHS = {
     "scripts/test_mcp_protocol_direct.py": "exact_test_mcp_protocol_direct_rebound",
     "scripts/verify_embeddings.py": "exact_verify_embeddings_rebound",
     "scripts/claude_code_behavior_simulator.py": "exact_claude_code_behavior_simulator_rebound",
+    "scripts/create_semantic_embeddings.py": "exact_create_semantic_embeddings_rebound",
+    "scripts/consolidate_real_performance_data.py": (
+        "exact_consolidate_real_performance_data_rebound"
+    ),
     "mcp_server/visualization/quick_charts.py": "exact_visualization_quick_charts_rebound",
     "tests/docs/test_mre2e_evidence_contract.py": "exact_mre2e_docs_contract_rebound",
     "tests/docs/test_gagov_governance_contract.py": "exact_gagov_docs_contract_rebound",

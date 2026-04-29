@@ -1,7 +1,7 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T17:28:49Z`.
-- Observed commit: `504e419a`.
+- Evidence captured: `2026-04-29T17:45:52Z`.
+- Observed commit: `5c0102d`.
 - Prior SEMMIXEDPHASETAIL live-rerun anchor: `2026-04-29T16:49:50Z` on
   observed commit `468dee18`.
 - Prior SEMLEGACYPLANS live-rerun anchor: `2026-04-29T16:07:22Z` on observed
@@ -28,8 +28,15 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMVERIFYSIMTAIL.md`.
-- Prior phase plan: `plans/phase-plan-v7-SEMPREUPGRADETAIL.md`.
+- Phase plan: `plans/phase-plan-v7-SEMEMBEDCONSOL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMVERIFYSIMTAIL.md`.
+- Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMDOCTESTTAIL` after SEMEMBEDCONSOL proved the later Python-script seam
+  is now cleared, but the refreshed live rerun on the new head still
+  terminalized later in lexical walking on
+  `tests/docs/test_gaclose_evidence_closeout.py ->
+  tests/docs/test_p8_deployment_security.py`. Older downstream assumptions
+  should be treated as stale after this roadmap amendment.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMEMBEDCONSOL` after SEMVERIFYSIMTAIL proved the later Python-script
   seam is now cleared, but the refreshed live rerun on the new head still
@@ -1573,7 +1580,87 @@ Steering outcome:
   `scripts/verify_embeddings.py ->
   scripts/claude_code_behavior_simulator.py` script seam.
 
+## SEMEMBEDCONSOL Live Rerun Check
+
+SEMEMBEDCONSOL tightened the exact later Python-script seam in the
+dispatcher, Python plugin, and operator-status surfaces, and the refreshed live
+rerun advanced durably beyond `scripts/create_semantic_embeddings.py` and
+`scripts/consolidate_real_performance_data.py` before the 120-second watchdog
+expired.
+
+Code/test repair completed in this phase:
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py` now treats
+  `scripts/create_semantic_embeddings.py` and
+  `scripts/consolidate_real_performance_data.py` as exact bounded Python
+  paths, preserving full-text discoverability plus
+  `get_repository_info(...)`, `process_repository(...)`,
+  `ConsolidatedResult`, and `PerformanceDataConsolidator` without widening
+  into a blanket `scripts/*.py` bypass.
+- `mcp_server/plugins/python_plugin/plugin.py` now keeps the same exact pair
+  on the bounded chunk path list so direct Python-plugin indexing stays aligned
+  with dispatcher exact-bounded behavior.
+- `mcp_server/cli/repository_commands.py` now advertises the repaired exact
+  bounded lexical boundary for
+  `scripts/create_semantic_embeddings.py ->
+  scripts/consolidate_real_performance_data.py`:
+  `Lexical boundary: using exact bounded Python indexing for scripts/create_semantic_embeddings.py -> scripts/consolidate_real_performance_data.py`.
+- `tests/test_dispatcher.py`, `tests/test_git_index_manager.py`, and
+  `tests/test_repository_commands.py` now freeze dispatcher discoverability,
+  durable trace progression, and status reporting for the exact
+  embed/consolidation pair without widening into a broader script-family
+  shortcut.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The SEMEMBEDCONSOL live rerun started on observed commit `5c0102d` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-29T17:45:44Z`, `.mcp-index/force_full_exit_trace.json` showed a
+  running lexical trace on
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/tests/docs/test_gaclose_evidence_closeout.py`
+  with
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/tests/docs/test_p8_deployment_security.py`.
+- At `2026-04-29T17:45:52Z`, a refreshed `repository status` terminalized that
+  running snapshot to `Trace status: interrupted` with the same
+  `tests/docs/test_gaclose_evidence_closeout.py ->
+  tests/docs/test_p8_deployment_security.py` pair while advertising the
+  repaired exact bounded Python lexical surfaces for both the
+  verify/simulator and embed/consolidation seams.
+- SQLite runtime counts after the rerun remained
+  `files = 1123`, `code_chunks = 28182`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+
+Steering outcome:
+
+- SEMEMBEDCONSOL acceptance is satisfied for its named blocker: the active
+  lexical blocker is no longer
+  `scripts/create_semantic_embeddings.py ->
+  scripts/consolidate_real_performance_data.py`.
+- The final authoritative rerun for this phase moved later and now reaches the
+  tests/docs lexical pair
+  `tests/docs/test_gaclose_evidence_closeout.py ->
+  tests/docs/test_p8_deployment_security.py`.
+- The roadmap now adds downstream phase `SEMDOCTESTTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the embed/consolidation
+  `scripts/create_semantic_embeddings.py ->
+  scripts/consolidate_real_performance_data.py` script seam.
+
 ## Verification
+
+Verification sequence for this SEMEMBEDCONSOL slice:
+
+```bash
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "create_semantic_embeddings or consolidate_real_performance_data or lexical or bounded or consolidator or script"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "create_semantic_embeddings or consolidate_real_performance_data or lexical or interrupted or boundary or consolidator or script"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
+timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+```
 
 Verification sequence for this SEMCROSSPLANS slice:
 
