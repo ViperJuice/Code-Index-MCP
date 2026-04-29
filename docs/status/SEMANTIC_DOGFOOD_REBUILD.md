@@ -2406,6 +2406,75 @@ Steering outcome:
   `plans/phase-plan-v7-SEMCROSSPLANS.md ->
   plans/phase-plan-v7-SEMDOGFOOD.md`.
 
+## SEMOPTREPORTTAIL Live Rerun Check
+
+SEMOPTREPORTTAIL repaired the generated optimized-report JSON boundary and
+proved that the live force-full rerun now advances beyond the optimized-report
+pair before terminalizing later in lexical walking.
+
+Code/test repair completed in this phase:
+
+- `mcp_server/plugins/generic_treesitter_plugin.py` now treats
+  `final_optimized_report_final_report_1750958096/final_report_data.json` as
+  an exact bounded JSON path so the generated JSON artifact stays lexically
+  discoverable without reopening the heavy JSON path.
+- `mcp_server/cli/repository_commands.py` now advertises the repaired exact
+  bounded lexical surface for the generated optimized-report pair and names the
+  optimized-report boundary successor in operator output when the rerun moves
+  through or beyond it.
+  `Lexical boundary: using exact bounded JSON indexing for final_optimized_report_final_report_1750958096/final_report_data.json -> final_optimized_report_final_report_1750958096/FINAL_OPTIMIZED_ANALYSIS_REPORT.md`.
+- `tests/test_dispatcher.py`, `tests/test_git_index_manager.py`,
+  `tests/test_repository_commands.py`, and
+  `tests/docs/test_semdogfood_evidence_contract.py` now freeze the exact
+  generated-report pair, the operator wording, and the downstream-steering
+  contract so the later fixture blocker becomes the new authoritative tail
+  instead of leaving stale SEMOPTREPORTTAIL-era assumptions behind.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMOPTREPORTTAIL live rerun started on observed commit
+  `f2600b65` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `135`.
+- At `2026-04-29T21:34:54Z`, `.mcp-index/force_full_exit_trace.json` was still
+  a running lexical snapshot with
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/tests/fixtures/multi_repo.py`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/tests/fixtures/files/test_files/example.c`,
+  which is later than the repaired generated-report pair.
+- At `2026-04-29T21:35:04Z`, a refreshed `repository status` terminalized that
+  snapshot to `Trace status: interrupted` with the same fixture pair while
+  advertising the repaired exact bounded JSON surface for
+  `final_optimized_report_final_report_1750958096/final_report_data.json ->
+  final_optimized_report_final_report_1750958096/FINAL_OPTIMIZED_ANALYSIS_REPORT.md`.
+- The SEMOPTREPORTTAIL target pair is no longer the active blocker:
+  `final_optimized_report_final_report_1750958096/final_report_data.json ->
+  final_optimized_report_final_report_1750958096/FINAL_OPTIMIZED_ANALYSIS_REPORT.md`.
+- SQLite runtime counts after the rerun remained
+  `files = 1064`, `code_chunks = 13095`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Rollout status: partial_index_failure`,
+  `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+
+Steering outcome:
+
+- SEMOPTREPORTTAIL acceptance is satisfied for its named blocker: the live
+  watchdog no longer terminalizes on
+  `final_optimized_report_final_report_1750958096/final_report_data.json ->
+  final_optimized_report_final_report_1750958096/FINAL_OPTIMIZED_ANALYSIS_REPORT.md`.
+- The final authoritative rerun for this phase moved later and now reaches the
+  fixture pair
+  `tests/fixtures/multi_repo.py ->
+  tests/fixtures/files/test_files/example.c`.
+- The roadmap now adds downstream phase `SEMFIXTURETAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMOPTREPORTTAIL-era generated-report seam
+  `final_optimized_report_final_report_1750958096/final_report_data.json ->
+  final_optimized_report_final_report_1750958096/FINAL_OPTIMIZED_ANALYSIS_REPORT.md`.
+
 ## Verification
 
 Verification sequence for this SEMDOCTRUTHTAIL slice:
@@ -2425,6 +2494,18 @@ Verification sequence for this SEMCROSSDOGTAIL slice:
 ```bash
 uv run pytest tests/test_dispatcher.py -q --no-cov -k "phase_plan or SEMCROSSPLANS or SEMDOGFOOD or markdown or lexical or bounded"
 env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "phase_plan or SEMCROSSPLANS or SEMDOGFOOD or lexical or interrupted or boundary"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
+timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+```
+
+Verification sequence for this SEMOPTREPORTTAIL slice:
+
+```bash
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "optimized_final_report or final_report_data or analysis_report"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "optimized_final_report or final_report_data or analysis_report or interrupted or boundary"
 uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status

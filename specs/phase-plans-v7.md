@@ -3866,6 +3866,67 @@ final_optimized_report_final_report_1750958096/FINAL_OPTIMIZED_ANALYSIS_REPORT.m
 - IF-0-SEMOPTREPORTTAIL-1 — generated optimized-report lexical recovery and
   evidence contract.
 
+### Phase 68 — Fixture Tail Recovery (SEMFIXTURETAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later fixture seam exposed after
+SEMOPTREPORTTAIL:
+`tests/fixtures/multi_repo.py ->
+tests/fixtures/files/test_files/example.c`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMOPTREPORTTAIL
+      head either advances durably beyond the
+      `tests/fixtures/multi_repo.py ->
+      tests/fixtures/files/test_files/example.c`
+      pair or emits a truthful newer blocker before the 120-second watchdog
+      expires.
+- [ ] The chosen repair for the fixture tail stays narrow, tested, and does
+      not reopen the repaired
+      `final_optimized_report_final_report_1750958096/final_report_data.json ->
+      final_optimized_report_final_report_1750958096/FINAL_OPTIMIZED_ANALYSIS_REPORT.md`
+      boundary without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the SEMOPTREPORTTAIL
+      rerun outcome and the final live verdict for the fixture pair.
+
+**Scope notes**
+
+This phase exists only if SEMOPTREPORTTAIL proves the generated optimized-report
+pair is cleared, but the refreshed live rerun still terminalizes later in
+lexical walking on the fixture pair
+`tests/fixtures/multi_repo.py ->
+tests/fixtures/files/test_files/example.c`.
+
+**Non-goals**
+
+- No reopening of the repaired SEMOPTREPORTTAIL generated-report recovery once
+  the live rerun has advanced beyond that seam.
+- No blanket ignore or bypass for all fixture files unless the refreshed rerun
+  proves the active blocker cannot be cleared with a narrower exact-path or
+  exact-pair contract.
+- No reopening of unrelated semantic-stage or roadmap work unless the
+  refreshed rerun proves the active blocker has moved again.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+- `tests/fixtures/multi_repo.py`
+- `tests/fixtures/files/test_files/example.c`
+
+**Depends on**
+- SEMOPTREPORTTAIL
+
+**Produces**
+- IF-0-SEMFIXTURETAIL-1 — fixture-pair lexical recovery and evidence
+  contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -3936,6 +3997,7 @@ SEMCONTRACT
   -> SEMJEDIP4TAIL
   -> SEMCROSSDOGTAIL
   -> SEMOPTREPORTTAIL
+  -> SEMFIXTURETAIL
 ```
 
 ## Execution Notes
@@ -4063,6 +4125,18 @@ SEMCONTRACT
   final_optimized_report_final_report_1750958096/FINAL_OPTIMIZED_ANALYSIS_REPORT.md`;
   it should repair that exact generated-report seam or preserve the next exact
   downstream blocker instead of reopening earlier phase-plan work.
+- SEMOPTREPORTTAIL should amend the roadmap immediately if the refreshed live
+  rerun clears the generated optimized-report pair but exposes a later exact
+  blocker such as
+  `tests/fixtures/multi_repo.py ->
+  tests/fixtures/files/test_files/example.c`.
+- SEMFIXTURETAIL exists only if SEMOPTREPORTTAIL proves the generated
+  optimized-report pair is cleared but the live rerun still remains in lexical
+  walking on
+  `tests/fixtures/multi_repo.py ->
+  tests/fixtures/files/test_files/example.c`; it should repair that exact
+  fixture seam or preserve the next exact downstream blocker instead of
+  reopening earlier generated-report work.
 - SEMCOLLECT exists only if SEMREADYFIX proves enrichment compatibility is
   repaired but semantic writes still cannot advance because the active
   collection/bootstrap path is missing or disconnected from the rebuild.

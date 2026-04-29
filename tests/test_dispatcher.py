@@ -5125,6 +5125,162 @@ class TestEnhancedDispatcherProtocolConformance:
         assert len(fts_rows) == 1
         assert "archive tail" in fts_rows[0][0]
 
+    def test_index_directory_uses_exact_bounded_json_path_for_optimized_final_report_pair(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        report_dir = repo / "final_optimized_report_final_report_1750958096"
+        report_dir.mkdir(parents=True)
+        report_json = report_dir / "final_report_data.json"
+        report_markdown = report_dir / "FINAL_OPTIMIZED_ANALYSIS_REPORT.md"
+        unrelated_json = repo / "config.json"
+        report_json.write_text(
+            "{\n"
+            '  "session_id": "final_report_1750958096",\n'
+            '  "business_metrics": {"time_reduction_percent": 81.0},\n'
+            '  "executive_dashboard": {"headline_metrics": {"speedup_factor": "5.3x"}},\n'
+            '  "technical_analysis": {"throughput_improvement": "5.3x"},\n'
+            '  "recommendations": {"immediate_actions": ["Deploy optimized analysis framework"]}\n'
+            "}\n",
+            encoding="utf-8",
+        )
+        report_markdown.write_text(
+            "# Optimized Enhanced MCP Analysis - Final Report\n\n"
+            "## Executive Summary\n\n"
+            "A concise summary.\n\n"
+            "## Technical Achievements\n\n"
+            "- Parallelization and bounded indexing.\n\n"
+            "## Financial Analysis\n\n"
+            "- Savings and ROI.\n\n"
+            "## Quality Improvements\n\n"
+            "- Better precision.\n\n"
+            "## Strategic Recommendations\n\n"
+            "- Preserve discoverability.\n",
+            encoding="utf-8",
+        )
+        unrelated_json.write_text('{"name": "config"}\n', encoding="utf-8")
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        class _FakeJsonPlugin:
+            lang = "json"
+            language = "json"
+
+            def indexFile(self, path, content):
+                if Path(path).resolve() == report_json.resolve():
+                    raise AssertionError(
+                        "exact bounded optimized final report JSON path should bypass plugin load"
+                    )
+                return {"symbols": [], "chunks": [{"content": content}], "metadata": {"fake": True}}
+
+        def _unexpected_markdown_heavy_path(*_args, **_kwargs):
+            raise AssertionError(
+                "heavy Markdown path should not run for the optimized final report Markdown file"
+            )
+
+        original_ensure_plugin_loaded = Dispatcher._ensure_plugin_loaded
+
+        monkeypatch.setattr(
+            Dispatcher,
+            "_ensure_plugin_loaded",
+            lambda _self, language: (
+                _FakeJsonPlugin()
+                if language == "json"
+                else original_ensure_plugin_loaded(_self, language)
+            ),
+        )
+        monkeypatch.setattr(MarkdownPlugin, "extract_structure", _unexpected_markdown_heavy_path)
+        monkeypatch.setattr(MarkdownPlugin, "chunk_document", _unexpected_markdown_heavy_path)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        plugin = MarkdownPlugin()
+        assert (
+            plugin._resolve_lightweight_reason(
+                report_markdown, report_markdown.read_text(encoding="utf-8")
+            )
+            == "analysis_report_path"
+        )
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 3
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(report_json.resolve()),
+            str(report_markdown.resolve()),
+            str(unrelated_json.resolve()),
+        }
+        with store._get_connection() as conn:
+            report_json_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'final_optimized_report_final_report_1750958096/final_report_data.json')"
+            ).fetchone()[0]
+            report_json_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'final_optimized_report_final_report_1750958096/final_report_data.json')"
+            ).fetchall()
+            report_markdown_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'final_optimized_report_final_report_1750958096/FINAL_OPTIMIZED_ANALYSIS_REPORT.md') "
+                    "ORDER BY id"
+                ).fetchall()
+            ]
+            report_markdown_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'final_optimized_report_final_report_1750958096/FINAL_OPTIMIZED_ANALYSIS_REPORT.md')"
+            ).fetchone()[0]
+            report_markdown_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'final_optimized_report_final_report_1750958096/FINAL_OPTIMIZED_ANALYSIS_REPORT.md')"
+            ).fetchall()
+            unrelated_json_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = 'config.json')"
+            ).fetchone()[0]
+        store.close()
+
+        assert report_json_chunk_count == 0
+        assert len(report_json_fts_rows) == 1
+        assert "business_metrics" in report_json_fts_rows[0][0]
+        assert "executive_dashboard" in report_json_fts_rows[0][0]
+        assert "recommendations" in report_json_fts_rows[0][0]
+        assert report_markdown_symbols == [
+            "Optimized Enhanced MCP Analysis - Final Report",
+            "Optimized Enhanced MCP Analysis - Final Report",
+            "Executive Summary",
+            "Technical Achievements",
+            "Financial Analysis",
+            "Quality Improvements",
+            "Strategic Recommendations",
+        ]
+        assert report_markdown_chunk_count == 0
+        assert len(report_markdown_fts_rows) == 1
+        assert "Technical Achievements" in report_markdown_fts_rows[0][0]
+        assert "Strategic Recommendations" in report_markdown_fts_rows[0][0]
+        assert unrelated_json_chunk_count > 0
+
     def test_index_directory_uses_exact_bounded_paths_for_legacy_codex_phase_loop_runtime(
         self, tmp_path, monkeypatch
     ):

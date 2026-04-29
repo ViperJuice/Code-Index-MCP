@@ -325,9 +325,13 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "roadmap now adds downstream phase `SEMJEDIP4TAIL`",
         "roadmap now adds downstream phase `SEMCROSSDOGTAIL`",
         "roadmap now adds downstream phase `SEMOPTREPORTTAIL`",
+        "roadmap now adds downstream phase `SEMFIXTURETAIL`",
         "2026-04-29T21:15:40Z",
         "2026-04-29T21:15:52Z",
+        "2026-04-29T21:34:54Z",
+        "2026-04-29T21:35:04Z",
         "e6584ee5",
+        "f2600b65",
     ):
         assert expected in text
 
@@ -405,6 +409,7 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "Lexical boundary: using exact bounded Python indexing for scripts/migrate_large_index_to_multi_repo.py -> scripts/check_index_languages.py",
         "Lexical boundary: using exact bounded Python indexing for scripts/create_semantic_embeddings.py -> scripts/consolidate_real_performance_data.py",
         "Lexical boundary: using exact bounded JSON indexing for analysis_archive/semantic_vs_sql_comparison_1750926162.json after analysis_archive/scripts_archive/scripts_test_files/verify_mcp_fix.py",
+        "Lexical boundary: using exact bounded JSON indexing for final_optimized_report_final_report_1750958096/final_report_data.json -> final_optimized_report_final_report_1750958096/FINAL_OPTIMIZED_ANALYSIS_REPORT.md",
         "fixture repositories under test_workspace/ are ignored during lexical walking",
         "SEMPHASEPLANS acceptance is satisfied for its named blocker",
         "SEMCROSSPLANS acceptance is satisfied for its named blocker",
@@ -422,6 +427,7 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "SEMSUPPORTTAIL acceptance is satisfied for its named blocker",
         "SEMV1PLANTAIL acceptance is satisfied for its named blocker",
         "SEMCROSSDOGTAIL acceptance is satisfied for its named blocker",
+        "SEMOPTREPORTTAIL acceptance is satisfied for its named blocker",
         "Phase plan: `plans/phase-plan-v7-SEMV1PLANTAIL.md`",
         "Prior phase plan: `plans/phase-plan-v7-SEMSUPPORTTAIL.md`",
         "repository status` now advertises the repaired exact bounded lexical surface",
@@ -454,6 +460,10 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k \"p23 or semdogfood or doc_truth or evidence_contract or boundary or interrupted or lexical\"",
         "uv run pytest tests/test_dispatcher.py -q --no-cov -k \"support_matrix or markdown_table_of_contents or support_docs or markdown or bounded\"",
         "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k \"support_matrix or markdown_table_of_contents or support_docs or lexical or interrupted or boundary\"",
+        "uv run pytest tests/test_dispatcher.py -q --no-cov -k \"optimized_final_report or final_report_data or analysis_report\"",
+        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k \"optimized_final_report or final_report_data or analysis_report or interrupted or boundary\"",
         "uv run pytest tests/docs/test_p23_doc_truth.py tests/docs/test_semdogfood_evidence_contract.py -q --no-cov",
+        "tests/fixtures/multi_repo.py",
+        "tests/fixtures/files/test_files/example.c",
     ):
         assert expected in text

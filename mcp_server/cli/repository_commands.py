@@ -97,6 +97,15 @@ def _archive_tail_pair(repo_path: Path) -> tuple[Path, Path]:
     )
 
 
+def _optimized_final_report_pair(repo_path: Path) -> tuple[Path, Path]:
+    return (
+        repo_path / "final_optimized_report_final_report_1750958096" / "final_report_data.json",
+        repo_path
+        / "final_optimized_report_final_report_1750958096"
+        / "FINAL_OPTIMIZED_ANALYSIS_REPORT.md",
+    )
+
+
 def _print_force_full_exit_trace(
     prefix: str, trace: Optional[dict[str, Any]], repo_path: Optional[Path] = None
 ) -> None:
@@ -145,6 +154,23 @@ def _print_force_full_exit_trace(
             click.echo(
                 f"{prefix}Archive-tail successor: exact bounded JSON indexing preserved lexical "
                 f"progress beyond {archive_script}"
+            )
+        optimized_json, optimized_markdown = _optimized_final_report_pair(repo_path)
+        if (
+            trace.get("last_progress_path") == str(optimized_json.resolve())
+            and trace.get("in_flight_path") == str(optimized_markdown.resolve())
+        ):
+            click.echo(
+                f"{prefix}Optimized-report boundary: exact bounded JSON indexing preserved "
+                f"lexical progress into {optimized_markdown.relative_to(repo_path)}"
+            )
+        if (
+            trace.get("last_progress_path") == str(optimized_markdown.resolve())
+            and trace.get("in_flight_path") is None
+        ):
+            click.echo(
+                f"{prefix}Optimized-report successor: bounded Markdown indexing preserved lexical "
+                f"progress beyond {optimized_json.relative_to(repo_path)}"
             )
     if trace.get("summary_call_file_path"):
         click.echo(f"{prefix}Timed-out summary file: {trace['summary_call_file_path']}")
@@ -554,6 +580,16 @@ def _print_archive_tail_json_boundary(prefix: str, repo_path: Path) -> None:
             f"{prefix}Lexical boundary: using exact bounded JSON indexing for "
             "analysis_archive/semantic_vs_sql_comparison_1750926162.json after "
             "analysis_archive/scripts_archive/scripts_test_files/verify_mcp_fix.py"
+        )
+
+
+def _print_optimized_final_report_boundary(prefix: str, repo_path: Path) -> None:
+    optimized_json, optimized_markdown = _optimized_final_report_pair(repo_path)
+    if optimized_json.is_file() and optimized_markdown.is_file():
+        click.echo(
+            f"{prefix}Lexical boundary: using exact bounded JSON indexing for "
+            "final_optimized_report_final_report_1750958096/final_report_data.json -> "
+            "final_optimized_report_final_report_1750958096/FINAL_OPTIMIZED_ANALYSIS_REPORT.md"
         )
 
 
@@ -996,6 +1032,7 @@ def status(repo_id: Optional[str]):
         _print_mock_plugin_fixture_python_boundary("  ", Path(status["path"]))
         _print_devcontainer_json_boundary("  ", Path(status["path"]))
         _print_archive_tail_json_boundary("  ", Path(status["path"]))
+        _print_optimized_final_report_boundary("  ", Path(status["path"]))
         _print_legacy_codex_phase_loop_boundary("  ", Path(status["path"]))
         _print_force_full_exit_trace(
             "  ", status.get("force_full_exit_trace"), Path(status["path"])

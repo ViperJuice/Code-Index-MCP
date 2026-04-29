@@ -38,6 +38,9 @@ class GenericTreeSitterPlugin(PluginWithSemanticSearch):
         "analysis_archive/semantic_vs_sql_comparison_1750926162.json": (
             "exact_archive_tail_json_walk_gap"
         ),
+        "final_optimized_report_final_report_1750958096/final_report_data.json": (
+            "exact_optimized_final_report_json_tail"
+        ),
     }
 
     @classmethod
