@@ -22,7 +22,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
 
     for expected in (
         "# Semantic Dogfood Rebuild",
-        "Phase plan: `plans/phase-plan-v7-SEMTESTSTALE.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMSCRIPTABORT.md`",
         "## Reset Boundary",
         "## SEMTRACEFRESHNESS Live Trace Recovery",
         "## SEMPUBLISHRACE Live Rerun Check",
@@ -31,6 +31,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
         "## SEMDISKIO Live Rerun Check",
         "## SEMDEVSTALE Live Rerun Check",
         "## SEMTESTSTALE Live Rerun Check",
+        "## SEMSCRIPTABORT Live Rerun Check",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -53,6 +54,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "SEMDISKIO",
         "SEMDEVSTALE",
         "SEMTESTSTALE",
+        "SEMSCRIPTABORT",
         "2026-04-29T08:50:29Z",
         "2026-04-29T08:50:44Z",
         "2026-04-29T08:51:28Z",
@@ -81,8 +83,11 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "2026-04-29T11:13:51Z",
         "2026-04-29T11:17:34Z",
         "2026-04-29T11:17:51Z",
+        "2026-04-29T11:43:04Z",
+        "2026-04-29T11:43:05Z",
+        "2026-04-29T11:43:19Z",
+        "098c1ad1",
         "c8b2d724",
-        "7e547c77",
         "a186b352",
         "1e7a2a10",
         "aec99482",
@@ -110,6 +115,8 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "tests/test_benchmarks.py",
         "tests/test_artifact_publish_race.py",
         "tests/root_tests/test_contextual_pipeline.py",
+        "tests/root_tests/test_voyage_api.py",
+        "tests/root_tests/run_reranking_tests.py",
         "tests/security/fixtures/mock_plugin/plugin.py",
         "ai_docs/qdrant.md",
         "fast_test_results/fast_report_*.md",
@@ -124,7 +131,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "Trace blocker source:",
         "Older downstream assumptions should be treated as stale",
         "roadmap now adds `SEMDEVSTALE` as the nearest downstream phase",
-        "roadmap now adds downstream phase `SEMSCRIPTABORT`",
+        "roadmap now adds downstream phase `SEMROOTTESTABORT`",
     ):
         assert expected in text
 
@@ -133,8 +140,8 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
     text = _normalized(EVIDENCE)
 
     for expected in (
-        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py -q --no-cov -k \"reindex_resume or deployment_runbook_shape or stale or lexical or force_full or trace\"",
-        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_repository_commands.py -q --no-cov -k \"stale or force_full or boundary or reindex_resume or deployment_runbook_shape or interrupted\"",
+        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py -q --no-cov -k \"run_test_batch or validate_mcp_comprehensive or force_full or lexical or trace or interrupted\"",
+        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_repository_commands.py -q --no-cov -k \"run_test_batch or validate_mcp_comprehensive or force_full or interrupted or boundary\"",
         "uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov",
         "env OPENAI_API_KEY=dummy-local-key MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5 uv run mcp-index repository sync --force-full",
         "env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status",
@@ -147,6 +154,8 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "tests/test_reindex_resume.py",
         "scripts/run_test_batch.py",
         "scripts/validate_mcp_comprehensive.py",
+        "tests/root_tests/test_voyage_api.py",
+        "tests/root_tests/run_reranking_tests.py",
         "scripts/quick_mcp_vs_native_validation.py",
         "tests/test_artifact_publish_race.py",
         "Last sync error:",

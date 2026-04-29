@@ -224,6 +224,15 @@ def _print_quick_validation_python_boundary(prefix: str, repo_path: Path) -> Non
         )
 
 
+def _print_validate_mcp_comprehensive_python_boundary(prefix: str, repo_path: Path) -> None:
+    script_path = repo_path / "scripts" / "validate_mcp_comprehensive.py"
+    if script_path.is_file():
+        click.echo(
+            f"{prefix}Lexical boundary: using exact bounded Python indexing for "
+            "scripts/validate_mcp_comprehensive.py"
+        )
+
+
 def _print_artifact_publish_race_python_boundary(prefix: str, repo_path: Path) -> None:
     test_path = repo_path / "tests" / "test_artifact_publish_race.py"
     if test_path.is_file():
@@ -635,6 +644,7 @@ def status(repo_id: Optional[str]):
         _print_jedi_markdown_boundary("  ", Path(status["path"]))
         _print_visual_report_python_boundary("  ", Path(status["path"]))
         _print_quick_validation_python_boundary("  ", Path(status["path"]))
+        _print_validate_mcp_comprehensive_python_boundary("  ", Path(status["path"]))
         _print_artifact_publish_race_python_boundary("  ", Path(status["path"]))
         _print_devcontainer_json_boundary("  ", Path(status["path"]))
         _print_force_full_exit_trace("  ", status.get("force_full_exit_trace"))

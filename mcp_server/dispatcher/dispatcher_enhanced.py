@@ -1,5 +1,6 @@
 """Enhanced dispatcher with dynamic plugin loading via PluginFactory."""
 
+import ast
 import asyncio
 import hashlib
 import json
@@ -116,6 +117,10 @@ _INDEX_EXCLUDED_FILENAMES = {
     "complete_indexing_results.json",
     "mcp_direct_test_results.json",
     "test_queries.json",
+}
+
+_EXACT_BOUNDED_PYTHON_PATHS = {
+    "scripts/validate_mcp_comprehensive.py": "exact_validate_mcp_comprehensive_rebound",
 }
 
 _REPO_SCOPE_SUMMARY_PASS_BUDGET = 8
@@ -1986,10 +1991,17 @@ class EnhancedDispatcher:
                     actual_hash=None,
                 )
 
+            bounded_python_shard = self._build_exact_bounded_python_shard(
+                path, content, ctx.workspace_root
+            )
             bounded_json_shard = self._build_exact_bounded_json_shard(
                 path, content, ctx.workspace_root
             )
-            if bounded_json_shard is not None:
+            if bounded_python_shard is not None:
+                plugin_language = "python"
+                plugin_lang = "python"
+                shard = bounded_python_shard
+            elif bounded_json_shard is not None:
                 plugin_language = "json"
                 plugin_lang = "json"
                 shard = bounded_json_shard
@@ -2002,7 +2014,7 @@ class EnhancedDispatcher:
             # Index the file
             start_time = time.time()
             logger.info(f"Indexing {path} with {plugin_lang} plugin")
-            if bounded_json_shard is None:
+            if bounded_python_shard is None and bounded_json_shard is None:
                 shard = plugin.indexFile(path, content)
             try:
                 self._persist_index_shard(ctx, path, content, plugin_language, shard)
@@ -2029,7 +2041,12 @@ class EnhancedDispatcher:
                 pass
 
             # Record performance if advanced features enabled
-            if self._enable_advanced and self._router and bounded_json_shard is None:
+            if (
+                self._enable_advanced
+                and self._router
+                and bounded_python_shard is None
+                and bounded_json_shard is None
+            ):
                 execution_time = time.time() - start_time
                 self._router.record_performance(plugin, execution_time)
 
@@ -2090,6 +2107,66 @@ class EnhancedDispatcher:
             "metadata": {
                 "bounded_chunk_path": True,
                 "bounded_path_reason": "exact_devcontainer_json_rebound",
+            },
+        }
+
+    def _build_exact_bounded_python_shard(
+        self, path: Path, content: str, workspace_root: Path
+    ) -> Optional[Dict[str, Any]]:
+        if path.suffix.lower() != ".py":
+            return None
+        try:
+            relative_path = path.resolve().relative_to(workspace_root.resolve()).as_posix()
+        except ValueError:
+            return None
+        bounded_path_reason = _EXACT_BOUNDED_PYTHON_PATHS.get(relative_path)
+        if bounded_path_reason is None:
+            return None
+
+        tree = ast.parse(content)
+        symbols = []
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                symbols.append(
+                    {
+                        "symbol": node.name,
+                        "kind": "function",
+                        "signature": f"def {node.name}(...):",
+                        "line": node.lineno,
+                        "span": (node.lineno, getattr(node, "end_lineno", node.lineno)),
+                    }
+                )
+                continue
+            if not isinstance(node, ast.ClassDef):
+                continue
+            symbols.append(
+                {
+                    "symbol": node.name,
+                    "kind": "class",
+                    "signature": f"class {node.name}:",
+                    "line": node.lineno,
+                    "span": (node.lineno, getattr(node, "end_lineno", node.lineno)),
+                }
+            )
+            for child in node.body:
+                if not isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                symbols.append(
+                    {
+                        "symbol": child.name,
+                        "kind": "method",
+                        "signature": f"def {child.name}(...):",
+                        "line": child.lineno,
+                        "span": (child.lineno, getattr(child, "end_lineno", child.lineno)),
+                    }
+                )
+
+        return {
+            "symbols": symbols,
+            "chunks": [],
+            "metadata": {
+                "bounded_chunk_path": True,
+                "bounded_path_reason": bounded_path_reason,
             },
         }
 

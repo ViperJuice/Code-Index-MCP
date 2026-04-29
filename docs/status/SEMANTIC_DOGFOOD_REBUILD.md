@@ -1,7 +1,7 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T11:17:51Z`.
-- Observed commit: `a186b352`.
+- Evidence captured: `2026-04-29T11:43:19Z`.
+- Observed commit: `098c1ad1`.
 - Prior SEMDISKIO live-rerun anchor: `2026-04-29T10:35:02Z` on observed
   commit `c8b2d724`.
 - Prior SEMSCRIPTREBOUND evidence anchor: `2026-04-29T10:13:12Z` on observed
@@ -12,7 +12,7 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMTESTSTALE.md`.
+- Phase plan: `plans/phase-plan-v7-SEMSCRIPTABORT.md`.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMSCRIPTABORT` after SEMTESTSTALE proved the later
   `tests/test_deployment_runbook_shape.py ->
@@ -349,6 +349,53 @@ cleared:
 - The next blocker is no longer the later test-pair stale trace. It is the
   later script-family abort that still exits with code `135`.
 
+## SEMSCRIPTABORT Live Rerun Check
+
+SEMSCRIPTABORT repaired the later
+`scripts/run_test_batch.py -> scripts/validate_mcp_comprehensive.py` lexical
+seam on the current `HEAD`, and the refreshed live rerun advanced beyond that
+pair before failing later in `tests/root_tests`.
+
+Code/test repair completed in this phase:
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py` now bypasses chunking for
+  the exact path `scripts/validate_mcp_comprehensive.py` while still
+  persisting symbols and lexical content.
+- `mcp_server/cli/repository_commands.py` now reports the exact bounded Python
+  boundary for `scripts/validate_mcp_comprehensive.py`.
+- `tests/test_dispatcher.py`, `tests/test_git_index_manager.py`, and
+  `tests/test_repository_commands.py` freeze the later script-pair progress
+  and post-repair boundary contract.
+
+Observed progression on the refreshed live repo-local force-full command:
+
+- The SEMSCRIPTABORT live rerun started on observed commit
+  `098c1ad19c3957af05bf1bfaf4ee6ceb07b73cce`.
+- At `2026-04-29T11:43:04Z`, the durable trace had already advanced to
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/tests/real_world/conftest.py`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/tests/real_world/test_redis_caching.py`.
+- At `2026-04-29T11:43:05Z`, `repository status` reported the same live rerun at
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/tests/root_tests/test_voyage_api.py`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/tests/root_tests/run_reranking_tests.py`.
+- The force-full command still exited with code `135`.
+- When observed again through `repository status` at `2026-04-29T11:43:19Z`
+  after that live process had already exited, the durable trace had been
+  rewritten from `running` to `interrupted` while preserving the same later
+  root-test pair.
+
+Current downstream verdict confirms the later script seam is cleared:
+
+- `scripts/run_test_batch.py`: no longer the latest durable
+  `last_progress_path`.
+- `scripts/validate_mcp_comprehensive.py`: no longer the active
+  `in_flight_path`.
+- `tests/root_tests/test_voyage_api.py`: latest durable `last_progress_path`.
+- `tests/root_tests/run_reranking_tests.py`: current exact `in_flight_path`.
+- The next blocker is no longer the later script-family abort. It is the
+  later root-test abort that still exits with code `135`.
+
 ## Rebuild Command
 
 ```bash
@@ -357,7 +404,7 @@ env OPENAI_API_KEY=dummy-local-key MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5 uv run mc
 
 ## Rebuild Evidence
 
-Observed runtime state during the current SEMTESTSTALE rerun check:
+Observed runtime state during the current SEMSCRIPTABORT rerun check:
 
 - Files indexed in SQLite: `1393`
 - Code chunks indexed in SQLite: `28013`
@@ -367,34 +414,37 @@ Observed runtime state during the current SEMTESTSTALE rerun check:
 - Chunks missing vectors: `28013`
 
 Durable stage trace from `.mcp-index/force_full_exit_trace.json` after the
-post-abort SEMTESTSTALE rerun evidence capture:
+post-abort SEMSCRIPTABORT rerun evidence capture:
 
 - Trace status: `interrupted`
 - Trace stage: `lexical_walking`
 - Trace stage family: `lexical`
-- Trace timestamp: `2026-04-29T11:17:51Z`
+- Trace timestamp: `2026-04-29T11:43:19Z`
 - Trace blocker source: `lexical_mutation`
-- Trace current commit: `a186b352144a8211552afa432f42d90d2c79546d`
+- Trace current commit: `098c1ad19c3957af05bf1bfaf4ee6ceb07b73cce`
 - Trace indexed commit before:
   `e2e9519858c3683c06b152c94a99e52098beaec6`
 - Last progress path:
-  `/home/viperjuice/code/Code-Index-MCP/scripts/run_test_batch.py`
+  `/home/viperjuice/code/Code-Index-MCP/tests/root_tests/test_voyage_api.py`
 - In-flight path:
-  `/home/viperjuice/code/Code-Index-MCP/scripts/validate_mcp_comprehensive.py`
+  `/home/viperjuice/code/Code-Index-MCP/tests/root_tests/run_reranking_tests.py`
 
 Runtime containment verdict for the refreshed live rerun:
 
-- The repaired SEMTESTSTALE liveness contract is frozen in unit coverage, and
-  the live rerun now advances well past both `.devcontainer/devcontainer.json`
-  and the later
+- The repaired SEMSCRIPTABORT contract is frozen in unit coverage, and the
+  live rerun now advances well past both the later
+  `scripts/run_test_batch.py -> scripts/validate_mcp_comprehensive.py` seam
+  and the earlier
   `tests/test_deployment_runbook_shape.py -> tests/test_reindex_resume.py`
   seam.
-- The current exact blocker is the later script-family pair
-  `scripts/run_test_batch.py -> scripts/validate_mcp_comprehensive.py`.
+- The current exact blocker is the later root-test pair
+  `tests/root_tests/test_voyage_api.py ->
+  tests/root_tests/run_reranking_tests.py`.
 - The live rerun still exits with code `135`, but `repository status` now
   rewrites the dead-process durable trace from `status=running` to
   `status=interrupted` instead of reporting a stale-running snapshot.
 - The exact bounded Python seams for
+  `scripts/validate_mcp_comprehensive.py`,
   `tests/test_artifact_publish_race.py`,
   `scripts/create_multi_repo_visual_report.py`, and
   `scripts/quick_mcp_vs_native_validation.py` remain preserved as earlier
@@ -405,7 +455,8 @@ Runtime containment verdict for the refreshed live rerun:
 ## Repository Status
 
 `env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status`
-after the SEMTESTSTALE live rerun had already exited with code `135` reported:
+after the SEMSCRIPTABORT live rerun had already exited with code `135`
+reported:
 
 - Lexical readiness: `stale_commit`
 - Semantic readiness: `summaries_missing`
@@ -428,6 +479,8 @@ after the SEMTESTSTALE live rerun had already exited with code `135` reported:
 - Lexical boundary:
   `using exact bounded Python indexing for scripts/quick_mcp_vs_native_validation.py`
 - Lexical boundary:
+  `using exact bounded Python indexing for scripts/validate_mcp_comprehensive.py`
+- Lexical boundary:
   `using exact bounded Python indexing for tests/test_artifact_publish_race.py`
 - Lexical boundary:
   `using exact bounded JSON indexing for .devcontainer/devcontainer.json`
@@ -436,13 +489,13 @@ after the SEMTESTSTALE live rerun had already exited with code `135` reported:
 - Trace stage family: `lexical`
 - Trace blocker source: `lexical_mutation`
 - Last progress path:
-  `/home/viperjuice/code/Code-Index-MCP/scripts/run_test_batch.py`
+  `/home/viperjuice/code/Code-Index-MCP/tests/root_tests/test_voyage_api.py`
 - In-flight path:
-  `/home/viperjuice/code/Code-Index-MCP/scripts/validate_mcp_comprehensive.py`
+  `/home/viperjuice/code/Code-Index-MCP/tests/root_tests/run_reranking_tests.py`
 
 Repository/index freshness evidence:
 
-- Current commit: `7e547c77`
+- Current commit: `098c1ad1`
 - Indexed commit: `e2e95198`
 
 ## Query Comparison
@@ -457,33 +510,33 @@ Fixed dogfood prompt: `how does semantic setup validate qdrant and embedding rea
 - `symbol` and lexical probes still point operators at
   `mcp_server/dispatcher/dispatcher_enhanced.py`,
   `mcp_server/cli/repository_commands.py`, and the renewed later
-  `scripts/run_test_batch.py ->
-  scripts/validate_mcp_comprehensive.py` lexical blocker.
+  `tests/root_tests/test_voyage_api.py ->
+  tests/root_tests/run_reranking_tests.py` lexical blocker.
 - The remaining downstream work is no longer centered on the renewed
-  `.devcontainer/devcontainer.json` stale-running lexical trace or the later
-  test-path stale/crash rebound. It is now centered on the later script-family
-  abort captured by `SEMSCRIPTABORT`.
+  `.devcontainer/devcontainer.json` stale-running lexical trace, the later
+  test-path stale/crash rebound, or the later script-family abort. It is now
+  centered on the later root-test abort captured by `SEMROOTTESTABORT`.
 
 ## Dogfood Verdict
 
 The exact verdict string for contract checks is `local multi-repo dogfooding`.
 
-Local multi-repo dogfooding is **still not ready** after SEMTESTSTALE.
+Local multi-repo dogfooding is **still not ready** after SEMSCRIPTABORT.
 
 Why:
 
-- The SEMTESTSTALE code/test repair is real: dead-process liveness
-  normalization and later-pair durable progress preservation are now covered
-  in unit tests.
+- The SEMSCRIPTABORT code/test repair is real: the later script seam now has a
+  bounded dispatcher path, exact status reporting, and durable progress
+  preservation in unit tests.
 - The stale trace bug from SEMJEDI remains closed as a unit/status contract:
   the operator surface now distinguishes missing traces, stale-running traces,
   and storage-closeout traces.
-- The refreshed live rerun on commit `a186b352` cleared the later stale-running
-  test seam and now reports a truthful `interrupted` trace after the process
-  exits.
-- The live rerun still exits with code `135` on the later script-family pair
-  `scripts/run_test_batch.py ->
-  scripts/validate_mcp_comprehensive.py`.
+- The refreshed live rerun on commit `098c1ad1` cleared the later
+  script-family seam and now reports a truthful `interrupted` trace after the
+  process exits.
+- The live rerun still exits with code `135` on the later root-test pair
+  `tests/root_tests/test_voyage_api.py ->
+  tests/root_tests/run_reranking_tests.py`.
 - The partial runtime still ends with `chunk_summaries = 0` and
   `semantic_points = 0`.
 
@@ -498,19 +551,21 @@ Steering outcome:
 - SEMDEVSTALE cleared the renewed `.devcontainer/devcontainer.json` seam on
   the current head, and SEMTESTSTALE restored truthful terminalization after
   the later test-path crash.
-- The roadmap now adds downstream phase `SEMSCRIPTABORT`.
+- SEMSCRIPTABORT cleared the later
+  `scripts/run_test_batch.py -> scripts/validate_mcp_comprehensive.py` seam.
+- The roadmap now adds downstream phase `SEMROOTTESTABORT`.
 - Older downstream assumptions should be treated as stale, including any
   downstream phase plan or handoff that still treats the active current-head
-  blocker as either the stale-running later test pair or the renewed
-  `.devcontainer/devcontainer.json` rebound.
+  blocker as either the stale-running later test pair, the script-family
+  abort, or the renewed `.devcontainer/devcontainer.json` rebound.
 
 ## Verification
 
-Verification sequence for this SEMTESTSTALE slice:
+Verification sequence for this SEMSCRIPTABORT slice:
 
 ```bash
-env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py -q --no-cov -k "reindex_resume or deployment_runbook_shape or stale or lexical or force_full or trace"
-env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_repository_commands.py -q --no-cov -k "stale or force_full or boundary or reindex_resume or deployment_runbook_shape or interrupted"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py -q --no-cov -k "run_test_batch or validate_mcp_comprehensive or force_full or lexical or trace or interrupted"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_repository_commands.py -q --no-cov -k "run_test_batch or validate_mcp_comprehensive or force_full or interrupted or boundary"
 uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 env OPENAI_API_KEY=dummy-local-key MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5 uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status

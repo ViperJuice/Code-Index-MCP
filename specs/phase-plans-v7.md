@@ -2120,6 +2120,63 @@ script-family pair.
 - IF-0-SEMSCRIPTABORT-1 — later script-family abort trace recovery and
   evidence contract.
 
+### Phase 39 — Post-Script Root-Test Abort Trace Recovery (SEMROOTTESTABORT)
+
+**Objective**
+
+Repair or truthfully classify the later repo-local force-full abort exposed
+after SEMSCRIPTABORT clears
+`scripts/run_test_batch.py -> scripts/validate_mcp_comprehensive.py`, so a
+rerun no longer exits with code `135` after advancing into
+`tests/root_tests/test_voyage_api.py -> tests/root_tests/run_reranking_tests.py`
+without an exact downstream blocker.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMSCRIPTABORT head
+      no longer exits with code `135` after advancing to
+      `tests/root_tests/test_voyage_api.py -> tests/root_tests/run_reranking_tests.py`
+      without either completing or naming a later exact blocker truthfully.
+- [ ] `force_full_exit_trace.json` and `uv run mcp-index repository status`
+      either advance durably beyond
+      `tests/root_tests/test_voyage_api.py -> tests/root_tests/run_reranking_tests.py`
+      or fail closed with the real later root-test blocker.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` is refreshed with the
+      SEMSCRIPTABORT repair, the later root-test-pair evidence on commit
+      `098c1ad1`, and the final live verdict for the rerun.
+
+**Scope notes**
+
+This phase exists only because SEMSCRIPTABORT proved the later
+`scripts/run_test_batch.py -> scripts/validate_mcp_comprehensive.py`
+script seam is cleared, but the refreshed live rerun on observed commit
+`098c1ad1` later exited with code `135` after advancing into an exact
+root-test pair.
+
+**Non-goals**
+
+- No reopening of the cleared later script-pair seam unless the live rerun
+  re-anchors there again.
+- No reopening of earlier `.devcontainer`, publish-race, quick-validation, or
+  later test-pair stale-trace slices unless the live rerun re-anchors there
+  again.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+
+**Depends on**
+- SEMSCRIPTABORT
+
+**Produces**
+- IF-0-SEMROOTTESTABORT-1 — later root-test abort trace recovery and evidence
+  contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -2161,6 +2218,7 @@ SEMCONTRACT
   -> SEMDEVSTALE
   -> SEMTESTSTALE
   -> SEMSCRIPTABORT
+  -> SEMROOTTESTABORT
 ```
 
 ## Execution Notes
@@ -2198,6 +2256,11 @@ SEMCONTRACT
   fails to reach semantic closeout on the current head and instead leaves a
   renewed stale-running lexical trace, because the next repair is then no
   longer a storage-closeout slice.
+- SEMSCRIPTABORT should amend the roadmap immediately if the refreshed live
+  rerun clears `scripts/run_test_batch.py ->
+  scripts/validate_mcp_comprehensive.py` but exposes a later exact blocker
+  such as `tests/root_tests/test_voyage_api.py ->
+  tests/root_tests/run_reranking_tests.py`.
 - SEMREADYFIX exists only if SEMDOGFOOD proves the default local dogfood path
   is still blocked; it should repair that blocker and then rerun the dogfood
   proof instead of widening into unrelated semantic work.
