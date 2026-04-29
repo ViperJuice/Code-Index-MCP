@@ -22,8 +22,8 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
 
     for expected in (
         "# Semantic Dogfood Rebuild",
-        "Phase plan: `plans/phase-plan-v7-SEMCROSSPLANS.md`",
-        "Prior phase plan: `plans/phase-plan-v7-SEMPHASEPLANS.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMPHASETAIL.md`",
+        "Prior phase plan: `plans/phase-plan-v7-SEMCROSSPLANS.md`",
         "## Reset Boundary",
         "## SEMTRACEFRESHNESS Live Trace Recovery",
         "## SEMPUBLISHRACE Live Rerun Check",
@@ -44,6 +44,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
         "## SEMSCRIPTLANGS Live Rerun Check",
         "## SEMPHASEPLANS Live Rerun Check",
         "## SEMCROSSPLANS Live Rerun Check",
+        "## SEMPHASETAIL Live Rerun Check",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -122,6 +123,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "2026-04-29T15:24:06Z",
         "2026-04-29T15:51:03Z",
         "2026-04-29T15:51:12Z",
+        "2026-04-29T16:07:22Z",
         "2026-04-29T15:37:54Z",
         "2026-04-29T15:37:57Z",
         "098c1ad1",
@@ -190,6 +192,8 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "plans/phase-plan-v7-SEMWALKGAP.md",
         "plans/phase-plan-v7-SEMSYNCFIX.md",
         "plans/phase-plan-v7-SEMVISUALREPORT.md",
+        "plans/phase-plan-v6-WATCH.md",
+        "plans/phase-plan-v1-p19.md",
         "ai_docs/*_overview.md",
         ".devcontainer/devcontainer.json",
         "stale-running snapshot",
@@ -212,6 +216,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "roadmap now adds downstream phase `SEMPHASEPLANS`",
         "roadmap now adds downstream phase `SEMCROSSPLANS`",
         "roadmap now adds downstream phase `SEMPHASETAIL`",
+        "roadmap now adds downstream phase `SEMLEGACYPLANS`",
     ):
         assert expected in text
 
@@ -253,6 +258,8 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "plans/phase-plan-v7-SEMWALKGAP.md",
         "plans/phase-plan-v7-SEMSYNCFIX.md",
         "plans/phase-plan-v7-SEMVISUALREPORT.md",
+        "plans/phase-plan-v6-WATCH.md",
+        "plans/phase-plan-v1-p19.md",
         "Last sync error:",
         "disk I/O error",
         "Trace status: `interrupted`",
@@ -268,13 +275,17 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "Lexical boundary: using exact bounded Markdown indexing for docs/validation/ga-closeout-decision.md",
         "Lexical boundary: using exact bounded Markdown indexing for docs/validation/mre2e-evidence.md",
         "Lexical boundary: using exact bounded Markdown indexing for docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md -> docs/benchmarks/production_benchmark.md",
+        "Lexical boundary: using exact bounded Markdown indexing for plans/phase-plan-v7-SEMSYNCFIX.md -> plans/phase-plan-v7-SEMVISUALREPORT.md",
         "Lexical boundary: using exact bounded Python indexing for scripts/migrate_large_index_to_multi_repo.py -> scripts/check_index_languages.py",
         "Lexical boundary: using exact bounded JSON indexing for analysis_archive/semantic_vs_sql_comparison_1750926162.json after analysis_archive/scripts_archive/scripts_test_files/verify_mcp_fix.py",
         "fixture repositories under test_workspace/ are ignored during lexical walking",
         "SEMPHASEPLANS acceptance is satisfied for its named blocker",
         "SEMCROSSPLANS acceptance is satisfied for its named blocker",
-        "repository status` still advertises only the earlier bounded lexical surfaces",
-        "Phase plan: `plans/phase-plan-v7-SEMCROSSPLANS.md`",
-        "Prior phase plan: `plans/phase-plan-v7-SEMPHASEPLANS.md`",
+        "SEMPHASETAIL acceptance is satisfied for its named blocker",
+        "Phase plan: `plans/phase-plan-v7-SEMPHASETAIL.md`",
+        "Prior phase plan: `plans/phase-plan-v7-SEMCROSSPLANS.md`",
+        "repository status` now advertises the repaired exact bounded lexical surface",
+        "uv run pytest tests/test_dispatcher.py -q --no-cov -k \"phase_plan or SEMSYNCFIX or SEMVISUALREPORT or markdown or lexical or bounded\"",
+        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k \"phase_plan or SEMSYNCFIX or SEMVISUALREPORT or lexical or interrupted or boundary\"",
     ):
         assert expected in text
