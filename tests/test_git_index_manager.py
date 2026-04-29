@@ -3389,6 +3389,104 @@ def test_force_full_sync_durable_trace_moves_past_historical_v1_phase_plan_pair(
     assert str(blocked_doc) not in {trace["last_progress_path"], trace["in_flight_path"]}
 
 
+def test_get_repository_status_preserves_semjedi_p4_phase_plan_pair_trace(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace_path.write_text(
+        json.dumps(
+            {
+                "status": "interrupted",
+                "stage": "lexical_walking",
+                "stage_family": "lexical",
+                "trace_timestamp": "2026-04-29T20:38:17Z",
+                "current_commit": commit,
+                "indexed_commit_before": "older-indexed-commit",
+                "last_progress_path": str(repo / "plans" / "phase-plan-v7-SEMJEDI.md"),
+                "in_flight_path": str(repo / "plans" / "phase-plan-v1-p4.md"),
+                "blocker_source": "lexical_mutation",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    status = manager.get_repository_status(repo_info.repository_id)
+
+    assert status["force_full_exit_trace"]["status"] == "interrupted"
+    assert status["force_full_exit_trace"]["stage"] == "lexical_walking"
+    assert status["force_full_exit_trace"]["stage_family"] == "lexical"
+    assert status["force_full_exit_trace"]["last_progress_path"] == str(
+        repo / "plans" / "phase-plan-v7-SEMJEDI.md"
+    )
+    assert status["force_full_exit_trace"]["in_flight_path"] == str(
+        repo / "plans" / "phase-plan-v1-p4.md"
+    )
+    assert "phase-plan-v1-p13.md" not in (
+        status["force_full_exit_trace"]["last_progress_path"] or ""
+    )
+
+
+def test_force_full_sync_durable_trace_moves_past_semjedi_p4_phase_plan_pair(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+
+    prior_doc = repo / "plans" / "phase-plan-v7-SEMJEDI.md"
+    blocked_doc = repo / "plans" / "phase-plan-v1-p4.md"
+    later_doc = repo / "specs" / "phase-plans-v7.md"
+    in_flight_doc = repo / "ai_docs" / "qdrant.md"
+    later_doc.parent.mkdir(parents=True, exist_ok=True)
+    in_flight_doc.parent.mkdir(parents=True, exist_ok=True)
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    registry.update_git_state.return_value = {"commit": commit, "branch": "main"}
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    manager._resolve_ctx = MagicMock(return_value=ctx)
+    manager._index_exists = MagicMock(return_value=True)
+    manager._index_has_durable_rows = MagicMock(return_value=True)
+    manager._full_index = MagicMock(
+        return_value=UpdateResult(
+            indexed=3,
+            failed=1,
+            errors=["Lexical indexing timed out while processing ai_docs/qdrant.md"],
+            low_level={
+                "lexical_stage": "blocked_file_timeout",
+                "lexical_files_attempted": 4,
+                "lexical_files_completed": 3,
+                "last_progress_path": str(later_doc),
+                "in_flight_path": str(in_flight_doc),
+                "low_level_blocker": {
+                    "code": "lexical_file_timeout",
+                    "message": "Lexical indexing timed out while processing ai_docs/qdrant.md",
+                },
+            },
+            semantic={"semantic_stage": "not_run"},
+        )
+    )
+
+    result = manager.sync_repository_index(repo_info.repository_id, force_full=True)
+
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert result.action == "failed"
+    assert trace["status"] == "completed"
+    assert trace["stage"] == "force_full_failed"
+    assert trace["stage_family"] == "final_closeout"
+    assert trace["blocker_source"] == "lexical_mutation"
+    assert trace["last_progress_path"] == str(later_doc)
+    assert trace["in_flight_path"] == str(in_flight_doc)
+    assert str(prior_doc) not in {trace["last_progress_path"], trace["in_flight_path"]}
+    assert str(blocked_doc) not in {trace["last_progress_path"], trace["in_flight_path"]}
+
+
 def test_get_repository_status_preserves_support_docs_pair_trace(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)

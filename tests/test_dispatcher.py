@@ -2407,6 +2407,164 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "Later blocker" in semphasetail_fts_rows[0][0]
         assert ".codex/phase-loop/" in gagov_fts_rows[0][0]
 
+    def test_index_directory_uses_exact_bounded_markdown_path_for_semjedi_p4_pair(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        plans_dir = repo / "plans"
+        plans_dir.mkdir(parents=True)
+        semjedi_doc = plans_dir / "phase-plan-v7-SEMJEDI.md"
+        p4_doc = plans_dir / "phase-plan-v1-p4.md"
+        unrelated_doc = plans_dir / "phase-plan-v7-SEMUNRELATED.md"
+        semjedi_doc.write_text(
+            "---\n"
+            "title: Phase Plan v7 SEMJEDI\n"
+            "---\n"
+            "# SEMJEDI Tail Recovery\n\n"
+            "## Context\n\n"
+            "### Later blocker\n"
+            "- Preserve bounded frontmatter and heading discoverability\n",
+            encoding="utf-8",
+        )
+        p4_doc.write_text(
+            "\"Historical phase plan\"\n\n"
+            "# PHASE-4-legacy-plan\n\n"
+            "## Context\n\n"
+            "### Execution notes\n"
+            "- Keep quoted preamble discoverable\n",
+            encoding="utf-8",
+        )
+        unrelated_doc.write_text(
+            "# SEMUNRELATED Notes\n\n"
+            "## Scope\n\n"
+            "### Guardrail\n"
+            "- Keep generic phase-plan handling intact\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        def _unexpected(*_args, **_kwargs):
+            raise AssertionError(
+                "heavy Markdown path should not run for the exact SEMJEDI/P4 phase-plan files"
+            )
+
+        monkeypatch.setattr(MarkdownPlugin, "extract_structure", _unexpected)
+        monkeypatch.setattr(MarkdownPlugin, "chunk_document", _unexpected)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        plugin = MarkdownPlugin()
+        assert (
+            plugin._resolve_lightweight_reason(semjedi_doc, semjedi_doc.read_text(encoding="utf-8"))
+            == "mixed_semjedi_phase_plan_path"
+        )
+        assert (
+            plugin._resolve_lightweight_reason(p4_doc, p4_doc.read_text(encoding="utf-8"))
+            == "mixed_p4_phase_plan_path"
+        )
+        assert (
+            plugin._resolve_lightweight_reason(
+                unrelated_doc, unrelated_doc.read_text(encoding="utf-8")
+            )
+            == "roadmap_path"
+        )
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 3
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(semjedi_doc.resolve()),
+            str(p4_doc.resolve()),
+            str(unrelated_doc.resolve()),
+        }
+        with store._get_connection() as conn:
+            semjedi_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'plans/phase-plan-v7-SEMJEDI.md') ORDER BY id"
+                ).fetchall()
+            ]
+            p4_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'plans/phase-plan-v1-p4.md') ORDER BY id"
+                ).fetchall()
+            ]
+            unrelated_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'plans/phase-plan-v7-SEMUNRELATED.md') ORDER BY id"
+                ).fetchall()
+            ]
+            semjedi_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v7-SEMJEDI.md')"
+            ).fetchone()[0]
+            p4_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v1-p4.md')"
+            ).fetchone()[0]
+            semjedi_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v7-SEMJEDI.md')"
+            ).fetchall()
+            p4_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v1-p4.md')"
+            ).fetchall()
+        store.close()
+
+        assert semjedi_symbols == [
+            "Phase Plan v7 SEMJEDI",
+            "SEMJEDI Tail Recovery",
+            "Context",
+            "Later blocker",
+        ]
+        assert p4_symbols == [
+            "PHASE-4-legacy-plan",
+            "PHASE-4-legacy-plan",
+            "Context",
+            "Execution notes",
+        ]
+        assert unrelated_symbols == [
+            "SEMUNRELATED Notes",
+            "SEMUNRELATED Notes",
+            "Scope",
+            "Guardrail",
+        ]
+        assert semjedi_chunk_count == 0
+        assert p4_chunk_count == 0
+        assert len(semjedi_fts_rows) == 1
+        assert len(p4_fts_rows) == 1
+        assert "Later blocker" in semjedi_fts_rows[0][0]
+        assert "Execution notes" in p4_fts_rows[0][0]
+
     def test_index_directory_uses_bounded_markdown_path_for_support_docs_pair(
         self, tmp_path, monkeypatch
     ):

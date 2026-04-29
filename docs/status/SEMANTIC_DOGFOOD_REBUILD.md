@@ -2270,6 +2270,77 @@ Steering outcome:
   `plans/phase-plan-v1-p13.md ->
   plans/phase-plan-v1-p3.md`.
 
+## SEMJEDIP4TAIL Live Rerun Check
+
+SEMJEDIP4TAIL confirmed that the later mixed-generation phase-plan seam is no
+longer the active lexical tail and that the refreshed live force-full rerun
+now exposes a later modern v7 phase-plan seam.
+
+Code/test repair completed in this phase:
+
+- `mcp_server/plugins/markdown_plugin/plugin.py` now names
+  `plans/phase-plan-v7-SEMJEDI.md` and `plans/phase-plan-v1-p4.md` as exact
+  bounded Markdown paths without widening into a blanket
+  `plans/phase-plan-*.md` bypass.
+- `mcp_server/cli/repository_commands.py` now advertises the repaired exact
+  bounded lexical boundary for
+  `plans/phase-plan-v7-SEMJEDI.md ->
+  plans/phase-plan-v1-p4.md`:
+  `Lexical boundary: using exact bounded Markdown indexing for plans/phase-plan-v7-SEMJEDI.md -> plans/phase-plan-v1-p4.md`.
+- `tests/test_dispatcher.py`, `tests/test_git_index_manager.py`, and
+  `tests/test_repository_commands.py` now freeze dispatcher discoverability,
+  durable trace progression, and status reporting for the SEMJEDI/P4
+  phase-plan pair without widening into a broader roadmap shortcut.
+- `plans/phase-plan-v7-SEMJEDI.md` and `plans/phase-plan-v1-p4.md` did not
+  require content simplification in this phase; the bounded Markdown path plus
+  exact operator contract were sufficient and the live rerun proved the real
+  blocker had moved later.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMJEDIP4TAIL live rerun started on observed commit
+  `404664a1` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-29T20:58:32Z`, `.mcp-index/force_full_exit_trace.json` was
+  still a running lexical snapshot with
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v7-SEMCROSSPLANS.md`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v7-SEMDOGFOOD.md`.
+- At `2026-04-29T20:58:40Z`, a refreshed `repository status` terminalized that
+  snapshot to `Trace status: interrupted` with the same
+  `plans/phase-plan-v7-SEMCROSSPLANS.md ->
+  plans/phase-plan-v7-SEMDOGFOOD.md` pair while continuing to advertise the
+  repaired exact bounded Markdown surface for the cleared
+  `plans/phase-plan-v7-SEMJEDI.md ->
+  plans/phase-plan-v1-p4.md` seam.
+- The SEMJEDIP4TAIL target pair is no longer the active blocker:
+  `plans/phase-plan-v7-SEMJEDI.md ->
+  plans/phase-plan-v1-p4.md`.
+- SQLite runtime counts after the rerun were
+  `files = 1064`, `code_chunks = 13095`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` also remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+
+Steering outcome:
+
+- SEMJEDIP4TAIL acceptance is satisfied for its named blocker: the live
+  watchdog no longer terminalizes on
+  `plans/phase-plan-v7-SEMJEDI.md ->
+  plans/phase-plan-v1-p4.md`.
+- The final authoritative rerun for this phase moved later and now reaches the
+  modern v7 phase-plan pair
+  `plans/phase-plan-v7-SEMCROSSPLANS.md ->
+  plans/phase-plan-v7-SEMDOGFOOD.md`.
+- The roadmap now adds downstream phase `SEMCROSSDOGTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMJEDIP4TAIL-era mixed-generation seam
+  `plans/phase-plan-v7-SEMJEDI.md ->
+  plans/phase-plan-v1-p4.md`.
+
 ## Verification
 
 Verification sequence for this SEMDOCTRUTHTAIL slice:

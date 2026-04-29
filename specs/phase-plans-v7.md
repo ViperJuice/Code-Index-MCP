@@ -3737,6 +3737,71 @@ plans/phase-plan-v1-p4.md`.
 - IF-0-SEMJEDIP4TAIL-1 — later SEMJEDI/P4 lexical recovery and evidence
   contract.
 
+### Phase 66 — Crossplans Dogfood Tail Recovery (SEMCROSSDOGTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later modern v7 phase-plan pair
+exposed after SEMJEDIP4TAIL:
+`plans/phase-plan-v7-SEMCROSSPLANS.md ->
+plans/phase-plan-v7-SEMDOGFOOD.md`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMJEDIP4TAIL head
+      either advances durably beyond the
+      `plans/phase-plan-v7-SEMCROSSPLANS.md ->
+      plans/phase-plan-v7-SEMDOGFOOD.md` pair or emits a truthful newer
+      blocker before the 120-second watchdog expires.
+- [ ] The chosen repair for the SEMCROSSPLANS/SEMDOGFOOD tail stays narrow,
+      tested, and does not reopen the repaired
+      `plans/phase-plan-v7-SEMJEDI.md ->
+      plans/phase-plan-v1-p4.md` boundary without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the SEMJEDIP4TAIL
+      rerun outcome and the final live verdict for the later
+      `plans/phase-plan-v7-SEMCROSSPLANS.md ->
+      plans/phase-plan-v7-SEMDOGFOOD.md` phase-plan pair.
+
+**Scope notes**
+
+This phase exists only if SEMJEDIP4TAIL proves the later mixed-generation
+phase-plan pair
+`plans/phase-plan-v7-SEMJEDI.md ->
+plans/phase-plan-v1-p4.md` is cleared, but the refreshed live rerun still
+terminalizes later in lexical walking on a modern v7 phase-plan pair such as
+`plans/phase-plan-v7-SEMCROSSPLANS.md ->
+plans/phase-plan-v7-SEMDOGFOOD.md`.
+
+**Non-goals**
+
+- No reopening of the repaired SEMJEDIP4TAIL mixed-generation plan recovery
+  once the live rerun has advanced beyond that seam.
+- No broad reopening of unrelated roadmap, evidence, or semantic-onboarding
+  artifacts unless the refreshed rerun proves the active blocker requires
+  them.
+- No blanket `plans/phase-plan-v7-*.md` bypass unless the refreshed rerun
+  proves the active blocker cannot be cleared with a narrower Markdown-path
+  repair.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/plugins/markdown_plugin/plugin.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `plans/phase-plan-v7-SEMCROSSPLANS.md`
+- `plans/phase-plan-v7-SEMDOGFOOD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMJEDIP4TAIL
+
+**Produces**
+- IF-0-SEMCROSSDOGTAIL-1 — later SEMCROSSPLANS/SEMDOGFOOD lexical recovery
+  and evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -3805,6 +3870,7 @@ SEMCONTRACT
   -> SEMSUPPORTTAIL
   -> SEMV1PLANTAIL
   -> SEMJEDIP4TAIL
+  -> SEMCROSSDOGTAIL
 ```
 
 ## Execution Notes

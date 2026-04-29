@@ -51,6 +51,8 @@ _EXACT_BOUNDED_MARKDOWN_PATHS = {
     "docs/support_matrix.md": "docs_support_matrix_path",
     "plans/phase-plan-v7-SEMPHASETAIL.md": "mixed_semphasetail_phase_plan_path",
     "plans/phase-plan-v5-gagov.md": "mixed_gagov_phase_plan_path",
+    "plans/phase-plan-v7-SEMJEDI.md": "mixed_semjedi_phase_plan_path",
+    "plans/phase-plan-v1-p4.md": "mixed_p4_phase_plan_path",
     "plans/phase-plan-v6-WATCH.md": "historical_watch_phase_plan_path",
     "plans/phase-plan-v1-p19.md": "historical_p19_phase_plan_path",
     "plans/phase-plan-v1-p13.md": "historical_p13_phase_plan_path",
@@ -96,6 +98,10 @@ class MarkdownPlugin(BaseDocumentPlugin):
         if _BOUNDED_MARKDOWN_NAME_RE.match(path.stem):
             return "changelog_path"
 
+        for relative_path, exact_reason in _EXACT_BOUNDED_MARKDOWN_PATHS.items():
+            if normalized_path.endswith(relative_path.lower()):
+                return exact_reason
+
         if _ROADMAP_MARKDOWN_NAME_RE.match(path.stem):
             return "roadmap_path"
 
@@ -110,10 +116,6 @@ class MarkdownPlugin(BaseDocumentPlugin):
 
         if path.parent.name.lower() == "ai_docs" and path.stem.lower().endswith("_overview"):
             return "ai_docs_overview_path"
-
-        for relative_path, exact_reason in _EXACT_BOUNDED_MARKDOWN_PATHS.items():
-            if normalized_path.endswith(relative_path):
-                return exact_reason
 
         return None
 

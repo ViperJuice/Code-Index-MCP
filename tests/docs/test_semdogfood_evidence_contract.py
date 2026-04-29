@@ -58,6 +58,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
         "## SEMDOCTRUTHTAIL Live Rerun Check",
         "## SEMSUPPORTTAIL Live Rerun Check",
         "## SEMV1PLANTAIL Live Rerun Check",
+        "## SEMJEDIP4TAIL Live Rerun Check",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -170,6 +171,8 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "2026-04-29T20:37:15Z",
         "2026-04-29T20:38:02Z",
         "2026-04-29T20:38:17Z",
+        "2026-04-29T20:58:32Z",
+        "2026-04-29T20:58:40Z",
         "2026-04-29T15:37:54Z",
         "2026-04-29T15:37:57Z",
         "098c1ad1",
@@ -194,6 +197,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "a7a71f24",
         "e78c2861",
         "dab8822a",
+        "404664a1",
         "6a909203",
         "40968140",
         "7335cf35",
@@ -249,6 +253,8 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "plans/phase-plan-v1-p3.md",
         "plans/phase-plan-v7-SEMJEDI.md",
         "plans/phase-plan-v1-p4.md",
+        "plans/phase-plan-v7-SEMCROSSPLANS.md",
+        "plans/phase-plan-v7-SEMDOGFOOD.md",
         "ai_docs/qdrant.md",
         "fast_test_results/fast_report_*.md",
         "test_workspace/real_repos/search_scaling/package.json",
@@ -314,6 +320,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "roadmap now adds downstream phase `SEMSUPPORTTAIL`",
         "roadmap now adds downstream phase `SEMV1PLANTAIL`",
         "roadmap now adds downstream phase `SEMJEDIP4TAIL`",
+        "roadmap now adds downstream phase `SEMCROSSDOGTAIL`",
     ):
         assert expected in text
 
