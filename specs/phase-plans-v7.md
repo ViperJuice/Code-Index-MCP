@@ -2065,6 +2065,61 @@ in lexical walking on a later exact test-file pair.
 - IF-0-SEMTESTSTALE-1 — later test-path stale-trace lexical recovery and
   evidence contract.
 
+### Phase 38 — Post-Test Script Abort Trace Recovery (SEMSCRIPTABORT)
+
+**Objective**
+
+Repair the later repo-local force-full abort exposed after SEMTESTSTALE clears
+the stale-running test pair, so a rerun no longer exits with code `135` after
+advancing into
+`scripts/run_test_batch.py -> scripts/validate_mcp_comprehensive.py` without a
+truthful final blocker.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMTESTSTALE head no
+      longer exits with code `135` after advancing to
+      `scripts/run_test_batch.py -> scripts/validate_mcp_comprehensive.py`
+      without either completing or naming a later exact blocker truthfully.
+- [ ] `force_full_exit_trace.json` and `uv run mcp-index repository status`
+      either advance durably beyond
+      `scripts/run_test_batch.py -> scripts/validate_mcp_comprehensive.py`
+      or fail closed with the real later script-family blocker.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` is refreshed with the
+      SEMTESTSTALE liveness repair, the later script-pair evidence on commit
+      `a186b352`, and the final live verdict for the repaired rerun.
+
+**Scope notes**
+
+This phase exists only because SEMTESTSTALE proved the later
+`tests/test_deployment_runbook_shape.py -> tests/test_reindex_resume.py`
+stale-running seam is cleared, but the refreshed live rerun on observed commit
+`a186b352` later exited with code `135` after advancing into an exact
+script-family pair.
+
+**Non-goals**
+
+- No reopening of the cleared later test-pair stale-trace repair unless the
+  live rerun re-anchors there again.
+- No reopening of earlier `.devcontainer`, publish-race, or quick-validation
+  exact-boundary slices unless the live rerun re-anchors there again.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+
+**Depends on**
+- SEMTESTSTALE
+
+**Produces**
+- IF-0-SEMSCRIPTABORT-1 — later script-family abort trace recovery and
+  evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -2105,6 +2160,7 @@ SEMCONTRACT
   -> SEMDISKIO
   -> SEMDEVSTALE
   -> SEMTESTSTALE
+  -> SEMSCRIPTABORT
 ```
 
 ## Execution Notes
@@ -2257,6 +2313,10 @@ SEMCONTRACT
   unexpectedly and leaves a stale-running lexical trace on the later exact
   test-file pair
   `tests/test_deployment_runbook_shape.py -> tests/test_reindex_resume.py`.
+- SEMTESTSTALE should amend the roadmap immediately if the refreshed live
+  rerun clears the later test-file stale-trace seam but exits again on a later
+  exact script-family blocker such as
+  `scripts/run_test_batch.py -> scripts/validate_mcp_comprehensive.py`.
 
 ## Verification
 

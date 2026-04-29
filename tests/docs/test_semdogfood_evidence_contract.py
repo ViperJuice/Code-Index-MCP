@@ -22,7 +22,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
 
     for expected in (
         "# Semantic Dogfood Rebuild",
-        "Phase plan: `plans/phase-plan-v7-SEMDEVSTALE.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMTESTSTALE.md`",
         "## Reset Boundary",
         "## SEMTRACEFRESHNESS Live Trace Recovery",
         "## SEMPUBLISHRACE Live Rerun Check",
@@ -30,6 +30,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
         "## SEMSCRIPTREBOUND Live Rerun Check",
         "## SEMDISKIO Live Rerun Check",
         "## SEMDEVSTALE Live Rerun Check",
+        "## SEMTESTSTALE Live Rerun Check",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -51,6 +52,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "SEMSCRIPTREBOUND",
         "SEMDISKIO",
         "SEMDEVSTALE",
+        "SEMTESTSTALE",
         "2026-04-29T08:50:29Z",
         "2026-04-29T08:50:44Z",
         "2026-04-29T08:51:28Z",
@@ -76,8 +78,12 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "2026-04-29T10:37:14Z",
         "2026-04-29T10:55:11Z",
         "2026-04-29T10:55:12Z",
+        "2026-04-29T11:13:51Z",
+        "2026-04-29T11:17:34Z",
+        "2026-04-29T11:17:51Z",
         "c8b2d724",
         "7e547c77",
+        "a186b352",
         "1e7a2a10",
         "aec99482",
         "8870a23f",
@@ -86,6 +92,8 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "scripts/rerun_failed_native_tests.py",
         "scripts/quick_mcp_vs_native_validation.py",
         "scripts/create_multi_repo_visual_report.py",
+        "scripts/run_test_batch.py",
+        "scripts/validate_mcp_comprehensive.py",
         "mcp_server/plugin_system/loader.py",
         "mcp_server/plugin_system/interfaces.py",
         "mcp_server/storage/sqlite_store.py",
@@ -116,7 +124,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "Trace blocker source:",
         "Older downstream assumptions should be treated as stale",
         "roadmap now adds `SEMDEVSTALE` as the nearest downstream phase",
-        "roadmap now adds `SEMTESTSTALE` as the nearest downstream phase",
+        "roadmap now adds downstream phase `SEMSCRIPTABORT`",
     ):
         assert expected in text
 
@@ -125,8 +133,8 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
     text = _normalized(EVIDENCE)
 
     for expected in (
-        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py -q --no-cov -k \"devcontainer or stale or lexical or force_full or trace\"",
-        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_repository_commands.py -q --no-cov -k \"devcontainer or stale-running or force_full or boundary\"",
+        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py -q --no-cov -k \"reindex_resume or deployment_runbook_shape or stale or lexical or force_full or trace\"",
+        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_repository_commands.py -q --no-cov -k \"stale or force_full or boundary or reindex_resume or deployment_runbook_shape or interrupted\"",
         "uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov",
         "env OPENAI_API_KEY=dummy-local-key MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5 uv run mcp-index repository sync --force-full",
         "env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status",
@@ -137,11 +145,13 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         ".devcontainer/devcontainer.json",
         "tests/test_deployment_runbook_shape.py",
         "tests/test_reindex_resume.py",
+        "scripts/run_test_batch.py",
+        "scripts/validate_mcp_comprehensive.py",
         "scripts/quick_mcp_vs_native_validation.py",
         "tests/test_artifact_publish_race.py",
         "Last sync error:",
         "disk I/O error",
-        "Trace status: `running`",
+        "Trace status: `interrupted`",
         "Trace stage: `lexical_walking`",
         "Trace stage family: `lexical`",
         "Trace blocker source: `lexical_mutation`",

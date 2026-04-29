@@ -6,6 +6,7 @@ supporting incremental updates and artifact management.
 
 import logging
 import json
+import os
 import shutil
 import sqlite3
 import subprocess
@@ -353,9 +354,26 @@ class GitAwareIndexManager:
             )
         except TypeError as exc:
             if progress_callback is not None and "progress_callback" in str(exc):
-                full_index_value = self._full_index(repo_id, ctx)
+                try:
+                    full_index_value = self._full_index(repo_id, ctx)
+                except BaseException:
+                    if force_full:
+                        self._finalize_running_force_full_trace_as_interrupted(
+                            repo_info=repo_info,
+                            current_commit=current_commit,
+                            indexed_commit_before=last_indexed_commit,
+                        )
+                    raise
             else:
                 raise
+        except BaseException:
+            if force_full:
+                self._finalize_running_force_full_trace_as_interrupted(
+                    repo_info=repo_info,
+                    current_commit=current_commit,
+                    indexed_commit_before=last_indexed_commit,
+                )
+            raise
         result = self._normalize_update_result(full_index_value)
         restore_result = self._restore_zero_summary_runtime_if_needed(
             repo_id,
@@ -1245,6 +1263,16 @@ class GitAwareIndexManager:
         temp_path.write_text(json.dumps(payload, sort_keys=True, indent=2), encoding="utf-8")
         temp_path.replace(path)
 
+    def _force_full_trace_process_alive(self, trace: Dict[str, Any]) -> Optional[bool]:
+        process_id = trace.get("process_id")
+        if not isinstance(process_id, int) or process_id <= 0:
+            return None
+        try:
+            os.kill(process_id, 0)
+        except OSError:
+            return False
+        return True
+
     def _make_force_full_progress_callback(
         self,
         *,
@@ -1273,6 +1301,7 @@ class GitAwareIndexManager:
                     "summary_call_timeout_seconds": snapshot.get(
                         "summary_call_timeout_seconds"
                     ),
+                    "process_id": os.getpid(),
                     "blocker_source": snapshot.get("blocker_source"),
                     "semantic_stage": snapshot.get("semantic_stage"),
                     "lexical_stage": snapshot.get("lexical_stage"),
@@ -1302,6 +1331,48 @@ class GitAwareIndexManager:
         if semantic.get("summary_call_timed_out"):
             return "summary_call_shutdown"
         return "final_closeout"
+
+    def _finalize_running_force_full_trace_as_interrupted(
+        self,
+        *,
+        repo_info: Any,
+        current_commit: Optional[str],
+        indexed_commit_before: Optional[str],
+    ) -> None:
+        previous_trace = self._read_force_full_exit_trace(repo_info) or {}
+        if previous_trace.get("status") != "running":
+            return
+        self._write_force_full_exit_trace(
+            repo_info,
+            {
+                "status": "interrupted",
+                "stage": previous_trace.get("stage") or "force_full_interrupted",
+                "stage_family": previous_trace.get("stage_family") or "final_closeout",
+                "current_commit": current_commit,
+                "indexed_commit_before": indexed_commit_before,
+                "last_progress_path": previous_trace.get("last_progress_path"),
+                "in_flight_path": previous_trace.get("in_flight_path"),
+                "summary_call_timed_out": previous_trace.get("summary_call_timed_out", False),
+                "summary_call_file_path": previous_trace.get("summary_call_file_path"),
+                "summary_call_chunk_ids": previous_trace.get("summary_call_chunk_ids", []),
+                "summary_call_timeout_seconds": previous_trace.get(
+                    "summary_call_timeout_seconds"
+                ),
+                "process_id": previous_trace.get("process_id"),
+                "blocker_source": previous_trace.get("blocker_source") or "process_interrupt",
+                "semantic_stage": previous_trace.get("semantic_stage"),
+                "lexical_stage": previous_trace.get("lexical_stage"),
+                "storage_failure_family": previous_trace.get("storage_failure_family"),
+                "storage_failure_reason": previous_trace.get("storage_failure_reason"),
+                "storage_failure_message": previous_trace.get("storage_failure_message"),
+                "storage_diagnostics": previous_trace.get("storage_diagnostics"),
+                "runtime_restore_performed": previous_trace.get("runtime_restore_performed"),
+                "runtime_restore_mode": previous_trace.get("runtime_restore_mode"),
+                "runtime_restore_declined_reason": previous_trace.get(
+                    "runtime_restore_declined_reason"
+                ),
+            },
+        )
 
     def _semantic_storage_closeout(self, semantic: Dict[str, Any]) -> bool:
         blocker = semantic.get("semantic_blocker")
@@ -1368,6 +1439,42 @@ class GitAwareIndexManager:
             status["index_exists"] = False
             status["index_size_mb"] = 0
         trace = self._read_force_full_exit_trace(repo_info)
+        if trace is not None and trace.get("status") == "running":
+            is_alive = self._force_full_trace_process_alive(trace)
+            if is_alive is False:
+                self._write_force_full_exit_trace(
+                    repo_info,
+                    {
+                        "status": "interrupted",
+                        "stage": trace.get("stage") or "force_full_interrupted",
+                        "stage_family": trace.get("stage_family") or "final_closeout",
+                        "current_commit": trace.get("current_commit") or repo_info.current_commit,
+                        "indexed_commit_before": trace.get("indexed_commit_before")
+                        or repo_info.last_indexed_commit,
+                        "last_progress_path": trace.get("last_progress_path"),
+                        "in_flight_path": trace.get("in_flight_path"),
+                        "summary_call_timed_out": trace.get("summary_call_timed_out", False),
+                        "summary_call_file_path": trace.get("summary_call_file_path"),
+                        "summary_call_chunk_ids": trace.get("summary_call_chunk_ids", []),
+                        "summary_call_timeout_seconds": trace.get(
+                            "summary_call_timeout_seconds"
+                        ),
+                        "process_id": trace.get("process_id"),
+                        "blocker_source": trace.get("blocker_source") or "process_interrupt",
+                        "semantic_stage": trace.get("semantic_stage"),
+                        "lexical_stage": trace.get("lexical_stage"),
+                        "storage_failure_family": trace.get("storage_failure_family"),
+                        "storage_failure_reason": trace.get("storage_failure_reason"),
+                        "storage_failure_message": trace.get("storage_failure_message"),
+                        "storage_diagnostics": trace.get("storage_diagnostics"),
+                        "runtime_restore_performed": trace.get("runtime_restore_performed"),
+                        "runtime_restore_mode": trace.get("runtime_restore_mode"),
+                        "runtime_restore_declined_reason": trace.get(
+                            "runtime_restore_declined_reason"
+                        ),
+                    },
+                )
+                trace = self._read_force_full_exit_trace(repo_info)
         if trace is not None:
             status["force_full_exit_trace"] = trace
 

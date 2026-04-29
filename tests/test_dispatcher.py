@@ -1774,6 +1774,84 @@ class TestEnhancedDispatcherProtocolConformance:
         assert snapshots[-1]["last_progress_path"] == str(config_file.resolve())
         assert snapshots[-1]["in_flight_path"] is None
 
+    def test_index_directory_emits_later_test_pair_before_closeout_handoff(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        tests_dir = repo / "tests"
+        tests_dir.mkdir(parents=True)
+        prior_file = tests_dir / "test_deployment_runbook_shape.py"
+        prior_file.write_text("def test_runbook_shape():\n    assert True\n", encoding="utf-8")
+        blocked_file = tests_dir / "test_reindex_resume.py"
+        blocked_file.write_text("def test_reindex_resume():\n    assert True\n", encoding="utf-8")
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+        snapshots = []
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: object())
+
+        def _fake_walk(_directory, followlinks=False):
+            assert followlinks is False
+            yield str(tests_dir), [], [prior_file.name, blocked_file.name]
+
+        def _explode_before_semantic_progress(self, _ctx, _paths, progress_callback=None):
+            raise RuntimeError("semantic closeout entry stalled before emitting progress")
+
+        monkeypatch.setattr("mcp_server.dispatcher.dispatcher_enhanced.os.walk", _fake_walk)
+        monkeypatch.setattr(
+            Dispatcher,
+            "rebuild_semantic_for_paths",
+            _explode_before_semantic_progress,
+        )
+
+        result = Dispatcher([]).index_directory(
+            ctx,
+            repo,
+            progress_callback=lambda snapshot: snapshots.append(dict(snapshot)),
+        )
+
+        store.close()
+        assert result["indexed_files"] == 2
+        assert result["semantic_stage"] == "failed"
+        lexical_pair = [
+            snapshot
+            for snapshot in snapshots
+            if snapshot["stage"] == "lexical_walking"
+            and snapshot["last_progress_path"] == str(prior_file.resolve())
+            and snapshot["in_flight_path"] == str(blocked_file.resolve())
+        ]
+        assert lexical_pair
+        assert snapshots[-1]["stage"] == "force_full_closeout_handoff"
+        assert snapshots[-1]["stage_family"] == "final_closeout"
+        assert snapshots[-1]["last_progress_path"] == str(blocked_file.resolve())
+        assert snapshots[-1]["in_flight_path"] is None
+        assert all(
+            needle not in (
+                (snapshot.get("last_progress_path") or "")
+                + " "
+                + (snapshot.get("in_flight_path") or "")
+            )
+            for needle in (
+                ".devcontainer/devcontainer.json",
+                "scripts/quick_mcp_vs_native_validation.py",
+                "tests/test_artifact_publish_race.py",
+            )
+            for snapshot in snapshots
+        )
+
     def test_index_directory_keeps_unrelated_json_files_off_exact_devcontainer_bypass(
         self, tmp_path, monkeypatch
     ):
