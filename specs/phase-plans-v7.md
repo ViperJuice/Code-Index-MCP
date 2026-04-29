@@ -2928,6 +2928,66 @@ plans/phase-plan-v1-p19.md`.
 - IF-0-SEMLEGACYPLANS-1 — historical phase-plan lexical recovery and evidence
   contract.
 
+### Phase 53 — Mixed-Version Phase Plan Tail Recovery (SEMMIXEDPHASETAIL)
+
+**Objective**
+
+Repair the next downstream lexical blocker exposed by SEMLEGACYPLANS so a
+refreshed rerun on the new head no longer terminalizes under the 120-second
+watchdog on
+`plans/phase-plan-v7-SEMPHASETAIL.md ->
+plans/phase-plan-v5-gagov.md`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMLEGACYPLANS head
+      either advances durably beyond
+      `plans/phase-plan-v7-SEMPHASETAIL.md ->
+      plans/phase-plan-v5-gagov.md` or emits a truthful newer blocker before
+      the 120-second watchdog expires.
+- [ ] The repair stays narrowly scoped to the exact mixed-version phase-plan
+      pair and the immediate dispatcher/trace/status/evidence plumbing needed
+      to prove it.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the SEMLEGACYPLANS
+      rerun outcome and the final live verdict for the newly exposed
+      mixed-version phase-plan blocker.
+
+**Scope notes**
+
+This phase exists only if SEMLEGACYPLANS proves the historical
+`plans/phase-plan-v6-WATCH.md -> plans/phase-plan-v1-p19.md` seam is cleared
+but the refreshed live rerun still terminalizes later in lexical walking on
+the exact mixed-version phase-plan pair
+`plans/phase-plan-v7-SEMPHASETAIL.md ->
+plans/phase-plan-v5-gagov.md`.
+
+**Non-goals**
+
+- No reopening of the historical `WATCH -> p19` recovery once the live rerun
+  has advanced beyond that seam.
+- No broad `plans/phase-plan-*.md` exemption or repo-wide lexical timeout
+  retune unless the refreshed rerun proves the blocker requires it.
+- No reopening of older benchmark, visualization, devcontainer, archive-tail,
+  docs-governance, `.claude`, or script-language seams unless the refreshed
+  rerun reaches them again and exposes a different newer blocker.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMLEGACYPLANS
+
+**Produces**
+- IF-0-SEMMIXEDPHASETAIL-1 — mixed-version phase-plan lexical recovery and
+  evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -2983,6 +3043,7 @@ SEMCONTRACT
   -> SEMCROSSPLANS
   -> SEMPHASETAIL
   -> SEMLEGACYPLANS
+  -> SEMMIXEDPHASETAIL
 ```
 
 ## Execution Notes
@@ -3071,6 +3132,12 @@ SEMCONTRACT
   such as
   `plans/phase-plan-v6-WATCH.md ->
   plans/phase-plan-v1-p19.md`.
+- SEMLEGACYPLANS should amend the roadmap immediately if the refreshed live
+  rerun clears
+  `plans/phase-plan-v6-WATCH.md ->
+  plans/phase-plan-v1-p19.md` but exposes a later exact blocker such as
+  `plans/phase-plan-v7-SEMPHASETAIL.md ->
+  plans/phase-plan-v5-gagov.md`.
 - SEMARCHIVEWALKGAP should amend the roadmap immediately if the refreshed live
   rerun clears the archive-tail seam but exposes a later exact lexical blocker
   such as
@@ -3217,6 +3284,12 @@ SEMCONTRACT
   later in lexical walking on
   `plans/phase-plan-v6-WATCH.md ->
   plans/phase-plan-v1-p19.md`.
+- SEMMIXEDPHASETAIL exists only if SEMLEGACYPLANS proves the historical
+  `plans/phase-plan-v6-WATCH.md -> plans/phase-plan-v1-p19.md` seam is
+  cleared but the refreshed live rerun still terminalizes later in lexical
+  walking on
+  `plans/phase-plan-v7-SEMPHASETAIL.md ->
+  plans/phase-plan-v5-gagov.md`.
 
 ## Verification
 

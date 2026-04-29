@@ -2687,6 +2687,68 @@ def test_force_full_sync_durable_trace_moves_past_late_v7_phase_plan_pair(tmp_pa
     assert "phase-plan-v5-garecut.md" not in (trace.get("last_progress_path") or "")
 
 
+def test_force_full_sync_durable_trace_moves_past_historical_phase_plan_pair(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+
+    prior_doc = repo / "plans" / "phase-plan-v6-WATCH.md"
+    blocked_doc = repo / "plans" / "phase-plan-v1-p19.md"
+    later_doc = repo / "docs" / "status" / "SEMANTIC_DOGFOOD_REBUILD.md"
+    later_doc.parent.mkdir(parents=True, exist_ok=True)
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    registry.update_git_state.return_value = {"commit": commit, "branch": "main"}
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    manager._resolve_ctx = MagicMock(return_value=ctx)
+    manager._index_exists = MagicMock(return_value=True)
+    manager._index_has_durable_rows = MagicMock(return_value=True)
+    manager._full_index = MagicMock(
+        return_value=UpdateResult(
+            indexed=3,
+            failed=1,
+            errors=[
+                "Lexical indexing timed out while processing "
+                "docs/status/SEMANTIC_DOGFOOD_REBUILD.md"
+            ],
+            low_level={
+                "lexical_stage": "blocked_file_timeout",
+                "lexical_files_attempted": 4,
+                "lexical_files_completed": 3,
+                "last_progress_path": str(blocked_doc),
+                "in_flight_path": str(later_doc),
+                "low_level_blocker": {
+                    "code": "lexical_file_timeout",
+                    "message": (
+                        "Lexical indexing timed out while processing "
+                        "docs/status/SEMANTIC_DOGFOOD_REBUILD.md"
+                    ),
+                },
+            },
+            semantic={"semantic_stage": "not_run"},
+        )
+    )
+
+    result = manager.sync_repository_index(repo_info.repository_id, force_full=True)
+
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert result.action == "failed"
+    assert trace["status"] == "completed"
+    assert trace["stage"] == "force_full_failed"
+    assert trace["stage_family"] == "final_closeout"
+    assert trace["blocker_source"] == "lexical_mutation"
+    assert trace["last_progress_path"] == str(blocked_doc)
+    assert trace["in_flight_path"] == str(later_doc)
+    assert str(prior_doc) in {trace["last_progress_path"], trace["in_flight_path"]} or str(
+        blocked_doc
+    ) in {trace["last_progress_path"], trace["in_flight_path"]}
+    assert "phase-plan-v7-SEMSYNCFIX.md" not in (trace.get("last_progress_path") or "")
+
+
 def test_force_full_sync_trace_moves_past_visual_report_script_after_exact_python_repair(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)

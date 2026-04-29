@@ -296,6 +296,18 @@ def _print_late_v7_phase_plan_markdown_boundary(prefix: str, repo_path: Path) ->
         )
 
 
+def _print_historical_phase_plan_markdown_boundary(prefix: str, repo_path: Path) -> None:
+    phase_plan_paths = (
+        repo_path / "plans" / "phase-plan-v6-WATCH.md",
+        repo_path / "plans" / "phase-plan-v1-p19.md",
+    )
+    if all(path.is_file() for path in phase_plan_paths):
+        click.echo(
+            f"{prefix}Lexical boundary: using exact bounded Markdown indexing for "
+            "plans/phase-plan-v6-WATCH.md -> plans/phase-plan-v1-p19.md"
+        )
+
+
 def _print_visual_report_python_boundary(prefix: str, repo_path: Path) -> None:
     script_path = repo_path / "scripts" / "create_multi_repo_visual_report.py"
     if script_path.is_file():
@@ -791,6 +803,7 @@ def status(repo_id: Optional[str]):
         _print_claude_command_markdown_boundary("  ", Path(status["path"]))
         _print_benchmark_markdown_boundary("  ", Path(status["path"]))
         _print_late_v7_phase_plan_markdown_boundary("  ", Path(status["path"]))
+        _print_historical_phase_plan_markdown_boundary("  ", Path(status["path"]))
         _print_visual_report_python_boundary("  ", Path(status["path"]))
         _print_quick_validation_python_boundary("  ", Path(status["path"]))
         _print_validate_mcp_comprehensive_python_boundary("  ", Path(status["path"]))

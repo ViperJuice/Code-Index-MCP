@@ -1,7 +1,9 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T16:07:22Z`.
-- Observed commit: `fe501b97`.
+- Evidence captured: `2026-04-29T16:29:12Z`.
+- Observed commit: `7ab3e4ca`.
+- Prior SEMLEGACYPLANS live-rerun anchor: `2026-04-29T16:07:22Z` on observed
+  commit `fe501b97`.
 - Prior SEMCROSSPLANS live-rerun anchor: `2026-04-29T15:51:12Z` on observed
   commit `d0b21255`.
 - Prior SEMPHASEPLANS live-rerun anchor: `2026-04-29T15:37:57Z` on observed
@@ -24,9 +26,16 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMPHASETAIL.md`.
-- Prior phase plan: `plans/phase-plan-v7-SEMCROSSPLANS.md`.
+- Phase plan: `plans/phase-plan-v7-SEMLEGACYPLANS.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMPHASETAIL.md`.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMMIXEDPHASETAIL` after SEMLEGACYPLANS proved the historical phase-plan
+  seam is now cleared, but the refreshed live rerun on the new head still
+  terminalized later in lexical walking on
+  `plans/phase-plan-v7-SEMPHASETAIL.md ->
+  plans/phase-plan-v5-gagov.md`. Older downstream assumptions should be
+  treated as stale after this roadmap amendment.
+- Prior roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMLEGACYPLANS` after SEMPHASETAIL proved the later v7-only phase-plan
   seam is now cleared, but the refreshed live rerun on the new head still
   terminalized later in lexical walking on
@@ -1280,6 +1289,61 @@ Steering outcome:
   downstream phase plan or handoff that still treats the active current-head
   blocker as the `SEMSYNCFIX -> SEMVISUALREPORT` phase-plan seam.
 
+## SEMLEGACYPLANS Live Rerun Check
+
+SEMLEGACYPLANS tightened the exact historical phase-plan seam in the bounded
+Markdown and operator-status surfaces, and the refreshed live rerun advanced
+durably beyond `plans/phase-plan-v6-WATCH.md` and
+`plans/phase-plan-v1-p19.md` before the 120-second watchdog expired.
+
+Code/test repair completed in this phase:
+
+- `mcp_server/plugins/markdown_plugin/plugin.py` now treats
+  `plans/phase-plan-v6-WATCH.md` and `plans/phase-plan-v1-p19.md` as exact
+  bounded Markdown paths in addition to the generic lightweight phase-plan
+  rule.
+- `mcp_server/cli/repository_commands.py` now advertises the repaired exact
+  bounded lexical boundary for
+  `plans/phase-plan-v6-WATCH.md -> plans/phase-plan-v1-p19.md`.
+- `tests/test_dispatcher.py`, `tests/test_git_index_manager.py`, and
+  `tests/test_repository_commands.py` now freeze dispatcher discoverability,
+  durable trace progression, and status reporting for the exact historical
+  phase-plan pair without widening into a blanket `plans/phase-plan-*.md`
+  bypass.
+
+Observed progression on the refreshed live repo-local force-full command:
+
+- The SEMLEGACYPLANS live rerun started on observed commit `7ab3e4ca` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-29T16:29:03Z`, `force_full_exit_trace.json` still showed a
+  running lexical trace on
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v7-SEMPHASETAIL.md`
+  with
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v5-gagov.md`.
+- At `2026-04-29T16:29:12Z`, `repository status` terminalized that stale
+  running snapshot to `Trace status: interrupted` with the same
+  `SEMPHASETAIL -> phase-plan-v5-gagov.md` pair and advertised the repaired
+  exact bounded historical lexical surface:
+  `Lexical boundary: using exact bounded Markdown indexing for plans/phase-plan-v6-WATCH.md -> plans/phase-plan-v1-p19.md`.
+- SQLite runtime counts after the rerun remained
+  `files = 1123`, `code_chunks = 28182`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+
+Steering outcome:
+
+- SEMLEGACYPLANS acceptance is satisfied for its named blocker: the active
+  lexical blocker is no longer
+  `plans/phase-plan-v6-WATCH.md ->
+  plans/phase-plan-v1-p19.md`.
+- The live rerun now reaches the mixed-version phase-plan pair
+  `plans/phase-plan-v7-SEMPHASETAIL.md ->
+  plans/phase-plan-v5-gagov.md`.
+- The roadmap now adds downstream phase `SEMMIXEDPHASETAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the historical `WATCH -> p19` phase-plan seam.
+
 ## Verification
 
 Verification sequence for this SEMCROSSPLANS slice:
@@ -1299,6 +1363,18 @@ Verification sequence for this SEMPHASETAIL slice:
 ```bash
 uv run pytest tests/test_dispatcher.py -q --no-cov -k "phase_plan or SEMSYNCFIX or SEMVISUALREPORT or markdown or lexical or bounded"
 env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "phase_plan or SEMSYNCFIX or SEMVISUALREPORT or lexical or interrupted or boundary"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
+timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+```
+
+Verification sequence for this SEMLEGACYPLANS slice:
+
+```bash
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "phase_plan or WATCH or p19 or markdown or lexical or bounded"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "phase_plan or WATCH or p19 or lexical or interrupted or boundary"
 uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status

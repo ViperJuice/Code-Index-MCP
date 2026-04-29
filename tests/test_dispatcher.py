@@ -1941,6 +1941,158 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "Summary drain" in semsyncfix_fts_rows[0][0]
         assert "Later blocker" in semvisualreport_fts_rows[0][0]
 
+    def test_index_directory_uses_bounded_markdown_path_for_historical_phase_plan_pair(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        plans_dir = repo / "plans"
+        plans_dir.mkdir(parents=True)
+        watch_doc = plans_dir / "phase-plan-v6-WATCH.md"
+        p19_doc = plans_dir / "phase-plan-v1-p19.md"
+        unrelated_doc = plans_dir / "phase-plan-v7-SEMUNRELATED.md"
+        watch_doc.write_text(
+            "---\n"
+            "title: Phase Plan v6 WATCH\n"
+            "---\n"
+            "# WATCH: Multi-Repo Watcher Event Correctness\n\n"
+            "## Context\n\n"
+            "### Watch truth\n"
+            "- Preserve bounded discoverability\n",
+            encoding="utf-8",
+        )
+        p19_doc.write_text(
+            "# P19: Release Readiness\n\n"
+            "## Context\n\n"
+            "### What actually exists today\n"
+            "- Preserve bounded discoverability\n\n"
+            "## Lane Index & Dependencies\n\n"
+            "### Wave plan\n"
+            "- Keep legacy heading discoverability\n",
+            encoding="utf-8",
+        )
+        unrelated_doc.write_text(
+            "# SEMUNRELATED Notes\n\n"
+            "## Scope\n\n"
+            "### Guardrail\n"
+            "- Keep generic phase-plan handling intact\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        def _unexpected(*_args, **_kwargs):
+            raise AssertionError(
+                "heavy Markdown path should not run for bounded historical phase-plan files"
+            )
+
+        monkeypatch.setattr(MarkdownPlugin, "extract_structure", _unexpected)
+        monkeypatch.setattr(MarkdownPlugin, "chunk_document", _unexpected)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 3
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(watch_doc.resolve()),
+            str(p19_doc.resolve()),
+            str(unrelated_doc.resolve()),
+        }
+        with store._get_connection() as conn:
+            watch_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'plans/phase-plan-v6-WATCH.md') ORDER BY id"
+                ).fetchall()
+            ]
+            p19_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'plans/phase-plan-v1-p19.md') ORDER BY id"
+                ).fetchall()
+            ]
+            unrelated_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'plans/phase-plan-v7-SEMUNRELATED.md') ORDER BY id"
+                ).fetchall()
+            ]
+            watch_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v6-WATCH.md')"
+            ).fetchone()[0]
+            p19_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v1-p19.md')"
+            ).fetchone()[0]
+            unrelated_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v7-SEMUNRELATED.md')"
+            ).fetchone()[0]
+            watch_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v6-WATCH.md')"
+            ).fetchall()
+            p19_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v1-p19.md')"
+            ).fetchall()
+        store.close()
+
+        assert watch_symbols == [
+            "Phase Plan v6 WATCH",
+            "WATCH: Multi-Repo Watcher Event Correctness",
+            "Context",
+            "Watch truth",
+        ]
+        assert p19_symbols == [
+            "P19: Release Readiness",
+            "P19: Release Readiness",
+            "Context",
+            "What actually exists today",
+            "Lane Index & Dependencies",
+            "Wave plan",
+        ]
+        assert unrelated_symbols == [
+            "SEMUNRELATED Notes",
+            "SEMUNRELATED Notes",
+            "Scope",
+            "Guardrail",
+        ]
+        assert watch_chunk_count == 0
+        assert p19_chunk_count == 0
+        assert unrelated_chunk_count == 0
+        assert len(watch_fts_rows) == 1
+        assert len(p19_fts_rows) == 1
+        assert "Watch truth" in watch_fts_rows[0][0]
+        assert "Wave plan" in p19_fts_rows[0][0]
+
     def test_index_directory_uses_exact_bounded_python_path_for_visual_report_script(
         self, tmp_path, monkeypatch
     ):
