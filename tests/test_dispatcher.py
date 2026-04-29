@@ -4014,6 +4014,136 @@ class TestEnhancedDispatcherProtocolConformance:
             for snapshot in snapshots
         )
 
+    def test_index_directory_emits_docs_contract_tail_pair_before_closeout_handoff(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.plugins.python_plugin.plugin import Plugin
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        docs_dir = repo / "tests" / "docs"
+        docs_dir.mkdir(parents=True)
+        prior_file = docs_dir / "test_semincr_contract.py"
+        prior_file.write_text(
+            "def test_semincr_docs_freeze_incremental_mutation_contract():\n"
+            "    assert True\n\n"
+            "def test_semincr_docs_stay_out_of_query_routing_and_dogfood_claims():\n"
+            "    assert True\n",
+            encoding="utf-8",
+        )
+        blocked_file = docs_dir / "test_gabase_ga_readiness_contract.py"
+        blocked_file.write_text(
+            "def test_checklist_exists_with_required_sections_and_baseline():\n"
+            "    assert True\n\n"
+            "def test_public_docs_remain_pre_ga_and_route_to_canonical_artifacts():\n"
+            "    assert True\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+        snapshots = []
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: object())
+
+        def _fake_walk(_directory, followlinks=False):
+            assert followlinks is False
+            yield str(docs_dir), [], [prior_file.name, blocked_file.name]
+
+        def _explode_before_semantic_progress(self, _ctx, _paths, progress_callback=None):
+            raise RuntimeError("semantic closeout entry stalled before emitting progress")
+
+        monkeypatch.setattr("mcp_server.dispatcher.dispatcher_enhanced.os.walk", _fake_walk)
+        monkeypatch.setattr(
+            Dispatcher,
+            "rebuild_semantic_for_paths",
+            _explode_before_semantic_progress,
+        )
+
+        result = Dispatcher([]).index_directory(
+            ctx,
+            repo,
+            progress_callback=lambda snapshot: snapshots.append(dict(snapshot)),
+        )
+
+        assert result["indexed_files"] == 2
+        assert result["semantic_stage"] == "failed"
+        lexical_pair = [
+            snapshot
+            for snapshot in snapshots
+            if snapshot["stage"] == "lexical_walking"
+            and snapshot["last_progress_path"] == str(prior_file.resolve())
+            and snapshot["in_flight_path"] == str(blocked_file.resolve())
+        ]
+        assert lexical_pair
+        with store._get_connection() as conn:
+            semincr_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/docs/test_semincr_contract.py') ORDER BY id"
+                ).fetchall()
+            ]
+            gabase_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/docs/test_gabase_ga_readiness_contract.py') ORDER BY id"
+                ).fetchall()
+            ]
+            semincr_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/docs/test_semincr_contract.py')"
+            ).fetchone()[0]
+            gabase_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/docs/test_gabase_ga_readiness_contract.py')"
+            ).fetchone()[0]
+            semincr_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/docs/test_semincr_contract.py')"
+            ).fetchall()
+            gabase_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/docs/test_gabase_ga_readiness_contract.py')"
+            ).fetchall()
+        store.close()
+        assert "test_semincr_docs_freeze_incremental_mutation_contract" in semincr_symbols
+        assert "test_semincr_docs_stay_out_of_query_routing_and_dogfood_claims" in semincr_symbols
+        assert "test_checklist_exists_with_required_sections_and_baseline" in gabase_symbols
+        assert "test_public_docs_remain_pre_ga_and_route_to_canonical_artifacts" in gabase_symbols
+        assert semincr_chunk_count == 0
+        assert gabase_chunk_count == 0
+        assert len(semincr_fts) == 1
+        assert "test_semincr_docs_freeze_incremental_mutation_contract" in semincr_fts[0][0]
+        assert len(gabase_fts) == 1
+        assert "test_public_docs_remain_pre_ga_and_route_to_canonical_artifacts" in gabase_fts[0][0]
+        assert snapshots[-1]["stage"] == "force_full_closeout_handoff"
+        assert snapshots[-1]["stage_family"] == "final_closeout"
+        assert snapshots[-1]["last_progress_path"] == str(blocked_file.resolve())
+        assert snapshots[-1]["in_flight_path"] is None
+        assert "tests/docs/test_semincr_contract.py" in Plugin._BOUNDED_CHUNK_PATHS
+        assert "tests/docs/test_gabase_ga_readiness_contract.py" in Plugin._BOUNDED_CHUNK_PATHS
+        assert "tests/docs/test_gaclose_evidence_closeout.py" in Plugin._BOUNDED_CHUNK_PATHS
+        assert all(
+            needle not in (
+                (snapshot.get("last_progress_path") or "")
+                + " "
+                + (snapshot.get("in_flight_path") or "")
+            )
+            for needle in (
+                "tests/docs/test_mre2e_evidence_contract.py",
+                "tests/docs/test_gagov_governance_contract.py",
+                "tests/docs/test_gaclose_evidence_closeout.py",
+                "tests/docs/test_p8_deployment_security.py",
+            )
+            for snapshot in snapshots
+        )
+
     def test_index_directory_emits_mock_plugin_fixture_pair_before_closeout_handoff(
         self, tmp_path, monkeypatch
     ):

@@ -136,6 +136,10 @@ _EXACT_BOUNDED_PYTHON_PATHS = {
     "tests/docs/test_gagov_governance_contract.py": "exact_gagov_docs_contract_rebound",
     "tests/docs/test_gaclose_evidence_closeout.py": "exact_gaclose_docs_contract_rebound",
     "tests/docs/test_p8_deployment_security.py": "exact_p8_security_docs_contract_rebound",
+    "tests/docs/test_semincr_contract.py": "exact_semincr_docs_contract_rebound",
+    "tests/docs/test_gabase_ga_readiness_contract.py": (
+        "exact_gabase_docs_contract_rebound"
+    ),
     "tests/security/fixtures/mock_plugin/plugin.py": "exact_mock_plugin_fixture_rebound",
     "tests/security/fixtures/mock_plugin/__init__.py": "exact_mock_plugin_fixture_init_rebound",
 }

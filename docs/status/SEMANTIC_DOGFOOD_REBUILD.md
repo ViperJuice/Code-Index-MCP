@@ -1,7 +1,11 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T18:06:41Z`.
-- Observed commit: `4133bfe`.
+- Evidence captured: `2026-04-29T19:13:19Z`.
+- Observed commit: `2167f18`.
+- Prior SEMCODEXLOOPTAIL live-rerun anchor: `2026-04-29T18:52:55Z` on observed
+  commit `3d627c33`.
+- Prior SEMMOCKPLUGIN live-rerun anchor: `2026-04-29T18:26:11Z` on observed
+  commit `6a909203`.
 - Prior SEMDOCTESTTAIL live-rerun anchor: `2026-04-29T17:45:52Z` on observed
   commit `5c0102d`.
 - Prior SEMMIXEDPHASETAIL live-rerun anchor: `2026-04-29T16:49:50Z` on
@@ -30,15 +34,21 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMEMBEDCONSOL.md`.
-- Prior phase plan: `plans/phase-plan-v7-SEMVERIFYSIMTAIL.md`.
+- Phase plan: `plans/phase-plan-v7-SEMDOCCONTRACTTAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMCODEXLOOPTAIL.md`.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
-  `SEMMOCKPLUGIN` after SEMDOCTESTTAIL proved the later tests/docs seam
+  `SEMGARELTAIL` after SEMDOCCONTRACTTAIL proved the later docs-contract seam
   is now cleared, but the refreshed live rerun on the new head still
   terminalized later in lexical walking on
-  `tests/security/fixtures/mock_plugin/plugin.py ->
-  tests/security/fixtures/mock_plugin/__init__.py`. Older downstream
-  assumptions should be treated as stale after this roadmap amendment.
+  `tests/docs/test_garc_rc_soak_contract.py ->
+  tests/docs/test_garel_ga_release_contract.py`. Older downstream assumptions
+  should be treated as stale after this roadmap amendment.
+- Prior roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMCODEXLOOPTAIL` after SEMMOCKPLUGIN proved the later security-fixture
+  seam is now cleared, but the refreshed live rerun on the new head still
+  terminalized later in lexical walking on
+  `.codex/phase-loop/runs/20260427T085911Z-02-mrready-execute/launch.json ->
+  .codex/phase-loop/runs/20260427T085911Z-02-mrready-execute/heartbeat.json`.
 - Prior roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMDOCTESTTAIL` after SEMEMBEDCONSOL proved the later Python-script seam
   is now cleared, but the refreshed live rerun on the new head still
@@ -1872,7 +1882,88 @@ Steering outcome:
   downstream phase plan or handoff that still treats the active current-head
   blocker as a legacy `.codex/phase-loop` compatibility-runtime seam.
 
+## SEMDOCCONTRACTTAIL Live Rerun Check
+
+SEMDOCCONTRACTTAIL tightened the later docs contract-test seam so the
+`test_semincr_contract.py -> test_gabase_ga_readiness_contract.py` blocker is
+no longer the active lexical tail and `repository status` now advertises that
+repaired boundary while preserving the next blocker truthfully.
+
+Code/test repair completed in this phase:
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py` now treats
+  `tests/docs/test_semincr_contract.py` and
+  `tests/docs/test_gabase_ga_readiness_contract.py` as exact bounded Python
+  paths, preserving bounded symbol and content discoverability without
+  widening into a blanket `tests/docs/**/*.py` bypass.
+- `mcp_server/plugins/python_plugin/plugin.py` now keeps the same exact pair on
+  the bounded chunk path list so direct Python-plugin indexing stays aligned
+  with dispatcher exact-bounded behavior.
+- `mcp_server/cli/repository_commands.py` now advertises the repaired exact
+  bounded lexical boundary for
+  `tests/docs/test_semincr_contract.py ->
+  tests/docs/test_gabase_ga_readiness_contract.py`:
+  `Lexical boundary: using exact bounded Python indexing for tests/docs/test_semincr_contract.py -> tests/docs/test_gabase_ga_readiness_contract.py`.
+- `tests/test_dispatcher.py`, `tests/test_git_index_manager.py`, and
+  `tests/test_repository_commands.py` now freeze dispatcher discoverability,
+  durable trace progression, and status reporting for the later docs
+  contract-test pair without widening into a broader docs-test shortcut.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMDOCCONTRACTTAIL live rerun started on observed commit
+  `2167f184` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-29T19:13:08Z`, `.mcp-index/force_full_exit_trace.json` showed a
+  running lexical trace on
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/tests/docs/test_garc_rc_soak_contract.py`
+  with
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/tests/docs/test_garel_ga_release_contract.py`.
+- At `2026-04-29T19:13:19Z`, a refreshed `repository status` terminalized that
+  running snapshot to `Trace status: interrupted` with the same
+  `tests/docs/test_garc_rc_soak_contract.py ->
+  tests/docs/test_garel_ga_release_contract.py` pair while advertising the
+  repaired exact bounded Python surface for the cleared
+  `tests/docs/test_semincr_contract.py ->
+  tests/docs/test_gabase_ga_readiness_contract.py` seam.
+- The SEMDOCCONTRACTTAIL target pair is no longer the active blocker:
+  `tests/docs/test_semincr_contract.py ->
+  tests/docs/test_gabase_ga_readiness_contract.py`.
+- SQLite runtime counts after the rerun remained
+  `files = 1152`, `code_chunks = 28182`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+
+Steering outcome:
+
+- SEMDOCCONTRACTTAIL acceptance is satisfied for its named blocker: the live
+  watchdog no longer terminalizes on
+  `tests/docs/test_semincr_contract.py ->
+  tests/docs/test_gabase_ga_readiness_contract.py`.
+- The final authoritative rerun for this phase moved later and now reaches the
+  GA release docs contract-test pair
+  `tests/docs/test_garc_rc_soak_contract.py ->
+  tests/docs/test_garel_ga_release_contract.py`.
+- The roadmap now adds downstream phase `SEMGARELTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMDOCCONTRACTTAIL-era docs contract seam
+  `tests/docs/test_semincr_contract.py ->
+  tests/docs/test_gabase_ga_readiness_contract.py`.
+
 ## Verification
+
+Verification sequence for this SEMDOCCONTRACTTAIL slice:
+
+```bash
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "semincr or gabase or docs_contract or readiness or lexical or bounded"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "semincr or gabase or docs_contract or readiness or boundary or interrupted or lexical"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
+timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+```
 
 Verification sequence for this SEMEMBEDCONSOL slice:
 

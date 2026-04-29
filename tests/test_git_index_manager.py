@@ -2611,6 +2611,66 @@ def test_force_full_sync_durable_trace_moves_past_mock_plugin_fixture_pair(tmp_p
     assert "scripts/create_semantic_embeddings.py" not in (trace.get("last_progress_path") or "")
 
 
+def test_force_full_sync_durable_trace_moves_past_docs_contract_tail_pair(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    repo_info.index_path.touch()
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+
+    prior_doc = repo / "tests" / "docs" / "test_semincr_contract.py"
+    blocked_doc = repo / "tests" / "docs" / "test_gabase_ga_readiness_contract.py"
+    later_doc = repo / "ai_docs" / "qdrant.md"
+    later_doc.parent.mkdir(parents=True, exist_ok=True)
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    registry.update_git_state.return_value = {"commit": commit, "branch": "main"}
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    manager._resolve_ctx = MagicMock(return_value=ctx)
+    manager._index_exists = MagicMock(return_value=True)
+    manager._index_has_durable_rows = MagicMock(return_value=True)
+    manager._full_index = MagicMock(
+        return_value=UpdateResult(
+            indexed=3,
+            failed=1,
+            errors=["Lexical indexing timed out while processing ai_docs/qdrant.md"],
+            low_level={
+                "lexical_stage": "blocked_file_timeout",
+                "lexical_files_attempted": 4,
+                "lexical_files_completed": 3,
+                "last_progress_path": str(blocked_doc),
+                "in_flight_path": str(later_doc),
+                "low_level_blocker": {
+                    "code": "lexical_file_timeout",
+                    "message": "Lexical indexing timed out while processing qdrant.md",
+                },
+            },
+            semantic={"semantic_stage": "not_run"},
+        )
+    )
+
+    result = manager.sync_repository_index(repo_info.repository_id, force_full=True)
+
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert result.action == "failed"
+    assert trace["status"] == "completed"
+    assert trace["stage"] == "force_full_failed"
+    assert trace["stage_family"] == "final_closeout"
+    assert trace["blocker_source"] == "lexical_mutation"
+    assert trace["last_progress_path"] == str(blocked_doc)
+    assert trace["in_flight_path"] == str(later_doc)
+    assert str(prior_doc) not in (trace.get("in_flight_path") or "")
+    assert "tests/security/fixtures/mock_plugin/plugin.py" not in (
+        trace.get("last_progress_path") or ""
+    )
+    assert "tests/docs/test_gaclose_evidence_closeout.py" not in (
+        trace.get("last_progress_path") or ""
+    )
+
+
 def test_get_repository_status_preserves_claude_command_pair_trace(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)
@@ -2694,6 +2754,53 @@ def test_get_repository_status_preserves_docs_test_tail_pair_trace(tmp_path):
         status["force_full_exit_trace"]["in_flight_path"] or ""
     )
     assert "consolidate_real_performance_data.py" not in (
+        status["force_full_exit_trace"]["last_progress_path"] or ""
+    )
+
+
+def test_get_repository_status_preserves_docs_contract_tail_pair_trace(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace_path.write_text(
+        json.dumps(
+            {
+                "status": "interrupted",
+                "stage": "lexical_walking",
+                "stage_family": "lexical",
+                "trace_timestamp": "2026-04-29T18:52:55Z",
+                "current_commit": commit,
+                "indexed_commit_before": "older-indexed-commit",
+                "last_progress_path": str(repo / "tests" / "docs" / "test_semincr_contract.py"),
+                "in_flight_path": str(
+                    repo / "tests" / "docs" / "test_gabase_ga_readiness_contract.py"
+                ),
+                "blocker_source": "lexical_mutation",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    status = manager.get_repository_status(repo_info.repository_id)
+
+    assert status["force_full_exit_trace"]["status"] == "interrupted"
+    assert status["force_full_exit_trace"]["stage"] == "lexical_walking"
+    assert status["force_full_exit_trace"]["stage_family"] == "lexical"
+    assert status["force_full_exit_trace"]["last_progress_path"] == str(
+        repo / "tests" / "docs" / "test_semincr_contract.py"
+    )
+    assert status["force_full_exit_trace"]["in_flight_path"] == str(
+        repo / "tests" / "docs" / "test_gabase_ga_readiness_contract.py"
+    )
+    assert "test_p8_deployment_security.py" not in (
+        status["force_full_exit_trace"]["in_flight_path"] or ""
+    )
+    assert "mock_plugin/plugin.py" not in (
         status["force_full_exit_trace"]["last_progress_path"] or ""
     )
 

@@ -3420,6 +3420,67 @@ tests/docs/test_gabase_ga_readiness_contract.py`.
 - IF-0-SEMDOCCONTRACTTAIL-1 — later docs contract-test lexical recovery and
   evidence contract.
 
+### Phase 61 — GA Release Docs Tail Recovery (SEMGARELTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later GA release docs contract-test
+pair exposed after SEMDOCCONTRACTTAIL:
+`tests/docs/test_garc_rc_soak_contract.py ->
+tests/docs/test_garel_ga_release_contract.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMDOCCONTRACTTAIL
+      head either advances durably beyond the
+      `tests/docs/test_garc_rc_soak_contract.py ->
+      tests/docs/test_garel_ga_release_contract.py` pair or emits a truthful
+      newer blocker before the 120-second watchdog expires.
+- [ ] The chosen repair for the GA release docs contract-test tail stays
+      narrow, tested, and does not reopen the repaired
+      `tests/docs/test_semincr_contract.py ->
+      tests/docs/test_gabase_ga_readiness_contract.py` boundary without direct
+      evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMDOCCONTRACTTAIL rerun outcome and the final live verdict for the later
+      GA release docs contract-test pair.
+
+**Scope notes**
+
+This phase exists only if SEMDOCCONTRACTTAIL proves the later docs
+contract-test pair
+`tests/docs/test_semincr_contract.py ->
+tests/docs/test_gabase_ga_readiness_contract.py` is cleared, but the refreshed
+live rerun still terminalizes later in lexical walking on a GA release docs
+contract-test pair such as
+`tests/docs/test_garc_rc_soak_contract.py ->
+tests/docs/test_garel_ga_release_contract.py`.
+
+**Non-goals**
+
+- No reopening of the repaired SEMDOCCONTRACTTAIL docs contract recovery once
+  the live rerun has advanced beyond that seam.
+- No broad reopening of unrelated release docs or validation artifacts unless
+  the refreshed rerun proves the active blocker requires them.
+- No blanket `tests/docs/**/*.py` bypass unless the refreshed rerun proves the
+  active blocker cannot be cleared with a narrower GA-release-docs repair.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMDOCCONTRACTTAIL
+
+**Produces**
+- IF-0-SEMGARELTAIL-1 — later GA release docs contract-test lexical recovery
+  and evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -3483,6 +3544,7 @@ SEMCONTRACT
   -> SEMMOCKPLUGIN
   -> SEMCODEXLOOPTAIL
   -> SEMDOCCONTRACTTAIL
+  -> SEMGARELTAIL
 ```
 
 ## Execution Notes
@@ -3800,6 +3862,19 @@ SEMCONTRACT
   exposes a later exact lexical blocker such as
   `tests/docs/test_semincr_contract.py ->
   tests/docs/test_gabase_ga_readiness_contract.py`.
+- SEMDOCCONTRACTTAIL should amend the roadmap immediately if the refreshed live
+  rerun clears
+  `tests/docs/test_semincr_contract.py ->
+  tests/docs/test_gabase_ga_readiness_contract.py` but exposes a later exact
+  docs contract-test blocker such as
+  `tests/docs/test_garc_rc_soak_contract.py ->
+  tests/docs/test_garel_ga_release_contract.py`.
+- SEMGARELTAIL exists only if SEMDOCCONTRACTTAIL proves the
+  `tests/docs/test_semincr_contract.py ->
+  tests/docs/test_gabase_ga_readiness_contract.py` seam is cleared but the
+  refreshed live rerun still terminalizes later in lexical walking on
+  `tests/docs/test_garc_rc_soak_contract.py ->
+  tests/docs/test_garel_ga_release_contract.py`.
 
 ## Verification
 
