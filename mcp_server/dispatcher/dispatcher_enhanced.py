@@ -124,6 +124,8 @@ _EXACT_BOUNDED_PYTHON_PATHS = {
     "scripts/validate_mcp_comprehensive.py": "exact_validate_mcp_comprehensive_rebound",
     "scripts/migrate_large_index_to_multi_repo.py": "exact_migrate_large_index_to_multi_repo_rebound",
     "scripts/check_index_languages.py": "exact_check_index_languages_rebound",
+    "scripts/check_test_index_schema.py": "exact_check_test_index_schema_rebound",
+    "scripts/ensure_test_repos_indexed.py": "exact_ensure_test_repos_indexed_rebound",
     "scripts/test_mcp_protocol_direct.py": "exact_test_mcp_protocol_direct_rebound",
     "scripts/verify_embeddings.py": "exact_verify_embeddings_rebound",
     "scripts/claude_code_behavior_simulator.py": "exact_claude_code_behavior_simulator_rebound",

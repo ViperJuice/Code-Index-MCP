@@ -4054,6 +4054,70 @@ scripts/ensure_test_repos_indexed.py`.
 - IF-0-SEMTESTREPOINDEXTAIL-1 — exact later test-repo index script recovery
   and evidence contract.
 
+### Phase 71 — Missing-Repo Semantic Index Script Tail Recovery (SEMMISSINGREPOSEMTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later Python script seam exposed
+after SEMTESTREPOINDEXTAIL:
+`scripts/index_missing_repos_semantic.py ->
+scripts/identify_working_indexes.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMTESTREPOINDEXTAIL
+      head either advances durably beyond the
+      `scripts/index_missing_repos_semantic.py ->
+      scripts/identify_working_indexes.py`
+      pair or emits a truthful newer blocker before the 120-second watchdog
+      expires.
+- [ ] The chosen repair for the later missing-repo semantic index script seam
+      stays narrow, tested, and does not reopen the already-cleared
+      `scripts/check_test_index_schema.py ->
+      scripts/ensure_test_repos_indexed.py`
+      boundary without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMTESTREPOINDEXTAIL rerun outcome and the final live verdict for the
+      later missing-repo semantic index script pair.
+
+**Scope notes**
+
+This phase exists only if SEMTESTREPOINDEXTAIL proves the later test-repo
+index script pair is cleared, but the refreshed live rerun still terminalizes
+later in lexical walking on
+`scripts/index_missing_repos_semantic.py ->
+scripts/identify_working_indexes.py`.
+
+**Non-goals**
+
+- No reopening of the cleared test-repo index script recovery once the live
+  rerun has advanced beyond
+  `scripts/check_test_index_schema.py ->
+  scripts/ensure_test_repos_indexed.py`.
+- No blanket reopening of unrelated script families unless the refreshed
+  rerun proves the active blocker cannot be cleared with a narrower exact-path
+  or exact-pair contract.
+- No reopening of unrelated semantic-stage or roadmap work unless the
+  refreshed rerun proves the active blocker has moved again.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+- `scripts/index_missing_repos_semantic.py`
+- `scripts/identify_working_indexes.py`
+
+**Depends on**
+- SEMTESTREPOINDEXTAIL
+
+**Produces**
+- IF-0-SEMMISSINGREPOSEMTAIL-1 — exact later missing-repo semantic index
+  script recovery and evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -4127,6 +4191,7 @@ SEMCONTRACT
   -> SEMFIXTURETAIL
   -> SEMAIOVERVIEWTAIL
   -> SEMTESTREPOINDEXTAIL
+  -> SEMMISSINGREPOSEMTAIL
 ```
 
 ## Execution Notes
@@ -4288,6 +4353,18 @@ SEMCONTRACT
   scripts/ensure_test_repos_indexed.py`; it should repair that exact later
   script pair or preserve the next exact downstream blocker instead of
   reopening earlier overview, fixture, or optimized-report work.
+- SEMTESTREPOINDEXTAIL should amend the roadmap immediately if the refreshed
+  live rerun clears the later test-repo index script pair but exposes a later
+  exact blocker such as
+  `scripts/index_missing_repos_semantic.py ->
+  scripts/identify_working_indexes.py`.
+- SEMMISSINGREPOSEMTAIL exists only if SEMTESTREPOINDEXTAIL proves the later
+  test-repo index script pair is cleared but the live rerun still remains in
+  lexical walking on
+  `scripts/index_missing_repos_semantic.py ->
+  scripts/identify_working_indexes.py`; it should repair that exact later
+  script pair or preserve the next exact downstream blocker instead of
+  reopening earlier overview or test-repo index work.
 - SEMCOLLECT exists only if SEMREADYFIX proves enrichment compatibility is
   repaired but semantic writes still cannot advance because the active
   collection/bootstrap path is missing or disconnected from the rebuild.

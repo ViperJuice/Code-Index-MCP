@@ -468,6 +468,19 @@ def _print_embed_consolidation_script_boundary(prefix: str, repo_path: Path) -> 
         )
 
 
+def _print_test_repo_index_script_boundary(prefix: str, repo_path: Path) -> None:
+    script_paths = (
+        repo_path / "scripts" / "check_test_index_schema.py",
+        repo_path / "scripts" / "ensure_test_repos_indexed.py",
+    )
+    if all(path.is_file() for path in script_paths):
+        click.echo(
+            f"{prefix}Lexical boundary: using exact bounded Python indexing for "
+            "scripts/check_test_index_schema.py -> "
+            "scripts/ensure_test_repos_indexed.py"
+        )
+
+
 def _print_artifact_publish_race_python_boundary(prefix: str, repo_path: Path) -> None:
     test_path = repo_path / "tests" / "test_artifact_publish_race.py"
     if test_path.is_file():
@@ -1022,6 +1035,7 @@ def status(repo_id: Optional[str]):
         _print_preflight_upgrade_script_boundary("  ", Path(status["path"]))
         _print_verify_simulator_script_boundary("  ", Path(status["path"]))
         _print_embed_consolidation_script_boundary("  ", Path(status["path"]))
+        _print_test_repo_index_script_boundary("  ", Path(status["path"]))
         _print_artifact_publish_race_python_boundary("  ", Path(status["path"]))
         _print_visualization_quick_charts_python_boundary("  ", Path(status["path"]))
         _print_docs_governance_contract_python_boundary("  ", Path(status["path"]))

@@ -3054,6 +3054,51 @@ def test_get_repository_status_preserves_docs_truth_tail_pair_trace(tmp_path):
     )
 
 
+def test_get_repository_status_preserves_test_repo_index_pair_trace(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace_path.write_text(
+        json.dumps(
+            {
+                "status": "interrupted",
+                "stage": "lexical_walking",
+                "stage_family": "lexical",
+                "trace_timestamp": "2026-04-29T22:08:25Z",
+                "current_commit": commit,
+                "indexed_commit_before": "older-indexed-commit",
+                "last_progress_path": str(repo / "scripts" / "check_test_index_schema.py"),
+                "in_flight_path": str(repo / "scripts" / "ensure_test_repos_indexed.py"),
+                "blocker_source": "lexical_mutation",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    status = manager.get_repository_status(repo_info.repository_id)
+
+    assert status["force_full_exit_trace"]["status"] == "interrupted"
+    assert status["force_full_exit_trace"]["stage"] == "lexical_walking"
+    assert status["force_full_exit_trace"]["stage_family"] == "lexical"
+    assert status["force_full_exit_trace"]["last_progress_path"] == str(
+        repo / "scripts" / "check_test_index_schema.py"
+    )
+    assert status["force_full_exit_trace"]["in_flight_path"] == str(
+        repo / "scripts" / "ensure_test_repos_indexed.py"
+    )
+    assert "scripts/consolidate_real_performance_data.py" not in (
+        status["force_full_exit_trace"]["last_progress_path"] or ""
+    )
+    assert "tests/docs/test_p8_deployment_security.py" not in (
+        status["force_full_exit_trace"]["in_flight_path"] or ""
+    )
+
+
 def test_get_repository_status_preserves_mock_plugin_fixture_pair_trace(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)

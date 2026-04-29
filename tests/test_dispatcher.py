@@ -3665,6 +3665,119 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "ConsolidatedResult" in consolidation_fts_rows[0][0]
         assert "PerformanceDataConsolidator" in consolidation_fts_rows[0][0]
 
+    def test_index_directory_uses_exact_bounded_python_pair_for_test_repo_index_tail(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        schema_script = repo / "scripts" / "check_test_index_schema.py"
+        ensure_script = repo / "scripts" / "ensure_test_repos_indexed.py"
+        helper_script = repo / "scripts" / "helper.py"
+        schema_script.parent.mkdir(parents=True)
+        schema_script.write_text(
+            "def check_schema(db_path):\n"
+            "    return db_path\n\n"
+            "def main():\n"
+            "    return check_schema('db')\n",
+            encoding="utf-8",
+        )
+        ensure_script.write_text(
+            "def check_index_exists(repo_info):\n"
+            "    return bool(repo_info)\n\n"
+            "def index_repository(repo_info):\n"
+            "    return repo_info\n\n"
+            "def main():\n"
+            "    return index_repository({})\n",
+            encoding="utf-8",
+        )
+        helper_script.write_text(
+            "def helper():\n"
+            "    return 'helper'\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 3
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(schema_script.resolve()),
+            str(helper_script.resolve()),
+            str(ensure_script.resolve()),
+        }
+        with store._get_connection() as conn:
+            schema_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/check_test_index_schema.py') ORDER BY id"
+                ).fetchall()
+            ]
+            ensure_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/ensure_test_repos_indexed.py') ORDER BY id"
+                ).fetchall()
+            ]
+            helper_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/helper.py') ORDER BY id"
+                ).fetchall()
+            ]
+            schema_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/check_test_index_schema.py')"
+            ).fetchone()[0]
+            ensure_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/ensure_test_repos_indexed.py')"
+            ).fetchone()[0]
+            schema_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/check_test_index_schema.py'"
+            ).fetchone()[0]
+            ensure_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/ensure_test_repos_indexed.py'"
+            ).fetchone()[0]
+            helper_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/helper.py'"
+            ).fetchone()[0]
+            schema_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/check_test_index_schema.py')"
+            ).fetchall()
+            ensure_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/ensure_test_repos_indexed.py')"
+            ).fetchall()
+        store.close()
+        assert schema_symbols == ["check_schema", "main"]
+        assert ensure_symbols == ["check_index_exists", "index_repository", "main"]
+        assert helper_symbols == ["helper"]
+        assert schema_chunk_count == 0
+        assert ensure_chunk_count == 0
+        assert "exact_check_test_index_schema_rebound" in schema_metadata
+        assert "exact_ensure_test_repos_indexed_rebound" in ensure_metadata
+        assert "exact_check_test_index_schema_rebound" not in helper_metadata
+        assert "exact_ensure_test_repos_indexed_rebound" not in helper_metadata
+        assert len(schema_fts_rows) == 1
+        assert "check_schema" in schema_fts_rows[0][0]
+        assert len(ensure_fts_rows) == 1
+        assert "check_index_exists" in ensure_fts_rows[0][0]
+        assert "index_repository" in ensure_fts_rows[0][0]
+
     def test_index_directory_uses_exact_bounded_python_path_for_quick_charts(
         self, tmp_path, monkeypatch
     ):
@@ -4854,6 +4967,135 @@ class TestEnhancedDispatcherProtocolConformance:
                 "tests/docs/test_gabase_ga_readiness_contract.py",
                 "tests/security/fixtures/mock_plugin/plugin.py",
                 "tests/security/fixtures/mock_plugin/__init__.py",
+            )
+            for snapshot in snapshots
+        )
+
+    def test_index_directory_emits_test_repo_index_pair_before_closeout_handoff(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        scripts_dir = repo / "scripts"
+        scripts_dir.mkdir(parents=True)
+        prior_file = scripts_dir / "check_test_index_schema.py"
+        prior_file.write_text(
+            "def check_schema(db_path):\n"
+            "    return db_path\n\n"
+            "def main():\n"
+            "    return check_schema('db')\n",
+            encoding="utf-8",
+        )
+        blocked_file = scripts_dir / "ensure_test_repos_indexed.py"
+        blocked_file.write_text(
+            "def check_index_exists(repo_info):\n"
+            "    return bool(repo_info)\n\n"
+            "def index_repository(repo_info):\n"
+            "    return repo_info\n\n"
+            "def main():\n"
+            "    return index_repository({})\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+        snapshots = []
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: object())
+
+        def _fake_walk(_directory, followlinks=False):
+            assert followlinks is False
+            yield str(scripts_dir), [], [prior_file.name, blocked_file.name]
+
+        def _explode_before_semantic_progress(self, _ctx, _paths, progress_callback=None):
+            raise RuntimeError("semantic closeout entry stalled before emitting progress")
+
+        monkeypatch.setattr("mcp_server.dispatcher.dispatcher_enhanced.os.walk", _fake_walk)
+        monkeypatch.setattr(
+            Dispatcher,
+            "rebuild_semantic_for_paths",
+            _explode_before_semantic_progress,
+        )
+
+        result = Dispatcher([]).index_directory(
+            ctx,
+            repo,
+            progress_callback=lambda snapshot: snapshots.append(dict(snapshot)),
+        )
+
+        assert result["indexed_files"] == 2
+        assert result["failed_files"] == 0
+        assert result["semantic_stage"] == "failed"
+        assert result["last_progress_path"] == str(blocked_file.resolve())
+        lexical_pair = [
+            snapshot
+            for snapshot in snapshots
+            if snapshot["stage"] == "lexical_walking"
+            and snapshot["last_progress_path"] == str(prior_file.resolve())
+            and snapshot["in_flight_path"] == str(blocked_file.resolve())
+        ]
+        assert lexical_pair
+        with store._get_connection() as conn:
+            schema_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/check_test_index_schema.py') ORDER BY id"
+                ).fetchall()
+            ]
+            ensure_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/ensure_test_repos_indexed.py') ORDER BY id"
+                ).fetchall()
+            ]
+            schema_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/check_test_index_schema.py')"
+            ).fetchone()[0]
+            ensure_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/ensure_test_repos_indexed.py')"
+            ).fetchone()[0]
+            schema_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/check_test_index_schema.py')"
+            ).fetchall()
+            ensure_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/ensure_test_repos_indexed.py')"
+            ).fetchall()
+        store.close()
+        assert schema_symbols == ["check_schema", "main"]
+        assert ensure_symbols == ["check_index_exists", "index_repository", "main"]
+        assert schema_chunk_count == 0
+        assert ensure_chunk_count == 0
+        assert len(schema_fts) == 1
+        assert "check_schema" in schema_fts[0][0]
+        assert len(ensure_fts) == 1
+        assert "check_index_exists" in ensure_fts[0][0]
+        assert "index_repository" in ensure_fts[0][0]
+        assert snapshots[-1]["stage"] == "force_full_closeout_handoff"
+        assert snapshots[-1]["stage_family"] == "final_closeout"
+        assert snapshots[-1]["last_progress_path"] == str(blocked_file.resolve())
+        assert snapshots[-1]["in_flight_path"] is None
+        assert all(
+            needle not in (
+                (snapshot.get("last_progress_path") or "")
+                + " "
+                + (snapshot.get("in_flight_path") or "")
+            )
+            for needle in (
+                "scripts/check_index_languages.py",
+                "scripts/test_mcp_protocol_direct.py",
+                "scripts/consolidate_real_performance_data.py",
+                "tests/docs/test_p8_deployment_security.py",
             )
             for snapshot in snapshots
         )

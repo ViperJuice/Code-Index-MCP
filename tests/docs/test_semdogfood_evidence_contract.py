@@ -22,8 +22,8 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
 
     for expected in (
         "# Semantic Dogfood Rebuild",
-        "Phase plan: `plans/phase-plan-v7-SEMAIOVERVIEWTAIL.md`",
-        "Prior phase plan: `plans/phase-plan-v7-SEMFIXTURETAIL.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMTESTREPOINDEXTAIL.md`",
+        "Prior phase plan: `plans/phase-plan-v7-SEMAIOVERVIEWTAIL.md`",
         "## Reset Boundary",
         "## SEMTRACEFRESHNESS Live Trace Recovery",
         "## SEMPUBLISHRACE Live Rerun Check",
@@ -62,6 +62,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
         "## SEMCROSSDOGTAIL Live Rerun Check",
         "## SEMFIXTURETAIL Live Rerun Check",
         "## SEMAIOVERVIEWTAIL Live Rerun Check",
+        "## SEMTESTREPOINDEXTAIL Live Rerun Check",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -329,6 +330,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "roadmap now adds downstream phase `SEMFIXTURETAIL`",
         "roadmap now adds downstream phase `SEMAIOVERVIEWTAIL`",
         "roadmap now adds downstream phase `SEMTESTREPOINDEXTAIL`",
+        "roadmap now adds downstream phase `SEMMISSINGREPOSEMTAIL`",
         "2026-04-29T21:15:40Z",
         "2026-04-29T21:15:52Z",
         "2026-04-29T21:34:54Z",
@@ -339,10 +341,15 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "2026-04-29T22:04:27Z",
         "2026-04-29T22:05:44Z",
         "2026-04-29T22:08:25Z",
+        "2026-04-29T22:26:54Z",
+        "2026-04-29T22:27:04Z",
+        "0195d3c",
         "e6584ee5",
         "f2600b65",
         "3b92a81",
         "a0811d8a",
+        "scripts/index_missing_repos_semantic.py",
+        "scripts/identify_working_indexes.py",
     ):
         assert expected in text
 
@@ -373,6 +380,8 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "scripts/quick_mcp_vs_native_validation.py",
         "scripts/check_test_index_schema.py",
         "scripts/ensure_test_repos_indexed.py",
+        "scripts/index_missing_repos_semantic.py",
+        "scripts/identify_working_indexes.py",
         "tests/test_artifact_publish_race.py",
         "analysis_archive/scripts_archive/scripts_test_files/verify_mcp_fix.py",
         "analysis_archive/semantic_vs_sql_comparison_1750926162.json",
@@ -421,6 +430,7 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "Lexical boundary: using exact bounded Markdown indexing for plans/phase-plan-v7-SEMPHASETAIL.md -> plans/phase-plan-v5-gagov.md",
         "Lexical boundary: using exact bounded Python indexing for scripts/migrate_large_index_to_multi_repo.py -> scripts/check_index_languages.py",
         "Lexical boundary: using exact bounded Python indexing for scripts/create_semantic_embeddings.py -> scripts/consolidate_real_performance_data.py",
+        "Lexical boundary: using exact bounded Python indexing for scripts/check_test_index_schema.py -> scripts/ensure_test_repos_indexed.py",
         "Lexical boundary: using exact bounded JSON indexing for analysis_archive/semantic_vs_sql_comparison_1750926162.json after analysis_archive/scripts_archive/scripts_test_files/verify_mcp_fix.py",
         "Lexical boundary: using exact bounded JSON indexing for final_optimized_report_final_report_1750958096/final_report_data.json -> final_optimized_report_final_report_1750958096/FINAL_OPTIMIZED_ANALYSIS_REPORT.md",
         "fixture repositories under test_workspace/ are ignored during lexical walking",
@@ -441,8 +451,8 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "SEMV1PLANTAIL acceptance is satisfied for its named blocker",
         "SEMCROSSDOGTAIL acceptance is satisfied for its named blocker",
         "SEMOPTREPORTTAIL acceptance is satisfied for its named blocker",
-        "Phase plan: `plans/phase-plan-v7-SEMAIOVERVIEWTAIL.md`",
-        "Prior phase plan: `plans/phase-plan-v7-SEMFIXTURETAIL.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMTESTREPOINDEXTAIL.md`",
+        "Prior phase plan: `plans/phase-plan-v7-SEMAIOVERVIEWTAIL.md`",
         "repository status` now advertises the repaired exact bounded lexical surface",
         "Lexical boundary: using exact bounded JSON/JSONL indexing for legacy .codex/phase-loop compatibility runtime artifacts while canonical .phase-loop remains authoritative",
         "Lexical boundary: using exact bounded shell/Python indexing for scripts/preflight_upgrade.sh -> scripts/test_mcp_protocol_direct.py",
@@ -484,5 +494,6 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "ai_docs/sqlite_fts5_overview.md",
         "SEMFIXTURETAIL acceptance is satisfied for its named blocker",
         "SEMAIOVERVIEWTAIL acceptance is satisfied for its named blocker",
+        "SEMTESTREPOINDEXTAIL acceptance is satisfied for its named blocker",
     ):
         assert expected in text

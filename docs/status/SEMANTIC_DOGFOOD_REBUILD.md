@@ -1,7 +1,9 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T22:08:25Z`.
-- Observed commit: `a0811d8a`.
+- Evidence captured: `2026-04-29T22:27:04Z`.
+- Observed commit: `0195d3c`.
+- Prior SEMTESTREPOINDEXTAIL live-rerun anchor: `2026-04-29T22:08:25Z` on
+  observed commit `a0811d8a`.
 - Prior SEMFIXTURETAIL live-rerun anchor: `2026-04-29T21:51:02Z` on observed
   commit `3b92a81`.
 - Prior SEMSUPPORTTAIL live-rerun anchor: `2026-04-29T19:52:03Z` on observed
@@ -38,8 +40,15 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMAIOVERVIEWTAIL.md`.
-- Prior phase plan: `plans/phase-plan-v7-SEMFIXTURETAIL.md`.
+- Phase plan: `plans/phase-plan-v7-SEMTESTREPOINDEXTAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMAIOVERVIEWTAIL.md`.
+- Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMMISSINGREPOSEMTAIL` after SEMTESTREPOINDEXTAIL proved the later
+  test-repo index script seam is now cleared, but the refreshed live rerun on
+  the new head still terminalized later in lexical walking on
+  `scripts/index_missing_repos_semantic.py ->
+  scripts/identify_working_indexes.py`. Older downstream assumptions should
+  be treated as stale after this roadmap amendment.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMTESTREPOINDEXTAIL` after SEMAIOVERVIEWTAIL proved the later `ai_docs`
   overview seam is now cleared, but the refreshed live rerun on the new head
@@ -2583,6 +2592,62 @@ Steering outcome:
   blocker as the SEMAIOVERVIEWTAIL-era overview seam
   `ai_docs/black_isort_overview.md ->
   ai_docs/sqlite_fts5_overview.md`.
+
+## SEMTESTREPOINDEXTAIL Live Rerun Check
+
+SEMTESTREPOINDEXTAIL repaired the later test-repo index script seam on the
+current head. The refreshed repo-local force-full rerun advanced durably
+beyond that pair and re-anchored later in lexical walking on a newer exact
+Python script seam.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMTESTREPOINDEXTAIL live rerun started on observed commit
+  `0195d3c` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- During the rerun, the force-full trace refreshed to the later exact script
+  pair
+  `scripts/index_missing_repos_semantic.py ->
+  scripts/identify_working_indexes.py`.
+- At `2026-04-29T22:26:54Z`, `.mcp-index/force_full_exit_trace.json` showed
+  `status: running`, `stage: lexical_walking`,
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/scripts/index_missing_repos_semantic.py`,
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/scripts/identify_working_indexes.py`.
+- At `2026-04-29T22:27:04Z`, a refreshed `repository status` terminalized the
+  rerun to `Trace status: interrupted` while preserving the same later script
+  pair and keeping the repo semantically fail-closed.
+- The SEMTESTREPOINDEXTAIL target pair is no longer the active blocker:
+  `scripts/check_test_index_schema.py ->
+  scripts/ensure_test_repos_indexed.py`.
+- SQLite runtime counts after the rerun remained
+  `files = 1064`, `code_chunks = 13095`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Rollout status: partial_index_failure`,
+  `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+- `repository status` now advertises the repaired exact bounded lexical
+  surface
+  `Lexical boundary: using exact bounded Python indexing for scripts/check_test_index_schema.py -> scripts/ensure_test_repos_indexed.py`.
+
+Steering outcome:
+
+- SEMTESTREPOINDEXTAIL acceptance is satisfied for its named blocker: the
+  live watchdog no longer terminalizes on
+  `scripts/check_test_index_schema.py ->
+  scripts/ensure_test_repos_indexed.py`.
+- The final authoritative rerun for this phase moved later and now reaches
+  the exact script pair
+  `scripts/index_missing_repos_semantic.py ->
+  scripts/identify_working_indexes.py`.
+- The roadmap now adds downstream phase `SEMMISSINGREPOSEMTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMTESTREPOINDEXTAIL-era script seam
+  `scripts/check_test_index_schema.py ->
+  scripts/ensure_test_repos_indexed.py`.
 
 ## Verification
 
