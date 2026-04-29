@@ -2021,6 +2021,9 @@ class EnhancedDispatcher:
             bounded_json_shard = self._build_exact_bounded_json_shard(
                 path, content, ctx.workspace_root
             )
+            bounded_jsonl_shard = self._build_exact_bounded_jsonl_shard(
+                path, content, ctx.workspace_root
+            )
             if bounded_python_shard is not None:
                 plugin_language = "python"
                 plugin_lang = "python"
@@ -2033,6 +2036,10 @@ class EnhancedDispatcher:
                 plugin_language = "json"
                 plugin_lang = "json"
                 shard = bounded_json_shard
+            elif bounded_jsonl_shard is not None:
+                plugin_language = "plaintext"
+                plugin_lang = "plaintext"
+                shard = bounded_jsonl_shard
             else:
                 # Find the appropriate plugin
                 plugin = self._match_plugin(path)
@@ -2046,6 +2053,7 @@ class EnhancedDispatcher:
                 bounded_python_shard is None
                 and bounded_shell_shard is None
                 and bounded_json_shard is None
+                and bounded_jsonl_shard is None
             ):
                 shard = plugin.indexFile(path, content)
             try:
@@ -2079,6 +2087,7 @@ class EnhancedDispatcher:
                 and bounded_python_shard is None
                 and bounded_shell_shard is None
                 and bounded_json_shard is None
+                and bounded_jsonl_shard is None
             ):
                 execution_time = time.time() - start_time
                 self._router.record_performance(plugin, execution_time)
@@ -2133,6 +2142,25 @@ class EnhancedDispatcher:
         if path.suffix.lower() != ".json":
             return None
         bounded_path_reason = GenericTreeSitterPlugin.exact_bounded_json_reason(
+            path, workspace_root
+        )
+        if bounded_path_reason is None:
+            return None
+        return {
+            "symbols": [],
+            "chunks": [],
+            "metadata": {
+                "bounded_chunk_path": True,
+                "bounded_path_reason": bounded_path_reason,
+            },
+        }
+
+    def _build_exact_bounded_jsonl_shard(
+        self, path: Path, content: str, workspace_root: Path
+    ) -> Optional[Dict[str, Any]]:
+        if path.suffix.lower() != ".jsonl":
+            return None
+        bounded_path_reason = GenericTreeSitterPlugin.exact_bounded_jsonl_reason(
             path, workspace_root
         )
         if bounded_path_reason is None:
@@ -3056,7 +3084,10 @@ class EnhancedDispatcher:
             exact_bounded_json = GenericTreeSitterPlugin.uses_exact_bounded_json_path(
                 path, directory
             )
-            if size > get_max_file_size_bytes() and not exact_bounded_json:
+            exact_bounded_jsonl = GenericTreeSitterPlugin.uses_exact_bounded_jsonl_path(
+                path, directory
+            )
+            if size > get_max_file_size_bytes() and not exact_bounded_json and not exact_bounded_jsonl:
                 logger.warning("skipping oversized file: %s (%d bytes)", path, size)
                 stats["ignored_files"] = stats.get("ignored_files", 0) + 1
                 continue
@@ -3065,7 +3096,7 @@ class EnhancedDispatcher:
             # This allows us to index ALL files, including .env, .key, etc.
             try:
                 # First try to match by extension
-                if path.suffix in supported_extensions:
+                if path.suffix in supported_extensions or exact_bounded_jsonl:
                     mutation = self._index_file_with_lexical_timeout(
                         ctx,
                         path,

@@ -482,6 +482,26 @@ def _print_archive_tail_json_boundary(prefix: str, repo_path: Path) -> None:
         )
 
 
+def _print_legacy_codex_phase_loop_boundary(prefix: str, repo_path: Path) -> None:
+    legacy_paths = (
+        repo_path / ".codex" / "phase-loop" / "runs" / "20260424T180441Z-01-gagov-execute" / "launch.json",
+        repo_path
+        / ".codex"
+        / "phase-loop"
+        / "runs"
+        / "20260427T071807Z-02-artpub-execute"
+        / "terminal-summary.json",
+        repo_path / ".codex" / "phase-loop" / "archive" / "20260424T211515Z" / "events.jsonl",
+        repo_path / ".codex" / "phase-loop" / "archive" / "20260424T211515Z" / "state.json",
+    )
+    if all(path.is_file() for path in legacy_paths):
+        click.echo(
+            f"{prefix}Lexical boundary: using exact bounded JSON/JSONL indexing for "
+            "legacy .codex/phase-loop compatibility runtime artifacts while canonical "
+            ".phase-loop remains authoritative"
+        )
+
+
 @repository.command()
 @click.argument("path", type=click.Path(exists=True))
 @click.option("--auto-sync/--no-auto-sync", default=True, help="Enable automatic synchronization")
@@ -895,6 +915,7 @@ def status(repo_id: Optional[str]):
         _print_mock_plugin_fixture_python_boundary("  ", Path(status["path"]))
         _print_devcontainer_json_boundary("  ", Path(status["path"]))
         _print_archive_tail_json_boundary("  ", Path(status["path"]))
+        _print_legacy_codex_phase_loop_boundary("  ", Path(status["path"]))
         _print_force_full_exit_trace(
             "  ", status.get("force_full_exit_trace"), Path(status["path"])
         )

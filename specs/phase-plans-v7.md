@@ -3363,6 +3363,63 @@ refreshed live rerun still terminalizes later in lexical walking on a legacy
 - IF-0-SEMCODEXLOOPTAIL-1 — later legacy `.codex/phase-loop` lexical recovery
   and evidence contract.
 
+### Phase 60 — Docs Contract Tail Recovery (SEMDOCCONTRACTTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later docs contract-test pair exposed
+after SEMCODEXLOOPTAIL:
+`tests/docs/test_semincr_contract.py ->
+tests/docs/test_gabase_ga_readiness_contract.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMCODEXLOOPTAIL head
+      either advances durably beyond the
+      `tests/docs/test_semincr_contract.py ->
+      tests/docs/test_gabase_ga_readiness_contract.py` pair or emits a truthful
+      newer blocker before the 120-second watchdog expires.
+- [ ] The chosen repair for the docs contract-test tail stays narrow, tested,
+      and does not reopen the repaired legacy `.codex/phase-loop`
+      compatibility-runtime boundary without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the SEMCODEXLOOPTAIL
+      rerun outcome and the final live verdict for the later docs contract-test
+      pair.
+
+**Scope notes**
+
+This phase exists only if SEMCODEXLOOPTAIL proves the legacy
+`.codex/phase-loop` compatibility-runtime family is cleared, but the refreshed
+live rerun still terminalizes later in lexical walking on a docs contract-test
+pair such as
+`tests/docs/test_semincr_contract.py ->
+tests/docs/test_gabase_ga_readiness_contract.py`.
+
+**Non-goals**
+
+- No reopening of the repaired legacy `.codex/phase-loop` compatibility-runtime
+  recovery once the live rerun has advanced beyond that family.
+- No broad reopening of unrelated docs tests unless the refreshed rerun proves
+  the active blocker requires them.
+- No blanket `tests/docs/**/*.py` bypass unless the refreshed rerun proves the
+  active blocker cannot be cleared with a narrower contract-tail repair.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMCODEXLOOPTAIL
+
+**Produces**
+- IF-0-SEMDOCCONTRACTTAIL-1 — later docs contract-test lexical recovery and
+  evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -3425,6 +3482,7 @@ SEMCONTRACT
   -> SEMDOCTESTTAIL
   -> SEMMOCKPLUGIN
   -> SEMCODEXLOOPTAIL
+  -> SEMDOCCONTRACTTAIL
 ```
 
 ## Execution Notes
@@ -3737,6 +3795,11 @@ SEMCONTRACT
   `.codex/phase-loop` blocker such as
   `.codex/phase-loop/runs/20260424T180441Z-01-gagov-execute/launch.json ->
   .codex/phase-loop/runs/20260427T071807Z-02-artpub-execute/terminal-summary.json`.
+- SEMCODEXLOOPTAIL should amend the roadmap immediately if the refreshed live
+  rerun clears the legacy `.codex/phase-loop` compatibility-runtime family but
+  exposes a later exact lexical blocker such as
+  `tests/docs/test_semincr_contract.py ->
+  tests/docs/test_gabase_ga_readiness_contract.py`.
 
 ## Verification
 

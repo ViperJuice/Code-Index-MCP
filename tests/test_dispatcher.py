@@ -4253,6 +4253,174 @@ class TestEnhancedDispatcherProtocolConformance:
         assert len(fts_rows) == 1
         assert "archive tail" in fts_rows[0][0]
 
+    def test_index_directory_uses_exact_bounded_paths_for_legacy_codex_phase_loop_runtime(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        launch_file = (
+            repo / ".codex" / "phase-loop" / "runs" / "20260424T180441Z-01-gagov-execute" / "launch.json"
+        )
+        terminal_file = (
+            repo
+            / ".codex"
+            / "phase-loop"
+            / "runs"
+            / "20260427T071807Z-02-artpub-execute"
+            / "terminal-summary.json"
+        )
+        heartbeat_file = (
+            repo
+            / ".codex"
+            / "phase-loop"
+            / "runs"
+            / "20260427T085911Z-02-mrready-execute"
+            / "heartbeat.json"
+        )
+        archive_events = (
+            repo / ".codex" / "phase-loop" / "archive" / "20260424T211515Z" / "events.jsonl"
+        )
+        archive_state = (
+            repo / ".codex" / "phase-loop" / "archive" / "20260424T211515Z" / "state.json"
+        )
+        for path in (launch_file, terminal_file, heartbeat_file, archive_events, archive_state):
+            path.parent.mkdir(parents=True, exist_ok=True)
+        launch_file.write_text('{"command": ["codex"], "phase": "GAGOV"}\n', encoding="utf-8")
+        terminal_file.write_text(
+            '{"artifact_paths": {"terminal": "terminal-summary.json"}, "terminal_status": "executed", "next_action": "preserve"}\n',
+            encoding="utf-8",
+        )
+        heartbeat_file.write_text(
+            '{"phase": "MRREADY", "current_phase": "MRREADY", "next_action": "monitor"}\n',
+            encoding="utf-8",
+        )
+        archive_events.write_text(
+            '{"phase": "GARC", "next_action": "resume"}\n{"phase": "GAREL", "next_action": "wait"}\n',
+            encoding="utf-8",
+        )
+        archive_state.write_text('{"current_phase": "GARC", "artifact_paths": ["launch.json"]}\n', encoding="utf-8")
+
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        def _unexpected_json_plugin_load(_self, language):
+            if language == "json":
+                raise AssertionError("legacy .codex/phase-loop JSON paths should bypass plugin load")
+            return None
+
+        monkeypatch.setattr(Dispatcher, "_ensure_plugin_loaded", _unexpected_json_plugin_load)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 5
+        assert result["failed_files"] == 0
+        with store._get_connection() as conn:
+            chunk_counts = conn.execute(
+                "SELECT relative_path, COUNT(*) FROM code_chunks "
+                "JOIN files ON code_chunks.file_id = files.id "
+                "GROUP BY relative_path"
+            ).fetchall()
+            fts_rows = dict(
+                conn.execute(
+                    "SELECT relative_path, content FROM fts_code "
+                    "JOIN files ON fts_code.file_id = files.id"
+                ).fetchall()
+            )
+        store.close()
+        assert chunk_counts == []
+        assert ".codex/phase-loop/runs/20260424T180441Z-01-gagov-execute/launch.json" in fts_rows
+        assert "command" in fts_rows[
+            ".codex/phase-loop/runs/20260424T180441Z-01-gagov-execute/launch.json"
+        ]
+        assert ".codex/phase-loop/runs/20260427T071807Z-02-artpub-execute/terminal-summary.json" in fts_rows
+        assert "terminal_status" in fts_rows[
+            ".codex/phase-loop/runs/20260427T071807Z-02-artpub-execute/terminal-summary.json"
+        ]
+        assert ".codex/phase-loop/runs/20260427T085911Z-02-mrready-execute/heartbeat.json" in fts_rows
+        assert "current_phase" in fts_rows[
+            ".codex/phase-loop/runs/20260427T085911Z-02-mrready-execute/heartbeat.json"
+        ]
+        assert ".codex/phase-loop/archive/20260424T211515Z/events.jsonl" in fts_rows
+        assert "next_action" in fts_rows[
+            ".codex/phase-loop/archive/20260424T211515Z/events.jsonl"
+        ]
+        assert ".codex/phase-loop/archive/20260424T211515Z/state.json" in fts_rows
+        assert "current_phase" in fts_rows[
+            ".codex/phase-loop/archive/20260424T211515Z/state.json"
+        ]
+
+    def test_index_directory_keeps_canonical_phase_loop_json_on_normal_plugin_path(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        legacy_launch = (
+            repo / ".codex" / "phase-loop" / "runs" / "20260424T180441Z-01-gagov-execute" / "launch.json"
+        )
+        canonical_state = repo / ".phase-loop" / "state.json"
+        for path in (legacy_launch, canonical_state):
+            path.parent.mkdir(parents=True, exist_ok=True)
+        legacy_launch.write_text('{"command": ["codex"], "phase": "GAGOV"}\n', encoding="utf-8")
+        canonical_state.write_text('{"current_phase": "SEMCODEXLOOPTAIL"}\n', encoding="utf-8")
+
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        json_plugin = Mock()
+        json_plugin.language = "json"
+        json_plugin.lang = "json"
+        json_plugin.supports.side_effect = lambda path: Path(path).suffix == ".json"
+        json_plugin.indexFile.return_value = {
+            "symbols": [],
+            "chunks": [],
+            "metadata": {"plugin_path": "normal_json_plugin"},
+        }
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([json_plugin]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 2
+        assert result["failed_files"] == 0
+        assert json_plugin.indexFile.call_count == 1
+        indexed_path = json_plugin.indexFile.call_args.args[0]
+        assert Path(indexed_path).resolve() == canonical_state.resolve()
+        with store._get_connection() as conn:
+            fts_rows = dict(
+                conn.execute(
+                    "SELECT relative_path, content FROM fts_code "
+                    "JOIN files ON fts_code.file_id = files.id"
+                ).fetchall()
+            )
+        store.close()
+        assert ".codex/phase-loop/runs/20260424T180441Z-01-gagov-execute/launch.json" in fts_rows
+        assert ".phase-loop/state.json" in fts_rows
+
     def test_index_directory_emits_archive_tail_successor_before_closeout_handoff(
         self, tmp_path, monkeypatch
     ):

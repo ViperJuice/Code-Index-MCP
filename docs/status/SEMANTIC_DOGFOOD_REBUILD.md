@@ -1793,6 +1793,85 @@ Steering outcome:
   `tests/security/fixtures/mock_plugin/plugin.py ->
   tests/security/fixtures/mock_plugin/__init__.py` seam.
 
+## SEMCODEXLOOPTAIL Live Rerun Check
+
+SEMCODEXLOOPTAIL tightened the legacy `.codex/phase-loop` compatibility-runtime
+surface so the old `launch.json -> terminal-summary.json` blocker is no longer
+the active tail and `repository status` now distinguishes that repaired family
+from canonical `.phase-loop/` runner state.
+
+Code/test repair completed in this phase:
+
+- `mcp_server/plugins/generic_treesitter_plugin.py` now recognizes the narrow
+  legacy `.codex/phase-loop` JSON family under `runs/*/launch.json`,
+  `runs/*/terminal-summary.json`, `archive/*/state.json`, and top-level
+  legacy `state.json`, plus the matching `events.jsonl` ledger family, without
+  widening into a blanket `.codex/**` bypass.
+- `mcp_server/dispatcher/dispatcher_enhanced.py` now routes those exact legacy
+  JSON and JSONL compatibility-runtime artifacts through bounded lexical
+  persistence, including `.jsonl` files that previously missed the supported
+  extension gate before the bounded shard could run.
+- `mcp_server/cli/repository_commands.py` now advertises the repaired exact
+  bounded lexical surface as
+  `Lexical boundary: using exact bounded JSON/JSONL indexing for legacy .codex/phase-loop compatibility runtime artifacts while canonical .phase-loop remains authoritative`.
+- `tests/test_dispatcher.py` and `tests/test_repository_commands.py` now freeze
+  the legacy run/archive fixture family while proving canonical
+  `.phase-loop/state.json` stays on its normal JSON path.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The first refreshed SEMCODEXLOOPTAIL live rerun started on observed commit
+  `3d627c33` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-29T18:48:10Z`, `.mcp-index/force_full_exit_trace.json` showed a
+  running lexical trace on
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/.codex/phase-loop/runs/20260427T085911Z-02-mrready-execute/launch.json`
+  with
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/.codex/phase-loop/runs/20260427T085911Z-02-mrready-execute/heartbeat.json`.
+- At `2026-04-29T18:48:20Z`, a refreshed `repository status` terminalized that
+  running snapshot to `Trace status: interrupted` with the same
+  `.codex/phase-loop/.../launch.json ->
+  .codex/phase-loop/.../heartbeat.json` pair while advertising the repaired
+  exact bounded JSON/JSONL compatibility-runtime surface.
+- The earlier SEMMOCKPLUGIN-era legacy pair was no longer the active blocker:
+  `.codex/phase-loop/runs/20260424T180441Z-01-gagov-execute/launch.json ->
+  .codex/phase-loop/runs/20260427T071807Z-02-artpub-execute/terminal-summary.json`.
+- The second refreshed SEMCODEXLOOPTAIL live rerun on the same observed commit
+  `3d627c33` used the same command, exited with code `124`, and advanced beyond
+  the legacy `.codex/phase-loop` compatibility-runtime family entirely.
+- At `2026-04-29T18:52:49Z`, `.mcp-index/force_full_exit_trace.json` showed a
+  running lexical trace on
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/tests/docs/test_semincr_contract.py`
+  with
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/tests/docs/test_gabase_ga_readiness_contract.py`.
+- At `2026-04-29T18:52:55Z`, a refreshed `repository status` terminalized that
+  running snapshot to `Trace status: interrupted` with the same
+  `tests/docs/test_semincr_contract.py ->
+  tests/docs/test_gabase_ga_readiness_contract.py` pair while keeping the
+  repaired legacy `.codex/phase-loop` boundary advertised as historical
+  cleared ground rather than the active blocker.
+- SQLite runtime counts after the rerun remained
+  `files = 1152`, `code_chunks = 28182`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+
+Steering outcome:
+
+- SEMCODEXLOOPTAIL acceptance is satisfied for its named blocker family: the
+  live watchdog no longer terminalizes on the legacy `.codex/phase-loop`
+  compatibility-runtime artifacts that motivated this phase.
+- The intermediate same-family pair
+  `.codex/phase-loop/runs/20260427T085911Z-02-mrready-execute/launch.json ->
+  .codex/phase-loop/runs/20260427T085911Z-02-mrready-execute/heartbeat.json`
+  is also no longer the active blocker after the heartbeat repair.
+- The current active blocker is now the later docs contract-test pair
+  `tests/docs/test_semincr_contract.py ->
+  tests/docs/test_gabase_ga_readiness_contract.py`.
+- The roadmap now adds downstream phase `SEMDOCCONTRACTTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as a legacy `.codex/phase-loop` compatibility-runtime seam.
+
 ## Verification
 
 Verification sequence for this SEMEMBEDCONSOL slice:
