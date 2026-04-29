@@ -70,6 +70,7 @@ class IndexSyncResult:
     duration_seconds: float = 0.0
     code: Optional[str] = None
     readiness: Optional[Dict[str, Any]] = None
+    semantic: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -264,12 +265,17 @@ class GitAwareIndexManager:
                         result = self._incremental_index_update(repo_id, ctx, changed_files)
                         if not result.clean:
                             self.registry.update_staleness_reason(repo_id, "partial_index_failure")
+                            self.registry.update_last_sync_error(
+                                repo_id,
+                                "; ".join(result.errors) or "Incremental index update failed",
+                            )
                             return IndexSyncResult(
                                 action="failed",
                                 commit=current_commit,
                                 files_processed=result.files_processed,
                                 error="; ".join(result.errors) or "Incremental index update failed",
                                 duration_seconds=(datetime.now() - start_time).total_seconds(),
+                                semantic=result.semantic,
                             )
                         if self._index_exists(repo_info) and self.registry.update_indexed_commit(
                             repo_id, current_commit, branch=current_branch
@@ -287,33 +293,50 @@ class GitAwareIndexManager:
         # Full index needed
         result = self._normalize_update_result(self._full_index(repo_id, ctx))
         if not result.clean:
+            self.registry.update_staleness_reason(repo_id, "partial_index_failure")
+            self.registry.update_last_sync_error(
+                repo_id,
+                "; ".join(result.errors) or "Full index failed",
+            )
             return IndexSyncResult(
                 action="failed",
                 commit=current_commit,
                 files_processed=result.files_processed,
                 error="; ".join(result.errors) or "Full index failed",
                 duration_seconds=(datetime.now() - start_time).total_seconds(),
+                semantic=result.semantic,
             )
         if not self._index_has_durable_rows(repo_info):
             self.registry.update_staleness_reason(repo_id, "index_empty")
+            self.registry.update_last_sync_error(
+                repo_id,
+                "Full index completed without durable SQLite file rows",
+            )
             return IndexSyncResult(
                 action="failed",
                 commit=current_commit,
                 files_processed=result.files_processed,
                 error="Full index completed without durable SQLite file rows",
                 duration_seconds=(datetime.now() - start_time).total_seconds(),
+                semantic=result.semantic,
             )
         if self._index_exists(repo_info) and self.registry.update_indexed_commit(
             repo_id, current_commit, branch=current_branch
         ):
             repo_info.last_indexed_commit = current_commit
+            self.registry.update_last_sync_error(repo_id, None)
         elif not self._index_exists(repo_info):
+            self.registry.update_last_sync_error(
+                repo_id,
+                "Full index did not create a durable SQLite index",
+            )
             return IndexSyncResult(
                 action="failed",
                 commit=current_commit,
                 files_processed=result.files_processed,
                 error="Full index did not create a durable SQLite index",
                 duration_seconds=(datetime.now() - start_time).total_seconds(),
+                semantic=result.semantic,
             )
 
         return IndexSyncResult(
@@ -321,6 +344,7 @@ class GitAwareIndexManager:
             commit=current_commit,
             files_processed=result.indexed,
             duration_seconds=(datetime.now() - start_time).total_seconds(),
+            semantic=result.semantic,
         )
 
     def _resolve_ctx(self, repo_id: str) -> Optional[RepoContext]:
@@ -618,6 +642,14 @@ class GitAwareIndexManager:
             result.semantic["semantic_stage"] = stage
         if semantic.get("semantic_error"):
             result.semantic["semantic_error"] = semantic.get("semantic_error")
+        for key in [
+            "summary_call_timed_out",
+            "summary_call_file_path",
+            "summary_call_chunk_ids",
+            "summary_call_timeout_seconds",
+        ]:
+            if key in semantic:
+                result.semantic[key] = semantic.get(key)
 
     def _should_full_reindex(self, repo_path: Path, changes: ChangeSet) -> bool:
         """Decide whether change volume warrants a full reindex."""
@@ -731,6 +763,10 @@ class GitAwareIndexManager:
                 "summary_continuation_required": stats.get(
                     "summary_continuation_required", False
                 ),
+                "summary_call_timed_out": stats.get("summary_call_timed_out", False),
+                "summary_call_file_path": stats.get("summary_call_file_path"),
+                "summary_call_chunk_ids": stats.get("summary_call_chunk_ids", []),
+                "summary_call_timeout_seconds": stats.get("summary_call_timeout_seconds"),
                 "semantic_indexed": stats.get("semantic_indexed", 0),
                 "semantic_failed": stats.get("semantic_failed", 0),
                 "semantic_skipped": stats.get("semantic_skipped", 0),
@@ -865,6 +901,7 @@ class GitAwareIndexManager:
             "artifact_enabled": repo_info.artifact_enabled,
             "artifact_backend": repo_info.artifact_backend,
             "artifact_health": repo_info.artifact_health,
+            "last_sync_error": getattr(repo_info, "last_sync_error", None),
         }
 
         # Check index file

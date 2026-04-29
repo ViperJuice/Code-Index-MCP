@@ -1692,6 +1692,87 @@ class TestEnhancedDispatcherProtocolConformance:
         assert result["summary_passes"] == 1
         assert summary_limits == [64, 32]
 
+    def test_index_directory_blocks_on_first_summary_call_timeout(
+        self, tmp_path, monkeypatch
+    ):
+        ctx = _make_repo_ctx(sqlite_store=MagicMock(db_path=str(tmp_path / "index.db")))
+        first = tmp_path / "sample_a.md"
+        second = tmp_path / "sample_b.md"
+        first.write_text("doc\n")
+        second.write_text("doc\n")
+
+        class FakeWriter:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def process_scope(self, **kwargs):
+                assert kwargs["max_batches"] == 1
+                return SimpleNamespace(
+                    summaries_written=0,
+                    chunks_attempted=1,
+                    authoritative_chunks=0,
+                    missing_chunk_ids=["sample-a-chunk-1", "sample-a-chunk-2"],
+                    files_attempted=1,
+                    files_summarized=0,
+                    remaining_chunks=2,
+                    scope_drained=False,
+                    blocked_call_reason="timeout",
+                    blocked_call_file_path=str(first),
+                    blocked_call_chunk_ids=["sample-a-chunk-1"],
+                    blocked_call_timeout_seconds=30.0,
+                )
+
+        semantic_called = {"value": False}
+
+        class FakeSemanticIndexer:
+            def index_files_batch(self, paths, **kwargs):
+                semantic_called["value"] = True
+                return {"files_indexed": 2, "files_failed": 0, "files_skipped": 0}
+
+        monkeypatch.setattr(
+            "mcp_server.indexing.summarization.ComprehensiveChunkWriter",
+            FakeWriter,
+        )
+        monkeypatch.setattr(
+            "mcp_server.setup.semantic_preflight.run_semantic_preflight",
+            lambda **_kwargs: SimpleNamespace(
+                to_dict=lambda: {"can_write_semantic_vectors": True, "blocker": None}
+            ),
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "_get_semantic_indexer",
+            lambda self, _ctx: FakeSemanticIndexer(),
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "_count_missing_summaries_for_paths",
+            lambda self, _ctx, _paths: 2,
+        )
+        monkeypatch.setattr(
+            Dispatcher,
+            "index_file",
+            lambda self, _ctx, path, do_semantic=False: IndexResult(
+                status=IndexResultStatus.INDEXED,
+                path=path,
+                observed_hash=None,
+                actual_hash=None,
+            ),
+        )
+
+        result = Dispatcher([]).index_directory(ctx, tmp_path)
+
+        assert semantic_called["value"] is False
+        assert result["semantic_stage"] == "blocked_summary_call_timeout"
+        assert result["semantic_blocked"] == 2
+        assert result["summary_passes"] == 0
+        assert result["summary_missing_chunks"] == 2
+        assert result["summary_remaining_chunks"] == 2
+        assert result["summary_call_timed_out"] is True
+        assert result["summary_call_file_path"] == str(first)
+        assert result["summary_call_chunk_ids"] == ["sample-a-chunk-1"]
+        assert result["summary_call_timeout_seconds"] == 30.0
+
     def test_index_directory_keeps_halving_summary_limit_until_timeout_recovers(
         self, tmp_path, monkeypatch
     ):

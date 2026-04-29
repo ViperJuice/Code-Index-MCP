@@ -1452,6 +1452,93 @@ async def test_summarize_file_chunks_bounds_repo_scope_doc_like_backlog_and_repo
 
 
 @pytest.mark.asyncio
+async def test_summarize_file_chunks_returns_exact_timeout_result_for_repo_scope_single_call(
+    tmp_path, monkeypatch
+):
+    db_path = tmp_path / "summaries.db"
+    store = SQLiteStore(str(db_path))
+    repo_id = store.ensure_repository_row(tmp_path)
+
+    target = tmp_path / "target.md"
+    target.write_text("doc\n" * 12, encoding="utf-8")
+    file_id = store.store_file(
+        repo_id,
+        path=target,
+        relative_path="target.md",
+        language="markdown",
+        size=target.stat().st_size,
+        content_hash="target-hash",
+    )
+    chunks = []
+    for idx in range(1, 5):
+        symbol_id = store.store_symbol(
+            file_id=file_id,
+            name=f"chunk_{idx}",
+            kind="paragraph",
+            line_start=idx,
+            line_end=idx,
+        )
+        chunk = {
+            "chunk_id": f"chunk-{idx}",
+            "line_start": idx,
+            "line_end": idx,
+            "node_type": "paragraph",
+            "symbol_id": symbol_id,
+            "language": "markdown",
+            "content": f"paragraph {idx}",
+        }
+        chunks.append(chunk)
+        store.store_chunk(
+            file_id=file_id,
+            content=chunk["content"],
+            content_start=0,
+            content_end=len(chunk["content"]),
+            line_start=idx,
+            line_end=idx,
+            chunk_id=chunk["chunk_id"],
+            node_id=f"node-chunk-{idx}",
+            treesitter_file_id=f"tree-chunk-{idx}",
+            symbol_id=symbol_id,
+            language="markdown",
+            node_type="paragraph",
+        )
+
+    summarizer = FileBatchSummarizer(
+        db_path=str(db_path),
+        qdrant_client=None,
+        summarization_config={"base_url": "http://ai:8002/v1", "model_name": "chat"},
+    )
+
+    async def _timeout_profile_batch(*_args, **_kwargs):
+        raise TimeoutError("synthetic timed-out summary call")
+
+    monkeypatch.setattr(summarizer, "_call_profile_batch_api", _timeout_profile_batch)
+
+    result = await summarizer.summarize_file_chunks(
+        file_id=file_id,
+        file_path=str(target),
+        file_content=target.read_text(encoding="utf-8"),
+        chunks=chunks,
+        symbol_map={},
+        persist=True,
+        max_chunks=1,
+        call_timeout_seconds=17.0,
+    )
+
+    assert result.summaries_written == 0
+    assert result.chunks_attempted == 1
+    assert result.authoritative_chunks == 0
+    assert result.missing_chunk_ids == ["chunk-1", "chunk-2", "chunk-3", "chunk-4"]
+    assert result.remaining_chunks == 4
+    assert result.scope_drained is False
+    assert result.blocked_call_reason == "timeout"
+    assert result.blocked_call_file_path == str(target)
+    assert result.blocked_call_chunk_ids == ["chunk-1"]
+    assert result.blocked_call_timeout_seconds == 17.0
+    assert store.get_chunk_summary("chunk-1") is None
+
+
+@pytest.mark.asyncio
 async def test_process_scope_max_batches_stops_after_one_batch(tmp_path, monkeypatch):
     db_path = tmp_path / "summaries.db"
     store = SQLiteStore(str(db_path))
@@ -1535,3 +1622,84 @@ async def test_process_scope_max_batches_stops_after_one_batch(tmp_path, monkeyp
     assert result.remaining_chunks == 1
     assert result.scope_drained is False
     assert result.missing_chunk_ids == []
+
+
+@pytest.mark.asyncio
+async def test_process_scope_returns_exact_timeout_result_for_repo_scope_single_call(
+    tmp_path, monkeypatch
+):
+    db_path = tmp_path / "summaries.db"
+    store = SQLiteStore(str(db_path))
+    repo_id = store.ensure_repository_row(tmp_path)
+
+    first = tmp_path / "first.md"
+    second = tmp_path / "second.md"
+    first.write_text("doc\n" * 12, encoding="utf-8")
+    second.write_text("doc\n" * 12, encoding="utf-8")
+
+    for file_path, content_hash in ((first, "first-hash"), (second, "second-hash")):
+        file_id = store.store_file(
+            repo_id,
+            path=file_path,
+            relative_path=file_path.name,
+            language="markdown",
+            size=file_path.stat().st_size,
+            content_hash=content_hash,
+        )
+        for idx in range(1, 5):
+            symbol_id = store.store_symbol(
+                file_id=file_id,
+                name=f"{file_path.stem}_{idx}",
+                kind="paragraph",
+                line_start=idx,
+                line_end=idx,
+            )
+            store.store_chunk(
+                file_id=file_id,
+                content=f"{file_path.stem} paragraph {idx}",
+                content_start=0,
+                content_end=len(f"{file_path.stem} paragraph {idx}"),
+                line_start=idx,
+                line_end=idx,
+                chunk_id=f"{file_path.stem}-chunk-{idx}",
+                node_id=f"{file_path.stem}-node-{idx}",
+                treesitter_file_id=f"{file_path.stem}-tree-{idx}",
+                symbol_id=symbol_id,
+                language="markdown",
+                node_type="paragraph",
+            )
+
+    writer = ComprehensiveChunkWriter(
+        db_path=str(db_path),
+        qdrant_client=None,
+        summarization_config={"base_url": "http://ai:8002/v1", "model_name": "chat"},
+    )
+
+    async def _timeout_first_file(**kwargs):
+        return SummaryGenerationResult(
+            chunks_attempted=1,
+            summaries_written=0,
+            authoritative_chunks=0,
+            missing_chunk_ids=[f"first-chunk-{idx}" for idx in range(1, 5)],
+            files_attempted=1,
+            files_summarized=0,
+            remaining_chunks=4,
+            scope_drained=False,
+            blocked_call_reason="timeout",
+            blocked_call_file_path=kwargs["file_path"],
+            blocked_call_chunk_ids=["first-chunk-1"],
+            blocked_call_timeout_seconds=30.0,
+        )
+
+    monkeypatch.setattr(writer, "summarize_file_chunks", _timeout_first_file)
+
+    result = await writer.process_scope(limit=64, target_paths=[first, second], max_batches=1)
+
+    assert result.summaries_written == 0
+    assert result.chunks_attempted == 4
+    assert result.remaining_chunks == 8
+    assert result.scope_drained is False
+    assert result.blocked_call_reason == "timeout"
+    assert result.blocked_call_file_path == str(first)
+    assert result.blocked_call_chunk_ids == ["first-chunk-1"]
+    assert result.blocked_call_timeout_seconds == 30.0

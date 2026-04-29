@@ -1297,6 +1297,57 @@ continuation verdict is returned.
 **Produces**
 - IF-0-SEMCALLTIME-1 — Repo-wide single-call summary timeout recovery contract.
 
+### Phase 24 — Timed-Out Summary Call Exit Recovery (SEMCANCEL)
+
+**Objective**
+
+Repair the remaining live force-full hang uncovered by SEMCALLTIME so a
+timed-out repo-scope summary call exits promptly, records the exact blocker on
+status surfaces, and does not leave the active SQLite/Qdrant runtime in a
+larger zero-summary partial state.
+
+**Exit criteria**
+- [ ] A force-full rebuild on the active repo returns promptly after the first
+      timed-out repo-scope summary call instead of staying in flight until
+      manual termination.
+- [ ] `uv run mcp-index repository status` records the exact timed-out-call
+      blocker or partial-index-failure follow-on state after the repaired live
+      rerun.
+- [ ] A terminated or timed-out force-full rerun does not inflate lexical row
+      counts while leaving `chunk_summaries = 0` and `semantic_points = 0`.
+
+**Scope notes**
+
+This phase exists only if SEMCALLTIME proves the per-call timeout contract in
+unit coverage, but the live repo-local force-full rerun still remains in
+flight and continues mutating lexical/runtime state until it is killed
+manually.
+
+**Non-goals**
+
+- No semantic ranking redesign.
+- No multi-repo rollout expansion beyond this repo-local dogfood recovery.
+- No artifact publishing or GitHub Actions release work.
+
+**Key files**
+
+- `mcp_server/indexing/summarization.py`
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_summarization.py`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMCALLTIME
+
+**Produces**
+- IF-0-SEMCANCEL-1 — Timed-out summary call exit and partial-state closeout
+  contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -1323,6 +1374,7 @@ SEMCONTRACT
   -> SEMTIMEOUT
   -> SEMPASSSTALL
   -> SEMCALLTIME
+  -> SEMCANCEL
 ```
 
 ## Execution Notes
@@ -1401,6 +1453,11 @@ SEMCONTRACT
   inside that first summary call with zero new `chunk_summaries`; it should
   add an exact per-call timeout/cancellation blocker instead of letting the
   force-full sync appear hung.
+- SEMCANCEL exists only if SEMCALLTIME proves the exact timeout blocker in unit
+  coverage but the live force-full rerun still does not exit promptly and can
+  leave enlarged zero-summary lexical/runtime state after manual termination;
+  it should repair cancellation/cleanup and preserve the next exact blocker
+  only if that repaired live exit path still fails closed.
 
 ## Verification
 
@@ -1472,4 +1529,10 @@ env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_summarization.py tes
 env OPENAI_API_KEY=dummy-local-key MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5 uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
 sqlite3 .mcp-index/current.db 'select count(*) from chunk_summaries; select count(*) from semantic_points;'
+
+# SEMCANCEL
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_summarization.py tests/test_dispatcher.py tests/test_git_index_manager.py tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
+env OPENAI_API_KEY=dummy-local-key MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5 uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
 ```

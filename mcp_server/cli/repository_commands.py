@@ -65,6 +65,30 @@ def _print_semantic_evidence(prefix: str, evidence: dict[str, Any]) -> None:
         )
 
 
+def _print_sync_semantic_details(prefix: str, semantic: Optional[dict[str, Any]]) -> None:
+    if not semantic:
+        return
+    if semantic.get("semantic_stage"):
+        click.echo(f"{prefix}Semantic stage: {semantic['semantic_stage']}")
+    if semantic.get("summary_passes") is not None:
+        click.echo(f"{prefix}Summary passes: {semantic.get('summary_passes', 0)}")
+    if semantic.get("summary_remaining_chunks") is not None:
+        click.echo(
+            f"{prefix}Summary remaining chunks: {semantic.get('summary_remaining_chunks', 0)}"
+        )
+    if semantic.get("summary_call_timed_out"):
+        if semantic.get("summary_call_file_path"):
+            click.echo(f"{prefix}Timed-out summary file: {semantic['summary_call_file_path']}")
+        if semantic.get("summary_call_chunk_ids"):
+            click.echo(
+                f"{prefix}Timed-out summary chunks: {', '.join(semantic['summary_call_chunk_ids'])}"
+            )
+        if semantic.get("summary_call_timeout_seconds") is not None:
+            click.echo(
+                f"{prefix}Timed-out summary timeout: {semantic['summary_call_timeout_seconds']}"
+            )
+
+
 @repository.command()
 @click.argument("path", type=click.Path(exists=True))
 @click.option("--auto-sync/--no-auto-sync", default=True, help="Enable automatic synchronization")
@@ -342,6 +366,7 @@ def sync(repo_id: Optional[str], force_full: bool, sync_all: bool):
                     "  Next step: run 'mcp-index artifact reconcile-workspace' if you manage multiple local repositories."
                 )
             elif result.action == "failed":
+                _print_sync_semantic_details("  ", result.semantic)
                 click.echo(click.style(f"✗ Sync failed: {result.error}", fg="red"), err=True)
                 sys.exit(1)
 
@@ -450,6 +475,8 @@ def status(repo_id: Optional[str]):
             click.echo(click.style("  No index found", fg="yellow"))
         if status.get("staleness_reason"):
             click.echo(f"  Staleness reason: {status['staleness_reason']}")
+        if status.get("last_sync_error"):
+            click.echo(f"  Last sync error: {status['last_sync_error']}")
 
         semantic_preflight = status["features"]["semantic"].get("preflight") or {}
         blocker = semantic_preflight.get("blocker") or {}

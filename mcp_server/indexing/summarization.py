@@ -66,6 +66,10 @@ class SummaryGenerationResult:
     batches_processed: int = 0
     remaining_chunks: int = 0
     scope_drained: bool = True
+    blocked_call_reason: Optional[str] = None
+    blocked_call_file_path: Optional[str] = None
+    blocked_call_chunk_ids: List[str] = field(default_factory=list)
+    blocked_call_timeout_seconds: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -78,6 +82,10 @@ class SummaryGenerationResult:
             "batches_processed": self.batches_processed,
             "remaining_chunks": self.remaining_chunks,
             "scope_drained": self.scope_drained,
+            "blocked_call_reason": self.blocked_call_reason,
+            "blocked_call_file_path": self.blocked_call_file_path,
+            "blocked_call_chunk_ids": list(self.blocked_call_chunk_ids),
+            "blocked_call_timeout_seconds": self.blocked_call_timeout_seconds,
         }
 
 
@@ -558,6 +566,41 @@ class FileBatchSummarizer(ChunkWriter):
     operating on ``Dict`` rows rather than raw SQL tuples).
     """
 
+    def _repo_scope_call_timeout_seconds(self) -> float:
+        raw_timeout = self.summarization_config.get("call_timeout_s")
+        if raw_timeout is None:
+            raw_timeout = self.summarization_config.get("timeout_s", 10.0)
+        try:
+            timeout_seconds = float(raw_timeout)
+        except (TypeError, ValueError):
+            timeout_seconds = 10.0
+        return max(15.0, timeout_seconds * 3)
+
+    def _blocked_call_result(
+        self,
+        *,
+        reason: str,
+        file_path: str,
+        selected_chunks: List[Dict[str, Any]],
+        remaining_chunks: List[Dict[str, Any]],
+        existing_authoritative: int,
+        timeout_seconds: Optional[float] = None,
+    ) -> SummaryGenerationResult:
+        return SummaryGenerationResult(
+            chunks_attempted=len(selected_chunks),
+            summaries_written=0,
+            authoritative_chunks=existing_authoritative,
+            missing_chunk_ids=[chunk["chunk_id"] for chunk in remaining_chunks],
+            files_attempted=1,
+            files_summarized=0,
+            remaining_chunks=len(remaining_chunks),
+            scope_drained=False,
+            blocked_call_reason=reason,
+            blocked_call_file_path=file_path,
+            blocked_call_chunk_ids=[chunk["chunk_id"] for chunk in selected_chunks],
+            blocked_call_timeout_seconds=timeout_seconds,
+        )
+
     async def _recover_with_profile_or_topological(
         self,
         *,
@@ -810,6 +853,7 @@ class FileBatchSummarizer(ChunkWriter):
         symbol_map: Optional[Dict[int, str]] = None,
         persist: bool = True,
         max_chunks: Optional[int] = None,
+        call_timeout_seconds: Optional[float] = None,
     ) -> SummaryGenerationResult:
         """Summarize all chunks of a file, preferring the batch API path.
 
@@ -848,14 +892,27 @@ class FileBatchSummarizer(ChunkWriter):
 
         try:
             if self.summarization_config.get("base_url"):
-                summaries = await self._call_profile_batch_api(
+                summary_call = self._call_profile_batch_api(
                     file_id, file_path, file_content, active_chunks, symbol_map
                 )
             else:
-                summaries = await self._call_batch_api(
+                summary_call = self._call_batch_api(
                     file_id, file_path, file_content, active_chunks, symbol_map
                 )
+            if call_timeout_seconds is not None:
+                summaries = await asyncio.wait_for(summary_call, timeout=call_timeout_seconds)
+            else:
+                summaries = await summary_call
             missing_chunk_ids: List[str] = []
+        except TimeoutError:
+            return self._blocked_call_result(
+                reason="timeout",
+                file_path=file_path,
+                selected_chunks=active_chunks,
+                remaining_chunks=to_summarize,
+                existing_authoritative=existing_authoritative,
+                timeout_seconds=call_timeout_seconds,
+            )
         except FileTooLargeError as exc:
             recovery = await self._recover_with_profile_or_topological(
                 file_id=file_id,
@@ -1036,6 +1093,7 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
 
         batches_processed = 0
         repo_scope = len(target_paths or []) > 1
+        call_timeout_seconds = self._repo_scope_call_timeout_seconds() if repo_scope else None
         while True:
             rows = self._fetch_unsummarized_rows(limit=limit, target_paths=target_paths)
             if not rows:
@@ -1124,12 +1182,30 @@ class ComprehensiveChunkWriter(FileBatchSummarizer):
                         symbol_map=file_symbol_maps[file_id],
                         persist=True,
                         max_chunks=file_chunk_window,
+                        call_timeout_seconds=call_timeout_seconds,
                     )
                     pass_summaries_written += file_result.summaries_written
                     total_summaries_written += file_result.summaries_written
                     total_authoritative_chunks += file_result.authoritative_chunks
                     total_files_summarized += file_result.files_summarized
                     missing_chunk_ids.extend(file_result.missing_chunk_ids)
+                    if file_result.blocked_call_reason is not None:
+                        remaining_chunks = self._count_unsummarized_rows(target_paths=target_paths)
+                        return SummaryGenerationResult(
+                            chunks_attempted=total_attempted,
+                            summaries_written=total_summaries_written,
+                            authoritative_chunks=total_authoritative_chunks,
+                            missing_chunk_ids=missing_chunk_ids,
+                            files_attempted=total_files_attempted,
+                            files_summarized=total_files_summarized,
+                            batches_processed=batches_processed,
+                            remaining_chunks=remaining_chunks,
+                            scope_drained=False,
+                            blocked_call_reason=file_result.blocked_call_reason,
+                            blocked_call_file_path=file_result.blocked_call_file_path,
+                            blocked_call_chunk_ids=file_result.blocked_call_chunk_ids,
+                            blocked_call_timeout_seconds=file_result.blocked_call_timeout_seconds,
+                        )
                 except Exception as exc:
                     logger.error("Failed to summarize file %s: %s", file_path, exc)
                     missing_chunk_ids.extend(

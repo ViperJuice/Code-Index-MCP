@@ -414,6 +414,18 @@ class RepositoryRegistry:
             self.save()
             return True
 
+    def update_last_sync_error(self, repository_id: str, error: Optional[str]) -> bool:
+        """Persist the latest exact sync blocker for status/reporting surfaces."""
+        with self._lock:
+            repo = self._registry.get(repository_id)
+            if not repo:
+                logger.warning(f"Repository {repository_id} not found in registry")
+                return False
+
+            repo["last_sync_error"] = error
+            self.save()
+            return True
+
     def get(self, repository_id: str) -> Optional[Any]:
         """
         Get repository information.
@@ -592,6 +604,7 @@ class RepositoryRegistry:
                 repo["last_indexed_branch"] = branch
             repo["last_indexed"] = datetime.now()
             repo["staleness_reason"] = None
+            repo["last_sync_error"] = None
             self.save()
             return commit
 

@@ -2228,6 +2228,10 @@ class EnhancedDispatcher:
             "summary_remaining_chunks": 0,
             "summary_scope_drained": True,
             "summary_continuation_required": False,
+            "summary_call_timed_out": False,
+            "summary_call_file_path": None,
+            "summary_call_chunk_ids": [],
+            "summary_call_timeout_seconds": None,
             "semantic_indexed": 0,
             "semantic_failed": 0,
             "semantic_skipped": 0,
@@ -2305,6 +2309,46 @@ class EnhancedDispatcher:
                 stats["semantic_blocked"] = len(normalized_paths)
                 stats["semantic_error"] = (
                     "Summary generation timed out before strict semantic indexing could start"
+                )
+                if summary_missing_ids:
+                    stats["summary_missing_chunk_ids"] = sorted(set(summary_missing_ids))
+                return stats
+            if getattr(summary_result, "blocked_call_reason", None) == "timeout":
+                summary_missing_ids.extend(summary_result.missing_chunk_ids)
+                reported_remaining = getattr(summary_result, "remaining_chunks", None)
+                if isinstance(reported_remaining, int):
+                    remaining_missing = reported_remaining
+                else:
+                    remaining_missing = self._count_missing_summaries_for_paths(
+                        ctx, normalized_paths
+                    )
+                stats["summary_missing_chunks"] = remaining_missing
+                stats["summary_remaining_chunks"] = remaining_missing
+                stats["summary_scope_drained"] = False
+                stats["summary_call_timed_out"] = True
+                stats["summary_call_file_path"] = getattr(
+                    summary_result, "blocked_call_file_path", None
+                )
+                stats["summary_call_chunk_ids"] = list(
+                    getattr(summary_result, "blocked_call_chunk_ids", []) or []
+                )
+                stats["summary_call_timeout_seconds"] = getattr(
+                    summary_result, "blocked_call_timeout_seconds", None
+                )
+                stats["semantic_stage"] = "blocked_summary_call_timeout"
+                stats["semantic_blocked"] = len(normalized_paths)
+                timeout_seconds = getattr(summary_result, "blocked_call_timeout_seconds", None)
+                timeout_detail = (
+                    f" after {timeout_seconds:.0f} seconds"
+                    if isinstance(timeout_seconds, (int, float))
+                    else ""
+                )
+                timed_out_path = getattr(summary_result, "blocked_call_file_path", None)
+                stats["semantic_error"] = (
+                    "Authoritative summary call timed out"
+                    f"{timeout_detail} before any summary was written for "
+                    f"{timed_out_path or 'unknown file'}; "
+                    f"{remaining_missing} chunks still require summaries"
                 )
                 if summary_missing_ids:
                     stats["summary_missing_chunk_ids"] = sorted(set(summary_missing_ids))

@@ -609,6 +609,53 @@ def test_full_index_returns_exact_semantic_blocker_when_summary_progress_plateau
     )
 
 
+def test_full_index_preserves_exact_summary_call_timeout_details(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+
+    dispatcher = MagicMock()
+    dispatcher.index_directory.return_value = {
+        "indexed_files": 1,
+        "failed_files": 0,
+        "errors": [],
+        "summaries_written": 0,
+        "summary_chunks_attempted": 1,
+        "summary_missing_chunks": 4,
+        "summary_passes": 0,
+        "summary_remaining_chunks": 4,
+        "summary_scope_drained": False,
+        "summary_call_timed_out": True,
+        "summary_call_file_path": str(repo / "README.md"),
+        "summary_call_chunk_ids": ["chunk-1"],
+        "summary_call_timeout_seconds": 30.0,
+        "semantic_indexed": 0,
+        "semantic_failed": 0,
+        "semantic_skipped": 0,
+        "semantic_blocked": 1,
+        "semantic_stage": "blocked_summary_call_timeout",
+        "semantic_error": (
+            "Authoritative summary call timed out after 30 seconds before any summary was "
+            f"written for {repo / 'README.md'}; 4 chunks still require summaries"
+        ),
+    }
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=dispatcher)
+    result = manager._full_index(repo_info.repository_id, ctx)
+
+    assert not result.clean
+    assert result.semantic is not None
+    assert result.semantic["summary_call_timed_out"] is True
+    assert result.semantic["summary_call_file_path"] == str(repo / "README.md")
+    assert result.semantic["summary_call_chunk_ids"] == ["chunk-1"]
+    assert result.semantic["summary_call_timeout_seconds"] == 30.0
+    assert result.semantic["semantic_stage"] == "blocked_summary_call_timeout"
+
+
 def test_full_index_preserves_bounded_summary_continuation_details(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)
@@ -987,7 +1034,69 @@ def test_force_full_sync_does_not_advance_commit_when_semantic_stage_is_blocked(
         result.error
         == "Summary generation plateaued before strict semantic indexing could start"
     )
+    registry.update_staleness_reason.assert_called_once_with(
+        repo_info.repository_id, "partial_index_failure"
+    )
     registry.update_indexed_commit.assert_not_called()
+
+
+def test_force_full_sync_preserves_exact_summary_call_timeout_blocker(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    old_commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, old_commit)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    registry.update_git_state.return_value = {"commit": old_commit, "branch": "main"}
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    manager._resolve_ctx = MagicMock(return_value=ctx)
+    manager._index_exists = MagicMock(return_value=True)
+    manager._index_has_durable_rows = MagicMock(return_value=True)
+    manager._full_index = MagicMock(
+        return_value=UpdateResult(
+            indexed=1,
+            failed=0,
+            errors=[
+                "Authoritative summary call timed out after 30 seconds before any summary was "
+                f"written for {repo / 'README.md'}; 4 chunks still require summaries"
+            ],
+            semantic={
+                "summary_passes": 0,
+                "summaries_written": 0,
+                "summary_chunks_attempted": 1,
+                "summary_missing_chunks": 4,
+                "summary_remaining_chunks": 4,
+                "summary_scope_drained": False,
+                "summary_call_timed_out": True,
+                "summary_call_file_path": str(repo / "README.md"),
+                "summary_call_chunk_ids": ["chunk-1"],
+                "summary_call_timeout_seconds": 30.0,
+                "semantic_indexed": 0,
+                "semantic_failed": 0,
+                "semantic_skipped": 0,
+                "semantic_blocked": 1,
+                "semantic_stage": "blocked_summary_call_timeout",
+                "semantic_error": (
+                    "Authoritative summary call timed out after 30 seconds before any summary "
+                    f"was written for {repo / 'README.md'}; 4 chunks still require summaries"
+                ),
+            },
+        )
+    )
+
+    result = manager.sync_repository_index(repo_info.repository_id, force_full=True)
+
+    assert result.action == "failed"
+    assert result.semantic is not None
+    assert result.semantic["summary_call_timed_out"] is True
+    assert result.semantic["summary_call_file_path"] == str(repo / "README.md")
+    assert result.semantic["summary_call_chunk_ids"] == ["chunk-1"]
+    assert result.semantic["summary_call_timeout_seconds"] == 30.0
+    registry.update_staleness_reason.assert_called_once_with(
+        repo_info.repository_id, "partial_index_failure"
+    )
 
 
 def test_force_full_sync_does_not_advance_commit_when_low_level_blocker_fires(tmp_path):
