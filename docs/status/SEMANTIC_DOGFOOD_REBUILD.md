@@ -1,7 +1,9 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T12:21:08Z`.
-- Observed commit: `ec443d85`.
+- Evidence captured: `2026-04-29T13:16:35Z`.
+- Observed commit: `8f5c5f0a`.
+- Prior SEMQUICKCHARTS live-rerun anchor: `2026-04-29T12:53:24Z` on observed
+  commit `26a163da`.
 - Prior SEMDISKIO live-rerun anchor: `2026-04-29T10:35:02Z` on observed
   commit `c8b2d724`.
 - Prior SEMSCRIPTREBOUND evidence anchor: `2026-04-29T10:13:12Z` on observed
@@ -12,14 +14,15 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMWALKGAP.md`.
+- Phase plan: `plans/phase-plan-v7-SEMQUICKCHARTS.md`.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
-  `SEMDEVRELAPSE` after SEMROOTTESTABORT proved the later
-  `tests/root_tests/test_voyage_api.py ->
-  tests/root_tests/run_reranking_tests.py` seam is now frozen in dispatcher,
+  `SEMVALIDEVIDENCE` after SEMQUICKCHARTS proved the later
+  `mcp_server/visualization/__init__.py ->
+  mcp_server/visualization/quick_charts.py` seam is now frozen in dispatcher,
   durable-trace, and operator-status coverage, but the refreshed live rerun on
-  the new head never reached that pair and instead re-anchored earlier on
-  `.devcontainer/devcontainer.json`. Older downstream assumptions should be
+  the new head re-anchored later on
+  `docs/validation/ga-closeout-decision.md ->
+  docs/validation/mre2e-evidence.md`. Older downstream assumptions should be
   treated as stale after this roadmap amendment.
 
 ## Reset Boundary
@@ -672,7 +675,7 @@ Fixed dogfood prompt: `how does semantic setup validate qdrant and embedding rea
 
 The exact verdict string for contract checks is `local multi-repo dogfooding`.
 
-Local multi-repo dogfooding is **still not ready** after SEMWALKGAP.
+Local multi-repo dogfooding is **still not ready** after SEMQUICKCHARTS.
 
 Why:
 
@@ -705,10 +708,55 @@ Steering outcome:
 - SEMSCRIPTABORT and SEMROOTTESTABORT remain historically valid repairs for
   later seams that were not reached by the refreshed current-head rerun.
 - The roadmap now adds downstream phase `SEMQUICKCHARTS`.
+- The roadmap now adds downstream phase `SEMVALIDEVIDENCE`.
 - Older downstream assumptions should be treated as stale, including any
   downstream phase plan or handoff that still treats the active current-head
   blocker as the post-devcontainer ignore tail or the older
   `.devcontainer/post_create.sh -> .devcontainer/devcontainer.json` rebound.
+
+## SEMQUICKCHARTS Live Rerun Check
+
+SEMQUICKCHARTS repaired the visualization lexical seam on the current
+head. The refreshed repo-local rerun advanced beyond
+`mcp_server/visualization/quick_charts.py` and re-anchored on a newer exact
+validation-doc blocker before the 120-second watchdog expired.
+
+Observed runtime state during the current SEMQUICKCHARTS rerun check:
+
+- The live rerun terminalized at `2026-04-29T13:16:35Z`.
+- The durable running trace had last refreshed at `2026-04-29T13:16:25Z`
+  before `repository status` truthfully terminalized it to `interrupted`.
+- The SEMQUICKCHARTS live rerun used
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- Observed commit: `8f5c5f0a`
+- Indexed commit before rerun: `e2e95198`
+- Force-full trace status: `interrupted`
+- Trace stage: `lexical_walking`
+- Trace stage family: `lexical`
+- Trace blocker source: `lexical_mutation`
+- Last progress path:
+  `/home/viperjuice/code/Code-Index-MCP/docs/validation/ga-closeout-decision.md`
+- In-flight path:
+  `/home/viperjuice/code/Code-Index-MCP/docs/validation/mre2e-evidence.md`
+- Repository status now advertises the repaired visualization boundary:
+  `Lexical boundary: using exact bounded Python indexing for mcp_server/visualization/quick_charts.py`
+- SQLite runtime counts after the rerun:
+  `files = 1114`, `code_chunks = 28182`, `chunk_summaries = 0`,
+  `semantic_points = 0`
+
+Steering outcome:
+
+- SEMQUICKCHARTS acceptance is satisfied: the active lexical blocker is no
+  longer `mcp_server/visualization/__init__.py ->
+  mcp_server/visualization/quick_charts.py`.
+- The live rerun now reaches the later validation-doc pair
+  `docs/validation/ga-closeout-decision.md ->
+  docs/validation/mre2e-evidence.md`.
+- The roadmap now adds downstream phase `SEMVALIDEVIDENCE`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the visualization pair.
 
 ## Verification
 

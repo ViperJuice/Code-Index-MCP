@@ -2343,6 +2343,61 @@ walking on the later visualization pair.
 - IF-0-SEMQUICKCHARTS-1 — visualization quick-charts lexical recovery and
   evidence contract.
 
+### Phase 43 — Validation Evidence Lexical Recovery (SEMVALIDEVIDENCE)
+
+**Objective**
+
+Repair the next exact lexical blocker exposed by SEMQUICKCHARTS so a refreshed
+rerun on the new head no longer times out with the durable trace stalled on
+`docs/validation/ga-closeout-decision.md ->
+docs/validation/mre2e-evidence.md`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMQUICKCHARTS head
+      either advances durably beyond
+      `docs/validation/mre2e-evidence.md` or emits a truthful newer blocker
+      before the 120-second watchdog expires.
+- [ ] The repair stays narrowly scoped to the exact validation-doc pair
+      `docs/validation/ga-closeout-decision.md ->
+      docs/validation/mre2e-evidence.md` plus the immediate
+      dispatcher/trace/status plumbing needed to prove the outcome.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the SEMQUICKCHARTS
+      rerun outcome and the final live verdict for the validation-doc blocker.
+
+**Scope notes**
+
+This phase exists only if SEMQUICKCHARTS proves the visualization pair is no
+longer the active lexical blocker but the refreshed live rerun still remains in
+lexical walking on the later validation-doc seam.
+
+**Non-goals**
+
+- No reopening of the visualization quick-charts recovery once the live rerun
+  has advanced beyond `mcp_server/visualization/quick_charts.py`.
+- No widening into semantic-closeout or summary/vector work unless the later
+  validation-doc blocker is cleared first.
+- No reopening of older exact seams unless a refreshed rerun reaches them
+  again and exposes a different newer blocker.
+
+**Key files**
+
+- `mcp_server/plugins/markdown_plugin/plugin.py`
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMQUICKCHARTS
+
+**Produces**
+- IF-0-SEMVALIDEVIDENCE-1 — validation-doc lexical recovery and evidence
+  contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -2388,6 +2443,7 @@ SEMCONTRACT
   -> SEMDEVRELAPSE
   -> SEMWALKGAP
   -> SEMQUICKCHARTS
+  -> SEMVALIDEVIDENCE
 ```
 
 ## Execution Notes

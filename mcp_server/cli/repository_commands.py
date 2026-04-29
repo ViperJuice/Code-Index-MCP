@@ -269,6 +269,15 @@ def _print_artifact_publish_race_python_boundary(prefix: str, repo_path: Path) -
         )
 
 
+def _print_visualization_quick_charts_python_boundary(prefix: str, repo_path: Path) -> None:
+    chart_path = repo_path / "mcp_server" / "visualization" / "quick_charts.py"
+    if chart_path.is_file():
+        click.echo(
+            f"{prefix}Lexical boundary: using exact bounded Python indexing for "
+            "mcp_server/visualization/quick_charts.py"
+        )
+
+
 def _print_devcontainer_json_boundary(prefix: str, repo_path: Path) -> None:
     config_path = repo_path / ".devcontainer" / "devcontainer.json"
     if config_path.is_file():
@@ -675,6 +684,7 @@ def status(repo_id: Optional[str]):
         _print_validate_mcp_comprehensive_python_boundary("  ", Path(status["path"]))
         _print_run_reranking_tests_python_boundary("  ", Path(status["path"]))
         _print_artifact_publish_race_python_boundary("  ", Path(status["path"]))
+        _print_visualization_quick_charts_python_boundary("  ", Path(status["path"]))
         _print_devcontainer_json_boundary("  ", Path(status["path"]))
         _print_force_full_exit_trace("  ", status.get("force_full_exit_trace"))
 

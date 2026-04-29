@@ -1811,6 +1811,75 @@ class TestEnhancedDispatcherProtocolConformance:
         assert len(fts_rows) == 1
         assert "test_root_contract" in fts_rows[0][0]
 
+    def test_index_directory_uses_exact_bounded_python_path_for_quick_charts(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        chart_file = repo / "mcp_server" / "visualization" / "quick_charts.py"
+        chart_file.parent.mkdir(parents=True)
+        chart_file.write_text(
+            "class QuickCharts:\n"
+            "    def latency_comparison(self):\n"
+            "        return 1\n\n"
+            "def build_chart():\n"
+            "    return QuickCharts()\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        calls = []
+
+        def _tracked_chunk_text(*_args, **_kwargs):
+            calls.append("called")
+            return []
+
+        monkeypatch.setattr(
+            "mcp_server.plugins.python_plugin.plugin.chunk_text", _tracked_chunk_text
+        )
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 1
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] == str(chart_file.resolve())
+        with store._get_connection() as conn:
+            symbol_names = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'mcp_server/visualization/quick_charts.py') ORDER BY id"
+                ).fetchall()
+            ]
+            chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'mcp_server/visualization/quick_charts.py')"
+            ).fetchone()[0]
+            fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'mcp_server/visualization/quick_charts.py')"
+            ).fetchall()
+        store.close()
+        assert "QuickCharts" in symbol_names
+        assert "latency_comparison" in symbol_names
+        assert "build_chart" in symbol_names
+        assert chunk_count == 0
+        assert calls == []
+        assert len(fts_rows) == 1
+        assert "build_chart" in fts_rows[0][0]
+
     def test_index_directory_uses_exact_bounded_json_path_for_devcontainer_config(
         self, tmp_path, monkeypatch
     ):
@@ -2307,6 +2376,7 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "tests/test_artifact_publish_race.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert "tests/root_tests/run_reranking_tests.py" not in Plugin._BOUNDED_CHUNK_PATHS
         assert "scripts/validate_mcp_comprehensive.py" not in Plugin._BOUNDED_CHUNK_PATHS
+        assert "mcp_server/visualization/quick_charts.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert "tests/root_tests/test_voyage_api.py" not in Plugin._BOUNDED_CHUNK_PATHS
         assert "tests/test_benchmarks.py" not in Plugin._BOUNDED_CHUNK_PATHS
 

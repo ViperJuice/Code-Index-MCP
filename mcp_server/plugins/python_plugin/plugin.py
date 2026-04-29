@@ -33,6 +33,7 @@ class Plugin(IPlugin):
         "scripts/create_multi_repo_visual_report.py",
         "scripts/quick_mcp_vs_native_validation.py",
         "tests/test_artifact_publish_race.py",
+        "mcp_server/visualization/quick_charts.py",
     }
 
     def __init__(self, sqlite_store: Optional[SQLiteStore] = None, preindex: bool = True) -> None:

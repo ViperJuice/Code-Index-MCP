@@ -99,6 +99,60 @@ class TestPluginInitialization:
         assert chunk_count == 0
         assert calls == []
 
+    def test_quick_charts_uses_exact_bounded_chunk_path(self, tmp_path, monkeypatch):
+        repo = tmp_path / "repo"
+        script = repo / "mcp_server" / "visualization" / "quick_charts.py"
+        script.parent.mkdir(parents=True)
+        script.write_text(
+            dedent(
+                """
+                class QuickCharts:
+                    def latency_comparison(self):
+                        return "ok"
+
+                def build_chart():
+                    return QuickCharts()
+                """
+            ),
+            encoding="utf-8",
+        )
+
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        store.path_resolver = PathResolver(repo)
+        plugin = PythonPlugin(sqlite_store=store, preindex=False)
+        plugin._repository_id = store.create_repository(str(repo), repo.name, {"language": "python"})
+
+        calls = []
+
+        def _tracked_chunk_text(*_args, **_kwargs):
+            calls.append("called")
+            return []
+
+        monkeypatch.setattr("mcp_server.plugins.python_plugin.plugin.chunk_text", _tracked_chunk_text)
+
+        result = plugin.indexFile(script, script.read_text(encoding="utf-8"))
+
+        assert result["file"] == str(script)
+        symbol_names = {symbol["symbol"] for symbol in result["symbols"]}
+        assert {"QuickCharts", "latency_comparison", "build_chart"} <= symbol_names
+
+        stored = store.get_file_by_path("mcp_server/visualization/quick_charts.py", plugin._repository_id)
+        assert stored is not None
+        with store._get_connection() as conn:
+            symbol_count = conn.execute(
+                "SELECT COUNT(*) FROM symbols WHERE file_id = ?",
+                (stored["id"],),
+            ).fetchone()[0]
+            chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id = ?",
+                (stored["id"],),
+            ).fetchone()[0]
+        store.close()
+
+        assert symbol_count >= 3
+        assert chunk_count == 0
+        assert calls == []
+
     def test_visual_report_bounded_chunk_path_does_not_broaden_to_other_python_files(
         self, tmp_path, monkeypatch
     ):

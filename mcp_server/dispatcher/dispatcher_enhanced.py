@@ -122,6 +122,7 @@ _INDEX_EXCLUDED_FILENAMES = {
 _EXACT_BOUNDED_PYTHON_PATHS = {
     "tests/root_tests/run_reranking_tests.py": "exact_run_reranking_tests_rebound",
     "scripts/validate_mcp_comprehensive.py": "exact_validate_mcp_comprehensive_rebound",
+    "mcp_server/visualization/quick_charts.py": "exact_visualization_quick_charts_rebound",
 }
 
 _REPO_SCOPE_SUMMARY_PASS_BUDGET = 8

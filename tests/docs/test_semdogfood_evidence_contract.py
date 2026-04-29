@@ -22,7 +22,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
 
     for expected in (
         "# Semantic Dogfood Rebuild",
-        "Phase plan: `plans/phase-plan-v7-SEMWALKGAP.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMQUICKCHARTS.md`",
         "## Reset Boundary",
         "## SEMTRACEFRESHNESS Live Trace Recovery",
         "## SEMPUBLISHRACE Live Rerun Check",
@@ -34,6 +34,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
         "## SEMSCRIPTABORT Live Rerun Check",
         "## SEMDEVRELAPSE Live Rerun Check",
         "## SEMWALKGAP Live Rerun Check",
+        "## SEMQUICKCHARTS Live Rerun Check",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -94,6 +95,8 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "2026-04-29T12:52:00Z",
         "2026-04-29T12:53:14Z",
         "2026-04-29T12:53:24Z",
+        "2026-04-29T13:16:25Z",
+        "2026-04-29T13:16:35Z",
         "098c1ad1",
         "c8b2d724",
         "a186b352",
@@ -133,6 +136,8 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "test_workspace/real_repos/search_scaling/package.json",
         "mcp_server/visualization/__init__.py",
         "mcp_server/visualization/quick_charts.py",
+        "docs/validation/ga-closeout-decision.md",
+        "docs/validation/mre2e-evidence.md",
         "ai_docs/*_overview.md",
         ".devcontainer/devcontainer.json",
         "stale-running snapshot",
@@ -146,6 +151,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "roadmap now adds `SEMDEVSTALE` as the nearest downstream phase",
         "roadmap now adds downstream phase `SEMWALKGAP`",
         "roadmap now adds downstream phase `SEMQUICKCHARTS`",
+        "roadmap now adds downstream phase `SEMVALIDEVIDENCE`",
     ):
         assert expected in text
 
@@ -180,7 +186,8 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "semantic_source: \"semantic\"",
         "semantic_collection_name: \"code_index__oss_high__v1\"",
         "local multi-repo dogfooding",
-        "Phase plan: `plans/phase-plan-v7-SEMWALKGAP.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMQUICKCHARTS.md`",
+        "Lexical boundary: using exact bounded Python indexing for mcp_server/visualization/quick_charts.py",
         "fixture repositories under test_workspace/ are ignored during lexical walking",
     ):
         assert expected in text
