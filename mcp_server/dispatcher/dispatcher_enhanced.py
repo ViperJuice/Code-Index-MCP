@@ -2875,7 +2875,12 @@ class EnhancedDispatcher:
             try:
                 # First try to match by extension
                 if path.suffix in supported_extensions:
-                    mutation = self._index_file_with_lexical_timeout(ctx, path, stats)
+                    mutation = self._index_file_with_lexical_timeout(
+                        ctx,
+                        path,
+                        stats,
+                        progress_callback=emit_progress,
+                    )
                     if mutation.status == IndexResultStatus.INDEXED:
                         stats["indexed_files"] += 1
                         semantically_indexed_paths.append(path.resolve())
@@ -2902,7 +2907,12 @@ class EnhancedDispatcher:
                     matched = False
                     for plugin in self._plugin_set_registry.plugins_for(ctx.repo_id):
                         if plugin.supports(path):
-                            mutation = self._index_file_with_lexical_timeout(ctx, path, stats)
+                            mutation = self._index_file_with_lexical_timeout(
+                                ctx,
+                                path,
+                                stats,
+                                progress_callback=emit_progress,
+                            )
                             if mutation.status == IndexResultStatus.INDEXED:
                                 stats["indexed_files"] += 1
                                 semantically_indexed_paths.append(path.resolve())
@@ -3007,11 +3017,17 @@ class EnhancedDispatcher:
         return stats
 
     def _index_file_with_lexical_timeout(
-        self, ctx: RepoContext, path: Path, stats: Dict[str, Any]
+        self,
+        ctx: RepoContext,
+        path: Path,
+        stats: Dict[str, Any],
+        progress_callback: Optional[Callable[[str, str, str], None]] = None,
     ) -> IndexResult:
         stats["lexical_stage"] = "walking"
         stats["lexical_files_attempted"] += 1
         stats["in_flight_path"] = str(path.resolve())
+        if progress_callback is not None:
+            progress_callback("lexical_walking", "lexical", "lexical_mutation")
         mutation = _run_blocking_with_timeout(
             lambda: self.index_file(ctx, path, do_semantic=False),
             timeout_seconds=_get_lexical_timeout_seconds(),

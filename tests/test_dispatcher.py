@@ -1132,7 +1132,7 @@ class TestEnhancedDispatcherProtocolConformance:
         target = tmp_path / "sample.py"
         target.write_text("x = 1\n")
 
-        def _timeout(self, _ctx, _path, _stats):
+        def _timeout(self, _ctx, _path, _stats, progress_callback=None):
             _stats["lexical_stage"] = "walking"
             _stats["lexical_files_attempted"] += 1
             _stats["in_flight_path"] = str(_path.resolve())
@@ -1152,6 +1152,54 @@ class TestEnhancedDispatcherProtocolConformance:
         assert result["low_level_blocker"]["code"] == "lexical_file_timeout"
         assert result["storage_diagnostics"]["journal_mode"] == "WAL"
         store.health_check.assert_called_once()
+
+    def test_index_directory_emits_in_flight_progress_before_lexical_completion(
+        self, tmp_path, monkeypatch
+    ):
+        ctx = _make_repo_ctx()
+        first = tmp_path / "first.py"
+        second = tmp_path / "second.py"
+        first.write_text("x = 1\n", encoding="utf-8")
+        second.write_text("y = 2\n", encoding="utf-8")
+        snapshots = []
+
+        monkeypatch.setattr(
+            "mcp_server.dispatcher.dispatcher_enhanced.os.walk",
+            lambda _root, followlinks=False: [(str(tmp_path), [], [first.name, second.name])],
+        )
+
+        def _index_file(self, _ctx, path, do_semantic=False):
+            if path == second:
+                assert any(
+                    snapshot["last_progress_path"] == str(first.resolve())
+                    and snapshot["in_flight_path"] == str(second.resolve())
+                    for snapshot in snapshots
+                )
+            return IndexResult(
+                status=IndexResultStatus.INDEXED,
+                path=path,
+                observed_hash=None,
+                actual_hash=None,
+            )
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+        monkeypatch.setattr(Dispatcher, "index_file", _index_file)
+
+        result = Dispatcher([]).index_directory(
+            ctx,
+            tmp_path,
+            progress_callback=lambda snapshot: snapshots.append(dict(snapshot)),
+        )
+
+        assert result["indexed_files"] == 2
+        assert result["failed_files"] == 0
+        assert any(
+            snapshot["last_progress_path"] == str(first.resolve())
+            and snapshot["in_flight_path"] == str(second.resolve())
+            for snapshot in snapshots
+        )
+        assert snapshots[-1]["last_progress_path"] == str(second.resolve())
+        assert snapshots[-1]["in_flight_path"] is None
 
     def test_index_directory_uses_bounded_markdown_path_for_changelog(
         self, tmp_path, monkeypatch
@@ -2044,18 +2092,22 @@ class TestEnhancedDispatcherProtocolConformance:
         assert stages == [
             "lexical_walking",
             "lexical_walking",
+            "lexical_walking",
+            "lexical_walking",
             "summary_shutdown_started",
             "blocked_summary_call_timeout",
             "force_full_closeout_handoff",
         ]
         assert snapshots[0]["stage_family"] == "lexical"
-        assert snapshots[1]["last_progress_path"] == str(second.resolve())
-        assert snapshots[2]["stage_family"] == "summary_shutdown"
-        assert snapshots[3]["stage_family"] == "semantic_closeout"
-        assert snapshots[3]["summary_call_timed_out"] is True
-        assert snapshots[3]["summary_call_file_path"] == str(first)
-        assert snapshots[4]["stage_family"] == "final_closeout"
-        assert snapshots[4]["semantic_stage"] == "blocked_summary_call_timeout"
+        assert snapshots[1]["last_progress_path"] == str(first.resolve())
+        assert snapshots[2]["in_flight_path"] == str(second.resolve())
+        assert snapshots[3]["last_progress_path"] == str(second.resolve())
+        assert snapshots[4]["stage_family"] == "summary_shutdown"
+        assert snapshots[5]["stage_family"] == "semantic_closeout"
+        assert snapshots[5]["summary_call_timed_out"] is True
+        assert snapshots[5]["summary_call_file_path"] == str(first)
+        assert snapshots[6]["stage_family"] == "final_closeout"
+        assert snapshots[6]["semantic_stage"] == "blocked_summary_call_timeout"
         assert result["semantic_stage"] == "blocked_summary_call_timeout"
 
     def test_index_directory_skips_fast_report_family_via_repo_ignore_boundary(

@@ -6,6 +6,7 @@ tracking repositories, and syncing indexes with git.
 
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional, cast
 
@@ -91,6 +92,7 @@ def _print_sync_semantic_details(prefix: str, semantic: Optional[dict[str, Any]]
 
 def _print_force_full_exit_trace(prefix: str, trace: Optional[dict[str, Any]]) -> None:
     if not trace:
+        click.echo(f"\n{prefix}Force-full exit trace: missing")
         return
     click.echo("\nForce-full exit trace:")
     if trace.get("status"):
@@ -101,6 +103,8 @@ def _print_force_full_exit_trace(prefix: str, trace: Optional[dict[str, Any]]) -
         click.echo(f"{prefix}Trace stage family: {trace['stage_family']}")
     if trace.get("trace_timestamp"):
         click.echo(f"{prefix}Trace timestamp: {trace['trace_timestamp']}")
+    if _force_full_trace_is_stale(trace):
+        click.echo(f"{prefix}Trace freshness: stale-running snapshot")
     if trace.get("blocker_source"):
         click.echo(f"{prefix}Trace blocker source: {trace['blocker_source']}")
     if trace.get("current_commit"):
@@ -117,6 +121,26 @@ def _print_force_full_exit_trace(prefix: str, trace: Optional[dict[str, Any]]) -
         click.echo(f"{prefix}Timed-out summary chunks: {', '.join(trace['summary_call_chunk_ids'])}")
     if trace.get("summary_call_timeout_seconds") is not None:
         click.echo(f"{prefix}Timed-out summary timeout: {trace['summary_call_timeout_seconds']}")
+
+
+def _force_full_trace_is_stale(trace: dict[str, Any]) -> bool:
+    if trace.get("status") != "running":
+        return False
+    trace_timestamp = trace.get("trace_timestamp")
+    if not isinstance(trace_timestamp, str) or not trace_timestamp:
+        return False
+    try:
+        observed_at = datetime.fromisoformat(trace_timestamp.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    try:
+        timeout_seconds = max(float(os.getenv("MCP_INDEX_LEXICAL_TIMEOUT_SECONDS", "20")), 1.0)
+    except ValueError:
+        timeout_seconds = 20.0
+    age_seconds = (datetime.now(timezone.utc) - observed_at).total_seconds()
+    if age_seconds < 0:
+        return False
+    return age_seconds > (timeout_seconds * 2)
 
 
 def _print_fast_report_boundary(prefix: str, repo_path: Path) -> None:

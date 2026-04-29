@@ -1663,6 +1663,60 @@ for more than two minutes while the durable trace remained stuck on the older
 - IF-0-SEMTRACEFRESHNESS-1 — Force-full trace freshness and downstream blocker
   evidence contract.
 
+### Phase 31 — Devcontainer JSON Lexical Exit Recovery (SEMDEVCONTAINER)
+
+**Objective**
+
+Repair the next exact live lexical blocker exposed by SEMTRACEFRESHNESS so a
+repo-local force-full rerun no longer leaves the durable trace parked on
+`.devcontainer/devcontainer.json` past the configured lexical-timeout window.
+
+**Exit criteria**
+- [ ] A live repo-local force-full rerun no longer remains on
+      `last_progress_path=/home/viperjuice/code/Code-Index-MCP/.devcontainer/post_create.sh`
+      and `in_flight_path=/home/viperjuice/code/Code-Index-MCP/.devcontainer/devcontainer.json`
+      with an unchanged `trace_timestamp` after the configured lexical timeout
+      window.
+- [ ] The rerun either completes the `.devcontainer/devcontainer.json` lexical
+      seam and advances into later lexical or semantic work, or exits with a
+      bounded lexical blocker that still names that exact file family
+      truthfully.
+- [ ] Operator status, tests, and dogfood evidence stay aligned with the
+      configured timeout window and the exact `.devcontainer` blocker shape.
+
+**Scope notes**
+
+This phase exists only because SEMTRACEFRESHNESS repaired stale
+`last_progress_path` reporting from the earlier `ai_docs/pytest_overview.md`
+failure, but the refreshed live rerun on 2026-04-29 still stopped refreshing
+at the later `.devcontainer/devcontainer.json` seam.
+
+**Non-goals**
+
+- No reopening of the exact `ai_docs/jedi.md`, `ai_docs/*_overview.md`,
+  fast-test report, or visual-report-script lexical repairs unless new
+  evidence re-anchors there.
+- No semantic summary or vector-write work before the live `.devcontainer`
+  lexical blocker exits cleanly or advances past that seam.
+- No broad repo-wide timeout retuning beyond what is needed to make this exact
+  blocker surface truthfully and fail closed.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMTRACEFRESHNESS
+
+**Produces**
+- IF-0-SEMDEVCONTAINER-1 — `.devcontainer` lexical exit and blocker evidence
+  contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -1696,6 +1750,7 @@ SEMCONTRACT
   -> SEMVISUALREPORT
   -> SEMJEDI
   -> SEMTRACEFRESHNESS
+  -> SEMDEVCONTAINER
 ```
 
 ## Execution Notes
@@ -1810,6 +1865,14 @@ SEMCONTRACT
 - SEMTRACEFRESHNESS exists only if SEMJEDI clears `ai_docs/jedi.md` but the
   live force-full rerun still hangs while the durable trace remains frozen on
   an older progress marker without naming the current in-flight blocker.
+- SEMTRACEFRESHNESS should amend the roadmap immediately if the refreshed live
+  trace proves a later exact lexical blocker such as
+  `.devcontainer/devcontainer.json`.
+- SEMDEVCONTAINER exists only if SEMTRACEFRESHNESS refreshes the live
+  force-full trace beyond `ai_docs/pytest_overview.md` but the rerun still
+  remains in lexical walking on `.devcontainer/devcontainer.json` past the
+  configured timeout window; it should repair that exact seam or preserve a
+  still narrower downstream blocker.
 
 ## Verification
 

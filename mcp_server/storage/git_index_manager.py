@@ -1043,7 +1043,10 @@ class GitAwareIndexManager:
         for suffix in ("-wal", "-shm"):
             sidecar = Path(f"{db_path}{suffix}")
             if sidecar.exists():
-                shutil.copy2(sidecar, backup_dir / sidecar.name)
+                try:
+                    shutil.copy2(sidecar, backup_dir / sidecar.name)
+                except FileNotFoundError:
+                    continue
                 sqlite_sidecars.append(suffix)
         if qdrant_path.exists():
             shutil.copytree(qdrant_path, backup_qdrant)

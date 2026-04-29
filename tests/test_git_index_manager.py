@@ -1282,6 +1282,47 @@ def test_force_full_sync_marks_durable_exit_trace_completed_on_clean_closeout(tm
     )
 
 
+def test_force_full_progress_callback_persists_fresh_in_flight_snapshot(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    repo_info.last_indexed_commit = "older-indexed-commit"
+
+    manager = GitAwareIndexManager(registry=MagicMock(), dispatcher=MagicMock())
+    callback = manager._make_force_full_progress_callback(
+        repo_info=repo_info,
+        current_commit=commit,
+        indexed_commit_before=repo_info.last_indexed_commit,
+    )
+
+    callback(
+        {
+            "stage": "lexical_walking",
+            "stage_family": "lexical",
+            "blocker_source": "lexical_mutation",
+            "lexical_stage": "walking",
+            "semantic_stage": "not_run",
+            "last_progress_path": str(repo / "ai_docs" / "pytest_overview.md"),
+            "in_flight_path": str(repo / "docs" / "status" / "SEMANTIC_DOGFOOD_REBUILD.md"),
+            "summary_call_timed_out": False,
+            "summary_call_file_path": None,
+            "summary_call_chunk_ids": [],
+            "summary_call_timeout_seconds": None,
+        }
+    )
+
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert trace["status"] == "running"
+    assert trace["stage"] == "lexical_walking"
+    assert trace["stage_family"] == "lexical"
+    assert trace["current_commit"] == commit
+    assert trace["indexed_commit_before"] == "older-indexed-commit"
+    assert trace["last_progress_path"] == str(repo / "ai_docs" / "pytest_overview.md")
+    assert trace["in_flight_path"] == str(repo / "docs" / "status" / "SEMANTIC_DOGFOOD_REBUILD.md")
+    assert trace["trace_timestamp"]
+
+
 def test_get_repository_status_includes_force_full_exit_trace(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)
