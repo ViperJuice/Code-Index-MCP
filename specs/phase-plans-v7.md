@@ -3481,6 +3481,69 @@ tests/docs/test_garel_ga_release_contract.py`.
 - IF-0-SEMGARELTAIL-1 — later GA release docs contract-test lexical recovery
   and evidence contract.
 
+### Phase 62 — Documentation Truth Tail Recovery (SEMDOCTRUTHTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later documentation-truth and
+evidence-contract pair exposed after SEMGARELTAIL:
+`tests/docs/test_p23_doc_truth.py ->
+tests/docs/test_semdogfood_evidence_contract.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMGARELTAIL head
+      either advances durably beyond the
+      `tests/docs/test_p23_doc_truth.py ->
+      tests/docs/test_semdogfood_evidence_contract.py` pair or emits a
+      truthful newer blocker before the 120-second watchdog expires.
+- [ ] The chosen repair for the documentation-truth tail stays narrow, tested,
+      and does not reopen the repaired
+      `tests/docs/test_garc_rc_soak_contract.py ->
+      tests/docs/test_garel_ga_release_contract.py` boundary without direct
+      evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the SEMGARELTAIL rerun
+      outcome and the final live verdict for the later documentation-truth
+      contract-test pair.
+
+**Scope notes**
+
+This phase exists only if SEMGARELTAIL proves the later GA release docs
+contract-test pair
+`tests/docs/test_garc_rc_soak_contract.py ->
+tests/docs/test_garel_ga_release_contract.py` is cleared, but the refreshed
+live rerun still terminalizes later in lexical walking on a documentation
+truth and dogfood-evidence pair such as
+`tests/docs/test_p23_doc_truth.py ->
+tests/docs/test_semdogfood_evidence_contract.py`.
+
+**Non-goals**
+
+- No reopening of the repaired SEMGARELTAIL GA release docs recovery once the
+  live rerun has advanced beyond that seam.
+- No broad reopening of unrelated docs truth, release docs, or evidence
+  artifacts unless the refreshed rerun proves the active blocker requires
+  them.
+- No blanket `tests/docs/**/*.py` bypass unless the refreshed rerun proves the
+  active blocker cannot be cleared with a narrower documentation-truth repair.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_p23_doc_truth.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMGARELTAIL
+
+**Produces**
+- IF-0-SEMDOCTRUTHTAIL-1 — later documentation-truth lexical recovery and
+  evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -3545,6 +3608,7 @@ SEMCONTRACT
   -> SEMCODEXLOOPTAIL
   -> SEMDOCCONTRACTTAIL
   -> SEMGARELTAIL
+  -> SEMDOCTRUTHTAIL
 ```
 
 ## Execution Notes
@@ -3875,6 +3939,19 @@ SEMCONTRACT
   refreshed live rerun still terminalizes later in lexical walking on
   `tests/docs/test_garc_rc_soak_contract.py ->
   tests/docs/test_garel_ga_release_contract.py`.
+- SEMGARELTAIL should amend the roadmap immediately if the refreshed live
+  rerun clears
+  `tests/docs/test_garc_rc_soak_contract.py ->
+  tests/docs/test_garel_ga_release_contract.py` but exposes a later exact docs
+  truth and evidence blocker such as
+  `tests/docs/test_p23_doc_truth.py ->
+  tests/docs/test_semdogfood_evidence_contract.py`.
+- SEMDOCTRUTHTAIL exists only if SEMGARELTAIL proves the
+  `tests/docs/test_garc_rc_soak_contract.py ->
+  tests/docs/test_garel_ga_release_contract.py` seam is cleared but the
+  refreshed live rerun still terminalizes later in lexical walking on
+  `tests/docs/test_p23_doc_truth.py ->
+  tests/docs/test_semdogfood_evidence_contract.py`.
 
 ## Verification
 

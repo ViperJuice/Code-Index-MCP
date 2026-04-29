@@ -140,6 +140,10 @@ _EXACT_BOUNDED_PYTHON_PATHS = {
     "tests/docs/test_gabase_ga_readiness_contract.py": (
         "exact_gabase_docs_contract_rebound"
     ),
+    "tests/docs/test_garc_rc_soak_contract.py": "exact_garc_docs_contract_rebound",
+    "tests/docs/test_garel_ga_release_contract.py": (
+        "exact_garel_docs_contract_rebound"
+    ),
     "tests/security/fixtures/mock_plugin/plugin.py": "exact_mock_plugin_fixture_rebound",
     "tests/security/fixtures/mock_plugin/__init__.py": "exact_mock_plugin_fixture_init_rebound",
 }

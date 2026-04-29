@@ -1,7 +1,7 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T19:13:19Z`.
-- Observed commit: `2167f18`.
+- Evidence captured: `2026-04-29T19:33:16Z`.
+- Observed commit: `a3af755`.
 - Prior SEMCODEXLOOPTAIL live-rerun anchor: `2026-04-29T18:52:55Z` on observed
   commit `3d627c33`.
 - Prior SEMMOCKPLUGIN live-rerun anchor: `2026-04-29T18:26:11Z` on observed
@@ -34,8 +34,15 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMDOCCONTRACTTAIL.md`.
-- Prior phase plan: `plans/phase-plan-v7-SEMCODEXLOOPTAIL.md`.
+- Phase plan: `plans/phase-plan-v7-SEMGARELTAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMDOCCONTRACTTAIL.md`.
+- Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMDOCTRUTHTAIL` after SEMGARELTAIL proved the later GA release docs seam
+  is now cleared, but the refreshed live rerun on the new head still
+  terminalized later in lexical walking on
+  `tests/docs/test_p23_doc_truth.py ->
+  tests/docs/test_semdogfood_evidence_contract.py`. Older downstream
+  assumptions should be treated as stale after this roadmap amendment.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMGARELTAIL` after SEMDOCCONTRACTTAIL proved the later docs-contract seam
   is now cleared, but the refreshed live rerun on the new head still
@@ -1951,11 +1958,82 @@ Steering outcome:
   `tests/docs/test_semincr_contract.py ->
   tests/docs/test_gabase_ga_readiness_contract.py`.
 
+## SEMGARELTAIL Live Rerun Check
+
+SEMGARELTAIL tightened the later GA release docs seam so the
+`test_garc_rc_soak_contract.py -> test_garel_ga_release_contract.py` blocker
+is no longer the active lexical tail and `repository status` now advertises
+that repaired boundary while preserving the next blocker truthfully.
+
+Code/test repair completed in this phase:
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py` now treats
+  `tests/docs/test_garc_rc_soak_contract.py` and
+  `tests/docs/test_garel_ga_release_contract.py` as exact bounded Python
+  paths, preserving bounded symbol and content discoverability without
+  widening into a blanket `tests/docs/**/*.py` bypass.
+- `mcp_server/plugins/python_plugin/plugin.py` now keeps the same exact pair
+  on the bounded chunk path list so direct Python-plugin indexing stays
+  aligned with dispatcher exact-bounded behavior.
+- `mcp_server/cli/repository_commands.py` now advertises the repaired exact
+  bounded lexical boundary for
+  `tests/docs/test_garc_rc_soak_contract.py ->
+  tests/docs/test_garel_ga_release_contract.py`:
+  `Lexical boundary: using exact bounded Python indexing for tests/docs/test_garc_rc_soak_contract.py -> tests/docs/test_garel_ga_release_contract.py`.
+- `tests/test_dispatcher.py`, `tests/test_git_index_manager.py`, and
+  `tests/test_repository_commands.py` now freeze dispatcher discoverability,
+  durable trace progression, and status reporting for the later GA release
+  docs pair without widening into a broader docs-test shortcut.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMGARELTAIL live rerun started on observed commit `a3af755`
+  via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-29T19:33:07Z`, `.mcp-index/force_full_exit_trace.json` showed a
+  running lexical trace on
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/tests/docs/test_p23_doc_truth.py`
+  with
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/tests/docs/test_semdogfood_evidence_contract.py`.
+- At `2026-04-29T19:33:16Z`, a refreshed `repository status` terminalized that
+  running snapshot to `Trace status: interrupted` with the same
+  `tests/docs/test_p23_doc_truth.py ->
+  tests/docs/test_semdogfood_evidence_contract.py` pair while advertising the
+  repaired exact bounded Python surface for the cleared
+  `tests/docs/test_garc_rc_soak_contract.py ->
+  tests/docs/test_garel_ga_release_contract.py` seam.
+- The SEMGARELTAIL target pair is no longer the active blocker:
+  `tests/docs/test_garc_rc_soak_contract.py ->
+  tests/docs/test_garel_ga_release_contract.py`.
+- SQLite runtime counts after the rerun remained
+  `files = 1152`, `code_chunks = 28182`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+
+Steering outcome:
+
+- SEMGARELTAIL acceptance is satisfied for its named blocker: the live
+  watchdog no longer terminalizes on
+  `tests/docs/test_garc_rc_soak_contract.py ->
+  tests/docs/test_garel_ga_release_contract.py`.
+- The final authoritative rerun for this phase moved later and now reaches the
+  documentation truth and dogfood evidence pair
+  `tests/docs/test_p23_doc_truth.py ->
+  tests/docs/test_semdogfood_evidence_contract.py`.
+- The roadmap now adds downstream phase `SEMDOCTRUTHTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMGARELTAIL-era GA release docs seam
+  `tests/docs/test_garc_rc_soak_contract.py ->
+  tests/docs/test_garel_ga_release_contract.py`.
+
 ## Verification
 
-Verification sequence for this SEMDOCCONTRACTTAIL slice:
+Verification sequence for this SEMGARELTAIL slice:
 
 ```bash
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "garc or garel or ga_release or rc_soak or lexical or bounded"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "garc or garel or ga_release or rc_soak or boundary or interrupted or lexical"
 uv run pytest tests/test_dispatcher.py -q --no-cov -k "semincr or gabase or docs_contract or readiness or lexical or bounded"
 env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "semincr or gabase or docs_contract or readiness or boundary or interrupted or lexical"
 uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov

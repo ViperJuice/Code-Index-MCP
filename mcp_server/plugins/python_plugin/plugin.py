@@ -41,6 +41,8 @@ class Plugin(IPlugin):
         "tests/docs/test_p8_deployment_security.py",
         "tests/docs/test_semincr_contract.py",
         "tests/docs/test_gabase_ga_readiness_contract.py",
+        "tests/docs/test_garc_rc_soak_contract.py",
+        "tests/docs/test_garel_ga_release_contract.py",
         "tests/security/fixtures/mock_plugin/plugin.py",
         "tests/security/fixtures/mock_plugin/__init__.py",
         "mcp_server/visualization/quick_charts.py",
