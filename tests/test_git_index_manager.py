@@ -1358,6 +1358,50 @@ def test_force_full_sync_does_not_advance_commit_when_low_level_blocker_fires(tm
 
     assert result.action == "failed"
     assert result.error == "Lexical indexing timed out while processing hello.py"
+def test_force_full_sync_trace_moves_past_fast_report_family_after_boundary_repair(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    registry.update_git_state.return_value = {"commit": commit, "branch": "main"}
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    manager._resolve_ctx = MagicMock(return_value=ctx)
+    manager._index_exists = MagicMock(return_value=True)
+    manager._index_has_durable_rows = MagicMock(return_value=True)
+    manager._full_index = MagicMock(
+        return_value=UpdateResult(
+            indexed=1,
+            failed=1,
+            errors=["Lexical indexing timed out while processing README.md"],
+            low_level={
+                "lexical_stage": "blocked_file_timeout",
+                "lexical_files_attempted": 2,
+                "lexical_files_completed": 1,
+                "last_progress_path": str(repo / "src" / "main.py"),
+                "in_flight_path": str(repo / "README.md"),
+                "low_level_blocker": {
+                    "code": "lexical_file_timeout",
+                    "message": "Lexical indexing timed out while processing README.md",
+                },
+            },
+            semantic={"semantic_stage": "not_run"},
+        )
+    )
+
+    result = manager.sync_repository_index(repo_info.repository_id, force_full=True)
+
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert result.action == "failed"
+    assert "fast_test_results/fast_report_" not in (trace.get("last_progress_path") or "")
+    assert "fast_test_results/fast_report_" not in (trace.get("in_flight_path") or "")
+    assert trace["last_progress_path"] == str(repo / "src" / "main.py")
+    assert trace["in_flight_path"] == str(repo / "README.md")
+    registry.update_indexed_commit.assert_not_called()
     registry.update_indexed_commit.assert_not_called()
 
 

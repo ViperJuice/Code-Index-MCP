@@ -1,50 +1,66 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T07:06:18Z`.
-- Observed commit: `a6492a44`.
-- Phase plan: `plans/phase-plan-v7-SEMEXITTRACE.md`.
+- Evidence captured: `2026-04-29T07:28:19Z`.
+- Observed commit: `feda36fc`.
+- Phase plan: `plans/phase-plan-v7-SEMFASTREPORT.md`.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
-  `SEMFASTREPORT` for the newly narrowed lexical blocker after SEMEXITTRACE
-  landed its live trace persistence and operator-surface repair.
+  `SEMPYTESTOVERVIEW` after SEMFASTREPORT proved the generated fast-test
+  report family is cleared but the live lexical blocker moved to
+  `ai_docs/pytest_overview.md`.
 
 ## Reset Boundary
 
-This SEMEXITTRACE rerun stayed inside the existing repo-local dogfood boundary:
+This SEMFASTREPORT rerun stayed inside the existing repo-local dogfood
+boundary:
 
-- `.mcp-index/current.db`, `.mcp-index/semantic_qdrant/`, and the new durable
-  trace file `.mcp-index/force_full_exit_trace.json` remained the only active
-  runtime locations touched by the live rerun.
+- `.mcp-index/current.db`, `.mcp-index/semantic_qdrant/`, and
+  `.mcp-index/force_full_exit_trace.json` remained the only active runtime
+  locations touched by the live rerun.
 - The active semantic collection remained `code_index__oss_high__v1`.
 - No destructive reset of the SQLite runtime, WAL files, or Qdrant directory
-  was used before the rerun.
+  was used before or after the rerun.
 
-## SEMEXITTRACE Live Exit Recovery
+## SEMFASTREPORT Live Lexical Recovery
 
-SEMEXITTRACE tightened the repo-local observability contract in code and tests:
+SEMFASTREPORT made the generated-report boundary explicit in code, config, and
+tests:
 
-- `mcp_server/dispatcher/dispatcher_enhanced.py` now emits stable lexical,
-  summary-shutdown, semantic-closeout, and final-closeout progress snapshots
-  during `index_directory(...)` and `rebuild_semantic_for_paths(...)`.
-- `mcp_server/storage/git_index_manager.py` now persists repo-scoped force-full
-  trace updates to `.mcp-index/force_full_exit_trace.json` from force-full
-  start through closeout, and `get_repository_status(...)` now carries that
-  trace into operator-facing status output.
-- `mcp_server/cli/repository_commands.py`, `tests/test_dispatcher.py`,
-  `tests/test_git_index_manager.py`, `tests/test_repository_commands.py`, and
-  `tests/docs/test_semdogfood_evidence_contract.py` now freeze the durable
-  trace contract and its repository-status rendering.
+- `.mcp-index-ignore` now ignores `fast_test_results/fast_report_*.md`.
+- `mcp_server/core/ignore_patterns.py` remains the live walker/filter surface
+  consumed by `build_walker_filter(...)`; SEMFASTREPORT kept the repair on
+  that existing repo-local ignore contract instead of introducing a second
+  filter path.
+- `mcp_server/dispatcher/dispatcher_enhanced.py` still owns the lexical walk
+  and consumed the repaired repo-local boundary without broader Markdown-path
+  changes.
+- `mcp_server/storage/git_index_manager.py` still owns the persisted
+  force-full trace and proved the blocker moved past the fast-report family.
+- `mcp_server/cli/repository_commands.py` now surfaces the explicit lexical
+  boundary alongside the durable trace.
+- `tests/test_ignore_patterns.py` freezes that the boundary is explicit and
+  narrow enough to keep nearby Markdown such as
+  `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` indexable.
+- `tests/test_dispatcher.py` proves `index_directory(...)` skips the fast-test
+  report family before lexical mutation begins.
+- `tests/test_git_index_manager.py` proves the durable trace can move past the
+  fast-report family while still failing closed on a new downstream lexical
+  blocker.
+- `mcp_server/cli/repository_commands.py` now prints
+  `Lexical boundary: ignoring generated fast-test reports matching fast_test_results/fast_report_*.md`
+  when the repo-local rule is present, and
+  `tests/test_repository_commands.py` freezes that status wording.
 
 The live rerun still did not close semantic dogfood readiness:
 
 - A fresh `repository sync --force-full` was started with
   `MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5`.
-- The command stayed in flight for `2:10.04` before external termination by
-  `timeout`.
-- This time the command left a durable stage trace instead of forcing manual
-  SQLite-only interpretation.
-- The durable trace narrowed the blocker to lexical walking, with the most
-  recent durable progress path at
-  `/home/viperjuice/code/Code-Index-MCP/fast_test_results/fast_report_20250628_193425.md`.
+- The durable trace advanced beyond
+  `fast_test_results/fast_report_20250628_193425.md`.
+- The most recent durable lexical progress marker became
+  `/home/viperjuice/code/Code-Index-MCP/ai_docs/pytest_overview.md`.
+- The command remained in flight until external termination at
+  `2026-04-29T07:28:19Z`, and the last durable trace snapshot before that stop
+  remained the lexical-walking update from `2026-04-29T07:27:49Z`.
 
 ## Rebuild Command
 
@@ -57,11 +73,11 @@ env OPENAI_API_KEY=dummy-local-key MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5 uv run mc
 Observed in-flight runtime state after external termination:
 
 - Files indexed in SQLite: `666`
-- Code chunks indexed in SQLite: `8934`
+- Code chunks indexed in SQLite: `8914`
 - Summary-backed chunks: `0`
-- Chunks missing summaries: `8934`
+- Chunks missing summaries: `8914`
 - Vector-linked chunks: `0`
-- Chunks missing vectors: `8934`
+- Chunks missing vectors: `8914`
 
 Durable stage trace from `.mcp-index/force_full_exit_trace.json`:
 
@@ -69,20 +85,20 @@ Durable stage trace from `.mcp-index/force_full_exit_trace.json`:
 - Trace stage: `lexical_walking`
 - Trace stage family: `lexical`
 - Trace blocker source: `lexical_mutation`
-- Trace timestamp: `2026-04-29T07:06:18Z`
-- Trace current commit: `a6492a44fe4aa77bfa8ebb4e3fcb928da97995ab`
+- Trace timestamp: `2026-04-29T07:27:49Z`
+- Trace current commit: `feda36fc6414cbf5ba686961475c5f56b7ca6377`
 - Trace indexed commit before:
   `e2e9519858c3683c06b152c94a99e52098beaec6`
 - Last progress path:
-  `/home/viperjuice/code/Code-Index-MCP/fast_test_results/fast_report_20250628_193425.md`
+  `/home/viperjuice/code/Code-Index-MCP/ai_docs/pytest_overview.md`
 
 Runtime containment verdict for the live rerun:
 
-- Prompt exit: **not restored** in repo-local execution.
-- Zero-summary containment before process exit: **not restored**.
-- Runtime containment happened before process exit or only after external
-  termination: **neither**; external termination still left the partial
-  lexical runtime in place.
+- The generated fast-test report family is no longer the active lexical
+  blocker.
+- Prompt exit is still not restored in repo-local execution.
+- External termination still left the partial lexical runtime in place, with
+  no `chunk_summaries` or `semantic_points` written.
 
 ## Repository Status
 
@@ -98,13 +114,17 @@ after external termination reported:
 - Collection bootstrap state: `reused`
 - Query surface: `index_unavailable`
 - Rollout status: `stale_commit`
+- Lexical boundary:
+  `ignoring generated fast-test reports matching fast_test_results/fast_report_*.md`
 - Force-full exit trace stage: `lexical_walking`
 - Force-full exit trace stage family: `lexical`
 - Force-full exit trace blocker source: `lexical_mutation`
+- Force-full exit trace last progress path:
+  `/home/viperjuice/code/Code-Index-MCP/ai_docs/pytest_overview.md`
 
 Repository/index freshness evidence:
 
-- Current commit: `a6492a44`
+- Current commit: `feda36fc`
 - Indexed commit: `e2e95198`
 
 ## Query Comparison
@@ -119,43 +139,43 @@ Fixed dogfood prompt: `how does semantic setup validate qdrant and embedding rea
 - `symbol` and lexical probes still point operators at
   `mcp_server/setup/semantic_preflight.py` and
   `mcp_server/cli/repository_commands.py`.
-- The remaining downstream work is no longer centered on summary-call exit
-  uncertainty. It is now centered on the lexical handling of generated
-  `fast_test_results/fast_report_*.md` artifacts plus the durable trace/status
-  surfaces that proved that narrowing.
+- The remaining downstream work is no longer centered on the generated
+  `fast_test_results/fast_report_*.md` family. It is now centered on the
+  lexical handling of `ai_docs/pytest_overview.md`.
 
 ## Dogfood Verdict
 
 The exact verdict string for contract checks is `local multi-repo dogfooding`.
 
-Local multi-repo dogfooding is **still not ready** after SEMEXITTRACE.
+Local multi-repo dogfooding is **still not ready** after SEMFASTREPORT.
 
 Why:
 
-- The unit-level stage-trace, force-full trace persistence, and repository
-  status rendering contracts now pass in owned tests.
-- The live force-full rerun still does not finish inside the observed
-  `2:10.04` window.
-- The durable trace now proves the command was still in lexical walking rather
-  than summary shutdown or semantic closeout when it was terminated.
+- The fast-test report boundary is now explicit, narrow, and reflected in
+  both the repo-local ignore file and `repository status`.
+- The durable trace proves the live rerun advanced beyond
+  `fast_test_results/fast_report_20250628_193425.md`.
+- The live force-full rerun still did not complete cleanly and remained in
+  lexical walking on `ai_docs/pytest_overview.md` when it was externally
+  terminated.
 - The partial runtime still ends with `chunk_summaries = 0` and
   `semantic_points = 0`.
 
 Steering outcome:
 
-- SEMEXITTRACE implementation landed, and its acceptance goal was met: the
-  blocker is now durably visible without guesswork.
-- The roadmap now adds `SEMFASTREPORT` as the nearest downstream phase.
+- SEMFASTREPORT acceptance is satisfied: the live repo-local force-full rerun
+  no longer leaves the durable trace anchored on the fast-test report family.
+- The roadmap now adds `SEMPYTESTOVERVIEW` as the nearest downstream phase.
 - Older downstream assumptions should be treated as stale. The next repair is
-  not another generic exit-path rerun; it is a lexical file-family recovery or
-  explicit ignore-boundary decision for `fast_test_results/fast_report_*.md`.
+  not another generic lexical retry; it is a bounded recovery for
+  `ai_docs/pytest_overview.md` or the next narrower blocker that path exposes.
 
 ## Verification
 
-Verification sequence for this SEMEXITTRACE slice:
+Verification sequence for this SEMFASTREPORT slice:
 
 ```bash
-env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_repository_commands.py tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_ignore_patterns.py tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_repository_commands.py tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 env OPENAI_API_KEY=dummy-local-key MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5 uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
 python - <<'PY'
@@ -167,11 +187,12 @@ sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from 
 
 Observed outcomes:
 
-- Targeted owned unit regression currently passes for the durable trace and
-  repository-status rendering contracts.
-- The live force-full rebuild stayed in flight for `2:10.04` and was
-  externally terminated.
-- Repository status now shows the durable trace directly instead of forcing
-  manual SQLite-only diagnosis.
-- The next work item is roadmap phase `SEMFASTREPORT`, not another blind retry
-  of the older generic “exit-path uncertainty” assumption.
+- Targeted owned regression for the explicit fast-report boundary and
+  repository-status wording passes.
+- The live force-full rebuild moved beyond the generated fast-test report
+  family and surfaced a new exact lexical blocker at
+  `ai_docs/pytest_overview.md`.
+- Repository status now shows both the explicit fast-report boundary and the
+  new durable lexical progress marker directly.
+- The next work item is roadmap phase `SEMPYTESTOVERVIEW`, not another retry
+  of the older fast-report assumption.

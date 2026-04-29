@@ -316,6 +316,7 @@ def test_status_reports_rollout_and_query_surfaces(monkeypatch, tmp_path: Path):
 def test_status_reports_durable_force_full_exit_trace(monkeypatch, tmp_path: Path):
     runner = CliRunner()
     repo_info = _repo_info(tmp_path)
+    (repo_info.path / ".mcp-index-ignore").write_text("fast_test_results/fast_report_*.md\n")
 
     class FakeRegistry:
         def get_repository_by_path(self, path):
@@ -406,6 +407,10 @@ def test_status_reports_durable_force_full_exit_trace(monkeypatch, tmp_path: Pat
     result = runner.invoke(repository, ["status"])
 
     assert result.exit_code == 0
+    assert (
+        "Lexical boundary: ignoring generated fast-test reports matching "
+        "fast_test_results/fast_report_*.md" in result.output
+    )
     assert "Force-full exit trace:" in result.output
     assert "Trace status: interrupted" in result.output
     assert "Trace stage: blocked_summary_call_timeout" in result.output

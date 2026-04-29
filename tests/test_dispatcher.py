@@ -1852,6 +1852,47 @@ class TestEnhancedDispatcherProtocolConformance:
         assert snapshots[4]["semantic_stage"] == "blocked_summary_call_timeout"
         assert result["semantic_stage"] == "blocked_summary_call_timeout"
 
+    def test_index_directory_skips_fast_report_family_via_repo_ignore_boundary(
+        self, tmp_path, monkeypatch
+    ):
+        ctx = _make_repo_ctx()
+        (tmp_path / ".mcp-index-ignore").write_text("fast_test_results/fast_report_*.md\n")
+        sample = tmp_path / "src" / "sample.py"
+        sample.parent.mkdir()
+        sample.write_text("x = 1\n")
+        fast_report = tmp_path / "fast_test_results" / "fast_report_20250628_193425.md"
+        fast_report.parent.mkdir()
+        fast_report.write_text("# generated\n")
+
+        monkeypatch.setattr(
+            "mcp_server.dispatcher.dispatcher_enhanced.os.walk",
+            lambda _root, followlinks=False: [
+                (str(tmp_path), ["src", "fast_test_results"], []),
+                (str(sample.parent), [], [sample.name]),
+                (str(fast_report.parent), [], [fast_report.name]),
+            ],
+        )
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+        monkeypatch.setattr(
+            Dispatcher,
+            "index_file",
+            lambda self, _ctx, path, do_semantic=False: IndexResult(
+                status=IndexResultStatus.INDEXED,
+                path=path,
+                observed_hash=None,
+                actual_hash=None,
+            ),
+        )
+
+        result = Dispatcher([]).index_directory(ctx, tmp_path)
+
+        assert result["indexed_files"] == 1
+        assert result["ignored_files"] == 1
+        assert result["failed_files"] == 0
+        assert result["lexical_files_attempted"] == 1
+        assert result["last_progress_path"] == str(sample.resolve())
+        assert result["last_progress_path"] != str(fast_report.resolve())
+
     def test_index_directory_keeps_halving_summary_limit_until_timeout_recovers(
         self, tmp_path, monkeypatch
     ):

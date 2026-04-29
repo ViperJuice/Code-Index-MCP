@@ -40,6 +40,7 @@ baml_client/
 
 # Benchmark artifacts (contain literal query strings that pollute BM25)
 docs/benchmarks/
+fast_test_results/fast_report_*.md
 coverage.xml
 htmlcov/
 

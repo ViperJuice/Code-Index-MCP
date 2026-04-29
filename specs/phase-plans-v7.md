@@ -1438,7 +1438,7 @@ filter boundary it exposes.
 **Key files**
 
 - `mcp_server/dispatcher/dispatcher_enhanced.py`
-- `mcp_server/dispatcher/ignore_patterns.py`
+- `mcp_server/core/ignore_patterns.py`
 - `mcp_server/storage/git_index_manager.py`
 - `mcp_server/cli/repository_commands.py`
 - `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
@@ -1452,6 +1452,58 @@ filter boundary it exposes.
 **Produces**
 - IF-0-SEMFASTREPORT-1 — Generated fast-test report lexical recovery or
   explicit ignore-boundary contract.
+
+### Phase 27 — Pytest Overview Lexical Recovery (SEMPYTESTOVERVIEW)
+
+**Objective**
+
+Repair the next exact live blocker surfaced by SEMFASTREPORT so a repo-local
+`repository sync --force-full` rerun does not remain in lexical walking on
+`ai_docs/pytest_overview.md` after the generated fast-test report family is
+cleared.
+
+**Exit criteria**
+- [ ] A live repo-local force-full rerun no longer leaves the durable trace in
+      lexical walking with `ai_docs/pytest_overview.md` as the last progress
+      marker.
+- [ ] The chosen repair for `ai_docs/pytest_overview.md` is explicit, narrow,
+      tested, and preserves indexing for unrelated Markdown/documentation files
+      unless new evidence proves they are the next exact blocker.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` is refreshed with the
+      `ai_docs/pytest_overview.md` rerun outcome and either semantic-stage
+      advancement or a still narrower downstream blocker.
+
+**Scope notes**
+
+This phase exists only if SEMFASTREPORT proves the generated
+`fast_test_results/fast_report_*.md` family is no longer the active lexical
+blocker but the live force-full rerun still stalls on `ai_docs/pytest_overview.md`.
+Keep the repair narrowly on that exact document and the lexical handling path
+it exercises.
+
+**Non-goals**
+
+- No reopening of the fast-test report ignore boundary unless new evidence
+  proves direct drift there.
+- No summary-timeout, semantic closeout, release, or rollout-policy work.
+
+**Key files**
+
+- `ai_docs/pytest_overview.md`
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMFASTREPORT
+
+**Produces**
+- IF-0-SEMPYTESTOVERVIEW-1 — Pytest overview lexical recovery and rerun
+  evidence contract.
 
 ## Phase Dependency DAG
 
@@ -1482,6 +1534,7 @@ SEMCONTRACT
   -> SEMCANCEL
   -> SEMEXITTRACE
   -> SEMFASTREPORT
+  -> SEMPYTESTOVERVIEW
 ```
 
 ## Execution Notes
@@ -1576,6 +1629,10 @@ SEMCONTRACT
   `fast_test_results/fast_report_*.md` output; it should repair that exact
   file family or make the ignore boundary explicit before reopening broader
   lexical or semantic work.
+- SEMPYTESTOVERVIEW exists only if SEMFASTREPORT proves the fast-test report
+  family is cleared but the live force-full rerun still remains in lexical
+  walking on `ai_docs/pytest_overview.md`; it should repair that exact file
+  path or preserve a still narrower downstream blocker.
 
 ## Verification
 

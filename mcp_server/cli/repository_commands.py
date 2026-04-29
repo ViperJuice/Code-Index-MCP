@@ -119,6 +119,24 @@ def _print_force_full_exit_trace(prefix: str, trace: Optional[dict[str, Any]]) -
         click.echo(f"{prefix}Timed-out summary timeout: {trace['summary_call_timeout_seconds']}")
 
 
+def _print_fast_report_boundary(prefix: str, repo_path: Path) -> None:
+    for ignore_name in (".mcp-index-ignore", ".gitignore"):
+        ignore_path = repo_path / ignore_name
+        if not ignore_path.exists():
+            continue
+        try:
+            for raw_line in ignore_path.read_text(encoding="utf-8").splitlines():
+                line = raw_line.strip()
+                if line == "fast_test_results/fast_report_*.md":
+                    click.echo(
+                        f"{prefix}Lexical boundary: ignoring generated fast-test reports matching "
+                        "fast_test_results/fast_report_*.md"
+                    )
+                    return
+        except OSError:
+            return
+
+
 @repository.command()
 @click.argument("path", type=click.Path(exists=True))
 @click.option("--auto-sync/--no-auto-sync", default=True, help="Enable automatic synchronization")
@@ -507,6 +525,7 @@ def status(repo_id: Optional[str]):
             click.echo(f"  Staleness reason: {status['staleness_reason']}")
         if status.get("last_sync_error"):
             click.echo(f"  Last sync error: {status['last_sync_error']}")
+        _print_fast_report_boundary("  ", Path(status["path"]))
         _print_force_full_exit_trace("  ", status.get("force_full_exit_trace"))
 
         semantic_preflight = status["features"]["semantic"].get("preflight") or {}
