@@ -22,7 +22,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
 
     for expected in (
         "# Semantic Dogfood Rebuild",
-        "Phase plan: `plans/phase-plan-v7-SEMARCHIVEWALKGAP.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMDOCGOV.md`",
         "## Reset Boundary",
         "## SEMTRACEFRESHNESS Live Trace Recovery",
         "## SEMPUBLISHRACE Live Rerun Check",
@@ -38,6 +38,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
         "## SEMVALIDEVIDENCE Live Rerun Check",
         "## SEMBENCHDOCS Live Rerun Check",
         "## SEMARCHIVEWALKGAP Live Rerun Check",
+        "## SEMDOCGOV Live Rerun Check",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -107,10 +108,13 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "2026-04-29T13:53:03Z",
         "2026-04-29T14:12:49Z",
         "2026-04-29T14:13:50Z",
+        "2026-04-29T14:41:18Z",
+        "2026-04-29T14:41:32Z",
         "098c1ad1",
         "705a506f",
         "7282e341",
         "9138e0b0",
+        "cd2c183",
         "c8b2d724",
         "a186b352",
         "1e7a2a10",
@@ -159,6 +163,8 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "analysis_archive/semantic_vs_sql_comparison_1750926162.json",
         "tests/docs/test_mre2e_evidence_contract.py",
         "tests/docs/test_gagov_governance_contract.py",
+        ".claude/commands/execute-lane.md",
+        ".claude/commands/plan-phase.md",
         "ai_docs/*_overview.md",
         ".devcontainer/devcontainer.json",
         "stale-running snapshot",
@@ -176,6 +182,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "roadmap now adds downstream phase `SEMBENCHDOCS`",
         "roadmap now adds downstream phase `SEMARCHIVEWALKGAP`",
         "roadmap now adds downstream phase `SEMDOCGOV`",
+        "roadmap now adds downstream phase `SEMCLAUDECMDS`",
     ):
         assert expected in text
 
@@ -184,7 +191,7 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
     text = _normalized(EVIDENCE)
 
     for expected in (
-        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k \"analysis_archive or verify_mcp_fix or semantic_vs_sql_comparison_1750926162 or lexical or force_full or json or trace or bounded\"",
+        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k \"mre2e or gagov or docs or lexical or force_full or python or trace or bounded\"",
         "uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov",
         "timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full",
         "env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status",
@@ -205,6 +212,8 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "analysis_archive/semantic_vs_sql_comparison_1750926162.json",
         "tests/docs/test_mre2e_evidence_contract.py",
         "tests/docs/test_gagov_governance_contract.py",
+        ".claude/commands/execute-lane.md",
+        ".claude/commands/plan-phase.md",
         "Last sync error:",
         "disk I/O error",
         "Trace status: `interrupted`",
@@ -214,8 +223,9 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "semantic_source: \"semantic\"",
         "semantic_collection_name: \"code_index__oss_high__v1\"",
         "local multi-repo dogfooding",
-        "Phase plan: `plans/phase-plan-v7-SEMARCHIVEWALKGAP.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMDOCGOV.md`",
         "Lexical boundary: using exact bounded Python indexing for mcp_server/visualization/quick_charts.py",
+        "Lexical boundary: using exact bounded Python indexing for tests/docs/test_mre2e_evidence_contract.py -> tests/docs/test_gagov_governance_contract.py",
         "Lexical boundary: using exact bounded Markdown indexing for docs/validation/ga-closeout-decision.md",
         "Lexical boundary: using exact bounded Markdown indexing for docs/validation/mre2e-evidence.md",
         "Lexical boundary: using exact bounded Markdown indexing for docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md -> docs/benchmarks/production_benchmark.md",

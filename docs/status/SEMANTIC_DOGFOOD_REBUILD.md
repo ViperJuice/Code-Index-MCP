@@ -1,7 +1,7 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T14:13:50Z`.
-- Observed commit: `9138e0b0`.
+- Evidence captured: `2026-04-29T14:41:32Z`.
+- Observed commit: `cd2c183`.
 - Prior SEMVALIDEVIDENCE live-rerun anchor: `2026-04-29T13:34:20Z` on
   observed commit `705a506f`.
 - Prior SEMQUICKCHARTS live-rerun anchor: `2026-04-29T12:53:24Z` on observed
@@ -16,8 +16,15 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMARCHIVEWALKGAP.md`.
+- Phase plan: `plans/phase-plan-v7-SEMDOCGOV.md`.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMCLAUDECMDS` after SEMDOCGOV proved the docs-governance seam is now
+  cleared, but the refreshed live rerun on the new head still terminalized
+  later in lexical walking on
+  `.claude/commands/execute-lane.md ->
+  .claude/commands/plan-phase.md`. Older downstream assumptions should be
+  treated as stale after this roadmap amendment.
+- Prior roadmap steering: `specs/phase-plans-v7.md` added downstream phase
   `SEMDOCGOV` after SEMARCHIVEWALKGAP proved the archive-tail seam is now
   cleared, but the refreshed live rerun on the new head still terminalized
   later in lexical walking on
@@ -928,12 +935,59 @@ Steering outcome:
   downstream phase plan or handoff that still treats the active current-head
   blocker as the archive-tail seam.
 
+## SEMDOCGOV Live Rerun Check
+
+SEMDOCGOV repaired the docs-governance lexical seam on the current head. The
+refreshed repo-local rerun advanced beyond both
+`tests/docs/test_mre2e_evidence_contract.py` and
+`tests/docs/test_gagov_governance_contract.py`, but the same 120-second
+watchdog still terminalized the run later in lexical walking on a `.claude`
+command pair.
+
+Observed runtime state during the current SEMDOCGOV rerun check:
+
+- Evidence capture completed at `2026-04-29T14:41:32Z`.
+- The durable running trace last refreshed at `2026-04-29T14:41:18Z` before
+  `repository status` truthfully terminalized it to `interrupted`.
+- The SEMDOCGOV live rerun used
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- Observed commit: `cd2c183`
+- Indexed commit before rerun: `e2e95198`
+- Force-full trace status: `interrupted`
+- Trace stage: `lexical_walking`
+- Trace stage family: `lexical`
+- Trace blocker source: `lexical_mutation`
+- Last progress path:
+  `/home/viperjuice/code/Code-Index-MCP/.claude/commands/execute-lane.md`
+- In-flight path:
+  `/home/viperjuice/code/Code-Index-MCP/.claude/commands/plan-phase.md`
+- Repository status now advertises the repaired docs-governance boundary:
+  `Lexical boundary: using exact bounded Python indexing for tests/docs/test_mre2e_evidence_contract.py -> tests/docs/test_gagov_governance_contract.py`
+- SQLite runtime counts after the rerun:
+  `files = 1119`, `code_chunks = 28182`, `chunk_summaries = 0`,
+  `semantic_points = 0`
+
+Steering outcome:
+
+- SEMDOCGOV acceptance is satisfied: the active lexical blocker is no longer
+  the docs-governance seam centered on
+  `tests/docs/test_mre2e_evidence_contract.py ->
+  tests/docs/test_gagov_governance_contract.py`.
+- The live rerun now reaches the later `.claude` command pair
+  `.claude/commands/execute-lane.md ->
+  .claude/commands/plan-phase.md`.
+- The roadmap now adds downstream phase `SEMCLAUDECMDS`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the docs-governance seam.
+
 ## Verification
 
-Verification sequence for this SEMARCHIVEWALKGAP slice:
+Verification sequence for this SEMDOCGOV slice:
 
 ```bash
-env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "analysis_archive or verify_mcp_fix or semantic_vs_sql_comparison_1750926162 or lexical or force_full or json or trace or bounded"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "mre2e or gagov or docs or lexical or force_full or python or trace or bounded"
 uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status

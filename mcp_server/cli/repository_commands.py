@@ -325,6 +325,19 @@ def _print_visualization_quick_charts_python_boundary(prefix: str, repo_path: Pa
         )
 
 
+def _print_docs_governance_contract_python_boundary(prefix: str, repo_path: Path) -> None:
+    contract_paths = (
+        repo_path / "tests" / "docs" / "test_mre2e_evidence_contract.py",
+        repo_path / "tests" / "docs" / "test_gagov_governance_contract.py",
+    )
+    if all(path.is_file() for path in contract_paths):
+        click.echo(
+            f"{prefix}Lexical boundary: using exact bounded Python indexing for "
+            "tests/docs/test_mre2e_evidence_contract.py -> "
+            "tests/docs/test_gagov_governance_contract.py"
+        )
+
+
 def _print_devcontainer_json_boundary(prefix: str, repo_path: Path) -> None:
     config_path = repo_path / ".devcontainer" / "devcontainer.json"
     if config_path.is_file():
@@ -744,6 +757,7 @@ def status(repo_id: Optional[str]):
         _print_run_reranking_tests_python_boundary("  ", Path(status["path"]))
         _print_artifact_publish_race_python_boundary("  ", Path(status["path"]))
         _print_visualization_quick_charts_python_boundary("  ", Path(status["path"]))
+        _print_docs_governance_contract_python_boundary("  ", Path(status["path"]))
         _print_devcontainer_json_boundary("  ", Path(status["path"]))
         _print_archive_tail_json_boundary("  ", Path(status["path"]))
         _print_force_full_exit_trace(

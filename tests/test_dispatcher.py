@@ -2087,6 +2087,109 @@ class TestEnhancedDispatcherProtocolConformance:
         assert len(fts_rows) == 1
         assert "build_chart" in fts_rows[0][0]
 
+    def test_index_directory_uses_exact_bounded_python_path_for_docs_governance_pair(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        docs_dir = repo / "tests" / "docs"
+        docs_dir.mkdir(parents=True)
+        mre2e_test = docs_dir / "test_mre2e_evidence_contract.py"
+        gagov_test = docs_dir / "test_gagov_governance_contract.py"
+        mre2e_test.write_text(
+            "def test_mre2e_contract():\n    assert True\n",
+            encoding="utf-8",
+        )
+        gagov_test.write_text(
+            "class TestGovernanceContract:\n"
+            "    def test_gagov_contract(self):\n"
+            "        assert True\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        calls = []
+
+        def _tracked_chunk_text(*_args, **_kwargs):
+            calls.append("called")
+            return []
+
+        monkeypatch.setattr(
+            "mcp_server.plugins.python_plugin.plugin.chunk_text", _tracked_chunk_text
+        )
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 2
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(mre2e_test.resolve()),
+            str(gagov_test.resolve()),
+        }
+        with store._get_connection() as conn:
+            mre2e_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'tests/docs/test_mre2e_evidence_contract.py') ORDER BY id"
+                ).fetchall()
+            ]
+            gagov_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'tests/docs/test_gagov_governance_contract.py') ORDER BY id"
+                ).fetchall()
+            ]
+            mre2e_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'tests/docs/test_mre2e_evidence_contract.py')"
+            ).fetchone()[0]
+            gagov_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'tests/docs/test_gagov_governance_contract.py')"
+            ).fetchone()[0]
+            mre2e_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'tests/docs/test_mre2e_evidence_contract.py')"
+            ).fetchall()
+            gagov_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'tests/docs/test_gagov_governance_contract.py')"
+            ).fetchall()
+        store.close()
+        assert "test_mre2e_contract" in mre2e_symbols
+        assert "TestGovernanceContract" in gagov_symbols
+        assert "test_gagov_contract" in gagov_symbols
+        assert mre2e_chunk_count == 0
+        assert gagov_chunk_count == 0
+        assert len(mre2e_fts_rows) == 1
+        assert len(gagov_fts_rows) == 1
+        assert "test_mre2e_contract" in mre2e_fts_rows[0][0]
+        assert "test_gagov_contract" in gagov_fts_rows[0][0]
+        assert calls == []
+
     def test_index_directory_uses_exact_bounded_json_path_for_devcontainer_config(
         self, tmp_path, monkeypatch
     ):
@@ -2490,6 +2593,88 @@ class TestEnhancedDispatcherProtocolConformance:
                 "scripts/validate_mcp_comprehensive.py",
                 "tests/test_artifact_publish_race.py",
                 "tests/test_reindex_resume.py",
+            )
+            for snapshot in snapshots
+        )
+
+    def test_index_directory_emits_docs_governance_pair_before_closeout_handoff(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        docs_dir = repo / "tests" / "docs"
+        docs_dir.mkdir(parents=True)
+        prior_file = docs_dir / "test_mre2e_evidence_contract.py"
+        prior_file.write_text("def test_mre2e_contract():\n    assert True\n", encoding="utf-8")
+        blocked_file = docs_dir / "test_gagov_governance_contract.py"
+        blocked_file.write_text(
+            "def test_gagov_contract():\n    assert True\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+        snapshots = []
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: object())
+
+        def _fake_walk(_directory, followlinks=False):
+            assert followlinks is False
+            yield str(docs_dir), [], [prior_file.name, blocked_file.name]
+
+        def _explode_before_semantic_progress(self, _ctx, _paths, progress_callback=None):
+            raise RuntimeError("semantic closeout entry stalled before emitting progress")
+
+        monkeypatch.setattr("mcp_server.dispatcher.dispatcher_enhanced.os.walk", _fake_walk)
+        monkeypatch.setattr(
+            Dispatcher,
+            "rebuild_semantic_for_paths",
+            _explode_before_semantic_progress,
+        )
+
+        result = Dispatcher([]).index_directory(
+            ctx,
+            repo,
+            progress_callback=lambda snapshot: snapshots.append(dict(snapshot)),
+        )
+
+        store.close()
+        assert result["indexed_files"] == 2
+        assert result["semantic_stage"] == "failed"
+        lexical_pair = [
+            snapshot
+            for snapshot in snapshots
+            if snapshot["stage"] == "lexical_walking"
+            and snapshot["last_progress_path"] == str(prior_file.resolve())
+            and snapshot["in_flight_path"] == str(blocked_file.resolve())
+        ]
+        assert lexical_pair
+        assert snapshots[-1]["stage"] == "force_full_closeout_handoff"
+        assert snapshots[-1]["stage_family"] == "final_closeout"
+        assert snapshots[-1]["last_progress_path"] == str(blocked_file.resolve())
+        assert snapshots[-1]["in_flight_path"] is None
+        assert all(
+            needle not in (
+                (snapshot.get("last_progress_path") or "")
+                + " "
+                + (snapshot.get("in_flight_path") or "")
+            )
+            for needle in (
+                ".devcontainer/devcontainer.json",
+                "scripts/validate_mcp_comprehensive.py",
+                "tests/root_tests/run_reranking_tests.py",
+                "analysis_archive/semantic_vs_sql_comparison_1750926162.json",
             )
             for snapshot in snapshots
         )

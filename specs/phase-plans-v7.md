@@ -2565,6 +2565,62 @@ terminalizes later in lexical walking on the docs contract-test pair.
 - IF-0-SEMDOCGOV-1 — docs governance contract lexical recovery and evidence
   contract.
 
+### Phase 47 — Claude Command Lexical Recovery (SEMCLAUDECMDS)
+
+**Objective**
+
+Repair the next downstream lexical blocker exposed by SEMDOCGOV so a refreshed
+rerun on the new head no longer terminalizes under the 120-second watchdog on
+`.claude/commands/execute-lane.md ->
+.claude/commands/plan-phase.md`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMDOCGOV head
+      either advances durably beyond
+      `.claude/commands/execute-lane.md ->
+      .claude/commands/plan-phase.md` or emits a truthful newer blocker
+      before the 120-second watchdog expires.
+- [ ] The repair stays narrowly scoped to the `.claude/commands` markdown pair
+      and the immediate dispatcher/trace/status plumbing needed to prove it.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the SEMDOCGOV rerun
+      outcome and the final live verdict for the `.claude/commands` blocker.
+
+**Scope notes**
+
+This phase exists only if SEMDOCGOV proves the docs contract-test pair is no
+longer the active lexical blocker but the refreshed live rerun still
+terminalizes later in lexical walking on the `.claude/commands` markdown pair.
+
+**Non-goals**
+
+- No reopening of the docs-governance recovery once the live rerun has
+  advanced beyond
+  `tests/docs/test_mre2e_evidence_contract.py ->
+  tests/docs/test_gagov_governance_contract.py`.
+- No broad `.claude/**/*.md` exemption or repo-wide lexical timeout retune
+  unless the refreshed rerun proves the blocker requires it.
+- No reopening of older benchmark, visualization, devcontainer, archive-tail,
+  or docs-governance seams unless the refreshed rerun reaches them again and
+  exposes a different newer blocker.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMDOCGOV
+
+**Produces**
+- IF-0-SEMCLAUDECMDS-1 — Claude command lexical recovery and evidence
+  contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -2614,6 +2670,7 @@ SEMCONTRACT
   -> SEMBENCHDOCS
   -> SEMARCHIVEWALKGAP
   -> SEMDOCGOV
+  -> SEMCLAUDECMDS
 ```
 
 ## Execution Notes
