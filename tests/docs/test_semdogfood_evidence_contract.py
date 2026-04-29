@@ -22,7 +22,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
 
     for expected in (
         "# Semantic Dogfood Rebuild",
-        "Phase plan: `plans/phase-plan-v7-SEMQUICKCHARTS.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMVALIDEVIDENCE.md`",
         "## Reset Boundary",
         "## SEMTRACEFRESHNESS Live Trace Recovery",
         "## SEMPUBLISHRACE Live Rerun Check",
@@ -35,6 +35,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
         "## SEMDEVRELAPSE Live Rerun Check",
         "## SEMWALKGAP Live Rerun Check",
         "## SEMQUICKCHARTS Live Rerun Check",
+        "## SEMVALIDEVIDENCE Live Rerun Check",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -97,7 +98,10 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "2026-04-29T12:53:24Z",
         "2026-04-29T13:16:25Z",
         "2026-04-29T13:16:35Z",
+        "2026-04-29T13:34:05Z",
+        "2026-04-29T13:34:20Z",
         "098c1ad1",
+        "705a506f",
         "c8b2d724",
         "a186b352",
         "1e7a2a10",
@@ -138,6 +142,8 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "mcp_server/visualization/quick_charts.py",
         "docs/validation/ga-closeout-decision.md",
         "docs/validation/mre2e-evidence.md",
+        "docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md",
+        "docs/benchmarks/production_benchmark.md",
         "ai_docs/*_overview.md",
         ".devcontainer/devcontainer.json",
         "stale-running snapshot",
@@ -152,6 +158,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "roadmap now adds downstream phase `SEMWALKGAP`",
         "roadmap now adds downstream phase `SEMQUICKCHARTS`",
         "roadmap now adds downstream phase `SEMVALIDEVIDENCE`",
+        "roadmap now adds downstream phase `SEMBENCHDOCS`",
     ):
         assert expected in text
 
@@ -160,7 +167,7 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
     text = _normalized(EVIDENCE)
 
     for expected in (
-        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_ignore_patterns.py tests/test_repository_commands.py -q --no-cov -k \"devcontainer or fast_report or test_workspace or lexical or force_full or trace or ignore or boundary\"",
+        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k \"validation or markdown or lexical or force_full or trace or bounded or mre2e or ga_closeout\"",
         "uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov",
         "timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full",
         "env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status",
@@ -186,8 +193,10 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "semantic_source: \"semantic\"",
         "semantic_collection_name: \"code_index__oss_high__v1\"",
         "local multi-repo dogfooding",
-        "Phase plan: `plans/phase-plan-v7-SEMQUICKCHARTS.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMVALIDEVIDENCE.md`",
         "Lexical boundary: using exact bounded Python indexing for mcp_server/visualization/quick_charts.py",
+        "Lexical boundary: using exact bounded Markdown indexing for docs/validation/ga-closeout-decision.md",
+        "Lexical boundary: using exact bounded Markdown indexing for docs/validation/mre2e-evidence.md",
         "fixture repositories under test_workspace/ are ignored during lexical walking",
     ):
         assert expected in text

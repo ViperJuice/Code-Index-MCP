@@ -1487,6 +1487,104 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "Code Completion" in symbol_names
         assert chunk_count == 0
 
+    def test_index_directory_uses_exact_bounded_markdown_path_for_validation_docs(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        validation_dir = repo / "docs" / "validation"
+        validation_dir.mkdir(parents=True)
+        ga_doc = validation_dir / "ga-closeout-decision.md"
+        mre2e_doc = validation_dir / "mre2e-evidence.md"
+        ga_doc.write_text(
+            "# GA Closeout Decision\n\n## Summary\n\n### Final decision\n- stay on RC/public-alpha\n",
+            encoding="utf-8",
+        )
+        mre2e_doc.write_text(
+            "# MRE2E Evidence\n\n## Fresh-State Multi-Repo Lifecycle\n\n### Frozen command set\n- preserve lifecycle evidence\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        def _unexpected(*_args, **_kwargs):
+            raise AssertionError(
+                "heavy Markdown path should not run for docs/validation bounded files"
+            )
+
+        monkeypatch.setattr(MarkdownPlugin, "extract_structure", _unexpected)
+        monkeypatch.setattr(MarkdownPlugin, "chunk_document", _unexpected)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 2
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] == str(mre2e_doc.resolve())
+        with store._get_connection() as conn:
+            ga_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = 'docs/validation/ga-closeout-decision.md') "
+                    "ORDER BY id"
+                ).fetchall()
+            ]
+            mre2e_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = 'docs/validation/mre2e-evidence.md') "
+                    "ORDER BY id"
+                ).fetchall()
+            ]
+            ga_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = 'docs/validation/ga-closeout-decision.md')"
+            ).fetchone()[0]
+            mre2e_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = 'docs/validation/mre2e-evidence.md')"
+            ).fetchone()[0]
+            ga_file_rows = conn.execute(
+                "SELECT COUNT(*) FROM files WHERE relative_path = 'docs/validation/ga-closeout-decision.md'"
+            ).fetchone()[0]
+            mre2e_file_rows = conn.execute(
+                "SELECT COUNT(*) FROM files WHERE relative_path = 'docs/validation/mre2e-evidence.md'"
+            ).fetchone()[0]
+        store.close()
+
+        assert ga_symbols == [
+            "GA Closeout Decision",
+            "GA Closeout Decision",
+            "Summary",
+            "Final decision",
+        ]
+        assert mre2e_symbols == [
+            "MRE2E Evidence",
+            "MRE2E Evidence",
+            "Fresh-State Multi-Repo Lifecycle",
+            "Frozen command set",
+        ]
+        assert ga_chunk_count == 0
+        assert mre2e_chunk_count == 0
+        assert ga_file_rows == 1
+        assert mre2e_file_rows == 1
+
     def test_index_directory_uses_exact_bounded_python_path_for_visual_report_script(
         self, tmp_path, monkeypatch
     ):

@@ -224,6 +224,18 @@ def _print_jedi_markdown_boundary(prefix: str, repo_path: Path) -> None:
         )
 
 
+def _print_validation_markdown_boundaries(prefix: str, repo_path: Path) -> None:
+    for relative_path in (
+        "docs/validation/ga-closeout-decision.md",
+        "docs/validation/mre2e-evidence.md",
+    ):
+        if (repo_path / relative_path).is_file():
+            click.echo(
+                f"{prefix}Lexical boundary: using exact bounded Markdown indexing for "
+                f"{relative_path}"
+            )
+
+
 def _print_visual_report_python_boundary(prefix: str, repo_path: Path) -> None:
     script_path = repo_path / "scripts" / "create_multi_repo_visual_report.py"
     if script_path.is_file():
@@ -679,6 +691,7 @@ def status(repo_id: Optional[str]):
         _print_test_workspace_boundary("  ", Path(status["path"]))
         _print_ai_docs_overview_boundary("  ", Path(status["path"]))
         _print_jedi_markdown_boundary("  ", Path(status["path"]))
+        _print_validation_markdown_boundaries("  ", Path(status["path"]))
         _print_visual_report_python_boundary("  ", Path(status["path"]))
         _print_quick_validation_python_boundary("  ", Path(status["path"]))
         _print_validate_mcp_comprehensive_python_boundary("  ", Path(status["path"]))

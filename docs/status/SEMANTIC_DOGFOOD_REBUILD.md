@@ -1,7 +1,7 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T13:16:35Z`.
-- Observed commit: `8f5c5f0a`.
+- Evidence captured: `2026-04-29T13:34:20Z`.
+- Observed commit: `705a506f`.
 - Prior SEMQUICKCHARTS live-rerun anchor: `2026-04-29T12:53:24Z` on observed
   commit `26a163da`.
 - Prior SEMDISKIO live-rerun anchor: `2026-04-29T10:35:02Z` on observed
@@ -14,16 +14,16 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMQUICKCHARTS.md`.
+- Phase plan: `plans/phase-plan-v7-SEMVALIDEVIDENCE.md`.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
-  `SEMVALIDEVIDENCE` after SEMQUICKCHARTS proved the later
-  `mcp_server/visualization/__init__.py ->
-  mcp_server/visualization/quick_charts.py` seam is now frozen in dispatcher,
+  `SEMBENCHDOCS` after SEMVALIDEVIDENCE proved the later
+  `docs/validation/ga-closeout-decision.md ->
+  docs/validation/mre2e-evidence.md` seam is now frozen in dispatcher,
   durable-trace, and operator-status coverage, but the refreshed live rerun on
   the new head re-anchored later on
-  `docs/validation/ga-closeout-decision.md ->
-  docs/validation/mre2e-evidence.md`. Older downstream assumptions should be
-  treated as stale after this roadmap amendment.
+  `docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md ->
+  docs/benchmarks/production_benchmark.md`. Older downstream assumptions
+  should be treated as stale after this roadmap amendment.
 
 ## Reset Boundary
 
@@ -758,12 +758,61 @@ Steering outcome:
   downstream phase plan or handoff that still treats the active current-head
   blocker as the visualization pair.
 
+## SEMVALIDEVIDENCE Live Rerun Check
+
+SEMVALIDEVIDENCE repaired the validation-doc lexical seam on the current head.
+The refreshed repo-local rerun advanced beyond
+`docs/validation/mre2e-evidence.md` and re-anchored on a newer exact
+benchmark-doc blocker before the 120-second watchdog expired.
+
+Observed runtime state during the current SEMVALIDEVIDENCE rerun check:
+
+- The live rerun terminalized at `2026-04-29T13:34:20Z`.
+- The durable running trace last refreshed at `2026-04-29T13:34:05Z` before
+  `repository status` truthfully terminalized it to `interrupted`.
+- The SEMVALIDEVIDENCE live rerun used
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- Observed commit: `705a506f`
+- Indexed commit before rerun: `e2e95198`
+- Force-full trace status: `interrupted`
+- Trace stage: `lexical_walking`
+- Trace stage family: `lexical`
+- Trace blocker source: `lexical_mutation`
+- Last progress path:
+  `/home/viperjuice/code/Code-Index-MCP/docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md`
+- In-flight path:
+  `/home/viperjuice/code/Code-Index-MCP/docs/benchmarks/production_benchmark.md`
+- Repository status now advertises the repaired validation boundaries:
+  `Lexical boundary: using exact bounded Markdown indexing for docs/validation/ga-closeout-decision.md`
+  and
+  `Lexical boundary: using exact bounded Markdown indexing for docs/validation/mre2e-evidence.md`
+- `repository status` still surfaces the older sync error `disk I/O error`,
+  but the refreshed durable trace proves the active blocker has moved back
+  into lexical walking on a later benchmark-doc pair.
+- SQLite runtime counts after the rerun:
+  `files = 1115`, `code_chunks = 28182`, `chunk_summaries = 0`,
+  `semantic_points = 0`
+
+Steering outcome:
+
+- SEMVALIDEVIDENCE acceptance is satisfied: the active lexical blocker is no
+  longer `docs/validation/ga-closeout-decision.md ->
+  docs/validation/mre2e-evidence.md`.
+- The live rerun now reaches the later benchmark-doc pair
+  `docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md ->
+  docs/benchmarks/production_benchmark.md`.
+- The roadmap now adds downstream phase `SEMBENCHDOCS`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the validation-doc pair.
+
 ## Verification
 
-Verification sequence for this SEMWALKGAP slice:
+Verification sequence for this SEMVALIDEVIDENCE slice:
 
 ```bash
-env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_ignore_patterns.py tests/test_repository_commands.py -q --no-cov -k "devcontainer or fast_report or test_workspace or lexical or force_full or trace or ignore or boundary"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "validation or markdown or lexical or force_full or trace or bounded or mre2e or ga_closeout"
 uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status

@@ -2398,6 +2398,62 @@ lexical walking on the later validation-doc seam.
 - IF-0-SEMVALIDEVIDENCE-1 — validation-doc lexical recovery and evidence
   contract.
 
+### Phase 44 — Benchmark Evidence Lexical Recovery (SEMBENCHDOCS)
+
+**Objective**
+
+Repair the next exact lexical blocker exposed by SEMVALIDEVIDENCE so a
+refreshed rerun on the new head no longer times out with the durable trace
+stalled on
+`docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md ->
+docs/benchmarks/production_benchmark.md`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMVALIDEVIDENCE
+      head either advances durably beyond
+      `docs/benchmarks/production_benchmark.md` or emits a truthful newer
+      blocker before the 120-second watchdog expires.
+- [ ] The repair stays narrowly scoped to the exact benchmark-doc pair
+      `docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md ->
+      docs/benchmarks/production_benchmark.md` plus the immediate
+      dispatcher/trace/status plumbing needed to prove the outcome.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMVALIDEVIDENCE rerun outcome and the final live verdict for the
+      benchmark-doc blocker.
+
+**Scope notes**
+
+This phase exists only if SEMVALIDEVIDENCE proves the validation-doc pair is no
+longer the active lexical blocker but the refreshed live rerun still remains
+in lexical walking on the later benchmark-doc seam.
+
+**Non-goals**
+
+- No reopening of the validation-doc recovery once the live rerun has advanced
+  beyond `docs/validation/mre2e-evidence.md`.
+- No widening into repo-wide benchmark-doc bypasses or semantic-closeout work
+  unless the exact benchmark-doc blocker is cleared first.
+- No reopening of older exact seams unless a refreshed rerun reaches them
+  again and exposes a different newer blocker.
+
+**Key files**
+
+- `mcp_server/plugins/markdown_plugin/plugin.py`
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMVALIDEVIDENCE
+
+**Produces**
+- IF-0-SEMBENCHDOCS-1 — benchmark-doc lexical recovery and evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -2444,6 +2500,7 @@ SEMCONTRACT
   -> SEMWALKGAP
   -> SEMQUICKCHARTS
   -> SEMVALIDEVIDENCE
+  -> SEMBENCHDOCS
 ```
 
 ## Execution Notes
@@ -2502,6 +2559,11 @@ SEMCONTRACT
   blocker such as
   `mcp_server/visualization/__init__.py ->
   mcp_server/visualization/quick_charts.py`.
+- SEMVALIDEVIDENCE should amend the roadmap immediately if the refreshed live
+  rerun clears the validation-doc pair but exposes a later exact lexical
+  blocker such as
+  `docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md ->
+  docs/benchmarks/production_benchmark.md`.
 - SEMREADYFIX exists only if SEMDOGFOOD proves the default local dogfood path
   is still blocked; it should repair that blocker and then rerun the dogfood
   proof instead of widening into unrelated semantic work.

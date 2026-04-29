@@ -39,6 +39,11 @@ _ANALYSIS_REPORT_MARKDOWN_NAME_RE = re.compile(
 )
 _AGENT_INSTRUCTIONS_MARKDOWN_NAME_RE = re.compile(r"^(?:agents)$", re.IGNORECASE)
 _README_MARKDOWN_NAME_RE = re.compile(r"^(?:readme)$", re.IGNORECASE)
+_EXACT_BOUNDED_MARKDOWN_PATHS = {
+    "ai_docs/jedi.md": "ai_docs_jedi_path",
+    "docs/validation/ga-closeout-decision.md": "validation_ga_closeout_path",
+    "docs/validation/mre2e-evidence.md": "validation_mre2e_path",
+}
 
 
 class MarkdownPlugin(BaseDocumentPlugin):
@@ -68,6 +73,8 @@ class MarkdownPlugin(BaseDocumentPlugin):
 
     def _resolve_lightweight_reason(self, path: Path, content: str) -> Optional[str]:
         """Return the bounded indexing reason when Markdown should skip the heavy path."""
+        normalized_path = path.as_posix().lower()
+
         if os.getenv("MCP_LIGHTWEIGHT_DOC_INDEX", "false").lower() == "true":
             return "forced_env"
 
@@ -92,8 +99,9 @@ class MarkdownPlugin(BaseDocumentPlugin):
         if path.parent.name.lower() == "ai_docs" and path.stem.lower().endswith("_overview"):
             return "ai_docs_overview_path"
 
-        if path.parent.name.lower() == "ai_docs" and path.name.lower() == "jedi.md":
-            return "ai_docs_jedi_path"
+        for relative_path, exact_reason in _EXACT_BOUNDED_MARKDOWN_PATHS.items():
+            if normalized_path.endswith(relative_path):
+                return exact_reason
 
         return None
 
