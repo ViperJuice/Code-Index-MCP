@@ -1,7 +1,9 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T13:34:20Z`.
-- Observed commit: `705a506f`.
+- Evidence captured: `2026-04-29T13:53:03Z`.
+- Observed commit: `7282e341`.
+- Prior SEMVALIDEVIDENCE live-rerun anchor: `2026-04-29T13:34:20Z` on
+  observed commit `705a506f`.
 - Prior SEMQUICKCHARTS live-rerun anchor: `2026-04-29T12:53:24Z` on observed
   commit `26a163da`.
 - Prior SEMDISKIO live-rerun anchor: `2026-04-29T10:35:02Z` on observed
@@ -14,8 +16,18 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMVALIDEVIDENCE.md`.
+- Phase plan: `plans/phase-plan-v7-SEMBENCHDOCS.md`.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMARCHIVEWALKGAP` after SEMBENCHDOCS proved the later
+  `docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md ->
+  docs/benchmarks/production_benchmark.md` seam is now cleared, but the
+  refreshed live rerun on the new head still terminalized later in lexical
+  walking at
+  `analysis_archive/scripts_archive/scripts_test_files/verify_mcp_fix.py`
+  before the 120-second watchdog could expose a durable later successor path.
+  Older downstream assumptions should be treated as stale after this roadmap
+  amendment.
+- Prior roadmap steering: `specs/phase-plans-v7.md` added downstream phase
   `SEMBENCHDOCS` after SEMVALIDEVIDENCE proved the later
   `docs/validation/ga-closeout-decision.md ->
   docs/validation/mre2e-evidence.md` seam is now frozen in dispatcher,
@@ -807,12 +819,64 @@ Steering outcome:
   downstream phase plan or handoff that still treats the active current-head
   blocker as the validation-doc pair.
 
+## SEMBENCHDOCS Live Rerun Check
+
+SEMBENCHDOCS repaired the benchmark-doc lexical seam on the current head. The
+refreshed repo-local rerun advanced beyond
+`docs/benchmarks/production_benchmark.md`, but the same 120-second watchdog
+still terminalized the run later in lexical walking around the archive tail.
+
+Observed runtime state during the current SEMBENCHDOCS rerun check:
+
+- The live rerun terminalized at `2026-04-29T13:53:03Z`.
+- A later durable running snapshot at `2026-04-29T13:51:47Z` had already
+  advanced to
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/tests/root_tests/test_document_plugins.py`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/tests/root_tests/test_real_world_repos.py`,
+  proving the benchmark-doc pair was no longer the active blocker.
+- The durable running trace last refreshed at `2026-04-29T13:52:50Z` before
+  `repository status` truthfully terminalized it to `interrupted`.
+- The SEMBENCHDOCS live rerun used
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- Observed commit: `7282e341`
+- Indexed commit before rerun: `e2e95198`
+- Force-full trace status: `interrupted`
+- Trace stage: `lexical_walking`
+- Trace stage family: `lexical`
+- Trace blocker source: `lexical_mutation`
+- Last progress path:
+  `/home/viperjuice/code/Code-Index-MCP/analysis_archive/scripts_archive/scripts_test_files/verify_mcp_fix.py`
+- In-flight path: `null`
+- The timed-out command emitted a later oversized-file warning for
+  `/home/viperjuice/code/Code-Index-MCP/analysis_archive/semantic_vs_sql_comparison_1750926162.json`
+  (`32983030` bytes), which did not reopen the benchmark-doc seam.
+- Repository status now advertises the repaired benchmark boundary:
+  `Lexical boundary: using exact bounded Markdown indexing for docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md -> docs/benchmarks/production_benchmark.md`
+- SQLite runtime counts after the rerun:
+  `files = 1116`, `code_chunks = 28182`, `chunk_summaries = 0`,
+  `semantic_points = 0`
+
+Steering outcome:
+
+- SEMBENCHDOCS acceptance is satisfied: the active lexical blocker is no
+  longer
+  `docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md ->
+  docs/benchmarks/production_benchmark.md`.
+- The live rerun now reaches a later archive-tail walk gap centered on
+  `analysis_archive/scripts_archive/scripts_test_files/verify_mcp_fix.py`.
+- The roadmap now adds downstream phase `SEMARCHIVEWALKGAP`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the benchmark-doc pair.
+
 ## Verification
 
-Verification sequence for this SEMVALIDEVIDENCE slice:
+Verification sequence for this SEMBENCHDOCS slice:
 
 ```bash
-env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "validation or markdown or lexical or force_full or trace or bounded or mre2e or ga_closeout"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "benchmark or markdown or lexical or force_full or trace or bounded or production_benchmark or voyage_local_iter5_rerun or boundary or interrupted"
 uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status

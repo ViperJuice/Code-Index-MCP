@@ -43,6 +43,8 @@ _EXACT_BOUNDED_MARKDOWN_PATHS = {
     "ai_docs/jedi.md": "ai_docs_jedi_path",
     "docs/validation/ga-closeout-decision.md": "validation_ga_closeout_path",
     "docs/validation/mre2e-evidence.md": "validation_mre2e_path",
+    "docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md": "benchmark_fullrepo_rerun_path",
+    "docs/benchmarks/production_benchmark.md": "production_benchmark_path",
 }
 
 

@@ -2454,6 +2454,61 @@ in lexical walking on the later benchmark-doc seam.
 **Produces**
 - IF-0-SEMBENCHDOCS-1 — benchmark-doc lexical recovery and evidence contract.
 
+### Phase 45 — Archive Tail Walk-Gap Recovery (SEMARCHIVEWALKGAP)
+
+**Objective**
+
+Repair the next downstream lexical/trace gap exposed by SEMBENCHDOCS so a
+refreshed rerun on the new head no longer terminalizes under the 120-second
+watchdog with the durable trace stuck at
+`analysis_archive/scripts_archive/scripts_test_files/verify_mcp_fix.py`
+without a surviving later `in_flight_path`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMBENCHDOCS head
+      either advances durably beyond
+      `analysis_archive/scripts_archive/scripts_test_files/verify_mcp_fix.py`
+      or emits a truthful newer blocker before the 120-second watchdog
+      expires.
+- [ ] The repair stays narrowly scoped to the later archive-tail walk-gap and
+      the immediate dispatcher/trace/status plumbing needed to prove it.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the SEMBENCHDOCS
+      rerun outcome and the final live verdict for the archive-tail blocker.
+
+**Scope notes**
+
+This phase exists only if SEMBENCHDOCS proves the benchmark-doc pair is no
+longer the active lexical blocker but the refreshed live rerun still
+terminalizes later in lexical walking around the archive tail without a
+trustworthy successor file.
+
+**Non-goals**
+
+- No reopening of the benchmark-doc recovery once the live rerun has advanced
+  beyond `docs/benchmarks/production_benchmark.md`.
+- No blanket ignore rule for `analysis_archive/` or repo-wide lexical timeout
+  retune unless the archive-tail blocker is proven to require it.
+- No reopening of older exact seams unless a refreshed rerun reaches them
+  again and exposes a different newer blocker.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMBENCHDOCS
+
+**Produces**
+- IF-0-SEMARCHIVEWALKGAP-1 — archive-tail walk-gap recovery and evidence
+  contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -2501,6 +2556,7 @@ SEMCONTRACT
   -> SEMQUICKCHARTS
   -> SEMVALIDEVIDENCE
   -> SEMBENCHDOCS
+  -> SEMARCHIVEWALKGAP
 ```
 
 ## Execution Notes
@@ -2564,6 +2620,12 @@ SEMCONTRACT
   blocker such as
   `docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md ->
   docs/benchmarks/production_benchmark.md`.
+- SEMBENCHDOCS should amend the roadmap immediately if the refreshed live
+  rerun clears the benchmark-doc pair but still terminalizes later in lexical
+  walking with `last_progress_path` at
+  `analysis_archive/scripts_archive/scripts_test_files/verify_mcp_fix.py`
+  and no surviving later `in_flight_path`, because the next repair is then an
+  archive-tail walk-gap slice rather than a benchmark-doc-local blocker.
 - SEMREADYFIX exists only if SEMDOGFOOD proves the default local dogfood path
   is still blocked; it should repair that blocker and then rerun the dogfood
   proof instead of widening into unrelated semantic work.

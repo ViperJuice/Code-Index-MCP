@@ -1585,6 +1585,115 @@ class TestEnhancedDispatcherProtocolConformance:
         assert ga_file_rows == 1
         assert mre2e_file_rows == 1
 
+    def test_index_directory_uses_exact_bounded_markdown_path_for_benchmark_docs(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        benchmark_dir = repo / "docs" / "benchmarks"
+        benchmark_dir.mkdir(parents=True)
+        rerun_doc = (
+            benchmark_dir
+            / "mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md"
+        )
+        production_doc = benchmark_dir / "production_benchmark.md"
+        rerun_doc.write_text(
+            "# MCP vs Native Benchmark\n\n## Native Tools\n\n### ripgrep\n- Preserve benchmark evidence\n",
+            encoding="utf-8",
+        )
+        production_doc.write_text(
+            "# Production Retrieval Benchmark\n\n## MCP Dispatcher Results\n\n### Hybrid search\n- Preserve production benchmark evidence\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        def _unexpected(*_args, **_kwargs):
+            raise AssertionError(
+                "heavy Markdown path should not run for docs/benchmarks bounded files"
+            )
+
+        monkeypatch.setattr(MarkdownPlugin, "extract_structure", _unexpected)
+        monkeypatch.setattr(MarkdownPlugin, "chunk_document", _unexpected)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 2
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] == str(production_doc.resolve())
+        with store._get_connection() as conn:
+            rerun_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md') "
+                    "ORDER BY id"
+                ).fetchall()
+            ]
+            production_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'docs/benchmarks/production_benchmark.md') ORDER BY id"
+                ).fetchall()
+            ]
+            rerun_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md')"
+            ).fetchone()[0]
+            production_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'docs/benchmarks/production_benchmark.md')"
+            ).fetchone()[0]
+            rerun_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md')"
+            ).fetchall()
+            production_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = 'docs/benchmarks/production_benchmark.md')"
+            ).fetchall()
+        store.close()
+
+        assert rerun_symbols == [
+            "MCP vs Native Benchmark",
+            "MCP vs Native Benchmark",
+            "Native Tools",
+            "ripgrep",
+        ]
+        assert production_symbols == [
+            "Production Retrieval Benchmark",
+            "Production Retrieval Benchmark",
+            "MCP Dispatcher Results",
+            "Hybrid search",
+        ]
+        assert rerun_chunk_count == 0
+        assert production_chunk_count == 0
+        assert len(rerun_fts_rows) == 1
+        assert len(production_fts_rows) == 1
+        assert "Native Tools" in rerun_fts_rows[0][0]
+        assert "MCP Dispatcher Results" in production_fts_rows[0][0]
+
     def test_index_directory_uses_exact_bounded_python_path_for_visual_report_script(
         self, tmp_path, monkeypatch
     ):
