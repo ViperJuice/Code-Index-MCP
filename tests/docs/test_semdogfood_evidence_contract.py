@@ -22,8 +22,8 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
 
     for expected in (
         "# Semantic Dogfood Rebuild",
-        "Phase plan: `plans/phase-plan-v7-SEMMIXEDPHASETAIL.md`",
-        "Prior phase plan: `plans/phase-plan-v7-SEMLEGACYPLANS.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMPREUPGRADETAIL.md`",
+        "Prior phase plan: `plans/phase-plan-v7-SEMMIXEDPHASETAIL.md`",
         "## Reset Boundary",
         "## SEMTRACEFRESHNESS Live Trace Recovery",
         "## SEMPUBLISHRACE Live Rerun Check",
@@ -47,6 +47,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
         "## SEMPHASETAIL Live Rerun Check",
         "## SEMLEGACYPLANS Live Rerun Check",
         "## SEMMIXEDPHASETAIL Live Rerun Check",
+        "## SEMPREUPGRADETAIL Live Rerun Check",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -132,6 +133,8 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "2026-04-29T16:42:21Z",
         "2026-04-29T16:49:38Z",
         "2026-04-29T16:49:50Z",
+        "2026-04-29T17:07:44Z",
+        "2026-04-29T17:07:52Z",
         "2026-04-29T15:37:54Z",
         "2026-04-29T15:37:57Z",
         "098c1ad1",
@@ -148,6 +151,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "8870a23f",
         "7ab3e4ca",
         "468dee18",
+        "c240c23e",
         "40968140",
         "7335cf35",
         "ec443d85",
@@ -157,6 +161,8 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "scripts/quick_mcp_vs_native_validation.py",
         "scripts/preflight_upgrade.sh",
         "scripts/test_mcp_protocol_direct.py",
+        "scripts/verify_embeddings.py",
+        "scripts/claude_code_behavior_simulator.py",
         "scripts/create_multi_repo_visual_report.py",
         "scripts/run_test_batch.py",
         "scripts/validate_mcp_comprehensive.py",
@@ -233,6 +239,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "roadmap now adds downstream phase `SEMLEGACYPLANS`",
         "roadmap now adds downstream phase `SEMMIXEDPHASETAIL`",
         "roadmap now adds downstream phase `SEMPREUPGRADETAIL`",
+        "roadmap now adds downstream phase `SEMVERIFYSIMTAIL`",
     ):
         assert expected in text
 
@@ -304,14 +311,18 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "SEMPHASETAIL acceptance is satisfied for its named blocker",
         "SEMLEGACYPLANS acceptance is satisfied for its named blocker",
         "SEMMIXEDPHASETAIL acceptance is satisfied for its named blocker",
-        "Phase plan: `plans/phase-plan-v7-SEMMIXEDPHASETAIL.md`",
-        "Prior phase plan: `plans/phase-plan-v7-SEMLEGACYPLANS.md`",
+        "SEMPREUPGRADETAIL acceptance is satisfied for its named blocker",
+        "Phase plan: `plans/phase-plan-v7-SEMPREUPGRADETAIL.md`",
+        "Prior phase plan: `plans/phase-plan-v7-SEMMIXEDPHASETAIL.md`",
         "repository status` now advertises the repaired exact bounded lexical surface",
+        "Lexical boundary: using exact bounded shell/Python indexing for scripts/preflight_upgrade.sh -> scripts/test_mcp_protocol_direct.py",
         "uv run pytest tests/test_dispatcher.py -q --no-cov -k \"phase_plan or SEMSYNCFIX or SEMVISUALREPORT or markdown or lexical or bounded\"",
         "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k \"phase_plan or SEMSYNCFIX or SEMVISUALREPORT or lexical or interrupted or boundary\"",
         "uv run pytest tests/test_dispatcher.py -q --no-cov -k \"phase_plan or WATCH or p19 or markdown or lexical or bounded\"",
         "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k \"phase_plan or WATCH or p19 or lexical or interrupted or boundary\"",
         "uv run pytest tests/test_dispatcher.py -q --no-cov -k \"phase_plan or SEMPHASETAIL or gagov or markdown or lexical or bounded\"",
         "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k \"phase_plan or SEMPHASETAIL or gagov or lexical or interrupted or boundary\"",
+        "uv run pytest tests/test_dispatcher.py -q --no-cov -k \"preflight_upgrade or test_mcp_protocol_direct or lexical or bounded or shell or script\"",
+        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k \"preflight_upgrade or test_mcp_protocol_direct or lexical or interrupted or boundary or script\"",
     ):
         assert expected in text

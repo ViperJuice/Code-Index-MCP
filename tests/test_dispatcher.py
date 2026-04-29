@@ -1623,6 +1623,15 @@ class TestEnhancedDispatcherProtocolConformance:
             ),
         )
 
+        calls = []
+
+        def _tracked_chunk_text(*_args, **_kwargs):
+            calls.append("called")
+            return []
+
+        monkeypatch.setattr(
+            "mcp_server.plugins.python_plugin.plugin.chunk_text", _tracked_chunk_text
+        )
         monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
 
         result = Dispatcher([]).index_directory(ctx, repo)
@@ -2701,6 +2710,157 @@ class TestEnhancedDispatcherProtocolConformance:
         assert calls == []
         assert len(fts_rows) == 1
         assert "Checking languages" in fts_rows[0][0]
+
+    def test_index_directory_uses_exact_bounded_script_pair_for_preflight_upgrade_tail(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        shell_script = repo / "scripts" / "preflight_upgrade.sh"
+        python_script = repo / "scripts" / "test_mcp_protocol_direct.py"
+        shell_script.parent.mkdir(parents=True)
+        shell_script.write_text(
+            "#!/usr/bin/env bash\n"
+            "set -euo pipefail\n"
+            'exec "$PYTHON" -m mcp_server.cli preflight_env "$1"\n',
+            encoding="utf-8",
+        )
+        python_script.write_text(
+            "import asyncio\n\n"
+            "async def test_mcp_protocol():\n"
+            "    return 'ok'\n\n"
+            "if __name__ == '__main__':\n"
+            "    asyncio.run(test_mcp_protocol())\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        calls = []
+
+        def _tracked_chunk_text(*_args, **_kwargs):
+            calls.append("called")
+            return []
+
+        monkeypatch.setattr(
+            "mcp_server.plugins.python_plugin.plugin.chunk_text", _tracked_chunk_text
+        )
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 2
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] == str(python_script.resolve())
+        with store._get_connection() as conn:
+            shell_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/preflight_upgrade.sh') ORDER BY id"
+                ).fetchall()
+            ]
+            python_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/test_mcp_protocol_direct.py') ORDER BY id"
+                ).fetchall()
+            ]
+            shell_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/preflight_upgrade.sh')"
+            ).fetchone()[0]
+            python_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/test_mcp_protocol_direct.py')"
+            ).fetchone()[0]
+            shell_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/preflight_upgrade.sh')"
+            ).fetchall()
+            python_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/test_mcp_protocol_direct.py')"
+            ).fetchall()
+        store.close()
+        assert shell_symbols == ["preflight_env"]
+        assert "test_mcp_protocol" in python_symbols
+        assert shell_chunk_count == 0
+        assert python_chunk_count == 0
+        assert calls == []
+        assert len(shell_fts_rows) == 1
+        assert "preflight_env" in shell_fts_rows[0][0]
+        assert len(python_fts_rows) == 1
+        assert "test_mcp_protocol" in python_fts_rows[0][0]
+
+    def test_index_directory_keeps_unrelated_scripts_off_exact_preflight_upgrade_bypass(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        exact_shell = repo / "scripts" / "preflight_upgrade.sh"
+        unrelated_shell = repo / "scripts" / "deploy_helper.sh"
+        unrelated_python = repo / "scripts" / "helper.py"
+        exact_shell.parent.mkdir(parents=True)
+        exact_shell.write_text(
+            "#!/usr/bin/env bash\n"
+            'exec "$PYTHON" -m mcp_server.cli preflight_env "$1"\n',
+            encoding="utf-8",
+        )
+        unrelated_shell.write_text("#!/usr/bin/env bash\necho helper\n", encoding="utf-8")
+        unrelated_python.write_text("def helper():\n    return 'ok'\n", encoding="utf-8")
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        calls = []
+
+        def _tracked_chunk_text(*_args, **_kwargs):
+            calls.append("called")
+            return []
+
+        monkeypatch.setattr(
+            "mcp_server.plugins.python_plugin.plugin.chunk_text", _tracked_chunk_text
+        )
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 2
+        assert result["ignored_files"] == 1
+        with store._get_connection() as conn:
+            exact_metadata = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/preflight_upgrade.sh'"
+            ).fetchone()[0]
+            unrelated_shell_row = conn.execute(
+                "SELECT metadata FROM files WHERE relative_path = 'scripts/deploy_helper.sh'"
+            ).fetchone()
+            unrelated_python_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/helper.py')"
+            ).fetchone()[0]
+        store.close()
+        assert "exact_preflight_upgrade_rebound" in exact_metadata
+        assert unrelated_shell_row is None
+        assert unrelated_python_chunk_count == 0
 
     def test_index_directory_uses_exact_bounded_python_path_for_quick_charts(
         self, tmp_path, monkeypatch

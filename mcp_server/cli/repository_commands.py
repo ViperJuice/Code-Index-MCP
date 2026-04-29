@@ -369,6 +369,18 @@ def _print_script_language_audit_python_boundary(prefix: str, repo_path: Path) -
         )
 
 
+def _print_preflight_upgrade_script_boundary(prefix: str, repo_path: Path) -> None:
+    script_paths = (
+        repo_path / "scripts" / "preflight_upgrade.sh",
+        repo_path / "scripts" / "test_mcp_protocol_direct.py",
+    )
+    if all(path.is_file() for path in script_paths):
+        click.echo(
+            f"{prefix}Lexical boundary: using exact bounded shell/Python indexing for "
+            "scripts/preflight_upgrade.sh -> scripts/test_mcp_protocol_direct.py"
+        )
+
+
 def _print_artifact_publish_race_python_boundary(prefix: str, repo_path: Path) -> None:
     test_path = repo_path / "tests" / "test_artifact_publish_race.py"
     if test_path.is_file():
@@ -822,6 +834,7 @@ def status(repo_id: Optional[str]):
         _print_validate_mcp_comprehensive_python_boundary("  ", Path(status["path"]))
         _print_run_reranking_tests_python_boundary("  ", Path(status["path"]))
         _print_script_language_audit_python_boundary("  ", Path(status["path"]))
+        _print_preflight_upgrade_script_boundary("  ", Path(status["path"]))
         _print_artifact_publish_race_python_boundary("  ", Path(status["path"]))
         _print_visualization_quick_charts_python_boundary("  ", Path(status["path"]))
         _print_docs_governance_contract_python_boundary("  ", Path(status["path"]))

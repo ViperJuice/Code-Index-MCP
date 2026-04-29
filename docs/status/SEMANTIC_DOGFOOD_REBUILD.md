@@ -1,9 +1,9 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T16:42:21Z`.
-- Observed commit: `468dee18`.
-- Prior SEMMIXEDPHASETAIL live-rerun anchor: `2026-04-29T16:29:12Z` on
-  observed commit `7ab3e4ca`.
+- Evidence captured: `2026-04-29T17:07:52Z`.
+- Observed commit: `c240c23e`.
+- Prior SEMMIXEDPHASETAIL live-rerun anchor: `2026-04-29T16:49:50Z` on
+  observed commit `468dee18`.
 - Prior SEMLEGACYPLANS live-rerun anchor: `2026-04-29T16:07:22Z` on observed
   commit `fe501b97`.
 - Prior SEMCROSSPLANS live-rerun anchor: `2026-04-29T15:51:12Z` on observed
@@ -28,9 +28,16 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMMIXEDPHASETAIL.md`.
-- Prior phase plan: `plans/phase-plan-v7-SEMLEGACYPLANS.md`.
+- Phase plan: `plans/phase-plan-v7-SEMPREUPGRADETAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMMIXEDPHASETAIL.md`.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMVERIFYSIMTAIL` after SEMPREUPGRADETAIL proved the mixed shell/Python
+  script seam is now cleared, but the refreshed live rerun on the new head
+  still terminalized later in lexical walking on
+  `scripts/verify_embeddings.py ->
+  scripts/claude_code_behavior_simulator.py`. Older downstream assumptions
+  should be treated as stale after this roadmap amendment.
+- Prior roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMPREUPGRADETAIL` after SEMMIXEDPHASETAIL proved the mixed-version
   phase-plan seam is now cleared and a post-edit rerun advanced beyond the
   transient `ai_docs` waypoint, but the refreshed live rerun on the same
@@ -1429,6 +1436,66 @@ Steering outcome:
   `SEMPHASETAIL -> phase-plan-v5-gagov.md` phase-plan seam or the transient
   `ai_docs/celery_overview.md -> ai_docs/qdrant.md` waypoint.
 
+## SEMPREUPGRADETAIL Live Rerun Check
+
+SEMPREUPGRADETAIL tightened the exact mixed shell/Python script seam in the
+dispatcher and operator-status surfaces, and the refreshed live rerun
+advanced durably beyond `scripts/preflight_upgrade.sh` and
+`scripts/test_mcp_protocol_direct.py` before the 120-second watchdog expired.
+
+Code/test repair completed in this phase:
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py` now treats
+  `scripts/preflight_upgrade.sh` as an exact bounded shell path and
+  `scripts/test_mcp_protocol_direct.py` as an exact bounded Python path,
+  preserving full-text discoverability plus the `preflight_env` and
+  `test_mcp_protocol` entry surfaces without widening into a blanket
+  `scripts/*.sh` or `scripts/*.py` bypass.
+- `mcp_server/cli/repository_commands.py` now advertises the repaired exact
+  bounded lexical boundary for
+  `scripts/preflight_upgrade.sh -> scripts/test_mcp_protocol_direct.py`.
+- `tests/test_dispatcher.py`, `tests/test_git_index_manager.py`, and
+  `tests/test_repository_commands.py` now freeze dispatcher discoverability,
+  durable trace progression, and status reporting for the exact mixed
+  shell/Python pair without widening into a broader script-family shortcut.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The SEMPREUPGRADETAIL live rerun started on observed commit `c240c23e` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-29T17:07:44Z`, `force_full_exit_trace.json` showed a running
+  lexical trace on
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/scripts/verify_embeddings.py`
+  with
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/scripts/claude_code_behavior_simulator.py`.
+- At `2026-04-29T17:07:52Z`, `repository status` terminalized that running
+  snapshot to `Trace status: interrupted` with the same
+  `scripts/verify_embeddings.py -> scripts/claude_code_behavior_simulator.py`
+  pair while advertising the repaired exact bounded shell/Python lexical
+  surface:
+  `Lexical boundary: using exact bounded shell/Python indexing for scripts/preflight_upgrade.sh -> scripts/test_mcp_protocol_direct.py`.
+- SQLite runtime counts after the rerun remained
+  `files = 1123`, `code_chunks = 28182`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+
+Steering outcome:
+
+- SEMPREUPGRADETAIL acceptance is satisfied for its named blocker: the active
+  lexical blocker is no longer
+  `scripts/preflight_upgrade.sh ->
+  scripts/test_mcp_protocol_direct.py`.
+- The final authoritative rerun for this phase moved later and now reaches the
+  Python-script lexical pair
+  `scripts/verify_embeddings.py ->
+  scripts/claude_code_behavior_simulator.py`.
+- The roadmap now adds downstream phase `SEMVERIFYSIMTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the preflight-upgrade
+  `scripts/preflight_upgrade.sh ->
+  scripts/test_mcp_protocol_direct.py` script seam.
+
 ## Verification
 
 Verification sequence for this SEMCROSSPLANS slice:
@@ -1472,6 +1539,18 @@ Verification sequence for this SEMMIXEDPHASETAIL slice:
 ```bash
 uv run pytest tests/test_dispatcher.py -q --no-cov -k "phase_plan or SEMPHASETAIL or gagov or markdown or lexical or bounded"
 env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "phase_plan or SEMPHASETAIL or gagov or lexical or interrupted or boundary"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
+timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+```
+
+Verification sequence for this SEMPREUPGRADETAIL slice:
+
+```bash
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "preflight_upgrade or test_mcp_protocol_direct or lexical or bounded or shell or script"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "preflight_upgrade or test_mcp_protocol_direct or lexical or interrupted or boundary or script"
 uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status

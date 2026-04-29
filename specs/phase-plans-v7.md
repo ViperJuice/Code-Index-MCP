@@ -3047,6 +3047,70 @@ but the refreshed live rerun still terminalizes later in lexical walking on
 - IF-0-SEMPREUPGRADETAIL-1 — mixed script tail lexical recovery and evidence
   contract.
 
+### Phase 55 — Verify/Simulator Tail Recovery (SEMVERIFYSIMTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later Python script tail exposed
+after SEMPREUPGRADETAIL:
+`scripts/verify_embeddings.py -> scripts/claude_code_behavior_simulator.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMPREUPGRADETAIL
+      head either advances durably beyond
+      `scripts/verify_embeddings.py ->
+      scripts/claude_code_behavior_simulator.py` or emits a truthful newer
+      blocker before the 120-second watchdog expires.
+- [ ] The chosen repair for the
+      `scripts/verify_embeddings.py ->
+      scripts/claude_code_behavior_simulator.py` seam stays narrow, tested,
+      and does not reopen the repaired
+      `scripts/preflight_upgrade.sh ->
+      scripts/test_mcp_protocol_direct.py` boundary without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMPREUPGRADETAIL rerun outcome and the final live verdict for the
+      later Python-script blocker pair.
+
+**Scope notes**
+
+This phase exists only if SEMPREUPGRADETAIL proves the mixed shell/Python
+`scripts/preflight_upgrade.sh -> scripts/test_mcp_protocol_direct.py` seam is
+cleared, but the refreshed live rerun still terminalizes later in lexical
+walking on
+`scripts/verify_embeddings.py -> scripts/claude_code_behavior_simulator.py`.
+
+**Non-goals**
+
+- No reopening of the repaired preflight-upgrade script recovery once the live
+  rerun has advanced beyond that seam.
+- No broad reopening of earlier script families such as
+  `scripts/migrate_large_index_to_multi_repo.py ->
+  scripts/check_index_languages.py` or
+  `scripts/preflight_upgrade.sh ->
+  scripts/test_mcp_protocol_direct.py` unless the refreshed rerun proves the
+  active blocker requires it.
+- No repo-wide lexical timeout retune unless the refreshed rerun proves this
+  later Python-script seam cannot be cleared with a narrower repair.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/plugins/python_plugin/plugin.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMPREUPGRADETAIL
+
+**Produces**
+- IF-0-SEMVERIFYSIMTAIL-1 — later Python-script lexical recovery and
+  evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -3103,6 +3167,8 @@ SEMCONTRACT
   -> SEMPHASETAIL
   -> SEMLEGACYPLANS
   -> SEMMIXEDPHASETAIL
+  -> SEMPREUPGRADETAIL
+  -> SEMVERIFYSIMTAIL
 ```
 
 ## Execution Notes
@@ -3356,6 +3422,19 @@ SEMCONTRACT
   terminalizes later in lexical walking on
   `scripts/preflight_upgrade.sh ->
   scripts/test_mcp_protocol_direct.py`.
+- SEMPREUPGRADETAIL should amend the roadmap immediately if the refreshed live
+  rerun clears
+  `scripts/preflight_upgrade.sh ->
+  scripts/test_mcp_protocol_direct.py` but exposes a later exact Python-script
+  blocker such as
+  `scripts/verify_embeddings.py ->
+  scripts/claude_code_behavior_simulator.py`.
+- SEMVERIFYSIMTAIL exists only if SEMPREUPGRADETAIL proves the
+  `scripts/preflight_upgrade.sh ->
+  scripts/test_mcp_protocol_direct.py` seam is cleared but the refreshed live
+  rerun still terminalizes later in lexical walking on
+  `scripts/verify_embeddings.py ->
+  scripts/claude_code_behavior_simulator.py`.
 
 ## Verification
 

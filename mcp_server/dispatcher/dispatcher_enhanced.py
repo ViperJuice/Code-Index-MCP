@@ -124,9 +124,14 @@ _EXACT_BOUNDED_PYTHON_PATHS = {
     "scripts/validate_mcp_comprehensive.py": "exact_validate_mcp_comprehensive_rebound",
     "scripts/migrate_large_index_to_multi_repo.py": "exact_migrate_large_index_to_multi_repo_rebound",
     "scripts/check_index_languages.py": "exact_check_index_languages_rebound",
+    "scripts/test_mcp_protocol_direct.py": "exact_test_mcp_protocol_direct_rebound",
     "mcp_server/visualization/quick_charts.py": "exact_visualization_quick_charts_rebound",
     "tests/docs/test_mre2e_evidence_contract.py": "exact_mre2e_docs_contract_rebound",
     "tests/docs/test_gagov_governance_contract.py": "exact_gagov_docs_contract_rebound",
+}
+
+_EXACT_BOUNDED_SHELL_PATHS = {
+    "scripts/preflight_upgrade.sh": "exact_preflight_upgrade_rebound",
 }
 
 _REPO_SCOPE_SUMMARY_PASS_BUDGET = 8
@@ -2000,6 +2005,9 @@ class EnhancedDispatcher:
             bounded_python_shard = self._build_exact_bounded_python_shard(
                 path, content, ctx.workspace_root
             )
+            bounded_shell_shard = self._build_exact_bounded_shell_shard(
+                path, content, ctx.workspace_root
+            )
             bounded_json_shard = self._build_exact_bounded_json_shard(
                 path, content, ctx.workspace_root
             )
@@ -2007,6 +2015,10 @@ class EnhancedDispatcher:
                 plugin_language = "python"
                 plugin_lang = "python"
                 shard = bounded_python_shard
+            elif bounded_shell_shard is not None:
+                plugin_language = "plaintext"
+                plugin_lang = "plaintext"
+                shard = bounded_shell_shard
             elif bounded_json_shard is not None:
                 plugin_language = "json"
                 plugin_lang = "json"
@@ -2020,7 +2032,11 @@ class EnhancedDispatcher:
             # Index the file
             start_time = time.time()
             logger.info(f"Indexing {path} with {plugin_lang} plugin")
-            if bounded_python_shard is None and bounded_json_shard is None:
+            if (
+                bounded_python_shard is None
+                and bounded_shell_shard is None
+                and bounded_json_shard is None
+            ):
                 shard = plugin.indexFile(path, content)
             try:
                 self._persist_index_shard(ctx, path, content, plugin_language, shard)
@@ -2051,6 +2067,7 @@ class EnhancedDispatcher:
                 self._enable_advanced
                 and self._router
                 and bounded_python_shard is None
+                and bounded_shell_shard is None
                 and bounded_json_shard is None
             ):
                 execution_time = time.time() - start_time
@@ -2169,6 +2186,44 @@ class EnhancedDispatcher:
                         "span": (child.lineno, getattr(child, "end_lineno", child.lineno)),
                     }
                 )
+
+        return {
+            "symbols": symbols,
+            "chunks": [],
+            "metadata": {
+                "bounded_chunk_path": True,
+                "bounded_path_reason": bounded_path_reason,
+            },
+        }
+
+    def _build_exact_bounded_shell_shard(
+        self, path: Path, content: str, workspace_root: Path
+    ) -> Optional[Dict[str, Any]]:
+        if path.suffix.lower() not in {".sh", ".bash", ".zsh"}:
+            return None
+        try:
+            relative_path = path.resolve().relative_to(workspace_root.resolve()).as_posix()
+        except ValueError:
+            return None
+        bounded_path_reason = _EXACT_BOUNDED_SHELL_PATHS.get(relative_path)
+        if bounded_path_reason is None:
+            return None
+
+        symbols = []
+        for line_number, raw_line in enumerate(content.splitlines(), start=1):
+            line = raw_line.strip()
+            if "preflight_env" not in line:
+                continue
+            symbols.append(
+                {
+                    "symbol": "preflight_env",
+                    "kind": "command",
+                    "signature": raw_line.strip(),
+                    "line": line_number,
+                    "span": (line_number, line_number),
+                }
+            )
+            break
 
         return {
             "symbols": symbols,
