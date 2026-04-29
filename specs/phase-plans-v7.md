@@ -2742,6 +2742,68 @@ plans/phase-plan-v7-SEMDOCGOV.md`.
 - IF-0-SEMPHASEPLANS-1 — phase-plan markdown lexical recovery and evidence
   contract.
 
+### Phase 50 — Cross-Version Phase Plan Lexical Recovery (SEMCROSSPLANS)
+
+**Objective**
+
+Repair the next downstream lexical blocker exposed by SEMPHASEPLANS so a
+refreshed rerun on the new head no longer terminalizes under the 120-second
+watchdog on
+`plans/phase-plan-v5-garecut.md ->
+plans/phase-plan-v7-SEMWALKGAP.md`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMPHASEPLANS head
+      either advances durably beyond
+      `plans/phase-plan-v5-garecut.md ->
+      plans/phase-plan-v7-SEMWALKGAP.md` or emits a truthful newer blocker
+      before the 120-second watchdog expires.
+- [ ] The repair stays narrowly scoped to the exact cross-version phase-plan
+      pair and the immediate dispatcher/trace/status/evidence plumbing needed
+      to prove it.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the SEMPHASEPLANS
+      rerun outcome and the final live verdict for the later cross-version
+      phase-plan blocker.
+
+**Scope notes**
+
+This phase exists only if SEMPHASEPLANS proves the earlier v7-only
+phase-plan markdown pair is no longer the active lexical blocker but the
+refreshed live rerun still terminalizes later in lexical walking on the exact
+cross-version phase-plan pair
+`plans/phase-plan-v5-garecut.md ->
+plans/phase-plan-v7-SEMWALKGAP.md`.
+
+**Non-goals**
+
+- No reopening of the earlier
+  `plans/phase-plan-v7-SEMPREFLIGHT.md ->
+  plans/phase-plan-v7-SEMDOCGOV.md` recovery once the live rerun has advanced
+  beyond that pair.
+- No broad `plans/phase-plan-*.md` exemption or repo-wide lexical timeout
+  retune unless the refreshed rerun proves the blocker requires it.
+- No reopening of older benchmark, visualization, devcontainer, archive-tail,
+  docs-governance, `.claude`, or script-language seams unless the refreshed
+  rerun reaches them again and exposes a different newer blocker.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMPHASEPLANS
+
+**Produces**
+- IF-0-SEMCROSSPLANS-1 — cross-version phase-plan lexical recovery and
+  evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -2794,6 +2856,7 @@ SEMCONTRACT
   -> SEMCLAUDECMDS
   -> SEMSCRIPTLANGS
   -> SEMPHASEPLANS
+  -> SEMCROSSPLANS
 ```
 
 ## Execution Notes
@@ -2863,6 +2926,12 @@ SEMCONTRACT
   `analysis_archive/scripts_archive/scripts_test_files/verify_mcp_fix.py`
   and no surviving later `in_flight_path`, because the next repair is then an
   archive-tail walk-gap slice rather than a benchmark-doc-local blocker.
+- SEMPHASEPLANS should amend the roadmap immediately if the refreshed live
+  rerun clears
+  `plans/phase-plan-v7-SEMPREFLIGHT.md ->
+  plans/phase-plan-v7-SEMDOCGOV.md` but exposes a later exact blocker such as
+  `plans/phase-plan-v5-garecut.md ->
+  plans/phase-plan-v7-SEMWALKGAP.md`.
 - SEMARCHIVEWALKGAP should amend the roadmap immediately if the refreshed live
   rerun clears the archive-tail seam but exposes a later exact lexical blocker
   such as

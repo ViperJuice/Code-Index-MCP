@@ -42,6 +42,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
         "## SEMDOCGOV Live Rerun Check",
         "## SEMCLAUDECMDS Live Rerun Check",
         "## SEMSCRIPTLANGS Live Rerun Check",
+        "## SEMPHASEPLANS Live Rerun Check",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -118,6 +119,8 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "2026-04-29T15:22:41Z",
         "2026-04-29T15:22:48Z",
         "2026-04-29T15:24:06Z",
+        "2026-04-29T15:37:54Z",
+        "2026-04-29T15:37:57Z",
         "098c1ad1",
         "705a506f",
         "7282e341",
@@ -128,6 +131,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "1e7a2a10",
         "aec99482",
         "8870a23f",
+        "40968140",
         "7335cf35",
         "ec443d85",
         "26a163da",
@@ -177,6 +181,8 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "scripts/check_index_languages.py",
         "plans/phase-plan-v7-SEMPREFLIGHT.md",
         "plans/phase-plan-v7-SEMDOCGOV.md",
+        "plans/phase-plan-v5-garecut.md",
+        "plans/phase-plan-v7-SEMWALKGAP.md",
         "ai_docs/*_overview.md",
         ".devcontainer/devcontainer.json",
         "stale-running snapshot",
@@ -197,6 +203,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "roadmap now adds downstream phase `SEMCLAUDECMDS`",
         "roadmap now adds downstream phase `SEMSCRIPTLANGS`",
         "roadmap now adds downstream phase `SEMPHASEPLANS`",
+        "roadmap now adds downstream phase `SEMCROSSPLANS`",
     ):
         assert expected in text
 
@@ -235,6 +242,8 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         ".claude/commands/plan-phase.md",
         "plans/phase-plan-v7-SEMPREFLIGHT.md",
         "plans/phase-plan-v7-SEMDOCGOV.md",
+        "plans/phase-plan-v5-garecut.md",
+        "plans/phase-plan-v7-SEMWALKGAP.md",
         "Last sync error:",
         "disk I/O error",
         "Trace status: `interrupted`",
@@ -255,5 +264,7 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "Lexical boundary: using exact bounded Python indexing for scripts/migrate_large_index_to_multi_repo.py -> scripts/check_index_languages.py",
         "Lexical boundary: using exact bounded JSON indexing for analysis_archive/semantic_vs_sql_comparison_1750926162.json after analysis_archive/scripts_archive/scripts_test_files/verify_mcp_fix.py",
         "fixture repositories under test_workspace/ are ignored during lexical walking",
+        "SEMPHASEPLANS acceptance is satisfied for its named blocker",
+        "repository status` still advertises only the earlier bounded lexical surfaces",
     ):
         assert expected in text

@@ -1093,6 +1093,63 @@ Steering outcome:
   downstream phase plan or handoff that still treats the active current-head
   blocker as the script language-audit seam.
 
+## SEMPHASEPLANS Live Rerun Check
+
+SEMPHASEPLANS did not need a new dispatcher or Markdown-path repair on the
+current head. The refreshed repo-local rerun advanced durably beyond
+`plans/phase-plan-v7-SEMPREFLIGHT.md` and
+`plans/phase-plan-v7-SEMDOCGOV.md`, but the same 120-second watchdog still
+terminalized the run later in lexical walking on a newer cross-version
+phase-plan pair.
+
+Observed runtime state during the current SEMPHASEPLANS rerun check:
+
+- Evidence capture completed at `2026-04-29T15:37:57Z`.
+- The durable raw trace snapshot last refreshed at `2026-04-29T15:37:54Z`
+  while still marked `running`, and `repository status` then truthfully
+  terminalized the same blocker to `interrupted` using the later observed
+  trace timestamp `2026-04-29T15:37:57Z`.
+- The SEMPHASEPLANS live rerun used
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- Observed commit: `40968140`
+- Indexed commit before rerun: `e2e95198`
+- Force-full trace status: `interrupted`
+- Trace stage: `lexical_walking`
+- Trace stage family: `lexical`
+- Trace blocker source: `lexical_mutation`
+- Last progress path:
+  `/home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v5-garecut.md`
+- In-flight path:
+  `/home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v7-SEMWALKGAP.md`
+- The SEMPHASEPLANS target pair is no longer the active blocker:
+  `plans/phase-plan-v7-SEMPREFLIGHT.md ->
+  plans/phase-plan-v7-SEMDOCGOV.md`.
+- `repository status` still advertises only the earlier bounded lexical
+  surfaces; the newly exposed cross-version phase-plan seam is currently
+  visible through `force_full_exit_trace.json`, not a dedicated lexical
+  boundary line yet.
+- Repository status still reports the historical field `Last sync error:
+  disk I/O error`, but the active blocker for this rerun is the later lexical
+  phase-plan pair above.
+- SQLite runtime counts after the rerun:
+  `files = 1119`, `code_chunks = 28182`, `chunk_summaries = 0`,
+  `semantic_points = 0`
+
+Steering outcome:
+
+- SEMPHASEPLANS acceptance is satisfied for its named blocker: the active
+  lexical blocker is no longer
+  `plans/phase-plan-v7-SEMPREFLIGHT.md ->
+  plans/phase-plan-v7-SEMDOCGOV.md`.
+- The live rerun now reaches the later cross-version phase-plan pair
+  `plans/phase-plan-v5-garecut.md ->
+  plans/phase-plan-v7-SEMWALKGAP.md`.
+- The roadmap now adds downstream phase `SEMCROSSPLANS`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the `SEMPREFLIGHT -> SEMDOCGOV` phase-plan seam.
+
 ## Verification
 
 Verification sequence for this SEMSCRIPTLANGS slice:
