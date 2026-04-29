@@ -2341,6 +2341,71 @@ Steering outcome:
   `plans/phase-plan-v7-SEMJEDI.md ->
   plans/phase-plan-v1-p4.md`.
 
+## SEMCROSSDOGTAIL Live Rerun Check
+
+SEMCROSSDOGTAIL confirmed that the later modern v7 phase-plan seam is no
+longer the active lexical tail and that the refreshed live force-full rerun
+now exposes a later generated optimized-report seam.
+
+Code/test repair completed in this phase:
+
+- No additional dispatcher or Markdown-path repair was required to clear
+  `plans/phase-plan-v7-SEMCROSSPLANS.md ->
+  plans/phase-plan-v7-SEMDOGFOOD.md`; the current exact bounded phase-plan
+  contract and operator surface were already sufficient, and the refreshed
+  rerun proved the active blocker had moved later.
+- `tests/test_dispatcher.py`, `tests/test_git_index_manager.py`,
+  `tests/test_repository_commands.py`, and
+  `tests/docs/test_semdogfood_evidence_contract.py` now freeze the
+  SEMCROSSDOGTAIL evidence and downstream-steering contract so the later
+  blocker becomes the new authoritative tail instead of leaving stale
+  SEMCROSSPLANS-era assumptions behind.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMCROSSDOGTAIL live rerun started on observed commit
+  `e6584ee5` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-29T21:15:40Z`, `.mcp-index/force_full_exit_trace.json` was
+  still a running lexical snapshot with
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/final_optimized_report_final_report_1750958096/final_report_data.json`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/final_optimized_report_final_report_1750958096/FINAL_OPTIMIZED_ANALYSIS_REPORT.md`.
+- At `2026-04-29T21:15:52Z`, a refreshed `repository status` terminalized that
+  snapshot to `Trace status: interrupted` with the same generated-report pair
+  while continuing to advertise the repaired exact bounded Markdown surfaces
+  for the cleared
+  `plans/phase-plan-v7-SEMCROSSPLANS.md ->
+  plans/phase-plan-v7-SEMDOGFOOD.md` seam.
+- The SEMCROSSDOGTAIL target pair is no longer the active blocker:
+  `plans/phase-plan-v7-SEMCROSSPLANS.md ->
+  plans/phase-plan-v7-SEMDOGFOOD.md`.
+- SQLite runtime counts after the rerun were
+  `files = 1064`, `code_chunks = 13095`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` also remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Rollout status: partial_index_failure`,
+  `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+
+Steering outcome:
+
+- SEMCROSSDOGTAIL acceptance is satisfied for its named blocker: the live
+  watchdog no longer terminalizes on
+  `plans/phase-plan-v7-SEMCROSSPLANS.md ->
+  plans/phase-plan-v7-SEMDOGFOOD.md`.
+- The final authoritative rerun for this phase moved later and now reaches the
+  generated optimized-report pair
+  `final_optimized_report_final_report_1750958096/final_report_data.json ->
+  final_optimized_report_final_report_1750958096/FINAL_OPTIMIZED_ANALYSIS_REPORT.md`.
+- The roadmap now adds downstream phase `SEMOPTREPORTTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMCROSSDOGTAIL-era modern phase-plan seam
+  `plans/phase-plan-v7-SEMCROSSPLANS.md ->
+  plans/phase-plan-v7-SEMDOGFOOD.md`.
+
 ## Verification
 
 Verification sequence for this SEMDOCTRUTHTAIL slice:
@@ -2349,6 +2414,18 @@ Verification sequence for this SEMDOCTRUTHTAIL slice:
 uv run pytest tests/test_dispatcher.py -q --no-cov -k "p23 or semdogfood or doc_truth or evidence_contract or lexical or bounded"
 env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "p23 or semdogfood or doc_truth or evidence_contract or boundary or interrupted or lexical"
 uv run pytest tests/docs/test_p23_doc_truth.py tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
+timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+```
+
+Verification sequence for this SEMCROSSDOGTAIL slice:
+
+```bash
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "phase_plan or SEMCROSSPLANS or SEMDOGFOOD or markdown or lexical or bounded"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "phase_plan or SEMCROSSPLANS or SEMDOGFOOD or lexical or interrupted or boundary"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
 sed -n '1,240p' .mcp-index/force_full_exit_trace.json

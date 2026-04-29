@@ -59,6 +59,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
         "## SEMSUPPORTTAIL Live Rerun Check",
         "## SEMV1PLANTAIL Live Rerun Check",
         "## SEMJEDIP4TAIL Live Rerun Check",
+        "## SEMCROSSDOGTAIL Live Rerun Check",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -255,6 +256,8 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "plans/phase-plan-v1-p4.md",
         "plans/phase-plan-v7-SEMCROSSPLANS.md",
         "plans/phase-plan-v7-SEMDOGFOOD.md",
+        "final_optimized_report_final_report_1750958096/final_report_data.json",
+        "final_optimized_report_final_report_1750958096/FINAL_OPTIMIZED_ANALYSIS_REPORT.md",
         "ai_docs/qdrant.md",
         "fast_test_results/fast_report_*.md",
         "test_workspace/real_repos/search_scaling/package.json",
@@ -321,6 +324,10 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "roadmap now adds downstream phase `SEMV1PLANTAIL`",
         "roadmap now adds downstream phase `SEMJEDIP4TAIL`",
         "roadmap now adds downstream phase `SEMCROSSDOGTAIL`",
+        "roadmap now adds downstream phase `SEMOPTREPORTTAIL`",
+        "2026-04-29T21:15:40Z",
+        "2026-04-29T21:15:52Z",
+        "e6584ee5",
     ):
         assert expected in text
 
@@ -414,6 +421,7 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "SEMDOCTRUTHTAIL acceptance is satisfied for its named blocker",
         "SEMSUPPORTTAIL acceptance is satisfied for its named blocker",
         "SEMV1PLANTAIL acceptance is satisfied for its named blocker",
+        "SEMCROSSDOGTAIL acceptance is satisfied for its named blocker",
         "Phase plan: `plans/phase-plan-v7-SEMV1PLANTAIL.md`",
         "Prior phase plan: `plans/phase-plan-v7-SEMSUPPORTTAIL.md`",
         "repository status` now advertises the repaired exact bounded lexical surface",
