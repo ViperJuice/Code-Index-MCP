@@ -2475,6 +2475,56 @@ Steering outcome:
   `final_optimized_report_final_report_1750958096/final_report_data.json ->
   final_optimized_report_final_report_1750958096/FINAL_OPTIMIZED_ANALYSIS_REPORT.md`.
 
+## SEMFIXTURETAIL Live Rerun Check
+
+SEMFIXTURETAIL did not require a new fixture-local repair on the current head.
+The refreshed repo-local force-full rerun already advanced beyond the fixture
+pair and terminalized later in lexical walking on a narrower `ai_docs`
+overview seam.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMFIXTURETAIL live rerun started on observed commit
+  `3b92a81` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-29T21:50:51Z`, `.mcp-index/force_full_exit_trace.json` was
+  still a running lexical snapshot with
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/ai_docs/black_isort_overview.md`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/ai_docs/sqlite_fts5_overview.md`,
+  which is later than the SEMFIXTURETAIL fixture pair.
+- At `2026-04-29T21:51:02Z`, a refreshed `repository status` terminalized that
+  snapshot to `Trace status: interrupted` with the same later `ai_docs`
+  overview pair while keeping the repo semantically fail-closed.
+- The SEMFIXTURETAIL target pair is no longer the active blocker:
+  `tests/fixtures/multi_repo.py ->
+  tests/fixtures/files/test_files/example.c`.
+- SQLite runtime counts after the rerun remained
+  `files = 1064`, `code_chunks = 13095`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+- `repository status` remained semantically fail-closed after the rerun:
+  `Readiness: stale_commit`, `Rollout status: partial_index_failure`,
+  `Last sync error: disk I/O error`, and
+  `Semantic readiness: summaries_missing`.
+
+Steering outcome:
+
+- SEMFIXTURETAIL acceptance is satisfied for its named blocker: the live
+  watchdog no longer terminalizes on
+  `tests/fixtures/multi_repo.py ->
+  tests/fixtures/files/test_files/example.c`.
+- The final authoritative rerun for this phase moved later and now reaches the
+  `ai_docs` overview pair
+  `ai_docs/black_isort_overview.md ->
+  ai_docs/sqlite_fts5_overview.md`.
+- The roadmap now adds downstream phase `SEMAIOVERVIEWTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMFIXTURETAIL-era fixture seam
+  `tests/fixtures/multi_repo.py ->
+  tests/fixtures/files/test_files/example.c`.
+
 ## Verification
 
 Verification sequence for this SEMDOCTRUTHTAIL slice:

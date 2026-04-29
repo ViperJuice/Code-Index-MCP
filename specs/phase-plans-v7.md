@@ -3927,6 +3927,69 @@ tests/fixtures/files/test_files/example.c`.
 - IF-0-SEMFIXTURETAIL-1 — fixture-pair lexical recovery and evidence
   contract.
 
+### Phase 69 — AI Docs Overview Tail Recovery (SEMAIOVERVIEWTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later `ai_docs` overview seam
+exposed after SEMFIXTURETAIL:
+`ai_docs/black_isort_overview.md ->
+ai_docs/sqlite_fts5_overview.md`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMFIXTURETAIL head
+      either advances durably beyond the
+      `ai_docs/black_isort_overview.md ->
+      ai_docs/sqlite_fts5_overview.md`
+      pair or emits a truthful newer blocker before the 120-second watchdog
+      expires.
+- [ ] The chosen repair for the later `ai_docs` overview seam stays narrow,
+      tested, and does not reopen the already-cleared
+      `tests/fixtures/multi_repo.py ->
+      tests/fixtures/files/test_files/example.c`
+      boundary without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the SEMFIXTURETAIL
+      rerun outcome and the final live verdict for the later `ai_docs`
+      overview pair.
+
+**Scope notes**
+
+This phase exists only if SEMFIXTURETAIL proves the fixture pair is cleared,
+but the refreshed live rerun still terminalizes later in lexical walking on
+`ai_docs/black_isort_overview.md ->
+ai_docs/sqlite_fts5_overview.md`.
+
+**Non-goals**
+
+- No reopening of the cleared fixture-tail recovery once the live rerun has
+  advanced beyond
+  `tests/fixtures/multi_repo.py ->
+  tests/fixtures/files/test_files/example.c`.
+- No blanket reopening of the earlier `ai_docs/*_overview.md` boundary unless
+  the refreshed rerun proves the active blocker cannot be cleared with a
+  narrower exact-pair contract.
+- No reopening of unrelated semantic-stage or roadmap work unless the
+  refreshed rerun proves the active blocker has moved again.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+- `ai_docs/black_isort_overview.md`
+- `ai_docs/sqlite_fts5_overview.md`
+
+**Depends on**
+- SEMFIXTURETAIL
+
+**Produces**
+- IF-0-SEMAIOVERVIEWTAIL-1 — exact later `ai_docs` overview recovery and
+  evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -3998,6 +4061,7 @@ SEMCONTRACT
   -> SEMCROSSDOGTAIL
   -> SEMOPTREPORTTAIL
   -> SEMFIXTURETAIL
+  -> SEMAIOVERVIEWTAIL
 ```
 
 ## Execution Notes
@@ -4137,6 +4201,16 @@ SEMCONTRACT
   tests/fixtures/files/test_files/example.c`; it should repair that exact
   fixture seam or preserve the next exact downstream blocker instead of
   reopening earlier generated-report work.
+- SEMFIXTURETAIL should amend the roadmap immediately if the refreshed live
+  rerun clears the fixture pair but exposes a later exact blocker such as
+  `ai_docs/black_isort_overview.md ->
+  ai_docs/sqlite_fts5_overview.md`.
+- SEMAIOVERVIEWTAIL exists only if SEMFIXTURETAIL proves the fixture pair is
+  cleared but the live rerun still remains in lexical walking on
+  `ai_docs/black_isort_overview.md ->
+  ai_docs/sqlite_fts5_overview.md`; it should repair that exact later
+  `ai_docs` pair or preserve the next exact downstream blocker instead of
+  reopening earlier fixture or optimized-report work.
 - SEMCOLLECT exists only if SEMREADYFIX proves enrichment compatibility is
   repaired but semantic writes still cannot advance because the active
   collection/bootstrap path is missing or disconnected from the rebuild.

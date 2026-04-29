@@ -326,12 +326,16 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "roadmap now adds downstream phase `SEMCROSSDOGTAIL`",
         "roadmap now adds downstream phase `SEMOPTREPORTTAIL`",
         "roadmap now adds downstream phase `SEMFIXTURETAIL`",
+        "roadmap now adds downstream phase `SEMAIOVERVIEWTAIL`",
         "2026-04-29T21:15:40Z",
         "2026-04-29T21:15:52Z",
         "2026-04-29T21:34:54Z",
         "2026-04-29T21:35:04Z",
+        "2026-04-29T21:50:51Z",
+        "2026-04-29T21:51:02Z",
         "e6584ee5",
         "f2600b65",
+        "3b92a81",
     ):
         assert expected in text
 
@@ -465,5 +469,8 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "uv run pytest tests/docs/test_p23_doc_truth.py tests/docs/test_semdogfood_evidence_contract.py -q --no-cov",
         "tests/fixtures/multi_repo.py",
         "tests/fixtures/files/test_files/example.c",
+        "ai_docs/black_isort_overview.md",
+        "ai_docs/sqlite_fts5_overview.md",
+        "SEMFIXTURETAIL acceptance is satisfied for its named blocker",
     ):
         assert expected in text
