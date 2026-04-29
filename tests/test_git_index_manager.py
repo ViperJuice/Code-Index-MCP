@@ -2419,6 +2419,67 @@ def test_force_full_sync_durable_trace_moves_past_benchmark_doc_pair(tmp_path):
     ) in {trace["last_progress_path"], trace["in_flight_path"]}
 
 
+def test_force_full_progress_callback_preserves_archive_tail_successor_handoff(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+
+    manager = GitAwareIndexManager(registry=MagicMock(), dispatcher=MagicMock())
+    callback = manager._make_force_full_progress_callback(
+        repo_info=repo_info,
+        current_commit=commit,
+        indexed_commit_before="oldercommit",
+    )
+
+    prior_file = (
+        repo
+        / "analysis_archive"
+        / "scripts_archive"
+        / "scripts_test_files"
+        / "verify_mcp_fix.py"
+    )
+    prior_file.parent.mkdir(parents=True, exist_ok=True)
+    archive_json = repo / "analysis_archive" / "semantic_vs_sql_comparison_1750926162.json"
+
+    callback(
+        {
+            "stage": "lexical_walking",
+            "stage_family": "lexical",
+            "blocker_source": "lexical_mutation",
+            "last_progress_path": str(prior_file),
+            "in_flight_path": str(archive_json),
+            "semantic_stage": "not_run",
+            "lexical_stage": "walking",
+        }
+    )
+
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    first_trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert first_trace["last_progress_path"] == str(prior_file)
+    assert first_trace["in_flight_path"] == str(archive_json)
+
+    callback(
+        {
+            "stage": "force_full_closeout_handoff",
+            "stage_family": "final_closeout",
+            "blocker_source": "final_closeout",
+            "last_progress_path": str(archive_json),
+            "in_flight_path": None,
+            "semantic_stage": "not_run",
+            "lexical_stage": "completed",
+        }
+    )
+
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert trace["last_progress_path"] == str(archive_json)
+    assert trace["in_flight_path"] is None
+    assert str(prior_file) not in (trace.get("in_flight_path") or "")
+    assert ".devcontainer/devcontainer.json" not in (trace.get("last_progress_path") or "")
+    assert "docs/benchmarks/production_benchmark.md" not in (
+        trace.get("last_progress_path") or ""
+    )
+
+
 def test_force_full_sync_trace_moves_past_visual_report_script_after_exact_python_repair(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)

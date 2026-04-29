@@ -2101,14 +2101,17 @@ class EnhancedDispatcher:
     ) -> Optional[Dict[str, Any]]:
         if path.suffix.lower() != ".json":
             return None
-        if not GenericTreeSitterPlugin.uses_exact_bounded_json_path(path, workspace_root):
+        bounded_path_reason = GenericTreeSitterPlugin.exact_bounded_json_reason(
+            path, workspace_root
+        )
+        if bounded_path_reason is None:
             return None
         return {
             "symbols": [],
             "chunks": [],
             "metadata": {
                 "bounded_chunk_path": True,
-                "bounded_path_reason": "exact_devcontainer_json_rebound",
+                "bounded_path_reason": bounded_path_reason,
             },
         }
 
@@ -2977,7 +2980,10 @@ class EnhancedDispatcher:
                 size = path.stat().st_size
             except OSError:
                 continue
-            if size > get_max_file_size_bytes():
+            exact_bounded_json = GenericTreeSitterPlugin.uses_exact_bounded_json_path(
+                path, directory
+            )
+            if size > get_max_file_size_bytes() and not exact_bounded_json:
                 logger.warning("skipping oversized file: %s (%d bytes)", path, size)
                 stats["ignored_files"] = stats.get("ignored_files", 0) + 1
                 continue

@@ -1562,6 +1562,115 @@ def test_status_reports_exact_devcontainer_json_boundary(monkeypatch, tmp_path: 
     assert f"In-flight path: {config_file}" in result.output
 
 
+def test_status_reports_archive_tail_bounded_successor_when_in_flight_is_null(
+    monkeypatch, tmp_path: Path
+):
+    runner = CliRunner()
+    repo_info = _repo_info(tmp_path)
+    prior_file = (
+        repo_info.path
+        / "analysis_archive"
+        / "scripts_archive"
+        / "scripts_test_files"
+        / "verify_mcp_fix.py"
+    )
+    prior_file.parent.mkdir(parents=True)
+    prior_file.write_text("def verify_fix():\n    return True\n", encoding="utf-8")
+    archive_json = repo_info.path / "analysis_archive" / "semantic_vs_sql_comparison_1750926162.json"
+    archive_json.write_text('{"comparison": "archive tail"}\n', encoding="utf-8")
+
+    class FakeRegistry:
+        def get_repository_by_path(self, path):
+            return repo_info
+
+    class FakeStoreRegistry:
+        @classmethod
+        def for_registry(cls, registry):
+            return object()
+
+    class FakeRepoResolver:
+        def __init__(self, registry, store_registry):
+            pass
+
+    class FakeIndexManager:
+        def __init__(self, registry, repo_resolver=None, store_registry=None):
+            pass
+
+        def get_repository_status(self, repo_id):
+            return {
+                "repo_id": repo_info.repository_id,
+                "name": repo_info.name,
+                "path": repo_info.path,
+                "current_commit": repo_info.current_commit,
+                "last_indexed_commit": repo_info.last_indexed_commit,
+                "last_indexed": repo_info.last_indexed,
+                "needs_update": True,
+                "auto_sync": repo_info.auto_sync,
+                "artifact_enabled": repo_info.artifact_enabled,
+                "artifact_backend": repo_info.artifact_backend,
+                "artifact_health": repo_info.artifact_health,
+                "index_exists": True,
+                "index_size_mb": 0.1,
+                "readiness": "stale_commit",
+                "ready": False,
+                "remediation": "Run reindex to update the repository index to the current commit.",
+                "rollout_status": "partial_index_failure",
+                "rollout_remediation": "A required lexical mutation failed.",
+                "query_status": "index_unavailable",
+                "query_remediation": 'Use native search or follow the readiness remediation; query tools stay fail-closed with safe_fallback: "native_search".',
+                "staleness_reason": "partial_index_failure",
+                "semantic_readiness": "summaries_missing",
+                "semantic_ready": False,
+                "semantic_remediation": "Run semantic summary/vector generation for the current profile before semantic queries.",
+                "force_full_exit_trace": {
+                    "status": "interrupted",
+                    "stage": "lexical_walking",
+                    "stage_family": "lexical",
+                    "trace_timestamp": "2026-04-29T14:10:00Z",
+                    "current_commit": "7282e34100000000000000000000000000000000",
+                    "indexed_commit_before": "705a506f00000000000000000000000000000000",
+                    "last_progress_path": str(archive_json),
+                    "in_flight_path": None,
+                    "blocker_source": "lexical_mutation",
+                },
+                "features": {"semantic": {"readiness": {"evidence": {}}, "preflight": {}}},
+            }
+
+    monkeypatch.setattr("mcp_server.cli.repository_commands.RepositoryRegistry", FakeRegistry)
+    monkeypatch.setattr("mcp_server.cli.repository_commands.StoreRegistry", FakeStoreRegistry)
+    monkeypatch.setattr("mcp_server.cli.repository_commands.RepoResolver", FakeRepoResolver)
+    monkeypatch.setattr("mcp_server.cli.repository_commands.GitAwareIndexManager", FakeIndexManager)
+    monkeypatch.setattr(
+        "mcp_server.cli.repository_commands.reload_settings",
+        lambda: SimpleNamespace(
+            get_semantic_default_profile=lambda: "oss_high",
+            semantic_strict_mode=False,
+        ),
+    )
+    monkeypatch.setattr(
+        "mcp_server.cli.repository_commands.run_semantic_preflight",
+        lambda **kwargs: _semantic_preflight_ready(),
+    )
+
+    result = runner.invoke(repository, ["status"])
+
+    assert result.exit_code == 0
+    assert (
+        "Lexical boundary: using exact bounded JSON indexing for "
+        "analysis_archive/semantic_vs_sql_comparison_1750926162.json after "
+        "analysis_archive/scripts_archive/scripts_test_files/verify_mcp_fix.py"
+    ) in result.output
+    assert f"Last progress path: {archive_json}" in result.output
+    assert "In-flight path:" not in result.output
+    assert (
+        "Archive-tail successor: exact bounded JSON indexing preserved lexical progress "
+        f"beyond {prior_file}"
+    ) in result.output
+    assert ".devcontainer/devcontainer.json" not in result.output
+    assert "mcp_server/visualization/quick_charts.py" not in result.output
+    assert "docs/benchmarks/production_benchmark.md" not in result.output
+
+
 def test_status_reports_same_devcontainer_relapse_without_older_or_later_boundaries(
     monkeypatch, tmp_path: Path
 ):

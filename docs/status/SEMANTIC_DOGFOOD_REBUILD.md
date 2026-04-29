@@ -1,7 +1,7 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T13:53:03Z`.
-- Observed commit: `7282e341`.
+- Evidence captured: `2026-04-29T14:13:50Z`.
+- Observed commit: `9138e0b0`.
 - Prior SEMVALIDEVIDENCE live-rerun anchor: `2026-04-29T13:34:20Z` on
   observed commit `705a506f`.
 - Prior SEMQUICKCHARTS live-rerun anchor: `2026-04-29T12:53:24Z` on observed
@@ -16,8 +16,15 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMBENCHDOCS.md`.
+- Phase plan: `plans/phase-plan-v7-SEMARCHIVEWALKGAP.md`.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMDOCGOV` after SEMARCHIVEWALKGAP proved the archive-tail seam is now
+  cleared, but the refreshed live rerun on the new head still terminalized
+  later in lexical walking on
+  `tests/docs/test_mre2e_evidence_contract.py ->
+  tests/docs/test_gagov_governance_contract.py`. Older downstream assumptions
+  should be treated as stale after this roadmap amendment.
+- Prior roadmap steering: `specs/phase-plans-v7.md` added downstream phase
   `SEMARCHIVEWALKGAP` after SEMBENCHDOCS proved the later
   `docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md ->
   docs/benchmarks/production_benchmark.md` seam is now cleared, but the
@@ -576,51 +583,52 @@ timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync
 
 ## Rebuild Evidence
 
-Observed runtime state during the current SEMWALKGAP rerun check:
+Observed runtime state during the current SEMARCHIVEWALKGAP rerun check:
 
-- Files indexed in SQLite: `1113`
-- Code chunks indexed in SQLite: `28098`
+- Files indexed in SQLite: `1116`
+- Code chunks indexed in SQLite: `28182`
 - Summary-backed chunks: `0`
-- Chunks missing summaries: `28098`
+- Chunks missing summaries: `28182`
 - Vector-linked chunks: `0`
-- Chunks missing vectors: `28098`
+- Chunks missing vectors: `28182`
 
 Durable stage trace from `.mcp-index/force_full_exit_trace.json` after the
-post-timeout SEMWALKGAP rerun evidence capture:
+post-timeout SEMARCHIVEWALKGAP rerun evidence capture:
 
 - Trace status: `interrupted`
 - Trace stage: `lexical_walking`
 - Trace stage family: `lexical`
-- Trace timestamp: `2026-04-29T12:53:24Z`
+- Trace timestamp: `2026-04-29T14:12:49Z`
 - Trace blocker source: `lexical_mutation`
-- Trace current commit: `26a163da52865a85c4f0c91e657c3f959e26b00e`
+- Trace current commit: `9138e0b0c78841324bcc9dc6863aede8e435f51d`
 - Trace indexed commit before:
   `e2e9519858c3683c06b152c94a99e52098beaec6`
 - Last progress path:
-  `/home/viperjuice/code/Code-Index-MCP/mcp_server/visualization/__init__.py`
+  `/home/viperjuice/code/Code-Index-MCP/tests/docs/test_mre2e_evidence_contract.py`
 - In-flight path:
-  `/home/viperjuice/code/Code-Index-MCP/mcp_server/visualization/quick_charts.py`
+  `/home/viperjuice/code/Code-Index-MCP/tests/docs/test_gagov_governance_contract.py`
 
 Runtime containment verdict for the refreshed live rerun:
 
-- The repaired post-devcontainer walk-gap contract is now validated live: the
-  durable trace advanced well beyond `.devcontainer/devcontainer.json`.
-- The ignored tail remains bounded and truthful: generated fast reports and
-  `test_workspace/` fixture repos are no longer treated as authoritative
-  progress markers.
-- The live rerun still timed out under the 120-second watchdog, and
+- The repaired archive-tail contract is now validated live: the durable trace
+  advanced beyond
+  `analysis_archive/scripts_archive/scripts_test_files/verify_mcp_fix.py`
+  and the exact bounded archive JSON successor
+  `analysis_archive/semantic_vs_sql_comparison_1750926162.json`.
+- The live rerun still exited under the 120-second watchdog, and
   `repository status` rewrote the dead-process durable trace from
-  `status=running` to `status=interrupted` on the later visualization pair.
+  `status=running` to `status=interrupted` on the later docs contract-test
+  pair.
 - The next exact blocker is now
-  `mcp_server/visualization/__init__.py ->
-  mcp_server/visualization/quick_charts.py`.
+  `tests/docs/test_mre2e_evidence_contract.py ->
+  tests/docs/test_gagov_governance_contract.py`.
 - The partial runtime still ends with no `chunk_summaries` and no
   `semantic_points`.
 
 ## Repository Status
 
 `env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status`
-after the SEMWALKGAP live rerun had already timed out
+after the SEMARCHIVEWALKGAP live rerun had already timed out
 reported:
 
 - Lexical readiness: `stale_commit`
@@ -651,18 +659,20 @@ reported:
   `using exact bounded Python indexing for tests/test_artifact_publish_race.py`
 - Lexical boundary:
   `using exact bounded JSON indexing for .devcontainer/devcontainer.json`
+- Lexical boundary:
+  `using exact bounded JSON indexing for analysis_archive/semantic_vs_sql_comparison_1750926162.json after analysis_archive/scripts_archive/scripts_test_files/verify_mcp_fix.py`
 - Trace status: `interrupted`
 - Trace stage: `lexical_walking`
 - Trace stage family: `lexical`
 - Trace blocker source: `lexical_mutation`
 - Last progress path:
-  `/home/viperjuice/code/Code-Index-MCP/mcp_server/visualization/__init__.py`
+  `/home/viperjuice/code/Code-Index-MCP/tests/docs/test_mre2e_evidence_contract.py`
 - In-flight path:
-  `/home/viperjuice/code/Code-Index-MCP/mcp_server/visualization/quick_charts.py`
+  `/home/viperjuice/code/Code-Index-MCP/tests/docs/test_gagov_governance_contract.py`
 
 Repository/index freshness evidence:
 
-- Current commit: `ec443d85`
+- Current commit: `9138e0b0`
 - Indexed commit: `e2e95198`
 
 ## Query Comparison
@@ -676,18 +686,18 @@ Fixed dogfood prompt: `how does semantic setup validate qdrant and embedding rea
   `semantic_collection_name: "code_index__oss_high__v1"`.
 - `symbol` and lexical probes still point operators at
   `mcp_server/dispatcher/dispatcher_enhanced.py`,
-  `mcp_server/cli/repository_commands.py`, and the renewed
-  `mcp_server/visualization/quick_charts.py` lexical blocker.
-- The remaining downstream work is no longer centered on the renewed
-  `.devcontainer/devcontainer.json` relapse captured by `SEMDEVRELAPSE`.
-  It is now centered on the later visualization lexical seam uncovered by
-  `SEMWALKGAP`.
+  `mcp_server/cli/repository_commands.py`, and the new
+  `tests/docs/test_gagov_governance_contract.py` lexical blocker.
+- The remaining downstream work is no longer centered on the archive tail
+  captured by `SEMARCHIVEWALKGAP`. It is now centered on the later docs
+  contract seam uncovered by the refreshed rerun.
 
 ## Dogfood Verdict
 
 The exact verdict string for contract checks is `local multi-repo dogfooding`.
 
-Local multi-repo dogfooding is **still not ready** after SEMQUICKCHARTS.
+Local multi-repo dogfooding is **still not ready** after
+SEMARCHIVEWALKGAP.
 
 Why:
 
@@ -871,12 +881,59 @@ Steering outcome:
   downstream phase plan or handoff that still treats the active current-head
   blocker as the benchmark-doc pair.
 
+## SEMARCHIVEWALKGAP Live Rerun Check
+
+SEMARCHIVEWALKGAP repaired the archive-tail walk-gap seam on the current
+head. The refreshed repo-local rerun advanced beyond both
+`analysis_archive/scripts_archive/scripts_test_files/verify_mcp_fix.py` and
+the exact bounded archive JSON successor
+`analysis_archive/semantic_vs_sql_comparison_1750926162.json`, but the same
+120-second watchdog still terminalized the run later in lexical walking on a
+docs contract-test pair.
+
+Observed runtime state during the current SEMARCHIVEWALKGAP rerun check:
+
+- Evidence capture completed at `2026-04-29T14:13:50Z`.
+- The durable running trace last refreshed at `2026-04-29T14:12:49Z` before
+  `repository status` truthfully terminalized it to `interrupted`.
+- The SEMARCHIVEWALKGAP live rerun used
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `135`.
+- Observed commit: `9138e0b0`
+- Indexed commit before rerun: `e2e95198`
+- Force-full trace status: `interrupted`
+- Trace stage: `lexical_walking`
+- Trace stage family: `lexical`
+- Trace blocker source: `lexical_mutation`
+- Last progress path:
+  `/home/viperjuice/code/Code-Index-MCP/tests/docs/test_mre2e_evidence_contract.py`
+- In-flight path:
+  `/home/viperjuice/code/Code-Index-MCP/tests/docs/test_gagov_governance_contract.py`
+- Repository status now advertises the repaired archive boundary:
+  `Lexical boundary: using exact bounded JSON indexing for analysis_archive/semantic_vs_sql_comparison_1750926162.json after analysis_archive/scripts_archive/scripts_test_files/verify_mcp_fix.py`
+- SQLite runtime counts after the rerun:
+  `files = 1116`, `code_chunks = 28182`, `chunk_summaries = 0`,
+  `semantic_points = 0`
+
+Steering outcome:
+
+- SEMARCHIVEWALKGAP acceptance is satisfied: the active lexical blocker is no
+  longer the archive-tail seam centered on
+  `analysis_archive/scripts_archive/scripts_test_files/verify_mcp_fix.py`.
+- The live rerun now reaches the later docs contract-test pair
+  `tests/docs/test_mre2e_evidence_contract.py ->
+  tests/docs/test_gagov_governance_contract.py`.
+- The roadmap now adds downstream phase `SEMDOCGOV`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the archive-tail seam.
+
 ## Verification
 
-Verification sequence for this SEMBENCHDOCS slice:
+Verification sequence for this SEMARCHIVEWALKGAP slice:
 
 ```bash
-env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "benchmark or markdown or lexical or force_full or trace or bounded or production_benchmark or voyage_local_iter5_rerun or boundary or interrupted"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "analysis_archive or verify_mcp_fix or semantic_vs_sql_comparison_1750926162 or lexical or force_full or json or trace or bounded"
 uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status

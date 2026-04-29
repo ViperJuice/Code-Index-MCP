@@ -2509,6 +2509,62 @@ trustworthy successor file.
 - IF-0-SEMARCHIVEWALKGAP-1 — archive-tail walk-gap recovery and evidence
   contract.
 
+### Phase 46 — Docs Governance Contract Lexical Recovery (SEMDOCGOV)
+
+**Objective**
+
+Repair the next downstream lexical blocker exposed by SEMARCHIVEWALKGAP so a
+refreshed rerun on the new head no longer terminalizes under the 120-second
+watchdog on
+`tests/docs/test_mre2e_evidence_contract.py ->
+tests/docs/test_gagov_governance_contract.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMARCHIVEWALKGAP
+      head either advances durably beyond
+      `tests/docs/test_mre2e_evidence_contract.py ->
+      tests/docs/test_gagov_governance_contract.py` or emits a truthful newer
+      blocker before the 120-second watchdog expires.
+- [ ] The repair stays narrowly scoped to the docs-test contract pair and the
+      immediate dispatcher/trace/status plumbing needed to prove it.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMARCHIVEWALKGAP rerun outcome and the final live verdict for the
+      docs-test blocker.
+
+**Scope notes**
+
+This phase exists only if SEMARCHIVEWALKGAP proves the archive-tail seam is no
+longer the active lexical blocker but the refreshed live rerun still
+terminalizes later in lexical walking on the docs contract-test pair.
+
+**Non-goals**
+
+- No reopening of the archive-tail recovery once the live rerun has advanced
+  beyond `analysis_archive/semantic_vs_sql_comparison_1750926162.json`.
+- No broad `tests/docs/*.py` exemption or repo-wide lexical timeout retune
+  unless the refreshed rerun proves the blocker requires it.
+- No reopening of older benchmark, visualization, devcontainer, or
+  archive-tail seams unless the refreshed rerun reaches them again and exposes
+  a different newer blocker.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMARCHIVEWALKGAP
+
+**Produces**
+- IF-0-SEMDOCGOV-1 — docs governance contract lexical recovery and evidence
+  contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -2557,6 +2613,7 @@ SEMCONTRACT
   -> SEMVALIDEVIDENCE
   -> SEMBENCHDOCS
   -> SEMARCHIVEWALKGAP
+  -> SEMDOCGOV
 ```
 
 ## Execution Notes
@@ -2626,6 +2683,13 @@ SEMCONTRACT
   `analysis_archive/scripts_archive/scripts_test_files/verify_mcp_fix.py`
   and no surviving later `in_flight_path`, because the next repair is then an
   archive-tail walk-gap slice rather than a benchmark-doc-local blocker.
+- SEMARCHIVEWALKGAP should amend the roadmap immediately if the refreshed live
+  rerun clears the archive-tail seam but exposes a later exact lexical blocker
+  such as
+  `tests/docs/test_mre2e_evidence_contract.py ->
+  tests/docs/test_gagov_governance_contract.py`, because the next repair is
+  then no longer archive-tail-local and any older downstream assumption is
+  stale.
 - SEMREADYFIX exists only if SEMDOGFOOD proves the default local dogfood path
   is still blocked; it should repair that blocker and then rerun the dogfood
   proof instead of widening into unrelated semantic work.

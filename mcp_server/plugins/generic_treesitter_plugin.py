@@ -34,7 +34,10 @@ class GenericTreeSitterPlugin(PluginWithSemanticSearch):
     """Generic plugin that can handle any tree-sitter supported language."""
 
     _EXACT_BOUNDED_JSON_PATHS = {
-        ".devcontainer/devcontainer.json",
+        ".devcontainer/devcontainer.json": "exact_devcontainer_json_rebound",
+        "analysis_archive/semantic_vs_sql_comparison_1750926162.json": (
+            "exact_archive_tail_json_walk_gap"
+        ),
     }
 
     def __init__(
@@ -134,7 +137,15 @@ class GenericTreeSitterPlugin(PluginWithSemanticSearch):
     def uses_exact_bounded_json_path(
         cls, path: str | Path, workspace_root: Optional[str | Path] = None
     ) -> bool:
-        return cls._normalized_relative_path(path, workspace_root) in cls._EXACT_BOUNDED_JSON_PATHS
+        return cls.exact_bounded_json_reason(path, workspace_root) is not None
+
+    @classmethod
+    def exact_bounded_json_reason(
+        cls, path: str | Path, workspace_root: Optional[str | Path] = None
+    ) -> Optional[str]:
+        return cls._EXACT_BOUNDED_JSON_PATHS.get(
+            cls._normalized_relative_path(path, workspace_root)
+        )
 
     def indexFile(self, path: str | Path, content: str) -> IndexShard:
         """Index a file with optional semantic embeddings."""

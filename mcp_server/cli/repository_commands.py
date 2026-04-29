@@ -90,7 +90,16 @@ def _print_sync_semantic_details(prefix: str, semantic: Optional[dict[str, Any]]
             )
 
 
-def _print_force_full_exit_trace(prefix: str, trace: Optional[dict[str, Any]]) -> None:
+def _archive_tail_pair(repo_path: Path) -> tuple[Path, Path]:
+    return (
+        repo_path / "analysis_archive" / "scripts_archive" / "scripts_test_files" / "verify_mcp_fix.py",
+        repo_path / "analysis_archive" / "semantic_vs_sql_comparison_1750926162.json",
+    )
+
+
+def _print_force_full_exit_trace(
+    prefix: str, trace: Optional[dict[str, Any]], repo_path: Optional[Path] = None
+) -> None:
     if not trace:
         click.echo(f"\n{prefix}Force-full exit trace: missing")
         return
@@ -127,6 +136,16 @@ def _print_force_full_exit_trace(prefix: str, trace: Optional[dict[str, Any]]) -
         click.echo(f"{prefix}Last progress path: {trace['last_progress_path']}")
     if trace.get("in_flight_path"):
         click.echo(f"{prefix}In-flight path: {trace['in_flight_path']}")
+    if repo_path is not None:
+        archive_script, archive_json = _archive_tail_pair(repo_path)
+        if (
+            trace.get("last_progress_path") == str(archive_json.resolve())
+            and trace.get("in_flight_path") is None
+        ):
+            click.echo(
+                f"{prefix}Archive-tail successor: exact bounded JSON indexing preserved lexical "
+                f"progress beyond {archive_script}"
+            )
     if trace.get("summary_call_file_path"):
         click.echo(f"{prefix}Timed-out summary file: {trace['summary_call_file_path']}")
     if trace.get("summary_call_chunk_ids"):
@@ -312,6 +331,16 @@ def _print_devcontainer_json_boundary(prefix: str, repo_path: Path) -> None:
         click.echo(
             f"{prefix}Lexical boundary: using exact bounded JSON indexing for "
             ".devcontainer/devcontainer.json"
+        )
+
+
+def _print_archive_tail_json_boundary(prefix: str, repo_path: Path) -> None:
+    archive_script, archive_json = _archive_tail_pair(repo_path)
+    if archive_script.is_file() and archive_json.is_file():
+        click.echo(
+            f"{prefix}Lexical boundary: using exact bounded JSON indexing for "
+            "analysis_archive/semantic_vs_sql_comparison_1750926162.json after "
+            "analysis_archive/scripts_archive/scripts_test_files/verify_mcp_fix.py"
         )
 
 
@@ -716,7 +745,10 @@ def status(repo_id: Optional[str]):
         _print_artifact_publish_race_python_boundary("  ", Path(status["path"]))
         _print_visualization_quick_charts_python_boundary("  ", Path(status["path"]))
         _print_devcontainer_json_boundary("  ", Path(status["path"]))
-        _print_force_full_exit_trace("  ", status.get("force_full_exit_trace"))
+        _print_archive_tail_json_boundary("  ", Path(status["path"]))
+        _print_force_full_exit_trace(
+            "  ", status.get("force_full_exit_trace"), Path(status["path"])
+        )
 
         semantic_preflight = status["features"]["semantic"].get("preflight") or {}
         blocker = semantic_preflight.get("blocker") or {}

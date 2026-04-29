@@ -2494,6 +2494,140 @@ class TestEnhancedDispatcherProtocolConformance:
             for snapshot in snapshots
         )
 
+    def test_index_directory_uses_exact_bounded_json_path_for_archive_tail_successor(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        archive_json = repo / "analysis_archive" / "semantic_vs_sql_comparison_1750926162.json"
+        archive_json.parent.mkdir(parents=True)
+        archive_json.write_text('{"comparison": "archive tail"}\n', encoding="utf-8")
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        def _unexpected_json_plugin_load(_self, language):
+            if language == "json":
+                raise AssertionError("exact bounded archive-tail JSON path should bypass plugin load")
+            return None
+
+        monkeypatch.setattr(Dispatcher, "_ensure_plugin_loaded", _unexpected_json_plugin_load)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 1
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] == str(archive_json.resolve())
+        with store._get_connection() as conn:
+            chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'analysis_archive/semantic_vs_sql_comparison_1750926162.json')"
+            ).fetchone()[0]
+            fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'analysis_archive/semantic_vs_sql_comparison_1750926162.json')"
+            ).fetchall()
+        store.close()
+        assert chunk_count == 0
+        assert len(fts_rows) == 1
+        assert "archive tail" in fts_rows[0][0]
+
+    def test_index_directory_emits_archive_tail_successor_before_closeout_handoff(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        prior_file = (
+            repo
+            / "analysis_archive"
+            / "scripts_archive"
+            / "scripts_test_files"
+            / "verify_mcp_fix.py"
+        )
+        prior_file.parent.mkdir(parents=True)
+        prior_file.write_text("def verify_fix():\n    return True\n", encoding="utf-8")
+        archive_json = repo / "analysis_archive" / "semantic_vs_sql_comparison_1750926162.json"
+        archive_json.write_text('{"comparison": "archive tail"}\n', encoding="utf-8")
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+        snapshots = []
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: object())
+
+        def _fake_walk(_directory, followlinks=False):
+            assert followlinks is False
+            yield str(prior_file.parent), [], [prior_file.name]
+            yield str(archive_json.parent), [], [archive_json.name]
+
+        def _explode_before_semantic_progress(self, _ctx, _paths, progress_callback=None):
+            raise RuntimeError("semantic closeout entry stalled before emitting progress")
+
+        monkeypatch.setattr("mcp_server.dispatcher.dispatcher_enhanced.os.walk", _fake_walk)
+        monkeypatch.setattr(
+            Dispatcher,
+            "rebuild_semantic_for_paths",
+            _explode_before_semantic_progress,
+        )
+
+        result = Dispatcher([]).index_directory(
+            ctx,
+            repo,
+            progress_callback=lambda snapshot: snapshots.append(dict(snapshot)),
+        )
+
+        store.close()
+        assert result["indexed_files"] == 2
+        assert result["semantic_stage"] == "failed"
+        lexical_pair = [
+            snapshot
+            for snapshot in snapshots
+            if snapshot["stage"] == "lexical_walking"
+            and snapshot["last_progress_path"] == str(prior_file.resolve())
+            and snapshot["in_flight_path"] == str(archive_json.resolve())
+        ]
+        assert lexical_pair
+        assert snapshots[-1]["stage"] == "force_full_closeout_handoff"
+        assert snapshots[-1]["stage_family"] == "final_closeout"
+        assert snapshots[-1]["last_progress_path"] == str(archive_json.resolve())
+        assert snapshots[-1]["in_flight_path"] is None
+        assert all(
+            needle not in (
+                (snapshot.get("last_progress_path") or "")
+                + " "
+                + (snapshot.get("in_flight_path") or "")
+            )
+            for needle in (
+                ".devcontainer/devcontainer.json",
+                "mcp_server/visualization/quick_charts.py",
+                "docs/benchmarks/production_benchmark.md",
+                "test_workspace/",
+            )
+            for snapshot in snapshots
+        )
+
     def test_index_directory_keeps_unrelated_json_files_off_exact_devcontainer_bypass(
         self, tmp_path, monkeypatch
     ):
