@@ -39,6 +39,8 @@ class Plugin(IPlugin):
         "tests/test_artifact_publish_race.py",
         "tests/docs/test_gaclose_evidence_closeout.py",
         "tests/docs/test_p8_deployment_security.py",
+        "tests/security/fixtures/mock_plugin/plugin.py",
+        "tests/security/fixtures/mock_plugin/__init__.py",
         "mcp_server/visualization/quick_charts.py",
     }
 

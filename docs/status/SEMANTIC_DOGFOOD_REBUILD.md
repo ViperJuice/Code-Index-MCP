@@ -1727,6 +1727,72 @@ Steering outcome:
   `tests/docs/test_gaclose_evidence_closeout.py ->
   tests/docs/test_p8_deployment_security.py` seam.
 
+## SEMMOCKPLUGIN Live Rerun Check
+
+SEMMOCKPLUGIN tightened the exact later mock-plugin seam and aligned the
+operator boundary surface so the repaired security-fixture pair remains
+discoverable without burning the lexical watchdog on direct Python chunking.
+
+Code/test repair completed in this phase:
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py` now treats
+  `tests/security/fixtures/mock_plugin/plugin.py` and
+  `tests/security/fixtures/mock_plugin/__init__.py` as exact bounded Python
+  paths, preserving bounded symbol and content discoverability without widening
+  into a blanket `tests/security/fixtures/**/*.py` bypass.
+- `mcp_server/plugins/python_plugin/plugin.py` now keeps the same exact pair on
+  the bounded chunk path list so direct Python-plugin indexing stays aligned
+  with dispatcher exact-bounded behavior.
+- `mcp_server/cli/repository_commands.py` now advertises the repaired exact
+  bounded lexical boundary for
+  `tests/security/fixtures/mock_plugin/plugin.py ->
+  tests/security/fixtures/mock_plugin/__init__.py`:
+  `Lexical boundary: using exact bounded Python indexing for tests/security/fixtures/mock_plugin/plugin.py -> tests/security/fixtures/mock_plugin/__init__.py`.
+- `tests/test_dispatcher.py`, `tests/test_git_index_manager.py`, and
+  `tests/test_repository_commands.py` now freeze dispatcher discoverability,
+  durable trace progression, and status reporting for the later mock-plugin
+  pair without widening into a broader security-fixture shortcut.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMMOCKPLUGIN live rerun started on observed commit
+  `6a909203` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-29T18:25:58Z`, `.mcp-index/force_full_exit_trace.json` showed a
+  running lexical trace on
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/.codex/phase-loop/runs/20260424T180441Z-01-gagov-execute/launch.json`
+  with
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/.codex/phase-loop/runs/20260427T071807Z-02-artpub-execute/terminal-summary.json`.
+- At `2026-04-29T18:26:11Z`, a refreshed `repository status` terminalized that
+  running snapshot to `Trace status: interrupted` with the same
+  `.codex/phase-loop/.../launch.json ->
+  .codex/phase-loop/.../terminal-summary.json` pair while advertising the
+  repaired exact bounded Python lexical surface for the mock-plugin seam.
+- The SEMMOCKPLUGIN target pair is no longer the active blocker:
+  `tests/security/fixtures/mock_plugin/plugin.py ->
+  tests/security/fixtures/mock_plugin/__init__.py`.
+- SQLite runtime counts after the rerun remained
+  `files = 1123`, `code_chunks = 28182`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+
+Steering outcome:
+
+- SEMMOCKPLUGIN acceptance is satisfied for its named blocker: the active
+  lexical blocker is no longer
+  `tests/security/fixtures/mock_plugin/plugin.py ->
+  tests/security/fixtures/mock_plugin/__init__.py`.
+- The final authoritative rerun for this phase moved later and now reaches the
+  legacy `.codex/phase-loop` lexical pair
+  `.codex/phase-loop/runs/20260424T180441Z-01-gagov-execute/launch.json ->
+  .codex/phase-loop/runs/20260427T071807Z-02-artpub-execute/terminal-summary.json`.
+- The roadmap now adds downstream phase `SEMCODEXLOOPTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the mock-plugin
+  `tests/security/fixtures/mock_plugin/plugin.py ->
+  tests/security/fixtures/mock_plugin/__init__.py` seam.
+
 ## Verification
 
 Verification sequence for this SEMEMBEDCONSOL slice:
@@ -1746,6 +1812,18 @@ Verification sequence for this SEMDOCTESTTAIL slice:
 ```bash
 uv run pytest tests/test_dispatcher.py -q --no-cov -k "gaclose_evidence_closeout or p8_deployment_security or consolidate_real_performance_data or lexical or bounded or deployment or security or docs or consolidator"
 env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "gaclose_evidence_closeout or p8_deployment_security or consolidate_real_performance_data or lexical or interrupted or boundary or deployment or security or docs or consolidator"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
+timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+```
+
+Verification sequence for this SEMMOCKPLUGIN slice:
+
+```bash
+uv run pytest tests/test_dispatcher.py tests/security/test_plugin_sandbox.py -q --no-cov -k "mock_plugin or lexical or bounded or sandbox or fixture"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "mock_plugin or lexical or interrupted or boundary or sandbox or fixture"
 uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status

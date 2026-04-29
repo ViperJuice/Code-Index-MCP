@@ -3303,6 +3303,66 @@ tests/security/fixtures/mock_plugin/__init__.py`.
 - IF-0-SEMMOCKPLUGIN-1 — later security-fixture lexical recovery and evidence
   contract.
 
+### Phase 59 — Legacy Codex Phase-Loop Tail Recovery (SEMCODEXLOOPTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later legacy `.codex/phase-loop`
+JSON tail exposed after SEMMOCKPLUGIN:
+`.codex/phase-loop/runs/20260424T180441Z-01-gagov-execute/launch.json ->
+.codex/phase-loop/runs/20260427T071807Z-02-artpub-execute/terminal-summary.json`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMMOCKPLUGIN head
+      either advances durably beyond the legacy
+      `.codex/phase-loop/.../launch.json ->
+      .codex/phase-loop/.../terminal-summary.json` pair or emits a truthful
+      newer blocker before the 120-second watchdog expires.
+- [ ] The chosen repair for the legacy `.codex/phase-loop` JSON seam stays
+      narrow, tested, and does not reopen the repaired
+      `tests/security/fixtures/mock_plugin/plugin.py ->
+      tests/security/fixtures/mock_plugin/__init__.py` boundary without direct
+      evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the SEMMOCKPLUGIN
+      rerun outcome and the final live verdict for the later legacy
+      `.codex/phase-loop` blocker pair.
+
+**Scope notes**
+
+This phase exists only if SEMMOCKPLUGIN proves the later security-fixture
+`tests/security/fixtures/mock_plugin/plugin.py ->
+tests/security/fixtures/mock_plugin/__init__.py` seam is cleared, but the
+refreshed live rerun still terminalizes later in lexical walking on a legacy
+`.codex/phase-loop` runtime artifact pair such as
+`.codex/phase-loop/runs/20260424T180441Z-01-gagov-execute/launch.json ->
+.codex/phase-loop/runs/20260427T071807Z-02-artpub-execute/terminal-summary.json`.
+
+**Non-goals**
+
+- No reopening of the repaired mock-plugin fixture recovery once the live
+  rerun has advanced beyond that seam.
+- No broad reopening of canonical `.phase-loop/` runtime behavior unless the
+  refreshed rerun proves the active blocker requires it.
+- No blanket ignore for `.codex/**` unless the refreshed rerun proves the
+  active blocker cannot be cleared with a narrower legacy-runtime repair.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMMOCKPLUGIN
+
+**Produces**
+- IF-0-SEMCODEXLOOPTAIL-1 — later legacy `.codex/phase-loop` lexical recovery
+  and evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -3364,6 +3424,7 @@ SEMCONTRACT
   -> SEMEMBEDCONSOL
   -> SEMDOCTESTTAIL
   -> SEMMOCKPLUGIN
+  -> SEMCODEXLOOPTAIL
 ```
 
 ## Execution Notes
@@ -3669,6 +3730,13 @@ SEMCONTRACT
   refreshed live rerun still terminalizes later in lexical walking on
   `tests/security/fixtures/mock_plugin/plugin.py ->
   tests/security/fixtures/mock_plugin/__init__.py`.
+- SEMMOCKPLUGIN should amend the roadmap immediately if the refreshed live
+  rerun clears
+  `tests/security/fixtures/mock_plugin/plugin.py ->
+  tests/security/fixtures/mock_plugin/__init__.py` but exposes a later legacy
+  `.codex/phase-loop` blocker such as
+  `.codex/phase-loop/runs/20260424T180441Z-01-gagov-execute/launch.json ->
+  .codex/phase-loop/runs/20260427T071807Z-02-artpub-execute/terminal-summary.json`.
 
 ## Verification
 

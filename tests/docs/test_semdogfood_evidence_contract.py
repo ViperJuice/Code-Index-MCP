@@ -51,6 +51,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
         "## SEMVERIFYSIMTAIL Live Rerun Check",
         "## SEMEMBEDCONSOL Live Rerun Check",
         "## SEMDOCTESTTAIL Live Rerun Check",
+        "## SEMMOCKPLUGIN Live Rerun Check",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -144,6 +145,8 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "2026-04-29T17:45:52Z",
         "2026-04-29T18:06:31Z",
         "2026-04-29T18:06:41Z",
+        "2026-04-29T18:25:58Z",
+        "2026-04-29T18:26:11Z",
         "2026-04-29T15:37:54Z",
         "2026-04-29T15:37:57Z",
         "098c1ad1",
@@ -164,6 +167,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "504e419a",
         "5c0102d",
         "4133bfe",
+        "6a909203",
         "40968140",
         "7335cf35",
         "ec443d85",
@@ -201,6 +205,9 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "tests/root_tests/test_voyage_api.py",
         "tests/root_tests/run_reranking_tests.py",
         "tests/security/fixtures/mock_plugin/plugin.py",
+        "tests/security/fixtures/mock_plugin/__init__.py",
+        ".codex/phase-loop/runs/20260424T180441Z-01-gagov-execute/launch.json",
+        ".codex/phase-loop/runs/20260427T071807Z-02-artpub-execute/terminal-summary.json",
         "ai_docs/qdrant.md",
         "fast_test_results/fast_report_*.md",
         "test_workspace/real_repos/search_scaling/package.json",
@@ -259,6 +266,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "roadmap now adds downstream phase `SEMEMBEDCONSOL`",
         "roadmap now adds downstream phase `SEMDOCTESTTAIL`",
         "roadmap now adds downstream phase `SEMMOCKPLUGIN`",
+        "roadmap now adds downstream phase `SEMCODEXLOOPTAIL`",
     ):
         assert expected in text
 
@@ -320,6 +328,7 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "Lexical boundary: using exact bounded Python indexing for mcp_server/visualization/quick_charts.py",
         "Lexical boundary: using exact bounded Python indexing for tests/docs/test_mre2e_evidence_contract.py -> tests/docs/test_gagov_governance_contract.py",
         "Lexical boundary: using exact bounded Python indexing for tests/docs/test_gaclose_evidence_closeout.py -> tests/docs/test_p8_deployment_security.py",
+        "Lexical boundary: using exact bounded Python indexing for tests/security/fixtures/mock_plugin/plugin.py -> tests/security/fixtures/mock_plugin/__init__.py",
         "Lexical boundary: using exact bounded Markdown indexing for .claude/commands/execute-lane.md -> .claude/commands/plan-phase.md",
         "Lexical boundary: using exact bounded Markdown indexing for docs/validation/ga-closeout-decision.md",
         "Lexical boundary: using exact bounded Markdown indexing for docs/validation/mre2e-evidence.md",
@@ -340,6 +349,7 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "SEMVERIFYSIMTAIL acceptance is satisfied for its named blocker",
         "SEMEMBEDCONSOL acceptance is satisfied for its named blocker",
         "SEMDOCTESTTAIL acceptance is satisfied for its named blocker",
+        "SEMMOCKPLUGIN acceptance is satisfied for its named blocker",
         "Phase plan: `plans/phase-plan-v7-SEMEMBEDCONSOL.md`",
         "Prior phase plan: `plans/phase-plan-v7-SEMVERIFYSIMTAIL.md`",
         "repository status` now advertises the repaired exact bounded lexical surface",
@@ -359,5 +369,7 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k \"preflight_upgrade or test_mcp_protocol_direct or lexical or interrupted or boundary or script\"",
         "uv run pytest tests/test_dispatcher.py -q --no-cov -k \"verify_embeddings or claude_code_behavior_simulator or lexical or bounded or simulator or script\"",
         "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k \"verify_embeddings or claude_code_behavior_simulator or lexical or interrupted or boundary or simulator or script\"",
+        "uv run pytest tests/test_dispatcher.py tests/security/test_plugin_sandbox.py -q --no-cov -k \"mock_plugin or lexical or bounded or sandbox or fixture\"",
+        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k \"mock_plugin or lexical or interrupted or boundary or sandbox or fixture\"",
     ):
         assert expected in text

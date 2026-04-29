@@ -4014,6 +4014,144 @@ class TestEnhancedDispatcherProtocolConformance:
             for snapshot in snapshots
         )
 
+    def test_index_directory_emits_mock_plugin_fixture_pair_before_closeout_handoff(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.plugins.python_plugin.plugin import Plugin
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        fixture_dir = repo / "tests" / "security" / "fixtures" / "mock_plugin"
+        fixture_dir.mkdir(parents=True)
+        plugin_file = fixture_dir / "plugin.py"
+        plugin_file.write_text(
+            "from __future__ import annotations\n\n"
+            "from typing import Iterable\n\n"
+            "from mcp_server.plugin_base import IndexShard, IPlugin, Reference, SearchOpts, SearchResult\n\n"
+            "class Plugin(IPlugin):\n"
+            "    lang = \"mock\"\n\n"
+            "    def __init__(self, sqlite_store=None, enable_semantic=False):\n"
+            "        self._ctx = None\n\n"
+            "    def bind(self, ctx) -> None:\n"
+            "        self._ctx = ctx\n\n"
+            "    def supports(self, path) -> bool:\n"
+            "        return True\n\n"
+            "    def indexFile(self, path, content: str) -> IndexShard:\n"
+            "        return {\"file\": str(path), \"symbols\": [{\"name\": \"echo\", \"len\": len(content)}], \"language\": self.lang}\n\n"
+            "    def getDefinition(self, symbol: str):\n"
+            "        return {\"symbol\": symbol, \"kind\": \"function\", \"language\": self.lang, \"signature\": f\"def {symbol}()\", \"doc\": None, \"defined_in\": \"mock.py\", \"start_line\": 1, \"end_line\": 1, \"span\": [1, 1]}\n\n"
+            "    def findReferences(self, symbol: str) -> Iterable[Reference]:\n"
+            "        return [Reference(file=\"mock.py\", start_line=1, end_line=1)]\n\n"
+            "    def search(self, query: str, opts: SearchOpts | None = None) -> Iterable[SearchResult]:\n"
+            "        return [{\"file\": \"mock.py\", \"start_line\": 1, \"end_line\": 1, \"snippet\": query}]\n",
+            encoding="utf-8",
+        )
+        init_file = fixture_dir / "__init__.py"
+        init_file.write_text(
+            "from .plugin import Plugin\n\n__all__ = [\"Plugin\"]\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+        snapshots = []
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: object())
+
+        def _fake_walk(_directory, followlinks=False):
+            assert followlinks is False
+            yield str(fixture_dir), [], [plugin_file.name, init_file.name]
+
+        def _explode_before_semantic_progress(self, _ctx, _paths, progress_callback=None):
+            raise RuntimeError("semantic closeout entry stalled before emitting progress")
+
+        monkeypatch.setattr("mcp_server.dispatcher.dispatcher_enhanced.os.walk", _fake_walk)
+        monkeypatch.setattr(
+            Dispatcher,
+            "rebuild_semantic_for_paths",
+            _explode_before_semantic_progress,
+        )
+
+        result = Dispatcher([]).index_directory(
+            ctx,
+            repo,
+            progress_callback=lambda snapshot: snapshots.append(dict(snapshot)),
+        )
+
+        assert result["indexed_files"] == 2
+        assert result["semantic_stage"] == "failed"
+        lexical_pair = [
+            snapshot
+            for snapshot in snapshots
+            if snapshot["stage"] == "lexical_walking"
+            and snapshot["last_progress_path"] == str(plugin_file.resolve())
+            and snapshot["in_flight_path"] == str(init_file.resolve())
+        ]
+        assert lexical_pair
+        with store._get_connection() as conn:
+            plugin_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/security/fixtures/mock_plugin/plugin.py') ORDER BY id"
+                ).fetchall()
+            ]
+            plugin_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/security/fixtures/mock_plugin/plugin.py')"
+            ).fetchone()[0]
+            init_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/security/fixtures/mock_plugin/__init__.py')"
+            ).fetchone()[0]
+            plugin_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/security/fixtures/mock_plugin/plugin.py')"
+            ).fetchall()
+            init_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/security/fixtures/mock_plugin/__init__.py')"
+            ).fetchall()
+        store.close()
+        assert "Plugin" in plugin_symbols
+        assert "supports" in plugin_symbols
+        assert "indexFile" in plugin_symbols
+        assert "findReferences" in plugin_symbols
+        assert plugin_chunk_count == 0
+        assert init_chunk_count == 0
+        assert len(plugin_fts) == 1
+        assert "class Plugin" in plugin_fts[0][0]
+        assert "def findReferences" in plugin_fts[0][0]
+        assert len(init_fts) == 1
+        assert "from .plugin import Plugin" in init_fts[0][0]
+        assert '__all__ = ["Plugin"]' in init_fts[0][0]
+        assert snapshots[-1]["stage"] == "force_full_closeout_handoff"
+        assert snapshots[-1]["stage_family"] == "final_closeout"
+        assert snapshots[-1]["last_progress_path"] == str(init_file.resolve())
+        assert snapshots[-1]["in_flight_path"] is None
+        assert "tests/security/fixtures/mock_plugin/plugin.py" in Plugin._BOUNDED_CHUNK_PATHS
+        assert "tests/security/fixtures/mock_plugin/__init__.py" in Plugin._BOUNDED_CHUNK_PATHS
+        assert "tests/security/test_plugin_sandbox.py" not in Plugin._BOUNDED_CHUNK_PATHS
+        assert all(
+            needle not in (
+                (snapshot.get("last_progress_path") or "")
+                + " "
+                + (snapshot.get("in_flight_path") or "")
+            )
+            for needle in (
+                "tests/docs/test_gaclose_evidence_closeout.py",
+                "tests/docs/test_p8_deployment_security.py",
+                "scripts/create_semantic_embeddings.py",
+                "scripts/consolidate_real_performance_data.py",
+            )
+            for snapshot in snapshots
+        )
+
     def test_index_directory_keeps_invalid_exact_bounded_python_path_discoverable(
         self, tmp_path, monkeypatch
     ):
@@ -4299,6 +4437,7 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "tests/root_tests/test_voyage_api.py" not in Plugin._BOUNDED_CHUNK_PATHS
         assert "tests/test_benchmarks.py" not in Plugin._BOUNDED_CHUNK_PATHS
         assert "tests/docs/test_mre2e_evidence_contract.py" not in Plugin._BOUNDED_CHUNK_PATHS
+        assert "tests/security/test_plugin_sandbox.py" not in Plugin._BOUNDED_CHUNK_PATHS
 
     def test_index_directory_keeps_unrelated_status_markdown_on_heavy_path(
         self, tmp_path, monkeypatch

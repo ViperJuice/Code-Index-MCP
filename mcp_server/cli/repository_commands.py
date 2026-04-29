@@ -450,6 +450,19 @@ def _print_docs_test_tail_python_boundary(prefix: str, repo_path: Path) -> None:
         )
 
 
+def _print_mock_plugin_fixture_python_boundary(prefix: str, repo_path: Path) -> None:
+    fixture_paths = (
+        repo_path / "tests" / "security" / "fixtures" / "mock_plugin" / "plugin.py",
+        repo_path / "tests" / "security" / "fixtures" / "mock_plugin" / "__init__.py",
+    )
+    if all(path.is_file() for path in fixture_paths):
+        click.echo(
+            f"{prefix}Lexical boundary: using exact bounded Python indexing for "
+            "tests/security/fixtures/mock_plugin/plugin.py -> "
+            "tests/security/fixtures/mock_plugin/__init__.py"
+        )
+
+
 def _print_devcontainer_json_boundary(prefix: str, repo_path: Path) -> None:
     config_path = repo_path / ".devcontainer" / "devcontainer.json"
     if config_path.is_file():
@@ -879,6 +892,7 @@ def status(repo_id: Optional[str]):
         _print_visualization_quick_charts_python_boundary("  ", Path(status["path"]))
         _print_docs_governance_contract_python_boundary("  ", Path(status["path"]))
         _print_docs_test_tail_python_boundary("  ", Path(status["path"]))
+        _print_mock_plugin_fixture_python_boundary("  ", Path(status["path"]))
         _print_devcontainer_json_boundary("  ", Path(status["path"]))
         _print_archive_tail_json_boundary("  ", Path(status["path"]))
         _print_force_full_exit_trace(
