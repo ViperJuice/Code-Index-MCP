@@ -1585,6 +1585,103 @@ class TestEnhancedDispatcherProtocolConformance:
         assert ga_file_rows == 1
         assert mre2e_file_rows == 1
 
+    def test_index_directory_uses_exact_bounded_markdown_path_for_claude_commands(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        commands_dir = repo / ".claude" / "commands"
+        commands_dir.mkdir(parents=True)
+        execute_doc = commands_dir / "execute-lane.md"
+        plan_doc = commands_dir / "plan-phase.md"
+        review_doc = commands_dir / "review-phase.md"
+        execute_doc.write_text(
+            "# Execute Lane\n\n## Workflow\n\n### Lane execution\n- preserve lexical progress\n",
+            encoding="utf-8",
+        )
+        plan_doc.write_text(
+            "# Plan Phase\n\n## Planning Rules\n\n### Dependency freeze\n- preserve heading discoverability\n",
+            encoding="utf-8",
+        )
+        review_doc.write_text(
+            "# Review Phase\n\n## Review Rules\n\n### Manual follow-up\n- stay on heavy Markdown path\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 3
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(execute_doc.resolve()),
+            str(plan_doc.resolve()),
+            str(review_doc.resolve()),
+        }
+        with store._get_connection() as conn:
+            execute_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = '.claude/commands/execute-lane.md') "
+                    "ORDER BY id"
+                ).fetchall()
+            ]
+            plan_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = '.claude/commands/plan-phase.md') "
+                    "ORDER BY id"
+                ).fetchall()
+            ]
+            execute_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = '.claude/commands/execute-lane.md')"
+            ).fetchone()[0]
+            plan_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = '.claude/commands/plan-phase.md')"
+            ).fetchone()[0]
+            review_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = '.claude/commands/review-phase.md')"
+            ).fetchone()[0]
+        store.close()
+
+        assert execute_symbols == [
+            "Execute Lane",
+            "Execute Lane",
+            "Workflow",
+            "Lane execution",
+        ]
+        assert plan_symbols == [
+            "Plan Phase",
+            "Plan Phase",
+            "Planning Rules",
+            "Dependency freeze",
+        ]
+        assert execute_chunk_count == 0
+        assert plan_chunk_count == 0
+        assert review_chunk_count > 0
+
     def test_index_directory_uses_exact_bounded_markdown_path_for_benchmark_docs(
         self, tmp_path, monkeypatch
     ):

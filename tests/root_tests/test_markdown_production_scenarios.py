@@ -737,6 +737,62 @@ All notable changes to this project will be documented in this file.
         assert result["metadata"].get("lightweight_index") is not True
         assert result["chunks"] != []
 
+    def test_claude_command_markdown_uses_exact_bounded_paths(self, markdown_plugin):
+        """The exact Claude command docs should stay lightweight but lexically visible."""
+        execute_content = """
+# Execute Lane
+
+## Workflow
+
+### Lane execution
+- Keep lexical file and heading discoverability intact
+"""
+        plan_content = """
+# Plan Phase
+
+## Planning Rules
+
+### Dependency freeze
+- Preserve heading discoverability on the exact command pair
+"""
+
+        execute_result = markdown_plugin.indexFile(
+            ".claude/commands/execute-lane.md", execute_content
+        )
+        plan_result = markdown_plugin.indexFile(".claude/commands/plan-phase.md", plan_content)
+
+        assert execute_result["metadata"]["lightweight_index"] is True
+        assert execute_result["metadata"]["lightweight_reason"] == "claude_execute_lane_path"
+        assert execute_result["chunks"] == []
+        execute_symbols = [symbol["symbol"] for symbol in execute_result["symbols"]]
+        assert "Execute Lane" in execute_symbols
+        assert "Workflow" in execute_symbols
+        assert "Lane execution" in execute_symbols
+
+        assert plan_result["metadata"]["lightweight_index"] is True
+        assert plan_result["metadata"]["lightweight_reason"] == "claude_plan_phase_path"
+        assert plan_result["chunks"] == []
+        plan_symbols = [symbol["symbol"] for symbol in plan_result["symbols"]]
+        assert "Plan Phase" in plan_symbols
+        assert "Planning Rules" in plan_symbols
+        assert "Dependency freeze" in plan_symbols
+
+    def test_other_claude_command_markdown_stays_on_heavy_path(self, markdown_plugin):
+        """The exact Claude command recovery must not broaden to unrelated command docs."""
+        content = """
+# Review Phase
+
+## Review Rules
+
+### Guardrails
+- Keep unrelated command docs on the heavy Markdown path
+"""
+
+        result = markdown_plugin.indexFile(".claude/commands/review-phase.md", content)
+
+        assert result["metadata"].get("lightweight_index") is not True
+        assert result["chunks"] != []
+
     def test_large_documentation_site(self, markdown_plugin, sqlite_store):
         """Test handling of large documentation site structure."""
         # Simulate multiple interconnected docs

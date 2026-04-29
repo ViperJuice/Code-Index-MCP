@@ -255,6 +255,18 @@ def _print_validation_markdown_boundaries(prefix: str, repo_path: Path) -> None:
             )
 
 
+def _print_claude_command_markdown_boundary(prefix: str, repo_path: Path) -> None:
+    command_paths = (
+        repo_path / ".claude" / "commands" / "execute-lane.md",
+        repo_path / ".claude" / "commands" / "plan-phase.md",
+    )
+    if all(path.is_file() for path in command_paths):
+        click.echo(
+            f"{prefix}Lexical boundary: using exact bounded Markdown indexing for "
+            ".claude/commands/execute-lane.md -> .claude/commands/plan-phase.md"
+        )
+
+
 def _print_benchmark_markdown_boundary(prefix: str, repo_path: Path) -> None:
     benchmark_paths = (
         repo_path
@@ -750,6 +762,7 @@ def status(repo_id: Optional[str]):
         _print_ai_docs_overview_boundary("  ", Path(status["path"]))
         _print_jedi_markdown_boundary("  ", Path(status["path"]))
         _print_validation_markdown_boundaries("  ", Path(status["path"]))
+        _print_claude_command_markdown_boundary("  ", Path(status["path"]))
         _print_benchmark_markdown_boundary("  ", Path(status["path"]))
         _print_visual_report_python_boundary("  ", Path(status["path"]))
         _print_quick_validation_python_boundary("  ", Path(status["path"]))

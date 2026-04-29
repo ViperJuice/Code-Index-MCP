@@ -1,7 +1,9 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T14:41:32Z`.
-- Observed commit: `cd2c183`.
+- Evidence captured: `2026-04-29T15:03:10Z`.
+- Observed commit: `68ae9492`.
+- Prior SEMDOCGOV live-rerun anchor: `2026-04-29T14:41:32Z` on observed
+  commit `cd2c183`.
 - Prior SEMVALIDEVIDENCE live-rerun anchor: `2026-04-29T13:34:20Z` on
   observed commit `705a506f`.
 - Prior SEMQUICKCHARTS live-rerun anchor: `2026-04-29T12:53:24Z` on observed
@@ -16,13 +18,13 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMDOCGOV.md`.
+- Phase plan: `plans/phase-plan-v7-SEMCLAUDECMDS.md`.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
-  `SEMCLAUDECMDS` after SEMDOCGOV proved the docs-governance seam is now
-  cleared, but the refreshed live rerun on the new head still terminalized
-  later in lexical walking on
-  `.claude/commands/execute-lane.md ->
-  .claude/commands/plan-phase.md`. Older downstream assumptions should be
+  `SEMSCRIPTLANGS` after SEMCLAUDECMDS proved the `.claude/commands` seam is
+  now cleared, but the refreshed live rerun on the new head still
+  terminalized later in lexical walking on
+  `scripts/migrate_large_index_to_multi_repo.py ->
+  scripts/check_index_languages.py`. Older downstream assumptions should be
   treated as stale after this roadmap amendment.
 - Prior roadmap steering: `specs/phase-plans-v7.md` added downstream phase
   `SEMDOCGOV` after SEMARCHIVEWALKGAP proved the archive-tail seam is now
@@ -982,19 +984,64 @@ Steering outcome:
   downstream phase plan or handoff that still treats the active current-head
   blocker as the docs-governance seam.
 
+## SEMCLAUDECMDS Live Rerun Check
+
+SEMCLAUDECMDS repaired the exact `.claude/commands` lexical seam on the
+current head. The refreshed repo-local rerun advanced beyond both
+`.claude/commands/execute-lane.md` and `.claude/commands/plan-phase.md`, but
+the same 120-second watchdog still terminalized the run later in lexical
+walking on a newer exact script pair.
+
+Observed runtime state during the current SEMCLAUDECMDS rerun check:
+
+- Evidence capture completed at `2026-04-29T15:03:10Z`.
+- The durable running trace refreshed during the active rerun at
+  `2026-04-29T15:02:46Z` and `repository status` then truthfully terminalized
+  it to `interrupted` at `2026-04-29T15:03:10Z`.
+- The SEMCLAUDECMDS live rerun used
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `135`.
+- Observed commit: `68ae9492`
+- Indexed commit before rerun: `e2e95198`
+- Force-full trace status: `interrupted`
+- Trace stage: `lexical_walking`
+- Trace stage family: `lexical`
+- Trace blocker source: `lexical_mutation`
+- Last progress path:
+  `/home/viperjuice/code/Code-Index-MCP/scripts/migrate_large_index_to_multi_repo.py`
+- In-flight path:
+  `/home/viperjuice/code/Code-Index-MCP/scripts/check_index_languages.py`
+- Repository status now advertises the repaired `.claude` command boundary:
+  `Lexical boundary: using exact bounded Markdown indexing for .claude/commands/execute-lane.md -> .claude/commands/plan-phase.md`
+- SQLite runtime counts after the rerun:
+  `files = 1119`, `code_chunks = 28182`, `chunk_summaries = 0`,
+  `semantic_points = 0`
+
+Steering outcome:
+
+- SEMCLAUDECMDS acceptance is satisfied: the active lexical blocker is no
+  longer the `.claude` command seam centered on
+  `.claude/commands/execute-lane.md ->
+  .claude/commands/plan-phase.md`.
+- The live rerun now reaches the later script pair
+  `scripts/migrate_large_index_to_multi_repo.py ->
+  scripts/check_index_languages.py`.
+- The roadmap now adds downstream phase `SEMSCRIPTLANGS`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the `.claude` command seam.
+
 ## Verification
 
-Verification sequence for this SEMDOCGOV slice:
+Verification sequence for this SEMCLAUDECMDS slice:
 
 ```bash
-env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "mre2e or gagov or docs or lexical or force_full or python or trace or bounded"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py -q --no-cov -k "claude or commands or execute or plan or lexical or force_full or markdown"
+uv run pytest tests/root_tests/test_markdown_production_scenarios.py -q --no-cov -k "claude or command or execute or plan"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_repository_commands.py -q --no-cov -k "claude or commands or execute or plan or boundary or force_full or interrupted"
 uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
-python - <<'PY'
-from pathlib import Path
-trace = Path(".mcp-index") / "force_full_exit_trace.json"
-print(trace.read_text() if trace.exists() else "missing")
-PY
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
 sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
 ```

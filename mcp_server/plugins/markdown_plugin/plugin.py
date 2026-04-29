@@ -40,6 +40,8 @@ _ANALYSIS_REPORT_MARKDOWN_NAME_RE = re.compile(
 _AGENT_INSTRUCTIONS_MARKDOWN_NAME_RE = re.compile(r"^(?:agents)$", re.IGNORECASE)
 _README_MARKDOWN_NAME_RE = re.compile(r"^(?:readme)$", re.IGNORECASE)
 _EXACT_BOUNDED_MARKDOWN_PATHS = {
+    ".claude/commands/execute-lane.md": "claude_execute_lane_path",
+    ".claude/commands/plan-phase.md": "claude_plan_phase_path",
     "ai_docs/jedi.md": "ai_docs_jedi_path",
     "docs/validation/ga-closeout-decision.md": "validation_ga_closeout_path",
     "docs/validation/mre2e-evidence.md": "validation_mre2e_path",

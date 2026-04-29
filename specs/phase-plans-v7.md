@@ -2621,6 +2621,66 @@ terminalizes later in lexical walking on the `.claude/commands` markdown pair.
 - IF-0-SEMCLAUDECMDS-1 — Claude command lexical recovery and evidence
   contract.
 
+### Phase 48 — Script Language Audit Lexical Recovery (SEMSCRIPTLANGS)
+
+**Objective**
+
+Repair the next downstream lexical blocker exposed by SEMCLAUDECMDS so a
+refreshed rerun on the new head no longer terminalizes under the 120-second
+watchdog on
+`scripts/migrate_large_index_to_multi_repo.py ->
+scripts/check_index_languages.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMCLAUDECMDS head
+      either advances durably beyond
+      `scripts/migrate_large_index_to_multi_repo.py ->
+      scripts/check_index_languages.py` or emits a truthful newer blocker
+      before the 120-second watchdog expires.
+- [ ] The repair stays narrowly scoped to the exact script pair and the
+      immediate dispatcher/trace/status/evidence plumbing needed to prove it.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the SEMCLAUDECMDS
+      rerun outcome and the final live verdict for the later script-pair
+      blocker.
+
+**Scope notes**
+
+This phase exists only if SEMCLAUDECMDS proves the `.claude/commands` pair is
+no longer the active lexical blocker but the refreshed live rerun still
+terminalizes later in lexical walking on the exact script pair
+`scripts/migrate_large_index_to_multi_repo.py ->
+scripts/check_index_languages.py`.
+
+**Non-goals**
+
+- No reopening of the `.claude/commands` recovery once the live rerun has
+  advanced beyond
+  `.claude/commands/execute-lane.md ->
+  .claude/commands/plan-phase.md`.
+- No broad `scripts/*.py` exemption or repo-wide lexical timeout retune unless
+  the refreshed rerun proves the blocker requires it.
+- No reopening of older benchmark, visualization, devcontainer, archive-tail,
+  docs-governance, or `.claude` seams unless the refreshed rerun reaches them
+  again and exposes a different newer blocker.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMCLAUDECMDS
+
+**Produces**
+- IF-0-SEMSCRIPTLANGS-1 — script language-audit lexical recovery and evidence
+  contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -2671,6 +2731,7 @@ SEMCONTRACT
   -> SEMARCHIVEWALKGAP
   -> SEMDOCGOV
   -> SEMCLAUDECMDS
+  -> SEMSCRIPTLANGS
 ```
 
 ## Execution Notes
@@ -2747,6 +2808,11 @@ SEMCONTRACT
   tests/docs/test_gagov_governance_contract.py`, because the next repair is
   then no longer archive-tail-local and any older downstream assumption is
   stale.
+- SEMCLAUDECMDS should amend the roadmap immediately if the refreshed live
+  rerun clears `.claude/commands/execute-lane.md ->
+  .claude/commands/plan-phase.md` but exposes a later exact script pair such
+  as `scripts/migrate_large_index_to_multi_repo.py ->
+  scripts/check_index_languages.py`.
 - SEMREADYFIX exists only if SEMDOGFOOD proves the default local dogfood path
   is still blocked; it should repair that blocker and then rerun the dogfood
   proof instead of widening into unrelated semantic work.
