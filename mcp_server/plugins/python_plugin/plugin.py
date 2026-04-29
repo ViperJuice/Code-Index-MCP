@@ -37,6 +37,8 @@ class Plugin(IPlugin):
         "scripts/create_semantic_embeddings.py",
         "scripts/consolidate_real_performance_data.py",
         "tests/test_artifact_publish_race.py",
+        "tests/docs/test_gaclose_evidence_closeout.py",
+        "tests/docs/test_p8_deployment_security.py",
         "mcp_server/visualization/quick_charts.py",
     }
 

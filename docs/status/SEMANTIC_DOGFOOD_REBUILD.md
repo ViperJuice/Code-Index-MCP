@@ -1,7 +1,9 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T17:45:52Z`.
-- Observed commit: `5c0102d`.
+- Evidence captured: `2026-04-29T18:06:41Z`.
+- Observed commit: `4133bfe`.
+- Prior SEMDOCTESTTAIL live-rerun anchor: `2026-04-29T17:45:52Z` on observed
+  commit `5c0102d`.
 - Prior SEMMIXEDPHASETAIL live-rerun anchor: `2026-04-29T16:49:50Z` on
   observed commit `468dee18`.
 - Prior SEMLEGACYPLANS live-rerun anchor: `2026-04-29T16:07:22Z` on observed
@@ -31,6 +33,13 @@
 - Phase plan: `plans/phase-plan-v7-SEMEMBEDCONSOL.md`.
 - Prior phase plan: `plans/phase-plan-v7-SEMVERIFYSIMTAIL.md`.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMMOCKPLUGIN` after SEMDOCTESTTAIL proved the later tests/docs seam
+  is now cleared, but the refreshed live rerun on the new head still
+  terminalized later in lexical walking on
+  `tests/security/fixtures/mock_plugin/plugin.py ->
+  tests/security/fixtures/mock_plugin/__init__.py`. Older downstream
+  assumptions should be treated as stale after this roadmap amendment.
+- Prior roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMDOCTESTTAIL` after SEMEMBEDCONSOL proved the later Python-script seam
   is now cleared, but the refreshed live rerun on the new head still
   terminalized later in lexical walking on
@@ -1648,6 +1657,76 @@ Steering outcome:
   `scripts/create_semantic_embeddings.py ->
   scripts/consolidate_real_performance_data.py` script seam.
 
+## SEMDOCTESTTAIL Live Rerun Check
+
+SEMDOCTESTTAIL tightened the exact later docs-test seam and corrected an
+existing exact-bounded Python fallback so invalid-syntax bounded files remain
+content-discoverable instead of aborting lexical walking.
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py` now treats exact bounded
+  Python files with invalid syntax as content-only bounded shards instead of
+  raising from `ast.parse(...)`.
+- `mcp_server/plugins/python_plugin/plugin.py` now keeps
+  `tests/docs/test_gaclose_evidence_closeout.py` and
+  `tests/docs/test_p8_deployment_security.py` on the bounded chunk path list so
+  direct Python-plugin indexing stays aligned with dispatcher exact-bounded
+  behavior.
+- `mcp_server/cli/repository_commands.py` now advertises the repaired exact
+  bounded lexical boundary for
+  `tests/docs/test_gaclose_evidence_closeout.py ->
+  tests/docs/test_p8_deployment_security.py`:
+  `Lexical boundary: using exact bounded Python indexing for tests/docs/test_gaclose_evidence_closeout.py -> tests/docs/test_p8_deployment_security.py`.
+- `tests/test_dispatcher.py`, `tests/test_git_index_manager.py`, and
+  `tests/test_repository_commands.py` now freeze dispatcher discoverability,
+  invalid-syntax exact-bounded fallback, durable trace progression, and status
+  reporting for the later docs-test pair without widening into a broader
+  tests/docs shortcut.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- A first SEMDOCTESTTAIL rerun exposed an exact-bounded fallback bug on
+  `scripts/consolidate_real_performance_data.py`; the run exited with code
+  `124` after `ast.parse(...)` raised on invalid syntax before the later
+  docs-test tail could be trusted.
+- After the exact-bounded invalid-syntax fallback landed, the refreshed
+  SEMDOCTESTTAIL live rerun started on observed commit `4133bfe` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-29T18:06:31Z`, `.mcp-index/force_full_exit_trace.json` showed a
+  running lexical trace on
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/tests/security/fixtures/mock_plugin/plugin.py`
+  with
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/tests/security/fixtures/mock_plugin/__init__.py`.
+- At `2026-04-29T18:06:41Z`, a refreshed `repository status` terminalized that
+  running snapshot to `Trace status: interrupted` with the same
+  `tests/security/fixtures/mock_plugin/plugin.py ->
+  tests/security/fixtures/mock_plugin/__init__.py` pair while advertising the
+  repaired exact bounded Python lexical surfaces for the docs-governance,
+  docs-test, verify/simulator, and embed/consolidation seams.
+- The SEMDOCTESTTAIL target pair is no longer the active blocker:
+  `tests/docs/test_gaclose_evidence_closeout.py ->
+  tests/docs/test_p8_deployment_security.py`.
+- SQLite runtime counts after the rerun remained
+  `files = 1123`, `code_chunks = 28182`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+
+Steering outcome:
+
+- SEMDOCTESTTAIL acceptance is satisfied for its named blocker: the active
+  lexical blocker is no longer
+  `tests/docs/test_gaclose_evidence_closeout.py ->
+  tests/docs/test_p8_deployment_security.py`.
+- The final authoritative rerun for this phase moved later and now reaches the
+  security-fixture lexical pair
+  `tests/security/fixtures/mock_plugin/plugin.py ->
+  tests/security/fixtures/mock_plugin/__init__.py`.
+- The roadmap now adds downstream phase `SEMMOCKPLUGIN`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the docs-test
+  `tests/docs/test_gaclose_evidence_closeout.py ->
+  tests/docs/test_p8_deployment_security.py` seam.
+
 ## Verification
 
 Verification sequence for this SEMEMBEDCONSOL slice:
@@ -1655,6 +1734,18 @@ Verification sequence for this SEMEMBEDCONSOL slice:
 ```bash
 uv run pytest tests/test_dispatcher.py -q --no-cov -k "create_semantic_embeddings or consolidate_real_performance_data or lexical or bounded or consolidator or script"
 env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "create_semantic_embeddings or consolidate_real_performance_data or lexical or interrupted or boundary or consolidator or script"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
+timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+```
+
+Verification sequence for this SEMDOCTESTTAIL slice:
+
+```bash
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "gaclose_evidence_closeout or p8_deployment_security or consolidate_real_performance_data or lexical or bounded or deployment or security or docs or consolidator"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "gaclose_evidence_closeout or p8_deployment_security or consolidate_real_performance_data or lexical or interrupted or boundary or deployment or security or docs or consolidator"
 uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status

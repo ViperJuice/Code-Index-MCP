@@ -3876,6 +3876,196 @@ class TestEnhancedDispatcherProtocolConformance:
             for snapshot in snapshots
         )
 
+    def test_index_directory_emits_docs_test_tail_pair_before_closeout_handoff(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.plugins.python_plugin.plugin import Plugin
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        docs_dir = repo / "tests" / "docs"
+        docs_dir.mkdir(parents=True)
+        prior_file = docs_dir / "test_gaclose_evidence_closeout.py"
+        prior_file.write_text(
+            "def test_decision_artifact_links_prerequisite_evidence_and_verification():\n"
+            "    assert True\n\n"
+            "def test_support_matrix_freezes_claim_tiers_and_topology_limits():\n"
+            "    assert True\n",
+            encoding="utf-8",
+        )
+        blocked_file = docs_dir / "test_p8_deployment_security.py"
+        blocked_file.write_text(
+            "def test_security_heading_present():\n"
+            "    assert True\n\n"
+            "def test_mcp_access_controls_subsection_present():\n"
+            "    assert True\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+        snapshots = []
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: object())
+
+        def _fake_walk(_directory, followlinks=False):
+            assert followlinks is False
+            yield str(docs_dir), [], [prior_file.name, blocked_file.name]
+
+        def _explode_before_semantic_progress(self, _ctx, _paths, progress_callback=None):
+            raise RuntimeError("semantic closeout entry stalled before emitting progress")
+
+        monkeypatch.setattr("mcp_server.dispatcher.dispatcher_enhanced.os.walk", _fake_walk)
+        monkeypatch.setattr(
+            Dispatcher,
+            "rebuild_semantic_for_paths",
+            _explode_before_semantic_progress,
+        )
+
+        result = Dispatcher([]).index_directory(
+            ctx,
+            repo,
+            progress_callback=lambda snapshot: snapshots.append(dict(snapshot)),
+        )
+
+        assert result["indexed_files"] == 2
+        assert result["semantic_stage"] == "failed"
+        lexical_pair = [
+            snapshot
+            for snapshot in snapshots
+            if snapshot["stage"] == "lexical_walking"
+            and snapshot["last_progress_path"] == str(prior_file.resolve())
+            and snapshot["in_flight_path"] == str(blocked_file.resolve())
+        ]
+        assert lexical_pair
+        with store._get_connection() as conn:
+            gaclose_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/docs/test_gaclose_evidence_closeout.py') ORDER BY id"
+                ).fetchall()
+            ]
+            p8_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/docs/test_p8_deployment_security.py') ORDER BY id"
+                ).fetchall()
+            ]
+            gaclose_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/docs/test_gaclose_evidence_closeout.py')"
+            ).fetchone()[0]
+            p8_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/docs/test_p8_deployment_security.py')"
+            ).fetchone()[0]
+            gaclose_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/docs/test_gaclose_evidence_closeout.py')"
+            ).fetchall()
+            p8_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/docs/test_p8_deployment_security.py')"
+            ).fetchall()
+        store.close()
+        assert (
+            "test_decision_artifact_links_prerequisite_evidence_and_verification"
+            in gaclose_symbols
+        )
+        assert (
+            "test_support_matrix_freezes_claim_tiers_and_topology_limits" in gaclose_symbols
+        )
+        assert "test_security_heading_present" in p8_symbols
+        assert "test_mcp_access_controls_subsection_present" in p8_symbols
+        assert gaclose_chunk_count == 0
+        assert p8_chunk_count == 0
+        assert len(gaclose_fts) == 1
+        assert (
+            "test_decision_artifact_links_prerequisite_evidence_and_verification"
+            in gaclose_fts[0][0]
+        )
+        assert len(p8_fts) == 1
+        assert "test_mcp_access_controls_subsection_present" in p8_fts[0][0]
+        assert snapshots[-1]["stage"] == "force_full_closeout_handoff"
+        assert snapshots[-1]["stage_family"] == "final_closeout"
+        assert snapshots[-1]["last_progress_path"] == str(blocked_file.resolve())
+        assert snapshots[-1]["in_flight_path"] is None
+        assert "tests/docs/test_gaclose_evidence_closeout.py" in Plugin._BOUNDED_CHUNK_PATHS
+        assert "tests/docs/test_p8_deployment_security.py" in Plugin._BOUNDED_CHUNK_PATHS
+        assert "tests/docs/test_mre2e_evidence_contract.py" not in Plugin._BOUNDED_CHUNK_PATHS
+        assert all(
+            needle not in (
+                (snapshot.get("last_progress_path") or "")
+                + " "
+                + (snapshot.get("in_flight_path") or "")
+            )
+            for needle in (
+                "tests/docs/test_mre2e_evidence_contract.py",
+                "tests/docs/test_gagov_governance_contract.py",
+                "scripts/create_semantic_embeddings.py",
+                "scripts/consolidate_real_performance_data.py",
+            )
+            for snapshot in snapshots
+        )
+
+    def test_index_directory_keeps_invalid_exact_bounded_python_path_discoverable(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        scripts_dir = repo / "scripts"
+        scripts_dir.mkdir(parents=True)
+        blocked_file = scripts_dir / "consolidate_real_performance_data.py"
+        blocked_file.write_text(
+            "class PerformanceDataConsolidator:\n"
+            "    def __init__(self):\n"
+            '        self.transcript_dir = Path("Path.home() / ".claude"/projects")\n',
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 1
+        assert result["failed_files"] == 0
+        assert result["last_progress_path"] == str(blocked_file.resolve())
+        with store._get_connection() as conn:
+            symbol_count = conn.execute(
+                "SELECT COUNT(*) FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/consolidate_real_performance_data.py')"
+            ).fetchone()[0]
+            chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/consolidate_real_performance_data.py')"
+            ).fetchone()[0]
+            fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/consolidate_real_performance_data.py')"
+            ).fetchall()
+        store.close()
+        assert symbol_count == 0
+        assert chunk_count == 0
+        assert len(fts_rows) == 1
+        assert 'Path("Path.home() / ".claude"/projects")' in fts_rows[0][0]
+
     def test_index_directory_uses_exact_bounded_json_path_for_archive_tail_successor(
         self, tmp_path, monkeypatch
     ):
@@ -4099,6 +4289,8 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "scripts/claude_code_behavior_simulator.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert "scripts/create_semantic_embeddings.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert "scripts/consolidate_real_performance_data.py" in Plugin._BOUNDED_CHUNK_PATHS
+        assert "tests/docs/test_gaclose_evidence_closeout.py" in Plugin._BOUNDED_CHUNK_PATHS
+        assert "tests/docs/test_p8_deployment_security.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert "scripts/rerun_failed_native_tests.py" not in Plugin._BOUNDED_CHUNK_PATHS
         assert "tests/test_artifact_publish_race.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert "tests/root_tests/run_reranking_tests.py" not in Plugin._BOUNDED_CHUNK_PATHS
@@ -4106,6 +4298,7 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "mcp_server/visualization/quick_charts.py" in Plugin._BOUNDED_CHUNK_PATHS
         assert "tests/root_tests/test_voyage_api.py" not in Plugin._BOUNDED_CHUNK_PATHS
         assert "tests/test_benchmarks.py" not in Plugin._BOUNDED_CHUNK_PATHS
+        assert "tests/docs/test_mre2e_evidence_contract.py" not in Plugin._BOUNDED_CHUNK_PATHS
 
     def test_index_directory_keeps_unrelated_status_markdown_on_heavy_path(
         self, tmp_path, monkeypatch

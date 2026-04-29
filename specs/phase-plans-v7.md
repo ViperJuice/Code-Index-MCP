@@ -3240,6 +3240,69 @@ tests/docs/test_p8_deployment_security.py`.
 - IF-0-SEMDOCTESTTAIL-1 — later tests/docs lexical recovery and evidence
   contract.
 
+### Phase 58 — Mock Plugin Fixture Tail Recovery (SEMMOCKPLUGIN)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later security-fixture tail exposed
+after SEMDOCTESTTAIL:
+`tests/security/fixtures/mock_plugin/plugin.py ->
+tests/security/fixtures/mock_plugin/__init__.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMDOCTESTTAIL
+      head either advances durably beyond
+      `tests/security/fixtures/mock_plugin/plugin.py ->
+      tests/security/fixtures/mock_plugin/__init__.py` or emits a truthful
+      newer blocker before the 120-second watchdog expires.
+- [ ] The chosen repair for the
+      `tests/security/fixtures/mock_plugin/plugin.py ->
+      tests/security/fixtures/mock_plugin/__init__.py` seam stays narrow,
+      tested, and does not reopen the repaired
+      `tests/docs/test_gaclose_evidence_closeout.py ->
+      tests/docs/test_p8_deployment_security.py` boundary without direct
+      evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the
+      SEMDOCTESTTAIL rerun outcome and the final live verdict for the later
+      security-fixture blocker pair.
+
+**Scope notes**
+
+This phase exists only if SEMDOCTESTTAIL proves the later tests/docs
+`tests/docs/test_gaclose_evidence_closeout.py ->
+tests/docs/test_p8_deployment_security.py` seam is cleared, but the
+refreshed live rerun still terminalizes later in lexical walking on
+`tests/security/fixtures/mock_plugin/plugin.py ->
+tests/security/fixtures/mock_plugin/__init__.py`.
+
+**Non-goals**
+
+- No reopening of the repaired docs-test recovery once the live rerun has
+  advanced beyond that seam.
+- No broad reopening of earlier security, sandbox, or plugin-system phases
+  unless the refreshed rerun proves the active blocker requires it.
+- No repo-wide lexical timeout retune unless the refreshed rerun proves this
+  later security-fixture seam cannot be cleared with a narrower repair.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/plugins/python_plugin/plugin.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMDOCTESTTAIL
+
+**Produces**
+- IF-0-SEMMOCKPLUGIN-1 — later security-fixture lexical recovery and evidence
+  contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -3300,6 +3363,7 @@ SEMCONTRACT
   -> SEMVERIFYSIMTAIL
   -> SEMEMBEDCONSOL
   -> SEMDOCTESTTAIL
+  -> SEMMOCKPLUGIN
 ```
 
 ## Execution Notes
@@ -3592,6 +3656,19 @@ SEMCONTRACT
   refreshed live rerun still terminalizes later in lexical walking on
   `tests/docs/test_gaclose_evidence_closeout.py ->
   tests/docs/test_p8_deployment_security.py`.
+- SEMDOCTESTTAIL should amend the roadmap immediately if the refreshed live
+  rerun clears
+  `tests/docs/test_gaclose_evidence_closeout.py ->
+  tests/docs/test_p8_deployment_security.py` but exposes a later security
+  fixture blocker such as
+  `tests/security/fixtures/mock_plugin/plugin.py ->
+  tests/security/fixtures/mock_plugin/__init__.py`.
+- SEMMOCKPLUGIN exists only if SEMDOCTESTTAIL proves the
+  `tests/docs/test_gaclose_evidence_closeout.py ->
+  tests/docs/test_p8_deployment_security.py` seam is cleared but the
+  refreshed live rerun still terminalizes later in lexical walking on
+  `tests/security/fixtures/mock_plugin/plugin.py ->
+  tests/security/fixtures/mock_plugin/__init__.py`.
 
 ## Verification
 

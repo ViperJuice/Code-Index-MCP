@@ -134,6 +134,8 @@ _EXACT_BOUNDED_PYTHON_PATHS = {
     "mcp_server/visualization/quick_charts.py": "exact_visualization_quick_charts_rebound",
     "tests/docs/test_mre2e_evidence_contract.py": "exact_mre2e_docs_contract_rebound",
     "tests/docs/test_gagov_governance_contract.py": "exact_gagov_docs_contract_rebound",
+    "tests/docs/test_gaclose_evidence_closeout.py": "exact_gaclose_docs_contract_rebound",
+    "tests/docs/test_p8_deployment_security.py": "exact_p8_security_docs_contract_rebound",
 }
 
 _EXACT_BOUNDED_SHELL_PATHS = {
@@ -2155,43 +2157,47 @@ class EnhancedDispatcher:
         if bounded_path_reason is None:
             return None
 
-        tree = ast.parse(content)
         symbols = []
-        for node in tree.body:
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        try:
+            tree = ast.parse(content)
+        except SyntaxError:
+            tree = None
+        if tree is not None:
+            for node in tree.body:
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    symbols.append(
+                        {
+                            "symbol": node.name,
+                            "kind": "function",
+                            "signature": f"def {node.name}(...):",
+                            "line": node.lineno,
+                            "span": (node.lineno, getattr(node, "end_lineno", node.lineno)),
+                        }
+                    )
+                    continue
+                if not isinstance(node, ast.ClassDef):
+                    continue
                 symbols.append(
                     {
                         "symbol": node.name,
-                        "kind": "function",
-                        "signature": f"def {node.name}(...):",
+                        "kind": "class",
+                        "signature": f"class {node.name}:",
                         "line": node.lineno,
                         "span": (node.lineno, getattr(node, "end_lineno", node.lineno)),
                     }
                 )
-                continue
-            if not isinstance(node, ast.ClassDef):
-                continue
-            symbols.append(
-                {
-                    "symbol": node.name,
-                    "kind": "class",
-                    "signature": f"class {node.name}:",
-                    "line": node.lineno,
-                    "span": (node.lineno, getattr(node, "end_lineno", node.lineno)),
-                }
-            )
-            for child in node.body:
-                if not isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    continue
-                symbols.append(
-                    {
-                        "symbol": child.name,
-                        "kind": "method",
-                        "signature": f"def {child.name}(...):",
-                        "line": child.lineno,
-                        "span": (child.lineno, getattr(child, "end_lineno", child.lineno)),
-                    }
-                )
+                for child in node.body:
+                    if not isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        continue
+                    symbols.append(
+                        {
+                            "symbol": child.name,
+                            "kind": "method",
+                            "signature": f"def {child.name}(...):",
+                            "line": child.lineno,
+                            "span": (child.lineno, getattr(child, "end_lineno", child.lineno)),
+                        }
+                    )
 
         return {
             "symbols": symbols,
