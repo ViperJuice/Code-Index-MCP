@@ -144,6 +144,10 @@ _EXACT_BOUNDED_PYTHON_PATHS = {
     "tests/docs/test_garel_ga_release_contract.py": (
         "exact_garel_docs_contract_rebound"
     ),
+    "tests/docs/test_p23_doc_truth.py": "exact_p23_docs_truth_rebound",
+    "tests/docs/test_semdogfood_evidence_contract.py": (
+        "exact_semdogfood_evidence_contract_rebound"
+    ),
     "tests/security/fixtures/mock_plugin/plugin.py": "exact_mock_plugin_fixture_rebound",
     "tests/security/fixtures/mock_plugin/__init__.py": "exact_mock_plugin_fixture_init_rebound",
 }

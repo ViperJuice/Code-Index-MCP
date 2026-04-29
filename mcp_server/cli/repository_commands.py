@@ -476,6 +476,19 @@ def _print_ga_release_docs_tail_python_boundary(prefix: str, repo_path: Path) ->
         )
 
 
+def _print_docs_truth_tail_python_boundary(prefix: str, repo_path: Path) -> None:
+    contract_paths = (
+        repo_path / "tests" / "docs" / "test_p23_doc_truth.py",
+        repo_path / "tests" / "docs" / "test_semdogfood_evidence_contract.py",
+    )
+    if all(path.is_file() for path in contract_paths):
+        click.echo(
+            f"{prefix}Lexical boundary: using exact bounded Python indexing for "
+            "tests/docs/test_p23_doc_truth.py -> "
+            "tests/docs/test_semdogfood_evidence_contract.py"
+        )
+
+
 def _print_mock_plugin_fixture_python_boundary(prefix: str, repo_path: Path) -> None:
     fixture_paths = (
         repo_path / "tests" / "security" / "fixtures" / "mock_plugin" / "plugin.py",
@@ -940,6 +953,7 @@ def status(repo_id: Optional[str]):
         _print_docs_test_tail_python_boundary("  ", Path(status["path"]))
         _print_docs_contract_tail_python_boundary("  ", Path(status["path"]))
         _print_ga_release_docs_tail_python_boundary("  ", Path(status["path"]))
+        _print_docs_truth_tail_python_boundary("  ", Path(status["path"]))
         _print_mock_plugin_fixture_python_boundary("  ", Path(status["path"]))
         _print_devcontainer_json_boundary("  ", Path(status["path"]))
         _print_archive_tail_json_boundary("  ", Path(status["path"]))

@@ -2912,6 +2912,53 @@ def test_get_repository_status_preserves_ga_release_docs_tail_pair_trace(tmp_pat
     )
 
 
+def test_get_repository_status_preserves_docs_truth_tail_pair_trace(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace_path.write_text(
+        json.dumps(
+            {
+                "status": "interrupted",
+                "stage": "lexical_walking",
+                "stage_family": "lexical",
+                "trace_timestamp": "2026-04-29T19:33:16Z",
+                "current_commit": commit,
+                "indexed_commit_before": "older-indexed-commit",
+                "last_progress_path": str(repo / "tests" / "docs" / "test_p23_doc_truth.py"),
+                "in_flight_path": str(
+                    repo / "tests" / "docs" / "test_semdogfood_evidence_contract.py"
+                ),
+                "blocker_source": "lexical_mutation",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    status = manager.get_repository_status(repo_info.repository_id)
+
+    assert status["force_full_exit_trace"]["status"] == "interrupted"
+    assert status["force_full_exit_trace"]["stage"] == "lexical_walking"
+    assert status["force_full_exit_trace"]["stage_family"] == "lexical"
+    assert status["force_full_exit_trace"]["last_progress_path"] == str(
+        repo / "tests" / "docs" / "test_p23_doc_truth.py"
+    )
+    assert status["force_full_exit_trace"]["in_flight_path"] == str(
+        repo / "tests" / "docs" / "test_semdogfood_evidence_contract.py"
+    )
+    assert "test_garel_ga_release_contract.py" not in (
+        status["force_full_exit_trace"]["last_progress_path"] or ""
+    )
+    assert "mock_plugin/plugin.py" not in (
+        status["force_full_exit_trace"]["in_flight_path"] or ""
+    )
+
+
 def test_get_repository_status_preserves_mock_plugin_fixture_pair_trace(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)
@@ -3121,6 +3168,65 @@ def test_force_full_sync_durable_trace_moves_past_late_v7_phase_plan_pair(tmp_pa
         blocked_doc
     ) in {trace["last_progress_path"], trace["in_flight_path"]}
     assert "phase-plan-v5-garecut.md" not in (trace.get("last_progress_path") or "")
+
+
+def test_force_full_sync_durable_trace_moves_past_docs_truth_tail_pair(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+
+    prior_doc = repo / "tests" / "docs" / "test_p23_doc_truth.py"
+    blocked_doc = repo / "tests" / "docs" / "test_semdogfood_evidence_contract.py"
+    later_doc = repo / "specs" / "phase-plans-v7.md"
+    later_doc.parent.mkdir(parents=True, exist_ok=True)
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    registry.update_git_state.return_value = {"commit": commit, "branch": "main"}
+
+    manager = GitAwareIndexManager(registry=registry, dispatcher=MagicMock())
+    manager._resolve_ctx = MagicMock(return_value=ctx)
+    manager._index_exists = MagicMock(return_value=True)
+    manager._index_has_durable_rows = MagicMock(return_value=True)
+    manager._full_index = MagicMock(
+        return_value=UpdateResult(
+            indexed=3,
+            failed=1,
+            errors=["Lexical indexing timed out while processing specs/phase-plans-v7.md"],
+            low_level={
+                "lexical_stage": "blocked_file_timeout",
+                "lexical_files_attempted": 4,
+                "lexical_files_completed": 3,
+                "last_progress_path": str(blocked_doc),
+                "in_flight_path": str(later_doc),
+                "low_level_blocker": {
+                    "code": "lexical_file_timeout",
+                    "message": (
+                        "Lexical indexing timed out while processing specs/phase-plans-v7.md"
+                    ),
+                },
+            },
+            semantic={"semantic_stage": "not_run"},
+        )
+    )
+
+    result = manager.sync_repository_index(repo_info.repository_id, force_full=True)
+
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert result.action == "failed"
+    assert trace["status"] == "completed"
+    assert trace["stage"] == "force_full_failed"
+    assert trace["stage_family"] == "final_closeout"
+    assert trace["blocker_source"] == "lexical_mutation"
+    assert trace["last_progress_path"] == str(blocked_doc)
+    assert trace["in_flight_path"] == str(later_doc)
+    assert str(prior_doc) not in (trace.get("in_flight_path") or "")
+    assert "test_garel_ga_release_contract.py" not in (
+        trace.get("last_progress_path") or ""
+    )
+    assert "mock_plugin/plugin.py" not in (trace.get("last_progress_path") or "")
 
 
 def test_force_full_sync_durable_trace_moves_past_historical_phase_plan_pair(tmp_path):

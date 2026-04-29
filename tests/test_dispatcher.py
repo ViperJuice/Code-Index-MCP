@@ -4280,6 +4280,156 @@ class TestEnhancedDispatcherProtocolConformance:
             for snapshot in snapshots
         )
 
+    def test_index_directory_emits_docs_truth_tail_pair_before_closeout_handoff(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.plugins.python_plugin.plugin import Plugin
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        docs_dir = repo / "tests" / "docs"
+        docs_dir.mkdir(parents=True)
+        prior_file = docs_dir / "test_p23_doc_truth.py"
+        prior_file.write_text(
+            "def test_active_docs_do_not_contain_stale_strings():\n"
+            "    assert True\n\n"
+            "def test_active_release_docs_name_stable_surface_and_support_status():\n"
+            "    assert True\n\n"
+            "def test_agent_docs_point_to_support_matrix_and_current_install_path():\n"
+            "    assert True\n",
+            encoding="utf-8",
+        )
+        blocked_file = docs_dir / "test_semdogfood_evidence_contract.py"
+        blocked_file.write_text(
+            "def test_semdogfood_report_exists_and_names_required_evidence_sections():\n"
+            "    assert True\n\n"
+            "def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering():\n"
+            "    assert True\n\n"
+            "def test_semdogfood_report_preserves_command_level_verification_and_runtime_paths():\n"
+            "    assert True\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+        snapshots = []
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: object())
+
+        def _fake_walk(_directory, followlinks=False):
+            assert followlinks is False
+            yield str(docs_dir), [], [prior_file.name, blocked_file.name]
+
+        def _explode_before_semantic_progress(self, _ctx, _paths, progress_callback=None):
+            raise RuntimeError("semantic closeout entry stalled before emitting progress")
+
+        monkeypatch.setattr("mcp_server.dispatcher.dispatcher_enhanced.os.walk", _fake_walk)
+        monkeypatch.setattr(
+            Dispatcher,
+            "rebuild_semantic_for_paths",
+            _explode_before_semantic_progress,
+        )
+
+        result = Dispatcher([]).index_directory(
+            ctx,
+            repo,
+            progress_callback=lambda snapshot: snapshots.append(dict(snapshot)),
+        )
+
+        assert result["indexed_files"] == 2
+        assert result["semantic_stage"] == "failed"
+        lexical_pair = [
+            snapshot
+            for snapshot in snapshots
+            if snapshot["stage"] == "lexical_walking"
+            and snapshot["last_progress_path"] == str(prior_file.resolve())
+            and snapshot["in_flight_path"] == str(blocked_file.resolve())
+        ]
+        assert lexical_pair
+        with store._get_connection() as conn:
+            p23_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/docs/test_p23_doc_truth.py') ORDER BY id"
+                ).fetchall()
+            ]
+            semdogfood_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/docs/test_semdogfood_evidence_contract.py') ORDER BY id"
+                ).fetchall()
+            ]
+            p23_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/docs/test_p23_doc_truth.py')"
+            ).fetchone()[0]
+            semdogfood_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/docs/test_semdogfood_evidence_contract.py')"
+            ).fetchone()[0]
+            p23_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/docs/test_p23_doc_truth.py')"
+            ).fetchall()
+            semdogfood_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'tests/docs/test_semdogfood_evidence_contract.py')"
+            ).fetchall()
+        store.close()
+        assert "test_active_docs_do_not_contain_stale_strings" in p23_symbols
+        assert "test_active_release_docs_name_stable_surface_and_support_status" in p23_symbols
+        assert "test_agent_docs_point_to_support_matrix_and_current_install_path" in p23_symbols
+        assert (
+            "test_semdogfood_report_exists_and_names_required_evidence_sections"
+            in semdogfood_symbols
+        )
+        assert (
+            "test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering"
+            in semdogfood_symbols
+        )
+        assert (
+            "test_semdogfood_report_preserves_command_level_verification_and_runtime_paths"
+            in semdogfood_symbols
+        )
+        assert p23_chunk_count == 0
+        assert semdogfood_chunk_count == 0
+        assert len(p23_fts) == 1
+        assert "test_active_release_docs_name_stable_surface_and_support_status" in p23_fts[0][0]
+        assert len(semdogfood_fts) == 1
+        assert (
+            "test_semdogfood_report_preserves_command_level_verification_and_runtime_paths"
+            in semdogfood_fts[0][0]
+        )
+        assert snapshots[-1]["stage"] == "force_full_closeout_handoff"
+        assert snapshots[-1]["stage_family"] == "final_closeout"
+        assert snapshots[-1]["last_progress_path"] == str(blocked_file.resolve())
+        assert snapshots[-1]["in_flight_path"] is None
+        assert "tests/docs/test_p23_doc_truth.py" in Plugin._BOUNDED_CHUNK_PATHS
+        assert "tests/docs/test_semdogfood_evidence_contract.py" in Plugin._BOUNDED_CHUNK_PATHS
+        assert "tests/docs/test_garc_rc_soak_contract.py" in Plugin._BOUNDED_CHUNK_PATHS
+        assert all(
+            needle not in (
+                (snapshot.get("last_progress_path") or "")
+                + " "
+                + (snapshot.get("in_flight_path") or "")
+            )
+            for needle in (
+                "tests/docs/test_semincr_contract.py",
+                "tests/docs/test_gabase_ga_readiness_contract.py",
+                "tests/docs/test_garc_rc_soak_contract.py",
+                "tests/docs/test_garel_ga_release_contract.py",
+                "tests/security/fixtures/mock_plugin/plugin.py",
+                "tests/security/fixtures/mock_plugin/__init__.py",
+            )
+            for snapshot in snapshots
+        )
+
     def test_index_directory_emits_mock_plugin_fixture_pair_before_closeout_handoff(
         self, tmp_path, monkeypatch
     ):
