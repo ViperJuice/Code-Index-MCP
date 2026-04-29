@@ -1,7 +1,9 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T16:29:12Z`.
-- Observed commit: `7ab3e4ca`.
+- Evidence captured: `2026-04-29T16:42:21Z`.
+- Observed commit: `468dee18`.
+- Prior SEMMIXEDPHASETAIL live-rerun anchor: `2026-04-29T16:29:12Z` on
+  observed commit `7ab3e4ca`.
 - Prior SEMLEGACYPLANS live-rerun anchor: `2026-04-29T16:07:22Z` on observed
   commit `fe501b97`.
 - Prior SEMCROSSPLANS live-rerun anchor: `2026-04-29T15:51:12Z` on observed
@@ -26,9 +28,17 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMLEGACYPLANS.md`.
-- Prior phase plan: `plans/phase-plan-v7-SEMPHASETAIL.md`.
+- Phase plan: `plans/phase-plan-v7-SEMMIXEDPHASETAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMLEGACYPLANS.md`.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMPREUPGRADETAIL` after SEMMIXEDPHASETAIL proved the mixed-version
+  phase-plan seam is now cleared and a post-edit rerun advanced beyond the
+  transient `ai_docs` waypoint, but the refreshed live rerun on the same
+  head still terminalized later in lexical walking on
+  `scripts/preflight_upgrade.sh ->
+  scripts/test_mcp_protocol_direct.py`. Older downstream assumptions should
+  be treated as stale after this roadmap amendment.
+- Prior roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMMIXEDPHASETAIL` after SEMLEGACYPLANS proved the historical phase-plan
   seam is now cleared, but the refreshed live rerun on the new head still
   terminalized later in lexical walking on
@@ -1344,6 +1354,81 @@ Steering outcome:
   downstream phase plan or handoff that still treats the active current-head
   blocker as the historical `WATCH -> p19` phase-plan seam.
 
+## SEMMIXEDPHASETAIL Live Rerun Check
+
+SEMMIXEDPHASETAIL tightened the exact mixed-version phase-plan seam in the
+bounded Markdown and operator-status surfaces, and the refreshed live rerun
+advanced durably beyond `plans/phase-plan-v7-SEMPHASETAIL.md` and
+`plans/phase-plan-v5-gagov.md` before the 120-second watchdog expired.
+
+Code/test repair completed in this phase:
+
+- `mcp_server/plugins/markdown_plugin/plugin.py` now treats
+  `plans/phase-plan-v7-SEMPHASETAIL.md` and `plans/phase-plan-v5-gagov.md`
+  as exact bounded Markdown paths in addition to the generic lightweight
+  phase-plan rule.
+- `mcp_server/cli/repository_commands.py` now advertises the repaired exact
+  bounded lexical boundary for
+  `plans/phase-plan-v7-SEMPHASETAIL.md -> plans/phase-plan-v5-gagov.md`.
+- `tests/test_dispatcher.py`, `tests/test_git_index_manager.py`, and
+  `tests/test_repository_commands.py` now freeze dispatcher discoverability,
+  durable trace progression, and status reporting for the exact mixed-version
+  phase-plan pair without widening into a blanket `plans/phase-plan-*.md`
+  bypass.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The SEMMIXEDPHASETAIL live rerun started on observed commit `468dee18` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-29T16:42:11Z`, `force_full_exit_trace.json` showed a running
+  lexical trace on
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/ai_docs/celery_overview.md`
+  with
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/ai_docs/qdrant.md`.
+- At `2026-04-29T16:42:21Z`, `repository status` terminalized that running
+  snapshot to `Trace status: interrupted` with the same
+  `ai_docs/celery_overview.md -> ai_docs/qdrant.md` pair and advertised the
+  repaired exact bounded mixed-version lexical surface:
+  `Lexical boundary: using exact bounded Markdown indexing for plans/phase-plan-v7-SEMPHASETAIL.md -> plans/phase-plan-v5-gagov.md`.
+- After the exact mixed-version Markdown/status repair landed, a fresh rerun
+  on the same observed commit again exited with code `124`.
+- At `2026-04-29T16:49:38Z`, `force_full_exit_trace.json` showed a newer
+  running lexical trace on
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/scripts/preflight_upgrade.sh`
+  with
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/scripts/test_mcp_protocol_direct.py`.
+- At `2026-04-29T16:49:50Z`, `repository status` terminalized that newer
+  running snapshot to `Trace status: interrupted` with the same
+  `scripts/preflight_upgrade.sh -> scripts/test_mcp_protocol_direct.py`
+  pair while still advertising the repaired exact bounded mixed-version
+  lexical surface for
+  `plans/phase-plan-v7-SEMPHASETAIL.md -> plans/phase-plan-v5-gagov.md`.
+- SQLite runtime counts after the rerun remained
+  `files = 1123`, `code_chunks = 28182`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+
+Steering outcome:
+
+- SEMMIXEDPHASETAIL acceptance is satisfied for its named blocker: the active
+  lexical blocker is no longer
+  `plans/phase-plan-v7-SEMPHASETAIL.md ->
+  plans/phase-plan-v5-gagov.md`.
+- The first refreshed rerun moved beyond the mixed-version phase-plan pair to
+  the transient ai-docs lexical pair
+  `ai_docs/celery_overview.md ->
+  ai_docs/qdrant.md`.
+- The final authoritative rerun for this phase moved later still and now
+  reaches the script lexical pair
+  `scripts/preflight_upgrade.sh ->
+  scripts/test_mcp_protocol_direct.py`.
+- The roadmap now adds downstream phase `SEMPREUPGRADETAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as either the mixed-version
+  `SEMPHASETAIL -> phase-plan-v5-gagov.md` phase-plan seam or the transient
+  `ai_docs/celery_overview.md -> ai_docs/qdrant.md` waypoint.
+
 ## Verification
 
 Verification sequence for this SEMCROSSPLANS slice:
@@ -1375,6 +1460,18 @@ Verification sequence for this SEMLEGACYPLANS slice:
 ```bash
 uv run pytest tests/test_dispatcher.py -q --no-cov -k "phase_plan or WATCH or p19 or markdown or lexical or bounded"
 env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "phase_plan or WATCH or p19 or lexical or interrupted or boundary"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
+timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+```
+
+Verification sequence for this SEMMIXEDPHASETAIL slice:
+
+```bash
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "phase_plan or SEMPHASETAIL or gagov or markdown or lexical or bounded"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "phase_plan or SEMPHASETAIL or gagov or lexical or interrupted or boundary"
 uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status

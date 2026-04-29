@@ -2988,6 +2988,65 @@ plans/phase-plan-v5-gagov.md`.
 - IF-0-SEMMIXEDPHASETAIL-1 — mixed-version phase-plan lexical recovery and
   evidence contract.
 
+### Phase 54 — Preflight Upgrade Tail Recovery (SEMPREUPGRADETAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later mixed script tail exposed
+after SEMMIXEDPHASETAIL:
+`scripts/preflight_upgrade.sh -> scripts/test_mcp_protocol_direct.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMMIXEDPHASETAIL
+      head either advances durably beyond
+      `scripts/preflight_upgrade.sh -> scripts/test_mcp_protocol_direct.py`
+      or emits a truthful newer blocker before the 120-second watchdog
+      expires.
+- [ ] The chosen repair for the
+      `scripts/preflight_upgrade.sh -> scripts/test_mcp_protocol_direct.py`
+      seam stays narrow, tested, and does not reopen the earlier
+      mixed-version phase-plan recovery without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the SEMMIXEDPHASETAIL
+      rerun outcome and the final live verdict for the later script blocker
+      pair.
+
+**Scope notes**
+
+This phase exists only if SEMMIXEDPHASETAIL proves the mixed-version
+`plans/phase-plan-v7-SEMPHASETAIL.md -> plans/phase-plan-v5-gagov.md` seam is
+cleared and subsequent reruns advance beyond any transient ai-docs waypoint,
+but the refreshed live rerun still terminalizes later in lexical walking on
+`scripts/preflight_upgrade.sh -> scripts/test_mcp_protocol_direct.py`.
+
+**Non-goals**
+
+- No reopening of the mixed-version phase-plan recovery once the live rerun
+  has advanced beyond that seam.
+- No broad reopening of earlier ai-docs seams such as
+  `ai_docs/*_overview.md`, `ai_docs/jedi.md`, or
+  `ai_docs/qdrant.md` unless the refreshed rerun proves the active blocker
+  requires it.
+- No repo-wide lexical timeout retune unless the refreshed rerun proves this
+  later mixed script seam cannot be cleared with a narrower repair.
+
+**Key files**
+
+- `mcp_server/plugins/markdown_plugin/plugin.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMMIXEDPHASETAIL
+
+**Produces**
+- IF-0-SEMPREUPGRADETAIL-1 — mixed script tail lexical recovery and evidence
+  contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -3290,6 +3349,13 @@ SEMCONTRACT
   walking on
   `plans/phase-plan-v7-SEMPHASETAIL.md ->
   plans/phase-plan-v5-gagov.md`.
+- SEMPREUPGRADETAIL exists only if SEMMIXEDPHASETAIL proves the
+  mixed-version `plans/phase-plan-v7-SEMPHASETAIL.md ->
+  plans/phase-plan-v5-gagov.md` seam is cleared and later reruns advance
+  beyond any transient ai-docs waypoint, but the refreshed live rerun still
+  terminalizes later in lexical walking on
+  `scripts/preflight_upgrade.sh ->
+  scripts/test_mcp_protocol_direct.py`.
 
 ## Verification
 

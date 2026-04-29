@@ -2093,6 +2093,156 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "Watch truth" in watch_fts_rows[0][0]
         assert "Wave plan" in p19_fts_rows[0][0]
 
+    def test_index_directory_uses_bounded_markdown_path_for_mixed_version_phase_plan_pair(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        plans_dir = repo / "plans"
+        plans_dir.mkdir(parents=True)
+        semphasetail_doc = plans_dir / "phase-plan-v7-SEMPHASETAIL.md"
+        gagov_doc = plans_dir / "phase-plan-v5-gagov.md"
+        unrelated_doc = plans_dir / "phase-plan-v7-SEMUNRELATED.md"
+        semphasetail_doc.write_text(
+            "---\n"
+            "title: Phase Plan v7 SEMPHASETAIL\n"
+            "---\n"
+            "# SEMPHASETAIL Tail Recovery\n\n"
+            "## Context\n\n"
+            "### Later blocker\n"
+            "- Preserve bounded discoverability\n",
+            encoding="utf-8",
+        )
+        gagov_doc.write_text(
+            "---\n"
+            "title: Phase Plan v5 GAGOV\n"
+            "---\n"
+            "# GAGOV: Governance Recovery\n\n"
+            "## Context\n\n"
+            "### Legacy loop note\n"
+            "- Keep `.codex/phase-loop/` prose discoverable\n",
+            encoding="utf-8",
+        )
+        unrelated_doc.write_text(
+            "# SEMUNRELATED Notes\n\n"
+            "## Scope\n\n"
+            "### Guardrail\n"
+            "- Keep generic phase-plan handling intact\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        def _unexpected(*_args, **_kwargs):
+            raise AssertionError(
+                "heavy Markdown path should not run for bounded mixed-version phase-plan files"
+            )
+
+        monkeypatch.setattr(MarkdownPlugin, "extract_structure", _unexpected)
+        monkeypatch.setattr(MarkdownPlugin, "chunk_document", _unexpected)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 3
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(semphasetail_doc.resolve()),
+            str(gagov_doc.resolve()),
+            str(unrelated_doc.resolve()),
+        }
+        with store._get_connection() as conn:
+            semphasetail_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'plans/phase-plan-v7-SEMPHASETAIL.md') ORDER BY id"
+                ).fetchall()
+            ]
+            gagov_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'plans/phase-plan-v5-gagov.md') ORDER BY id"
+                ).fetchall()
+            ]
+            unrelated_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'plans/phase-plan-v7-SEMUNRELATED.md') ORDER BY id"
+                ).fetchall()
+            ]
+            semphasetail_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v7-SEMPHASETAIL.md')"
+            ).fetchone()[0]
+            gagov_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v5-gagov.md')"
+            ).fetchone()[0]
+            unrelated_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v7-SEMUNRELATED.md')"
+            ).fetchone()[0]
+            semphasetail_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v7-SEMPHASETAIL.md')"
+            ).fetchall()
+            gagov_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'plans/phase-plan-v5-gagov.md')"
+            ).fetchall()
+        store.close()
+
+        assert semphasetail_symbols == [
+            "Phase Plan v7 SEMPHASETAIL",
+            "SEMPHASETAIL Tail Recovery",
+            "Context",
+            "Later blocker",
+        ]
+        assert gagov_symbols == [
+            "Phase Plan v5 GAGOV",
+            "GAGOV: Governance Recovery",
+            "Context",
+            "Legacy loop note",
+        ]
+        assert unrelated_symbols == [
+            "SEMUNRELATED Notes",
+            "SEMUNRELATED Notes",
+            "Scope",
+            "Guardrail",
+        ]
+        assert semphasetail_chunk_count == 0
+        assert gagov_chunk_count == 0
+        assert unrelated_chunk_count == 0
+        assert len(semphasetail_fts_rows) == 1
+        assert len(gagov_fts_rows) == 1
+        assert "Later blocker" in semphasetail_fts_rows[0][0]
+        assert ".codex/phase-loop/" in gagov_fts_rows[0][0]
+
     def test_index_directory_uses_exact_bounded_python_path_for_visual_report_script(
         self, tmp_path, monkeypatch
     ):
