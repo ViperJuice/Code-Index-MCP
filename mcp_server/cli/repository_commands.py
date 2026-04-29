@@ -197,6 +197,15 @@ def _print_artifact_publish_race_python_boundary(prefix: str, repo_path: Path) -
         )
 
 
+def _print_devcontainer_json_boundary(prefix: str, repo_path: Path) -> None:
+    config_path = repo_path / ".devcontainer" / "devcontainer.json"
+    if config_path.is_file():
+        click.echo(
+            f"{prefix}Lexical boundary: using exact bounded JSON indexing for "
+            ".devcontainer/devcontainer.json"
+        )
+
+
 @repository.command()
 @click.argument("path", type=click.Path(exists=True))
 @click.option("--auto-sync/--no-auto-sync", default=True, help="Enable automatic synchronization")
@@ -590,6 +599,7 @@ def status(repo_id: Optional[str]):
         _print_jedi_markdown_boundary("  ", Path(status["path"]))
         _print_visual_report_python_boundary("  ", Path(status["path"]))
         _print_artifact_publish_race_python_boundary("  ", Path(status["path"]))
+        _print_devcontainer_json_boundary("  ", Path(status["path"]))
         _print_force_full_exit_trace("  ", status.get("force_full_exit_trace"))
 
         semantic_preflight = status["features"]["semantic"].get("preflight") or {}

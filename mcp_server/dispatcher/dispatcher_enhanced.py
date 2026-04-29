@@ -32,6 +32,7 @@ from ..graph import (
     XRefAdapter,
 )
 from ..plugin_base import IPlugin, SearchResult, SymbolDef
+from ..plugins.generic_treesitter_plugin import GenericTreeSitterPlugin
 from ..plugins.language_registry import get_all_extensions, get_language_by_extension
 from ..plugins.plugin_factory import PluginFactory, PluginUnavailableError
 from ..plugins.plugin_set_registry import PluginSetRegistry
@@ -1985,15 +1986,26 @@ class EnhancedDispatcher:
                     actual_hash=None,
                 )
 
-            # Find the appropriate plugin
-            plugin = self._match_plugin(path)
+            bounded_json_shard = self._build_exact_bounded_json_shard(
+                path, content, ctx.workspace_root
+            )
+            if bounded_json_shard is not None:
+                plugin_language = "json"
+                plugin_lang = "json"
+                shard = bounded_json_shard
+            else:
+                # Find the appropriate plugin
+                plugin = self._match_plugin(path)
+                plugin_language = plugin.language
+                plugin_lang = plugin.lang
 
             # Index the file
             start_time = time.time()
-            logger.info(f"Indexing {path} with {plugin.lang} plugin")
-            shard = plugin.indexFile(path, content)
+            logger.info(f"Indexing {path} with {plugin_lang} plugin")
+            if bounded_json_shard is None:
+                shard = plugin.indexFile(path, content)
             try:
-                self._persist_index_shard(ctx, path, content, plugin.language, shard)
+                self._persist_index_shard(ctx, path, content, plugin_language, shard)
             except Exception as e:
                 logger.error(f"Failed to persist index shard for {path}: {e}", exc_info=True)
                 return IndexResult(
@@ -2017,7 +2029,7 @@ class EnhancedDispatcher:
                 pass
 
             # Record performance if advanced features enabled
-            if self._enable_advanced and self._router:
+            if self._enable_advanced and self._router and bounded_json_shard is None:
                 execution_time = time.time() - start_time
                 self._router.record_performance(plugin, execution_time)
 
@@ -2064,6 +2076,22 @@ class EnhancedDispatcher:
                 actual_hash=None,
                 error=str(e),
             )
+
+    def _build_exact_bounded_json_shard(
+        self, path: Path, content: str, workspace_root: Path
+    ) -> Optional[Dict[str, Any]]:
+        if path.suffix.lower() != ".json":
+            return None
+        if not GenericTreeSitterPlugin.uses_exact_bounded_json_path(path, workspace_root):
+            return None
+        return {
+            "symbols": [],
+            "chunks": [],
+            "metadata": {
+                "bounded_chunk_path": True,
+                "bounded_path_reason": "exact_devcontainer_json_rebound",
+            },
+        }
 
     def index_file_guarded(self, ctx: RepoContext, path: Path, expected_hash: str) -> IndexResult:
         """TOCTOU-guarded index: re-hashes immediately before plugin write.

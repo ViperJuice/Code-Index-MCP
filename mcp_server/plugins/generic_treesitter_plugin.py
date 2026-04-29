@@ -33,6 +33,10 @@ logger = logging.getLogger(__name__)
 class GenericTreeSitterPlugin(PluginWithSemanticSearch):
     """Generic plugin that can handle any tree-sitter supported language."""
 
+    _EXACT_BOUNDED_JSON_PATHS = {
+        ".devcontainer/devcontainer.json",
+    }
+
     def __init__(
         self,
         language_config: Dict[str, Any],
@@ -105,6 +109,32 @@ class GenericTreeSitterPlugin(PluginWithSemanticSearch):
     def supports(self, path: str | Path) -> bool:
         """Check if this plugin supports the given file."""
         return Path(path).suffix in self.file_extensions
+
+    @classmethod
+    def _normalized_relative_path(
+        cls, path: str | Path, workspace_root: Optional[str | Path] = None
+    ) -> str:
+        candidate = Path(path)
+        if workspace_root is not None:
+            root = Path(workspace_root)
+            if candidate.is_absolute():
+                try:
+                    candidate = candidate.relative_to(root)
+                    return candidate.as_posix()
+                except ValueError:
+                    pass
+        if candidate.is_absolute():
+            try:
+                candidate = candidate.relative_to(Path.cwd())
+            except ValueError:
+                return candidate.as_posix()
+        return candidate.as_posix()
+
+    @classmethod
+    def uses_exact_bounded_json_path(
+        cls, path: str | Path, workspace_root: Optional[str | Path] = None
+    ) -> bool:
+        return cls._normalized_relative_path(path, workspace_root) in cls._EXACT_BOUNDED_JSON_PATHS
 
     def indexFile(self, path: str | Path, content: str) -> IndexShard:
         """Index a file with optional semantic embeddings."""

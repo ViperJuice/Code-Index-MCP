@@ -2,7 +2,7 @@
 phase_loop_plan_version: 1
 phase: SEMDEVREBOUND
 roadmap: specs/phase-plans-v7.md
-roadmap_sha256: 658d58f4f7999e9964028dd2d39babd0199c11e6020a796fb98bb3572a6901c9
+roadmap_sha256: 06d6346c00207ca639722c240f6a3900f6ba5ed2125eee0016ce12b7cb429e42
 ---
 # SEMDEVREBOUND: Devcontainer Rebound Lexical Re-Anchor Recovery
 

@@ -1611,6 +1611,98 @@ class TestEnhancedDispatcherProtocolConformance:
         assert len(fts_rows) == 1
         assert "test_publish_race_boundary" in fts_rows[0][0]
 
+    def test_index_directory_uses_exact_bounded_json_path_for_devcontainer_config(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        config_file = repo / ".devcontainer" / "devcontainer.json"
+        config_file.parent.mkdir(parents=True)
+        config_file.write_text('{"name": "devcontainer"}\n', encoding="utf-8")
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        def _unexpected_json_plugin_load(_self, language):
+            if language == "json":
+                raise AssertionError("exact bounded devcontainer JSON path should bypass plugin load")
+            return None
+
+        monkeypatch.setattr(Dispatcher, "_ensure_plugin_loaded", _unexpected_json_plugin_load)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 1
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] == str(config_file.resolve())
+        with store._get_connection() as conn:
+            chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = '.devcontainer/devcontainer.json')"
+            ).fetchone()[0]
+            fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = '.devcontainer/devcontainer.json')"
+            ).fetchall()
+        store.close()
+        assert chunk_count == 0
+        assert len(fts_rows) == 1
+        assert "devcontainer" in fts_rows[0][0]
+
+    def test_index_directory_keeps_unrelated_json_files_off_exact_devcontainer_bypass(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        config_file = repo / "config.json"
+        repo.mkdir()
+        config_file.write_text('{"name": "config"}\n', encoding="utf-8")
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        calls = []
+
+        class _FakeJsonPlugin:
+            lang = "json"
+            language = "json"
+
+            def indexFile(self, path, content):
+                calls.append(Path(path).name)
+                return {"symbols": [], "chunks": [], "metadata": {"fake": True}}
+
+        monkeypatch.setattr(Dispatcher, "_ensure_plugin_loaded", lambda _self, language: _FakeJsonPlugin())
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 1
+        assert result["failed_files"] == 0
+        assert result["last_progress_path"] == str(config_file.resolve())
+        assert calls == ["config.json"]
+
     def test_index_directory_keeps_other_bounded_python_tests_on_chunked_path(
         self, tmp_path, monkeypatch
     ):

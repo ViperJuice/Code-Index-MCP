@@ -1835,6 +1835,68 @@ running snapshot on 2026-04-29.
 - IF-0-SEMDEVREBOUND-1 — renewed `.devcontainer/devcontainer.json` lexical
   re-anchor and blocker evidence contract.
 
+### Phase 34 — Script Rebound Lexical Re-Anchor Recovery (SEMSCRIPTREBOUND)
+
+**Objective**
+
+Repair the next exact lexical blocker exposed after SEMDEVREBOUND so a
+repo-local force-full rerun no longer clears `.devcontainer/devcontainer.json`
+only to re-anchor on `scripts/quick_mcp_vs_native_validation.py` with a stale
+durable trace.
+
+**Exit criteria**
+- [ ] A live repo-local force-full rerun no longer remains on
+      `last_progress_path=/home/viperjuice/code/Code-Index-MCP/scripts/rerun_failed_native_tests.py`
+      and
+      `in_flight_path=/home/viperjuice/code/Code-Index-MCP/scripts/quick_mcp_vs_native_validation.py`
+      with an unchanged `trace_timestamp` after the configured lexical-timeout
+      window once the rerun has already advanced beyond
+      `.devcontainer/devcontainer.json`.
+- [ ] The rerun either completes the renewed
+      `scripts/quick_mcp_vs_native_validation.py` lexical seam and advances
+      into later lexical or semantic work, or exits with a bounded lexical
+      blocker that still names that exact script pair truthfully.
+- [ ] Operator status, tests, and dogfood evidence stay aligned with the
+      configured timeout window and the renewed script-pair blocker shape
+      after `.devcontainer/devcontainer.json` is cleared.
+
+**Scope notes**
+
+This phase exists only because SEMDEVREBOUND proved the live force-full rerun
+no longer remains on `.devcontainer/devcontainer.json`, but the same live
+rerun later re-anchored on `scripts/quick_mcp_vs_native_validation.py` with a
+stale running snapshot on 2026-04-29.
+
+**Non-goals**
+
+- No reopening of `.devcontainer/devcontainer.json`,
+  `tests/test_artifact_publish_race.py`, `ai_docs/jedi.md`,
+  `ai_docs/*_overview.md`, fast-test report, or visual-report-script lexical
+  repairs unless fresh evidence re-anchors there again.
+- No semantic summary or vector-write work before the renewed
+  `scripts/quick_mcp_vs_native_validation.py` lexical blocker exits cleanly or
+  advances past that seam.
+- No broad repo-wide timeout retuning beyond what is needed to make this exact
+  blocker surface truthfully and fail closed.
+
+**Key files**
+
+- `mcp_server/plugins/python_plugin/plugin.py`
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMDEVREBOUND
+
+**Produces**
+- IF-0-SEMSCRIPTREBOUND-1 — renewed
+  `scripts/quick_mcp_vs_native_validation.py` lexical re-anchor and blocker
+  evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -1871,6 +1933,7 @@ SEMCONTRACT
   -> SEMDEVCONTAINER
   -> SEMPUBLISHRACE
   -> SEMDEVREBOUND
+  -> SEMSCRIPTREBOUND
 ```
 
 ## Execution Notes
@@ -1897,6 +1960,9 @@ SEMCONTRACT
 - SEMJEDI should amend the roadmap immediately if the live rerun clears
   `ai_docs/jedi.md` but exposes a later exact blocker or a trace-freshness
   failure that changes the next downstream phase.
+- SEMDEVREBOUND should amend the roadmap immediately if the live rerun clears
+  `.devcontainer/devcontainer.json` but exposes a later exact blocker such as
+  `scripts/quick_mcp_vs_native_validation.py`.
 - SEMREADYFIX exists only if SEMDOGFOOD proves the default local dogfood path
   is still blocked; it should repair that blocker and then rerun the dogfood
   proof instead of widening into unrelated semantic work.
