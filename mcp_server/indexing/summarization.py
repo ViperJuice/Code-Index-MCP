@@ -42,6 +42,7 @@ _REPO_SCOPE_DOC_PROCESS_SCOPE_CHUNK_LIMIT = 4
 _REPO_SCOPE_DOC_FILE_CHUNK_WINDOW = 1
 _REPO_SCOPE_FILE_LIMIT = 1
 _DOC_TOPOLOGICAL_RECOVERY_CHUNK_LIMIT = 4
+_SUMMARY_CALL_CANCEL_SETTLE_SECONDS = 1.0
 
 # Files larger than this (in characters) skip the single-batch API call and fall back
 # to the topological per-chunk path.
@@ -601,6 +602,31 @@ class FileBatchSummarizer(ChunkWriter):
             blocked_call_timeout_seconds=timeout_seconds,
         )
 
+    async def _await_summary_call_with_timeout(
+        self,
+        summary_call: Any,
+        *,
+        timeout_seconds: float,
+    ) -> List[Any]:
+        """Bound the summary call and stop waiting once cancellation has been requested."""
+        task = asyncio.create_task(summary_call)
+        done, _pending = await asyncio.wait({task}, timeout=timeout_seconds)
+        if done:
+            return await task
+
+        task.cancel()
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(task, return_exceptions=True),
+                timeout=_SUMMARY_CALL_CANCEL_SETTLE_SECONDS,
+            )
+        except TimeoutError:
+            logger.warning(
+                "Timed-out summary call did not settle within %.1fs after cancellation",
+                _SUMMARY_CALL_CANCEL_SETTLE_SECONDS,
+            )
+        raise TimeoutError
+
     async def _recover_with_profile_or_topological(
         self,
         *,
@@ -900,7 +926,10 @@ class FileBatchSummarizer(ChunkWriter):
                     file_id, file_path, file_content, active_chunks, symbol_map
                 )
             if call_timeout_seconds is not None:
-                summaries = await asyncio.wait_for(summary_call, timeout=call_timeout_seconds)
+                summaries = await self._await_summary_call_with_timeout(
+                    summary_call,
+                    timeout_seconds=call_timeout_seconds,
+                )
             else:
                 summaries = await summary_call
             missing_chunk_ids: List[str] = []

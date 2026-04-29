@@ -1348,6 +1348,57 @@ manually.
 - IF-0-SEMCANCEL-1 — Timed-out summary call exit and partial-state closeout
   contract.
 
+### Phase 25 — Live Force-Full Exit Trace Recovery (SEMEXITTRACE)
+
+**Objective**
+
+If SEMCANCEL lands its unit-level cancellation and runtime-restore contracts
+but the real repo-local `repository sync --force-full` path still does not
+return promptly, add precise live-stage tracing and fail-closed shutdown
+accounting so operators can see the exact in-flight stage and the command can
+persist a narrower blocker without manual guesswork.
+
+**Exit criteria**
+- [ ] A live repo-local force-full rerun that still fails to complete now
+      persists a precise final stage or in-flight blocker instead of requiring
+      manual interpretation of partial SQLite growth.
+- [ ] `uv run mcp-index repository status` records whether the hung path was
+      still in lexical indexing, summary-call shutdown, or later closeout when
+      the command aborted.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` captures the stage-trace
+      evidence and whether runtime containment happened before process exit or
+      only after external termination.
+
+**Scope notes**
+
+This phase exists only if SEMCANCEL proves the bounded timeout and zero-summary
+restore behavior in unit coverage, but the live repo-local force-full rerun on
+the active commit still remains in flight long enough that operators must kill
+it before the repaired blocker can be persisted.
+
+**Non-goals**
+
+- No new semantic ranking or retrieval work.
+- No broader watchdog redesign outside the force-full live tracing path.
+- No artifact publishing or release-process changes.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMCANCEL
+
+**Produces**
+- IF-0-SEMEXITTRACE-1 — Live force-full exit tracing and persisted blocker
+  contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -1375,6 +1426,7 @@ SEMCONTRACT
   -> SEMPASSSTALL
   -> SEMCALLTIME
   -> SEMCANCEL
+  -> SEMEXITTRACE
 ```
 
 ## Execution Notes
@@ -1458,6 +1510,12 @@ SEMCONTRACT
   leave enlarged zero-summary lexical/runtime state after manual termination;
   it should repair cancellation/cleanup and preserve the next exact blocker
   only if that repaired live exit path still fails closed.
+- SEMEXITTRACE exists only if SEMCANCEL proves bounded cancellation and
+  zero-summary runtime restore behavior in tests, but the live force-full
+  command still does not return promptly enough to persist that repaired
+  blocker on the active commit; it should narrow the remaining hang to an
+  exact live stage and persisted fail-closed status rather than repeating the
+  same blind rerun.
 
 ## Verification
 

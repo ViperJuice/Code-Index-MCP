@@ -656,6 +656,89 @@ def test_full_index_preserves_exact_summary_call_timeout_details(tmp_path):
     assert result.semantic["semantic_stage"] == "blocked_summary_call_timeout"
 
 
+def test_force_full_timeout_restores_active_runtime_and_preserves_exact_blocker(tmp_path):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    index_base = Path(repo_info.index_location)
+    index_base.mkdir(parents=True, exist_ok=True)
+
+    active_store = SQLiteStore(str(repo_info.index_path))
+    repo_row = active_store.ensure_repository_row(repo, name="test-repo")
+    active_store.store_file(repo_row, path=repo / "hello.py", relative_path="hello.py")
+    active_store.close()
+    semantic_qdrant = index_base / "semantic_qdrant"
+    semantic_qdrant.mkdir(parents=True, exist_ok=True)
+    (semantic_qdrant / "marker.txt").write_text("original", encoding="utf-8")
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    registry.update_git_state.return_value = {"commit": commit, "branch": "main"}
+
+    manager = _make_manager(registry)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+    manager._resolve_ctx = MagicMock(return_value=ctx)
+
+    def _mutating_full_index(_repo_id, active_ctx):
+        mutated_store = active_ctx.sqlite_store
+        mutated_repo_row = mutated_store.ensure_repository_row(repo, name="test-repo")
+        mutated_store.store_file(
+            mutated_repo_row,
+            path=repo / "extra.py",
+            relative_path="extra.py",
+        )
+        (semantic_qdrant / "marker.txt").write_text("mutated", encoding="utf-8")
+        return UpdateResult(
+            indexed=2,
+            errors=[
+                "Authoritative summary call timed out after 30 seconds before any summary was "
+                f"written for {repo / 'README.md'}; 4 chunks still require summaries"
+            ],
+            semantic={
+                "summaries_written": 0,
+                "summary_chunks_attempted": 1,
+                "summary_missing_chunks": 4,
+                "summary_passes": 0,
+                "summary_remaining_chunks": 4,
+                "summary_scope_drained": False,
+                "summary_call_timed_out": True,
+                "summary_call_file_path": str(repo / "README.md"),
+                "summary_call_chunk_ids": ["chunk-1"],
+                "summary_call_timeout_seconds": 30.0,
+                "semantic_indexed": 0,
+                "semantic_failed": 0,
+                "semantic_skipped": 0,
+                "semantic_blocked": 1,
+                "semantic_stage": "blocked_summary_call_timeout",
+            },
+        )
+
+    manager._full_index = MagicMock(side_effect=_mutating_full_index)
+
+    result = manager.sync_repository_index(repo_info.repository_id, force_full=True)
+
+    assert result.action == "failed"
+    assert "Authoritative summary call timed out after 30 seconds" in result.error
+    assert "runtime restored via" in result.error
+    assert result.semantic is not None
+    assert result.semantic["runtime_restore_performed"] is True
+    assert result.semantic["runtime_counts_before"]["files"] == 1
+    assert result.semantic["runtime_counts_after"]["files"] == 1
+    restored_store = SQLiteStore(str(repo_info.index_path))
+    with restored_store._get_connection() as conn:
+        files_count = conn.execute("SELECT COUNT(*) FROM files").fetchone()[0]
+        file_paths = {
+            row[0] for row in conn.execute("SELECT relative_path FROM files").fetchall()
+        }
+        semantic_points = conn.execute("SELECT COUNT(*) FROM semantic_points").fetchone()[0]
+    restored_store.close()
+    assert files_count == 1
+    assert file_paths == {"hello.py"}
+    assert semantic_points == 0
+    assert (semantic_qdrant / "marker.txt").read_text(encoding="utf-8") == "original"
+    registry.update_indexed_commit.assert_not_called()
+
+
 def test_full_index_preserves_bounded_summary_continuation_details(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)

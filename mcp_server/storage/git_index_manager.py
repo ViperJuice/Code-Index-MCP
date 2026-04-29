@@ -5,7 +5,10 @@ supporting incremental updates and artifact management.
 """
 
 import logging
+import shutil
+import sqlite3
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -98,6 +101,29 @@ class UpdateResult:
     @property
     def clean(self) -> bool:
         return self.failed == 0 and self.skipped == 0 and not self.errors
+
+
+@dataclass
+class RuntimeSnapshot:
+    """Temporary backup of the active runtime before a force-full mutation."""
+
+    backup_dir: Path
+    db_path: Path
+    qdrant_path: Path
+    db_existed: bool
+    qdrant_existed: bool
+    counts_before: Dict[str, int]
+    sqlite_sidecars: List[str]
+
+
+@dataclass
+class RuntimeRestoreResult:
+    """Outcome of restoring or preserving the active runtime after a blocked run."""
+
+    restored: bool
+    mode: str
+    counts_before: Dict[str, int]
+    counts_after: Dict[str, int]
 
 
 class GitAwareIndexManager:
@@ -291,18 +317,30 @@ class GitAwareIndexManager:
                 logger.warning(f"Incremental update failed, falling back to full index: {e}")
 
         # Full index needed
+        runtime_snapshot = self._snapshot_active_runtime(repo_info)
         result = self._normalize_update_result(self._full_index(repo_id, ctx))
+        restore_result = self._restore_zero_summary_runtime_if_needed(
+            repo_id,
+            repo_info,
+            ctx,
+            result,
+            runtime_snapshot,
+        )
         if not result.clean:
             self.registry.update_staleness_reason(repo_id, "partial_index_failure")
+            error_detail = self._format_sync_error_with_restore_context(
+                "; ".join(result.errors) or "Full index failed",
+                restore_result,
+            )
             self.registry.update_last_sync_error(
                 repo_id,
-                "; ".join(result.errors) or "Full index failed",
+                error_detail,
             )
             return IndexSyncResult(
                 action="failed",
                 commit=current_commit,
                 files_processed=result.files_processed,
-                error="; ".join(result.errors) or "Full index failed",
+                error=error_detail,
                 duration_seconds=(datetime.now() - start_time).total_seconds(),
                 semantic=result.semantic,
             )
@@ -853,6 +891,150 @@ class GitAwareIndexManager:
     def enqueue_full_rescan(self, repo_id: str) -> IndexSyncResult:
         """Trigger a guarded full rescan without bypassing the tracked-branch check."""
         return self.sync_repository_index(repo_id, force_full=True)
+
+    def _runtime_paths(self, repo_info: Any) -> Tuple[Path, Path]:
+        index_location = Path(repo_info.index_location)
+        return index_location / "current.db", index_location / "semantic_qdrant"
+
+    def _snapshot_active_runtime(self, repo_info: Any) -> RuntimeSnapshot:
+        db_path, qdrant_path = self._runtime_paths(repo_info)
+        backup_dir = Path(tempfile.mkdtemp(prefix="mcp-index-runtime-"))
+        backup_db = backup_dir / "current.db"
+        backup_qdrant = backup_dir / "semantic_qdrant"
+        counts_before = self._read_runtime_counts(db_path)
+        if db_path.exists():
+            shutil.copy2(db_path, backup_db)
+        sqlite_sidecars: List[str] = []
+        for suffix in ("-wal", "-shm"):
+            sidecar = Path(f"{db_path}{suffix}")
+            if sidecar.exists():
+                shutil.copy2(sidecar, backup_dir / sidecar.name)
+                sqlite_sidecars.append(suffix)
+        if qdrant_path.exists():
+            shutil.copytree(qdrant_path, backup_qdrant)
+        return RuntimeSnapshot(
+            backup_dir=backup_dir,
+            db_path=db_path,
+            qdrant_path=qdrant_path,
+            db_existed=db_path.exists(),
+            qdrant_existed=qdrant_path.exists(),
+            counts_before=counts_before,
+            sqlite_sidecars=sqlite_sidecars,
+        )
+
+    def _restore_zero_summary_runtime_if_needed(
+        self,
+        repo_id: str,
+        repo_info: Any,
+        ctx: RepoContext,
+        result: UpdateResult,
+        snapshot: RuntimeSnapshot,
+    ) -> Optional[RuntimeRestoreResult]:
+        semantic = result.semantic or {}
+        timed_out = semantic.get("semantic_stage") == "blocked_summary_call_timeout"
+        zero_summary = int(semantic.get("summaries_written", 0) or 0) == 0
+        zero_vectors = self._read_runtime_counts(snapshot.db_path).get("semantic_points", 0) == 0
+        if not timed_out or not zero_summary or not zero_vectors:
+            self._cleanup_runtime_snapshot(snapshot)
+            return None
+
+        self._release_runtime_handles(repo_id, repo_info, ctx)
+        try:
+            restore_mode = self._restore_runtime_snapshot(snapshot)
+        finally:
+            counts_after = self._read_runtime_counts(snapshot.db_path)
+            self._cleanup_runtime_snapshot(snapshot)
+
+        semantic["runtime_restore_performed"] = True
+        semantic["runtime_restore_mode"] = restore_mode
+        semantic["runtime_counts_before"] = dict(snapshot.counts_before)
+        semantic["runtime_counts_after"] = dict(counts_after)
+        result.semantic = semantic
+        return RuntimeRestoreResult(
+            restored=True,
+            mode=restore_mode,
+            counts_before=dict(snapshot.counts_before),
+            counts_after=dict(counts_after),
+        )
+
+    def _restore_runtime_snapshot(self, snapshot: RuntimeSnapshot) -> str:
+        for suffix in ("", "-wal", "-shm"):
+            runtime_file = Path(f"{snapshot.db_path}{suffix}")
+            if runtime_file.exists():
+                runtime_file.unlink()
+        if snapshot.qdrant_path.exists():
+            shutil.rmtree(snapshot.qdrant_path)
+
+        mode_parts: List[str] = []
+        backup_db = snapshot.backup_dir / "current.db"
+        backup_qdrant = snapshot.backup_dir / "semantic_qdrant"
+        if snapshot.db_existed and backup_db.exists():
+            snapshot.db_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(backup_db, snapshot.db_path)
+            for suffix in snapshot.sqlite_sidecars:
+                backup_sidecar = snapshot.backup_dir / f"{snapshot.db_path.name}{suffix}"
+                if backup_sidecar.exists():
+                    shutil.copy2(backup_sidecar, Path(f"{snapshot.db_path}{suffix}"))
+            mode_parts.append("sqlite_restored")
+        else:
+            mode_parts.append("sqlite_preserved_empty")
+
+        if snapshot.qdrant_existed and backup_qdrant.exists():
+            shutil.copytree(backup_qdrant, snapshot.qdrant_path)
+            mode_parts.append("qdrant_restored")
+        else:
+            mode_parts.append("qdrant_preserved_empty")
+        return "+".join(mode_parts)
+
+    def _release_runtime_handles(
+        self,
+        repo_id: str,
+        repo_info: Any,
+        ctx: RepoContext,
+    ) -> None:
+        if self.store_registry is not None:
+            self.store_registry.close(repo_id)
+        sqlite_store = getattr(ctx, "sqlite_store", None)
+        if sqlite_store is not None:
+            try:
+                sqlite_store.close()
+            except Exception:
+                pass
+        if self.dispatcher is not None and hasattr(self.dispatcher, "evict_repository_state"):
+            self.dispatcher.evict_repository_state(repo_id, repo_info.path)
+
+    def _cleanup_runtime_snapshot(self, snapshot: RuntimeSnapshot) -> None:
+        shutil.rmtree(snapshot.backup_dir, ignore_errors=True)
+
+    def _read_runtime_counts(self, db_path: Path) -> Dict[str, int]:
+        counts = {
+            "files": 0,
+            "code_chunks": 0,
+            "chunk_summaries": 0,
+            "semantic_points": 0,
+        }
+        if not db_path.exists():
+            return counts
+        try:
+            with sqlite3.connect(db_path) as conn:
+                for table in counts:
+                    row = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
+                    counts[table] = int(row[0]) if row else 0
+        except sqlite3.Error:
+            return counts
+        return counts
+
+    def _format_sync_error_with_restore_context(
+        self,
+        error: str,
+        restore_result: Optional[RuntimeRestoreResult],
+    ) -> str:
+        if restore_result is None or not restore_result.restored:
+            return error
+        return (
+            f"{error} [runtime restored via {restore_result.mode}; "
+            f"counts {restore_result.counts_before} -> {restore_result.counts_after}]"
+        )
 
     def sync_all_repositories(self) -> Dict[str, IndexSyncResult]:
         """Sync all repositories that need updates sequentially."""

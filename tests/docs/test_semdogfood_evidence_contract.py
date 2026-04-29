@@ -22,10 +22,9 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
 
     for expected in (
         "# Semantic Dogfood Rebuild",
-        "Phase plan: `plans/phase-plan-v7-SEMCALLTIME.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMCANCEL.md`",
         "## Reset Boundary",
-        "## README Lexical Repair",
-        "## SEMCALLTIME Timeout Recovery",
+        "## SEMCANCEL Exit Recovery",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -40,26 +39,25 @@ def test_semdogfood_report_records_live_timeout_exit_gap_and_roadmap_steering():
     text = _normalized(EVIDENCE)
 
     for expected in (
-        "2026-04-29T06:24:13Z",
-        "7ec6351",
-        "SEMCALLTIME",
+        "2026-04-29T06:47:14Z",
+        "0032c46a",
         "SEMCANCEL",
-        "timed-out summary-call",
-        "three minutes",
+        "SEMEXITTRACE",
+        "1:43",
         "terminated manually",
-        "Files indexed in SQLite: `1046`",
-        "Code chunks indexed in SQLite: `29194`",
+        "Files indexed in SQLite: `666`",
+        "Code chunks indexed in SQLite: `8934`",
         "Summary-backed chunks: `0`",
-        "Chunks missing summaries: `29194`",
+        "Chunks missing summaries: `8934`",
         "Vector-linked chunks: `0`",
-        "Chunks missing vectors: `29194`",
-        "Current commit: `7ec6351`",
+        "Chunks missing vectors: `8934`",
+        "Current commit: `0032c46a`",
         "Indexed commit: `e2e95198`",
         "Semantic readiness: `summaries_missing`",
         "Query surface: `index_unavailable`",
         "Active-profile preflight: `ready`",
         "Collection bootstrap state: `reused`",
-        "roadmap now adds `SEMCANCEL` as the nearest downstream phase",
+        "roadmap now adds `SEMEXITTRACE` as the nearest downstream phase",
     ):
         assert expected in text
 
@@ -76,7 +74,6 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "mcp_server/dispatcher/dispatcher_enhanced.py",
         "mcp_server/storage/git_index_manager.py",
         "mcp_server/cli/repository_commands.py",
-        "mcp_server/setup/semantic_preflight.py",
         "semantic_source: \"semantic\"",
         "semantic_collection_name: \"code_index__oss_high__v1\"",
         "local multi-repo dogfooding",

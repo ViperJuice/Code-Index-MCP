@@ -4,6 +4,8 @@ import asyncio
 import importlib
 import json
 import re
+import sqlite3
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -214,6 +216,72 @@ class TestChunkWriterInit:
             summarization_config={"base_url": "http://vllm:8000"},
         )
         assert cw.can_summarize() is True
+
+
+@pytest.mark.asyncio
+async def test_repo_scope_timeout_returns_prompt_blocker_even_if_summary_call_ignores_cancel(
+    tmp_path,
+    monkeypatch,
+):
+    db_path = tmp_path / "code.db"
+    store, file_id = _seed_chunk_summary_tables(db_path, tmp_path)
+    _store_chunk(
+        store,
+        file_id=file_id,
+        chunk_id="chunk-1",
+        content="def beta():\n    return 2\n",
+        line_start=1,
+        line_end=2,
+        symbol="beta",
+    )
+
+    lingered = asyncio.Event()
+
+    async def _late_call(*_args, **_kwargs):
+        try:
+            await asyncio.sleep(0.2)
+        except asyncio.CancelledError:
+            await asyncio.sleep(0.2)
+            lingered.set()
+            return [SimpleNamespace(chunk_id="chunk-1", summary="late summary")]
+        return [SimpleNamespace(chunk_id="chunk-1", summary="on-time summary")]
+
+    summarizer = FileBatchSummarizer(
+        db_path=str(db_path),
+        qdrant_client=None,
+        summarization_config={"base_url": "http://ai:8002/v1", "timeout_s": 0.05},
+    )
+    monkeypatch.setattr(summarizer, "_call_profile_batch_api", _late_call)
+
+    started = time.perf_counter()
+    result = await summarizer.summarize_file_chunks(
+        file_id=file_id,
+        file_path=str(tmp_path / "sample.py"),
+        file_content="def beta():\n    return 2\n",
+        chunks=[
+            {
+                "chunk_id": "chunk-1",
+                "file_id": file_id,
+                "line_start": 1,
+                "line_end": 2,
+                "content": "def beta():\n    return 2\n",
+                "node_type": "function_definition",
+                "parent_chunk_id": None,
+                "language": "python",
+                "symbol_id": None,
+            }
+        ],
+        call_timeout_seconds=0.05,
+    )
+    elapsed = time.perf_counter() - started
+
+    assert result.blocked_call_reason == "timeout"
+    assert elapsed < 0.4
+    await asyncio.sleep(0.3)
+    assert lingered.is_set() is True
+    with sqlite3.connect(db_path) as conn:
+        row = conn.execute("SELECT COUNT(*) FROM chunk_summaries").fetchone()
+    assert int(row[0]) == 0
 
 
 class TestLazyChunkWriterInit:
