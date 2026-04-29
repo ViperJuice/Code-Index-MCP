@@ -22,8 +22,8 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
 
     for expected in (
         "# Semantic Dogfood Rebuild",
-        "Phase plan: `plans/phase-plan-v7-SEMDOCTRUTHTAIL.md`",
-        "Prior phase plan: `plans/phase-plan-v7-SEMGARELTAIL.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMSUPPORTTAIL.md`",
+        "Prior phase plan: `plans/phase-plan-v7-SEMDOCTRUTHTAIL.md`",
         "## Reset Boundary",
         "## SEMTRACEFRESHNESS Live Trace Recovery",
         "## SEMPUBLISHRACE Live Rerun Check",
@@ -56,6 +56,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
         "## SEMDOCCONTRACTTAIL Live Rerun Check",
         "## SEMGARELTAIL Live Rerun Check",
         "## SEMDOCTRUTHTAIL Live Rerun Check",
+        "## SEMSUPPORTTAIL Live Rerun Check",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -161,6 +162,8 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "2026-04-29T19:33:16Z",
         "2026-04-29T19:51:51Z",
         "2026-04-29T19:52:03Z",
+        "2026-04-29T20:12:35Z",
+        "2026-04-29T20:12:44Z",
         "2026-04-29T15:37:54Z",
         "2026-04-29T15:37:57Z",
         "098c1ad1",
@@ -183,6 +186,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "4133bfe",
         "2167f184",
         "a7a71f24",
+        "e78c2861",
         "6a909203",
         "40968140",
         "7335cf35",
@@ -234,6 +238,8 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "tests/docs/test_semdogfood_evidence_contract.py",
         "docs/markdown-table-of-contents.md",
         "docs/SUPPORT_MATRIX.md",
+        "plans/phase-plan-v1-p13.md",
+        "plans/phase-plan-v1-p3.md",
         "ai_docs/qdrant.md",
         "fast_test_results/fast_report_*.md",
         "test_workspace/real_repos/search_scaling/package.json",
@@ -297,6 +303,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "roadmap now adds downstream phase `SEMGARELTAIL`",
         "roadmap now adds downstream phase `SEMDOCTRUTHTAIL`",
         "roadmap now adds downstream phase `SEMSUPPORTTAIL`",
+        "roadmap now adds downstream phase `SEMV1PLANTAIL`",
     ):
         assert expected in text
 
@@ -366,6 +373,7 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "Lexical boundary: using exact bounded Markdown indexing for docs/validation/ga-closeout-decision.md",
         "Lexical boundary: using exact bounded Markdown indexing for docs/validation/mre2e-evidence.md",
         "Lexical boundary: using exact bounded Markdown indexing for docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md -> docs/benchmarks/production_benchmark.md",
+        "Lexical boundary: using exact bounded Markdown indexing for docs/markdown-table-of-contents.md -> docs/SUPPORT_MATRIX.md",
         "Lexical boundary: using exact bounded Markdown indexing for plans/phase-plan-v7-SEMSYNCFIX.md -> plans/phase-plan-v7-SEMVISUALREPORT.md",
         "Lexical boundary: using exact bounded Markdown indexing for plans/phase-plan-v6-WATCH.md -> plans/phase-plan-v1-p19.md",
         "Lexical boundary: using exact bounded Markdown indexing for plans/phase-plan-v7-SEMPHASETAIL.md -> plans/phase-plan-v5-gagov.md",
@@ -386,8 +394,9 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "SEMDOCCONTRACTTAIL acceptance is satisfied for its named blocker",
         "SEMGARELTAIL acceptance is satisfied for its named blocker",
         "SEMDOCTRUTHTAIL acceptance is satisfied for its named blocker",
-        "Phase plan: `plans/phase-plan-v7-SEMDOCTRUTHTAIL.md`",
-        "Prior phase plan: `plans/phase-plan-v7-SEMGARELTAIL.md`",
+        "SEMSUPPORTTAIL acceptance is satisfied for its named blocker",
+        "Phase plan: `plans/phase-plan-v7-SEMSUPPORTTAIL.md`",
+        "Prior phase plan: `plans/phase-plan-v7-SEMDOCTRUTHTAIL.md`",
         "repository status` now advertises the repaired exact bounded lexical surface",
         "Lexical boundary: using exact bounded JSON/JSONL indexing for legacy .codex/phase-loop compatibility runtime artifacts while canonical .phase-loop remains authoritative",
         "Lexical boundary: using exact bounded shell/Python indexing for scripts/preflight_upgrade.sh -> scripts/test_mcp_protocol_direct.py",
@@ -414,6 +423,8 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k \"garc or garel or ga_release or rc_soak or boundary or interrupted or lexical\"",
         "uv run pytest tests/test_dispatcher.py -q --no-cov -k \"p23 or semdogfood or doc_truth or evidence_contract or lexical or bounded\"",
         "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k \"p23 or semdogfood or doc_truth or evidence_contract or boundary or interrupted or lexical\"",
+        "uv run pytest tests/test_dispatcher.py -q --no-cov -k \"support_matrix or markdown_table_of_contents or support_docs or markdown or bounded\"",
+        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k \"support_matrix or markdown_table_of_contents or support_docs or lexical or interrupted or boundary\"",
         "uv run pytest tests/docs/test_p23_doc_truth.py tests/docs/test_semdogfood_evidence_contract.py -q --no-cov",
     ):
         assert expected in text

@@ -283,6 +283,18 @@ def _print_benchmark_markdown_boundary(prefix: str, repo_path: Path) -> None:
         )
 
 
+def _print_support_docs_markdown_boundary(prefix: str, repo_path: Path) -> None:
+    support_doc_paths = (
+        repo_path / "docs" / "markdown-table-of-contents.md",
+        repo_path / "docs" / "SUPPORT_MATRIX.md",
+    )
+    if all(path.is_file() for path in support_doc_paths):
+        click.echo(
+            f"{prefix}Lexical boundary: using exact bounded Markdown indexing for "
+            "docs/markdown-table-of-contents.md -> docs/SUPPORT_MATRIX.md"
+        )
+
+
 def _print_late_v7_phase_plan_markdown_boundary(prefix: str, repo_path: Path) -> None:
     phase_plan_paths = (
         repo_path / "plans" / "phase-plan-v7-SEMSYNCFIX.md",
@@ -936,6 +948,7 @@ def status(repo_id: Optional[str]):
         _print_validation_markdown_boundaries("  ", Path(status["path"]))
         _print_claude_command_markdown_boundary("  ", Path(status["path"]))
         _print_benchmark_markdown_boundary("  ", Path(status["path"]))
+        _print_support_docs_markdown_boundary("  ", Path(status["path"]))
         _print_late_v7_phase_plan_markdown_boundary("  ", Path(status["path"]))
         _print_historical_phase_plan_markdown_boundary("  ", Path(status["path"]))
         _print_mixed_version_phase_plan_markdown_boundary("  ", Path(status["path"]))

@@ -47,6 +47,8 @@ _EXACT_BOUNDED_MARKDOWN_PATHS = {
     "docs/validation/mre2e-evidence.md": "validation_mre2e_path",
     "docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md": "benchmark_fullrepo_rerun_path",
     "docs/benchmarks/production_benchmark.md": "production_benchmark_path",
+    "docs/markdown-table-of-contents.md": "docs_markdown_index_path",
+    "docs/support_matrix.md": "docs_support_matrix_path",
     "plans/phase-plan-v7-SEMPHASETAIL.md": "mixed_semphasetail_phase_plan_path",
     "plans/phase-plan-v5-gagov.md": "mixed_gagov_phase_plan_path",
     "plans/phase-plan-v6-WATCH.md": "historical_watch_phase_plan_path",

@@ -3610,6 +3610,69 @@ docs/SUPPORT_MATRIX.md`.
 - IF-0-SEMSUPPORTTAIL-1 — later support-docs Markdown lexical recovery and
   evidence contract.
 
+### Phase 64 — Historical V1 Plan Tail Recovery (SEMV1PLANTAIL)
+
+**Objective**
+
+Carry the live force-full rerun beyond the later historical v1 phase-plan pair
+exposed after SEMSUPPORTTAIL:
+`plans/phase-plan-v1-p13.md ->
+plans/phase-plan-v1-p3.md`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMSUPPORTTAIL head
+      either advances durably beyond the
+      `plans/phase-plan-v1-p13.md ->
+      plans/phase-plan-v1-p3.md` pair or emits a truthful newer blocker before
+      the 120-second watchdog expires.
+- [ ] The chosen repair for the historical v1 plan tail stays narrow, tested,
+      and does not reopen the repaired
+      `docs/markdown-table-of-contents.md ->
+      docs/SUPPORT_MATRIX.md` boundary without direct evidence.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the SEMSUPPORTTAIL
+      rerun outcome and the final live verdict for the later historical v1
+      phase-plan pair.
+
+**Scope notes**
+
+This phase exists only if SEMSUPPORTTAIL proves the support-docs Markdown pair
+`docs/markdown-table-of-contents.md ->
+docs/SUPPORT_MATRIX.md` is cleared, but the refreshed live rerun still
+terminalizes later in lexical walking on a historical v1 phase-plan pair such
+as `plans/phase-plan-v1-p13.md ->
+plans/phase-plan-v1-p3.md`.
+
+**Non-goals**
+
+- No reopening of the repaired SEMSUPPORTTAIL support-doc recovery once the
+  live rerun has advanced beyond that seam.
+- No broad reopening of unrelated plan artifacts, roadmap docs, or evidence
+  artifacts unless the refreshed rerun proves the active blocker requires
+  them.
+- No blanket `plans/phase-plan-v1-*.md` bypass unless the refreshed rerun
+  proves the active blocker cannot be cleared with a narrower Markdown-path
+  repair.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/plugins/markdown_plugin/plugin.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `plans/phase-plan-v1-p13.md`
+- `plans/phase-plan-v1-p3.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+- `tests/docs/test_semdogfood_evidence_contract.py`
+
+**Depends on**
+- SEMSUPPORTTAIL
+
+**Produces**
+- IF-0-SEMV1PLANTAIL-1 — later historical v1 phase-plan lexical recovery and
+  evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -3676,6 +3739,7 @@ SEMCONTRACT
   -> SEMGARELTAIL
   -> SEMDOCTRUTHTAIL
   -> SEMSUPPORTTAIL
+  -> SEMV1PLANTAIL
 ```
 
 ## Execution Notes

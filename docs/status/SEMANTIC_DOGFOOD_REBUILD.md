@@ -1,7 +1,9 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T19:52:03Z`.
-- Observed commit: `a7a71f24`.
+- Evidence captured: `2026-04-29T20:12:44Z`.
+- Observed commit: `e78c2861`.
+- Prior SEMSUPPORTTAIL live-rerun anchor: `2026-04-29T19:52:03Z` on observed
+  commit `a7a71f24`.
 - Prior SEMCODEXLOOPTAIL live-rerun anchor: `2026-04-29T18:52:55Z` on observed
   commit `3d627c33`.
 - Prior SEMMOCKPLUGIN live-rerun anchor: `2026-04-29T18:26:11Z` on observed
@@ -34,8 +36,15 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMDOCTRUTHTAIL.md`.
-- Prior phase plan: `plans/phase-plan-v7-SEMGARELTAIL.md`.
+- Phase plan: `plans/phase-plan-v7-SEMSUPPORTTAIL.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMDOCTRUTHTAIL.md`.
+- Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMV1PLANTAIL` after SEMSUPPORTTAIL proved the later support-docs Markdown
+  seam is now cleared, but the refreshed live rerun on the new head still
+  terminalized later in lexical walking on
+  `plans/phase-plan-v1-p13.md ->
+  plans/phase-plan-v1-p3.md`. Older downstream assumptions should be treated
+  as stale after this roadmap amendment.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMSUPPORTTAIL` after SEMDOCTRUTHTAIL proved the later documentation truth
   and dogfood-evidence seam is now cleared, but the refreshed live rerun on
@@ -2104,6 +2113,75 @@ Steering outcome:
   `tests/docs/test_p23_doc_truth.py ->
   tests/docs/test_semdogfood_evidence_contract.py`.
 
+## SEMSUPPORTTAIL Live Rerun Check
+
+SEMSUPPORTTAIL tightened the later support-doc Markdown seam so the
+`docs/markdown-table-of-contents.md -> docs/SUPPORT_MATRIX.md` blocker is no
+longer the active lexical tail and `repository status` now advertises that
+repaired boundary while preserving the next blocker truthfully.
+
+Code/test repair completed in this phase:
+
+- `mcp_server/plugins/markdown_plugin/plugin.py` now treats
+  `docs/markdown-table-of-contents.md` and `docs/SUPPORT_MATRIX.md` as exact
+  bounded Markdown paths, preserving bounded symbol and content
+  discoverability without widening into a blanket `docs/*.md` bypass.
+- `mcp_server/cli/repository_commands.py` now advertises the repaired exact
+  bounded lexical boundary for
+  `docs/markdown-table-of-contents.md ->
+  docs/SUPPORT_MATRIX.md`:
+  `Lexical boundary: using exact bounded Markdown indexing for docs/markdown-table-of-contents.md -> docs/SUPPORT_MATRIX.md`.
+- `tests/test_dispatcher.py`, `tests/test_git_index_manager.py`, and
+  `tests/test_repository_commands.py` now freeze dispatcher discoverability,
+  durable trace progression, and status reporting for the later support-doc
+  pair without widening into a broader docs Markdown shortcut.
+- `docs/markdown-table-of-contents.md` and `docs/SUPPORT_MATRIX.md` did not
+  require content simplification in this phase; the exact bounded Markdown
+  routing was sufficient to clear the active lexical hotspot while preserving
+  lexical discoverability and the support-matrix contract.
+
+Observed progression on the refreshed repo-local force-full command:
+
+- The refreshed SEMSUPPORTTAIL live rerun started on observed commit
+  `e78c2861` via
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- At `2026-04-29T20:12:35Z`, `.mcp-index/force_full_exit_trace.json` showed a
+  running lexical trace on
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v1-p13.md`
+  with
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v1-p3.md`.
+- At `2026-04-29T20:12:44Z`, a refreshed `repository status` terminalized that
+  running snapshot to `Trace status: interrupted` with the same
+  `plans/phase-plan-v1-p13.md ->
+  plans/phase-plan-v1-p3.md` pair while advertising the repaired exact bounded
+  Markdown surface for the cleared
+  `docs/markdown-table-of-contents.md ->
+  docs/SUPPORT_MATRIX.md` seam.
+- The SEMSUPPORTTAIL target pair is no longer the active blocker:
+  `docs/markdown-table-of-contents.md ->
+  docs/SUPPORT_MATRIX.md`.
+- SQLite runtime counts after the rerun remained
+  `files = 1062`, `code_chunks = 13095`, `chunk_summaries = 0`, and
+  `semantic_points = 0`.
+
+Steering outcome:
+
+- SEMSUPPORTTAIL acceptance is satisfied for its named blocker: the live
+  watchdog no longer terminalizes on
+  `docs/markdown-table-of-contents.md ->
+  docs/SUPPORT_MATRIX.md`.
+- The final authoritative rerun for this phase moved later and now reaches the
+  historical v1 phase-plan pair
+  `plans/phase-plan-v1-p13.md ->
+  plans/phase-plan-v1-p3.md`.
+- The roadmap now adds downstream phase `SEMV1PLANTAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the SEMSUPPORTTAIL-era support-docs seam
+  `docs/markdown-table-of-contents.md ->
+  docs/SUPPORT_MATRIX.md`.
+
 ## Verification
 
 Verification sequence for this SEMDOCTRUTHTAIL slice:
@@ -2111,6 +2189,18 @@ Verification sequence for this SEMDOCTRUTHTAIL slice:
 ```bash
 uv run pytest tests/test_dispatcher.py -q --no-cov -k "p23 or semdogfood or doc_truth or evidence_contract or lexical or bounded"
 env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "p23 or semdogfood or doc_truth or evidence_contract or boundary or interrupted or lexical"
+uv run pytest tests/docs/test_p23_doc_truth.py tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
+timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
+env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
+sed -n '1,240p' .mcp-index/force_full_exit_trace.json
+sqlite3 .mcp-index/current.db 'select count(*) from files; select count(*) from code_chunks; select count(*) from chunk_summaries; select count(*) from semantic_points;'
+```
+
+Verification sequence for this SEMSUPPORTTAIL slice:
+
+```bash
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "support_matrix or markdown_table_of_contents or support_docs or markdown or bounded"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "support_matrix or markdown_table_of_contents or support_docs or lexical or interrupted or boundary"
 uv run pytest tests/docs/test_p23_doc_truth.py tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status

@@ -2252,6 +2252,149 @@ class TestEnhancedDispatcherProtocolConformance:
         assert "Later blocker" in semphasetail_fts_rows[0][0]
         assert ".codex/phase-loop/" in gagov_fts_rows[0][0]
 
+    def test_index_directory_uses_bounded_markdown_path_for_support_docs_pair(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.plugins.markdown_plugin.plugin import MarkdownPlugin
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        docs_dir = repo / "docs"
+        docs_dir.mkdir(parents=True)
+        toc_doc = docs_dir / "markdown-table-of-contents.md"
+        support_doc = docs_dir / "SUPPORT_MATRIX.md"
+        unrelated_doc = docs_dir / "OTHER.md"
+        toc_doc.write_text(
+            "# Code-Index-MCP Documentation Table of Contents\n\n"
+            "## Executive Summary\n\n"
+            "### Project Overview\n"
+            "- Preserve navigation headings\n",
+            encoding="utf-8",
+        )
+        support_doc.write_text(
+            "# Code-Index-MCP Support Matrix\n\n"
+            "## Claim tiers\n\n"
+            "## Machine-checkable support facts\n\n"
+            "| Language | Support tier | Runtime behavior | Parser status | Sandbox support | Required extras | Symbol quality | Semantic support | Known limitations |\n"
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+            "| Python | GA-supported | Specialized plugin | Tree-sitter plus Jedi | Default sandbox module | Core | High for Python symbols | Optional provider/API key | Dynamic runtime behavior is best effort |\n",
+            encoding="utf-8",
+        )
+        unrelated_doc.write_text(
+            "# Other Doc\n\n"
+            "## Scope\n\n"
+            "### Guardrail\n"
+            "- Keep generic Markdown handling intact\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        def _unexpected(*_args, **_kwargs):
+            raise AssertionError(
+                "heavy Markdown path should not run for bounded support-doc files"
+            )
+
+        monkeypatch.setattr(MarkdownPlugin, "extract_structure", _unexpected)
+        monkeypatch.setattr(MarkdownPlugin, "chunk_document", _unexpected)
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 3
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] in {
+            str(toc_doc.resolve()),
+            str(support_doc.resolve()),
+            str(unrelated_doc.resolve()),
+        }
+        with store._get_connection() as conn:
+            toc_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'docs/markdown-table-of-contents.md') ORDER BY id"
+                ).fetchall()
+            ]
+            support_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'docs/SUPPORT_MATRIX.md') ORDER BY id"
+                ).fetchall()
+            ]
+            unrelated_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN "
+                    "(SELECT id FROM files WHERE relative_path = "
+                    "'docs/OTHER.md') ORDER BY id"
+                ).fetchall()
+            ]
+            toc_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'docs/markdown-table-of-contents.md')"
+            ).fetchone()[0]
+            support_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'docs/SUPPORT_MATRIX.md')"
+            ).fetchone()[0]
+            unrelated_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'docs/OTHER.md')"
+            ).fetchone()[0]
+            toc_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'docs/markdown-table-of-contents.md')"
+            ).fetchall()
+            support_fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN "
+                "(SELECT id FROM files WHERE relative_path = "
+                "'docs/SUPPORT_MATRIX.md')"
+            ).fetchall()
+        store.close()
+
+        assert toc_symbols == [
+            "Code-Index-MCP Documentation Table of Contents",
+            "Code-Index-MCP Documentation Table of Contents",
+            "Executive Summary",
+            "Project Overview",
+        ]
+        assert support_symbols == [
+            "Code-Index-MCP Support Matrix",
+            "Code-Index-MCP Support Matrix",
+            "Claim tiers",
+            "Machine-checkable support facts",
+        ]
+        assert "Other Doc" in unrelated_symbols
+        assert "Scope" in unrelated_symbols
+        assert "Guardrail" in unrelated_symbols
+        assert toc_chunk_count == 0
+        assert support_chunk_count == 0
+        assert unrelated_chunk_count >= 0
+        assert len(toc_fts_rows) == 1
+        assert len(support_fts_rows) == 1
+        assert "Project Overview" in toc_fts_rows[0][0]
+        assert "Machine-checkable support facts" in support_fts_rows[0][0]
+
     def test_index_directory_uses_exact_bounded_python_path_for_visual_report_script(
         self, tmp_path, monkeypatch
     ):
