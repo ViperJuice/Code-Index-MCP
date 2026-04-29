@@ -122,6 +122,8 @@ _INDEX_EXCLUDED_FILENAMES = {
 _EXACT_BOUNDED_PYTHON_PATHS = {
     "tests/root_tests/run_reranking_tests.py": "exact_run_reranking_tests_rebound",
     "scripts/validate_mcp_comprehensive.py": "exact_validate_mcp_comprehensive_rebound",
+    "scripts/migrate_large_index_to_multi_repo.py": "exact_migrate_large_index_to_multi_repo_rebound",
+    "scripts/check_index_languages.py": "exact_check_index_languages_rebound",
     "mcp_server/visualization/quick_charts.py": "exact_visualization_quick_charts_rebound",
     "tests/docs/test_mre2e_evidence_contract.py": "exact_mre2e_docs_contract_rebound",
     "tests/docs/test_gagov_governance_contract.py": "exact_gagov_docs_contract_rebound",

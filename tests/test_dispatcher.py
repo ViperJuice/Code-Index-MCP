@@ -2115,6 +2115,141 @@ class TestEnhancedDispatcherProtocolConformance:
         assert len(fts_rows) == 1
         assert "test_root_contract" in fts_rows[0][0]
 
+    def test_index_directory_uses_exact_bounded_python_path_for_migration_script(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        script = repo / "scripts" / "migrate_large_index_to_multi_repo.py"
+        script.parent.mkdir(parents=True)
+        script.write_text(
+            "class RepositoryMigration:\n"
+            "    pass\n\n"
+            "class LargeIndexMigrator:\n"
+            "    def migrate_repository(self):\n"
+            "        return 'ok'\n\n"
+            "def main():\n"
+            "    return LargeIndexMigrator()\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        calls = []
+
+        def _tracked_chunk_text(*_args, **_kwargs):
+            calls.append("called")
+            return []
+
+        monkeypatch.setattr(
+            "mcp_server.plugins.python_plugin.plugin.chunk_text", _tracked_chunk_text
+        )
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 1
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] == str(script.resolve())
+        with store._get_connection() as conn:
+            symbol_names = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/migrate_large_index_to_multi_repo.py') ORDER BY id"
+                ).fetchall()
+            ]
+            chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/migrate_large_index_to_multi_repo.py')"
+            ).fetchone()[0]
+            fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/migrate_large_index_to_multi_repo.py')"
+            ).fetchall()
+        store.close()
+        assert "RepositoryMigration" in symbol_names
+        assert "LargeIndexMigrator" in symbol_names
+        assert "migrate_repository" in symbol_names
+        assert "main" in symbol_names
+        assert chunk_count == 0
+        assert calls == []
+        assert len(fts_rows) == 1
+        assert "LargeIndexMigrator" in fts_rows[0][0]
+
+    def test_index_directory_uses_exact_bounded_python_path_for_script_language_audit(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        script = repo / "scripts" / "check_index_languages.py"
+        script.parent.mkdir(parents=True)
+        script.write_text(
+            "print('Checking languages')\n"
+            "tables = ['files']\n"
+            "for table in tables:\n"
+            "    print(table)\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        calls = []
+
+        def _tracked_chunk_text(*_args, **_kwargs):
+            calls.append("called")
+            return []
+
+        monkeypatch.setattr(
+            "mcp_server.plugins.python_plugin.plugin.chunk_text", _tracked_chunk_text
+        )
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: None)
+
+        result = Dispatcher([]).index_directory(ctx, repo)
+
+        assert result["indexed_files"] == 1
+        assert result["failed_files"] == 0
+        assert result["lexical_stage"] == "completed"
+        assert result["last_progress_path"] == str(script.resolve())
+        with store._get_connection() as conn:
+            symbol_count = conn.execute(
+                "SELECT COUNT(*) FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/check_index_languages.py')"
+            ).fetchone()[0]
+            chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/check_index_languages.py')"
+            ).fetchone()[0]
+            fts_rows = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/check_index_languages.py')"
+            ).fetchall()
+        store.close()
+        assert symbol_count == 0
+        assert chunk_count == 0
+        assert calls == []
+        assert len(fts_rows) == 1
+        assert "Checking languages" in fts_rows[0][0]
+
     def test_index_directory_uses_exact_bounded_python_path_for_quick_charts(
         self, tmp_path, monkeypatch
     ):
@@ -2690,6 +2825,134 @@ class TestEnhancedDispatcherProtocolConformance:
                 "scripts/validate_mcp_comprehensive.py",
                 "tests/test_artifact_publish_race.py",
                 "tests/test_reindex_resume.py",
+            )
+            for snapshot in snapshots
+        )
+
+    def test_index_directory_emits_script_language_audit_pair_before_closeout_handoff(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        scripts_dir = repo / "scripts"
+        scripts_dir.mkdir(parents=True)
+        prior_file = scripts_dir / "migrate_large_index_to_multi_repo.py"
+        prior_file.write_text(
+            "class RepositoryMigration:\n"
+            "    pass\n\n"
+            "class LargeIndexMigrator:\n"
+            "    def migrate_repository(self):\n"
+            "        return 'ok'\n\n"
+            "def main():\n"
+            "    return LargeIndexMigrator()\n",
+            encoding="utf-8",
+        )
+        blocked_file = scripts_dir / "check_index_languages.py"
+        blocked_file.write_text(
+            "print('Checking languages')\n"
+            "tables = ['files']\n"
+            "for table in tables:\n"
+            "    print(table)\n",
+            encoding="utf-8",
+        )
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+        snapshots = []
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: object())
+
+        def _fake_walk(_directory, followlinks=False):
+            assert followlinks is False
+            yield str(scripts_dir), [], [prior_file.name, blocked_file.name]
+
+        def _explode_before_semantic_progress(self, _ctx, _paths, progress_callback=None):
+            raise RuntimeError("semantic closeout entry stalled before emitting progress")
+
+        monkeypatch.setattr("mcp_server.dispatcher.dispatcher_enhanced.os.walk", _fake_walk)
+        monkeypatch.setattr(
+            Dispatcher,
+            "rebuild_semantic_for_paths",
+            _explode_before_semantic_progress,
+        )
+
+        result = Dispatcher([]).index_directory(
+            ctx,
+            repo,
+            progress_callback=lambda snapshot: snapshots.append(dict(snapshot)),
+        )
+
+        assert result["indexed_files"] == 2
+        assert result["failed_files"] == 0
+        assert result["semantic_stage"] == "failed"
+        assert result["last_progress_path"] == str(blocked_file.resolve())
+        lexical_pair = [
+            snapshot
+            for snapshot in snapshots
+            if snapshot["stage"] == "lexical_walking"
+            and snapshot["last_progress_path"] == str(prior_file.resolve())
+            and snapshot["in_flight_path"] == str(blocked_file.resolve())
+        ]
+        assert lexical_pair
+        with store._get_connection() as conn:
+            migration_symbols = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/migrate_large_index_to_multi_repo.py') ORDER BY id"
+                ).fetchall()
+            ]
+            audit_symbol_count = conn.execute(
+                "SELECT COUNT(*) FROM symbols WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/check_index_languages.py')"
+            ).fetchone()[0]
+            migration_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/migrate_large_index_to_multi_repo.py')"
+            ).fetchone()[0]
+            audit_chunk_count = conn.execute(
+                "SELECT COUNT(*) FROM code_chunks WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/check_index_languages.py')"
+            ).fetchone()[0]
+            migration_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/migrate_large_index_to_multi_repo.py')"
+            ).fetchall()
+            audit_fts = conn.execute(
+                "SELECT content FROM fts_code WHERE file_id IN (SELECT id FROM files WHERE relative_path = 'scripts/check_index_languages.py')"
+            ).fetchall()
+        store.close()
+        assert "RepositoryMigration" in migration_symbols
+        assert "LargeIndexMigrator" in migration_symbols
+        assert "main" in migration_symbols
+        assert audit_symbol_count == 0
+        assert migration_chunk_count == 0
+        assert audit_chunk_count == 0
+        assert len(migration_fts) == 1
+        assert "LargeIndexMigrator" in migration_fts[0][0]
+        assert len(audit_fts) == 1
+        assert "Checking languages" in audit_fts[0][0]
+        assert snapshots[-1]["stage"] == "force_full_closeout_handoff"
+        assert snapshots[-1]["stage_family"] == "final_closeout"
+        assert snapshots[-1]["last_progress_path"] == str(blocked_file.resolve())
+        assert snapshots[-1]["in_flight_path"] is None
+        assert all(
+            needle not in (
+                (snapshot.get("last_progress_path") or "")
+                + " "
+                + (snapshot.get("in_flight_path") or "")
+            )
+            for needle in (
+                ".claude/commands/execute-lane.md",
+                ".claude/commands/plan-phase.md",
+                "tests/root_tests/run_reranking_tests.py",
+                "scripts/validate_mcp_comprehensive.py",
             )
             for snapshot in snapshots
         )

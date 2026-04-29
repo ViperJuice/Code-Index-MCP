@@ -1,7 +1,9 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T15:03:10Z`.
-- Observed commit: `68ae9492`.
+- Evidence captured: `2026-04-29T15:24:06Z`.
+- Observed commit: `769cd75c`.
+- Prior SEMCLAUDECMDS live-rerun anchor: `2026-04-29T15:03:10Z` on observed
+  commit `68ae9492`.
 - Prior SEMDOCGOV live-rerun anchor: `2026-04-29T14:41:32Z` on observed
   commit `cd2c183`.
 - Prior SEMVALIDEVIDENCE live-rerun anchor: `2026-04-29T13:34:20Z` on
@@ -18,8 +20,16 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMCLAUDECMDS.md`.
+- Phase plan: `plans/phase-plan-v7-SEMSCRIPTLANGS.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMCLAUDECMDS.md`.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMPHASEPLANS` after SEMSCRIPTLANGS proved the script language-audit seam
+  is now cleared, but the refreshed live rerun on the new head still
+  terminalized later in lexical walking on
+  `plans/phase-plan-v7-SEMPREFLIGHT.md ->
+  plans/phase-plan-v7-SEMDOCGOV.md`. Older downstream assumptions should be
+  treated as stale after this roadmap amendment.
+- Prior roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMSCRIPTLANGS` after SEMCLAUDECMDS proved the `.claude/commands` seam is
   now cleared, but the refreshed live rerun on the new head still
   terminalized later in lexical walking on
@@ -1031,14 +1041,66 @@ Steering outcome:
   downstream phase plan or handoff that still treats the active current-head
   blocker as the `.claude` command seam.
 
+## SEMSCRIPTLANGS Live Rerun Check
+
+SEMSCRIPTLANGS repaired the exact later script-language lexical seam on the
+current head. The refreshed repo-local rerun advanced beyond both
+`scripts/migrate_large_index_to_multi_repo.py` and
+`scripts/check_index_languages.py`, but the same 120-second watchdog still
+terminalized the run later in lexical walking on a newer exact phase-plan
+markdown pair.
+
+Observed runtime state during the current SEMSCRIPTLANGS rerun check:
+
+- Evidence capture completed at `2026-04-29T15:24:06Z`.
+- The durable raw trace snapshot last refreshed at `2026-04-29T15:22:41Z`
+  while still marked `running`, and `repository status` then truthfully
+  terminalized the same blocker to `interrupted` using the later observed
+  trace timestamp `2026-04-29T15:22:48Z`.
+- The SEMSCRIPTLANGS live rerun used
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- Observed commit: `769cd75c`
+- Indexed commit before rerun: `e2e95198`
+- Force-full trace status: `interrupted`
+- Trace stage: `lexical_walking`
+- Trace stage family: `lexical`
+- Trace blocker source: `lexical_mutation`
+- Last progress path:
+  `/home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v7-SEMPREFLIGHT.md`
+- In-flight path:
+  `/home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v7-SEMDOCGOV.md`
+- Repository status now advertises the repaired script-language boundary:
+  `Lexical boundary: using exact bounded Python indexing for scripts/migrate_large_index_to_multi_repo.py -> scripts/check_index_languages.py`
+- Repository status still reports the historical field `Last sync error:
+  disk I/O error`, but the active blocker for this rerun is the later lexical
+  phase-plan pair above.
+- SQLite runtime counts after the rerun:
+  `files = 1119`, `code_chunks = 28182`, `chunk_summaries = 0`,
+  `semantic_points = 0`
+
+Steering outcome:
+
+- SEMSCRIPTLANGS acceptance is satisfied: the active lexical blocker is no
+  longer the script language-audit seam centered on
+  `scripts/migrate_large_index_to_multi_repo.py ->
+  scripts/check_index_languages.py`.
+- The live rerun now reaches the later phase-plan markdown pair
+  `plans/phase-plan-v7-SEMPREFLIGHT.md ->
+  plans/phase-plan-v7-SEMDOCGOV.md`.
+- The roadmap now adds downstream phase `SEMPHASEPLANS`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the script language-audit seam.
+
 ## Verification
 
-Verification sequence for this SEMCLAUDECMDS slice:
+Verification sequence for this SEMSCRIPTLANGS slice:
 
 ```bash
-env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py -q --no-cov -k "claude or commands or execute or plan or lexical or force_full or markdown"
-uv run pytest tests/root_tests/test_markdown_production_scenarios.py -q --no-cov -k "claude or command or execute or plan"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py -q --no-cov -k "migrate or check_index_languages or lexical or force_full or script"
 env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_repository_commands.py -q --no-cov -k "claude or commands or execute or plan or boundary or force_full or interrupted"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_repository_commands.py -q --no-cov -k "migrate or check_index_languages or lexical or boundary or interrupted"
 uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status

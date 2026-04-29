@@ -22,7 +22,8 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
 
     for expected in (
         "# Semantic Dogfood Rebuild",
-        "Phase plan: `plans/phase-plan-v7-SEMCLAUDECMDS.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMSCRIPTLANGS.md`",
+        "Prior phase plan: `plans/phase-plan-v7-SEMCLAUDECMDS.md`",
         "## Reset Boundary",
         "## SEMTRACEFRESHNESS Live Trace Recovery",
         "## SEMPUBLISHRACE Live Rerun Check",
@@ -40,6 +41,7 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
         "## SEMARCHIVEWALKGAP Live Rerun Check",
         "## SEMDOCGOV Live Rerun Check",
         "## SEMCLAUDECMDS Live Rerun Check",
+        "## SEMSCRIPTLANGS Live Rerun Check",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -113,6 +115,9 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "2026-04-29T14:41:32Z",
         "2026-04-29T15:02:46Z",
         "2026-04-29T15:03:10Z",
+        "2026-04-29T15:22:41Z",
+        "2026-04-29T15:22:48Z",
+        "2026-04-29T15:24:06Z",
         "098c1ad1",
         "705a506f",
         "7282e341",
@@ -170,6 +175,8 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         ".claude/commands/plan-phase.md",
         "scripts/migrate_large_index_to_multi_repo.py",
         "scripts/check_index_languages.py",
+        "plans/phase-plan-v7-SEMPREFLIGHT.md",
+        "plans/phase-plan-v7-SEMDOCGOV.md",
         "ai_docs/*_overview.md",
         ".devcontainer/devcontainer.json",
         "stale-running snapshot",
@@ -189,6 +196,7 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "roadmap now adds downstream phase `SEMDOCGOV`",
         "roadmap now adds downstream phase `SEMCLAUDECMDS`",
         "roadmap now adds downstream phase `SEMSCRIPTLANGS`",
+        "roadmap now adds downstream phase `SEMPHASEPLANS`",
     ):
         assert expected in text
 
@@ -197,9 +205,9 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
     text = _normalized(EVIDENCE)
 
     for expected in (
-        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py -q --no-cov -k \"claude or commands or execute or plan or lexical or force_full or markdown\"",
-        "uv run pytest tests/root_tests/test_markdown_production_scenarios.py -q --no-cov -k \"claude or command or execute or plan\"",
+        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py -q --no-cov -k \"migrate or check_index_languages or lexical or force_full or script\"",
         "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_repository_commands.py -q --no-cov -k \"claude or commands or execute or plan or boundary or force_full or interrupted\"",
+        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_repository_commands.py -q --no-cov -k \"migrate or check_index_languages or lexical or boundary or interrupted\"",
         "uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov",
         "timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full",
         "env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status",
@@ -213,6 +221,8 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "tests/test_reindex_resume.py",
         "scripts/run_test_batch.py",
         "scripts/validate_mcp_comprehensive.py",
+        "scripts/migrate_large_index_to_multi_repo.py",
+        "scripts/check_index_languages.py",
         "tests/root_tests/test_voyage_api.py",
         "tests/root_tests/run_reranking_tests.py",
         "scripts/quick_mcp_vs_native_validation.py",
@@ -223,6 +233,8 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "tests/docs/test_gagov_governance_contract.py",
         ".claude/commands/execute-lane.md",
         ".claude/commands/plan-phase.md",
+        "plans/phase-plan-v7-SEMPREFLIGHT.md",
+        "plans/phase-plan-v7-SEMDOCGOV.md",
         "Last sync error:",
         "disk I/O error",
         "Trace status: `interrupted`",
@@ -232,13 +244,15 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "semantic_source: \"semantic\"",
         "semantic_collection_name: \"code_index__oss_high__v1\"",
         "local multi-repo dogfooding",
-        "Phase plan: `plans/phase-plan-v7-SEMCLAUDECMDS.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMSCRIPTLANGS.md`",
+        "Prior phase plan: `plans/phase-plan-v7-SEMCLAUDECMDS.md`",
         "Lexical boundary: using exact bounded Python indexing for mcp_server/visualization/quick_charts.py",
         "Lexical boundary: using exact bounded Python indexing for tests/docs/test_mre2e_evidence_contract.py -> tests/docs/test_gagov_governance_contract.py",
         "Lexical boundary: using exact bounded Markdown indexing for .claude/commands/execute-lane.md -> .claude/commands/plan-phase.md",
         "Lexical boundary: using exact bounded Markdown indexing for docs/validation/ga-closeout-decision.md",
         "Lexical boundary: using exact bounded Markdown indexing for docs/validation/mre2e-evidence.md",
         "Lexical boundary: using exact bounded Markdown indexing for docs/benchmarks/mcp_vs_native_benchmark_fullrepo_fireworks_qwen_voyage_local_iter5_rerun.md -> docs/benchmarks/production_benchmark.md",
+        "Lexical boundary: using exact bounded Python indexing for scripts/migrate_large_index_to_multi_repo.py -> scripts/check_index_languages.py",
         "Lexical boundary: using exact bounded JSON indexing for analysis_archive/semantic_vs_sql_comparison_1750926162.json after analysis_archive/scripts_archive/scripts_test_files/verify_mcp_fix.py",
         "fixture repositories under test_workspace/ are ignored during lexical walking",
     ):
