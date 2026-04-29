@@ -1,7 +1,9 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T15:24:06Z`.
-- Observed commit: `769cd75c`.
+- Evidence captured: `2026-04-29T15:51:12Z`.
+- Observed commit: `d0b21255`.
+- Prior SEMPHASEPLANS live-rerun anchor: `2026-04-29T15:37:57Z` on observed
+  commit `40968140`.
 - Prior SEMCLAUDECMDS live-rerun anchor: `2026-04-29T15:03:10Z` on observed
   commit `68ae9492`.
 - Prior SEMDOCGOV live-rerun anchor: `2026-04-29T14:41:32Z` on observed
@@ -20,9 +22,16 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMSCRIPTLANGS.md`.
-- Prior phase plan: `plans/phase-plan-v7-SEMCLAUDECMDS.md`.
+- Phase plan: `plans/phase-plan-v7-SEMCROSSPLANS.md`.
+- Prior phase plan: `plans/phase-plan-v7-SEMPHASEPLANS.md`.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
+  `SEMPHASETAIL` after SEMCROSSPLANS proved the cross-version phase-plan seam
+  is now cleared, but the refreshed live rerun on the new head still
+  terminalized later in lexical walking on
+  `plans/phase-plan-v7-SEMSYNCFIX.md ->
+  plans/phase-plan-v7-SEMVISUALREPORT.md`. Older downstream assumptions
+  should be treated as stale after this roadmap amendment.
+- Prior roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
   `SEMPHASEPLANS` after SEMSCRIPTLANGS proved the script language-audit seam
   is now cleared, but the refreshed live rerun on the new head still
   terminalized later in lexical walking on
@@ -1150,14 +1159,70 @@ Steering outcome:
   downstream phase plan or handoff that still treats the active current-head
   blocker as the `SEMPREFLIGHT -> SEMDOCGOV` phase-plan seam.
 
+## SEMCROSSPLANS Live Rerun Check
+
+SEMCROSSPLANS also did not need a new dispatcher or Markdown-path repair on
+the current head. The refreshed repo-local rerun advanced durably beyond
+`plans/phase-plan-v5-garecut.md` and
+`plans/phase-plan-v7-SEMWALKGAP.md`, but the same 120-second watchdog still
+terminalized the run later in lexical walking on a newer v7-only phase-plan
+pair.
+
+Observed runtime state during the current SEMCROSSPLANS rerun check:
+
+- Evidence capture completed at `2026-04-29T15:51:12Z`.
+- The durable raw trace snapshot last refreshed at `2026-04-29T15:51:03Z`
+  while still marked `running`, and `repository status` then truthfully
+  terminalized the same blocker to `interrupted` using the later observed
+  trace timestamp `2026-04-29T15:51:12Z`.
+- The SEMCROSSPLANS live rerun used
+  `timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full`
+  and exited with code `124`.
+- Observed commit: `d0b21255`
+- Indexed commit before rerun: `e2e95198`
+- Force-full trace status: `interrupted`
+- Trace stage: `lexical_walking`
+- Trace stage family: `lexical`
+- Trace blocker source: `lexical_mutation`
+- Last progress path:
+  `/home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v7-SEMSYNCFIX.md`
+- In-flight path:
+  `/home/viperjuice/code/Code-Index-MCP/plans/phase-plan-v7-SEMVISUALREPORT.md`
+- The SEMCROSSPLANS target pair is no longer the active blocker:
+  `plans/phase-plan-v5-garecut.md ->
+  plans/phase-plan-v7-SEMWALKGAP.md`.
+- `repository status` still advertises only the earlier bounded lexical
+  surfaces; the newly exposed later phase-plan seam is currently visible
+  through `force_full_exit_trace.json`, not a dedicated lexical boundary line
+  yet.
+- Repository status still reports the historical field `Last sync error:
+  disk I/O error`, but the active blocker for this rerun is the later lexical
+  phase-plan pair above.
+- SQLite runtime counts after the rerun:
+  `files = 1122`, `code_chunks = 28182`, `chunk_summaries = 0`,
+  `semantic_points = 0`
+
+Steering outcome:
+
+- SEMCROSSPLANS acceptance is satisfied for its named blocker: the active
+  lexical blocker is no longer
+  `plans/phase-plan-v5-garecut.md ->
+  plans/phase-plan-v7-SEMWALKGAP.md`.
+- The live rerun now reaches the later v7-only phase-plan pair
+  `plans/phase-plan-v7-SEMSYNCFIX.md ->
+  plans/phase-plan-v7-SEMVISUALREPORT.md`.
+- The roadmap now adds downstream phase `SEMPHASETAIL`.
+- Older downstream assumptions should be treated as stale, including any
+  downstream phase plan or handoff that still treats the active current-head
+  blocker as the `garecut -> SEMWALKGAP` cross-version phase-plan seam.
+
 ## Verification
 
-Verification sequence for this SEMSCRIPTLANGS slice:
+Verification sequence for this SEMCROSSPLANS slice:
 
 ```bash
-env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py -q --no-cov -k "migrate or check_index_languages or lexical or force_full or script"
-env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_repository_commands.py -q --no-cov -k "claude or commands or execute or plan or boundary or force_full or interrupted"
-env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_repository_commands.py -q --no-cov -k "migrate or check_index_languages or lexical or boundary or interrupted"
+uv run pytest tests/test_dispatcher.py -q --no-cov -k "phase_plan or garecut or SEMWALKGAP or markdown or lexical"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_git_index_manager.py tests/test_repository_commands.py -q --no-cov -k "phase_plan or garecut or SEMWALKGAP or lexical or interrupted or boundary"
 uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 timeout 120s env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
