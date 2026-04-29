@@ -22,13 +22,14 @@ def test_semdogfood_report_exists_and_names_required_evidence_sections():
 
     for expected in (
         "# Semantic Dogfood Rebuild",
-        "Phase plan: `plans/phase-plan-v7-SEMDISKIO.md`",
+        "Phase plan: `plans/phase-plan-v7-SEMDEVSTALE.md`",
         "## Reset Boundary",
         "## SEMTRACEFRESHNESS Live Trace Recovery",
         "## SEMPUBLISHRACE Live Rerun Check",
         "## SEMDEVREBOUND Live Rerun Check",
         "## SEMSCRIPTREBOUND Live Rerun Check",
         "## SEMDISKIO Live Rerun Check",
+        "## SEMDEVSTALE Live Rerun Check",
         "## Rebuild Command",
         "## Rebuild Evidence",
         "## Repository Status",
@@ -73,7 +74,10 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "2026-04-29T10:34:59Z",
         "2026-04-29T10:35:02Z",
         "2026-04-29T10:37:14Z",
+        "2026-04-29T10:55:11Z",
+        "2026-04-29T10:55:12Z",
         "c8b2d724",
+        "7e547c77",
         "1e7a2a10",
         "aec99482",
         "8870a23f",
@@ -91,6 +95,10 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         "ai_docs/plantuml_reference.md",
         ".devcontainer/post_create.sh",
         ".devcontainer/devcontainer.json",
+        "tests/test_security.py",
+        "tests/test_bootstrap.py",
+        "tests/test_deployment_runbook_shape.py",
+        "tests/test_reindex_resume.py",
         "tests/test_benchmarks.py",
         "tests/test_artifact_publish_race.py",
         "tests/root_tests/test_contextual_pipeline.py",
@@ -101,12 +109,14 @@ def test_semdogfood_report_records_trace_freshness_recovery_and_roadmap_steering
         ".devcontainer/devcontainer.json",
         "stale-running snapshot",
         "force_full_exit_trace.json",
+        "code `135`",
         "disk I/O error",
         "Trace stage:",
         "Trace stage family:",
         "Trace blocker source:",
         "Older downstream assumptions should be treated as stale",
         "roadmap now adds `SEMDEVSTALE` as the nearest downstream phase",
+        "roadmap now adds `SEMTESTSTALE` as the nearest downstream phase",
     ):
         assert expected in text
 
@@ -115,7 +125,9 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
     text = _normalized(EVIDENCE)
 
     for expected in (
-        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_disk_full.py tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_repository_commands.py tests/docs/test_semdogfood_evidence_contract.py -q --no-cov",
+        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py -q --no-cov -k \"devcontainer or stale or lexical or force_full or trace\"",
+        "env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_repository_commands.py -q --no-cov -k \"devcontainer or stale-running or force_full or boundary\"",
+        "uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov",
         "env OPENAI_API_KEY=dummy-local-key MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5 uv run mcp-index repository sync --force-full",
         "env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status",
         "force_full_exit_trace.json",
@@ -123,6 +135,8 @@ def test_semdogfood_report_preserves_command_level_verification_and_runtime_path
         "mcp_server/dispatcher/dispatcher_enhanced.py",
         "mcp_server/cli/repository_commands.py",
         ".devcontainer/devcontainer.json",
+        "tests/test_deployment_runbook_shape.py",
+        "tests/test_reindex_resume.py",
         "scripts/quick_mcp_vs_native_validation.py",
         "tests/test_artifact_publish_race.py",
         "Last sync error:",

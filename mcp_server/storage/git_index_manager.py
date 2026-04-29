@@ -1253,6 +1253,10 @@ class GitAwareIndexManager:
         indexed_commit_before: Optional[str],
     ) -> Any:
         def callback(snapshot: Dict[str, Any]) -> None:
+            previous_trace = self._read_force_full_exit_trace(repo_info) or {}
+            last_progress_path = snapshot.get("last_progress_path")
+            if last_progress_path is None:
+                last_progress_path = previous_trace.get("last_progress_path")
             self._write_force_full_exit_trace(
                 repo_info,
                 {
@@ -1261,7 +1265,7 @@ class GitAwareIndexManager:
                     "stage_family": snapshot.get("stage_family"),
                     "current_commit": current_commit,
                     "indexed_commit_before": indexed_commit_before,
-                    "last_progress_path": snapshot.get("last_progress_path"),
+                    "last_progress_path": last_progress_path,
                     "in_flight_path": snapshot.get("in_flight_path"),
                     "summary_call_timed_out": snapshot.get("summary_call_timed_out", False),
                     "summary_call_file_path": snapshot.get("summary_call_file_path"),

@@ -1,7 +1,7 @@
 # Semantic Dogfood Rebuild
 
-- Evidence captured: `2026-04-29T10:37:14Z`.
-- Observed commit: `c8b2d724`.
+- Evidence captured: `2026-04-29T10:55:12Z`.
+- Observed commit: `7e547c77`.
 - Prior SEMDISKIO live-rerun anchor: `2026-04-29T10:35:02Z` on observed
   commit `c8b2d724`.
 - Prior SEMSCRIPTREBOUND evidence anchor: `2026-04-29T10:13:12Z` on observed
@@ -12,13 +12,15 @@
   on observed commit `8870a23f`.
 - Earlier lexical anchor: `SEMJEDI` at `2026-04-29T08:35:12Z` on observed
   commit `7335cf35`.
-- Phase plan: `plans/phase-plan-v7-SEMDISKIO.md`.
+- Phase plan: `plans/phase-plan-v7-SEMDEVSTALE.md`.
 - Roadmap steering: `specs/phase-plans-v7.md` now adds downstream phase
-  `SEMDEVSTALE` after SEMDISKIO proved the code/test storage-closeout repair,
-  but the refreshed live rerun on the new head never reached semantic
-  closeout and instead re-anchored on a stale-running lexical trace at
-  `.devcontainer/devcontainer.json`. Older downstream assumptions should be
-  treated as stale after this roadmap amendment.
+  `SEMTESTSTALE` after SEMDEVSTALE proved the
+  `.devcontainer/devcontainer.json` seam is cleared, but the refreshed live
+  rerun on the new head exited with code `135` and instead re-anchored on a
+  stale-running lexical trace at
+  `tests/test_reindex_resume.py` after
+  `tests/test_deployment_runbook_shape.py`. Older downstream assumptions
+  should be treated as stale after this roadmap amendment.
 
 ## Reset Boundary
 
@@ -236,6 +238,57 @@ Steering outcome from that live rerun:
   or handoff that still treats the active blocker as the semantic-closeout
   `disk I/O error` seam on the current head.
 
+## SEMDEVSTALE Live Rerun Check
+
+SEMDEVSTALE repaired the post-lexical handoff contract around the renewed
+`.devcontainer/devcontainer.json` seam, and the refreshed live rerun advanced
+past that boundary before exposing a later stale-running lexical blocker.
+
+Code/test repair completed in this phase:
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py` now emits a durable
+  `force_full_closeout_handoff` snapshot as soon as lexical walking completes,
+  before semantic setup begins.
+- `mcp_server/storage/git_index_manager.py` now preserves the latest completed
+  lexical `last_progress_path` across later semantic-stage progress snapshots
+  that do not carry a new lexical path.
+- `tests/test_dispatcher.py` freezes the renewed devcontainer rebound by
+  requiring a durable post-lexical handoff snapshot even when semantic
+  closeout stalls before emitting its own progress.
+- `tests/test_git_index_manager.py` freezes preservation of the later lexical
+  `last_progress_path` across semantic handoff snapshots.
+
+Observed progression on the refreshed live repo-local force-full command:
+
+- The SEMDEVSTALE live rerun started on observed commit
+  `7e547c77da72da4def8fce65fb8962a36f759c3c`.
+- At `2026-04-29T10:55:11Z`, the durable trace had already advanced beyond
+  `.devcontainer/devcontainer.json` to
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/tests/test_security.py`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/tests/test_bootstrap.py`.
+- At `2026-04-29T10:55:12Z`, `repository status` and the durable trace had
+  advanced again to
+  `last_progress_path=/home/viperjuice/code/Code-Index-MCP/tests/test_deployment_runbook_shape.py`
+  and
+  `in_flight_path=/home/viperjuice/code/Code-Index-MCP/tests/test_reindex_resume.py`.
+- The `uv run mcp-index repository sync --force-full` process then exited with
+  code `135` before any later durable terminal trace was written.
+- When observed again after the process had already exited, `repository
+  status` reported `Trace freshness: stale-running snapshot` on the same
+  later test-file pair.
+
+Current downstream verdict confirms the renewed devcontainer seam is cleared:
+
+- `.devcontainer/devcontainer.json`: no longer the latest durable
+  `last_progress_path`.
+- `.devcontainer/devcontainer.json`: no longer the active `in_flight_path`.
+- `tests/test_deployment_runbook_shape.py`: latest durable `last_progress_path`.
+- `tests/test_reindex_resume.py`: current exact `in_flight_path`.
+- The next blocker is no longer the renewed devcontainer seam. It is the
+  later lexical/crash rebound that leaves a stale-running trace after the
+  process has already exited.
+
 ## Rebuild Command
 
 ```bash
@@ -244,7 +297,7 @@ env OPENAI_API_KEY=dummy-local-key MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5 uv run mc
 
 ## Rebuild Evidence
 
-Observed runtime state during the current SEMDISKIO rerun check:
+Observed runtime state during the current SEMDEVSTALE rerun check:
 
 - Files indexed in SQLite: `1393`
 - Code chunks indexed in SQLite: `28013`
@@ -254,27 +307,32 @@ Observed runtime state during the current SEMDISKIO rerun check:
 - Chunks missing vectors: `28013`
 
 Durable stage trace from `.mcp-index/force_full_exit_trace.json` after the
-stale-running SEMDISKIO rerun evidence capture:
+stale-running SEMDEVSTALE rerun evidence capture:
 
 - Trace status: `running`
 - Trace stage: `lexical_walking`
 - Trace stage family: `lexical`
-- Trace timestamp: `2026-04-29T10:35:02Z`
+- Trace timestamp: `2026-04-29T10:55:12Z`
 - Trace freshness: `stale-running snapshot`
 - Trace blocker source: `lexical_mutation`
-- Trace current commit: `c8b2d72469b9bdf7887f3f30ee411b8b529c040b`
+- Trace current commit: `7e547c77da72da4def8fce65fb8962a36f759c3c`
 - Trace indexed commit before:
   `e2e9519858c3683c06b152c94a99e52098beaec6`
 - Last progress path:
-  `/home/viperjuice/code/Code-Index-MCP/.devcontainer/devcontainer.json`
-- In-flight path: `null`
+  `/home/viperjuice/code/Code-Index-MCP/tests/test_deployment_runbook_shape.py`
+- In-flight path:
+  `/home/viperjuice/code/Code-Index-MCP/tests/test_reindex_resume.py`
 
 Runtime containment verdict for the refreshed live rerun:
 
-- The repaired storage-closeout/runtime-restore contract is frozen in unit
-  coverage, but the live rerun never reached that seam on the current head.
-- The exact bounded JSON seam for `.devcontainer/devcontainer.json` has
-  re-anchored as the current stale-running lexical blocker.
+- The repaired SEMDEVSTALE handoff contract is frozen in unit coverage, and
+  the live rerun now advances well past `.devcontainer/devcontainer.json`.
+- The current stale-running lexical blocker is the later exact test-file pair
+  `tests/test_deployment_runbook_shape.py ->
+  tests/test_reindex_resume.py`.
+- The live rerun exited with code `135` before writing a terminal trace, so
+  the durable trace remained `status=running` even after the process had
+  already stopped.
 - The exact bounded Python seams for
   `tests/test_artifact_publish_race.py`,
   `scripts/create_multi_repo_visual_report.py`, and
@@ -286,7 +344,7 @@ Runtime containment verdict for the refreshed live rerun:
 ## Repository Status
 
 `env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status`
-after terminating the stale-running SEMDISKIO rerun reported:
+after the SEMDEVSTALE live rerun had already exited with code `135` reported:
 
 - Lexical readiness: `stale_commit`
 - Semantic readiness: `summaries_missing`
@@ -318,11 +376,13 @@ after terminating the stale-running SEMDISKIO rerun reported:
 - Trace freshness: `stale-running snapshot`
 - Trace blocker source: `lexical_mutation`
 - Last progress path:
-  `/home/viperjuice/code/Code-Index-MCP/.devcontainer/devcontainer.json`
+  `/home/viperjuice/code/Code-Index-MCP/tests/test_deployment_runbook_shape.py`
+- In-flight path:
+  `/home/viperjuice/code/Code-Index-MCP/tests/test_reindex_resume.py`
 
 Repository/index freshness evidence:
 
-- Current commit: `c8b2d724`
+- Current commit: `7e547c77`
 - Indexed commit: `e2e95198`
 
 ## Query Comparison
@@ -337,32 +397,33 @@ Fixed dogfood prompt: `how does semantic setup validate qdrant and embedding rea
 - `symbol` and lexical probes still point operators at
   `mcp_server/dispatcher/dispatcher_enhanced.py`,
   `mcp_server/cli/repository_commands.py`, and the renewed stale-running
-  `.devcontainer/devcontainer.json` lexical blocker.
-- The remaining downstream work is no longer centered on the intended
-  SEMDISKIO semantic-closeout `disk I/O error` seam for the current head. It
-  is now centered on the renewed `.devcontainer/devcontainer.json`
-  stale-running lexical trace.
+  `tests/test_deployment_runbook_shape.py ->
+  tests/test_reindex_resume.py` lexical blocker.
+- The remaining downstream work is no longer centered on the renewed
+  `.devcontainer/devcontainer.json` stale-running lexical trace. It is now
+  centered on the later test-path stale/crash rebound captured by
+  `SEMTESTSTALE`.
 
 ## Dogfood Verdict
 
 The exact verdict string for contract checks is `local multi-repo dogfooding`.
 
-Local multi-repo dogfooding is **still not ready** after SEMDISKIO.
+Local multi-repo dogfooding is **still not ready** after SEMDEVSTALE.
 
 Why:
 
-- The SEMDISKIO code/test repair is real: storage-closeout classification,
-  runtime restoration, and operator trace rendering are now covered in unit
-  tests.
+- The SEMDEVSTALE code/test repair is real: post-lexical handoff emission and
+  durable last-progress preservation are now covered in unit tests.
 - The stale trace bug from SEMJEDI remains closed as a unit/status contract:
   the operator surface now distinguishes missing traces, stale-running traces,
   and storage-closeout traces.
-- The refreshed live rerun on commit `c8b2d724` did not reach semantic
-  closeout and therefore did not validate the repaired disk-I/O contract on
-  the current head.
-- The refreshed live rerun instead re-anchored on
-  `.devcontainer/devcontainer.json` and stayed in `lexical_walking` until the
-  trace became stale again.
+- The refreshed live rerun on commit `7e547c77` cleared the renewed
+  `.devcontainer/devcontainer.json` seam, but it exited with code `135`
+  before writing a terminal trace.
+- The durable trace then remained `running` on
+  `tests/test_deployment_runbook_shape.py ->
+  tests/test_reindex_resume.py` until `repository status` reported
+  `Trace freshness: stale-running snapshot`.
 - The partial runtime still ends with `chunk_summaries = 0` and
   `semantic_points = 0`.
 
@@ -374,19 +435,23 @@ Steering outcome:
 - SEMSCRIPTREBOUND remains historically valid on the prior head: the earlier
   rerun did clear `scripts/quick_mcp_vs_native_validation.py` and expose the
   later disk-I/O closeout seam.
-- SEMDISKIO is not complete on the current head because the live rerun never
-  exercised the intended storage-closeout seam after the code/test repair.
-- The roadmap now adds `SEMDEVSTALE` as the nearest downstream phase.
+- SEMDEVSTALE cleared the renewed `.devcontainer/devcontainer.json` seam on
+  the current head, but it did not restore truthful terminalization after the
+  later test-path crash.
+- The roadmap now adds `SEMTESTSTALE` as the nearest downstream phase.
 - Older downstream assumptions should be treated as stale, including any
   downstream phase plan or handoff that still treats the active current-head
-  blocker as the semantic-closeout `disk I/O error` seam.
+  blocker as either the semantic-closeout `disk I/O error` seam or the
+  renewed `.devcontainer/devcontainer.json` rebound.
 
 ## Verification
 
-Verification sequence for this SEMDISKIO slice:
+Verification sequence for this SEMDEVSTALE slice:
 
 ```bash
-env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_disk_full.py tests/test_dispatcher.py tests/test_git_index_manager.py tests/test_repository_commands.py tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_dispatcher.py tests/test_git_index_manager.py -q --no-cov -k "devcontainer or stale or lexical or force_full or trace"
+env OPENAI_API_KEY=dummy-local-key uv run pytest tests/test_repository_commands.py -q --no-cov -k "devcontainer or stale-running or force_full or boundary"
+uv run pytest tests/docs/test_semdogfood_evidence_contract.py -q --no-cov
 env OPENAI_API_KEY=dummy-local-key MCP_INDEX_LEXICAL_TIMEOUT_SECONDS=5 uv run mcp-index repository sync --force-full
 env OPENAI_API_KEY=dummy-local-key uv run mcp-index repository status
 python - <<'PY'

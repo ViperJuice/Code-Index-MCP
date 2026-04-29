@@ -1425,6 +1425,53 @@ def test_force_full_progress_callback_persists_fresh_in_flight_snapshot(tmp_path
     assert trace["trace_timestamp"]
 
 
+def test_force_full_progress_callback_preserves_last_progress_path_across_semantic_handoff(
+    tmp_path,
+):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    repo_info.last_indexed_commit = "older-indexed-commit"
+
+    manager = GitAwareIndexManager(registry=MagicMock(), dispatcher=MagicMock())
+    callback = manager._make_force_full_progress_callback(
+        repo_info=repo_info,
+        current_commit=commit,
+        indexed_commit_before=repo_info.last_indexed_commit,
+    )
+    devcontainer_path = repo / ".devcontainer" / "devcontainer.json"
+
+    callback(
+        {
+            "stage": "force_full_closeout_handoff",
+            "stage_family": "final_closeout",
+            "blocker_source": "final_closeout",
+            "lexical_stage": "completed",
+            "semantic_stage": "not_run",
+            "last_progress_path": str(devcontainer_path),
+            "in_flight_path": None,
+        }
+    )
+    callback(
+        {
+            "stage": "summary_shutdown_started",
+            "stage_family": "summary_shutdown",
+            "blocker_source": "summary_call_shutdown",
+            "lexical_stage": "completed",
+            "semantic_stage": "not_run",
+            "last_progress_path": None,
+            "in_flight_path": None,
+        }
+    )
+
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert trace["stage"] == "summary_shutdown_started"
+    assert trace["stage_family"] == "summary_shutdown"
+    assert trace["last_progress_path"] == str(devcontainer_path)
+    assert trace["in_flight_path"] is None
+
+
 def test_get_repository_status_includes_force_full_exit_trace(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)

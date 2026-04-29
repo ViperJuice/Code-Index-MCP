@@ -1725,6 +1725,55 @@ class TestEnhancedDispatcherProtocolConformance:
         assert len(fts_rows) == 1
         assert "devcontainer" in fts_rows[0][0]
 
+    def test_index_directory_emits_post_lexical_handoff_after_devcontainer_boundary(
+        self, tmp_path, monkeypatch
+    ):
+        from mcp_server.storage.sqlite_store import SQLiteStore
+
+        repo = tmp_path / "repo"
+        config_file = repo / ".devcontainer" / "devcontainer.json"
+        config_file.parent.mkdir(parents=True)
+        config_file.write_text('{"name": "devcontainer"}\n', encoding="utf-8")
+        store = SQLiteStore(str(tmp_path / "index.db"))
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=store,
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+        snapshots = []
+
+        monkeypatch.setattr(Dispatcher, "_get_semantic_indexer", lambda self, _ctx: object())
+
+        def _explode_before_semantic_progress(self, _ctx, _paths, progress_callback=None):
+            raise RuntimeError("semantic closeout entry stalled before emitting progress")
+
+        monkeypatch.setattr(
+            Dispatcher,
+            "rebuild_semantic_for_paths",
+            _explode_before_semantic_progress,
+        )
+
+        result = Dispatcher([]).index_directory(
+            ctx,
+            repo,
+            progress_callback=lambda snapshot: snapshots.append(dict(snapshot)),
+        )
+
+        store.close()
+        assert result["indexed_files"] == 1
+        assert result["semantic_stage"] == "failed"
+        assert snapshots[-1]["stage"] == "force_full_closeout_handoff"
+        assert snapshots[-1]["stage_family"] == "final_closeout"
+        assert snapshots[-1]["last_progress_path"] == str(config_file.resolve())
+        assert snapshots[-1]["in_flight_path"] is None
+
     def test_index_directory_keeps_unrelated_json_files_off_exact_devcontainer_bypass(
         self, tmp_path, monkeypatch
     ):
@@ -2363,19 +2412,21 @@ class TestEnhancedDispatcherProtocolConformance:
             "lexical_walking",
             "lexical_walking",
             "lexical_walking",
+            "force_full_closeout_handoff",
             "summary_shutdown_started",
             "blocked_summary_call_timeout",
-            "force_full_closeout_handoff",
         ]
         assert snapshots[0]["stage_family"] == "lexical"
         assert snapshots[1]["last_progress_path"] == str(first.resolve())
         assert snapshots[2]["in_flight_path"] == str(second.resolve())
         assert snapshots[3]["last_progress_path"] == str(second.resolve())
-        assert snapshots[4]["stage_family"] == "summary_shutdown"
-        assert snapshots[5]["stage_family"] == "semantic_closeout"
-        assert snapshots[5]["summary_call_timed_out"] is True
-        assert snapshots[5]["summary_call_file_path"] == str(first)
-        assert snapshots[6]["stage_family"] == "final_closeout"
+        assert snapshots[4]["stage_family"] == "final_closeout"
+        assert snapshots[4]["last_progress_path"] == str(second.resolve())
+        assert snapshots[4]["in_flight_path"] is None
+        assert snapshots[5]["stage_family"] == "summary_shutdown"
+        assert snapshots[6]["stage_family"] == "semantic_closeout"
+        assert snapshots[6]["summary_call_timed_out"] is True
+        assert snapshots[6]["summary_call_file_path"] == str(first)
         assert snapshots[6]["semantic_stage"] == "blocked_summary_call_timeout"
         assert result["semantic_stage"] == "blocked_summary_call_timeout"
 

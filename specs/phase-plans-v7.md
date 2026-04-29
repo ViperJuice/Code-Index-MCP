@@ -2009,6 +2009,62 @@ on `.devcontainer/devcontainer.json` at `2026-04-29T10:35:02Z`.
 - IF-0-SEMDEVSTALE-1 — renewed `.devcontainer/devcontainer.json`
   stale-trace lexical recovery and evidence contract.
 
+### Phase 37 — Post-Devcontainer Test Stale-Trace Recovery (SEMTESTSTALE)
+
+**Objective**
+
+Repair the later live lexical/crash blocker exposed after SEMDEVSTALE clears
+`.devcontainer/devcontainer.json`, so a repo-local force-full rerun no longer
+exits unexpectedly and leaves a stale-running lexical trace on
+`tests/test_reindex_resume.py` after advancing through
+`tests/test_deployment_runbook_shape.py`.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMDEVSTALE head no
+      longer remains on `Trace stage: lexical_walking`,
+      `Trace freshness: stale-running snapshot`, and
+      `In-flight path: /home/viperjuice/code/Code-Index-MCP/tests/test_reindex_resume.py`
+      after the process has already exited.
+- [ ] `force_full_exit_trace.json` and `uv run mcp-index repository status`
+      either fail closed with the true later blocker or advance durably beyond
+      `tests/test_reindex_resume.py` into the next exact stage.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` is refreshed with the
+      SEMDEVSTALE handoff repair, the later
+      `tests/test_deployment_runbook_shape.py -> tests/test_reindex_resume.py`
+      stale-running evidence on commit `7e547c77`, and the final live verdict
+      for the repaired rerun.
+
+**Scope notes**
+
+This phase exists only because SEMDEVSTALE cleared the renewed
+`.devcontainer/devcontainer.json` stale seam, but the refreshed live rerun on
+observed commit `7e547c77` exited abnormally and left the durable trace frozen
+in lexical walking on a later exact test-file pair.
+
+**Non-goals**
+
+- No reopening of the `.devcontainer/devcontainer.json` exact-boundary repair
+  unless the later test-path blocker re-anchors there again.
+- No reopening of the SEMDISKIO storage-closeout contract unless a refreshed
+  rerun reaches semantic closeout again.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+
+**Depends on**
+- SEMDEVSTALE
+
+**Produces**
+- IF-0-SEMTESTSTALE-1 — later test-path stale-trace lexical recovery and
+  evidence contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -2048,6 +2104,7 @@ SEMCONTRACT
   -> SEMSCRIPTREBOUND
   -> SEMDISKIO
   -> SEMDEVSTALE
+  -> SEMTESTSTALE
 ```
 
 ## Execution Notes
@@ -2195,6 +2252,11 @@ SEMCONTRACT
 - SEMDEVSTALE exists only if SEMDISKIO’s repaired live rerun never reaches the
   intended disk-I/O closeout seam and instead re-anchors on a renewed stale
   lexical trace at `.devcontainer/devcontainer.json`.
+- SEMTESTSTALE exists only if SEMDEVSTALE clears
+  `.devcontainer/devcontainer.json`, but the refreshed live rerun still exits
+  unexpectedly and leaves a stale-running lexical trace on the later exact
+  test-file pair
+  `tests/test_deployment_runbook_shape.py -> tests/test_reindex_resume.py`.
 
 ## Verification
 

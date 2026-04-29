@@ -3013,6 +3013,11 @@ class EnhancedDispatcher:
         if stats["low_level_blocker"] is None:
             stats["lexical_stage"] = "completed"
             stats["in_flight_path"] = None
+            emit_progress(
+                "force_full_closeout_handoff",
+                "final_closeout",
+                "final_closeout",
+            )
 
         # Batch semantic embedding — O(n/1000) API calls instead of O(n)
         _sem = self._get_semantic_indexer(ctx)
@@ -3026,11 +3031,6 @@ class EnhancedDispatcher:
                         semantically_indexed_paths,
                         progress_callback=progress_callback,
                     )
-                )
-                emit_progress(
-                    "force_full_closeout_handoff",
-                    "final_closeout",
-                    "final_closeout",
                 )
             except Exception as e:
                 logger.error(f"Batch semantic indexing failed: {e}", exc_info=True)
