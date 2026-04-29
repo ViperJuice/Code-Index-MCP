@@ -1909,6 +1909,80 @@ class TestEnhancedDispatcherProtocolConformance:
         assert snapshots[-1]["last_progress_path"] == str(config_file.resolve())
         assert snapshots[-1]["in_flight_path"] is None
 
+    def test_index_file_with_lexical_timeout_records_same_devcontainer_path_before_handoff(
+        self, tmp_path, monkeypatch
+    ):
+        repo = tmp_path / "repo"
+        config_file = repo / ".devcontainer" / "devcontainer.json"
+        config_file.parent.mkdir(parents=True)
+        config_file.write_text('{"name": "devcontainer"}\n', encoding="utf-8")
+        stats = {
+            "lexical_stage": "not_run",
+            "lexical_files_attempted": 0,
+            "lexical_files_completed": 0,
+            "last_progress_path": None,
+            "in_flight_path": None,
+        }
+        snapshots = []
+        ctx = RepoContext(
+            repo_id="test-repo-id-0001",
+            sqlite_store=MagicMock(),
+            workspace_root=repo,
+            tracked_branch="main",
+            registry_entry=SimpleNamespace(
+                tracked_branch="main",
+                path=repo,
+                name="repo",
+                repository_id="test-repo-id-0001",
+            ),
+        )
+
+        monkeypatch.setattr(
+            Dispatcher,
+            "index_file",
+            lambda self, _ctx, path, do_semantic=False: IndexResult(
+                status=IndexResultStatus.INDEXED,
+                path=path,
+                observed_hash=None,
+                actual_hash=None,
+            ),
+        )
+
+        mutation = Dispatcher([])._index_file_with_lexical_timeout(
+            ctx,
+            config_file,
+            stats,
+            progress_callback=lambda stage, family, source: snapshots.append(
+                {
+                    "stage": stage,
+                    "stage_family": family,
+                    "blocker_source": source,
+                    "last_progress_path": stats["last_progress_path"],
+                    "in_flight_path": stats["in_flight_path"],
+                }
+            ),
+        )
+
+        assert mutation.status == IndexResultStatus.INDEXED
+        assert snapshots == [
+            {
+                "stage": "lexical_walking",
+                "stage_family": "lexical",
+                "blocker_source": "lexical_mutation",
+                "last_progress_path": None,
+                "in_flight_path": str(config_file.resolve()),
+            }
+        ]
+        assert stats["lexical_stage"] == "walking"
+        assert stats["lexical_files_attempted"] == 1
+        assert stats["lexical_files_completed"] == 1
+        assert stats["last_progress_path"] == str(config_file.resolve())
+        assert stats["in_flight_path"] is None
+        assert ".devcontainer/post_create.sh" not in stats["last_progress_path"]
+        assert "tests/test_reindex_resume.py" not in stats["last_progress_path"]
+        assert "scripts/validate_mcp_comprehensive.py" not in stats["last_progress_path"]
+        assert "tests/root_tests/run_reranking_tests.py" not in stats["last_progress_path"]
+
     def test_index_directory_emits_later_test_pair_before_closeout_handoff(
         self, tmp_path, monkeypatch
     ):

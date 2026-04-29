@@ -1735,6 +1735,68 @@ def test_force_full_progress_callback_preserves_last_progress_path_across_semant
     assert trace["in_flight_path"] is None
 
 
+def test_force_full_sync_terminalizes_running_trace_when_same_devcontainer_relapse_persists(
+    tmp_path,
+):
+    repo = _make_git_repo(tmp_path)
+    commit = _get_head_commit(repo)
+    repo_info = _make_repo_info(repo, commit)
+    repo_info.last_indexed_commit = "older-indexed-commit"
+    repo_info.index_path.touch()
+
+    registry = MagicMock()
+    registry.get_repository.return_value = repo_info
+    registry.update_git_state.return_value = {"commit": commit, "branch": "main"}
+
+    manager = _make_manager(registry)
+    ctx = _make_ctx(repo_info.repository_id, repo, repo_info.index_path)
+    manager._resolve_ctx = MagicMock(return_value=ctx)
+    manager._index_exists = MagicMock(return_value=True)
+    manager._index_has_durable_rows = MagicMock(return_value=True)
+
+    blocked_file = repo / ".devcontainer" / "devcontainer.json"
+
+    def _crashing_full_index(repo_id, _ctx, progress_callback=None):
+        assert progress_callback is not None
+        progress_callback(
+            {
+                "stage": "lexical_walking",
+                "stage_family": "lexical",
+                "blocker_source": "lexical_mutation",
+                "lexical_stage": "walking",
+                "semantic_stage": "not_run",
+                "last_progress_path": str(blocked_file),
+                "in_flight_path": None,
+                "summary_call_timed_out": False,
+                "summary_call_file_path": None,
+                "summary_call_chunk_ids": [],
+                "summary_call_timeout_seconds": None,
+            }
+        )
+        raise RuntimeError("synthetic crash after renewed devcontainer relapse")
+
+    manager._full_index = MagicMock(side_effect=_crashing_full_index)
+
+    with pytest.raises(RuntimeError, match="synthetic crash after renewed devcontainer relapse"):
+        manager.sync_repository_index(repo_info.repository_id, force_full=True)
+
+    trace_path = Path(repo_info.index_location) / "force_full_exit_trace.json"
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert trace["status"] == "interrupted"
+    assert trace["stage"] == "lexical_walking"
+    assert trace["stage_family"] == "lexical"
+    assert trace["current_commit"] == commit
+    assert trace["indexed_commit_before"] == "older-indexed-commit"
+    assert trace["last_progress_path"] == str(blocked_file)
+    assert trace["in_flight_path"] is None
+    assert trace["blocker_source"] == "lexical_mutation"
+    assert ".devcontainer/post_create.sh" not in (trace.get("last_progress_path") or "")
+    assert "tests/test_reindex_resume.py" not in (trace.get("last_progress_path") or "")
+    assert "scripts/validate_mcp_comprehensive.py" not in (trace.get("last_progress_path") or "")
+    assert "tests/root_tests/run_reranking_tests.py" not in (trace.get("last_progress_path") or "")
+    registry.update_indexed_commit.assert_not_called()
+
+
 def test_get_repository_status_includes_force_full_exit_trace(tmp_path):
     repo = _make_git_repo(tmp_path)
     commit = _get_head_commit(repo)

@@ -2235,6 +2235,61 @@ and instead re-anchored earlier on `.devcontainer/devcontainer.json`.
 - IF-0-SEMDEVRELAPSE-1 — renewed `.devcontainer/devcontainer.json` lexical
   relapse recovery and evidence contract.
 
+### Phase 41 — Post-Devcontainer Walk Gap Recovery (SEMWALKGAP)
+
+**Objective**
+
+Repair the post-devcontainer force-full visibility gap exposed by
+SEMDEVRELAPSE, so a refreshed rerun on the new head no longer appears stuck on
+`.devcontainer/devcontainer.json` when lexical walking has actually moved into
+the long tail that follows that boundary.
+
+**Exit criteria**
+- [ ] A refreshed repo-local force-full rerun on the post-SEMDEVRELAPSE head
+      either advances durably to a later exact path after
+      `.devcontainer/devcontainer.json` or emits a truthful newer blocker
+      before the 120-second watchdog expires.
+- [ ] The next authoritative blocker after `.devcontainer/devcontainer.json`
+      is identified as either a later exact indexed path or a deliberate
+      bounded exclusion or visibility rule for the post-devcontainer tail.
+- [ ] `docs/status/SEMANTIC_DOGFOOD_REBUILD.md` records the walk-order
+      evidence showing `.devcontainer/devcontainer.json` followed by the
+      post-devcontainer tail and the final live verdict for the repaired rerun.
+
+**Scope notes**
+
+This phase exists only if SEMDEVRELAPSE proves the same-file devcontainer
+relapse still appears in the durable trace even though walk-order evidence
+shows `.devcontainer/devcontainer.json` is followed by generated fast-report
+artifacts and `test_workspace/real_repos/**` content before the next later
+exact blocker becomes visible.
+
+**Non-goals**
+
+- No reopening of the earlier `.devcontainer/post_create.sh ->
+  .devcontainer/devcontainer.json` rebound contract.
+- No reopening of later script or root-test seams unless a refreshed rerun
+  reaches them again and exposes a newer blocker.
+- No widening into semantic-closeout or summary/vector work unless the
+  post-devcontainer lexical walk gap is cleared first.
+
+**Key files**
+
+- `mcp_server/dispatcher/dispatcher_enhanced.py`
+- `mcp_server/storage/git_index_manager.py`
+- `mcp_server/cli/repository_commands.py`
+- `docs/status/SEMANTIC_DOGFOOD_REBUILD.md`
+- `tests/test_dispatcher.py`
+- `tests/test_git_index_manager.py`
+- `tests/test_repository_commands.py`
+
+**Depends on**
+- SEMDEVRELAPSE
+
+**Produces**
+- IF-0-SEMWALKGAP-1 — post-devcontainer walk-gap recovery and evidence
+  contract.
+
 ## Phase Dependency DAG
 
 ```text
@@ -2278,6 +2333,7 @@ SEMCONTRACT
   -> SEMSCRIPTABORT
   -> SEMROOTTESTABORT
   -> SEMDEVRELAPSE
+  -> SEMWALKGAP
 ```
 
 ## Execution Notes
@@ -2325,6 +2381,12 @@ SEMCONTRACT
   re-anchors earlier on `.devcontainer/devcontainer.json`, because the next
   repair is then no longer root-test-local and any older downstream plan is
   stale.
+- SEMDEVRELAPSE should amend the roadmap immediately if the refreshed live
+  rerun still terminalizes on the same-file
+  `.devcontainer/devcontainer.json` marker but walk-order evidence shows the
+  next unexplained gap sits in the long post-devcontainer tail, because the
+  next repair is then no longer devcontainer-file-local and any older
+  downstream assumption is stale.
 - SEMREADYFIX exists only if SEMDOGFOOD proves the default local dogfood path
   is still blocked; it should repair that blocker and then rerun the dogfood
   proof instead of widening into unrelated semantic work.
